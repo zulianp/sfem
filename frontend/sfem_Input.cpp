@@ -67,6 +67,19 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+         static unsigned int convert(const std::string &str, unsigned int &value) {
+            // FIXME
+            value = atoi(str.c_str());
+            return SFEM_SUCCESS;
+        }
+
+#ifdef _WIN32
+     static ptrdiff_t convert(const std::string &str, ptrdiff_t &value) {
+            value = atoll(str.c_str());
+            return SFEM_SUCCESS;
+        }
+#endif
+
         static int convert(const std::string &str, bool &value) {
             value = str == "true" || atoi(str.c_str());
             return SFEM_SUCCESS;
@@ -76,6 +89,7 @@ namespace sfem {
             value = atol(str.c_str());
             return SFEM_SUCCESS;
         }
+
 
         static float convert(const std::string &str, float &value) {
             value = atof(str.c_str());
@@ -135,6 +149,7 @@ namespace sfem {
             }
 
             // return convert(iter->second, value);
+            return SFEM_SUCCESS;
         }
 
         template <typename V>
@@ -145,6 +160,7 @@ namespace sfem {
             }
 
             // return convert(iter->second, value);
+            return SFEM_SUCCESS;
         }
 
         bool key_exists(const std::string &key) const { return kv.find(key) != kv.end(); }
@@ -194,6 +210,24 @@ namespace sfem {
         std::stringstream ss(input);
         return parse(ss);
     }
+
+#ifdef _WIN32
+   static char *strsep(char **stringp, const char *delim) {
+        char *start = *stringp;
+        char *p;
+
+        p = (start != NULL) ? strpbrk(start, delim) : NULL;
+
+        if (p == NULL) {
+            *stringp = NULL;
+        } else {
+            *p       = '\0';
+            *stringp = p + 1;
+        }
+
+        return start;
+    }
+#endif
 
     static int parse_key_and_value(const std::string &line, std::string &key, std::string &value) {
         char *token, *string, *tofree;

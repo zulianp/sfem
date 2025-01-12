@@ -11,6 +11,7 @@
 #include "dirichlet.h"
 
 #include "sfem_base.h"
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -37,15 +38,12 @@ int main(int argc, char *argv[]) {
     const int block_rows = atoi(argv[1]);
     const int block_cols = atoi(argv[2]);
 
-    const char *crs_folder = argv[3];
-    const char *nodes_path = argv[4];
-    const real_t diag_value = atof(argv[5]);
-    const char *output_folder = argv[6];
+    const char  *crs_folder    = argv[3];
+    const char  *nodes_path    = argv[4];
+    const real_t diag_value    = atof(argv[5]);
+    const char  *output_folder = argv[6];
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 
@@ -57,21 +55,18 @@ int main(int argc, char *argv[]) {
     sprintf(colidx_path, "%s/colidx.raw", crs_folder);
 
     ptrdiff_t _nope_, ndirichlet;
-    idx_t *dirichlet_nodes = 0;
-    array_create_from_file(
-        comm, nodes_path, SFEM_MPI_IDX_T, (void **)&dirichlet_nodes, &_nope_, &ndirichlet);
+    idx_t    *dirichlet_nodes = 0;
+    array_create_from_file(comm, nodes_path, SFEM_MPI_IDX_T, (void **)&dirichlet_nodes, &_nope_, &ndirichlet);
 
     if (block_rows * block_cols > 1) {
         sprintf(values_path, "%s/values.*.raw", crs_folder);
         block_crs_t crs;
-        block_crs_read(comm,
-                       rowptr_path,
-                       colidx_path,
-                       values_path,
-                       SFEM_MPI_COUNT_T,
-                       SFEM_MPI_IDX_T,
-                       SFEM_MPI_REAL_T,
-                       &crs);
+#ifdef _WIN32
+        SFEM_ERROR("IMEPLEMET ME!");
+
+#else
+        block_crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
+#endif
 
         assert(block_rows * block_cols == crs.block_size);
         if (block_rows * block_cols != crs.block_size) {
@@ -93,13 +88,13 @@ int main(int argc, char *argv[]) {
 
         if (0) {
             const count_t *rowptr = (count_t *)crs.rowptr;
-            const idx_t *colidx = (idx_t *)crs.colidx;
-            real_t **values = (real_t **)crs.values;
+            const idx_t   *colidx = (idx_t *)crs.colidx;
+            real_t       **values = (real_t **)crs.values;
 
             for (ptrdiff_t i = 0; i < crs.lrows; i++) {
-                ptrdiff_t begin = rowptr[i] - rowptr[0];
-                ptrdiff_t extent = rowptr[i + 1] - rowptr[i];
-                const idx_t *row = &colidx[begin];
+                ptrdiff_t    begin  = rowptr[i] - rowptr[0];
+                ptrdiff_t    extent = rowptr[i + 1] - rowptr[i];
+                const idx_t *row    = &colidx[begin];
 
                 for (ptrdiff_t k = 0; k < extent; k++) {
                     printf("(%d, %d)\n", (int)i, row[k]);
@@ -128,14 +123,7 @@ int main(int argc, char *argv[]) {
         sprintf(values_path, "%s/values.raw", crs_folder);
 
         crs_t crs;
-        crs_read(comm,
-                 rowptr_path,
-                 colidx_path,
-                 values_path,
-                 SFEM_MPI_COUNT_T,
-                 SFEM_MPI_IDX_T,
-                 SFEM_MPI_REAL_T,
-                 &crs);
+        crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
 
         crs_constraint_nodes_to_identity(ndirichlet,
                                          dirichlet_nodes,

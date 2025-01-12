@@ -15,12 +15,12 @@
 
 #define MAX_BLOCK_SIZE 4
 
-static int bgs_init(const ptrdiff_t nnodes,
-                    const int block_rows,
+static int bgs_init(const ptrdiff_t                    nnodes,
+                    const int                          block_rows,
                     const count_t *const SFEM_RESTRICT rowptr,
-                    const idx_t *const SFEM_RESTRICT colidx,
-                    real_t **const SFEM_RESTRICT values,
-                    real_t **const inv_bdiag) {
+                    const idx_t *const SFEM_RESTRICT   colidx,
+                    real_t **const SFEM_RESTRICT       values,
+                    real_t **const                     inv_bdiag) {
     //
     switch (block_rows) {
         case 1: {
@@ -50,14 +50,14 @@ static int bgs_init(const ptrdiff_t nnodes,
     return 0;
 }
 
-static int residual(const ptrdiff_t nnodes,
-                    const int block_rows,
+static int residual(const ptrdiff_t                    nnodes,
+                    const int                          block_rows,
                     const count_t *const SFEM_RESTRICT rowptr,
-                    const idx_t *const SFEM_RESTRICT colidx,
-                    real_t **const SFEM_RESTRICT values,
-                    real_t **const SFEM_RESTRICT rhs,
-                    real_t **const SFEM_RESTRICT x,
-                    real_t *res) {
+                    const idx_t *const SFEM_RESTRICT   colidx,
+                    real_t **const SFEM_RESTRICT       values,
+                    real_t **const SFEM_RESTRICT       rhs,
+                    real_t **const SFEM_RESTRICT       x,
+                    real_t                            *res) {
 #pragma omp parallel
     {
 #pragma omp for
@@ -67,9 +67,9 @@ static int residual(const ptrdiff_t nnodes,
 
 #pragma omp for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
-            const count_t r_begin = rowptr[i];
-            const count_t r_end = rowptr[i + 1];
-            const count_t r_extent = r_end - r_begin;
+            const count_t      r_begin  = rowptr[i];
+            const count_t      r_end    = rowptr[i + 1];
+            const count_t      r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
             real_t r[MAX_BLOCK_SIZE];
@@ -113,20 +113,20 @@ static SFEM_INLINE void atomic_write(real_t *p, const real_t value) {
     *p = value;
 }
 
-static int bgs2_forward(const ptrdiff_t nnodes,
+static int bgs2_forward(const ptrdiff_t                    nnodes,
                         const count_t *const SFEM_RESTRICT rowptr,
-                        const idx_t *const SFEM_RESTRICT colidx,
-                        real_t **const SFEM_RESTRICT values,
-                        real_t **const SFEM_RESTRICT inv_bdiag,
-                        real_t **const SFEM_RESTRICT rhs,
-                        real_t **const SFEM_RESTRICT x) {
+                        const idx_t *const SFEM_RESTRICT   colidx,
+                        real_t **const SFEM_RESTRICT       values,
+                        real_t **const SFEM_RESTRICT       inv_bdiag,
+                        real_t **const SFEM_RESTRICT       rhs,
+                        real_t **const SFEM_RESTRICT       x) {
 #pragma omp parallel
     {
 #pragma omp for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
-            const count_t r_begin = rowptr[i];
-            const count_t r_end = rowptr[i + 1];
-            const count_t r_extent = r_end - r_begin;
+            const count_t      r_begin  = rowptr[i];
+            const count_t      r_end    = rowptr[i + 1];
+            const count_t      r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
             real_t r[2];
@@ -174,20 +174,20 @@ static int bgs2_forward(const ptrdiff_t nnodes,
     return 0;
 }
 
-static int bgs3_forward(const ptrdiff_t nnodes,
+static int bgs3_forward(const ptrdiff_t                    nnodes,
                         const count_t *const SFEM_RESTRICT rowptr,
-                        const idx_t *const SFEM_RESTRICT colidx,
-                        real_t **const SFEM_RESTRICT values,
-                        real_t **const SFEM_RESTRICT inv_bdiag,
-                        real_t **const SFEM_RESTRICT rhs,
-                        real_t **const SFEM_RESTRICT x) {
+                        const idx_t *const SFEM_RESTRICT   colidx,
+                        real_t **const SFEM_RESTRICT       values,
+                        real_t **const SFEM_RESTRICT       inv_bdiag,
+                        real_t **const SFEM_RESTRICT       rhs,
+                        real_t **const SFEM_RESTRICT       x) {
 #pragma omp parallel
     {
 #pragma omp for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
-            const count_t r_begin = rowptr[i];
-            const count_t r_end = rowptr[i + 1];
-            const count_t r_extent = r_end - r_begin;
+            const count_t      r_begin  = rowptr[i];
+            const count_t      r_end    = rowptr[i + 1];
+            const count_t      r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
             real_t r[3];
@@ -234,14 +234,14 @@ static int bgs3_forward(const ptrdiff_t nnodes,
     return 0;
 }
 
-static int bgs_forward(const ptrdiff_t nnodes,
-                       const int block_rows,
+static int bgs_forward(const ptrdiff_t                    nnodes,
+                       const int                          block_rows,
                        const count_t *const SFEM_RESTRICT rowptr,
-                       const idx_t *const SFEM_RESTRICT colidx,
-                       real_t **const SFEM_RESTRICT values,
-                       real_t **const SFEM_RESTRICT inv_bdiag,
-                       real_t **const SFEM_RESTRICT rhs,
-                       real_t **const SFEM_RESTRICT x) {
+                       const idx_t *const SFEM_RESTRICT   colidx,
+                       real_t **const SFEM_RESTRICT       values,
+                       real_t **const SFEM_RESTRICT       inv_bdiag,
+                       real_t **const SFEM_RESTRICT       rhs,
+                       real_t **const SFEM_RESTRICT       x) {
     if (block_rows == 2) {
         return bgs2_forward(nnodes, rowptr, colidx, values, inv_bdiag, rhs, x);
     } else if (block_rows == 3) {
@@ -252,9 +252,9 @@ static int bgs_forward(const ptrdiff_t nnodes,
     {
 #pragma omp for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
-            const count_t r_begin = rowptr[i];
-            const count_t r_end = rowptr[i + 1];
-            const count_t r_extent = r_end - r_begin;
+            const count_t      r_begin  = rowptr[i];
+            const count_t      r_end    = rowptr[i + 1];
+            const count_t      r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
             real_t r[MAX_BLOCK_SIZE];
@@ -294,21 +294,21 @@ static int bgs_forward(const ptrdiff_t nnodes,
     return 0;
 }
 
-static int bgs_backward(const ptrdiff_t nnodes,
-                        const int block_rows,
+static int bgs_backward(const ptrdiff_t                    nnodes,
+                        const int                          block_rows,
                         const count_t *const SFEM_RESTRICT rowptr,
-                        const idx_t *const SFEM_RESTRICT colidx,
-                        real_t **const SFEM_RESTRICT values,
-                        real_t **const SFEM_RESTRICT inv_bdiag,
-                        real_t **const SFEM_RESTRICT rhs,
-                        real_t **const SFEM_RESTRICT x) {
+                        const idx_t *const SFEM_RESTRICT   colidx,
+                        real_t **const SFEM_RESTRICT       values,
+                        real_t **const SFEM_RESTRICT       inv_bdiag,
+                        real_t **const SFEM_RESTRICT       rhs,
+                        real_t **const SFEM_RESTRICT       x) {
 #pragma omp parallel
     {
 #pragma omp for
         for (ptrdiff_t i = nnodes - 1; i >= 0; i--) {
-            const count_t r_begin = rowptr[i];
-            const count_t r_end = rowptr[i + 1];
-            const count_t r_extent = r_end - r_begin;
+            const count_t      r_begin  = rowptr[i];
+            const count_t      r_end    = rowptr[i + 1];
+            const count_t      r_extent = r_end - r_begin;
             const idx_t *const r_colidx = &colidx[r_begin];
 
             real_t r[MAX_BLOCK_SIZE];
@@ -348,20 +348,19 @@ static int bgs_backward(const ptrdiff_t nnodes,
     return 0;
 }
 
-static int bgs(const ptrdiff_t nnodes,
-               const int block_rows,
+static int bgs(const ptrdiff_t                    nnodes,
+               const int                          block_rows,
                const count_t *const SFEM_RESTRICT rowptr,
-               const idx_t *const SFEM_RESTRICT colidx,
-               real_t **const SFEM_RESTRICT values,
-               real_t **const SFEM_RESTRICT inv_bdiag,
-               real_t **const SFEM_RESTRICT rhs,
-               real_t **const SFEM_RESTRICT x,
-               const int num_sweeps,
-               int symmetric_variant) {
+               const idx_t *const SFEM_RESTRICT   colidx,
+               real_t **const SFEM_RESTRICT       values,
+               real_t **const SFEM_RESTRICT       inv_bdiag,
+               real_t **const SFEM_RESTRICT       rhs,
+               real_t **const SFEM_RESTRICT       x,
+               const int                          num_sweeps,
+               int                                symmetric_variant) {
     for (int s = 0; s < num_sweeps; s++) {
         bgs_forward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
-        if (symmetric_variant)
-            bgs_backward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
+        if (symmetric_variant) bgs_backward(nnodes, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x);
     }
 
     return 0;
@@ -382,14 +381,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc != 5) {
-        fprintf(
-            stderr, "usage: %s <block_rows> <crs_folder> <rhs_prefix> <output_prefix>\n", argv[0]);
+        fprintf(stderr, "usage: %s <block_rows> <crs_folder> <rhs_prefix> <output_prefix>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const int block_rows = atoi(argv[1]);
-    const char *crs_folder = argv[2];
-    const char *rhs_prefix = argv[3];
+    const int   block_rows    = atoi(argv[1]);
+    const char *crs_folder    = argv[2];
+    const char *rhs_prefix    = argv[3];
     const char *output_prefix = argv[4];
 
     int SFEM_LS_MAX_IT = 1;
@@ -422,22 +420,20 @@ int main(int argc, char *argv[]) {
     sprintf(values_path, "%s/values.*.raw", crs_folder);
 
     ptrdiff_t local_ndofs, ndofs;
-    real_t **rhs = (real_t **)malloc(block_rows * sizeof(real_t *));
+    real_t  **rhs = (real_t **)malloc(block_rows * sizeof(real_t *));
     for (int d = 0; d < block_rows; d++) {
         sprintf(vec_path, "%s.%d.raw", rhs_prefix, d);
-        array_create_from_file(
-            comm, vec_path, SFEM_MPI_REAL_T, (void **)&rhs[d], &local_ndofs, &ndofs);
+        array_create_from_file(comm, vec_path, SFEM_MPI_REAL_T, (void **)&rhs[d], &local_ndofs, &ndofs);
     }
 
     block_crs_t crs;
-    block_crs_read(comm,
-                   rowptr_path,
-                   colidx_path,
-                   values_path,
-                   SFEM_MPI_COUNT_T,
-                   SFEM_MPI_IDX_T,
-                   SFEM_MPI_REAL_T,
-                   &crs);
+
+#ifdef _WIN32
+    SFEM_ERROR("IMPLEMENT ME!");
+
+#else
+    block_crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
+#endif
 
     assert(block_rows * block_rows == crs.block_size);
     if (block_rows * block_rows != crs.block_size) {
@@ -463,22 +459,13 @@ int main(int argc, char *argv[]) {
         }
 
         count_t *rowptr = (count_t *)crs.rowptr;
-        idx_t *colidx = (idx_t *)crs.colidx;
+        idx_t   *colidx = (idx_t *)crs.colidx;
         real_t **values = (real_t **)crs.values;
 
         bgs_init(local_ndofs, block_rows, rowptr, colidx, values, inv_bdiag);
 
         for (int i = 0; i < SFEM_LS_MAX_IT; i += SFEM_BGS_SWEEPS) {
-            bgs(local_ndofs,
-                block_rows,
-                rowptr,
-                colidx,
-                values,
-                inv_bdiag,
-                rhs,
-                x,
-                SFEM_BGS_SWEEPS,
-                SFEM_BGS_SYMMETRIC);
+            bgs(local_ndofs, block_rows, rowptr, colidx, values, inv_bdiag, rhs, x, SFEM_BGS_SWEEPS, SFEM_BGS_SYMMETRIC);
 
             residual(local_ndofs, block_rows, rowptr, colidx, values, rhs, x, res);
 

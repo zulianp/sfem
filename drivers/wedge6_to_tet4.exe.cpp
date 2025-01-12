@@ -22,6 +22,8 @@
 
 #include "adj_table.h"
 
+#include "sfem_glob.hpp"
+
 SFEM_INLINE static void wedge6_to_3Xtet4(const ptrdiff_t wedge_idx,
                                          idx_t **const SFEM_RESTRICT wedges,
                                          const ptrdiff_t tet_idx_offset,
@@ -75,13 +77,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = argv[2];
-
-    {
-        struct stat st = {0};
-        if (stat(output_folder, &st) == -1) {
-            mkdir(output_folder, 0700);
-        }
-    }
+    sfem::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

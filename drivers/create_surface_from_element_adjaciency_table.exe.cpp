@@ -109,12 +109,7 @@ int main(int argc, char *argv[]) {
     const char *adj_table_pattern = argv[2];
     const char *output_folder     = argv[3];
 
-    {
-        struct stat st = {0};
-        if (stat(output_folder, &st) == -1) {
-            mkdir(output_folder, 0700);
-        }
-    }
+    sfem::create_directory(output_folder);
 
     if (!rank) {
         printf("%s %s %s %s\n", argv[0], mesh_folder, adj_table_pattern, output_folder);

@@ -22,6 +22,8 @@
 
 #include "adj_table.h"
 
+#include "sfem_glob.hpp"
+
 static SFEM_INLINE void normalize(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -139,12 +141,7 @@ int main(int argc, char* argv[]) {
     const geom_t outer_thickness = atof(argv[3]);
     const char* output_folder = argv[4];
 
-    {
-        struct stat st = {0};
-        if (stat(output_folder, &st) == -1) {
-            mkdir(output_folder, 0700);
-        }
-    }
+    sfem::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

@@ -5,6 +5,7 @@
 #include <ostream>
 #include <string>
 #include <memory>
+#include <vector>
 
 namespace sfem {
     class Input {

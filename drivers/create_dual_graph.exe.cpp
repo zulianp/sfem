@@ -44,13 +44,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = argv[2];
-
-    {
-        struct stat st = {0};
-        if (stat(output_folder, &st) == -1) {
-            mkdir(output_folder, 0700);
-        }
-    }
+    sfem::create_directory(output_folder);
 
     if (!rank) {
         printf("%s %s %s\n", argv[0], argv[1], output_folder);
