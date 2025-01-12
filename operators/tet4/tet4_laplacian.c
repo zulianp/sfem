@@ -3,7 +3,9 @@
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
 
+#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
 #include "vtet4_laplacian.h"
+#endif
 
 #include <assert.h>
 #include <math.h>
@@ -71,12 +73,14 @@ int tet4_laplacian_apply(const ptrdiff_t nelements,
                          geom_t **const SFEM_RESTRICT points,
                          const real_t *const SFEM_RESTRICT u,
                          real_t *const SFEM_RESTRICT values) {
+#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
     int SFEM_ENABLE_V = 0;
     SFEM_READ_ENV(SFEM_ENABLE_V, atoi);
 
     if (SFEM_ENABLE_V) {
         return vtet4_laplacian_apply(nelements, nnodes, elements, points, u, values);
     }
+#endif
 
     SFEM_UNUSED(nnodes);
 
@@ -235,12 +239,14 @@ int tet4_laplacian_apply_opt(const ptrdiff_t nelements,
                              const jacobian_t *const SFEM_RESTRICT fff_all,
                              const real_t *const SFEM_RESTRICT u,
                              real_t *const SFEM_RESTRICT values) {
+#ifdef SFEM_ENABLE_EXPLICIT_VECTORIZATION
     int SFEM_ENABLE_V = 0;
     SFEM_READ_ENV(SFEM_ENABLE_V, atoi);
 
     if (SFEM_ENABLE_V) {
         return vtet4_laplacian_apply_opt(nelements, elements, fff_all, u, values);
     }
+#endif
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {

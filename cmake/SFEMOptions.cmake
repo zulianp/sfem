@@ -23,6 +23,16 @@ option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
+option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
+
+
+if(WIN32)        
+    set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
+        OFF
+        CACHE STRING "Enable explicit vectorization kernels" FORCE)
+endif()
+
+
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
