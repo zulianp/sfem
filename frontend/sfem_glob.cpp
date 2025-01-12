@@ -28,7 +28,7 @@ namespace sfem {
         for(auto path : glob::glob(pattern)) {
             ret.push_back(path.generic_string());
         }
-        return {};
+        return ret;
 #endif
     }
 
