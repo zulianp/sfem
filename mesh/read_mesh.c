@@ -17,6 +17,9 @@
 
 #include "sortreduce.h"
 
+// sfem_glob.hpp
+size_t count_files(const char *pattern);
+
 #define BARRIER_MSG(msg_)                \
     do {                                 \
         printf("[%d] %s\n", rank, msg_); \
@@ -40,21 +43,6 @@
             array_[i] = temp_actual_[mapping_[i]];             \
         }                                                      \
     } while (0)
-
-inline static int count_files(const char *pattern) {
-    glob_t gl;
-    glob(pattern, GLOB_MARK, NULL, &gl);
-
-    int n_files = gl.gl_pathc;
-
-    printf("n_files (%d):\n", n_files);
-    for (int np = 0; np < n_files; np++) {
-        printf("%s\n", gl.gl_pathv[np]);
-    }
-
-    globfree(&gl);
-    return n_files;
-}
 
 int mesh_node_ids(mesh_t *mesh, idx_t *const ids) {
     int rank, size;

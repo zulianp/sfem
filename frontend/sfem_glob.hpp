@@ -6,7 +6,9 @@
 
 namespace sfem {
 	std::vector<std::string> find_files(const std::string &pattern);
-	size_t count_files(const std::string &pattern);
+	size_t count_files(const char *pattern);
 }
+
+ extern "C" size_t count_files(const char *pattern);
 
 #endif //SFEM_GLOB_HPP
