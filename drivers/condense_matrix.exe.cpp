@@ -5,13 +5,14 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
 
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "utils.h"
 
 #include "sfem_base.h"
+#include "sfem_glob.hpp"
 
 #ifdef NDEBUG
 #define INLINE inline
@@ -64,11 +65,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
-
+    sfem::create_directory(output_folder);
     printf("%s %s %s %s\n", argv[0], argv[1], argv[2], output_folder);
 
     double tick = MPI_Wtime();

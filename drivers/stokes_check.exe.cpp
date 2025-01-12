@@ -1,10 +1,14 @@
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
 
 #include "array_dtof.h"
 #include "matrixio_array.h"

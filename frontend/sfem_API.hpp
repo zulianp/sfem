@@ -46,6 +46,8 @@ namespace sfem {
 #include <sys/stat.h>
 #include "matrixio_crs.h"
 
+#include "sfem_glob.hpp"
+
 namespace sfem {
 
     template <typename T>
@@ -970,11 +972,7 @@ namespace sfem {
     }
 
     static int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
-        struct stat st = {0};
-        if (stat(path.c_str(), &st) == -1) {
-            mkdir(path.c_str(), 0700);
-        }
-
+        sfem::create_directory(path.c_str());
         crs_t crs_out;
         crs_out.rowptr = (char *)graph.rowptr()->data();
         crs_out.colidx = (char *)graph.colidx()->data();

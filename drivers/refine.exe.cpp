@@ -16,6 +16,7 @@
 #include "sfem_mesh_write.h"
 
 #include "sortreduce.h"
+#include "sfem_glob.hpp"
 
 static const int tet4_refine_pattern[8][4] = {
     // Corner tests
@@ -74,11 +75,7 @@ int main(int argc, char *argv[]) {
     }
 
     double tick = MPI_Wtime();
-
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data

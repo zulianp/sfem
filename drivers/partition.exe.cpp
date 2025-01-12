@@ -17,6 +17,7 @@
 #include "sfem_mesh_write.h"
 
 #include "mesh_aura.h"
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -46,10 +47,7 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data

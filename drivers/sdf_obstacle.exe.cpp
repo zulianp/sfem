@@ -101,11 +101,8 @@ int main(int argc, char *argv[]) {
     if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
-
-    struct stat st = {0};
-    if (stat(output_path, &st) == -1) {
-        mkdir(output_path, 0700);
-    }
+    
+    sfem::create_directory(output_path);
 
     double tick = MPI_Wtime();
 

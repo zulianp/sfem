@@ -41,10 +41,7 @@ int main(int argc, char *argv[]) {
     auto       &mesh         = *((mesh_t *)m->impl_mesh());
 
     // Make sure the folder exists
-    struct stat st = {0};
-    if (stat(argv[3], &st) == -1) {
-        mkdir(argv[3], 0700);
-    }
+    sfem::create_directory(argv[3]);
 
     enum ElemType element_type       = (enum ElemType)mesh.element_type;
     std::string   path_output_format = argv[3];

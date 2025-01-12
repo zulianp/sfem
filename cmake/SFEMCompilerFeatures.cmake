@@ -1,4 +1,8 @@
 
 macro (set_compiler_features target_)
-target_compile_features(${target_} PUBLIC cxx_std_14)
+if(WIN32)
+    target_compile_features(${target_} PUBLIC cxx_std_17)
+else()
+    target_compile_features(${target_} PUBLIC cxx_std_14)
+endif()
 endmacro(set_compiler_features)
