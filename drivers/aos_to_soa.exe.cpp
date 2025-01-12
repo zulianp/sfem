@@ -1,4 +1,3 @@
-#include <glob.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,7 +62,7 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_bytes_soa = single_component_n_values * n_bytes_x_entry;
-    char *soa_data = malloc(n_bytes_soa);
+    char *soa_data = (char*)malloc(n_bytes_soa);
 
     for (int b = 0; b < block_size; b++) {
         for (ptrdiff_t i = 0; i < single_component_n_values; i++) {

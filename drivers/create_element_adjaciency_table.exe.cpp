@@ -1,4 +1,3 @@
-#include <glob.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,21 +19,7 @@
 #include "sfem_defs.h"
 
 #include "argsort.h"
-
-inline static int count_files(const char *pattern) {
-    glob_t gl;
-    glob(pattern, GLOB_MARK, NULL, &gl);
-
-    int n_files = gl.gl_pathc;
-
-    printf("n_files (%d):\n", n_files);
-    for (int np = 0; np < n_files; np++) {
-        printf("%s\n", gl.gl_pathv[np]);
-    }
-
-    globfree(&gl);
-    return n_files;
-}
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -78,13 +63,13 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
-    char path[SFEM_MAX_PATH_LENGTH];
+    char        path[SFEM_MAX_PATH_LENGTH];
     sprintf(path, "%s/i*.raw", folder);
-    int nnxe = count_files(path);
+    int nnxe = sfem::count_files(path);
 
     // FIXME
-    int element_type = nnxe;
-    int element_type_for_algo = element_type;
+    enum ElemType element_type          = (enum ElemType)nnxe;
+    enum ElemType element_type_for_algo = element_type;
     if (element_type == TET10) {
         element_type_for_algo = TET4;
     } else if (element_type == TRI6) {
@@ -107,28 +92,25 @@ int main(int argc, char *argv[]) {
 
     n_nodes += 1;
 
-    count_t *adj_ptr = 0;
+    count_t       *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
 
     sprintf(path, "%s/adj_ptr.raw", output_folder);
     ptrdiff_t adj_ptr_size_local, adj_ptr_size;
-    array_create_from_file(
-        comm, path, SFEM_MPI_COUNT_T, (void **)&adj_ptr, &adj_ptr_size_local, &adj_ptr_size);
+    array_create_from_file(comm, path, SFEM_MPI_COUNT_T, (void **)&adj_ptr, &adj_ptr_size_local, &adj_ptr_size);
 
     sprintf(path, "%s/adj_idx.raw", output_folder);
     ptrdiff_t ennz_local, ennz;
-    array_create_from_file(
-        comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
+    array_create_from_file(comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
 
-    int ns = elem_num_sides(element_type);
+    int             ns    = elem_num_sides(element_type);
     element_idx_t **table = (element_idx_t **)malloc(ns * sizeof(element_idx_t *));
 
     for (int s = 0; s < ns; s++) {
         table[s] = (element_idx_t *)malloc(n_elements * sizeof(element_idx_t));
     }
 
-    create_element_adj_table_from_dual_graph_soa(
-        n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
+    create_element_adj_table_from_dual_graph_soa(n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
     for (int s = 0; s < ns; s++) {
         sprintf(path, "%s/a.%d.raw", output_folder, s);

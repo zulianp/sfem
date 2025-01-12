@@ -1,3 +1,4 @@
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,10 +22,7 @@
 #include "argsort.h"
 
 #include "adj_table.h"
-
-#include "sshex8.h"  // FIXME
-#include "sfem_hex8_mesh_graph.h"
-#include "sfem_sshex8_skin.h"
+#include "sfem_glob.hpp"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -87,7 +85,7 @@ void correct_side_orientation(const ptrdiff_t                          nsides,
     }
 
     double tock = MPI_Wtime();
-    printf("skin.c: correct_side_orientation\t%g seconds\n", tock - tick);
+    printf("create_surface_from_element_adjaciency_table.c: correct_side_orientation\t%g seconds\n", tock - tick);
 }
 
 int main(int argc, char *argv[]) {
@@ -99,18 +97,17 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    if (argc < 2) {
+    if (argc < 4) {
         if (!rank) {
-            fprintf(stderr, "usage: %s <folder> [output_folder=./]\n", argv[0]);
+            fprintf(stderr, "usage: %s <mesh_folder> <adj_table_pattern> <output_folder>\n", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    const char *output_folder = "./";
-    if (argc > 2) {
-        output_folder = argv[2];
-    }
+    const char *mesh_folder       = argv[1];
+    const char *adj_table_pattern = argv[2];
+    const char *output_folder     = argv[3];
 
     {
         struct stat st = {0};
@@ -120,111 +117,94 @@ int main(int argc, char *argv[]) {
     }
 
     if (!rank) {
-        printf("%s %s %s\n", argv[0], argv[1], output_folder);
+        printf("%s %s %s %s\n", argv[0], mesh_folder, adj_table_pattern, output_folder);
     }
 
     double tick = MPI_Wtime();
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Read data
+    // Read and process table data
     ///////////////////////////////////////////////////////////////////////////////
 
-    const char *folder = argv[1];
+    auto files   = sfem::find_files(adj_table_pattern);
+    int  n_sides = files.size();
+
+    element_idx_t **table            = (element_idx_t **)malloc(n_sides * sizeof(element_idx_t *));
+    ptrdiff_t       n_local_elements = 0, n_elements = 0;
+
+    printf("n_sides (%d):\n", n_sides);
+    for (int s = 0; s < n_sides; s++) {
+        printf("Reading %s\n", files[s].c_str());
+        array_create_from_file(
+                comm, files[s].c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&table[s], &n_local_elements, &n_elements);
+    }
+
+    // Compute vol surface map
+    ptrdiff_t n_surf_elements = 0;
+    for (int s = 0; s < n_sides; s++) {
+        for (ptrdiff_t e = 0; e < n_local_elements; e++) {
+            n_surf_elements += table[s][e] < 0;
+        }
+    }
+
+    element_idx_t *parent         = (element_idx_t *)malloc(n_surf_elements * sizeof(element_idx_t));
+    int           *local_side_idx = (int *)malloc(n_surf_elements * sizeof(int));
+
+    ptrdiff_t surf_element_idx = 0;
+    for (ptrdiff_t e = 0; e < n_local_elements; e++) {
+        for (int s = 0; s < n_sides; s++) {
+            if (table[s][e] < 0) {
+                parent[surf_element_idx]         = e;
+                local_side_idx[surf_element_idx] = s;
+                surf_element_idx++;
+            }
+        }
+    }
+
+    // Free resources to leave space for mesh
+    for (int s = 0; s < n_sides; s++) {
+        free(table[s]);
+    }
+
+    free(table);
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Read mesh data
+    ///////////////////////////////////////////////////////////////////////////////
 
     mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    if (mesh_read(comm, mesh_folder, &mesh)) {
         return EXIT_FAILURE;
-    }
-
-    const char *SFEM_ELEMENT_TYPE = 0;
-    SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
-    enum ElemType override_element_type = INVALID;
-    if (SFEM_ELEMENT_TYPE) {
-        override_element_type = type_from_string(SFEM_ELEMENT_TYPE);
-    }
-
-    if (override_element_type == SSHEX8) {
-        int SFEM_ELEMENT_REFINE_LEVEL = 0;
-        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-        if (!SFEM_ELEMENT_REFINE_LEVEL) {
-            fprintf(stderr,
-                    "ElemType sshex8 requires SFEM_ELEMENT_REFINE_LEVEL to be defined and >= "
-                    "2!\n");
-            return EXIT_FAILURE;
-        }
-
-        if (mesh.element_type == HEX8) {
-            // Generate proteus mesh on the fly!
-
-            const int nxe      = sshex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
-            const int txe      = sshex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
-            idx_t   **elements = 0;
-
-            elements = malloc(nxe * sizeof(idx_t *));
-            for (int d = 0; d < nxe; d++) {
-                elements[d] = malloc(mesh.nelements * sizeof(idx_t));
-            }
-
-            for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-                    elements[d][i] = -1;
-                }
-            }
-
-            ptrdiff_t n_unique_nodes, interior_start;
-            sshex8_generate_elements(SFEM_ELEMENT_REFINE_LEVEL,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         elements,
-                                         &n_unique_nodes,
-                                         &interior_start);
-
-            const int nnxs = (SFEM_ELEMENT_REFINE_LEVEL + 1) * (SFEM_ELEMENT_REFINE_LEVEL + 1);
-
-            ptrdiff_t      n_surf_elements = 0;
-            idx_t        **surf_elems      = (idx_t **)calloc(nnxs, sizeof(idx_t *));
-            element_idx_t *parent          = 0;
-
-            sshex8_skin(SFEM_ELEMENT_REFINE_LEVEL, mesh.nelements, elements, &n_surf_elements, surf_elems, &parent);
-
-            char path[2048];
-            for (int d = 0; d < nnxs; d++) {
-                sprintf(path, "%s/i%d.raw", output_folder, d);
-                array_write(comm, path, SFEM_MPI_IDX_T, surf_elems[d], n_surf_elements, n_surf_elements);
-            }
-
-            // TODO
-            return SFEM_SUCCESS;
-
-        } else {
-            assert(0);
-            return SFEM_FAILURE;
-        }
     }
 
     enum ElemType st   = side_type(mesh.element_type);
     const int     nnxs = elem_num_nodes(st);
 
-    ptrdiff_t      n_surf_elements = 0;
-    idx_t        **surf_elems      = (idx_t **)malloc(nnxs * sizeof(idx_t *));
-    element_idx_t *parent          = 0;
-    int16_t       *side_idx        = 0;
+    idx_t **surf_elems = 0;
+    {
+        // Extract surface index
+        int  nnxs             = elem_num_nodes(side_type(mesh.element_type));
+        int *local_side_table = (int *)malloc(elem_num_sides(mesh.element_type) * nnxs * sizeof(int));
+        surf_elems            = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+        for (int d = 0; d < nnxs; d++) {
+            surf_elems[d] = (idx_t *)malloc(n_surf_elements * sizeof(idx_t));
+        }
 
-    if (extract_skin_sideset(
-                mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, &parent, &side_idx) !=
-        SFEM_SUCCESS) {
-        SFEM_ERROR("Failed to extract skin!\n");
-    }
+        fill_local_side_table(mesh.element_type, local_side_table);
 
-    for (int s = 0; s < nnxs; s++) {
-        surf_elems[s] = malloc(n_surf_elements * sizeof(idx_t));
-    }
+        for (ptrdiff_t e = 0; e < n_surf_elements; e++) {
+            const element_idx_t p = parent[e];
+            const int           s = local_side_idx[e];
 
-    if (extract_surface_from_sideset(mesh.element_type, mesh.elements, n_surf_elements, parent, side_idx, surf_elems) !=
-        SFEM_SUCCESS) {
-        SFEM_ERROR("Unable to extract surface from sideset!\n");
+            for (int d = 0; d < nnxs; d++) {
+                int   node_num   = local_side_table[s * nnxs + d];
+                idx_t node       = mesh.elements[node_num][p];
+                surf_elems[d][e] = node;
+            }
+        }
+
+        free(local_side_table);
+        free(local_side_idx);
     }
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
@@ -256,6 +236,7 @@ int main(int argc, char *argv[]) {
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
         if (vol2surf[i] < 0) continue;
+
         mapping[vol2surf[i]] = i;
 
         for (int d = 0; d < mesh.spatial_dim; ++d) {
@@ -284,7 +265,7 @@ int main(int argc, char *argv[]) {
     surf.mem_space = mesh.mem_space;
 
     surf.spatial_dim  = mesh.spatial_dim;
-    surf.element_type = shell_type(side_type(mesh.element_type));
+    surf.element_type = side_type(mesh.element_type);
 
     surf.nelements = n_surf_elements;
     surf.nnodes    = n_surf_nodes;
@@ -302,9 +283,6 @@ int main(int argc, char *argv[]) {
     sprintf(path, "%s/parent.raw", output_folder);
     array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
 
-    sprintf(path, "%s/lfi.int16.raw", output_folder);
-    array_write(comm, path, MPI_SHORT, side_idx, n_surf_elements, n_surf_elements);
-
     // Clean-up
 
     if (!rank) {
@@ -316,7 +294,6 @@ int main(int argc, char *argv[]) {
     mesh_destroy(&mesh);
     mesh_destroy(&surf);
     free(parent);
-    free(side_idx);
 
     double tock = MPI_Wtime();
 

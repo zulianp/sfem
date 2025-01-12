@@ -15,7 +15,7 @@ int main(int argc, const char *argv[]) {
     ptrdiff_t xslice = atol(argv[5]);
     ptrdiff_t n = nx * ny * nz;
 
-    float *sdt = malloc(n * sizeof(float));
+    float *sdt = (float*)malloc(n * sizeof(float));
 
     {
         FILE *f_sdt = fopen(argv[4], "r");
@@ -30,7 +30,7 @@ int main(int argc, const char *argv[]) {
 
     // Code to extract slice
     ptrdiff_t nslice = ny * nz;
-    float *slice = malloc(nslice * sizeof(float));
+    float *slice = (float*)malloc(nslice * sizeof(float));
 
     for (ptrdiff_t z = 0; z < nz; z++) {
         ptrdiff_t z_offset = z * (ny * nx);

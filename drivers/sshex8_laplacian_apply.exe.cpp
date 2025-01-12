@@ -78,9 +78,9 @@ int main(int argc, char *argv[]) {
 
     idx_t **elements = 0;
 
-    elements = malloc(nxe * sizeof(idx_t *));
+    elements = (idx_t**)malloc(nxe * sizeof(idx_t *));
     for (int d = 0; d < nxe; d++) {
-        elements[d] = malloc(mesh.nelements * sizeof(idx_t));
+        elements[d] = (idx_t*)malloc(mesh.nelements * sizeof(idx_t));
     }
 
     for (int d = 0; d < nxe; d++) {
@@ -124,8 +124,8 @@ int main(int argc, char *argv[]) {
     printf("vol nodes %ld\n", internal_nodes);
     printf("vol %f%%\n", 100 * (float)internal_nodes / n_unique_nodes);
 
-    real_t *x = calloc(n_unique_nodes, sizeof(real_t));
-    real_t *y = calloc(n_unique_nodes, sizeof(real_t));
+    real_t *x = (real_t *)calloc(n_unique_nodes, sizeof(real_t));
+    real_t *y = (real_t *)calloc(n_unique_nodes, sizeof(real_t));
 
     for (ptrdiff_t i = 0; i < n_unique_nodes; i++) {
         x[i] = 1;
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
 
     double spmv_tock = MPI_Wtime();
     long nelements = mesh.nelements;
-    int element_type = mesh.element_type;
+    enum ElemType element_type = mesh.element_type;
 
     // ///////////////////////////////////////////////////////////////////////////////
     // // Output for testing

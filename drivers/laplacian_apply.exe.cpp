@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     real_t *x = 0;
     if (strcmp("gen:ones", path_f) == 0) {
-        x = malloc(mesh.nnodes * sizeof(real_t));
+        x = (real_t*)malloc(mesh.nnodes * sizeof(real_t));
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
             x[i] = 1;
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
         array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&x, &u_n_local, &u_n_global);
     }
 
-    real_t *y = calloc(u_n_local, sizeof(real_t));
+    real_t *y = (real_t*)calloc(u_n_local, sizeof(real_t));
 
     if (!laplacian_is_opt(mesh.element_type)) {
         SFEM_USE_OPT = 0;
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     double spmv_tock = MPI_Wtime();
     long nelements = mesh.nelements;
     long nnodes = mesh.nnodes;
-    int element_type = mesh.element_type;
+    enum ElemType element_type = mesh.element_type;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Output for testing

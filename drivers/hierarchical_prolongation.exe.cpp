@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t coarse_nodes = max_node_id(from_element, mesh.nelements, mesh.elements) + 1;
 
-    real_t *from = malloc(coarse_nodes * sizeof(real_t));
-    real_t *to = calloc(mesh.nnodes, sizeof(real_t));
+    real_t *from = (real_t *) malloc(coarse_nodes * sizeof(real_t));
+    real_t *to = (real_t *)calloc(mesh.nnodes, sizeof(real_t));
 
     if (array_read(comm, path_input, SFEM_MPI_REAL_T, from, coarse_nodes, coarse_nodes) ||
         hierarchical_prolongation(

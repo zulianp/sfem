@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     p2_mesh.node_owner = 0;
     p2_mesh.element_mapping = 0;
 
-    p2_mesh.element_type = p1_mesh.element_type + n_p2_node_x_element;
+    p2_mesh.element_type = elem_higher_order(p1_mesh.element_type);
     p2_mesh.elements = (idx_t **)malloc(p2_mesh.element_type * sizeof(idx_t *));
     p2_mesh.points = (geom_t **)malloc(p2_mesh.spatial_dim * sizeof(geom_t *));
 

@@ -44,8 +44,8 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t n_coarse_nodes = max_node_id(to_element, mesh.nelements, mesh.elements) + 1;
 
-    real_t *from = malloc(mesh.nnodes * sizeof(real_t));
-    real_t *to = calloc(n_coarse_nodes, sizeof(real_t));
+    real_t *from = (real_t*)malloc(mesh.nnodes * sizeof(real_t));
+    real_t *to = (real_t*)calloc(n_coarse_nodes, sizeof(real_t));
 
     int err = array_read(comm, path_input, SFEM_MPI_REAL_T, from, mesh.nnodes, mesh.nnodes);
     if (err) return EXIT_FAILURE;

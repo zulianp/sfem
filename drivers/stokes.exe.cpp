@@ -198,37 +198,37 @@ int main(int argc, char *argv[]) {
     real_t *rhs_values[4] = {0, 0, 0, 0};
     switch (SFEM_PROBLEM_TYPE) {
         case 1: {
-            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs1_x, rhs_values[0]);
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs1_y, rhs_values[1]);
             break;
         }
         case 2: {
-            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs2_x, rhs_values[0]);
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs2_y, rhs_values[1]);
             break;
         }
         case 3: {
-            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_x, rhs_values[0]);
             node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_y, rhs_values[1]);
             break;
         }
         case 4: {
-            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[2] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[2] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_x, rhs_values[0]);
             node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_y, rhs_values[1]);
             node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_z, rhs_values[2]);
             break;
         }
         case 5: {
-            rhs_values[0] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
             node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs5_x, rhs_values[0]);
             break;
         }
@@ -238,8 +238,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (SFEM_AOS) {
-        real_t *values = calloc(n_vars * n_vars * nnz, sizeof(real_t));
-        real_t *rhs = calloc(n_vars * mesh.nnodes, sizeof(real_t));
+        real_t *values = (real_t*)calloc(n_vars * n_vars * nnz, sizeof(real_t));
+        real_t *rhs = (real_t*)calloc(n_vars * mesh.nnodes, sizeof(real_t));
 
         ///////////////////////////////////////////////////////////////////////////////
         // Operator assembly
@@ -337,13 +337,13 @@ int main(int argc, char *argv[]) {
         real_t **values = 0;
         values = (real_t **)malloc((n_vars * n_vars) * sizeof(real_t *));
         for (int d = 0; d < (n_vars * n_vars); d++) {
-            values[d] = calloc(nnz, sizeof(real_t));
+            values[d] = (real_t*)calloc(nnz, sizeof(real_t));
         }
 
         real_t **rhs = 0;
         rhs = (real_t **)malloc((n_vars) * sizeof(real_t *));
         for (int d = 0; d < n_vars; d++) {
-            rhs[d] = calloc(mesh.nnodes, sizeof(real_t));
+            rhs[d] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
         }
 
         ///////////////////////////////////////////////////////////////////////////////

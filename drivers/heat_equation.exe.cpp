@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 
     isolver_idx_t *rowptr = 0;
     if(sizeof(count_t) != sizeof(isolver_idx_t)) {
-        rowptr = malloc((mesh.nnodes+1) * sizeof(isolver_idx_t));
+        rowptr = (isolver_idx_t*)malloc((mesh.nnodes+1) * sizeof(isolver_idx_t));
         for(ptrdiff_t i = 0; i < mesh.nnodes+1; i++) {
             isolver_idx_t converted = sfem_rowptr[i];
         }
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t nnz = rowptr[mesh.nnodes];
-    system_matrix = calloc(nnz, sizeof(real_t));
+    system_matrix = (real_t*)calloc(nnz, sizeof(real_t));
 
     laplacian_crs(mesh.element_type,
                                mesh.nelements,
@@ -255,7 +255,7 @@ int main(int argc, char *argv[]) {
 
     {  // Mass matrix
         if (SFEM_LUMPED_MASS) {
-            mass_matrix = calloc(mesh.nnodes, sizeof(real_t));
+            mass_matrix = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
 
             assemble_lumped_mass(mesh.element_type,
                                  mesh.nelements,
@@ -264,7 +264,7 @@ int main(int argc, char *argv[]) {
                                  mesh.points,
                                  mass_matrix);
         } else {
-            mass_matrix = calloc(nnz, sizeof(real_t));
+            mass_matrix = (real_t*)calloc(nnz, sizeof(real_t));
 
             assemble_mass(mesh.element_type,
                           mesh.nelements,
@@ -357,8 +357,8 @@ int main(int argc, char *argv[]) {
     isolver_lsolve_update_crs(
         &lsolve[INVERSE_SYSTEM], mesh.nnodes, mesh.nnodes, rowptr, colidx, system_matrix);
 
-    real_t *u = calloc(mesh.nnodes, sizeof(real_t));
-    real_t *u_old = calloc(mesh.nnodes, sizeof(real_t));
+    real_t *u = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+    real_t *u_old = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
 
     for (int i = 0; i < n_dirichlet_conditions; i++) {
         boundary_condition_t cond = dirichlet_conditions[i];

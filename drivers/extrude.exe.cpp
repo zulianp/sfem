@@ -57,9 +57,9 @@ void extrude(const ptrdiff_t nsides,
              geom_t** const SFEM_RESTRICT extruded_xyz) {
     double tick = MPI_Wtime();
 
-    geom_t** pseudo_normals = malloc(3 * sizeof(geom_t*));
+    geom_t** pseudo_normals = (geom_t**)malloc(3 * sizeof(geom_t*));
     for (int d = 0; d < 3; d++) {
-        pseudo_normals[d] = calloc(nnodes, sizeof(geom_t));
+        pseudo_normals[d] = (geom_t*)calloc(nnodes, sizeof(geom_t));
     }
 
     for (ptrdiff_t i = 0; i < nsides; ++i) {
@@ -182,14 +182,14 @@ int main(int argc, char* argv[]) {
     extruded.node_owner = 0;
 
     int nnxe_extruded = elem_num_nodes(extruded.element_type);
-    extruded.elements = malloc(nnxe_extruded * sizeof(idx_t*));
+    extruded.elements = (idx_t**)malloc(nnxe_extruded * sizeof(idx_t*));
     for (int d = 0; d < nnxe_extruded; d++) {
-        extruded.elements[d] = malloc(extruded.nelements * sizeof(idx_t));
+        extruded.elements[d] = (idx_t*)malloc(extruded.nelements * sizeof(idx_t));
     }
 
-    extruded.points = malloc(extruded.spatial_dim * sizeof(geom_t*));
+    extruded.points = (geom_t**)malloc(extruded.spatial_dim * sizeof(geom_t*));
     for (int d = 0; d < extruded.spatial_dim; d++) {
-        extruded.points[d] = malloc(extruded.nnodes * sizeof(geom_t));
+        extruded.points[d] = (geom_t*)malloc(extruded.nnodes * sizeof(geom_t));
     }
 
     extrude(mesh.nelements,

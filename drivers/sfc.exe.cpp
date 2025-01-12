@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
         }
 
         // update coordinates
-        geom_t *x_buff = malloc(mesh.n_owned_nodes * sizeof(geom_t));
+        geom_t *x_buff = (geom_t*)malloc(mesh.n_owned_nodes * sizeof(geom_t));
         for (int d = 0; d < mesh.spatial_dim; d++) {
             memcpy(x_buff, mesh.points[d], mesh.n_owned_nodes * sizeof(geom_t));
 

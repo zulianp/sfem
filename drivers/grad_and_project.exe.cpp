@@ -33,9 +33,9 @@ void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
                                  real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t *p0_dudx = malloc(nelements * sizeof(real_t));
-    real_t *p0_dudy = malloc(nelements * sizeof(real_t));
-    real_t *p0_dudz = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudx = (real_t*)malloc(nelements * sizeof(real_t));
+    real_t *p0_dudy = (real_t*)malloc(nelements * sizeof(real_t));
+    real_t *p0_dudz = (real_t*)malloc(nelements * sizeof(real_t));
 
     tet4_grad(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
 
@@ -59,9 +59,9 @@ void tet10_p2_p2_grad_and_project(const ptrdiff_t nelements,
                                   real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t *p1_dudx = malloc(nelements * 4 * sizeof(real_t));
-    real_t *p1_dudy = malloc(nelements * 4 * sizeof(real_t));
-    real_t *p1_dudz = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudx = (real_t*)malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudy = (real_t*)malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudz = (real_t*)malloc(nelements * 4 * sizeof(real_t));
 
     tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
 
@@ -113,9 +113,9 @@ void tet4_p1_p1_grad_and_project_coeffs(const ptrdiff_t nelements,
                                         real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t *p0_dudx = malloc(nelements * sizeof(real_t));
-    real_t *p0_dudy = malloc(nelements * sizeof(real_t));
-    real_t *p0_dudz = malloc(nelements * sizeof(real_t));
+    real_t *p0_dudx = (real_t*)malloc(nelements * sizeof(real_t));
+    real_t *p0_dudy = (real_t*)malloc(nelements * sizeof(real_t));
+    real_t *p0_dudz = (real_t*)malloc(nelements * sizeof(real_t));
 
     tet4_grad(nelements, nnodes, elems, xyz, u, p0_dudx, p0_dudy, p0_dudz);
 
@@ -157,9 +157,9 @@ void tet10_p2_p2_grad_and_project_coeffs(const ptrdiff_t nelements,
                                          real_t *const SFEM_RESTRICT dudz)
 
 {
-    real_t *p1_dudx = malloc(nelements * 4 * sizeof(real_t));
-    real_t *p1_dudy = malloc(nelements * 4 * sizeof(real_t));
-    real_t *p1_dudz = malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudx = (real_t*)malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudy = (real_t*)malloc(nelements * 4 * sizeof(real_t));
+    real_t *p1_dudz = (real_t*)malloc(nelements * 4 * sizeof(real_t));
 
     tet10_grad(nelements, nnodes, elems, xyz, u, p1_dudx, p1_dudy, p1_dudz);
 

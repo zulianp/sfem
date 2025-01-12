@@ -262,16 +262,16 @@ int main(int argc, char *argv[]) {
     idx_t **elements = 0;
 
     if (SFEM_USE_IDX) {
-        elements = malloc(nxe * sizeof(idx_t *));
+        elements = (idx_t**)malloc(nxe * sizeof(idx_t *));
         for (int d = 0; d < nxe; d++) {
-            elements[d] = malloc(mesh.nelements * sizeof(idx_t));
+            elements[d] = (idx_t*)malloc(mesh.nelements * sizeof(idx_t));
         }
 
         sstet4_create_full_idx(L, &mesh, elements);
     }
 
-    real_t *x = calloc(nnodes_discont, sizeof(real_t));
-    real_t *y = calloc(nnodes_discont, sizeof(real_t));
+    real_t *x = (real_t *)calloc(nnodes_discont, sizeof(real_t));
+    real_t *y = (real_t *)calloc(nnodes_discont, sizeof(real_t));
 
     if (!x || !y) {
         fprintf(stderr, "Unable to allocate memory!\n");
@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
 
     double spmv_tock = MPI_Wtime();
     long nelements = mesh.nelements;
-    int element_type = mesh.element_type;
+    enum ElemType element_type = mesh.element_type;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Output for testing

@@ -203,8 +203,8 @@ static void mesh_self_intersect_3D(const ptrdiff_t nelements,
     ptrdiff_t intersection_count = 0;
     ptrdiff_t intersection_list_size = MAX(64, nelements / 32);
 
-    ptrdiff_t * ii = malloc(intersection_list_size * sizeof(ptrdiff_t));
-    ptrdiff_t * jj = malloc(intersection_list_size * sizeof(ptrdiff_t));
+    ptrdiff_t * ii = (ptrdiff_t *)malloc(intersection_list_size * sizeof(ptrdiff_t));
+    ptrdiff_t * jj = (ptrdiff_t *)malloc(intersection_list_size * sizeof(ptrdiff_t));
 
     // Brute force
     for (ptrdiff_t e1 = 0; e1 < nelements; e1++) {
@@ -254,8 +254,8 @@ static void mesh_self_intersect_3D(const ptrdiff_t nelements,
 
             if(intersection_count >= intersection_list_size) {
                 intersection_list_size *= 2;
-                ii = realloc(ii, intersection_list_size * sizeof(ptrdiff_t));
-                jj = realloc(jj, intersection_list_size * sizeof(ptrdiff_t));
+                ii = (ptrdiff_t*)realloc(ii, intersection_list_size * sizeof(ptrdiff_t));
+                jj = (ptrdiff_t*)realloc(jj, intersection_list_size * sizeof(ptrdiff_t));
             }
 
             // Update intersection list
@@ -352,14 +352,14 @@ int main(int argc, char* argv[]) {
     intersection_mesh.node_owner = 0;
 
     int nnxe_intersection_mesh = elem_num_nodes(intersection_mesh.element_type);
-    intersection_mesh.elements = malloc(nnxe_intersection_mesh * sizeof(idx_t*));
+    intersection_mesh.elements = (idx_t**)malloc(nnxe_intersection_mesh * sizeof(idx_t*));
     for (int d = 0; d < nnxe_intersection_mesh; d++) {
-        intersection_mesh.elements[d] = malloc(intersection_mesh.nelements * sizeof(idx_t));
+        intersection_mesh.elements[d] = (idx_t*)malloc(intersection_mesh.nelements * sizeof(idx_t));
     }
 
-    intersection_mesh.points = malloc(intersection_mesh.spatial_dim * sizeof(geom_t*));
+    intersection_mesh.points = (geom_t**)malloc(intersection_mesh.spatial_dim * sizeof(geom_t*));
     for (int d = 0; d < intersection_mesh.spatial_dim; d++) {
-        intersection_mesh.points[d] = malloc(intersection_mesh.nnodes * sizeof(geom_t));
+        intersection_mesh.points[d] = (geom_t*)malloc(intersection_mesh.nnodes * sizeof(geom_t));
     }
 
     mesh_self_intersect(mesh.nelements,

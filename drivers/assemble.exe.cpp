@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     }
 
     if(SFEM_USE_MACRO) {
-        mesh.element_type = macro_type_variant(mesh.element_type);
+        mesh.element_type = macro_type_variant((enum ElemType)mesh.element_type);
     }
 
     double tack = MPI_Wtime();

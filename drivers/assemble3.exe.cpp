@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = mesh.nelements;
 
     // TODO read displacement from file
-    real_t *displacement = malloc(nnodes * mesh.spatial_dim * sizeof(real_t));
+    real_t *displacement = (real_t *)malloc(nnodes * mesh.spatial_dim * sizeof(real_t));
     memset(displacement, 0, nnodes * mesh.spatial_dim * sizeof(real_t));
 
     // TODO read params

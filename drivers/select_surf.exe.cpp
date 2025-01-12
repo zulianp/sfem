@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *folder = argv[1];
-    const geom_t roi[3] = {atof(argv[2]), atof(argv[3]), atof(argv[4])};
+    const geom_t roi[3] = {(geom_t)atof(argv[2]), (geom_t)atof(argv[3]), (geom_t)atof(argv[4])};
     const geom_t angle_threshold = atof(argv[5]);
     const char *path_selection = argv[6];
 
