@@ -2,6 +2,7 @@
 #include "sfem_base.h"
 #ifndef _WIN32
 #include <glob.h>
+#include <sys/stat.h>
 #else
 #include <filesystem>
 #include <iostream>
@@ -37,6 +38,7 @@ namespace sfem {
         return find_files(pattern).size();
     }
 
+    // FIXME
     int create_directory(const char *path) {
 #ifdef _WIN32
         namespace fs = std::filesystem;
@@ -51,6 +53,8 @@ namespace sfem {
         if (stat(path, &st) == -1) {
             mkdir(path, 0700);
         }
+
+        return SFEM_SUCCESS;
 #endif
     }
 }  // namespace sfem
