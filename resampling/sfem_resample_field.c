@@ -774,39 +774,39 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-#define MY_RESTRICT __restrict__
+
 #define real_type real_t
 
 int tet4_resample_field_local_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
-        float** const MY_RESTRICT xyz,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        float** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
-        const real_type* const MY_RESTRICT data,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const float* const SFEM_RESTRICT origin, const float* const SFEM_RESTRICT delta,
+        const real_type* const SFEM_RESTRICT data,
         // Output
-        real_type* const MY_RESTRICT weighted_field);
+        real_type* const SFEM_RESTRICT weighted_field);
 
 int tet4_resample_field_local_reduce_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
-        float** const MY_RESTRICT xyz,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        float** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
-        const real_type* const MY_RESTRICT data,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const float* const SFEM_RESTRICT origin, const float* const SFEM_RESTRICT delta,
+        const real_type* const SFEM_RESTRICT data,
         // Output
-        real_type* const MY_RESTRICT weighted_field);
+        real_type* const SFEM_RESTRICT weighted_field);
 
 int tet4_resample_field_local_V8(
         // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const MY_RESTRICT elems,
-        float** const MY_RESTRICT xyz,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        float** const SFEM_RESTRICT xyz,
         // SDF
-        const ptrdiff_t* const MY_RESTRICT n, const ptrdiff_t* const MY_RESTRICT stride,
-        const float* const MY_RESTRICT origin, const float* const MY_RESTRICT delta,
-        const real_type* const MY_RESTRICT data,
+        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
+        const float* const SFEM_RESTRICT origin, const float* const SFEM_RESTRICT delta,
+        const real_type* const SFEM_RESTRICT data,
         // Output
-        real_type* const MY_RESTRICT weighted_field);
+        real_type* const SFEM_RESTRICT weighted_field);
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////

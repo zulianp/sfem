@@ -48,6 +48,10 @@ int test_poisson() {
     cg->set_max_it(1000);
     cg->set_op(linear_op);
 
+    auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    f->hessian_diag(nullptr, diag->data());
+    cg->set_preconditioner_op(create_shiftable_jacobi(diag, es));
+
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
