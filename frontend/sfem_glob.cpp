@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cassert>
+#include "glob/glob.h"
 #endif
 
 namespace sfem {
@@ -23,7 +24,10 @@ namespace sfem {
         globfree(&gl);
         return ret;
 #else
-        SFEM_ERROR("IMPLEMENT ME!");
+        std::vector<std::string> ret;
+        for(auto path : glob::glob(pattern)) {
+            ret.push_back(path.generic_string());
+        }
         return {};
 #endif
     }
