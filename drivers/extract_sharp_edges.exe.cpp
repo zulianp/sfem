@@ -19,6 +19,7 @@
 
 #include "extract_sharp_features.h"
 #include "mesh_utils.h"
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -45,11 +46,7 @@ int main(int argc, char *argv[]) {
     }
 
     double tick = MPI_Wtime();
-
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -126,10 +123,7 @@ int main(int argc, char *argv[]) {
 
         sprintf(path, "%s/corners", output_folder);
 
-        struct stat st = {0};
-        if (stat(path, &st) == -1) {
-            mkdir(path, 0700);
-        }
+        sfem::create_directory(path);
 
         sprintf(path, "%s/corners/i0.raw", output_folder);
         array_write(comm, path, SFEM_MPI_COUNT_T, corners, n_corners, n_corners);
@@ -149,11 +143,7 @@ int main(int argc, char *argv[]) {
                 nxe, n_disconnected_elements, disconnected_elements, mesh.elements, delems);
 
             sprintf(path, "%s/disconnected", output_folder);
-
-            struct stat st = {0};
-            if (stat(path, &st) == -1) {
-                mkdir(path, 0700);
-            }
+            sfem::create_directory(path);
 
             for (int d = 0; d < nxe; d++) {
                 sprintf(path, "%s/disconnected/i%d.raw", output_folder, d);

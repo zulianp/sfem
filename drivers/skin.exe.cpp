@@ -26,6 +26,8 @@
 #include "sfem_hex8_mesh_graph.h"
 #include "sfem_sshex8_skin.h"
 
+#include "sfem_glob.hpp"
+
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -112,12 +114,7 @@ int main(int argc, char *argv[]) {
         output_folder = argv[2];
     }
 
-    {
-        struct stat st = {0};
-        if (stat(output_folder, &st) == -1) {
-            mkdir(output_folder, 0700);
-        }
-    }
+    sfem::create_directory(output_folder);
 
     if (!rank) {
         printf("%s %s %s\n", argv[0], argv[1], output_folder);

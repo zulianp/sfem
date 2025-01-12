@@ -1,10 +1,14 @@
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+// #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
 
 #include "array_dtof.h"
 #include "matrixio_array.h"
@@ -24,6 +28,8 @@
 
 #include "read_mesh.h"
 #include "stokes_mini.h"
+
+#include "sfem_glob.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // The MINI mixed finite element for the Stokes problem: An experimental
@@ -130,11 +136,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = argv[2];
-
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     double tick = MPI_Wtime();
 

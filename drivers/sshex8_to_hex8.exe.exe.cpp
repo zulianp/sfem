@@ -20,6 +20,7 @@
 #include "sshex8.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_mesh.h"
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -101,10 +102,8 @@ int main(int argc, char *argv[]) {
     // Write to disk
     // ///////////////////////////////////////////////////////////////////////////////
 
-    struct stat st = {0};
-    if (stat(path_output, &st) == -1) {
-        mkdir(path_output, 0700);
-    }
+
+    sfem::create_directory(path_output);
 
     char path[1024 * 10];
     for (int lnode = 0; lnode < 8; lnode++) {

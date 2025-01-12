@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <sstream>
 
 // Ops
 
@@ -467,12 +468,7 @@ namespace sfem {
     int SemiStructuredMesh::export_as_standard(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::export_as_standard");
 
-        {
-            struct stat st = {0};
-            if (stat(path, &st) == -1) {
-                mkdir(path, 0700);
-            }
-        }
+        sfem::create_directory(path);
 
         std::string folder   = path;
         auto        elements = impl_->elements;
@@ -521,13 +517,7 @@ namespace sfem {
 
     int SemiStructuredMesh::write(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::write");
-
-        {
-            struct stat st = {0};
-            if (stat(path, &st) == -1) {
-                mkdir(path, 0700);
-            }
-        }
+        sfem::create_directory(path);
 
         std::string folder   = path;
         auto        elements = impl_->elements;
@@ -1364,13 +1354,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write");
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        {
-            struct stat st = {0};
-            if (stat(impl_->output_dir.c_str(), &st) == -1) {
-                mkdir(impl_->output_dir.c_str(), 0700);
-            }
-        }
+        sfem::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
         if (impl_->AoS_to_SoA && block_size > 1) {
@@ -1408,13 +1392,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
         auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-
-        {
-            struct stat st = {0};
-            if (stat(impl_->output_dir.c_str(), &st) == -1) {
-                mkdir(impl_->output_dir.c_str(), 0700);
-            }
-        }
+        sfem::create_directory(impl_->output_dir.c_str());
 
         char path[2048];
         sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
