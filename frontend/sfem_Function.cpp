@@ -1,5 +1,5 @@
 #include "sfem_Function.hpp"
-#include <glob.h>
+
 #include <stddef.h>
 
 #include "matrixio_array.h"
@@ -48,6 +48,7 @@
 #include "sfem_prolongation_restriction.h"
 
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -3035,10 +3036,8 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
-        glob_t gl;
-        glob(pattern, GLOB_MARK, NULL, &gl);
-
-        int n_files = gl.gl_pathc;
+        auto files = sfem::find_files(pattern);
+        int n_files = files.size();
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
@@ -3048,15 +3047,13 @@ namespace sfem {
         printf("n_files (%d):\n", n_files);
         int err = 0;
         for (int np = 0; np < n_files; np++) {
-            printf("%s\n", gl.gl_pathv[np]);
+            printf("%s\n", files[np].c_str());
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm, gl.gl_pathv[np], SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm, files[np].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }
-
-        globfree(&gl);
 
         ret = std::make_shared<Buffer<idx_t *>>(
                 n_files,

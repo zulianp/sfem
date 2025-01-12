@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     }
 
     // float for visualization
-    float *neigh_count = calloc(mesh.nnodes, sizeof(float));
+    float *neigh_count = (float *)calloc(mesh.nnodes, sizeof(float));
 
     idx_t *nodeids = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     mesh_node_ids(&mesh, nodeids);
@@ -107,10 +107,10 @@ int main(int argc, char *argv[]) {
 
     { // Count how many neighboring processes a master node is connected to
         ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
-        int *int_buffer = malloc(count * sizeof(int));
+        int *int_buffer = (int*)malloc(count * sizeof(int));
 
         ptrdiff_t n_ghosts = (mesh.nnodes - mesh.n_owned_nodes);
-        int *ones = malloc(n_ghosts * sizeof(int));
+        int *ones = (int*)malloc(n_ghosts * sizeof(int));
 
         for (ptrdiff_t i = 0; i < n_ghosts; i++) {
             ones[i] = 1;

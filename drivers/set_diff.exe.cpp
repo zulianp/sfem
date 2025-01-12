@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         max_idx = MAX(max_idx, input[i]);
     }
 
-    uint8_t *keep = malloc((max_idx + 1) * sizeof(uint8_t));
+    uint8_t *keep = (uint8_t*)malloc((max_idx + 1) * sizeof(uint8_t));
     memset(keep, 0, (max_idx + 1) * sizeof(uint8_t));
 
     for (ptrdiff_t i = 0; i < n_entries; ++i) {

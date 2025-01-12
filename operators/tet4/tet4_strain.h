@@ -5,6 +5,11 @@
 
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 void strain(const ptrdiff_t nelements,
            const ptrdiff_t nnodes,
            idx_t **const SFEM_RESTRICT elems,
@@ -30,5 +35,11 @@ void principal_strains(const ptrdiff_t nelements,
            real_t *const SFEM_RESTRICT strain_e0,
            real_t *const SFEM_RESTRICT strain_e1,
            real_t *const SFEM_RESTRICT strain_e2);
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif //SFEM_STRAIN_H

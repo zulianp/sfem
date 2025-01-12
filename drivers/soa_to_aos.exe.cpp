@@ -1,4 +1,4 @@
-#include <glob.h>
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +7,8 @@
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "utils.h"
+
+#include "sfem_glob.hpp"
 
 typedef int idx_t;
 #define MPI_IDX_T MPI_INT
@@ -33,38 +35,32 @@ int main(int argc, char *argv[]) {
     }
 
     const char *path_soa_pattern = argv[1];
-    int n_bytes_x_entry = atoi(argv[2]);
-    const char *path_output_aos = argv[3];
+    int         n_bytes_x_entry  = atoi(argv[2]);
+    const char *path_output_aos  = argv[3];
 
-    glob_t gl;
-    glob(path_soa_pattern, GLOB_MARK, NULL, &gl);
-
-    int n_arrays = gl.gl_pathc;
+    auto      files    = sfem::find_files(path_soa_pattern);
+    const int n_arrays = files.size();
 
     printf("n_arrays (%d):\n", n_arrays);
     for (int np = 0; np < n_arrays; np++) {
-        printf("%s\n", gl.gl_pathv[np]);
+        printf("%s\n", files[np].c_str());
     }
 
     double tick = MPI_Wtime();
 
     MPI_Datatype values_mpi_t = MPI_CHAR;
-    char **arrays;
+    char       **arrays;
     arrays = (char **)malloc(n_arrays * sizeof(char *));
 
     ptrdiff_t check_bytes = 0;
     ptrdiff_t _nope_, n_bytes = 0;
     for (int np = 0; np < n_arrays; np++) {
-        array_create_from_file(
-            comm, gl.gl_pathv[np], values_mpi_t, (void **)&arrays[np], &_nope_, &n_bytes);
+        array_create_from_file(comm, files[np].c_str(), values_mpi_t, (void **)&arrays[np], &_nope_, &n_bytes);
         if (!check_bytes) {
             check_bytes = n_bytes;
         } else {
             if (check_bytes != n_bytes) {
-                fprintf(stderr,
-                        "Bad input! arrays do not have same length %ld != %ld\n",
-                        (long)check_bytes,
-                        (long)n_bytes);
+                fprintf(stderr, "Bad input! arrays do not have same length %ld != %ld\n", (long)check_bytes, (long)n_bytes);
             }
         }
     }
@@ -76,13 +72,11 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_bytes_aos = n_bytes * n_arrays * sizeof(char);
-    char *aos = (char *)malloc(n_bytes_aos);
+    char     *aos         = (char *)malloc(n_bytes_aos);
 
     for (int np = 0; np < n_arrays; np++) {
         for (ptrdiff_t i = 0; i < n_values; i++) {
-            memcpy(&aos[(i * n_arrays + np) * n_bytes_x_entry],
-                   &arrays[np][i * n_bytes_x_entry],
-                   n_bytes_x_entry);
+            memcpy(&aos[(i * n_arrays + np) * n_bytes_x_entry], &arrays[np][i * n_bytes_x_entry], n_bytes_x_entry);
         }
     }
 
@@ -93,7 +87,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(aos);
-    globfree(&gl);
 
     double tock = MPI_Wtime();
 

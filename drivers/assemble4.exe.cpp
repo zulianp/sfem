@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     static const int mat_block_size = 4 * 4;
 
     // TODO read displacement from file
-    real_t *u = malloc(nnodes * block_size * sizeof(real_t));
+    real_t *u = (real_t*)malloc(nnodes * block_size * sizeof(real_t));
 
     if (SFEM_INPUT) {
         ptrdiff_t nlocal, nglobal;

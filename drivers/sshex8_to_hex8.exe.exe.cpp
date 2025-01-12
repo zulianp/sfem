@@ -63,9 +63,9 @@ int main(int argc, char *argv[]) {
 
     idx_t **elements = 0;
 
-    elements = malloc(nxe * sizeof(idx_t *));
+    elements = (idx_t**)malloc(nxe * sizeof(idx_t *));
     for (int d = 0; d < nxe; d++) {
-        elements[d] = malloc(mesh.nelements * sizeof(idx_t));
+        elements[d] = (idx_t*)malloc(mesh.nelements * sizeof(idx_t));
     }
 
     for (int d = 0; d < nxe; d++) {
@@ -82,17 +82,17 @@ int main(int argc, char *argv[]) {
     // ///////////////////////////////////////////////////////////////////////////////
     ptrdiff_t n_micro_elements = mesh.nelements * txe;
 
-    idx_t **hex8_elements = malloc(8 * sizeof(idx_t *));
+    idx_t **hex8_elements = (idx_t**)malloc(8 * sizeof(idx_t *));
     for (int d = 0; d < 8; d++) {
-        hex8_elements[d] = malloc(n_micro_elements * sizeof(idx_t));
+        hex8_elements[d] = (idx_t*)malloc(n_micro_elements * sizeof(idx_t));
     }
 
     // Elements
     sshex8_to_standard_hex8_mesh(level, mesh.nelements, elements, hex8_elements);
 
-    geom_t **hex8_points = malloc(3 * sizeof(geom_t *));
+    geom_t **hex8_points = (geom_t**)malloc(3 * sizeof(geom_t *));
     for (int d = 0; d < 3; d++) {
-        hex8_points[d] = calloc(n_unique_nodes, sizeof(geom_t));
+        hex8_points[d] = (geom_t*)calloc(n_unique_nodes, sizeof(geom_t));
     }
 
     sshex8_fill_points(level, mesh.nelements, elements, mesh.points, hex8_points);

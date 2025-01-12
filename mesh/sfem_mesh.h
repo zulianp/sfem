@@ -20,7 +20,7 @@ typedef struct {
     int mem_space;
 
     int spatial_dim;
-    int element_type;
+    enum ElemType element_type;
 
     ptrdiff_t nelements;
     ptrdiff_t nnodes;

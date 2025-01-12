@@ -120,9 +120,9 @@ int main(int argc, char *argv[]) {
     tet4_mesh.points = mesh.points;
 
     int nnxe_tet4_mesh = 4;
-    tet4_mesh.elements = malloc(nnxe_tet4_mesh * sizeof(idx_t*));
+    tet4_mesh.elements = (idx_t**)malloc(nnxe_tet4_mesh * sizeof(idx_t*));
     for (int d = 0; d < nnxe_tet4_mesh; d++) {
-        tet4_mesh.elements[d] = malloc(tet4_mesh.nelements * sizeof(idx_t));
+        tet4_mesh.elements[d] = (idx_t*)malloc(tet4_mesh.nelements * sizeof(idx_t));
     }
 
     for (ptrdiff_t i = 0; i < mesh.nelements; i++) {

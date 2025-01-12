@@ -336,7 +336,7 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(
             p1_type, mesh.nelements, p1_nnodes, mesh.elements, &p1_rowptr, &p1_colidx);
     p1_nnz = p1_rowptr[p1_nnodes];
-    real_t *p1_values = calloc(p1_nnz, sizeof(real_t));
+    real_t *p1_values = (real_t*)calloc(p1_nnz, sizeof(real_t));
 
     laplacian_crs(p1_type,
                                mesh.nelements,
@@ -352,8 +352,8 @@ int main(int argc, char *argv[]) {
     real_t *p1_inv_diag = 0;
 
     if (SFEM_AVG_PRESSURE_CONSTRAINT) {
-        p1_mass_vector = calloc(p1_nnodes, sizeof(real_t));
-        p1_inv_diag = calloc(p1_nnodes, sizeof(real_t));
+        p1_mass_vector = (real_t*)calloc(p1_nnodes, sizeof(real_t));
+        p1_inv_diag = (real_t*)calloc(p1_nnodes, sizeof(real_t));
 
         assemble_lumped_mass(
                 p1_type, mesh.nelements, p1_nnodes, mesh.elements, mesh.points, p1_mass_vector);
@@ -419,11 +419,11 @@ int main(int argc, char *argv[]) {
                                       &p2_colidx);
 
         p2_nnz = p2_rowptr[mesh.nnodes];
-        p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
+        p2_mass_matrix = (real_t*)calloc(p2_nnz, sizeof(real_t));
     }
 
     if (implicit_momentum) {
-        p2_diffusion = calloc(p2_nnz, sizeof(real_t));
+        p2_diffusion = (real_t*)calloc(p2_nnz, sizeof(real_t));
 
         // Only works if B.C. are set on al three vector components
         {
@@ -456,7 +456,7 @@ int main(int argc, char *argv[]) {
     // Only works if B.C. are set on al three vector components
     if (!SFEM_LUMPED_MASS) {
         p2_nnz = p2_rowptr[mesh.nnodes];
-        p2_mass_matrix = calloc(p2_nnz, sizeof(real_t));
+        p2_mass_matrix = (real_t*)calloc(p2_nnz, sizeof(real_t));
 
         // Projection Step
         assemble_mass(mesh.element_type,
@@ -485,7 +485,7 @@ int main(int argc, char *argv[]) {
                                   p2_colidx,
                                   p2_mass_matrix);
     } else {
-        p2_mass_matrix = calloc(mesh.nnodes, sizeof(real_t));
+        p2_mass_matrix = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
         assemble_lumped_mass(mesh.element_type,
                              mesh.nelements,
                              mesh.nnodes,
@@ -500,15 +500,15 @@ int main(int argc, char *argv[]) {
     real_t *vel[3];
     real_t *correction[3];
     real_t *tentative_vel[3];
-    real_t *buff = calloc(mesh.nnodes, sizeof(real_t));
+    real_t *buff = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
 
     for (int d = 0; d < sdim; d++) {
-        vel[d] = calloc(mesh.nnodes, sizeof(real_t));
-        tentative_vel[d] = calloc(mesh.nnodes, sizeof(real_t));
-        correction[d] = calloc(mesh.nnodes, sizeof(real_t));
+        vel[d] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+        tentative_vel[d] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+        correction[d] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
     }
 
-    real_t *p = calloc(p1_nnodes, sizeof(real_t));
+    real_t *p = (real_t*)calloc(p1_nnodes, sizeof(real_t));
     for (int i = 0; i < n_velocity_dirichlet_conditions; i++) {
         boundary_condition_t cond = velocity_dirichlet_conditions[i];
         if (cond.values) {
