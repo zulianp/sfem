@@ -108,5 +108,5 @@ void p0_u_dot_grad_q_apply(const ptrdiff_t nelements,
                            const real_t *const SFEM_RESTRICT uy,
                            const real_t *const SFEM_RESTRICT uz,
                            real_t *const SFEM_RESTRICT values) {
-    p0_u_dot_grad_q_apply(nelements, nnodes, elems, xyz, ux, uy, uz, values);
+    tet4_p0_u_dot_grad_q_apply(nelements, nnodes, elems, xyz, ux, uy, uz, values);
 }

@@ -73,6 +73,10 @@ if(SFEM_ENABLE_AMG)
     list(APPEND SFEM_MODULES amg)
 endif()
 
+if(WIN32)
+set(SFEM_ENABLE_RESAMPLING OFF)
+endif()
+
 if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
