@@ -5,6 +5,10 @@
 
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelements,
                                                          const ptrdiff_t nnodes,
                                                          idx_t *const elems[4],
@@ -39,5 +43,9 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
                                                        const real_t ls,
                                                        const real_t *const u,
                                                        real_t *const value);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // ISOTROPIC_PHASEFIELD_FOR_FRACTURE_H

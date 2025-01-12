@@ -359,6 +359,7 @@ namespace sfem {
         ~DirichletConditions();
 
         std::shared_ptr<FunctionSpace> space();
+        std::vector<struct Condition>  &conditions();
 
         static std::shared_ptr<DirichletConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
         static std::shared_ptr<DirichletConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
