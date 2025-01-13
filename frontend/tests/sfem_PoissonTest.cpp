@@ -14,6 +14,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->verbose    = true;
     cg->set_max_it(1000);
     cg->set_op(linear_op);
+    cg->set_rtol(1e-8);
 
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     f->hessian_diag(nullptr, diag->data());
@@ -60,7 +61,7 @@ int test_poisson() {
     }
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     auto m  = sfem::Mesh::create_hex8_cube(comm);
     auto fs = sfem::FunctionSpace::create(m, 1);
@@ -106,8 +107,11 @@ int test_poisson_and_boundary_selector() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int  base_resolution = 10;
-    auto m  = sfem::Mesh::create_hex8_cube(comm, base_resolution * 2, base_resolution * 1, base_resolution * 1, 0, 0, 0, 2, 1, 1);
+    int SFEM_BASE_RESOLUTION = 10;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(
+            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     auto f = sfem::Function::create(fs);
@@ -142,7 +146,7 @@ int test_linear_elasticity() {
     }
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     auto m  = sfem::Mesh::create_hex8_cube(comm);
     auto fs = sfem::FunctionSpace::create(m, 3);
