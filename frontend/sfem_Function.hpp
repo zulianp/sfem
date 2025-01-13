@@ -368,6 +368,8 @@ namespace sfem {
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                                      std::string                           yaml);
 
+        static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space, const std::vector<struct Condition> &conditions);
+
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
