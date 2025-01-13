@@ -15,6 +15,7 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include "sfem_Buffer.hpp"
+#include "sfem_Tracer.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -48,6 +49,8 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         int apply(const T* const rhs, T* const x) override {
+            SFEM_TRACE_SCOPE("Multigrid::apply");
+
             ensure_init();
 
             // Wrap input arrays into fine level of mg
