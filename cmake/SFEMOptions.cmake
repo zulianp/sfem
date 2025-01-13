@@ -46,7 +46,7 @@ if(HAS_PARENT)
     option(SFEM_ENABLE_TESTING "Build the tests" OFF)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
 else()
-    option(SFEM_ENABLE_TESTING "Build the tests" OFF)
+    option(SFEM_ENABLE_TESTING "Build the tests" ON)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
 endif()
 

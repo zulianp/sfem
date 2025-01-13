@@ -2,6 +2,7 @@
 #include <cuda_profiler_api.h>
 #include <sfem_base.h>
 #include <stdio.h>
+#include <assert.h>
 
 // #define real_type real_t
 
