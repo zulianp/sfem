@@ -35,7 +35,7 @@ void mesh_init(mesh_t *mesh) {
     mesh->ghosts = 0;
 }
 
-void mesh_create_hex8_cube(mesh_t *mesh)
+void mesh_create_reference_hex8_cube(mesh_t *mesh)
 {
     mesh_init(mesh);
     mesh->comm = MPI_COMM_SELF;

@@ -73,10 +73,7 @@ int test_poisson() {
                                               .value     = -1,
                                               .component = 0};
 
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset,
-                                               // .nodeset = nullptr, .values = nullptr,
-                                               .value     = 1,
-                                               .component = 0};
+    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
