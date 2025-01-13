@@ -48,6 +48,7 @@ static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
     sub_determinant[0] = determinant * (POW3(h));
 }
 
+// FIXME there is probably a bug in here!
 int sshex8_linear_elasticity_apply(
         const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
