@@ -18,7 +18,8 @@ floor_real_t(const real_t x) {  //
 #else
     return floorf(x);
 #endif
-}
+}  // end of floor_real_t
+////////////////////////////////////////
 
 /**
  * @brief sqrt function for real_t
@@ -34,7 +35,8 @@ sqrt_real_t(const real_t x) {  //
 #else
     return sqrtf(x);
 #endif
-}
+}  // end of sqrt_real_t
+////////////////////////////////////////
 
 /**
  * @brief abs function for real_t
@@ -50,7 +52,8 @@ abs_real_t(const real_t x) {  //
 #else
     return fabsf(x);
 #endif
-}
+}  // end of abs_real_t
+////////////////////////////////////////
 
 /**
  * @brief pow function for real_t
@@ -67,6 +70,7 @@ pow_real_t(const real_t x, const real_t y) {  //
 #else
     return powf(x, y);
 #endif
-}
+}  // end of pow_real_t
+////////////////////////////////////////
 
 #endif  // __SFEM_CUDA_MATH_CUH__

@@ -376,14 +376,30 @@ hex_aa_8_collect_coeffs_cu(const ptrdiff_t           stride0,  //
  * @param i0 .. i15
  * @return SFEM_INLINE
  */
-__device__ void hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0,  //
-                                         const ptrdiff_t SFEM_RESTRICT stride1,  //
-                                         const ptrdiff_t SFEM_RESTRICT stride2,  //
-                                         const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k, const ptrdiff_t k_diff,
-                                         // Output
-                                         ptrdiff_t* i0, ptrdiff_t* i1, ptrdiff_t* i2, ptrdiff_t* i3, ptrdiff_t* i4, ptrdiff_t* i5,
-                                         ptrdiff_t* i6, ptrdiff_t* i7, ptrdiff_t* i8, ptrdiff_t* i9, ptrdiff_t* i10,
-                                         ptrdiff_t* i11, ptrdiff_t* i12, ptrdiff_t* i13, ptrdiff_t* i14, ptrdiff_t* i15) {
+__device__ void                                                  //
+hex_aa_8_indices_O3_cuda(const ptrdiff_t SFEM_RESTRICT stride0,  //
+                         const ptrdiff_t SFEM_RESTRICT stride1,  //
+                         const ptrdiff_t SFEM_RESTRICT stride2,  //
+                         const ptrdiff_t               i,        //
+                         const ptrdiff_t               j,        //
+                         const ptrdiff_t               k,        //
+                         const ptrdiff_t               k_diff,   //
+                         ptrdiff_t*                    i0,       // Output
+                         ptrdiff_t*                    i1,       // Output
+                         ptrdiff_t*                    i2,       // Output
+                         ptrdiff_t*                    i3,       // Output
+                         ptrdiff_t*                    i4,       // Output
+                         ptrdiff_t*                    i5,       // Output
+                         ptrdiff_t*                    i6,       // Output
+                         ptrdiff_t*                    i7,       // Output
+                         ptrdiff_t*                    i8,       // Output
+                         ptrdiff_t*                    i9,       // Output
+                         ptrdiff_t*                    i10,      // Output
+                         ptrdiff_t*                    i11,      // Output
+                         ptrdiff_t*                    i12,      // Output
+                         ptrdiff_t*                    i13,      // Output
+                         ptrdiff_t*                    i14,      // Output
+                         ptrdiff_t*                    i15) {                       // Output
     //
     const ptrdiff_t stride_x = stride0;
     const ptrdiff_t stride_y = stride1;
@@ -1031,10 +1047,12 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(const ptrdiff_t    start_el
  * @param g the resulting vector
  * @return void
  */
-__global__ void                                                   //
-compute_g_kernel(ptrdiff_t nnodes, const real_t* weighted_field,  //
-                 const real_t* mass_vector, real_t* g) {          //
-                                                                  //
+__global__ void                                 //
+compute_g_kernel(ptrdiff_t     nnodes,          //
+                 const real_t* weighted_field,  //
+                 const real_t* mass_vector,     //
+                 real_t*       g) {                   //
+                                                //
     ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < nnodes) {
         assert(mass_vector[i] != 0);
@@ -1051,9 +1069,11 @@ compute_g_kernel(ptrdiff_t nnodes, const real_t* weighted_field,  //
  * @param g_wf
  * @return __global__
  */
-__global__ void                                                                   //
-compute_g_kernel_v2(ptrdiff_t nnodes, const real_t* mass_vector, real_t* g_wf) {  //
-                                                                                  //
+__global__ void                                 //
+compute_g_kernel_v2(ptrdiff_t     nnodes,       //
+                    const real_t* mass_vector,  //
+                    real_t*       g_wf) {             //
+                                                //
     ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < nnodes) {
         assert(mass_vector[i] != 0);
@@ -1068,8 +1088,10 @@ compute_g_kernel_v2(ptrdiff_t nnodes, const real_t* mass_vector, real_t* g_wf) {
  * @param n
  * @param a
  */
-__global__ void zeros_kernel(ptrdiff_t n, real_t* a) {
-    ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void zeros_kernel(const ptrdiff_t n,  //
+                             real_t*         a) {        //
+
+    const ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) a[i] = 0.0;
 }
 
@@ -1082,12 +1104,13 @@ __global__ void zeros_kernel(ptrdiff_t n, real_t* a) {
  * @param k
  * @return __device__
  */
-__device__ ptrdiff_t                                                        //
-hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride0,               //
-                                     const ptrdiff_t stride1,               //
-                                     const ptrdiff_t stride2,               //
-                                     const ptrdiff_t i, const ptrdiff_t j,  //
-                                     const ptrdiff_t k) {                   //
+__device__ ptrdiff_t                                           //
+hex_aa_8_indices_O3_first_index_cuda(const ptrdiff_t stride0,  //
+                                     const ptrdiff_t stride1,  //
+                                     const ptrdiff_t stride2,  //
+                                     const ptrdiff_t i,        //
+                                     const ptrdiff_t j,        //
+                                     const ptrdiff_t k) {      //
     //
     return (i - 1) * stride0 + (j - 1) * stride1 + (k - 1) * stride2;
 }
@@ -1119,21 +1142,20 @@ hex_aa_8_collect_coeffs_O3_ptr_cuda(const ptrdiff_t     stride0,  //
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_eval_weno4_3D
 ////////////////////////////////////////////////////////////////////////
-__device__ real_t                                   //
-hex_aa_8_eval_weno4_3D_Unit_cuda(                   //
-        const real_t                      x_unit,   //
-        const real_t                      y_unit,   //
-        const real_t                      z_unit,   //
-        const real_t                      ox_unit,  //
-        const real_t                      oy_unit,  //
-        const real_t                      oz_unit,  //
-        const ptrdiff_t                   i,        // it must be the absulte index
-        const ptrdiff_t                   j,        // Used to retrive the data
-        const ptrdiff_t                   k,        // From the data array
-        const ptrdiff_t                   stride0,  //
-        const ptrdiff_t                   stride1,  //
-        const ptrdiff_t                   stride2,  //
-        const real_t* const SFEM_RESTRICT data) {   //
+__device__ real_t                                                            //
+hex_aa_8_eval_weno4_3D_Unit_cuda(const real_t                      x_unit,   //
+                                 const real_t                      y_unit,   //
+                                 const real_t                      z_unit,   //
+                                 const real_t                      ox_unit,  //
+                                 const real_t                      oy_unit,  //
+                                 const real_t                      oz_unit,  //
+                                 const ptrdiff_t                   i,        // it must be the absulte index
+                                 const ptrdiff_t                   j,        // Used to retrive the data
+                                 const ptrdiff_t                   k,        // From the data array
+                                 const ptrdiff_t                   stride0,  //
+                                 const ptrdiff_t                   stride1,  //
+                                 const ptrdiff_t                   stride2,  //
+                                 const real_t* const SFEM_RESTRICT data) {   //
 
 #define WENO_DIRECT_CUDA 1
 
@@ -1191,35 +1213,26 @@ hex_aa_8_eval_weno4_3D_Unit_cuda(                   //
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_local_cube1_cuda
 ///////////////////////////////////////////////////////////////////////
-__global__ void                                                 //
-hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(  //
-                                                                // Mesh
-        const ptrdiff_t start_element,                          // start element
-        const ptrdiff_t end_element,                            // end element
-        const ptrdiff_t nnodes,                                 // number of nodes
-
-        elems_tet10_device elems,  // connectivity
-        xyz_tet10_device   xyz,    // coordinates
-        // SDF
-        const ptrdiff_t nx,  // number of nodes in each direction x
-        const ptrdiff_t ny,  // number of nodes in each direction y
-        const ptrdiff_t nz,  // number of nodes in each direction z
-
-        const ptrdiff_t stride0,  // stride of the data
-        const ptrdiff_t stride1,  // stride of the data
-        const ptrdiff_t stride2,  // stride of the data
-
-        const geom_t originx,  // origin x of the domain
-        const geom_t originy,  // origin y of the domain
-        const geom_t originz,  // origin z of the domain
-
-        const geom_t deltax,  // delta x of the domain
-        const geom_t deltay,  // delta y of the domain
-        const geom_t deltaz,  // delta z of the domain
-
-        const real_t* const MY_RESTRICT data,  // SDF
-        // Output
-        real_t* const MY_RESTRICT weighted_field) {  //
+__global__ void                                                                                  //
+hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t    start_element,  // Mesh: start element
+                                                              const ptrdiff_t    end_element,    // Mesh: end element
+                                                              const ptrdiff_t    nnodes,         // Mesh: number of nodes
+                                                              elems_tet10_device elems,          // Mesh: connectivity
+                                                              xyz_tet10_device   xyz,            // Mesh: coordinates
+                                                              const ptrdiff_t    nx,  // SDF: number of nodes in each direction x
+                                                              const ptrdiff_t    ny,  // SDF: number of nodes in each direction y
+                                                              const ptrdiff_t    nz,  // SDF: number of nodes in each direction z
+                                                              const ptrdiff_t    stride0,  // SDF: stride of the data
+                                                              const ptrdiff_t    stride1,  // SDF: stride of the data
+                                                              const ptrdiff_t    stride2,  // SDF: stride of the data
+                                                              const geom_t       originx,  // SDF: origin x of the domain
+                                                              const geom_t       originy,  // SDF: origin y of the domain
+                                                              const geom_t       originz,  // SDF: origin z of the domain
+                                                              const geom_t       deltax,   // SDF: delta x of the domain
+                                                              const geom_t       deltay,   // SDF: delta y of the domain
+                                                              const geom_t       deltaz,   // SDF: delta z of the domain
+                                                              const real_t* const MY_RESTRICT data,        // SDF
+                                                              real_t* const MY_RESTRICT       weighted_field) {  // Output field
 
 #define WENO_CUBE 1
 
