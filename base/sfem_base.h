@@ -1,6 +1,7 @@
 #ifndef SFEM_BASE_H
 #define SFEM_BASE_H
 
+#include <stdio.h>
 #include <stdlib.h>
 
 // FIXME

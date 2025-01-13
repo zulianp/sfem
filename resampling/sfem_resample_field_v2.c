@@ -138,18 +138,21 @@ hex_aa_8_eval_fun_V(const real_t x, const real_t y, const real_t z,
 // hex_aa_8_collect_coeffs ////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-hex_aa_8_eval_fun_V(const real_t x,  //
-                    const real_t y,  //
-                    const real_t z,  //
-                    // Output
-                    real_t* const SFEM_RESTRICT f0,  //
-                    real_t* const SFEM_RESTRICT f1,  //
-                    real_t* const SFEM_RESTRICT f2,  //
-                    real_t* const SFEM_RESTRICT f3,  //
-                    real_t* const SFEM_RESTRICT f4,  //
-                    real_t* const SFEM_RESTRICT f5,  //
-                    real_t* const SFEM_RESTRICT f6,  //
-                    real_t* const SFEM_RESTRICT f7) {
+void                                                                    //
+hex_aa_8_collect_coeffs_V(const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
+                          const ptrdiff_t                      i,       // Indices of the element
+                          const ptrdiff_t                      j,       // 
+                          const ptrdiff_t                      k,       //
+                          const real_t* const SFEM_RESTRICT    data,    // Input
+                          real_t* const SFEM_RESTRICT          out0,    // Output
+                          real_t* const SFEM_RESTRICT          out1,    //
+                          real_t* const SFEM_RESTRICT          out2,    //
+                          real_t* const SFEM_RESTRICT          out3,    //
+                          real_t* const SFEM_RESTRICT          out4,    //
+                          real_t* const SFEM_RESTRICT          out5,    //
+                          real_t* const SFEM_RESTRICT          out6,    //
+                          real_t* const SFEM_RESTRICT          out7) {           //
+    // Attention this is geometric data transformed to solver data!
     //
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
