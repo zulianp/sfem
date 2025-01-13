@@ -129,7 +129,7 @@ int test_linear_elasticity() {
     auto left_sideset  = std::make_shared<sfem::Sideset>(comm, left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(comm, right_parent, right_lfi);
 
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = -2, .component = 0};
     sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
     sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0, .component = 2};
 
