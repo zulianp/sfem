@@ -27,13 +27,19 @@ SFEM_INLINE vec_indices floor_V(const vec_real x) {
 // tet4_measure_V8 ///////////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static vec_real tet4_measure_V(
-        // X-coordinates
-        const vec_real px0, const vec_real px1, const vec_real px2, const vec_real px3,
-        // Y-coordinates
-        const vec_real py0, const vec_real py1, const vec_real py2, const vec_real py3,
-        // Z-coordinates
-        const vec_real pz0, const vec_real pz1, const vec_real pz2, const vec_real pz3) {
+SFEM_INLINE static vec_real           //
+tet4_measure_V(const vec_real px0,    // X-coordinate
+               const vec_real px1,    // X-coordinate
+               const vec_real px2,    // X-coordinate
+               const vec_real px3,    // X-coordinate
+               const vec_real py0,    // Y-coordinate
+               const vec_real py1,    // Y-coordinate
+               const vec_real py2,    // Y-coordinate
+               const vec_real py3,    // Y-coordinate
+               const vec_real pz0,    // Z-coordinates
+               const vec_real pz1,    // Z-coordinates
+               const vec_real pz2,    // Z-coordinates
+               const vec_real pz3) {  // Z-coordinates
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -62,45 +68,52 @@ SFEM_INLINE static vec_real tet4_measure_V(
 // tet4_transform_V8 /////////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static void tet4_transform_V(
-        /**
-         ****************************************************************************************
-        \begin{bmatrix}
-        out_x \\
-        out_y \\
-        out_z
-        \end{bmatrix}
-        =
-        \begin{bmatrix}
-        px_0 \\
-        py_0 \\
-        pz_0
-        \end{bmatrix}
-        +
-        \begin{bmatrix}
-        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
-        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
-        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
-        \end{bmatrix}
-        \cdot
-        \begin{bmatrix}
-        qx \\
-        qy \\
-        qz
-        \end{bmatrix}
-        *************************************************************************************************
+SFEM_INLINE static void                                //
+tet4_transform_V(const vec_real                px0,    // X-coordinates
+                 const vec_real                px1,    //
+                 const vec_real                px2,    //
+                 const vec_real                px3,    //
+                 const vec_real                py0,    // Y-coordinates
+                 const vec_real                py1,    //
+                 const vec_real                py2,    //
+                 const vec_real                py3,    //
+                 const vec_real                pz0,    // Z-coordinates
+                 const vec_real                pz1,    //
+                 const vec_real                pz2,    //
+                 const vec_real                pz3,    //
+                 const vec_real                qx,     // Quadrature point
+                 const vec_real                qy,     //
+                 const vec_real                qz,     //
+                 vec_real* const SFEM_RESTRICT out_x,  // Output
+                 vec_real* const SFEM_RESTRICT out_y,  //
+                 vec_real* const SFEM_RESTRICT out_z) {
+    /**
+****************************************************************************************
+\begin{bmatrix}
+out_x \\
+out_y \\
+out_z
+\end{bmatrix}
+=
+\begin{bmatrix}
+px_0 \\
+py_0 \\
+pz_0
+\end{bmatrix}
++
+\begin{bmatrix}
+px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+\end{bmatrix}
+\cdot
+\begin{bmatrix}
+qx \\
+qy \\
+qz
+\end{bmatrix}
+*************************************************************************************************
 */
-
-        // X-coordinates
-        const vec_real px0, const vec_real px1, const vec_real px2, const vec_real px3,
-        // Y-coordinates
-        const vec_real py0, const vec_real py1, const vec_real py2, const vec_real py3,
-        // Z-coordinates
-        const vec_real pz0, const vec_real pz1, const vec_real pz2, const vec_real pz3,
-        // Quadrature point
-        const vec_real qx, const vec_real qy, const vec_real qz,
-        // Output
-        vec_real* const SFEM_RESTRICT out_x, vec_real* const SFEM_RESTRICT out_y, vec_real* const SFEM_RESTRICT out_z) {
     //
     //
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
@@ -113,17 +126,24 @@ SFEM_INLINE static void tet4_transform_V(
 // hex_aa_8_collect_coeffs ////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static void hex_aa_8_eval_fun_V(
-        // Quadrature point (local coordinates)
-        // With respect to the hat functions of a cube element
-        // In a local coordinate system
-        const vec_real x, const vec_real y, const vec_real z,
-
-        // Output
-        vec_real* const SFEM_RESTRICT f0, vec_real* const SFEM_RESTRICT f1, vec_real* const SFEM_RESTRICT f2,
-        vec_real* const SFEM_RESTRICT f3, vec_real* const SFEM_RESTRICT f4, vec_real* const SFEM_RESTRICT f5,
-        vec_real* const SFEM_RESTRICT f6, vec_real* const SFEM_RESTRICT f7) {
+SFEM_INLINE static void                                //
+hex_aa_8_eval_fun_V(const vec_real                x,   //
+                    const vec_real                y,   //
+                    const vec_real                z,   //
+                    vec_real* const SFEM_RESTRICT f0,  // Output
+                    vec_real* const SFEM_RESTRICT f1,  //
+                    vec_real* const SFEM_RESTRICT f2,  //
+                    vec_real* const SFEM_RESTRICT f3,  //
+                    vec_real* const SFEM_RESTRICT f4,  //
+                    vec_real* const SFEM_RESTRICT f5,  //
+                    vec_real* const SFEM_RESTRICT f6,  //
+                    vec_real* const SFEM_RESTRICT f7) {
     //
+
+    // Quadrature point (local coordinates)
+    // With respect to the hat functions of a cube element
+    // In a local coordinate system
+
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
     *f1 = x * (1.0 - y) * (1.0 - z);
     *f2 = x * y * (1.0 - z);
@@ -301,15 +321,18 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(const vec_indices stride0, con
 // tet4_resample_field_local_v2 //////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int tet4_resample_field_local_V_aligned(
-        // Mesh
-        const ptrdiff_t start_nelement, const ptrdiff_t end_nelement, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const SFEM_RESTRICT data,
-        // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+int                                                                                       //
+tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_nelement,  // Mesh
+                                    const ptrdiff_t                      end_nelement,    //
+                                    const ptrdiff_t                      nnodes,          //
+                                    idx_t** const SFEM_RESTRICT          elems,           //
+                                    geom_t** const SFEM_RESTRICT         xyz,             //
+                                    const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                    const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                    const geom_t* const SFEM_RESTRICT    origin,          //
+                                    const geom_t* const SFEM_RESTRICT    delta,           //
+                                    const real_t* const SFEM_RESTRICT    data,            //
+                                    real_t* const SFEM_RESTRICT          weighted_field) {         // Output
     //
     PRINT_CURRENT_FUNCTION;
 

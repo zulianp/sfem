@@ -1,7 +1,5 @@
 #include "sfem_resample_field.h"
 
-
-
 #include "mass.h"
 // #include "read_mesh.h"
 #include "matrixio_array.h"
@@ -15,66 +13,61 @@
 
 #include "quadratures_rule.h"
 
-
 #define real_type real_t
 #define SFEM_RESTRICT __restrict__
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
-SFEM_INLINE static void tet4_transform_v2(
-        /**
-         ****************************************************************************************
-        \begin{bmatrix}
-        out_x \\
-        out_y \\
-        out_z
-        \end{bmatrix}
-        =
-        \begin{bmatrix}
-        px_0 \\
-        py_0 \\
-        pz_0
-        \end{bmatrix}
-        +
-        \begin{bmatrix}
-        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
-        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
-        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
-        \end{bmatrix}
-        \cdot
-        \begin{bmatrix}
-        qx \\
-        qy \\
-        qz
-        \end{bmatrix}
-        *************************************************************************************************
-      */
+SFEM_INLINE static void                                    //
+tet4_transform_v2(const real_type                px0,      // X-coordinate
+                  const real_type                px1,      //
+                  const real_type                px2,      //
+                  const real_type                px3,      //
+                  const real_type                py0,      // Y-coordinate
+                  const real_type                py1,      //
+                  const real_type                py2,      //
+                  const real_type                py3,      //
+                  const real_type                pz0,      // Z-coordinate
+                  const real_type                pz1,      //
+                  const real_type                pz2,      //
+                  const real_type                pz3,      //
+                  const real_type                qx,       // Quadrature point
+                  const real_type                qy,       //
+                  const real_type                qz,       //
+                  real_type* const SFEM_RESTRICT out_x,    // Output
+                  real_type* const SFEM_RESTRICT out_y,    //
+                  real_type* const SFEM_RESTRICT out_z) {  //
+    //
+    //
 
-        // X-coordinates
-        const real_type px0,
-        const real_type px1,
-        const real_type px2,
-        const real_type px3,
-        // Y-coordinates
-        const real_type py0,
-        const real_type py1,
-        const real_type py2,
-        const real_type py3,
-        // Z-coordinates
-        const real_type pz0,
-        const real_type pz1,
-        const real_type pz2,
-        const real_type pz3,
-        // Quadrature point
-        const real_type qx,
-        const real_type qy,
-        const real_type qz,
-        // Output
-        real_type* const SFEM_RESTRICT out_x,
-        real_type* const SFEM_RESTRICT out_y,
-        real_type* const SFEM_RESTRICT out_z) {
-    //
-    //
+    /**
+     ****************************************************************************************
+    \begin{bmatrix}
+    out_x \\
+    out_y \\
+    out_z
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+    px_0 \\
+    py_0 \\
+    pz_0
+    \end{bmatrix}
+    +
+    \begin{bmatrix}
+    px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+    py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+    pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+    \end{bmatrix}
+    \cdot
+    \begin{bmatrix}
+    qx \\
+    qy \\
+    qz
+    \end{bmatrix}
+    *************************************************************************************************
+  */
+
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
     *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
@@ -85,22 +78,14 @@ SFEM_INLINE static void tet4_transform_v2(
 // tet4_resample_field_local /////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static real_type tet4_measure_v2(
+SFEM_INLINE static real_type  //
+tet4_measure_v2(
         // X-coordinates
-        const real_type px0,
-        const real_type px1,
-        const real_type px2,
-        const real_type px3,
+        const real_type px0, const real_type px1, const real_type px2, const real_type px3,
         // Y-coordinates
-        const real_type py0,
-        const real_type py1,
-        const real_type py2,
-        const real_type py3,
+        const real_type py0, const real_type py1, const real_type py2, const real_type py3,
         // Z-coordinates
-        const real_type pz0,
-        const real_type pz1,
-        const real_type pz2,
-        const real_type pz3) {
+        const real_type pz0, const real_type pz1, const real_type pz2, const real_type pz3) {
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -128,23 +113,15 @@ SFEM_INLINE static real_type tet4_measure_v2(
 // hex_aa_8_collect_coeffs ////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static void hex_aa_8_eval_fun_V(
-        // Quadrature point (local coordinates)
-        // With respect to the hat functions of a cube element
-        // In a local coordinate system
-        const real_t x,
-        const real_t y,
-        const real_t z,
-
-        // Output
-        real_t* const SFEM_RESTRICT f0,
-        real_t* const SFEM_RESTRICT f1,
-        real_t* const SFEM_RESTRICT f2,
-        real_t* const SFEM_RESTRICT f3,
-        real_t* const SFEM_RESTRICT f4,
-        real_t* const SFEM_RESTRICT f5,
-        real_t* const SFEM_RESTRICT f6,
-        real_t* const SFEM_RESTRICT f7) {
+SFEM_INLINE static void  //
+hex_aa_8_eval_fun_V(const real_t x, const real_t y, const real_t z,
+                    // Output
+                    real_t* const SFEM_RESTRICT f0, real_t* const SFEM_RESTRICT f1, real_t* const SFEM_RESTRICT f2,
+                    real_t* const SFEM_RESTRICT f3, real_t* const SFEM_RESTRICT f4, real_t* const SFEM_RESTRICT f5,
+                    real_t* const SFEM_RESTRICT f6, real_t* const SFEM_RESTRICT f7) {
+    // Quadrature point (local coordinates)
+    // With respect to the hat functions of a cube element
+    // In a local coordinate system
     //
     *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
     *f1 = x * (1.0 - y) * (1.0 - z);
@@ -161,22 +138,18 @@ SFEM_INLINE static void hex_aa_8_eval_fun_V(
 // hex_aa_8_collect_coeffs ////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const ptrdiff_t i,
-        const ptrdiff_t j,
-        const ptrdiff_t k,
-        // Attention this is geometric data transformed to solver data!
-        const real_t* const SFEM_RESTRICT data,
-        //
-        real_t* SFEM_RESTRICT out0,
-        real_t* SFEM_RESTRICT out1,
-        real_t* SFEM_RESTRICT out2,
-        real_t* SFEM_RESTRICT out3,
-        real_t* SFEM_RESTRICT out4,
-        real_t* SFEM_RESTRICT out5,
-        real_t* SFEM_RESTRICT out6,
-        real_t* SFEM_RESTRICT out7) {
+hex_aa_8_eval_fun_V(const real_t x,  //
+                    const real_t y,  //
+                    const real_t z,  //
+                    // Output
+                    real_t* const SFEM_RESTRICT f0,  //
+                    real_t* const SFEM_RESTRICT f1,  //
+                    real_t* const SFEM_RESTRICT f2,  //
+                    real_t* const SFEM_RESTRICT f3,  //
+                    real_t* const SFEM_RESTRICT f4,  //
+                    real_t* const SFEM_RESTRICT f5,  //
+                    real_t* const SFEM_RESTRICT f6,  //
+                    real_t* const SFEM_RESTRICT f7) {
     //
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
@@ -202,21 +175,18 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs_V(
 // tet4_resample_field_local_v2 //////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int tet4_resample_field_local_v2(
-        // Mesh
-        const ptrdiff_t start_element,
-        const ptrdiff_t end_element,
-        const ptrdiff_t nnodes,
-        idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,
-        const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin,
-        const geom_t* const SFEM_RESTRICT delta,
-        const real_type* const SFEM_RESTRICT data,
-        // Output
-        real_type* const SFEM_RESTRICT weighted_field) {
+int                                                                               //
+tet4_resample_field_local_v2(const ptrdiff_t                      start_element,  // Mesh
+                             const ptrdiff_t                      end_element,    //
+                             const ptrdiff_t                      nnodes,         //
+                             idx_t** const SFEM_RESTRICT          elems,          //
+                             geom_t** const SFEM_RESTRICT         xyz,            //
+                             const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                             const ptrdiff_t* const SFEM_RESTRICT stride,         //
+                             const geom_t* const SFEM_RESTRICT    origin,         //
+                             const geom_t* const SFEM_RESTRICT    delta,          //
+                             const real_type* const SFEM_RESTRICT data,           //
+                             real_type* const SFEM_RESTRICT       weighted_field) {     // Output
     //
     printf("============================================================\n");
     printf("Start: tet4_resample_field_local  v2 [%s] \n", __FILE__);
@@ -238,19 +208,18 @@ int tet4_resample_field_local_v2(
         real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
 
         // real_type hex8_f[8];
-        real_type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0, hex8_f4 = 0.0,
-                  hex8_f5 = 0.0, hex8_f6 = 0.0, hex8_f7 = 0.0;
+        real_type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0, hex8_f4 = 0.0, hex8_f5 = 0.0, hex8_f6 = 0.0,
+                  hex8_f7 = 0.0;
 
         // real_type coeffs[8];
-        real_type coeffs0 = 0.0, coeffs1 = 0.0, coeffs2 = 0.0, coeffs3 = 0.0, coeffs4 = 0.0,
-                  coeffs5 = 0.0, coeffs6 = 0.0, coeffs7 = 0.0;
+        real_type coeffs0 = 0.0, coeffs1 = 0.0, coeffs2 = 0.0, coeffs3 = 0.0, coeffs4 = 0.0, coeffs5 = 0.0, coeffs6 = 0.0,
+                  coeffs7 = 0.0;
 
         // real_type tet4_f[4];
         real_type tet4_f0 = 0.0, tet4_f1 = 0.0, tet4_f2 = 0.0, tet4_f3 = 0.0;
 
         // real_type element_field[4];
-        real_type element_field0 = 0.0, element_field1 = 0.0, element_field2 = 0.0,
-                  element_field3 = 0.0;
+        real_type element_field0 = 0.0, element_field1 = 0.0, element_field2 = 0.0, element_field3 = 0.0;
 
         // loop over the 4 vertices of the tetrahedron
         idx_t ev[4];
@@ -297,7 +266,7 @@ int tet4_resample_field_local_v2(
                                                        z2,
                                                        z3);
 
-        /////////////////////////////////////////////  
+        /////////////////////////////////////////////
         // loop over the quadrature points
         for (int quad_i = 0; quad_i < TET4_NQP; quad_i++) {  // loop over the quadrature points
 
@@ -335,8 +304,10 @@ int tet4_resample_field_local_v2(
                 tet4_f[2] = tet4_qz[q];
             }
 #else
-            // DUAL basis function
+
             {
+                // DUAL basis function (Shape functions for tetrahedral elements)
+                // at the quadrature point
                 const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
                 const real_type f1 = tet4_qx[quad_i];
                 const real_type f2 = tet4_qy[quad_i];
@@ -392,31 +363,10 @@ int tet4_resample_field_local_v2(
             assert(l_z <= 1 + 1e-8);
 
             // Critical point
-            hex_aa_8_eval_fun_V(l_x,
-                                l_y,
-                                l_z,
-                                &hex8_f0,
-                                &hex8_f1,
-                                &hex8_f2,
-                                &hex8_f3,
-                                &hex8_f4,
-                                &hex8_f5,
-                                &hex8_f6,
-                                &hex8_f7);
+            hex_aa_8_eval_fun_V(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
 
-            hex_aa_8_collect_coeffs_V(stride,
-                                      i,
-                                      j,
-                                      k,
-                                      data,
-                                      &coeffs0,
-                                      &coeffs1,
-                                      &coeffs2,
-                                      &coeffs3,
-                                      &coeffs4,
-                                      &coeffs5,
-                                      &coeffs6,
-                                      &coeffs7);
+            hex_aa_8_collect_coeffs_V(
+                    stride, i, j, k, data, &coeffs0, &coeffs1, &coeffs2, &coeffs3, &coeffs4, &coeffs5, &coeffs6, &coeffs7);
 
             // Integrate gap function
             {
