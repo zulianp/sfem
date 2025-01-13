@@ -1,17 +1,16 @@
-#include "sfem_resample_field.h"
+#include <math.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "matrixio_array.h"
+#include "sfem_resample_field.h"
 
 #include "mass.h"
 
 #include "sfem_resample_V.h"
 #include "tet10_resample_field.h"
 #include "tet10_resample_field_V2.h"
-
-#include <math.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "mesh_aura.h"
 #include "quadratures_rule.h"
@@ -127,45 +126,52 @@ SFEM_INLINE static real_t tet4_measure(
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
 
-SFEM_INLINE static void tet4_transform(
-        /**
-         ****************************************************************************************
-        \begin{bmatrix}
-        out_x \\
-        out_y \\
-        out_z
-        \end{bmatrix}
-        =
-        \begin{bmatrix}
-        px_0 \\
-        py_0 \\
-        pz_0
-        \end{bmatrix}
-        +
-        \begin{bmatrix}
-        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
-        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
-        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
-        \end{bmatrix}
-        \cdot
-        \begin{bmatrix}
-        qx \\
-        qy \\
-        qz
-        \end{bmatrix}
-        *************************************************************************************************
-      */
-
-        // X-coordinates
-        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
-        // Y-coordinates
-        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
-        // Z-coordinates
-        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3,
-        // Quadrature point
-        const real_t qx, const real_t qy, const real_t qz,
-        // Output
-        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z) {
+SFEM_INLINE static void                            //
+tet4_transform(const real_t                px0,    // X-coordinates
+               const real_t                px1,    //
+               const real_t                px2,    //
+               const real_t                px3,    //
+               const real_t                py0,    // Y-coordinates
+               const real_t                py1,    //
+               const real_t                py2,    //
+               const real_t                py3,    //
+               const real_t                pz0,    // Z-coordinates
+               const real_t                pz1,    //
+               const real_t                pz2,    //
+               const real_t                pz3,    //
+               const real_t                qx,     // Quadrature point
+               const real_t                qy,     //
+               const real_t                qz,     //
+               real_t* const SFEM_RESTRICT out_x,  // Output
+               real_t* const SFEM_RESTRICT out_y,  //
+               real_t* const SFEM_RESTRICT out_z) {
+    /**
+****************************************************************************************
+\begin{bmatrix}
+out_x \\
+out_y \\
+out_z
+\end{bmatrix}
+=
+\begin{bmatrix}
+px_0 \\
+py_0 \\
+pz_0
+\end{bmatrix}
++
+\begin{bmatrix}
+px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+\end{bmatrix}
+\cdot
+\begin{bmatrix}
+qx \\
+qy \\
+qz
+\end{bmatrix}
+*************************************************************************************************
+*/
     //
     //
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
@@ -262,20 +268,17 @@ SFEM_INLINE static void hex_aa_8_eval_grad(
 // tet4_resample_field_local /////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int tet4_resample_field_local(
-        // Mesh
-        const ptrdiff_t              nelements,  // number of elements
-        const ptrdiff_t              nnodes,     // number of nodes
-        idx_t** const SFEM_RESTRICT  elems,      // connectivity
-        geom_t** const SFEM_RESTRICT xyz,        // coordinates
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
-        const geom_t* const SFEM_RESTRICT    origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT    delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT    data,    // SDF
-        // Output
-        real_t* const SFEM_RESTRICT weighted_field) {
+int                                                                        //
+tet4_resample_field_local(const ptrdiff_t                      nelements,  // Mesh: number of elements
+                          const ptrdiff_t                      nnodes,     // Mesh: number of nodes
+                          idx_t** const SFEM_RESTRICT          elems,      // Mesh: connectivity
+                          geom_t** const SFEM_RESTRICT         xyz,        // Mesh: coordinates
+                          const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: number of nodes in each direction
+                          const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride of the data
+                          const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin of the domain
+                          const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta of the domain
+                          const real_t* const SFEM_RESTRICT    data,       // SDF
+                          real_t* const SFEM_RESTRICT          weighted_field) {    // Output
     //
     printf("============================================================\n");
     printf("Start: tet4_resample_field_local\n");
