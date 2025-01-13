@@ -162,9 +162,9 @@ void mesh_create_hex8_cube(mesh_t      *mesh,
         for (ptrdiff_t yi = 0; yi <= ny; yi++) {
             for (ptrdiff_t xi = 0; xi <= nx; xi++) {
                 ptrdiff_t node        = xi * ldx + yi * ldy + zi * ldz;
-                mesh->points[0][node] = xmin + xi * hx;
-                mesh->points[1][node] = ymin + yi * hy;
-                mesh->points[2][node] = zmin + zi * hz;
+                mesh->points[0][node] = (double)xmin + xi * hx;
+                mesh->points[1][node] = (double)ymin + yi * hy;
+                mesh->points[2][node] = (double)zmin + zi * hz;
             }
         }
     }

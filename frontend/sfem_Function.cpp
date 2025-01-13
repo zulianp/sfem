@@ -582,6 +582,17 @@ namespace sfem {
         ss << "- z: x2.raw\n";
         ss << "rpath: true\n";
 
+        const double mem_hex8_mesh = hex8_elements->extent(0) * hex8_elements->extent(1) * sizeof(idx_t) * 1e-9;
+        const double mem_sshex8_mesh = elements->extent(0) * elements->extent(1) * sizeof(idx_t) * 1e-9;
+        const double mem_points = points->extent(0) * points->extent(1) * sizeof(geom_t) * 1e-9;
+        const double mem_macro_points = impl_->macro_mesh->points()->extent(0) * impl_->macro_mesh->points()->extent(1) * sizeof(geom_t) * 1e-9;
+
+        ss << "mem_hex8_mesh:    " << mem_hex8_mesh << " [GB]\n";
+        ss << "mem_sshex8_mesh:  " << mem_sshex8_mesh << " [GB]\n";
+        ss << "mem_points:       " << mem_points << " [GB]\n";
+        ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
+
+
         std::string   meta_path = folder + "/meta.yaml";
         std::ofstream os(meta_path.c_str());
 
