@@ -42,7 +42,7 @@ int test_poisson() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    const char *SFEM_EXECUTION_SPACE;
+    const char *SFEM_EXECUTION_SPACE{nullptr};
     SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
 
     if (SFEM_EXECUTION_SPACE) {
@@ -130,6 +130,11 @@ int test_poisson_yaml() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
+
+#ifdef SFEM_ENABLE_CUDA
+    sfem::register_device_ops();
+#endif
+
     SFEM_RUN_TEST(test_poisson);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_poisson_yaml);
