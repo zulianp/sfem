@@ -87,7 +87,16 @@ void mesh_create_reference_hex8_cube(mesh_t *mesh) {
     mesh->points[2][7] = 1;
 }
 
-void mesh_create_hex8_cube(mesh_t *mesh, const int nx, const int ny, const int nz) {
+void mesh_create_hex8_cube(mesh_t      *mesh,
+                           const int    nx,
+                           const int    ny,
+                           const int    nz,
+                           const geom_t xmin,
+                           const geom_t ymin,
+                           const geom_t zmin,
+                           const geom_t xmax,
+                           const geom_t ymax,
+                           const geom_t zmax) {
     const ptrdiff_t nelements = nx * ny * nz;
     const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
 
@@ -113,9 +122,13 @@ void mesh_create_hex8_cube(mesh_t *mesh, const int nx, const int ny, const int n
     const ptrdiff_t ldy = nx + 1;
     const ptrdiff_t ldx = 1;
 
-    const double hx = 1. / nx;
-    const double hy = 1. / ny;
-    const double hz = 1. / nz;
+    const double hx = (xmax - xmin) * 1. / nx;
+    const double hy = (ymax - ymin) * 1. / ny;
+    const double hz = (zmax - zmin) * 1. / nz;
+
+    assert(hx > 0);
+    assert(hy > 0);
+    assert(hz > 0);
 
     for (ptrdiff_t zi = 0; zi < nz; zi++) {
         for (ptrdiff_t yi = 0; yi < ny; yi++) {
@@ -149,9 +162,9 @@ void mesh_create_hex8_cube(mesh_t *mesh, const int nx, const int ny, const int n
         for (ptrdiff_t yi = 0; yi <= ny; yi++) {
             for (ptrdiff_t xi = 0; xi <= nx; xi++) {
                 ptrdiff_t node        = xi * ldx + yi * ldy + zi * ldz;
-                mesh->points[0][node] = xi * hx;
-                mesh->points[1][node] = yi * hy;
-                mesh->points[2][node] = zi * hz;
+                mesh->points[0][node] = xmin + xi * hx;
+                mesh->points[1][node] = ymin + yi * hy;
+                mesh->points[2][node] = zmin + zi * hz;
             }
         }
     }
