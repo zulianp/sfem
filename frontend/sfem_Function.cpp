@@ -26,8 +26,8 @@
 #include <iostream>
 #include <map>
 #include <memory>
-#include <vector>
 #include <sstream>
+#include <vector>
 
 // Ops
 
@@ -474,9 +474,9 @@ namespace sfem {
         auto        elements = impl_->elements;
         auto        points   = this->points();
 
-        const int txe = sshex8_txe(this->level());
+        const int txe              = sshex8_txe(this->level());
         ptrdiff_t n_micro_elements = this->n_elements() * txe;
-        auto hex8_elements = create_host_buffer<idx_t>(8, n_micro_elements);
+        auto      hex8_elements    = create_host_buffer<idx_t>(8, n_micro_elements);
 
         sshex8_to_standard_hex8_mesh(level(), n_elements(), elements->data(), hex8_elements->data());
 
@@ -691,6 +691,37 @@ namespace sfem {
         return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
     }
 
+    static std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+                                                                      const std::shared_ptr<Sideset>       &sideset) {
+        ptrdiff_t n_nodes{0};
+        idx_t    *nodes{nullptr};
+        if (space->has_semi_structured_mesh()) {
+            auto &&ss = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+            if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                    ss.element_data(),
+                                                    sideset->parent()->size(),
+                                                    sideset->parent()->data(),
+                                                    sideset->lfi()->data(),
+                                                    &n_nodes,
+                                                    &nodes) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+            }
+        } else {
+            if (extract_nodeset_from_sideset(space->element_type(),
+                                             space->mesh_ptr()->elements()->data(),
+                                             sideset->parent()->size(),
+                                             sideset->parent()->data(),
+                                             sideset->lfi()->data(),
+                                             &n_nodes,
+                                             &nodes) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+            }
+        }
+
+        return sfem::manage_host_buffer(n_nodes, nodes);
+    }
+
     class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -836,8 +867,22 @@ namespace sfem {
         std::vector<struct Condition>  conditions;
     };
 
-    std::shared_ptr<FunctionSpace> DirichletConditions::space() { return impl_->space; }
-    std::vector<struct DirichletConditions::Condition>  &DirichletConditions::conditions() { return impl_->conditions; }
+    std::shared_ptr<DirichletConditions> DirichletConditions::create(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const std::vector<struct Condition>  &conditions) {
+        auto dc               = std::make_unique<DirichletConditions>(space);
+        dc->impl_->conditions = conditions;
+
+        for (auto &c : dc->impl_->conditions) {
+            if (!c.nodeset) {
+                c.nodeset = create_nodeset_from_sideset(space, c.sideset);
+            }
+        }
+
+        return dc;
+    }
+
+    std::shared_ptr<FunctionSpace>                      DirichletConditions::space() { return impl_->space; }
+    std::vector<struct DirichletConditions::Condition> &DirichletConditions::conditions() { return impl_->conditions; }
 
     int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 
@@ -888,34 +933,7 @@ namespace sfem {
 
                 auto it = sideset_to_nodeset.find(conds[i].sideset);
                 if (it == sideset_to_nodeset.end()) {
-                    ptrdiff_t n_nodes{0};
-                    idx_t    *nodes{nullptr};
-
-                    if (coarse_space->has_semi_structured_mesh()) {
-                        auto &&ss = coarse_space->semi_structured_mesh();
-                        SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                        if (sshex8_extract_nodeset_from_sideset(ss.level(),
-                                                                ss.element_data(),
-                                                                cdc.sideset->parent()->size(),
-                                                                cdc.sideset->parent()->data(),
-                                                                cdc.sideset->lfi()->data(),
-                                                                &n_nodes,
-                                                                &nodes) != SFEM_SUCCESS) {
-                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                        }
-                    } else {
-                        if (extract_nodeset_from_sideset(coarse_space->element_type(),
-                                                         coarse_space->mesh_ptr()->elements()->data(),
-                                                         cdc.sideset->parent()->size(),
-                                                         cdc.sideset->parent()->data(),
-                                                         cdc.sideset->lfi()->data(),
-                                                         &n_nodes,
-                                                         &nodes) != SFEM_SUCCESS) {
-                            SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                        }
-                    }
-
-                    auto nodeset                         = sfem::manage_host_buffer(n_nodes, nodes);
+                    auto nodeset = create_nodeset_from_sideset(coarse_space, cdc.sideset);
                     cdc.nodeset                          = nodeset;
                     sideset_to_nodeset[conds[i].sideset] = nodeset;
 
@@ -3015,8 +3033,8 @@ namespace sfem {
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
-        auto files = sfem::find_files(pattern);
-        int n_files = files.size();
+        auto files   = sfem::find_files(pattern);
+        int  n_files = files.size();
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 

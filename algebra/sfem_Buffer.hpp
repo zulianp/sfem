@@ -1,17 +1,30 @@
 #ifndef SFEM_BUFFER_HPP
 #define SFEM_BUFFER_HPP
 
+#include <cassert>
+#include <cstdio>
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <cstdio>
-#include <cassert>
 
 #include "sfem_base.h"
 
 namespace sfem {
 
     enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1, EXECUTION_SPACE_INVALID = -1 };
+
+    static ExecutionSpace execution_space_from_string(const std::string &str) {
+        if (str == "host") {
+            return EXECUTION_SPACE_HOST;
+        }
+
+        if (str == "device") {
+            return EXECUTION_SPACE_DEVICE;
+        }
+
+        SFEM_ERROR("Invalid ExecutionSpace: %s\n", str.c_str());
+        return EXECUTION_SPACE_INVALID;
+    }
 
     enum MemorySpace {
         MEMORY_SPACE_HOST    = EXECUTION_SPACE_HOST,
@@ -136,12 +149,11 @@ namespace sfem {
 
         int to_files(const char *format) {
             char path[2048];
-            for(int i = 0; i < extent_[0]; i++) {
-
+            for (int i = 0; i < extent_[0]; i++) {
                 int nchars = snprintf(path, sizeof(path), format, i);
                 assert(nchars < sizeof(path));
 
-                if(nchars >= sizeof(path)) {
+                if (nchars >= sizeof(path)) {
                     SFEM_ERROR("Path is too long!\n");
                 }
 
