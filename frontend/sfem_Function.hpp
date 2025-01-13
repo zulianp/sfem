@@ -78,6 +78,7 @@ namespace sfem {
         int       n_nodes_per_elem() const;
         ptrdiff_t n_nodes() const;
         ptrdiff_t n_elements() const;
+        enum ElemType element_type() const;
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
@@ -102,7 +103,7 @@ namespace sfem {
             return ret;
         }
 
-        static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm comm);
+        static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm comm, const int nx = 1, const int ny = 1, const int nz = 1);
 
     private:
         class Impl;
@@ -119,6 +120,10 @@ namespace sfem {
         Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
         Sideset();
         ~Sideset();
+
+        static std::shared_ptr<Sideset> create_from_selector(
+            const std::shared_ptr<Mesh> &mesh, 
+            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector);
 
     private:
         class Impl;

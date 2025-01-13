@@ -24,6 +24,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <list>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -154,9 +155,15 @@ namespace sfem {
         mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
     }
 
-    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm) {
+    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm, const int nx, const int ny, const int nz) {
         auto ret = std::make_shared<Mesh>(comm);
-        mesh_create_reference_hex8_cube(&ret->impl_->mesh);
+
+        if (nx == 1 && ny == 1 && nz == 1) {
+            mesh_create_reference_hex8_cube(&ret->impl_->mesh);
+        } else {
+            mesh_create_hex8_cube(&ret->impl_->mesh, nx, ny, nz);
+        }
+
         return ret;
     }
 
@@ -165,6 +172,8 @@ namespace sfem {
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
+
+    enum ElemType Mesh::element_type() const { return impl_->mesh.element_type; }
 
     std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
         return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
@@ -328,6 +337,73 @@ namespace sfem {
         auto ret = std::make_shared<Sideset>();
         if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
         return ret;
+    }
+
+    std::shared_ptr<Sideset> Sideset::create_from_selector(
+            const std::shared_ptr<Mesh>                                         &mesh,
+            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector) {
+        const ptrdiff_t nelements = mesh->n_elements();
+        const ptrdiff_t nnodes    = mesh->n_nodes();
+        const int       dim       = mesh->spatial_dimension();
+
+        auto elements = mesh->elements()->data();
+        auto points   = mesh->points()->data();
+
+        enum ElemType element_type = mesh->element_type();
+
+        const enum ElemType st   = side_type(element_type);
+        const int           nnxs = elem_num_nodes(st);
+        const int           ns   = elem_num_sides(element_type);
+
+        std::vector<int> local_side_table(ns * nnxs);
+        fill_local_side_table(mesh->element_type(), local_side_table.data());
+
+        std::list<element_idx_t> parent_list;
+        std::list<int16_t>       lfi_list;
+
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            for (int s = 0; s < ns; s++) {
+                // Barycenter of face
+                double p[3] = {0, 0, 0};
+
+                for (int ln = 0; ln < nnxs; ln++) {
+                    const idx_t node = elements[local_side_table[s * nnxs + ln]][e];
+
+                    for (int d = 0; d < dim; d++) {
+                        p[d] += points[d][node];
+                    }
+                }
+
+                for (int d = 0; d < dim; d++) {
+                    p[d] /= nnxs;
+                }
+
+                if (selector(p[0], p[1], p[2])) {
+                    parent_list.push_back(e);
+                    lfi_list.push_back(s);
+                }
+            }
+        }
+
+        const ptrdiff_t nparents = parent_list.size();
+        auto            parent   = create_host_buffer<element_idx_t>(nparents);
+        auto            lfi      = create_host_buffer<int16_t>(nparents);
+
+        {
+            ptrdiff_t idx = 0;
+            for (auto p : parent_list) {
+                parent->data()[idx++] = p;
+            }
+        }
+
+        {
+            ptrdiff_t idx = 0;
+            for (auto l : lfi_list) {
+                lfi->data()[idx++] = l;
+            }
+        }
+
+        return std::make_shared<Sideset>(mesh->comm(), parent, lfi);
     }
 
     int Sideset::read(MPI_Comm comm, const char *folder) {
@@ -933,7 +1009,7 @@ namespace sfem {
 
                 auto it = sideset_to_nodeset.find(conds[i].sideset);
                 if (it == sideset_to_nodeset.end()) {
-                    auto nodeset = create_nodeset_from_sideset(coarse_space, cdc.sideset);
+                    auto nodeset                         = create_nodeset_from_sideset(coarse_space, cdc.sideset);
                     cdc.nodeset                          = nodeset;
                     sideset_to_nodeset[conds[i].sideset] = nodeset;
 
