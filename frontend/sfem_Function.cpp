@@ -156,7 +156,7 @@ namespace sfem {
 
     std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm) {
         auto ret = std::make_shared<Mesh>(comm);
-        mesh_create_hex8_cube(&ret->impl_->mesh);
+        mesh_create_reference_hex8_cube(&ret->impl_->mesh);
         return ret;
     }
 
