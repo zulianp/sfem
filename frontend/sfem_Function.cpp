@@ -155,14 +155,18 @@ namespace sfem {
         mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
     }
 
-    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm comm, const int nx, const int ny, const int nz) {
+    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm     comm,
+                                                 const int    nx,
+                                                 const int    ny,
+                                                 const int    nz,
+                                                 const geom_t xmin,
+                                                 const geom_t ymin,
+                                                 const geom_t zmin,
+                                                 const geom_t xmax,
+                                                 const geom_t ymax,
+                                                 const geom_t zmax) {
         auto ret = std::make_shared<Mesh>(comm);
-
-        if (nx == 1 && ny == 1 && nz == 1) {
-            mesh_create_reference_hex8_cube(&ret->impl_->mesh);
-        } else {
-            mesh_create_hex8_cube(&ret->impl_->mesh, nx, ny, nz);
-        }
+        mesh_create_hex8_cube(&ret->impl_->mesh, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
 
         return ret;
     }

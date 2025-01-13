@@ -106,7 +106,8 @@ int test_poisson_and_boundary_selector() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m  = sfem::Mesh::create_hex8_cube(comm, 11, 12, 13);
+    int  base_resolution = 10;
+    auto m  = sfem::Mesh::create_hex8_cube(comm, base_resolution * 2, base_resolution * 1, base_resolution * 1, 0, 0, 0, 2, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     auto f = sfem::Function::create(fs);
@@ -115,7 +116,7 @@ int test_poisson_and_boundary_selector() {
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (1 - 1e-5) && x < (1 + 1e-5); });
+            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (2 - 1e-5) && x < (2 + 1e-5); });
 
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
