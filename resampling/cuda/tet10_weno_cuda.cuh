@@ -45,7 +45,10 @@
  * @param y
  * @return real_type
  */
-__device__ real_type Power_cuda(const real_type x, const real_type y) {
+__device__ real_type             //
+Power_cuda(const real_type x,    //
+           const real_type y) {  //
+
 #if SFEM_REAL_T_IS_FLOAT64
     return pow(x, y);
 #else
@@ -512,9 +515,12 @@ getNonLinearWeightsHOne_cuda(const real_type x,                       //
  * @param y3
  * @return real_type
  */
-__device__ real_type weno4_HOne_cuda(const real_type x,                         //
-                                     const real_type y0, const real_type y1,    //
-                                     const real_type y2, const real_type y3) {  //
+__device__ real_type                   //
+weno4_HOne_cuda(const real_type x,     //
+                const real_type y0,    //
+                const real_type y1,    //
+                const real_type y2,    //
+                const real_type y3) {  //
 
     const real_type eps = 1e-6;
 
