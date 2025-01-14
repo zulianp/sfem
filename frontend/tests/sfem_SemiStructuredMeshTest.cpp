@@ -59,7 +59,7 @@ int test_derefine_mesh() {
     return test_derefine(m, "test_derefine_mesh");
 }
 
-int test_prolong_restrict(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
+int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
     int  L  = 16;
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(L);
@@ -69,7 +69,7 @@ int test_prolong_restrict(const std::shared_ptr<sfem::Mesh> &m, const std::strin
 
     auto levels = fs->semi_structured_mesh().derefinement_levels();
 
-    auto coarse_fs = fs->derefine(levels[2]);
+    auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
     SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
@@ -119,7 +119,7 @@ int test_prolong_restrict(const std::shared_ptr<sfem::Mesh> &m, const std::strin
     return SFEM_TEST_SUCCESS;
 }
 
-int test_prolong_restrict_cube() {
+int test_prolongation_cube() {
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int L                    = 8;
@@ -129,14 +129,14 @@ int test_prolong_restrict_cube() {
     auto m = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
 
-    return test_prolong_restrict(m, "test_derefine_cube");
+    return test_prolongation(m, "test_derefine_cube");
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_derefine_cube);
     // SFEM_RUN_TEST(test_derefine_mesh);
-    SFEM_RUN_TEST(test_prolong_restrict_cube);
+    SFEM_RUN_TEST(test_prolongation_cube);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
