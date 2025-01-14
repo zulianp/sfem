@@ -1,15 +1,14 @@
 # P100
 
 GPU Architecture NVIDIA Pascal
-NVIDIA CUDA® Cores 3584
+NVIDIA CUDA Cores 3584
 FP64 		4.7  TFLOPS
 FP32 		9.3  TFLOPS
 FP16		18.7 TFLOPS
 
 GPU Memory 16GB 
-CoWoS 	 HBM2 at 732 GB/s or 12GB CoWoS HBM2 at 549 GB/s
+CoWoS  HBM2 at 732 GB/s or 12GB CoWoS HBM2 at 549 GB/s
 System Interface PCIe Gen3
-
 
 # A100
 
@@ -19,7 +18,6 @@ FP64					  9.7 	TFLOPS
 FP64 Tensor Core		 19.5 	TFLOPS
 FP32					 19.5 	TFLOPS
 Tensor Float 32 (TF32)	156 	TFLOPS 		| 312 TFLOPS*
-BFLOAT16 Tensor Core	312 	TFLOPS 		| 624 TFLOPS*
 FP16 Tensor Core	    312 	TFLOPS 		| 624 TFLOPS*
 INT8 Tensor Core		624 	TOPS   		| 1248 TOPS*
 
@@ -43,10 +41,11 @@ TC64 	67 TFLOPS 	60 TFLOPS
 FP32 	67 TFLOPS 	60 TFLOPS
 TC32   989 TFLOPS  835 TFLOPS
 TC16  1979 TFLOPS 1671 TFLOPS (bfloat and float)
-TC8 T 3958 TFLOPS 3341 TFLOPS (Int and float)
+TC8   3958 TFLOPS 3341 TFLOPS (Int and float)
 GPU Memory 141GB 141GB
 
 GPU Memory Bandwidth 4.8TB/s 4.8TB/s
 
 
-
+Rough expected speed-up for FP64
+P100 > H100  34/4.7 = 7.23x (reached 5.4x)
