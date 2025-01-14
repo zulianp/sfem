@@ -16,6 +16,8 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_tpl_blas.hpp"
+#include "sfem_openmp_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
