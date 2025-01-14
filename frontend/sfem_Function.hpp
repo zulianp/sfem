@@ -155,6 +155,9 @@ namespace sfem {
             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
         }
 
+        std::vector<int> derefinement_levels();
+        int apply_hierarchical_renumbering();
+
         int       n_nodes_per_element() const;
         ptrdiff_t n_nodes() const;
         int       level() const;

@@ -495,10 +495,19 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::vector<int> SemiStructuredMesh::derefinement_levels()
+    {
+        const int L = level();
+        const int nlevels = sshex8_hierarchical_n_levels(L);
+        std::vector<int> levels(nlevels);
+        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
+        return levels;
+    }
+
     std::shared_ptr<SemiStructuredMesh> SemiStructuredMesh::derefine(const int to_level) {
         const int from_level  = this->level();
         const int step_factor = from_level / to_level;
-        const int nxe         = (to_level + 1) * (to_level + 1);
+        const int nxe         = (to_level + 1) * (to_level + 1) * (to_level + 1);
 
         auto elements = this->impl_->elements;
 
@@ -522,25 +531,41 @@ namespace sfem {
             }
         }
 
-        ptrdiff_t n_unique_nodes{-1}; 
+        ptrdiff_t n_unique_nodes{-1};
         {
-            auto vv = view->data();
+            auto            vv        = view->data();
             const ptrdiff_t nelements = this->n_elements();
-            for(int v = 0; v < view->extent(0); v++) {
-                for(ptrdiff_t e = 0; e < nelements; e++) {
+            for (int v = 0; v < view->extent(0); v++) {
+                for (ptrdiff_t e = 0; e < nelements; e++) {
                     n_unique_nodes = MAX(vv[v][e], n_unique_nodes);
                 }
             }
+
+            n_unique_nodes += 1;
         }
 
-        auto ret = std::make_shared<SemiStructuredMesh>();
-        ret->impl_->macro_mesh = this->impl_->macro_mesh;
-        ret->impl_->level = to_level;
-        ret->impl_->elements = view;   
+        auto ret                   = std::make_shared<SemiStructuredMesh>();
+        ret->impl_->macro_mesh     = this->impl_->macro_mesh;
+        ret->impl_->level          = to_level;
+        ret->impl_->elements       = view;
         ret->impl_->n_unique_nodes = n_unique_nodes;
         ret->impl_->interior_start = this->impl_->interior_start;
-        ret->impl_->points = this->impl_->points;
+        ret->impl_->points         = this->impl_->points;
         return ret;
+    }
+
+    int SemiStructuredMesh::apply_hierarchical_renumbering() {
+        const int L = level();
+
+        const int nlevels = sshex8_hierarchical_n_levels(L);
+
+        std::vector<int> levels(nlevels);
+
+        // FiXME harcoded for sshex8
+        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
+
+        return sshex8_hierarchical_renumbering(
+                L, nlevels, levels.data(), this->n_elements(), this->impl_->n_unique_nodes, this->impl_->elements->data());
     }
 
     std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
@@ -587,8 +612,7 @@ namespace sfem {
         impl_->init(macro_mesh, level);
     }
 
-    SemiStructuredMesh::SemiStructuredMesh()
-    : impl_(std::make_unique<Impl>()) {}
+    SemiStructuredMesh::SemiStructuredMesh() : impl_(std::make_unique<Impl>()) {}
 
     SemiStructuredMesh::~SemiStructuredMesh() {}
 
