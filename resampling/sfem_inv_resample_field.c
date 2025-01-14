@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "matrixio_array.h"
 #include "sfem_resample_field.h"
 
@@ -33,27 +35,81 @@ abs_real_t(const real_t x) {  //
     return x < 0 ? -x : x;
 }
 
+real_t                               //
+shape_function(const real_t x1,      // 1st vertex X
+               const real_t y1,      // 1st vertex Y
+               const real_t z1,      // 1st vertex Z
+               const real_t x2,      // 2nd vertex X
+               const real_t y2,      // 2nd vertex Y
+               const real_t z2,      // 2nd vertex Z
+               const real_t x3,      // 3rd vertex X
+               const real_t y3,      // 3rd vertex Y
+               const real_t z3,      // 3rd vertex Z
+               const real_t x4,      // 4th vertex X
+               const real_t y4,      // 4th vertex Y
+               const real_t z4,      // 4th vertex Z
+               const real_t x,       // X Interpolation point
+               const real_t y,       // Y Interpolation point
+               const real_t z,       // Z Interpolation point
+               const real_t val1,    // Value at 1st vertex
+               const real_t val2,    // Value at 2nd vertex
+               const real_t val3,    // Value at 3rd vertex
+               const real_t val4) {  // Value at 4th vertex
+
+    const real_t V6 =
+            (-(x2 * y3 * z1) + x2 * y4 * z1 + x1 * y3 * z2 - x1 * y4 * z2 + x2 * y1 * z3 - x1 * y2 * z3 + x1 * y4 * z3 -
+             x2 * y4 * z3 + x4 * (-(y2 * z1) + y3 * z1 + y1 * z2 - y3 * z2 - y1 * z3 + y2 * z3) +
+             (-(x2 * y1) + x1 * y2 - x1 * y3 + x2 * y3) * z4 + x3 * (-(y4 * z1) - y1 * z2 + y4 * z2 + y2 * (z1 - z4) + y1 * z4));
+
+    const real_t a1 = (y4 * (-z1 + z2) + y2 * (z1 - z4) + y1 * (-z2 + z4)) / V6;
+    const real_t b1 = (x4 * (z1 - z2) + x1 * (z2 - z4) + x2 * (-z1 + z4)) / V6;
+    const real_t c1 = (x4 * (-y1 + y2) + x2 * (y1 - y4) + x1 * (-y2 + y4)) / V6;
+    const real_t d1 = (x4 * y2 * z1 - x2 * y4 * z1 - x4 * y1 * z2 + x1 * y4 * z2 + x2 * y1 * z4 - x1 * y2 * z4) / V6;
+
+    const real_t a2 = (y4 * (z1 - z3) + y1 * (z3 - z4) + y3 * (-z1 + z4)) / V6;
+    const real_t b2 = (x4 * (-z1 + z3) + x3 * (z1 - z4) + x1 * (-z3 + z4)) / V6;
+    const real_t c2 = (x4 * (y1 - y3) + x1 * (y3 - y4) + x3 * (-y1 + y4)) / V6;
+    const real_t d2 = (x4 * y3 * z1 - x3 * y4 * z1 - x4 * y1 * z3 + x1 * y4 * z3 + x3 * y1 * z4 - x1 * y3 * z4) / V6;
+
+    const real_t a3 = (y4 * (-z1 + z2) + y2 * (z1 - z4) + y1 * (-z2 + z4)) / V6;
+    const real_t b3 = (x4 * (z1 - z2) + x1 * (z2 - z4) + x2 * (-z1 + z4)) / V6;
+    const real_t c3 = (x4 * (-y1 + y2) + x2 * (y1 - y4) + x1 * (-y2 + y4)) / V6;
+    const real_t d3 = (x4 * y2 * z1 - x2 * y4 * z1 - x4 * y1 * z2 + x1 * y4 * z2 + x2 * y1 * z4 - x1 * y2 * z4) / V6;
+
+    const real_t a4 = (y3 * (-z1 + z2) + y2 * (z1 - z3) + y1 * (-z2 + z3)) / V6;
+    const real_t b4 = (x3 * (z1 - z2) + x1 * (z2 - z3) + x2 * (-z1 + z3)) / V6;
+    const real_t c4 = (x3 * (-y1 + y2) + x2 * (y1 - y3) + x1 * (-y2 + y3)) / V6;
+    const real_t d4 = (x3 * y2 * z1 - x2 * y3 * z1 - x3 * y1 * z2 + x1 * y3 * z2 + x2 * y1 * z3 - x1 * y2 * z3) / V6;
+
+    const real_t f1 = (a1 * x + b1 * y + c1 * z + d1) * val1;
+    const real_t f2 = (a2 * x + b2 * y + c2 * z + d2) * val2;
+    const real_t f3 = (a3 * x + b3 * y + c3 * z + d3) * val3;
+    const real_t f4 = (a4 * x + b4 * y + c4 * z + d4) * val4;
+
+    return f1 + f2 + f3 + f4;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-// thedeadnum_volume //////////////////////////////////////////////////////////
+// tetrahedron_volume //////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-real_t                                //
-thedeadnum_volume(const real_t x0,    // 1st vertex X
-                  const real_t y0,    // 1st vertex Y
-                  const real_t z0,    // 1st vertex Z
-                  const real_t x1,    // 2nd vertex X
-                  const real_t y1,    // 2nd vertex Y
-                  const real_t z1,    // 2nd vertex Z
-                  const real_t x2,    // 3rd vertex X
-                  const real_t y2,    // 3rd vertex Y
-                  const real_t z2,    // 3rd vertex Z
-                  const real_t x3,    // 4th vertex X
-                  const real_t y3,    // 4th vertex Y
-                  const real_t z3) {  // 4th vertex Z
+real_t                                 //
+tetrahedron_volume(const real_t x0,    // 1st vertex X
+                   const real_t y0,    // 1st vertex Y
+                   const real_t z0,    // 1st vertex Z
+                   const real_t x1,    // 2nd vertex X
+                   const real_t y1,    // 2nd vertex Y
+                   const real_t z1,    // 2nd vertex Z
+                   const real_t x2,    // 3rd vertex X
+                   const real_t y2,    // 3rd vertex Y
+                   const real_t z2,    // 3rd vertex Z
+                   const real_t x3,    // 4th vertex X
+                   const real_t y3,    // 4th vertex Y
+                   const real_t z3) {  // 4th vertex Z
 
     // determinant of the Jacobian
-    // M = [x0, y0, z0, 1]
-    //     [x1, y1, z1, 1]
+    //     [x0, y0, z0, 1]
+    // M = [x1, y1, z1, 1]
     //     [x2, y2, z2, 1]
     //     [x3, y3, z3, 1]
     //
@@ -61,60 +117,72 @@ thedeadnum_volume(const real_t x0,    // 1st vertex X
 
     const real_t f1_6 = 1.0 / 6.0;
 
-    return f1_6 * abs_real_t(x1 * y2 * z0 - x1 * y3 * z0 - x0 * y2 * z1 + x0 * y3 * z1 - x1 * y0 * z2 + x0 * y1 * z2 -
-                             x0 * y3 * z2 + x1 * y3 * z2 + x3 * (y1 * z0 - y2 * z0 - y0 * z1 + y2 * z1 + y0 * z2 - y1 * z2) +
-                             x1 * y0 * z3 - x0 * y1 * z3 + x0 * y2 * z3 - x1 * y2 * z3 +
-                             x2 * (y3 * z0 + y0 * z1 - y3 * z1 - y0 * z3 + y1 * (-z0 + z3)));
+    return f1_6 * abs_real_t(-(x1 * y2 * z0) + x1 * y3 * z0 + x0 * y2 * z1 - x0 * y3 * z1 + x1 * y0 * z2 - x0 * y1 * z2 +
+                             x0 * y3 * z2 - x1 * y3 * z2 + x3 * (-(y1 * z0) + y2 * z0 + y0 * z1 - y2 * z1 - y0 * z2 + y1 * z2) +
+                             (-(x1 * y0) + x0 * y1 - x0 * y2 + x1 * y2) * z3 +
+                             x2 * (-(y3 * z0) - y0 * z1 + y3 * z1 + y1 * (z0 - z3) + y0 * z3));
 }
 
-int                                          //
-check_inside_testreadnum(const real_t px,    //
-                         const real_t py,    //
-                         const real_t pz,    //
-                         const real_t x0,    //
-                         const real_t y0,    //
-                         const real_t z0,    //
-                         const real_t x1,    //
-                         const real_t y1,    //
-                         const real_t z1,    //
-                         const real_t x2,    //
-                         const real_t y2,    //
-                         const real_t z2,    //
-                         const real_t x3,    //
-                         const real_t y3,    //
-                         const real_t z3) {  //
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// check_inside_testreadnum ///////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+int                                            //
+check_p_inside_testreadnum(const real_t px,    //
+                           const real_t py,    //
+                           const real_t pz,    //
+                           const real_t x0,    //
+                           const real_t y0,    //
+                           const real_t z0,    //
+                           const real_t x1,    //
+                           const real_t y1,    //
+                           const real_t z1,    //
+                           const real_t x2,    //
+                           const real_t y2,    //
+                           const real_t z2,    //
+                           const real_t x3,    //
+                           const real_t y3,    //
+                           const real_t z3) {  //
 
-    const real_t volume_th = thedeadnum_volume(x0,  // 1st vertex X
-                                               y0,
-                                               z0,
-                                               x1,  // 2nd vertex X
-                                               y1,
-                                               z1,
-                                               x2,  // 3rd vertex X
-                                               y2,
-                                               z2,
-                                               x3,  // 4th vertex X
-                                               y3,
-                                               z3);
+    /**
+     * see:
+     * https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/51733522#51733522
+     *
+     */
 
-    const real_t volume_0 = thedeadnum_volume(px,  // vertices of the point
-                                              py,
-                                              pz,
-                                              x1,  // 2nd vertex X of the tetrahedron
-                                              y1,
-                                              z1,
-                                              x2,  // 3rd vertex X of the tetrahedron
-                                              y2,
-                                              z2,
-                                              x3,  // 4th vertex X of the tetrahedron
-                                              y3,
-                                              z3);
+    const double den13 =
+            (x1 * y2 * z0 - x1 * y3 * z0 - x0 * y2 * z1 + x0 * y3 * z1 - x1 * y0 * z2 + x0 * y1 * z2 - x0 * y3 * z2 +
+             x1 * y3 * z2 + x3 * (y1 * z0 - y2 * z0 - y0 * z1 + y2 * z1 + y0 * z2 - y1 * z2) + x1 * y0 * z3 - x0 * y1 * z3 +
+             x0 * y2 * z3 - x1 * y2 * z3 + x2 * (y3 * z0 + y0 * z1 - y3 * z1 - y0 * z3 + y1 * (-z0 + z3)));
 
-    if (volume_0 > volume_th) {
-        return 0
-    }
+    const double r1 =
+            (pz * (-(x3 * y0) - x0 * y2 + x3 * y2 + x2 * (y0 - y3) + x0 * y3) + px * y2 * z0 - x3 * y2 * z0 - px * y3 * z0 +
+             x2 * y3 * z0 - px * y0 * z2 + x3 * y0 * z2 + px * y3 * z2 - x0 * y3 * z2 + px * y0 * z3 - x2 * y0 * z3 -
+             px * y2 * z3 + x0 * y2 * z3 + py * (-(x2 * z0) + x3 * z0 + x0 * z2 - x3 * z2 - x0 * z3 + x2 * z3)) /
+            den13;
 
+    const double r2 =
+            (pz * (-(x3 * y0) - x0 * y1 + x3 * y1 + x1 * (y0 - y3) + x0 * y3) + px * y1 * z0 - x3 * y1 * z0 - px * y3 * z0 +
+             x1 * y3 * z0 - px * y0 * z1 + x3 * y0 * z1 + px * y3 * z1 - x0 * y3 * z1 + px * y0 * z3 - x1 * y0 * z3 -
+             px * y1 * z3 + x0 * y1 * z3 + py * (-(x1 * z0) + x3 * z0 + x0 * z1 - x3 * z1 - x0 * z3 + x1 * z3)) /
+            (-(x1 * y2 * z0) + x1 * y3 * z0 + x0 * y2 * z1 - x0 * y3 * z1 + x1 * y0 * z2 - x0 * y1 * z2 + x0 * y3 * z2 -
+             x1 * y3 * z2 + x3 * (-(y1 * z0) + y2 * z0 + y0 * z1 - y2 * z1 - y0 * z2 + y1 * z2) +
+             (-(x1 * y0) + x0 * y1 - x0 * y2 + x1 * y2) * z3 + x2 * (-(y3 * z0) - y0 * z1 + y3 * z1 + y1 * (z0 - z3) + y0 * z3));
 
+    const double r3 =
+            (pz * (-(x2 * y0) - x0 * y1 + x2 * y1 + x1 * (y0 - y2) + x0 * y2) + px * y1 * z0 - x2 * y1 * z0 - px * y2 * z0 +
+             x1 * y2 * z0 - px * y0 * z1 + x2 * y0 * z1 + px * y2 * z1 - x0 * y2 * z1 + px * y0 * z2 - x1 * y0 * z2 -
+             px * y1 * z2 + x0 * y1 * z2 + py * (-(x1 * z0) + x2 * z0 + x0 * z1 - x2 * z1 - x0 * z2 + x1 * z2)) /
+            den13;
+
+    const double same_side = ((x2 * y1 - x3 * y1 - x1 * y2 + x3 * y2 + x1 * y3 - x2 * y3) * (pz - z0) +
+                              (py - y0) * (-(x2 * z1) + x3 * z1 + x1 * z2 - x3 * z2 - x1 * z3 + x2 * z3) +
+                              (px - x0) * (y2 * z1 - y3 * z1 - y1 * z2 + y3 * z2 + y1 * z3 - y2 * z3)) *
+                             ((x2 * y1 - x3 * y1 - x1 * y2 + x3 * y2 + x1 * y3 - x2 * y3) * (-z0 + z2) +
+                              (-y0 + y2) * (-(x2 * z1) + x3 * z1 + x1 * z2 - x3 * z2 - x1 * z3 + x2 * z3) +
+                              (-x0 + x2) * (y2 * z1 - y3 * z1 - y1 * z2 + y3 * z2 + y1 * z3 - y2 * z3));
+
+    return same_side > 0.0 && r1 >= 0.0 && r1 <= 1.0 && r2 >= 0.0 && r2 <= 1.0 && r3 >= 0.0 && r3 <= 1.0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -220,6 +288,48 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                     const real_t grid_z = (k * dz + oz);
 
                     // Check if the grid point is inside the tetrahedron
+                    const int is_inside = check_p_inside_testreadnum(grid_x,
+                                                                     grid_y,
+                                                                     grid_z,  //
+                                                                     x0,
+                                                                     y0,
+                                                                     z0,
+                                                                     x1,
+                                                                     y1,
+                                                                     z1,
+                                                                     x2,
+                                                                     y2,
+                                                                     z2,
+                                                                     x3,
+                                                                     y3,
+                                                                     z3);
+
+                    if (is_inside) {
+                        // Interpolate the field at the grid point
+                        const real_t val = shape_function(x0,
+                                                          y0,
+                                                          z0,
+                                                          x1,
+                                                          y1,
+                                                          z1,
+                                                          x2,
+                                                          y2,
+                                                          z2,
+                                                          x3,
+                                                          y3,
+                                                          z3,
+                                                          grid_x,
+                                                          grid_y,
+                                                          grid_z,
+                                                          weighted_field_0,
+                                                          weighted_field_1,
+                                                          weighted_field_2,
+                                                          weighted_field_3);
+
+                        // Update the field at the grid point
+                        const ptrdiff_t idx = i * stride[0] + j * stride[1] + k * stride[2];
+                        data[idx]           = val;
+                    }
                 }
             }
         }
