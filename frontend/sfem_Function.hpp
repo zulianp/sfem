@@ -145,6 +145,7 @@ namespace sfem {
         geom_t  **point_data();
         ptrdiff_t interior_start() const;
 
+        SemiStructuredMesh();
         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
         ~SemiStructuredMesh();
 
@@ -158,6 +159,8 @@ namespace sfem {
         ptrdiff_t n_nodes() const;
         int       level() const;
         ptrdiff_t n_elements() const;
+
+        std::shared_ptr<SemiStructuredMesh> derefine(const int to_level);
 
         std::shared_ptr<Buffer<geom_t *>> points();
 
@@ -199,7 +202,7 @@ namespace sfem {
 
         enum ElemType element_type() const;
 
-        std::shared_ptr<FunctionSpace> derefine() const;
+        std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
         std::shared_ptr<FunctionSpace> lor() const;
 
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
