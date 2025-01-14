@@ -346,17 +346,41 @@ namespace sfem {
 #endif
         {
             if (to_space->has_semi_structured_mesh()) {
-                return std::make_shared<LambdaOperator<real_t>>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            auto &ssm = to_space->semi_structured_mesh();
-                            sshex8_hierarchical_prolongation(
-                                    ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
-                        },
-                        EXECUTION_SPACE_HOST);
+                if (!from_space->has_semi_structured_mesh()) {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                auto &ssm = to_space->semi_structured_mesh();
+                                sshex8_hierarchical_prolongation(
+                                        ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                } else {
+                    assert(from_space->semi_structured_mesh().level() > 1);
+
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                auto &from_ssm = from_space->semi_structured_mesh();
+                                auto &to_ssm   = to_space->semi_structured_mesh();
+
+                                sshex8_prolongate(from_ssm.n_elements(),     // nelements,
+                                                  from_ssm.level(),          // from_level
+                                                  1,                         // from_level_stride
+                                                  from_ssm.element_data(),   // from_elements
+                                                  to_ssm.level(),            // to_level
+                                                  1,                         // to_level_stride
+                                                  to_ssm.element_data(),     // to_elements
+                                                  from_space->block_size(),  // vec_size
+                                                  from,
+                                                  to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                }
             } else {
-                return std::make_shared<LambdaOperator<real_t>>(
+                return make_op<real_t>(
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {

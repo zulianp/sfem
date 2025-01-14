@@ -495,10 +495,11 @@ namespace sfem {
         ~Impl() {}
     };
 
-    std::vector<int> SemiStructuredMesh::derefinement_levels()
-    {
-        const int L = level();
-        const int nlevels = sshex8_hierarchical_n_levels(L);
+    std::shared_ptr<Mesh> SemiStructuredMesh::macro_mesh() { return impl_->macro_mesh; }
+
+    std::vector<int> SemiStructuredMesh::derefinement_levels() {
+        const int        L       = level();
+        const int        nlevels = sshex8_hierarchical_n_levels(L);
         std::vector<int> levels(nlevels);
         sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
         return levels;
@@ -796,13 +797,20 @@ namespace sfem {
         }
 
         assert(has_semi_structured_mesh());
+        return create(semi_structured_mesh().derefine(to_level), block_size());
+    }
 
-        auto ssm                        = semi_structured_mesh().derefine(to_level);
-        auto fs                         = FunctionSpace::create(mesh_ptr(), block_size(), element_type());
-        fs->impl_->semi_structured_mesh = ssm;
-        fs->impl_->nlocal               = ssm->n_nodes() * block_size();
-        fs->impl_->nglobal              = fs->impl_->nlocal;
-        return fs;
+    FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
+
+    std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size) {
+        auto ret                         = std::make_shared<FunctionSpace>();
+        ret->impl_->mesh                 = mesh->macro_mesh();
+        ret->impl_->block_size           = block_size;
+        ret->impl_->element_type         = SSHEX8;
+        ret->impl_->semi_structured_mesh = mesh;
+        ret->impl_->nlocal               = mesh->n_nodes() * block_size;
+        ret->impl_->nglobal              = ret->impl_->nlocal;
+        return ret;
     }
 
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)

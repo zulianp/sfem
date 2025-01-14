@@ -170,6 +170,8 @@ namespace sfem {
         int export_as_standard(const char *path);
         int write(const char *path);
 
+        std::shared_ptr<Mesh> macro_mesh();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -187,6 +189,10 @@ namespace sfem {
                                                      const enum ElemType          element_type = INVALID) {
             return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
+
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh,
+                                                     const int                    block_size   = 1);
+
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
@@ -213,7 +219,10 @@ namespace sfem {
 
         friend class Op;
 
+        // private
+        FunctionSpace();
     private:
+        
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
