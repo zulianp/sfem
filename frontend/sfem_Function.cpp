@@ -495,6 +495,54 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::shared_ptr<SemiStructuredMesh> SemiStructuredMesh::derefine(const int to_level) {
+        const int from_level  = this->level();
+        const int step_factor = from_level / to_level;
+        const int nxe         = (to_level + 1) * (to_level + 1);
+
+        auto elements = this->impl_->elements;
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                n_elements(),
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        for (int zi = 0; zi <= to_level; zi++) {
+            for (int yi = 0; yi <= to_level; yi++) {
+                for (int xi = 0; xi <= to_level; xi++) {
+                    const int from_lidx   = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                    const int to_lidx     = sshex8_lidx(to_level, xi, yi, zi);
+                    view->data()[to_lidx] = elements->data()[from_lidx];
+                }
+            }
+        }
+
+        ptrdiff_t n_unique_nodes{-1}; 
+        {
+            auto vv = view->data();
+            const ptrdiff_t nelements = this->n_elements();
+            for(int v = 0; v < view->extent(0); v++) {
+                for(ptrdiff_t e = 0; e < nelements; e++) {
+                    n_unique_nodes = MAX(vv[v][e], n_unique_nodes);
+                }
+            }
+        }
+
+        auto ret = std::make_shared<SemiStructuredMesh>();
+        ret->impl_->macro_mesh = this->impl_->macro_mesh;
+        ret->impl_->level = to_level;
+        ret->impl_->elements = view;   
+        ret->impl_->n_unique_nodes = n_unique_nodes;
+        ret->impl_->interior_start = this->impl_->interior_start;
+        ret->impl_->points = this->impl_->points;
+        return ret;
+    }
+
     std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
         if (!impl_->points) {
             auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
@@ -539,6 +587,9 @@ namespace sfem {
         impl_->init(macro_mesh, level);
     }
 
+    SemiStructuredMesh::SemiStructuredMesh()
+    : impl_(std::make_unique<Impl>()) {}
+
     SemiStructuredMesh::~SemiStructuredMesh() {}
 
     ptrdiff_t SemiStructuredMesh::n_nodes() const { return impl_->n_unique_nodes; }
@@ -582,16 +633,16 @@ namespace sfem {
         ss << "- z: x2.raw\n";
         ss << "rpath: true\n";
 
-        const double mem_hex8_mesh = hex8_elements->extent(0) * hex8_elements->extent(1) * sizeof(idx_t) * 1e-9;
+        const double mem_hex8_mesh   = hex8_elements->extent(0) * hex8_elements->extent(1) * sizeof(idx_t) * 1e-9;
         const double mem_sshex8_mesh = elements->extent(0) * elements->extent(1) * sizeof(idx_t) * 1e-9;
-        const double mem_points = points->extent(0) * points->extent(1) * sizeof(geom_t) * 1e-9;
-        const double mem_macro_points = impl_->macro_mesh->points()->extent(0) * impl_->macro_mesh->points()->extent(1) * sizeof(geom_t) * 1e-9;
+        const double mem_points      = points->extent(0) * points->extent(1) * sizeof(geom_t) * 1e-9;
+        const double mem_macro_points =
+                impl_->macro_mesh->points()->extent(0) * impl_->macro_mesh->points()->extent(1) * sizeof(geom_t) * 1e-9;
 
         ss << "mem_hex8_mesh:    " << mem_hex8_mesh << " [GB]\n";
         ss << "mem_sshex8_mesh:  " << mem_sshex8_mesh << " [GB]\n";
         ss << "mem_points:       " << mem_points << " [GB]\n";
         ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
-
 
         std::string   meta_path = folder + "/meta.yaml";
         std::ofstream os(meta_path.c_str());
@@ -714,15 +765,20 @@ namespace sfem {
         return impl_->element_type;
     }
 
-    std::shared_ptr<FunctionSpace> FunctionSpace::derefine() const {
-        // if (has_semi_structured_mesh()) {
-
-        // }
-
-        {
+    std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
+        if (to_level == 1) {
             // FIXME the number of nodes in mesh does not change, will lead to bugs
             return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_base_elem(impl_->element_type));
         }
+
+        assert(has_semi_structured_mesh());
+
+        auto ssm                        = semi_structured_mesh().derefine(to_level);
+        auto fs                         = FunctionSpace::create(mesh_ptr(), block_size(), element_type());
+        fs->impl_->semi_structured_mesh = ssm;
+        fs->impl_->nlocal               = ssm->n_nodes() * block_size();
+        fs->impl_->nglobal              = fs->impl_->nlocal;
+        return fs;
     }
 
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)
