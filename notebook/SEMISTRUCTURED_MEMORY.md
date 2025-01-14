@@ -1,9 +1,14 @@
 # Memory footprint of semi-structured discretizations for basic Conjugate Gradient solve
 
-|E|			|N| 
-16000000 	16200801
+This does not account for pre-computed assembly data. 
+Hence, it is a lower bound that favors more unstructured over the other two variants.
 
-*Fully unstructured*
+## Problem size
+
+#elements 16000000 	
+#nodes    16200801
+
+## Fully unstructured
 mem_hex8_mesh:   0.512 		[GB]
 mem_points:      0.19441 	[GB]
 field float64:   0.13		[GB]
@@ -21,7 +26,7 @@ mem reduction: 2x
 CG (float32): 5 * 0.065 = 0.325 [GB]
 mem reduction: 3x
 
-*Semi-structured (store all points and indices)*
+## Semi-structured (store all points and indices)
 
 Base: 	20 	
 R: 		10
@@ -52,7 +57,7 @@ mem reduction: 1.48x
 CG (float32): 0.0679173 + 0.19441 + 5 * 0.065 = 0.58 [GB]
 mem reduction: 1.7x
 
-*Semi-structured (store only corner nodes)*
+## Semi-structured (store only corner nodes)
 
 Base: 	4 	
 R: 		50
