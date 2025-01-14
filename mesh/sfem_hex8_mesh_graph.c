@@ -946,9 +946,12 @@ int sshex8_hierarchical_renumbering(const int       L,
         for (int yi = 0; yi <= 1; yi++) {
             for (int xi = 0; xi <= 1; xi++) {
                 for (ptrdiff_t e = 0; e < nelements; e++) {
-                    const int v                  = sshex8_lidx(L, xi * L, yi * L, zi * L);
-                    node_mapping[elements[v][e]] = elements[v][e];
-                    next_id                      = MAX(next_id, node_mapping[v]);
+                    const int   v   = sshex8_lidx(L, xi * L, yi * L, zi * L);
+                    const idx_t idx = elements[v][e];
+
+                    assert(idx < nnodes);
+                    node_mapping[idx] = idx;
+                    next_id           = MAX(next_id, idx);
                 }
             }
         }
@@ -967,6 +970,7 @@ int sshex8_hierarchical_renumbering(const int       L,
                     for (int xi = 0; xi <= l; xi += stride) {
                         const int   v   = sshex8_lidx(L, xi * step_factor, yi * step_factor, zi * step_factor);
                         const idx_t idx = elements[v][e];
+                        assert(idx < nnodes);
                         if (node_mapping[idx] == -1) {
                             node_mapping[idx] = next_id++;
                         }

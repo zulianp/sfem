@@ -18,14 +18,9 @@ namespace sfem {
         auto     &ssmesh = f->space()->semi_structured_mesh();
         const int L      = ssmesh.level();
 
-        // FiXME harcoded for sshex8
-        const int nlevels = sshex8_hierarchical_n_levels(L);
-
-        std::vector<int> levels(nlevels);
-
-        // FiXME harcoded for sshex8
-        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
-
+        std::vector<int> levels =  ssmesh.derefinement_levels();
+        const int nlevels = levels.size();
+        
         std::vector<std::shared_ptr<Function>> functions;
         functions.push_back(f);
 
