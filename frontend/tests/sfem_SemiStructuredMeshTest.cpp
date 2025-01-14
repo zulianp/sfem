@@ -22,7 +22,7 @@ int test_derefine() {
     // Do this before any other operation
     fs->semi_structured_mesh().apply_hierarchical_renumbering();
 
-    // Create the points to avoid duplication (lazy)!
+    // Create the points to avoid duplication in coarse levels (lazy init)!
     // fs->semi_structured_mesh().points();    
 
     auto levels = fs->semi_structured_mesh().derefinement_levels();
