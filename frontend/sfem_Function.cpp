@@ -1551,7 +1551,7 @@ namespace sfem {
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        MPI_Comm comm = impl_->space->mesh_ptr()->comm();
         sfem::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
@@ -1570,7 +1570,7 @@ namespace sfem {
                 char b_name[1024];
                 sprintf(b_name, "%s.%d", name, b);
                 sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
-                if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (array_write(comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
             }
@@ -1578,7 +1578,7 @@ namespace sfem {
         } else {
             char path[2048];
             sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
-            if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
+            if (array_write(comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
                 return SFEM_FAILURE;
             }
         }
@@ -2487,10 +2487,16 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             SFEM_TRACE_SCOPE("SemiStructuredLaplacian::derefine_op");
 
-            assert(space->element_type() == macro_base_elem(element_type));
-            auto ret          = std::make_shared<Laplacian>(space);
-            ret->element_type = macro_base_elem(element_type);
-            return ret;
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));            
+            if (space->has_semi_structured_mesh()) {
+                auto ret = std::make_shared<SemiStructuredLaplacian>(space);
+                ret->element_type = element_type;
+                return ret;
+            } else {
+                auto ret = std::make_shared<Laplacian>(space);
+                ret->element_type = macro_base_elem(element_type);
+                return ret;
+            }
         }
 
         const char *name() const override { return "ss:Laplacian"; }
