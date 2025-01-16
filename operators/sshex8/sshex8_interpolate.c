@@ -710,19 +710,13 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
                             const scalar_t ly = (yi - cyi * step_factor) / ((scalar_t)step_factor);
                             const scalar_t lz = (zi - czi * step_factor) / ((scalar_t)step_factor);
 
-                            assert(lx <= 1+1e-8);
+                            assert(lx <= 1 + 1e-8);
                             assert(lx >= -1e-8);
 
-                            const scalar_t phi0x[2] = {
-                                    1 - lx, lx
-                            };
-                            const scalar_t phi0y[2] = {
-                                    1 - ly, ly
-                            };
+                            const scalar_t phi0x[2] = {1 - lx, lx};
+                            const scalar_t phi0y[2] = {1 - ly, ly};
 
-                            const scalar_t phi0z[2] = {
-                                    1 - lz, lz
-                            };
+                            const scalar_t phi0z[2] = {1 - lz, lz};
 
                             for (int kk = 0; kk <= zinc; kk++) {
                                 for (int jj = 0; jj <= yinc; jj++) {
@@ -997,6 +991,12 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
         }
 
         free(from_coeffs);
+
+        for (int d = 0; d < vec_size; d++) {
+            free(to_coeffs[d]);
+        }
+
+        free(to_coeffs);
     }
 
     return SFEM_SUCCESS;
