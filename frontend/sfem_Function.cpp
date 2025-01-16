@@ -1629,10 +1629,9 @@ namespace sfem {
         return ret;
     }
 
-    void Function::describe(std::ostream &os) const
-    {
+    void Function::describe(std::ostream &os) const {
         os << "n_dofs: " << impl_->space->n_dofs() << "\n";
-        os << "n_ops: " << impl_->ops.size()  << "\n";
+        os << "n_ops: " << impl_->ops.size() << "\n";
         os << "n_constraints: " << impl_->constraints.size() << "\n";
     }
 
@@ -2141,8 +2140,9 @@ namespace sfem {
 
         ~SemiStructuredLinearElasticity() {
             if (calls) {
-                printf("SemiStructuredLinearElasticity::apply(%s) called %ld times. Total: %g [s], "
+                printf("SemiStructuredLinearElasticity[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
+                       space->semi_structured_mesh().level(),
                        use_affine_approximation ? "affine" : "isoparametric",
                        calls,
                        total_time,
@@ -2203,12 +2203,23 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::derefine_op");
 
-            assert(space->element_type() == macro_base_elem(element_type));
-            auto ret          = std::make_shared<LinearElasticity>(space);
-            ret->element_type = macro_base_elem(element_type);
-            ret->mu           = mu;
-            ret->lambda       = lambda;
-            return ret;
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
+            
+            if (space->has_semi_structured_mesh()) {
+                auto ret                      = std::make_shared<SemiStructuredLinearElasticity>(space);
+                ret->element_type             = element_type;
+                ret->use_affine_approximation = use_affine_approximation;
+                ret->mu                       = mu;
+                ret->lambda                   = lambda;
+                return ret;
+            } else {
+                assert(space->element_type() == macro_base_elem(element_type));
+                auto ret          = std::make_shared<LinearElasticity>(space);
+                ret->element_type = macro_base_elem(element_type);
+                ret->mu           = mu;
+                ret->lambda       = lambda;
+                return ret;
+            }
         }
 
         const char *name() const override { return "ss:LinearElasticity"; }
@@ -2495,14 +2506,14 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
             SFEM_TRACE_SCOPE("SemiStructuredLaplacian::derefine_op");
 
-            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));            
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
             if (space->has_semi_structured_mesh()) {
-                auto ret = std::make_shared<SemiStructuredLaplacian>(space);
-                ret->element_type = element_type;
+                auto ret                      = std::make_shared<SemiStructuredLaplacian>(space);
+                ret->element_type             = element_type;
                 ret->use_affine_approximation = use_affine_approximation;
                 return ret;
             } else {
-                auto ret = std::make_shared<Laplacian>(space);
+                auto ret          = std::make_shared<Laplacian>(space);
                 ret->element_type = macro_base_elem(element_type);
                 return ret;
             }
