@@ -56,6 +56,7 @@ shape_function(const real_t x1,      // 1st vertex X
                const real_t val3,    // Value at 3rd vertex
                const real_t val4) {  // Value at 4th vertex
 
+    // 6 * Volume of the tetrahedron (Determinant of the Jacobian)
     const real_t V6 =
             (-(x2 * y3 * z1) + x2 * y4 * z1 + x1 * y3 * z2 - x1 * y4 * z2 + x2 * y1 * z3 - x1 * y2 * z3 + x1 * y4 * z3 -
              x2 * y4 * z3 + x4 * (-(y2 * z1) + y3 * z1 + y1 * z2 - y3 * z2 - y1 * z3 + y2 * z3) +
@@ -148,6 +149,7 @@ check_p_inside_testreadnum(const real_t px,    //
      * see:
      * https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/51733522#51733522
      *
+     * This is the Mathematica manipulation of the above method.
      */
 
     const double den13 =
@@ -282,6 +284,8 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
         // Loop over the bounding box of the tetrahedron in the grid
         for (ptrdiff_t i = i_min_thv; i <= i_max_thv; i++) {
             for (ptrdiff_t j = j_min_thv; j <= j_max_thv; j++) {
+                int in_out_status = 0;
+
                 for (ptrdiff_t k = k_min_thv; k <= k_max_thv; k++) {
                     const real_t grid_x = (i * dx + ox);
                     const real_t grid_y = (j * dy + oy);
@@ -303,6 +307,16 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                                                                      x3,
                                                                      y3,
                                                                      z3);
+
+                    if (in_out_status == 1 && !is_inside) {
+                        // if the grid point is outside the tetrahedron
+                        // all the grid points after this point in the k loop
+                        // are outside the tetrahedron
+                        in_out_status = 0;
+                        continue;
+                    }
+
+                    in_out_status = is_inside;
 
                     if (is_inside) {
                         // Interpolate the field at the grid point
@@ -327,13 +341,13 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                                                           weighted_field_3);
 
                         // Update the field at the grid point
-                        const ptrdiff_t idx = i * stride[0] + j * stride[1] + k * stride[2];
-                        data[idx]           = val;
+                        const ptrdiff_t index = i * stride[0] + j * stride[1] + k * stride[2];
+                        data[index]           = val;
                     }
                 }
             }
         }
     }
 
-    RETURN_FROM_FUNCTION(0);
+    RETURN_FROM_FUNCTION(ret);
 }

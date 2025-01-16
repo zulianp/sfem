@@ -154,7 +154,23 @@ int main(int argc, char* argv[]) {
         if (SFEM_READ_FP32) {
             float* temp = NULL;
 
-            if (ndarray_create_from_file(comm, data_path, MPI_FLOAT, 3, (void**)&temp, nlocal, nglobal)) {
+            // int ndarray_create_from_file_segmented(
+            //                MPI_Comm comm,
+            //                const char *path,
+            //                MPI_Datatype type,
+            //                int ndims,
+            //                void **data_ptr,
+            //                int segment_size, // INT_MAX (ignored) in this case
+            //                ptrdiff_t *const nlocal,
+            //                const ptrdiff_t *const nglobal);
+
+            if (ndarray_create_from_file(comm,           //
+                                         data_path,      //
+                                         MPI_FLOAT,      //
+                                         3,              //
+                                         (void**)&temp,  //
+                                         nlocal,         //
+                                         nglobal)) {     //
                 exit(EXIT_FAILURE);
             }
 
@@ -298,7 +314,7 @@ int main(int argc, char* argv[]) {
                                                       &info);    //
                     break;                                       //
 
-                case TET4:  // TET4 case
+                case TET4:                                      // TET4 case
                     ret_resample =                              //
                             resample_field_mesh_tet4(mpi_size,  //
                                                      mpi_rank,  //
