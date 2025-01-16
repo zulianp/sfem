@@ -529,6 +529,8 @@ namespace sfem {
 
         std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
 
+        void describe(std::ostream &os) const;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

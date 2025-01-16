@@ -388,7 +388,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("hierarchical_prolongation");
-                            
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_prolongation(from_space->element_type(),
                                                       to_space->element_type(),
@@ -416,9 +416,9 @@ namespace sfem {
         int       nxe;
         if (from_space->has_semi_structured_mesh()) {
             auto &ssmesh = from_space->semi_structured_mesh();
-            nxe        = sshex8_nxe(ssmesh.level());
-            elements   = ssmesh.element_data();
-            nnodes     = ssmesh.n_nodes();
+            nxe          = sshex8_nxe(ssmesh.level());
+            elements     = ssmesh.element_data();
+            nnodes       = ssmesh.n_nodes();
         } else {
             nxe      = elem_num_nodes(from_element);
             elements = mesh->elements;
@@ -429,10 +429,10 @@ namespace sfem {
         {
             auto buff = element_to_node_incidence_count->data();
 
+// #pragma omp parallel for // BAD performance with parallel for
             for (int d = 0; d < nxe; d++) {
-#pragma omp parallel for
                 for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
-#pragma omp atomic update
+// #pragma omp atomic update
                     buff[elements[d][i]]++;
                 }
             }

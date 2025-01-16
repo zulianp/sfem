@@ -290,6 +290,7 @@ if(SFEM_ENABLE_TESTING)
         operators/sshex8/tests
         mesh/tests
         frontend/tests
+        ssmg/tests
     )
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})

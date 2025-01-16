@@ -1629,6 +1629,13 @@ namespace sfem {
         return ret;
     }
 
+    void Function::describe(std::ostream &os) const
+    {
+        os << "n_dofs: " << impl_->space->n_dofs() << "\n";
+        os << "n_ops: " << impl_->ops.size()  << "\n";
+        os << "n_constraints: " << impl_->constraints.size() << "\n";
+    }
+
     Function::Function(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space  = space;
         impl_->output = std::make_shared<Output>(space);
@@ -2445,8 +2452,9 @@ namespace sfem {
 
         ~SemiStructuredLaplacian() {
             if (calls) {
-                printf("SemiStructuredLaplacian::apply(%s) called %ld times. Total: %g [s], "
+                printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
+                       space->semi_structured_mesh().level(),
                        use_affine_approximation ? "affine" : "isoparametric",
                        calls,
                        total_time,
@@ -2491,6 +2499,7 @@ namespace sfem {
             if (space->has_semi_structured_mesh()) {
                 auto ret = std::make_shared<SemiStructuredLaplacian>(space);
                 ret->element_type = element_type;
+                ret->use_affine_approximation = use_affine_approximation;
                 return ret;
             } else {
                 auto ret = std::make_shared<Laplacian>(space);
