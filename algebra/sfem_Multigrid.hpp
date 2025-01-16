@@ -15,6 +15,9 @@
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include "sfem_Buffer.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_tpl_blas.hpp"
+#include "sfem_openmp_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -48,6 +51,8 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         int apply(const T* const rhs, T* const x) override {
+            SFEM_TRACE_SCOPE("Multigrid::apply");
+
             ensure_init();
 
             // Wrap input arrays into fine level of mg
@@ -185,7 +190,7 @@ namespace sfem {
 
         int max_it_{10};
         int iterations_{0};
-        int cycle_type_{4};
+        int cycle_type_{V_CYCLE};
         T atol_{1e-10};
 
         T norm_residual_0{1};

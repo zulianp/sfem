@@ -11,6 +11,7 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_Tracer.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 // Must check:
@@ -124,6 +125,8 @@ namespace sfem {
         }
 
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
+            SFEM_TRACE_SCOPE("ConjugateGradient::apply");
+
             if (preconditioner_op) {
                 return aux_apply_precond(n, b, x);
             } else {
