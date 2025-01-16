@@ -26,8 +26,6 @@
 
 #include <vector>
 
-
-
 int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::string &name) {
     auto fs = f->space();
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
@@ -38,7 +36,7 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     auto mg = create_ssgmg(f, f->execution_space());
     SFEM_TEST_ASSERT(mg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
 
-#if 1
+#if 0
     sfem::create_directory(name.c_str());
     sfem::create_directory((name +"/fields").c_str());
 
@@ -52,7 +50,6 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
 #endif
     return SFEM_TEST_SUCCESS;
 }
-
 
 int test_ssgmg_poisson_cube() {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -103,7 +100,6 @@ int test_ssgmg_poisson_cube() {
 
     return test_linear_problem(f, "test_ssgmg_poisson_cube");
 }
-
 
 int test_ssgmg_linear_elasticity_cube() {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -156,7 +152,6 @@ int test_ssgmg_linear_elasticity_cube() {
 
     return test_linear_problem(f, "test_ssgmg_linear_elasticity_cube");
 }
-
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
