@@ -2,16 +2,19 @@
 
 #include "sshex8.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 int         sshex8_hierarchical_restriction(int                                 level,
-                                                  const ptrdiff_t                     nelements,
-                                                  idx_t **const SFEM_RESTRICT         elements,
-                                                  const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
-                                                  const int                           vec_size,
-                                                  const real_t *const SFEM_RESTRICT   from,
-                                                  real_t *const SFEM_RESTRICT         to) {
+                                            const ptrdiff_t                     nelements,
+                                            idx_t **const SFEM_RESTRICT         elements,
+                                            const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                            const int                           vec_size,
+                                            const real_t *const SFEM_RESTRICT   from,
+                                            real_t *const SFEM_RESTRICT         to) {
 #pragma omp parallel
     {
         const int  nxe    = sshex8_nxe(level);
@@ -123,11 +126,11 @@ int         sshex8_hierarchical_restriction(int                                 
 }
 
 int         sshex8_hierarchical_prolongation(int                               level,
-                                                   const ptrdiff_t                   nelements,
-                                                   idx_t **const SFEM_RESTRICT       elements,
-                                                   const int                         vec_size,
-                                                   const real_t *const SFEM_RESTRICT from,
-                                                   real_t *const SFEM_RESTRICT       to) {
+                                             const ptrdiff_t                   nelements,
+                                             idx_t **const SFEM_RESTRICT       elements,
+                                             const int                         vec_size,
+                                             const real_t *const SFEM_RESTRICT from,
+                                             real_t *const SFEM_RESTRICT       to) {
 #pragma omp parallel
     {
         const int  nxe    = sshex8_nxe(level);
@@ -297,13 +300,12 @@ int sshex8_prolongate(const ptrdiff_t                   nelements,
                             for (int xi = 0; xi <= from_level; xi++) {
                                 // Use top level stride
                                 const int from_lidx = sshex8_lidx(from_level * from_level_stride,
-                                                                        xi * from_level_stride,
-                                                                        yi * from_level_stride,
-                                                                        zi * from_level_stride);
+                                                                  xi * from_level_stride,
+                                                                  yi * from_level_stride,
+                                                                  zi * from_level_stride);
 
                                 // Use stride to convert from "from" to "to" local indexing
-                                const int to_lidx =
-                                        sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                                const int to_lidx = sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor);
 
                                 const idx_t    idx = from_elements[from_lidx][e];
                                 const scalar_t val = from[idx * vec_size + d];
@@ -337,16 +339,15 @@ printf("\n");
                 for (int zi = 0; zi <= from_level; zi++) {
                     for (int yi = 0; yi <= from_level; yi++) {
                         for (int xi = 0; xi < from_level; xi++) {
-                            const scalar_t c0 =
-                                    c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
+                            const scalar_t c0 = c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
                             const scalar_t c1 =
                                     c[sshex8_lidx(to_level, (xi + 1) * step_factor, yi * step_factor, zi * step_factor)];
 
                             for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                                const scalar_t fl      = (1 - between_xi * to_h);
-                                const scalar_t fr      = (between_xi * to_h);
-                                const int      to_lidx = sshex8_lidx(
-                                        to_level, xi * step_factor + between_xi, yi * step_factor, zi * step_factor);
+                                const scalar_t fl = (1 - between_xi * to_h);
+                                const scalar_t fr = (between_xi * to_h);
+                                const int      to_lidx =
+                                        sshex8_lidx(to_level, xi * step_factor + between_xi, yi * step_factor, zi * step_factor);
                                 c[to_lidx] = fl * c0 + fr * c1;
                             }
                         }
@@ -370,16 +371,15 @@ printf("\n");
                 for (int zi = 0; zi <= from_level; zi++) {
                     for (int yi = 0; yi < from_level; yi++) {
                         for (int xi = 0; xi <= from_level; xi++) {
-                            const scalar_t c0 =
-                                    c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
+                            const scalar_t c0 = c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
                             const scalar_t c1 =
                                     c[sshex8_lidx(to_level, xi * step_factor, (yi + 1) * step_factor, zi * step_factor)];
 
                             for (int between_yi = 1; between_yi < step_factor; between_yi++) {
-                                const scalar_t fb      = (1 - between_yi * to_h);
-                                const scalar_t ft      = (between_yi * to_h);
-                                const int      to_lidx = sshex8_lidx(
-                                        to_level, xi * step_factor, yi * step_factor + between_yi, zi * step_factor);
+                                const scalar_t fb = (1 - between_yi * to_h);
+                                const scalar_t ft = (between_yi * to_h);
+                                const int      to_lidx =
+                                        sshex8_lidx(to_level, xi * step_factor, yi * step_factor + between_yi, zi * step_factor);
                                 c[to_lidx] = fb * c0 + ft * c1;
                             }
                         }
@@ -403,16 +403,15 @@ printf("\n");
                 for (int zi = 0; zi < from_level; zi++) {
                     for (int yi = 0; yi <= from_level; yi++) {
                         for (int xi = 0; xi <= from_level; xi++) {
-                            const scalar_t c0 =
-                                    c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
+                            const scalar_t c0 = c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor)];
                             const scalar_t c1 =
                                     c[sshex8_lidx(to_level, xi * step_factor, yi * step_factor, (zi + 1) * step_factor)];
 
                             for (int between_zi = 1; between_zi < step_factor; between_zi++) {
-                                const scalar_t fb      = (1 - between_zi * to_h);
-                                const scalar_t ft      = (between_zi * to_h);
-                                const int      to_lidx = sshex8_lidx(
-                                        to_level, xi * step_factor, yi * step_factor, zi * step_factor + between_zi);
+                                const scalar_t fb = (1 - between_zi * to_h);
+                                const scalar_t ft = (between_zi * to_h);
+                                const int      to_lidx =
+                                        sshex8_lidx(to_level, xi * step_factor, yi * step_factor, zi * step_factor + between_zi);
                                 c[to_lidx] = fb * c0 + ft * c1;
                             }
                         }
@@ -659,6 +658,11 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
             from_coeffs[d] = malloc(from_nxe * sizeof(scalar_t));
         }
 
+        scalar_t **to_coeffs = malloc(vec_size * sizeof(scalar_t *));
+        for (int d = 0; d < vec_size; d++) {
+            to_coeffs[d] = malloc(to_nxe * sizeof(scalar_t));
+        }
+
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; e++) {
             {  // Gather elemental data
@@ -667,243 +671,315 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
                         for (int xi = 0; xi <= from_level; xi++) {
                             const int v         = sshex8_lidx(from_level, xi, yi, zi);
                             const int strided_v = sshex8_lidx(from_level * from_level_stride,
-                                                                    xi * from_level_stride,
-                                                                    yi * from_level_stride,
-                                                                    zi * from_level_stride);
+                                                              xi * from_level_stride,
+                                                              yi * from_level_stride,
+                                                              zi * from_level_stride);
 
                             const ptrdiff_t gid = from_elements[strided_v][e];
                             for (int d = 0; d < vec_size; d++) {
                                 from_coeffs[d][v] = from[gid * vec_size + d] / from_element_to_node_incidence_count[gid];
+                                // printf("%d %d %d) %g\n", xi, yi, zi, from_coeffs[d][v]);
                             }
                         }
                     }
                 }
+
+                for (int d = 0; d < vec_size; d++) {
+                    memset(to_coeffs[d], 0, to_nxe * sizeof(scalar_t));
+                }
             }
 
-            // print_stuff("input", from_level, from_coeffs[0]);
-            const scalar_t to_h = to_level * 1. / from_level;
             for (int d = 0; d < vec_size; d++) {
-                scalar_t *c = from_coeffs[d];
+                scalar_t *in  = from_coeffs[d];
+                scalar_t *out = to_coeffs[d];
 
-                // Restrict the coefficients along the x-axis (center) in the x-y-planes
-                for (int zi = 0; zi < to_level; zi++) {
-                    for (int between_zi = 1; between_zi < step_factor; between_zi++) {
-                        for (int yi = 0; yi < to_level; yi++) {
-                            for (int between_yi = 1; between_yi < step_factor; between_yi++) {
-                                for (int xi = 0; xi < to_level; xi++) {
-                                    const int zz    = zi * step_factor + between_zi;
-                                    const int yy    = yi * step_factor + between_yi;
-                                    const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
-                                    const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
+                for (int zi = 0; zi <= from_level; zi++) {
+                    for (int yi = 0; yi <= from_level; yi++) {
+                        for (int xi = 0; xi <= from_level; xi++) {
+                            const int v = sshex8_lidx(from_level, xi, yi, zi);
+                            // Floor
+                            const int cxi = xi / step_factor;
+                            const int cyi = yi / step_factor;
+                            const int czi = zi / step_factor;
 
-                                    for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                                        const scalar_t fl = (1 - between_xi * to_h);
-                                        const scalar_t fr = (between_xi * to_h);
-                                        assert(fl >= 1e-16);
-                                        assert(fr >= 1e-16);
-                                        assert(fl <= 1 + 1e-16);
-                                        assert(fr <= 1 + 1e-16);
+                            const int xinc = MIN(cxi + 1, to_level) - cxi;
+                            const int yinc = MIN(cyi + 1, to_level) - cyi;
+                            const int zinc = MIN(czi + 1, to_level) - czi;
 
-                                        const int xx     = xi * step_factor + between_xi;
-                                        const int center = sshex8_lidx(from_level, xx, yy, zz);
+                            const scalar_t lx = (xi - cxi * step_factor) / ((scalar_t)step_factor);
+                            const scalar_t ly = (yi - cyi * step_factor) / ((scalar_t)step_factor);
+                            const scalar_t lz = (zi - czi * step_factor) / ((scalar_t)step_factor);
 
-                                        c[left] += fl * c[center];
-                                        c[right] += fr * c[center];
+                            assert(lx <= 1 + 1e-8);
+                            assert(lx >= -1e-8);
+
+                            const scalar_t phi0x[2] = {1 - lx, lx};
+                            const scalar_t phi0y[2] = {1 - ly, ly};
+
+                            const scalar_t phi0z[2] = {1 - lz, lz};
+
+                            for (int kk = 0; kk <= zinc; kk++) {
+                                for (int jj = 0; jj <= yinc; jj++) {
+                                    for (int ii = 0; ii <= xinc; ii++) {
+                                        const scalar_t val = phi0x[ii] * phi0y[jj] * phi0z[kk] * in[v];
+                                        out[sshex8_lidx(to_level, cxi + ii, cyi + jj, czi + kk)] += val;
+                                        // printf("(%d %d %d) -> %g (%d %d %d)\n", xi, yi, zi, val, cxi + ii, cyi + jj, czi + kk);
                                     }
                                 }
                             }
                         }
                     }
                 }
-
-                // print_stuff("7) Restrict the coefficients along the x-axis (center) in the x-y-planes", from_level,
-                // from_coeffs[0]);
-
-                // Restrict the coefficients along the y-axis (center) in the y-z-planes
-                for (int zi = 0; zi < to_level; zi++) {
-                    for (int between_zi = 1; between_zi < step_factor; between_zi++) {
-                        for (int yi = 0; yi < to_level; yi++) {
-                            for (int xi = 0; xi <= to_level; xi++) {
-                                const int xx    = xi * step_factor;
-                                const int zz    = zi * step_factor + between_zi;
-                                const int left  = sshex8_lidx(from_level, xx, yi * step_factor, zz);
-                                const int right = sshex8_lidx(from_level, xx, (yi + 1) * step_factor, zz);
-
-                                for (int between_yi = 1; between_yi < step_factor; between_yi++) {
-                                    const scalar_t fl = (1 - between_yi * to_h);
-                                    const scalar_t fr = (between_yi * to_h);
-                                    assert(fl >= 1e-16);
-                                    assert(fr >= 1e-16);
-                                    assert(fl <= 1 + 1e-16);
-                                    assert(fr <= 1 + 1e-16);
-
-                                    const int yy     = yi * step_factor + between_yi;
-                                    const int center = sshex8_lidx(from_level, xx, yy, zz);
-
-                                    c[left] += fl * c[center];
-                                    c[right] += fr * c[center];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("6) Restrict the coefficients along the y-axis (center) in the y-z-planes", from_level,
-                // from_coeffs[0]);
-
-                // Restrict the coefficients along the x-axis (center) in the x-z-planes
-                for (int zi = 0; zi < to_level; zi++) {
-                    for (int between_zi = 1; between_zi < step_factor; between_zi++) {
-                        for (int yi = 0; yi <= to_level; yi++) {
-                            for (int xi = 0; xi < to_level; xi++) {
-                                const int yy    = yi * step_factor;
-                                const int zz    = zi * step_factor + between_zi;
-                                const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
-                                const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
-
-                                for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                                    const scalar_t fl = (1 - between_xi * to_h);
-                                    const scalar_t fr = (between_xi * to_h);
-                                    assert(fl >= 1e-16);
-                                    assert(fr >= 1e-16);
-                                    assert(fl <= 1 + 1e-16);
-                                    assert(fr <= 1 + 1e-16);
-
-                                    const int xx     = xi * step_factor + between_xi;
-                                    const int center = sshex8_lidx(from_level, xx, yy, zz);
-
-                                    c[left] += fl * c[center];
-                                    c[right] += fr * c[center];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("5) Restrict the coefficients along the x-axis (center) in the x-z-planes", from_level,
-                // from_coeffs[0]);
-
-                // Restrict the coefficients along the x-axis (center) in the x-y-planes
-                for (int zi = 0; zi <= to_level; zi++) {
-                    for (int yi = 0; yi < to_level; yi++) {
-                        for (int between_yi = 1; between_yi < step_factor; between_yi++) {
-                            for (int xi = 0; xi < to_level; xi++) {
-                                const int zz    = zi * step_factor;
-                                const int yy    = yi * step_factor + between_yi;
-                                const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
-                                const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
-
-                                for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                                    const scalar_t fl = (1 - between_xi * to_h);
-                                    const scalar_t fr = (between_xi * to_h);
-                                    assert(fl >= 1e-16);
-                                    assert(fr >= 1e-16);
-                                    assert(fl <= 1 + 1e-16);
-                                    assert(fr <= 1 + 1e-16);
-
-                                    const int xx     = xi * step_factor + between_xi;
-                                    const int center = sshex8_lidx(from_level, xx, yy, zz);
-
-                                    c[left] += fl * c[center];
-                                    c[right] += fr * c[center];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("4) Restrict the coefficients along the x-axis (center) in the x-y-planes", from_level,
-                // from_coeffs[0]);
-
-                // Restrict the coefficients along the z-axis (edges)
-                for (int zi = 0; zi < to_level; zi++) {
-                    for (int yi = 0; yi <= to_level; yi++) {
-                        for (int xi = 0; xi <= to_level; xi++) {
-                            for (int between_zi = 1; between_zi < step_factor; between_zi++) {
-                                const scalar_t fb = (1 - between_zi * to_h);
-                                const scalar_t ft = (between_zi * to_h);
-                                assert(fb >= 1e-16);
-                                assert(ft >= 1e-16);
-                                assert(fb <= 1 + 1e-16);
-                                assert(ft <= 1 + 1e-16);
-
-                                const int between_idx = sshex8_lidx(
-                                        from_level, xi * step_factor, yi * step_factor, zi * step_factor + between_zi);
-
-                                c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
-                                        fb * c[between_idx];
-
-                                c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, (zi + 1) * step_factor)] +=
-                                        ft * c[between_idx];
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("3) Restrict the coefficients along the z-axis (edges)", from_level, from_coeffs[0]);
-
-                // Restrict the coefficients along the y-axis (edges)
-                for (int zi = 0; zi <= to_level; zi++) {
-                    for (int yi = 0; yi < to_level; yi++) {
-                        for (int xi = 0; xi <= to_level; xi++) {
-                            for (int between_yi = 1; between_yi < step_factor; between_yi++) {
-                                const scalar_t fb          = (1 - between_yi * to_h);
-                                const scalar_t ft          = (between_yi * to_h);
-                                const int      between_idx = sshex8_lidx(
-                                        from_level, xi * step_factor, yi * step_factor + between_yi, zi * step_factor);
-
-                                c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
-                                        fb * c[between_idx];
-
-                                c[sshex8_lidx(from_level, xi * step_factor, (yi + 1) * step_factor, zi * step_factor)] +=
-                                        ft * c[between_idx];
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("2) Restrict the coefficients along the y-axis (edges)", from_level, from_coeffs[0]);
-
-                // Restrict the coefficients along the x-axis (edges)
-                for (int zi = 0; zi <= to_level; zi++) {
-                    for (int yi = 0; yi <= to_level; yi++) {
-                        for (int xi = 0; xi < to_level; xi++) {
-                            for (int between_xi = 1; between_xi < step_factor; between_xi++) {
-                                const scalar_t fl          = (1 - between_xi * to_h);
-                                const scalar_t fr          = (between_xi * to_h);
-                                const int      between_idx = sshex8_lidx(
-                                        from_level, xi + between_xi, yi * from_level_stride, zi * from_level_stride);
-
-                                c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
-                                        fl * c[between_idx];
-
-                                c[sshex8_lidx(from_level, (xi + 1) * step_factor, yi * step_factor, zi * step_factor)] +=
-                                        fr * c[between_idx];
-                            }
-                        }
-                    }
-                }
-
-                // print_stuff("1) Restrict the coefficients along the x-axis (edges)", from_level, from_coeffs[0]);
             }
+
+            // print_stuff("input", to_level, to_coeffs[0]);
+            // const scalar_t to_h = to_level * 1. / from_level;
+            // for (int d = 0; d < vec_size; d++) {
+            //     scalar_t *c = from_coeffs[d];
+
+            //     // Restrict the coefficients along the x-axis (center) in the x-y-planes
+            //     for (int zi = 0; zi < to_level; zi++) {
+            //         for (int between_zi = 1; between_zi < step_factor; between_zi++) {
+            //             for (int yi = 0; yi < to_level; yi++) {
+            //                 for (int between_yi = 1; between_yi < step_factor; between_yi++) {
+            //                     for (int xi = 0; xi < to_level; xi++) {
+            //                         const int zz    = zi * step_factor + between_zi;
+            //                         const int yy    = yi * step_factor + between_yi;
+            //                         const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
+            //                         const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
+
+            //                         for (int between_xi = 1; between_xi < step_factor; between_xi++) {
+            //                             const scalar_t fl = (1 - between_xi * to_h);
+            //                             const scalar_t fr = (between_xi * to_h);
+            //                             assert(fl >= 1e-16);
+            //                             assert(fr >= 1e-16);
+            //                             assert(fl <= 1 + 1e-16);
+            //                             assert(fr <= 1 + 1e-16);
+
+            //                             const int xx     = xi * step_factor + between_xi;
+            //                             const int center = sshex8_lidx(from_level, xx, yy, zz);
+
+            //                             c[left] += fl * c[center];
+            //                             c[right] += fr * c[center];
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     // Referes to above
+            //     print_stuff(
+            //             "7) Restrict the coefficients along the x-axis (center) in the x-y-planes", from_level,
+            //             from_coeffs[0]);
+
+            //     // Restrict the coefficients along the y-axis (center) in the y-z-planes
+            //     for (int zi = 0; zi < to_level; zi++) {
+            //         for (int between_zi = 1; between_zi < step_factor; between_zi++) {
+            //             for (int yi = 0; yi < to_level; yi++) {
+            //                 for (int xi = 0; xi <= to_level; xi++) {
+            //                     const int xx    = xi * step_factor;
+            //                     const int zz    = zi * step_factor + between_zi;
+            //                     const int left  = sshex8_lidx(from_level, xx, yi * step_factor, zz);
+            //                     const int right = sshex8_lidx(from_level, xx, (yi + 1) * step_factor, zz);
+
+            //                     for (int between_yi = 1; between_yi < step_factor; between_yi++) {
+            //                         const scalar_t fl = (1 - between_yi * to_h);
+            //                         const scalar_t fr = (between_yi * to_h);
+            //                         assert(fl >= 1e-16);
+            //                         assert(fr >= 1e-16);
+            //                         assert(fl <= 1 + 1e-16);
+            //                         assert(fr <= 1 + 1e-16);
+
+            //                         const int yy     = yi * step_factor + between_yi;
+            //                         const int center = sshex8_lidx(from_level, xx, yy, zz);
+
+            //                         c[left] += fl * c[center];
+            //                         c[right] += fr * c[center];
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff(
+            //             "6) Restrict the coefficients along the y-axis (center) in the y-z-planes", from_level,
+            //             from_coeffs[0]);
+
+            //     // Restrict the coefficients along the x-axis (center) in the x-z-planes
+            //     for (int zi = 0; zi < to_level; zi++) {
+            //         for (int between_zi = 1; between_zi < step_factor; between_zi++) {
+            //             for (int yi = 0; yi < to_level; yi++) {
+            //                 for (int xi = 0; xi < to_level; xi++) {
+            //                     const int yy    = yi * step_factor;
+            //                     const int zz    = zi * step_factor + between_zi;
+            //                     const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
+            //                     const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
+
+            //                     for (int between_xi = 1; between_xi < step_factor; between_xi++) {
+            //                         const scalar_t fl = (1 - between_xi * to_h);
+            //                         const scalar_t fr = (between_xi * to_h);
+            //                         assert(fl >= 1e-16);
+            //                         assert(fr >= 1e-16);
+            //                         assert(fl <= 1 + 1e-16);
+            //                         assert(fr <= 1 + 1e-16);
+
+            //                         const int xx     = xi * step_factor + between_xi;
+            //                         const int center = sshex8_lidx(from_level, xx, yy, zz);
+
+            //                         c[left] += fl * c[center];
+            //                         c[right] += fr * c[center];
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff(
+            //             "5) Restrict the coefficients along the x-axis (center) in the x-z-planes", from_level,
+            //             from_coeffs[0]);
+
+            //     // Restrict the coefficients along the x-axis (center) in the x-y-planes
+            //     for (int zi = 0; zi <= to_level; zi++) {
+            //         for (int yi = 0; yi < to_level; yi++) {
+            //             for (int between_yi = 1; between_yi < step_factor; between_yi++) {
+            //                 for (int xi = 0; xi < to_level; xi++) {
+            //                     const int zz    = zi * step_factor;
+            //                     const int yy    = yi * step_factor + between_yi;
+            //                     const int left  = sshex8_lidx(from_level, xi * step_factor, yy, zz);
+            //                     const int right = sshex8_lidx(from_level, (xi + 1) * step_factor, yy, zz);
+
+            //                     for (int between_xi = 1; between_xi < step_factor; between_xi++) {
+            //                         const scalar_t fl = (1 - between_xi * to_h);
+            //                         const scalar_t fr = (between_xi * to_h);
+            //                         assert(fl >= 1e-16);
+            //                         assert(fr >= 1e-16);
+            //                         assert(fl <= 1 + 1e-16);
+            //                         assert(fr <= 1 + 1e-16);
+
+            //                         const int xx     = xi * step_factor + between_xi;
+            //                         const int center = sshex8_lidx(from_level, xx, yy, zz);
+
+            //                         c[left] += fl * c[center];
+            //                         c[right] += fr * c[center];
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff(
+            //             "4) Restrict the coefficients along the x-axis (center) in the x-y-planes", from_level,
+            //             from_coeffs[0]);
+
+            //     // Restrict the coefficients along the z-axis (edges)
+            //     for (int zi = 0; zi < to_level; zi++) {
+            //         for (int yi = 0; yi <= to_level; yi++) {
+            //             for (int xi = 0; xi <= to_level; xi++) {
+            //                 for (int between_zi = 1; between_zi < step_factor; between_zi++) {
+            //                     const scalar_t fb = (1 - between_zi * to_h);
+            //                     const scalar_t ft = (between_zi * to_h);
+            //                     assert(fb >= 1e-16);
+            //                     assert(ft >= 1e-16);
+            //                     assert(fb <= 1 + 1e-16);
+            //                     assert(ft <= 1 + 1e-16);
+
+            //                     const int between_idx = sshex8_lidx(
+            //                             from_level, xi * step_factor, yi * step_factor, zi * step_factor + between_zi);
+
+            //                     c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
+            //                             fb * c[between_idx];
+
+            //                     c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, (zi + 1) * step_factor)] +=
+            //                             ft * c[between_idx];
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff("3) Restrict the coefficients along the z-axis (edges)", from_level, from_coeffs[0]);
+
+            //     // Restrict the coefficients along the y-axis (edges)
+            //     for (int zi = 0; zi <= to_level; zi++) {
+            //         for (int yi = 0; yi < to_level; yi++) {
+            //             for (int xi = 0; xi <= to_level; xi++) {
+            //                 for (int between_yi = 1; between_yi < step_factor; between_yi++) {
+            //                     const scalar_t fb          = (1 - between_yi * to_h);
+            //                     const scalar_t ft          = (between_yi * to_h);
+            //                     const int      between_idx = sshex8_lidx(
+            //                             from_level, xi * step_factor, yi * step_factor + between_yi, zi * step_factor);
+
+            //                     c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
+            //                             fb * c[between_idx];
+
+            //                     c[sshex8_lidx(from_level, xi * step_factor, (yi + 1) * step_factor, zi * step_factor)] +=
+            //                             ft * c[between_idx];
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff("2) Restrict the coefficients along the y-axis (edges)", from_level, from_coeffs[0]);
+
+            //     // Restrict the coefficients along the x-axis (edges)
+            //     for (int zi = 0; zi <= to_level; zi++) {
+            //         for (int yi = 0; yi <= to_level; yi++) {
+            //             for (int xi = 0; xi < to_level; xi++) {
+            //                 for (int between_xi = 1; between_xi < step_factor; between_xi++) {
+            //                     const scalar_t fl = (1 - between_xi * to_h);
+            //                     const scalar_t fr = (between_xi * to_h);
+            //                     const int      between_idx =
+            //                             sshex8_lidx(from_level, xi + between_xi, yi * from_level_stride, zi *
+            //                             from_level_stride);
+
+            //                     c[sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor)] +=
+            //                             fl * c[between_idx];
+
+            //                     c[sshex8_lidx(from_level, (xi + 1) * step_factor, yi * step_factor, zi * step_factor)] +=
+            //                             fr * c[between_idx];
+            //                 }
+            //             }
+            //         }
+            //     }
+
+            //     print_stuff("1) Restrict the coefficients along the x-axis (edges)", from_level, from_coeffs[0]);
+            // }
 
             // Scatter elemental data
             // Extract coarse coeffs and discard rest
+            //             for (int d = 0; d < vec_size; d++) {
+            //                 for (int zi = 0; zi <= to_level; zi++) {
+            //                     for (int yi = 0; yi <= to_level; yi++) {
+            //                         for (int xi = 0; xi <= to_level; xi++) {
+            //                             // Use top level stride
+            //                             const int to_lidx = sshex8_lidx(
+            //                                     to_level * to_level_stride, xi * to_level_stride, yi * to_level_stride, zi *
+            //                                     to_level_stride);
+
+            //                             // Use stride to convert from "from" to "to" local indexing
+            //                             const int from_lidx = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi *
+            //                             step_factor);
+
+            //                             const idx_t idx = to_elements[to_lidx][e];
+            // #pragma omp atomic update
+            //                             to[idx * vec_size + d] += from_coeffs[d][from_lidx];
+            //                         }
+            //                     }
+            //                 }
+            //             }
+
             for (int d = 0; d < vec_size; d++) {
                 for (int zi = 0; zi <= to_level; zi++) {
                     for (int yi = 0; yi <= to_level; yi++) {
                         for (int xi = 0; xi <= to_level; xi++) {
                             // Use top level stride
-                            const int to_lidx = sshex8_lidx(
-                                    to_level * to_level_stride, xi * to_level_stride, yi * to_level_stride, zi * to_level_stride);
+                            const int to_lidx = sshex8_lidx(to_level, xi, yi, zi);
 
                             // Use stride to convert from "from" to "to" local indexing
-                            const int from_lidx =
-                                    sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
 
                             const idx_t idx = to_elements[to_lidx][e];
 #pragma omp atomic update
-                            to[idx * vec_size + d] += from_coeffs[d][from_lidx];
+                            to[idx * vec_size + d] += to_coeffs[d][to_lidx];
                         }
                     }
                 }
@@ -915,6 +991,12 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
         }
 
         free(from_coeffs);
+
+        for (int d = 0; d < vec_size; d++) {
+            free(to_coeffs[d]);
+        }
+
+        free(to_coeffs);
     }
 
     return SFEM_SUCCESS;

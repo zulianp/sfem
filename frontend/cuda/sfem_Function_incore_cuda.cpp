@@ -128,7 +128,7 @@ namespace sfem {
             for (auto &c : dc->conditions()) {
                 DirichletConditions::Condition cond{.sideset   = (c.sideset) ? to_device(c.sideset) : nullptr,
                                                     .nodeset   = to_device(c.nodeset),
-                                                    .values    = to_device(c.values),
+                                                    .values    = (c.values) ? to_device(c.values) : nullptr,
                                                     .value     = c.value,
                                                     .component = c.component};
                 conditions.push_back(cond);
@@ -306,17 +306,17 @@ namespace sfem {
                             const idx_t *const   colidx,
                             real_t *const        diag_values,
                             real_t *const        off_diag_values) override {
-            cu_laplacian_crs_sym(element_type,
-                                 fff->n_elements(),
-                                 fff->n_elements(),  // stride
-                                 fff->elements(),
-                                 fff->fff(),
-                                 rowptr,
-                                 colidx,
-                                 real_type,
-                                 diag_values,
-                                 off_diag_values,
-                                 stream);
+            return cu_laplacian_crs_sym(element_type,
+                                        fff->n_elements(),
+                                        fff->n_elements(),  // stride
+                                        fff->elements(),
+                                        fff->fff(),
+                                        rowptr,
+                                        colidx,
+                                        real_type,
+                                        diag_values,
+                                        off_diag_values,
+                                        stream);
         }
 
         int value(const real_t *x, real_t *const out) override {

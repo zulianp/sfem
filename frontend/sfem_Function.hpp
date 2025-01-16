@@ -74,10 +74,11 @@ namespace sfem {
         int initialize_node_to_node_graph();
         int convert_to_macro_element_mesh();
 
-        int       spatial_dimension() const;
-        int       n_nodes_per_elem() const;
-        ptrdiff_t n_nodes() const;
-        ptrdiff_t n_elements() const;
+        int           spatial_dimension() const;
+        int           n_nodes_per_elem() const;
+        ptrdiff_t     n_nodes() const;
+        ptrdiff_t     n_elements() const;
+        enum ElemType element_type() const;
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
@@ -102,7 +103,16 @@ namespace sfem {
             return ret;
         }
 
-        static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm comm);
+        static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm     comm,
+                                                      const int    nx   = 1,
+                                                      const int    ny   = 1,
+                                                      const int    nz   = 1,
+                                                      const geom_t xmin = 0,
+                                                      const geom_t ymin = 0,
+                                                      const geom_t zmin = 0,
+                                                      const geom_t xmax = 1,
+                                                      const geom_t ymax = 1,
+                                                      const geom_t zmax = 1);
 
     private:
         class Impl;
@@ -120,6 +130,10 @@ namespace sfem {
         Sideset();
         ~Sideset();
 
+        static std::shared_ptr<Sideset> create_from_selector(
+                const std::shared_ptr<Mesh>                                         &mesh,
+                const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -131,6 +145,7 @@ namespace sfem {
         geom_t  **point_data();
         ptrdiff_t interior_start() const;
 
+        SemiStructuredMesh();
         SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level);
         ~SemiStructuredMesh();
 
@@ -140,15 +155,22 @@ namespace sfem {
             return std::make_shared<SemiStructuredMesh>(macro_mesh, level);
         }
 
+        std::vector<int> derefinement_levels();
+        int apply_hierarchical_renumbering();
+
         int       n_nodes_per_element() const;
         ptrdiff_t n_nodes() const;
         int       level() const;
         ptrdiff_t n_elements() const;
 
+        std::shared_ptr<SemiStructuredMesh> derefine(const int to_level);
+
         std::shared_ptr<Buffer<geom_t *>> points();
 
         int export_as_standard(const char *path);
         int write(const char *path);
+
+        std::shared_ptr<Mesh> macro_mesh();
 
     private:
         class Impl;
@@ -168,6 +190,10 @@ namespace sfem {
             return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh,
+                                                     const int                    block_size   = 1);
+
+
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
 
@@ -185,7 +211,7 @@ namespace sfem {
 
         enum ElemType element_type() const;
 
-        std::shared_ptr<FunctionSpace> derefine() const;
+        std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
         std::shared_ptr<FunctionSpace> lor() const;
 
         std::shared_ptr<CRSGraph> dof_to_dof_graph();
@@ -193,7 +219,10 @@ namespace sfem {
 
         friend class Op;
 
+        // private
+        FunctionSpace();
     private:
+        
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
@@ -352,14 +381,14 @@ namespace sfem {
             std::shared_ptr<Buffer<idx_t>>  nodeset;
             std::shared_ptr<Buffer<real_t>> values;
             real_t                          value{0};
-            int component{0};
+            int                             component{0};
         };
 
         DirichletConditions(const std::shared_ptr<FunctionSpace> &space);
         ~DirichletConditions();
 
         std::shared_ptr<FunctionSpace> space();
-        std::vector<struct Condition>  &conditions();
+        std::vector<struct Condition> &conditions();
 
         static std::shared_ptr<DirichletConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
         static std::shared_ptr<DirichletConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
@@ -367,6 +396,9 @@ namespace sfem {
 
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                                      std::string                           yaml);
+
+        static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space,
+                                                           const std::vector<struct Condition>  &conditions);
 
         int apply(real_t *const x) override;
         int apply_value(const real_t value, real_t *const x) override;
@@ -496,6 +528,8 @@ namespace sfem {
         ExecutionSpace          execution_space() const;
 
         std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
+
+        void describe(std::ostream &os) const;
 
     private:
         class Impl;
