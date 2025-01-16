@@ -149,8 +149,6 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     {
         auto            data  = fine_field->data();
         const ptrdiff_t ndofs = fs->n_dofs();
-
-#pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs; i++) {
             data[i] = 1;
         }
@@ -163,8 +161,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
 #endif
 
     restriction->apply(fine_field->data(), coarse_field->data());
-    // coarse_field->print(std::cout);
-
+    coarse_field->print(std::cout);
 
     sfem::create_directory(output_dir.c_str());
     SFEM_TEST_ASSERT(m->write((output_dir + "/input_mesh").c_str()) == SFEM_SUCCESS);
@@ -196,7 +193,7 @@ int test_restrict_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+            comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     return test_restriction(m, "test_restrict_cube");
 }

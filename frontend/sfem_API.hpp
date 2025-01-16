@@ -351,6 +351,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
+
                                 auto &ssm = to_space->semi_structured_mesh();
                                 sshex8_hierarchical_prolongation(
                                         ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
@@ -363,6 +365,7 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_prolongate");
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
@@ -384,6 +387,8 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("hierarchical_prolongation");
+                            
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_prolongation(from_space->element_type(),
                                                       to_space->element_type(),
@@ -410,10 +415,10 @@ namespace sfem {
         idx_t   **elements = nullptr;
         int       nxe;
         if (from_space->has_semi_structured_mesh()) {
-            auto &mesh = from_space->semi_structured_mesh();
-            nxe        = sshex8_nxe(mesh.level());
-            elements   = mesh.element_data();
-            nnodes     = mesh.n_nodes();
+            auto &ssmesh = from_space->semi_structured_mesh();
+            nxe        = sshex8_nxe(ssmesh.level());
+            elements   = ssmesh.element_data();
+            nnodes     = ssmesh.n_nodes();
         } else {
             nxe      = elem_num_nodes(from_element);
             elements = mesh->elements;
@@ -497,6 +502,7 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
                                 auto &ssm = from_space->semi_structured_mesh();
                                 sshex8_hierarchical_restriction(ssm.level(),
                                                                 ssm.n_elements(),
@@ -512,6 +518,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_restrict");
+
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
