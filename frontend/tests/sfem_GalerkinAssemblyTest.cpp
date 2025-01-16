@@ -65,10 +65,16 @@ int test_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
+    int SFEM_ELEMENT_DEREFINE = 1;
+    SFEM_READ_ENV(SFEM_ELEMENT_DEREFINE, atoi);
+
+    // int SFEM_VERBOSE = 0;
+    // SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+
     int block_size = 1;
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+            comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
@@ -94,14 +100,14 @@ int test_cube() {
 
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
-    printf("Fine op:\t%s\n", SFEM_FINE_OP_TYPE);
+    printf("Fine op (%d):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, SFEM_FINE_OP_TYPE);
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
     auto levels    = fs->semi_structured_mesh().derefinement_levels();
-    auto fs_coarse = fs->derefine(levels[1]);
+    auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
     auto f_coarse  = f->derefine(fs_coarse, true);
 
-    printf("Coarse op:\t%s\n", SFEM_COARSE_OP_TYPE);
+    printf("Coarse op (%d):\t%s\n", levels[SFEM_ELEMENT_DEREFINE], SFEM_COARSE_OP_TYPE);
     coarse_op = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
     auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
@@ -117,10 +123,11 @@ int test_cube() {
 
     auto h_input = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
     {
-        ptrdiff_t n    = fs_coarse->n_dofs();
-        auto      data = h_input->data();
+        ptrdiff_t n      = fs_coarse->n_dofs();
+        auto      data   = h_input->data();
+        auto      points = fs_coarse->semi_structured_mesh().points()->data();
         for (ptrdiff_t i = 0; i < n; i++) {
-            data[i] = i;
+            data[i] = points[0][i] * points[0][i];
         }
     }
 
@@ -202,15 +209,20 @@ int test_cube() {
         }
     }
 
+#if 0
     sfem::create_directory("galerkin");
+    sfem::create_directory("galerkin/fields");
+
     SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
 
     sfem::Output out(fs_coarse);
-    
-    out.set_output_dir("galerkin");
-    SFEM_TEST_ASSERT(out.write("R", Ax_coarse->data()) == SFEM_SUCCESS); 
-    SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS); 
 
+    out.set_output_dir("galerkin/fields");
+    SFEM_TEST_ASSERT(out.write("R", h_actual->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
+#endif
 
     return SFEM_TEST_SUCCESS;
 }
