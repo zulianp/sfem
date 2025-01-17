@@ -1,4 +1,5 @@
 #include "sfem_pwc_interpolator.hpp"
+#include "coo_sort.h"
 
 /*
 void piecewise_constant(const idx_t *partition, const real_t *near_null,
@@ -35,6 +36,7 @@ namespace sfem {
         for (R k = 0; k < fine_nnz; k++) {
             R i = a->offdiag_rowidx->data()[k];
             R j = a->offdiag_colidx->data()[k];
+            assert(j > i);
             T val = a->values->data()[k];
 
             R coarse_i = partition[i];
@@ -52,13 +54,16 @@ namespace sfem {
                     values[write_pos] = coarse_val;
                     write_pos += 1;
                 } else {
-                    acoarse_diag[coarse_i] += coarse_val;
+                    acoarse_diag[coarse_i] += 2. * coarse_val;
                 }
             }
         }
 
         count_t new_nnz = (count_t)write_pos;
-        sum_duplicates(row_indices, col_indices, values, sort_indices, &new_nnz);
+        // printf("NEW NNZ: %d\n", new_nnz);
+        sum_duplicates(sort_indices, row_indices, col_indices, values, &new_nnz);
+        // printf("NEW NNZ after sum dup: %d\n", new_nnz);
+        // printf("COARSE DIM: %d\n", (int)coarse_dim);
 
         R *offdiag_row_indices = (R *)malloc(new_nnz * sizeof(R));
         R *offdiag_col_indices = (R *)malloc(new_nnz * sizeof(R));

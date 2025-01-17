@@ -67,7 +67,7 @@ function(add_codecov _targetname _testrunner _outputname)
 
     add_custom_target(
         ${_targetname}_html
-        COMMAND ${GENHTML_EXE} --prefix ${CMAKE_SOURCE_DIR} --ignore-errors
+        COMMAND ${GENHTML_EXE} --prefix ${CMAKE_CURRENT_SOURCE_DIR} --ignore-errors
                 source ${coverage_info} --output-directory ${_outputname}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 

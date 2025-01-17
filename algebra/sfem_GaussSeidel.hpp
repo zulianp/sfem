@@ -23,11 +23,16 @@ namespace sfem {
         std::function<void(const T* const, T* const)> left_preconditioner_op;
         std::function<void(const T* const, T* const)> right_preconditioner_op;
         BLAS_Tpl<T> blas;
+        int iterations_{0};
 
         // x[i] += r[i] / d[i];
         std::function<void(const std::size_t, const T* const, T* const)> smooth_;
 
         ptrdiff_t n_dofs{-1};
+
+        int iterations() const override {
+            return iterations_;
+        }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -95,16 +100,15 @@ namespace sfem {
             }
 
             int info = -1;
-            int k = 1;
-            for (; k < max_it; k++) {
+            for (iterations_ = 1; iterations_ < max_it; iterations_++) {
                 smooth_(n, b, x);
 
-                if (k % check_each == 0) {
+                if (iterations_ % check_each == 0) {
                     blas.zeros(n, r);
                     apply_op(x, r);
                     blas.axpby(n, 1, b, -1, r);
                     const T norm_r = sqrt(blas.dot(n, r, r));
-                    monitor(k, norm_r);
+                    monitor(iterations_, norm_r);
 
                     if (norm_r < tol || norm_r != norm_r) {
                         assert(norm_r == norm_r);
@@ -116,7 +120,7 @@ namespace sfem {
             if (verbose) {
                 const T norm_r = sqrt(blas.dot(n, r, r));
                 std::printf("Finished at iteration %d with |r| = %g, reduction %g\n",
-                            k,
+                            iterations_,
                             (double)norm_r,
                             (double)(norm_r / norm_r0));
             }

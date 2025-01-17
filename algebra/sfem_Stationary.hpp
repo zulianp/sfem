@@ -23,26 +23,38 @@ namespace sfem {
         bool verbose{false};
         BLAS_Tpl<T> blas;
 
+        int iterations_{0};
+
+        int iterations() const override { return iterations_; }
+
+        void ensure_workspace()
+        {
+            if(!workspace || workspace->size() != n_dofs) {
+                workspace = Buffer<T>::own(n_dofs, blas.allocate(n_dofs), this->blas.destroy);
+            }
+        }
+
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
             execution_space_ = EXECUTION_SPACE_HOST;
-            auto x = this->blas.allocate(n_dofs);
-            workspace = Buffer<T>::own(n_dofs, x, this->blas.destroy);
         }
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
+            ensure_workspace();
+
             T* r = workspace->data();
-            for (int i = 0; i < max_it; i++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(workspace->size(), r);
                 op->apply(x, r);
                 blas.axpby(n_dofs, 1.0, b, -1.0, r);
                 if (verbose) {
                     T norm_residual = this->blas.norm2(workspace->size(), r);
-                    printf("%d : %f\n", i, (double)norm_residual);
+                    printf("%d : %f\n", iterations_, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);
             }
+            
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -59,6 +71,31 @@ namespace sfem {
         }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+                                  const std::shared_ptr<Buffer<T>>& diag) override {
+            this->op = op + sfem::diag_op(diag, execution_space());
+            auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner); 
+            if(shiftable) {
+                return shiftable->shift(diag);
+            } else {
+                    fprintf(stderr,
+                            "Tried to call shift on object that is not subclass of ShiftableOperator!\n");
+                    assert(false);
+                    return SFEM_FAILURE;
+            }
+
+            // auto prec = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(preconditioner);
+            // if (prec) {
+            //     return prec->set_op_and_diag_shift(op, diag, can_modify_diag_buffer);
+            // } else {
+            //     fprintf(stderr,
+            //             "Tried to call set_op_and_diag_shift on non MatrixFreeLinearSolver "
+            //             "object\n");
+            //     assert(false);
+            //     return SFEM_FAILURE;
+            // }
+        }
     };
 
     template <typename T>

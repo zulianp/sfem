@@ -3,21 +3,37 @@
 import gmsh
 import meshio
 import numpy as np
-import sys
+import sys, getopt
 
 def main(argv):
-	nrefs = 1
+	usage = f'usage: {argv[0]} <output_db.vtk>'
 
 	if(len(argv) < 2):
-		print(f'usage: {argv[0]} <output_db.vtk> [nrefs=1]')
+		print(usage)
 		exit(1)
 
 	output = argv[1]
 	radius=0.5
+	nrefs = 1
 
-	if(len(argv) > 2):
-		nrefs = int(sys.argv[2])
-		print(f'nrefs = {nrefs}')
+	try:
+	    opts, args = getopt.getopt(
+	        argv[3:], "e:h",
+	        ["refinements=", "radius=", "help"])
+
+	except getopt.GetoptError as err:
+	    print(err)
+	    print(usage)
+	    sys.exit(1)
+
+	for opt, arg in opts:
+	    if opt in ('-h', '--help'):
+	        print(usage)
+	        sys.exit()
+	    elif opt in ("--refinemnts"):
+	    	nrefs = int(arg)
+	    elif opt in ("--radius"):
+	    	radius = float(arg)
 
 	gmsh.initialize(argv=["","-bin"])
 	gmsh.option.setNumber("General.Terminal", 0)

@@ -277,7 +277,7 @@ void trishell3_assemble_mass(const ptrdiff_t nelements,
     printf("trishell3_mass.c: assemble_mass\t%g seconds\n", tock - tick);
 }
 
-void trishell3_assemble_lumped_mass(const ptrdiff_t nelements,
+int trishell3_assemble_lumped_mass(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
                                     idx_t **const SFEM_RESTRICT elems,
                                     geom_t **const SFEM_RESTRICT xyz,
@@ -324,6 +324,7 @@ void trishell3_assemble_lumped_mass(const ptrdiff_t nelements,
 
     // double tock = MPI_Wtime();
     // printf("trishell3_mass.c: trishell3_assemble_lumped_mass\t%g seconds\n", tock - tick);
+    return SFEM_SUCCESS;
 }
 
 void trishell3_apply_inv_lumped_mass(const ptrdiff_t nelements,

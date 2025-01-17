@@ -313,6 +313,7 @@ if __name__ == '__main__':
 
     if(len(sys.argv) < 3):
         print(usage)
+        exit(1)
     try:
         opts, args = getopt.getopt(
             sys.argv[3:len(sys.argv)], "h",
@@ -358,7 +359,7 @@ if __name__ == '__main__':
             export_normals = True
 
     if box_from_mesh != None:
-        aux_mesh = read_mesh(arg)
+        aux_mesh = read_mesh(box_from_mesh)
         pmin, pmax = compute_aabb(aux_mesh, margin)
         defined_bounds = True
         aux_mesh = None
@@ -401,7 +402,8 @@ if __name__ == '__main__':
     nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals)
     nedt.tofile(output_path)
 
-    header =    f'nx: {dims[0]}\n'
+    header =    f'spatial_dimension: 3\n'
+    header +=   f'nx: {dims[0]}\n'
     header +=   f'ny: {dims[1]}\n'
     header +=   f'nz: {dims[2]}\n'
     header +=   f'block_size: 1\n'

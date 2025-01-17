@@ -31,7 +31,7 @@ Iterations 5882
 residual abs: 1.34694e-11 
 residual rel: 9.89148e-11
 ----------------------------------------
-obstacle (PROTEUS_HEX8):
+obstacle (SSHEX8):
 ----------------------------------------
 #elements 591552 #nodes 304390625 #dofs 304390625
 TTS:		10136.8 [s], solve: 10130.4 [s]
@@ -59,7 +59,7 @@ iter	abs		rel		rate
 8	3.74158e-09	3.78715e-07	0.20789
 9	7.98989e-10	8.08721e-08	0.213543
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 59319 #nodes 64000 #dofs 91992891
 TTS:		312.95 [s], compute 311.254 [s] (solve: 259.869 [s], init: 51.3746 [s])
@@ -86,7 +86,7 @@ iter	abs		rel		rate
 8	2.85613e-09	2.90206e-07	0.202978
 9	5.96252e-10	6.05841e-08	0.208762
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 205379 #nodes 216000 #dofs 317471451
 TTS:		1131.7 [s], compute 1107.01 [s] (solve: 964.925 [s], init: 142.05 [s])
@@ -107,7 +107,7 @@ residual rel: ~2.2e-14
 #expansion_steps		362
 #proportioning_steps	19
 ----------------------------------------
-obstacle (PROTEUS_HEX8):
+obstacle (SSHEX8):
 ----------------------------------------
 #elements 1872 #nodes 1030625 #dofs 3091875
 TTS:		480.354 [s], solve: 480.285 [s]
@@ -121,7 +121,7 @@ residual rel: ~2.2e-14
 #expansion_steps		672
 #proportioning_steps	21
 ----------------------------------------
-obstacle (PROTEUS_HEX8):
+obstacle (SSHEX8):
 ----------------------------------------
 #elements 1872 #nodes 1030625 #dofs 3091875
 TTS:		451.011 [s], solve: 450.914 [s]
@@ -202,7 +202,7 @@ iter	abs		rel		rate
 5	3.15638e-09	7.30244e-08	0.0403571
 6	1.28658e-10	2.97656e-09	0.0407612
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 226981 #nodes 238328 #dofs 116930169
 TTS:		22.1533 [s], compute 16.1473 [s] (solve: 13.8048 [s], init: 2.29316 [s])
@@ -221,7 +221,7 @@ iter	abs		rel		rate
 5	3.15647e-09	7.30265e-08	0.0403572
 6	1.28662e-10	2.97665e-09	0.0407613
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 226981 #nodes 238328 #dofs 116930169
 TTS:		28.9183 [s], compute 26.0561 [s] (solve: 24.0579 [s], init: 1.99194 [s])
@@ -240,7 +240,7 @@ iter	abs		rel		rate
 5	3.15638e-09	7.30244e-08	0.0403571
 6	1.28658e-10	2.97656e-09	0.0407612
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 226981 #nodes 238328 #dofs 116930169
 TTS:		17.8547 [s], compute 3.46191 [s] (solve: 2.55559 [s], init: 0.899413 [s])
@@ -262,7 +262,7 @@ iter	abs		rel		rate
 8	5.9379e-09	1.3756e-07	0.142631
 9	8.49459e-10	1.9679e-08	0.143057
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 59319 #nodes 64000 #dofs 201230056
 TTS:		55.1387 [s], compute 24.7028 [s] (solve: 20.3692 [s], init: 4.32541 [s])
@@ -283,7 +283,7 @@ iter	abs		rel		rate
 8	6.07515e-09	1.40814e-07	0.142397
 9	8.67185e-10	2.01002e-08	0.142743
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 205379 #nodes 216000 #dofs 695506456
 TTS:		176.452 [s], compute 92.5454 [s] (solve: 84.8508 [s], init: 7.67918 [s])
@@ -339,7 +339,7 @@ iter	abs		rel		rate
 38	5.3385e-08	2.58633e-06	0.78405
 39	4.19102e-08	2.03041e-06	0.785056
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 3785 #nodes 5181 #dofs 2599413
 TTS:		61.2121 [s], compute 61.125 [s] (solve: 60.9462 [s], init: 0.177892 [s])
@@ -357,7 +357,7 @@ Throughput of fine-op is very bad (`0.22 [GDOF/s]`) with this implementation, wi
 ...
 39	4.18898e-08	2.02951e-06	0.785051
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 ----------------------------------------
 #elements 3785 #nodes 5181 #dofs 2599413
 TTS:		23.5485 [s], compute 23.0922 [s] (solve: 22.3401 [s], init: 0.501535 [s])
@@ -383,7 +383,7 @@ Throughput of fine-op is still bad (`0.4 [GDOF/s]`) with this implementation, wi
 ```c
 39	4.18898e-08	2.02951e-06	0.785051
 ----------------------------------------
-mgsolve (PROTEUS_HEX8):
+mgsolve (SSHEX8):
 #elements 3785 #nodes 5181 #dofs 2599413
 TTS:		17.4191 [s], compute 16.5649 [s] (solve: 15.7444 [s], init: 0.664405 [s]) 
 residual:	3.72803e-08

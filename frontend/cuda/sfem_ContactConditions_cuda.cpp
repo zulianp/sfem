@@ -6,14 +6,14 @@
 
 namespace sfem {
 
-    class GPUContactConditions final : public Constraint {
+    class GPUAxisAlignedContactConditions final : public Constraint {
     public:
         std::shared_ptr<FunctionSpace> space;
         int n_conditions{0};
         boundary_condition_t *conditions{nullptr};
-        std::shared_ptr<ContactConditions> h_contact_conditions;
+        std::shared_ptr<AxisAlignedContactConditions> h_contact_conditions;
 
-        GPUContactConditions(const std::shared_ptr<ContactConditions> &dc)
+        GPUAxisAlignedContactConditions(const std::shared_ptr<AxisAlignedContactConditions> &dc)
             : space(dc->space()), h_contact_conditions(dc) {
             n_conditions = dc->n_conditions();
             auto *h_buffer = (boundary_condition_t *)dc->impl_conditions();
@@ -117,9 +117,9 @@ namespace sfem {
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<sfem::FunctionSpace> &space,
                                              bool as_zeros) const override {
-            auto h_derefined = std::static_pointer_cast<ContactConditions>(
+            auto h_derefined = std::static_pointer_cast<AxisAlignedContactConditions>(
                     h_contact_conditions->derefine(space, as_zeros));
-            return std::make_shared<GPUContactConditions>(h_derefined);
+            return std::make_shared<GPUAxisAlignedContactConditions>(h_derefined);
         }
 
         int mask(mask_t *mask) override
@@ -128,11 +128,11 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        ~GPUContactConditions() { d_destroy_conditions(n_conditions, conditions); }
+        ~GPUAxisAlignedContactConditions() { d_destroy_conditions(n_conditions, conditions); }
     };
 
-    std::shared_ptr<Constraint> to_device(const std::shared_ptr<ContactConditions> &dc) {
-        return std::make_shared<GPUContactConditions>(dc);
+    std::shared_ptr<Constraint> to_device(const std::shared_ptr<AxisAlignedContactConditions> &dc) {
+        return std::make_shared<GPUAxisAlignedContactConditions>(dc);
     }
 
 

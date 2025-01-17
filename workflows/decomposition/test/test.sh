@@ -23,7 +23,7 @@ matrix=system
 output=decomp.raw
 test_output=decomp.txt
 
-sphere.py $mesh_db 1
+sphere.py $mesh_db --refinements=1
 db_to_raw.py $mesh_db $mesh
 
 mkdir -p $matrix

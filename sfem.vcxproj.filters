@@ -1,0 +1,231 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="algebra\argsort.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="algebra\sortreduce.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="algebra\crs_graph.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\ssolve.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\assemble.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\assemble3.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\assemble4.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\axpy.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\cgrad.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\condense_matrix.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\condense_vector.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\cshear.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\divergence.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\idx_to_indicator.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\lumped_mass_inv.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\projection_p0_to_p1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\remap_vector.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\set_diff.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\sgather.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\smask.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\soverride.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\surf_split.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drivers\wss.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\extract_surface_graph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\sfem_cuda_mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\partition.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\read_mesh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\refine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\select_submesh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\sfem_mesh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\sfem_mesh_write.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh\skin.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\dirichlet.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\div.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\grad_p1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\isotropic_phasefield_for_fracture.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\laplacian.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\linear_elasticity.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\mass.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\neohookean.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\neumann.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\simd_laplacian.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="operators\simd_neohookean.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pizzastack\grid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plugin\isolver_sfem_plugin.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="python\codegen\tpl\AssembleSerial_tpl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="python\codegen\tpl\PhaseFieldSplit_tpl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="python\codegen\tpl\PhaseField_tpl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="resampling\pizzastack_to_mesh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="algebra\argsort.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="algebra\crs_graph.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="algebra\sortreduce.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="base\sfem_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="base\sfem_cuda_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="base\sfem_vec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external\avx2sort.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh\extract_surface_graph.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh\read_mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh\sfem_cuda_mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh\sfem_mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh\sfem_mesh_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\dirichlet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\div.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\grad_p1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\isotropic_phasefield_for_fracture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\laplacian.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\mass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\neohookean.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="operators\neumann.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pizzastack\grid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

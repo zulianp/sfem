@@ -50,6 +50,8 @@ typedef real_t vec_real __attribute__((vector_size(_VL_ * sizeof(real_t)),  //
 typedef ptrdiff_t_sfem vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t_sfem)),  //
                                                   aligned(sizeof(ptrdiff_t_sfem))));
 
+int vec_real_check_nan(const vec_real a);
+
 #if _VL_ == 8
 
 #define ZEROS_VEC \
@@ -80,5 +82,9 @@ typedef ptrdiff_t_sfem vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrd
     }
 
 #endif
+
+#define POW2_VEC(__X__) ((__X__) * (__X__))
+
+#define POW3_VEC(__X__) ((__X__) * (__X__) * (__X__))
 
 #endif  // __TET10_VEC_H__

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cstddef>
 #include "partitioner.h"
+#include "sfem_API.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_LpSmoother.hpp"
@@ -9,128 +10,165 @@
 #include "sfem_Stationary.hpp"
 #include "sfem_pwc_interpolator.hpp"
 #include "smoother.h"
-#include "sparse.h"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(
-        const real_t coarsening_factor,
-        const mask_t *bdy_dofs,
-        real_t *near_null,
+        const real_t coarsening_factor, const std::shared_ptr<sfem::Buffer<mask_t>> bdy_dofs_buff,
+        std::shared_ptr<sfem::Buffer<real_t>> near_null,
         std::shared_ptr<sfem::CooSymSpMV<idx_t, real_t>> &fine_mat) {
     std::shared_ptr<sfem::Multigrid<real_t>> amg = sfem::h_mg<real_t>();
 
-    ptrdiff_t dim = fine_mat->rows();
+    sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
+    auto bdy_dofs = bdy_dofs_buff->data();
 
-    idx_t current_dim = dim;
-    idx_t levels = 1;
+    ptrdiff_t fine_ndofs = fine_mat->rows();
+    count_t offdiag_nnz = fine_mat->values->size();
 
-    PartitionerWorkspace ws;
-    count_t nweights = fine_mat->values->size();
-    ws.partition = (idx_t *)malloc((dim) * sizeof(idx_t));
-    ws.rowsums = (real_t *)calloc((dim), sizeof(real_t));
-    ws.ptr_i = (idx_t *)malloc(nweights * sizeof(idx_t));
-    ws.ptr_j = (idx_t *)malloc(nweights * sizeof(idx_t));
-    ws.weights = (real_t *)malloc(nweights * sizeof(real_t));
-    ws.sort_indices = (idx_t *)malloc(nweights * sizeof(idx_t));
+    for (idx_t i = 0; i < fine_ndofs; i++) {
+        near_null->data()[i] = 1.0;
+    }
 
-    real_t *zeros = (real_t *)calloc((dim), sizeof(real_t));
+    PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
+    // Weighted connectivity graph in COO format
+    auto offdiag_row_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
+    auto offdiag_col_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
+    auto offdiag_values = sfem::create_host_buffer<real_t>(offdiag_nnz);
 
-    // Don't need `prev.diag` for partitioner so don't allocate it
-    SymmCOOMatrix a_bar;
-    a_bar.offdiag_row_indices = (idx_t *)malloc(nweights * sizeof(idx_t));
-    a_bar.offdiag_col_indices = (idx_t *)malloc(nweights * sizeof(idx_t));
-    a_bar.offdiag_values = (real_t *)malloc(nweights * sizeof(real_t));
+    idx_t amg_levels = 1;
+
+    // AMG tunable paramaters
+    count_t smoothing_steps = 3;
+    count_t coarsest_ndofs = 500;
+    count_t max_levels = 20;
 
     auto prev_mat = fine_mat;
+    std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p, pt = nullptr;
 
-    while (current_dim > 10) {
-        a_bar.dim = current_dim;
-        a_bar.offdiag_nnz = prev_mat->values->size();
-        for (idx_t k = 0; k < a_bar.offdiag_nnz; k++) {
-            a_bar.offdiag_row_indices[k] = prev_mat->offdiag_rowidx->data()[k];
-            a_bar.offdiag_col_indices[k] = prev_mat->offdiag_colidx->data()[k];
-            a_bar.offdiag_values[k] = prev_mat->values->data()[k];
+    auto diag_smoother = sfem::create_host_buffer<real_t>(fine_ndofs);
+    l2_smoother(fine_ndofs,
+                bdy_dofs,
+                prev_mat->values->size(),
+                prev_mat->diag_values->data(),
+                prev_mat->values->data(),
+                prev_mat->offdiag_rowidx->data(),
+                prev_mat->offdiag_colidx->data(),
+                diag_smoother->data());
+    auto amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
+    amg_smoother->relaxation_parameter = 1.0;
+
+    ptrdiff_t ndofs = fine_ndofs;
+    count_t fine_memory = fine_ndofs + offdiag_nnz;
+    count_t fine_nnz = fine_ndofs + offdiag_nnz * 2;
+
+    count_t prev_nnz = fine_nnz;
+    count_t total_memory = fine_memory;
+    count_t total_complexity = fine_nnz;
+
+    printf("\nAMG info:\n level      cf         dofs       offdiag nnz    true nnz   "
+           "sparsity "
+           "factor\n");
+    printf("|%-10d|%-10.2f|%-10td|%-14d|%-10d|%-16.2f|\n",
+           1,
+           1.0,
+           fine_ndofs,
+           offdiag_nnz,
+           fine_nnz,
+           1.0);
+
+    while (amg_levels < max_levels && ndofs > coarsest_ndofs) {
+        for (idx_t k = 0; k < offdiag_nnz; k++) {
+            offdiag_row_indices->data()[k] = prev_mat->offdiag_rowidx->data()[k];
+            offdiag_col_indices->data()[k] = prev_mat->offdiag_colidx->data()[k];
+            offdiag_values->data()[k] = prev_mat->values->data()[k];
         }
 
-        real_t *inv_diag = (real_t *)malloc(current_dim * sizeof(real_t));
-        l2_smoother(current_dim,
+        ptrdiff_t finer_dim = ndofs;
+        int failure = partition(bdy_dofs,
+                                coarsening_factor,
+                                near_null->data(),
+                                offdiag_row_indices->data(),
+                                offdiag_col_indices->data(),
+                                offdiag_values->data(),
+                                &offdiag_nnz,
+                                &ndofs,
+                                ws);
+
+        if (failure) {
+            printf("Failed to add new level, AMG levels: %d\n", amg_levels);
+            // Otherwise no AMG :(
+            assert(amg_levels > 1);
+            break;
+        }
+
+        ptrdiff_t coarser_dim = ndofs;
+        auto partition_buff = sfem::create_host_buffer<idx_t>(finer_dim);
+        auto weights_buff = sfem::create_host_buffer<real_t>(finer_dim);
+
+        for (idx_t k = 0; k < finer_dim; k++) {
+            partition_buff->data()[k] = ws->partition[k];
+            weights_buff->data()[k] = near_null->data()[k];
+        }
+
+        auto pt = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+        pt->transpose();
+
+        // Convert matrix?
+        std::shared_ptr<sfem::Operator<real_t>> coarse_op = prev_mat;
+        auto stat_iter = sfem::create_stationary<real_t>(coarse_op, amg_smoother, es);
+
+        stat_iter->set_max_it(smoothing_steps);
+        amg->add_level(coarse_op, stat_iter, p, pt);
+        p = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+
+        amg_levels++;
+
+        auto a_coarse = p->coarsen(prev_mat);
+        offdiag_nnz = a_coarse->values->size();
+        count_t coarse_nnz = ndofs + (offdiag_nnz * 2);
+        printf("|%-10d|%-10.2f|%-10td|%-14d|%-10d|%-16.2f|\n",
+               amg_levels,
+               (real_t)finer_dim / (real_t)coarser_dim,
+               ndofs,
+               offdiag_nnz,
+               coarse_nnz,
+               (real_t)coarse_nnz / (real_t)prev_nnz);
+        total_memory += ndofs + offdiag_nnz;
+        total_complexity += ndofs + (offdiag_nnz * 2);
+        prev_nnz = coarse_nnz;
+        prev_mat = a_coarse;
+        bdy_dofs = nullptr;
+
+        diag_smoother = sfem::create_buffer<real_t>(ndofs, es);
+        l2_smoother(ndofs,
                     bdy_dofs,
                     prev_mat->values->size(),
                     prev_mat->diag_values->data(),
                     prev_mat->values->data(),
                     prev_mat->offdiag_rowidx->data(),
                     prev_mat->offdiag_colidx->data(),
-                    inv_diag);
-        auto ptr_lp =
-                sfem::Buffer<real_t>::own(current_dim, inv_diag, free, sfem::MEMORY_SPACE_HOST);
-        auto l2_smoother = sfem::h_lpsmoother(ptr_lp);
-
-        for (idx_t i = 0; i < current_dim; i++) {
-            near_null[i] = 1.0;
-        }
-        auto stat_iter = sfem::h_stationary<real_t>(prev_mat, l2_smoother);
-        stat_iter->set_max_it(3);
-        stat_iter->apply(zeros, near_null);
-
-        int failure = partition(near_null, bdy_dofs, coarsening_factor, &a_bar, &ws);
-        if (failure) {
-            stat_iter->set_max_it(5);
-            // stat_iter->verbose = true;
-            amg->add_level(prev_mat, stat_iter, nullptr, nullptr);
-
-            printf("Failed to add new level, levels: %d\n", levels);
-            break;
-        }
-
-        ptrdiff_t fine_dim = current_dim;
-        ptrdiff_t coarse_dim = a_bar.dim;
-        idx_t *partition = (idx_t *)malloc(current_dim * sizeof(idx_t));
-        real_t *weights = (real_t *)malloc(current_dim * sizeof(real_t));
-
-        for (idx_t k = 0; k < current_dim; k++) {
-            partition[k] = ws.partition[k];
-            weights[k] = near_null[k];
-        }
-
-        auto ptr_weights =
-                sfem::Buffer<real_t>::own(fine_dim, weights, free, sfem::MEMORY_SPACE_HOST);
-        auto ptr_partition =
-                sfem::Buffer<idx_t>::own(fine_dim, partition, free, sfem::MEMORY_SPACE_HOST);
-        auto p = h_pwc_interp(ptr_weights, ptr_partition, coarse_dim);
-
-        auto pt = h_pwc_interp(ptr_weights, ptr_partition, coarse_dim);
-        pt->transpose();
-
-        amg->add_level(prev_mat, stat_iter, p, pt);
-
-        real_t resulting_cf = ((real_t)current_dim) / ((real_t)p->coarse_dim);
-        levels++;
-
-        auto a_coarse = p->coarsen(prev_mat);
-        printf("Added level %d\n\tcf: %.2f nrows: %td offdiag nnz: %d, nnz: %td\n",
-               levels,
-               resulting_cf,
-               a_bar.dim,
-               a_bar.offdiag_nnz,
-               a_bar.dim + (a_bar.offdiag_nnz * 2));
-        current_dim = p->coarse_dim;
-        prev_mat = a_coarse;
-        bdy_dofs = nullptr;
+                    diag_smoother->data());
+        amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
+        amg_smoother->relaxation_parameter = 1.0;
     }
 
-    // TODO need to add solver for coarsest level in AMG!!
+    // Create a coarsest level solver, could also just smooth here if coarsest problem isn't
+    // small enough to solve exactly. Direct solver by cholesky is also probably better here
+    auto cg = sfem::create_cg<real_t>(prev_mat, es);
+    cg->verbose = false;
+    cg->set_max_it(10000);  // Keep it large just to be sure!
+    cg->set_rtol(1e-12);
+    cg->set_preconditioner_op(amg_smoother);
+    amg->add_level(prev_mat, cg, p, nullptr);
 
-    free(ws.partition);
-    free(ws.rowsums);
-    free(ws.ptr_i);
-    free(ws.ptr_j);
-    free(ws.weights);
-    free(ws.sort_indices);
+    if (amg_levels == max_levels) {
+        printf("AMG constructed successfully with max levels hit (%d levels)\n", amg_levels);
+    } else if (ndofs <= coarsest_ndofs) {
+        printf("AMG constructed successfully with coarsest target hit (%td dofs on coarsest)\n",
+               ndofs);
+    }
+    printf("Memory complexity: %.2f\n", (real_t)total_memory / (real_t)fine_memory);
+    printf("Operator complexity: %.2f\n\n", (real_t)total_complexity / (real_t)fine_nnz);
 
-    free(a_bar.offdiag_row_indices);
-    free(a_bar.offdiag_col_indices);
-    free(a_bar.offdiag_values);
-
-    free(zeros);
+    free_partition_ws(ws);
 
     return amg;
 }
