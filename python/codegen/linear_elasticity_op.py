@@ -595,8 +595,8 @@ def main():
 
 	fe.use_adjugate = True
 	
-	# op = LinearElasticityOp(fe)
-	op = LinearElasticityOpSymbolic(SymbolicFE3D())
+	op = LinearElasticityOp(fe)
+	# op = LinearElasticityOpSymbolic(SymbolicFE3D())
 	# op = LinearElasticityOpTaylor(fe)
 	# op.hessian_check()
 
@@ -646,10 +646,10 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.apply())
 
-	# c_log("--------------------------")
-	# c_log("hessian_diag")	
-	# c_log("--------------------------")
-	# c_code(op.hessian_diag())
+	c_log("--------------------------")
+	c_log("hessian_diag")	
+	c_log("--------------------------")
+	c_code(op.hessian_diag())
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')

@@ -7,6 +7,8 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
+#include "sfem_Tracer.hpp"
+
 namespace sfem {
 
     template <typename R, typename C, typename T>
@@ -15,6 +17,8 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_;
 
         int apply(const T* const x, T* const y) override {
+            SFEM_TRACE_SCOPE("CRSSpMV::apply");
+
             apply_(x, y);
             return 0;
         }

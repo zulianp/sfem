@@ -45,6 +45,7 @@ int block_crs_to_crs(const ptrdiff_t nnodes,
                      real_t *const values);
 
 int crs_to_coo(const ptrdiff_t n, const count_t *const rowptr, idx_t *const row_idx);
+int sorted_coo_to_crs(const count_t nnz, const idx_t *const row_idx, const ptrdiff_t n, count_t *const rowptr);
 
 
 // for crs insertion

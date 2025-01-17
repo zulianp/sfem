@@ -155,4 +155,40 @@ if(SFEM_ENABLE_CUDA)
         list(APPEND SFEM_DEP_LIBRARIES "$ENV{CRAY_CUDATOOLKIT_POST_LINK_OPTS} -lcublas -lcusparse")
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
+
+    #https://github.com/NVIDIA/thrust/blob/main/thrust/cmake/README.md
+    find_package(Thrust CONFIG)
+    if(Thrust_FOUND)
+        thrust_create_target(Thrust)
+        list(APPEND SFEM_DEP_LIBRARIES Thrust)
+    else()
+        message(WARNING "Thrust not found!")
+    endif()
+endif()
+
+
+if(SFEM_ENABLE_RYAML)
+    set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
+    set(RYML_BRANCH_NAME master CACHE STRING "")
+    include(FetchContent)
+    FetchContent_Declare(ryml
+        GIT_REPOSITORY ${RYML_REPO_URL}
+        GIT_TAG ${RYML_BRANCH_NAME}
+        GIT_SHALLOW FALSE  # ensure submodules are checked out
+    )
+    FetchContent_MakeAvailable(ryml)
+    list(APPEND SFEM_SUBMODULES ryml::ryml)
+endif()
+
+if(WIN32)
+    set(GLOB_REPO_URL https://github.com/p-ranav/glob.git CACHE STRING "")
+    set(GLOB_BRANCH_NAME master CACHE STRING "")
+    include(FetchContent)
+    FetchContent_Declare(Glob
+        GIT_REPOSITORY ${GLOB_REPO_URL}
+        GIT_TAG ${GLOB_BRANCH_NAME}
+        GIT_SHALLOW FALSE  # ensure submodules are checked out
+    )
+    FetchContent_MakeAvailable(Glob)
+    list(APPEND SFEM_SUBMODULES Glob)
 endif()

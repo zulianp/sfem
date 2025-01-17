@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{053790CB-14CC-460E-8921-C8525A8B3213}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="algebra\argsort.cpp" />
+    <ClCompile Include="algebra\crs_graph.c" />
+    <ClCompile Include="algebra\sortreduce.cpp" />
+    <ClCompile Include="drivers\assemble.c" />
+    <ClCompile Include="drivers\assemble3.c" />
+    <ClCompile Include="drivers\assemble4.c" />
+    <ClCompile Include="drivers\axpy.c" />
+    <ClCompile Include="drivers\cgrad.c" />
+    <ClCompile Include="drivers\condense_matrix.c" />
+    <ClCompile Include="drivers\condense_vector.c" />
+    <ClCompile Include="drivers\cshear.c" />
+    <ClCompile Include="drivers\divergence.c" />
+    <ClCompile Include="drivers\idx_to_indicator.c" />
+    <ClCompile Include="drivers\lumped_mass_inv.c" />
+    <ClCompile Include="drivers\projection_p0_to_p1.c" />
+    <ClCompile Include="drivers\remap_vector.c" />
+    <ClCompile Include="drivers\set_diff.c" />
+    <ClCompile Include="drivers\sgather.c" />
+    <ClCompile Include="drivers\smask.c" />
+    <ClCompile Include="drivers\soverride.c" />
+    <ClCompile Include="drivers\ssolve.cpp" />
+    <ClCompile Include="drivers\surf_split.c" />
+    <ClCompile Include="drivers\wss.c" />
+    <ClCompile Include="mesh\extract_surface_graph.cpp" />
+    <ClCompile Include="mesh\partition.c" />
+    <ClCompile Include="mesh\read_mesh.c" />
+    <ClCompile Include="mesh\refine.c" />
+    <ClCompile Include="mesh\select_submesh.c" />
+    <ClCompile Include="mesh\sfem_cuda_mesh.cpp" />
+    <ClCompile Include="mesh\sfem_mesh.c" />
+    <ClCompile Include="mesh\sfem_mesh_write.c" />
+    <ClCompile Include="mesh\skin.c" />
+    <ClCompile Include="operators\dirichlet.c" />
+    <ClCompile Include="operators\div.c" />
+    <ClCompile Include="operators\grad_p1.c" />
+    <ClCompile Include="operators\isotropic_phasefield_for_fracture.c" />
+    <ClCompile Include="operators\laplacian.c" />
+    <ClCompile Include="operators\linear_elasticity.c" />
+    <ClCompile Include="operators\mass.c" />
+    <ClCompile Include="operators\neohookean.c" />
+    <ClCompile Include="operators\neumann.c" />
+    <ClCompile Include="operators\simd_laplacian.c" />
+    <ClCompile Include="operators\simd_neohookean.c" />
+    <ClCompile Include="pizzastack\grid.c" />
+    <ClCompile Include="plugin\isolver_sfem_plugin.c" />
+    <ClCompile Include="python\codegen\tpl\AssembleSerial_tpl.c" />
+    <ClCompile Include="python\codegen\tpl\PhaseFieldSplit_tpl.c" />
+    <ClCompile Include="python\codegen\tpl\PhaseField_tpl.c" />
+    <ClCompile Include="resampling\pizzastack_to_mesh.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="algebra\argsort.h" />
+    <ClInclude Include="algebra\crs_graph.h" />
+    <ClInclude Include="algebra\sortreduce.h" />
+    <ClInclude Include="base\sfem_base.h" />
+    <ClInclude Include="base\sfem_cuda_base.h" />
+    <ClInclude Include="base\sfem_vec.h" />
+    <ClInclude Include="external\avx2sort.h" />
+    <ClInclude Include="mesh\extract_surface_graph.h" />
+    <ClInclude Include="mesh\read_mesh.h" />
+    <ClInclude Include="mesh\sfem_cuda_mesh.h" />
+    <ClInclude Include="mesh\sfem_mesh.h" />
+    <ClInclude Include="mesh\sfem_mesh_write.h" />
+    <ClInclude Include="operators\dirichlet.h" />
+    <ClInclude Include="operators\div.h" />
+    <ClInclude Include="operators\grad_p1.h" />
+    <ClInclude Include="operators\isotropic_phasefield_for_fracture.h" />
+    <ClInclude Include="operators\laplacian.h" />
+    <ClInclude Include="operators\mass.h" />
+    <ClInclude Include="operators\neohookean.h" />
+    <ClInclude Include="operators\neumann.h" />
+    <ClInclude Include="pizzastack\grid.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

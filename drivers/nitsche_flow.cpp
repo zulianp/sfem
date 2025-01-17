@@ -7,7 +7,9 @@
 
 #include <mpi.h>
 #include <stdio.h>
-#include <sys/stat.h>
+// #include <sys/stat.h>
+
+#include "sfem_glob.hpp"
 
 #define POW2(x) ((x) * (x))
 
@@ -408,10 +410,7 @@ int main(int argc, char *argv[]) {
     const geom_t dx = 2. / nx;
     const geom_t dy = 2. / ny;
 
-    struct stat st = {0};
-    if (stat(output_folder, &st) == -1) {
-        mkdir(output_folder, 0700);
-    }
+    sfem::create_directory(output_folder);
 
     const ptrdiff_t ndofs = (nx + 1) * (ny + 1);
     real_t *u = (real_t *)calloc(ndofs, sizeof(real_t));
