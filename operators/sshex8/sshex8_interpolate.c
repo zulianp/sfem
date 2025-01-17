@@ -973,13 +973,17 @@ int sshex8_restrict(const ptrdiff_t                     nelements,
                     for (int yi = 0; yi <= to_level; yi++) {
                         for (int xi = 0; xi <= to_level; xi++) {
                             // Use top level stride
-                            const int to_lidx = sshex8_lidx(to_level, xi, yi, zi);
+                            const int to_lidx =  // sshex8_lidx(to_level, xi, yi, zi);
+                                    sshex8_lidx(to_level * to_level_stride,
+                                                xi * to_level_stride,
+                                                yi * to_level_stride,
+                                                zi * to_level_stride);
 
                             // Use stride to convert from "from" to "to" local indexing
 
                             const idx_t idx = to_elements[to_lidx][e];
 #pragma omp atomic update
-                            to[idx * vec_size + d] += to_coeffs[d][to_lidx];
+                            to[idx * vec_size + d] += to_coeffs[d][sshex8_lidx(to_level, xi, yi, zi)];
                         }
                     }
                 }
