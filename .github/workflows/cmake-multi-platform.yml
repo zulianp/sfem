@@ -64,6 +64,13 @@ jobs:
         Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
         scoop bucket add main
         scoop install main/msmpi
+        $MPI_DIR = (scoop prefix msmpi)
+        $MPI_BIN_DIR = (scoop prefix msmpi) + "\bin"
+        [System.Environment]::SetEnvironmentVariable('CC', $MPI_BIN_DIR + "\mpicc.exe", [System.EnvironmentVariableTarget]::Process)
+        [System.Environment]::SetEnvironmentVariable('CXX', $MPI_BIN_DIR + "\mpicxx.exe", [System.EnvironmentVariableTarget]::Process)
+        echo "CC=$MPI_BIN_DIR\mpicc.exe" >> $GITHUB_ENV
+        echo "CXX=$MPI_BIN_DIR\mpicxx.exe" >> $GITHUB_ENV
+        echo "PATH=$env:PATH" >> $GITHUB_ENV
       shell: powershell
       
      # Ensure the parent directories exist
