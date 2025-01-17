@@ -67,8 +67,8 @@ jobs:
       shell: powershell
       
      # Ensure the parent directories exist
-    - name: Create directory for external repositories
-      run: mkdir -p external
+    # - name: Create directory for external repositories
+    #   run: mkdir -p external
       
     - name: Download Matrix.IO
       run: |
