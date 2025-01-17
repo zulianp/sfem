@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <exception>
 
 #include "sfem_Tracer.hpp"
 #include "sfem_base.h"
@@ -13,12 +14,20 @@ extern "C" {
 
 #define SFEM_TEST_SUCCESS 0
 #define SFEM_TEST_FAILURE 1
-#define SFEM_UNIT_TEST_INIT(argc,argv) MPI_Init(&argc, &argv); int err = 0;
-#define SFEM_RUN_TEST(test_)                                                                          \
-    do {                                                                                              \
-        SFEM_TRACE_SCOPE(#test_);                                                                     \
-        if ((err = test_())) fprintf(stderr, "TEST: %s failed! %s:%d\n", #test_, __FILE__, __LINE__); \
+#define SFEM_UNIT_TEST_INIT(argc, argv) \
+    MPI_Init(&argc, &argv);             \
+    int err = 0;
+#define SFEM_RUN_TEST(test_)                                                                              \
+    do {                                                                                                  \
+        SFEM_TRACE_SCOPE(#test_);                                                                         \
+        try {                                                                                             \
+            if ((err = test_())) fprintf(stderr, "TEST: %s failed! %s:%d\n", #test_, __FILE__, __LINE__); \
+        } catch (const std::exception &ex) {                                                              \
+            fprintf(stderr, "Exception: %s, in test %s! %s:%d\n", ex.what(), #test_, __FILE__, __LINE__);            \
+            err = SFEM_TEST_FAILURE;                                                                      \
+        }                                                                                                 \
     } while (0)
+
 #define SFEM_UNIT_TEST_FINALIZE() MPI_Finalize()
 #define SFEM_UNIT_TEST_ERR() (err)
 
