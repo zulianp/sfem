@@ -61,8 +61,11 @@ jobs:
     - name: Set up MPI on Windows
       if: matrix.os == 'windows-latest'
       run: |
+        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
         scoop bucket add main
         scoop install main/msmpi
+      shell: powershell
+      
      # Ensure the parent directories exist
     - name: Create directory for external repositories
       run: mkdir -p external
