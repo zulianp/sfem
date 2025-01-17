@@ -55,6 +55,7 @@ namespace sfem {
             std::shared_ptr<Buffer<T>> solution;
             std::shared_ptr<Buffer<T>> work;
             std::shared_ptr<Buffer<T>> diag;
+            std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op;
             inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
@@ -330,6 +331,8 @@ namespace sfem {
             if (memory_.empty()) {
                 init();
             }
+
+            memory_[finest_level()]->constraints_op_x_op = constraints_op_x_op_;
         }
 
         int init() {
