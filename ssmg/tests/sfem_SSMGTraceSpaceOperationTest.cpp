@@ -41,7 +41,7 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     auto &&coarse_ssmesh = coarse_fs->semi_structured_mesh();
 
     ptrdiff_t n_nodes{0};
-    idx_t * nodes{nullptr};
+    idx_t    *nodes{nullptr};
     SFEM_TEST_ASSERT(sshex8_extract_nodeset_from_sideset(coarse_ssmesh.level(),
                                                          coarse_ssmesh.element_data(),
                                                          sideset->parent()->size(),
@@ -90,7 +90,7 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
                                         fine_x->data()) == SFEM_SUCCESS);
 
     auto restricted_x = sfem::create_buffer<real_t>(coarse_fs->n_dofs(), es);
-    auto count = sfem::create_host_buffer<uint16_t>(fine_ssmesh.n_nodes());
+    auto count        = sfem::create_host_buffer<uint16_t>(fine_ssmesh.n_nodes());
 
 #ifdef SFEM_ENABLE_CUDA
     if (es == sfem::EXECUTION_SPACE_DEVICE) count = sfem::to_device(count);
@@ -125,9 +125,8 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
         auto rx = restricted_x->data();
         auto cx = coarse_x->data();
 
-
         for (ptrdiff_t i = 0; i < n; i++) {
-            SFEM_TEST_ASSERT( (cx[i] != 0) == (rx[i] != 0));
+            SFEM_TEST_ASSERT((cx[i] != 0) == (rx[i] != 0));
         }
     }
 
@@ -145,7 +144,7 @@ int test_trace_space_prolongation_restriction() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 4;
+    int SFEM_ELEMENT_REFINE_LEVEL = 24;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     int SFEM_BASE_RESOLUTION = 8;

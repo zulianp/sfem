@@ -12,8 +12,8 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
-#include "sfem_tpl_blas.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_tpl_blas.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_Tracer.hpp"
@@ -23,8 +23,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
-                                                const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
 
     /// level 0 is the finest
     template <typename T>
@@ -34,12 +33,12 @@ namespace sfem {
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
-        void set_constraints_op(const std::shared_ptr<Operator<T>>& op,
-                                const std::shared_ptr<Operator<T>>& op_t,
+        void set_constraints_op(const std::shared_ptr<Operator<T>>&          op,
+                                const std::shared_ptr<Operator<T>>&          op_t,
                                 const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
-            constraints_op_ = op;
+            constraints_op_           = op;
             constraints_op_transpose_ = op_t;
-            constraints_op_x_op_      = op_x_op;
+            constraints_op_x_op_.push_back(op_x_op);
         }
 
         enum CycleType {
@@ -55,8 +54,7 @@ namespace sfem {
             std::shared_ptr<Buffer<T>> solution;
             std::shared_ptr<Buffer<T>> work;
             std::shared_ptr<Buffer<T>> diag;
-            std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op;
-            inline ptrdiff_t size() const { return solution->size(); }
+            inline ptrdiff_t           size() const { return solution->size(); }
             ~Memory() {}
         };
 
@@ -73,35 +71,32 @@ namespace sfem {
 
             // Wrap input arrays into fine level of mg
             if (wrap_input_) {
-                memory_[finest_level()]->solution =
-                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+                memory_[finest_level()]->solution = Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-                memory_[finest_level()]->rhs =
-                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
+                memory_[finest_level()]->rhs = Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
             }
 
-            const int level = finest_level();
-            auto mem = memory_[level];
-            auto smoother = smoother_[level];
-            auto op = operator_[level];
+            const int level    = finest_level();
+            auto      mem      = memory_[level];
+            auto      smoother = smoother_[level];
+            auto      op       = operator_[level];
 
-            const ptrdiff_t n_dofs = op->rows();
-            const ptrdiff_t n_constrained_dofs =
-                    (constraints_op_ ? constraints_op_->rows() : n_dofs);
+            const ptrdiff_t n_dofs             = op->rows();
+            const ptrdiff_t n_constrained_dofs = (constraints_op_ ? constraints_op_->rows() : n_dofs);
 
-            T* lb = (lower_bound_) ? lower_bound_->data() : nullptr;
-            T* ub = (upper_bound_) ? upper_bound_->data() : nullptr;
-            lagr_lb = lb ? make_buffer(n_constrained_dofs) : nullptr;
-            lagr_ub = ub ? make_buffer(n_constrained_dofs) : nullptr;
+            T* lb               = (lower_bound_) ? lower_bound_->data() : nullptr;
+            T* ub               = (upper_bound_) ? upper_bound_->data() : nullptr;
+            lagr_lb             = lb ? make_buffer(n_constrained_dofs) : nullptr;
+            lagr_ub             = ub ? make_buffer(n_constrained_dofs) : nullptr;
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             T penetration_norm = 0;
-            T penetration_tol = 1 / (penalty_param_ * 0.1);
+            T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
-            int count_inner_iter = 0;
+            int count_inner_iter        = 0;
             int count_lagr_mult_updates = 0;
-            T omega = 1 / penalty_param_;
+            T   omega                   = 1 / penalty_param_;
 
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
@@ -112,7 +107,7 @@ namespace sfem {
                         break;
                     }
 
-                    if(constraints_op_) {
+                    if (constraints_op_) {
                         blas_.zeros(n_constrained_dofs, correction->data());
 
                         // Solution space to constraints space
@@ -120,14 +115,8 @@ namespace sfem {
 
                         // Constraints space to solution space
                         blas_.zeros(n_constrained_dofs, mem->work->data());
-                        impl_.calc_r_pen(n_constrained_dofs,
-                                        correction->data(),
-                                        penalty_param_,
-                                        lb,
-                                        ub,
-                                        l_lb,
-                                        l_ub,
-                                        mem->work->data());
+                        impl_.calc_r_pen(
+                                n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
                         blas_.zeros(n_dofs, correction->data());
 
@@ -164,29 +153,24 @@ namespace sfem {
                     }
                 }
 
-                const T e_pen =
-                        ((ub) ? impl_.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
-                        ((lb) ? impl_.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
+                const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
+                                ((lb) ? impl_.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
 
-                const T norm_pen = std::sqrt(e_pen);
+                const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
                 if (norm_pen < penetration_tol) {
-                    if (ub)
-                        impl_.update_lagr_p(
-                                n_dofs, penalty_param_, mem->solution->data(), ub, lagr_ub->data());
-                    if (lb)
-                        impl_.update_lagr_m(
-                                n_dofs, penalty_param_, mem->solution->data(), lb, lagr_lb->data());
+                    if (ub) impl_.update_lagr_p(n_dofs, penalty_param_, mem->solution->data(), ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_dofs, penalty_param_, mem->solution->data(), lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
-                    omega = omega / penalty_param_;
+                    omega           = omega / penalty_param_;
 
                     count_lagr_mult_updates++;
                 } else {
-                    penalty_param_ = std::min(penalty_param_ * 10, max_penalty_param_);
+                    penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
                     penetration_tol = 1 / pow(penalty_param_, 0.1);
-                    omega = 1 / penalty_param_;
+                    omega           = 1 / penalty_param_;
                 }
 
                 if (debug && ub) {
@@ -215,9 +199,14 @@ namespace sfem {
             return 0;
         }
 
-        void monitor(const int iter, const int count_inner_iter, const int count_smoothing_steps,
-                     const int count_lagr_mult_updates, const T norm_pen, const T norm_rpen,
-                     const T penetration_tol, const T penalty_param) {
+        void monitor(const int iter,
+                     const int count_inner_iter,
+                     const int count_smoothing_steps,
+                     const int count_lagr_mult_updates,
+                     const T   norm_pen,
+                     const T   norm_rpen,
+                     const T   penetration_tol,
+                     const T   penalty_param) {
             // if (iter == max_it_ || (norm_pen < atol_ && norm_rpen < atol_)) {
             printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
                    "penalty_param "
@@ -246,10 +235,10 @@ namespace sfem {
 
         // Fine level prolongation has to be null
         // Coarse level restriction has to be null
-        inline void add_level(const std::shared_ptr<Operator<T>>& op,
+        inline void add_level(const std::shared_ptr<Operator<T>>&               op,
                               const std::shared_ptr<MatrixFreeLinearSolver<T>>& smoother_or_solver,
-                              const std::shared_ptr<Operator<T>>& prolongation,
-                              const std::shared_ptr<Operator<T>>& restriction) {
+                              const std::shared_ptr<Operator<T>>&               prolongation,
+                              const std::shared_ptr<Operator<T>>&               restriction) {
             operator_.push_back(op);
             smoother_.push_back(smoother_or_solver);
             prolongation_.push_back(prolongation);
@@ -259,64 +248,62 @@ namespace sfem {
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
             OpenMP_ShiftedPenalty<T>::build(impl_);
-            execution_space_ = EXECUTION_SPACE_HOST; 
+            execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void set_max_it(const int val) { max_it_ = val; }
 
         void set_atol(const T val) { atol_ = val; }
 
-        void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
-        BLAS_Tpl<T>& blas() { return blas_; }
+        void                   set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
+        BLAS_Tpl<T>&           blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
 
         bool debug{false};
 
         void set_cycle_type(const int val) { cycle_type_ = val; }
-        void set_project_coarse_space_correction(const bool val) {
-            project_coarse_space_correction_ = val;
-        }
+        void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
 
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
     private:
-        std::vector<std::shared_ptr<Operator<T>>> operator_;
+        std::vector<std::shared_ptr<Operator<T>>>               operator_;
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;
 
         std::vector<std::shared_ptr<Operator<T>>> prolongation_;
         std::vector<std::shared_ptr<Operator<T>>> restriction_;
 
-        std::shared_ptr<Operator<T>> constraints_op_;
-        std::shared_ptr<Operator<T>> constraints_op_transpose_;
-        std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
+        std::shared_ptr<Operator<T>>                       constraints_op_;
+        std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
+        std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
+        std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
-        bool wrap_input_{true};
+        bool                                 wrap_input_{true};
 
         int max_it_{10};
         int iterations_{0};
         int cycle_type_{V_CYCLE};
-        T atol_{1e-10};
+        T   atol_{1e-10};
 
-        BLAS_Tpl<T> blas_;
+        BLAS_Tpl<T>           blas_;
         ShiftedPenalty_Tpl<T> impl_;
-        bool verbose{true};
+        bool                  verbose{true};
 
         bool project_coarse_space_correction_{false};
         bool line_search_enabled_{true};
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
-            return Buffer<T>::own(
-                    n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());
+            return Buffer<T>::own(n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());
         }
 
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
         std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
 
-        T penalty_param_{10};  // mu
-        T max_penalty_param_{1000};
+        T   penalty_param_{10};  // mu
+        T   max_penalty_param_{1000};
         int nlsmooth_steps{3};
         int max_inner_it{3};
 
@@ -331,8 +318,6 @@ namespace sfem {
             if (memory_.empty()) {
                 init();
             }
-
-            memory_[finest_level()]->constraints_op_x_op = constraints_op_x_op_;
         }
 
         int init() {
@@ -349,7 +334,7 @@ namespace sfem {
                 const ptrdiff_t n = smoother_[l]->rows();
                 if (l != finest_level() || !wrap_input_) {
                     memory_[l]->solution = make_buffer(n);
-                    memory_[l]->rhs = make_buffer(n);
+                    memory_[l]->rhs      = make_buffer(n);
                 }
 
                 memory_[l]->work = make_buffer(n);
@@ -359,8 +344,7 @@ namespace sfem {
             return 0;
         }
 
-        std::shared_ptr<Operator<T>> shifted_op(const int level)
-        {
+        std::shared_ptr<Operator<T>> shifted_op(const int level) {
             auto J = operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
             return J;
         }
@@ -368,17 +352,16 @@ namespace sfem {
         void eval_residual_and_jacobian() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::eval_residual_and_jacobian");
 
-            const int level = finest_level();
-            auto mem = memory_[level];
-            auto smoother = smoother_[level];
-            auto op = operator_[level];
+            const int level    = finest_level();
+            auto      mem      = memory_[level];
+            auto      smoother = smoother_[level];
+            auto      op       = operator_[level];
 
-            const ptrdiff_t n_dofs = op->rows();
-            const ptrdiff_t n_constrained_dofs =
-                    (constraints_op_ ? constraints_op_->rows() : n_dofs);
+            const ptrdiff_t n_dofs             = op->rows();
+            const ptrdiff_t n_constrained_dofs = (constraints_op_ ? constraints_op_->rows() : n_dofs);
 
-            const T* const lb = (lower_bound_) ? lower_bound_->data() : nullptr;
-            const T* const ub = (upper_bound_) ? upper_bound_->data() : nullptr;
+            const T* const lb   = (lower_bound_) ? lower_bound_->data() : nullptr;
+            const T* const ub   = (upper_bound_) ? upper_bound_->data() : nullptr;
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
@@ -392,31 +375,17 @@ namespace sfem {
                 blas_.zeros(n_dofs, mem->diag->data());
 
                 blas_.zeros(n_constrained_dofs, mem->diag->data());
-                impl_.calc_J_pen(n_constrained_dofs,
-                                mem->work->data(),
-                                penalty_param_,
-                                lb,
-                                ub,
-                                l_lb,
-                                l_ub,
-                                mem->diag->data());
+                impl_.calc_J_pen(n_constrained_dofs, mem->work->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
 
                 // Residual
                 blas_.zeros(n_constrained_dofs, mem->work->data());
-                impl_.calc_r_pen(n_constrained_dofs,
-                                correction->data(),
-                                penalty_param_,
-                                lb,
-                                ub,
-                                l_lb,
-                                l_ub,
-                                mem->work->data());
+                impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
                 blas_.zeros(n_dofs, correction->data());
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
-                
+
                 blas_.zeros(n_dofs, mem->work->data());
                 op->apply(mem->solution->data(), mem->work->data());
                 blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
@@ -430,24 +399,10 @@ namespace sfem {
                 blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
 
                 // Compute penalty residual
-                impl_.calc_r_pen(n_dofs,
-                                 mem->solution->data(),
-                                 penalty_param_,
-                                 lb,
-                                 ub,
-                                 l_lb,
-                                 l_ub,
-                                 mem->work->data());
+                impl_.calc_r_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
                 blas_.zeros(n_dofs, mem->diag->data());
-                impl_.calc_J_pen(n_dofs,
-                                 mem->solution->data(),
-                                 penalty_param_,
-                                 lb,
-                                 ub,
-                                 l_lb,
-                                 l_ub,
-                                 mem->diag->data());
+                impl_.calc_J_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
             }
 
             // if (debug) {
@@ -459,27 +414,41 @@ namespace sfem {
         void penalty_pseudo_galerkin_assembly() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::penalty_pseudo_galerkin_assembly");
 
-            for(int  l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
+            for (int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
                 auto mem_coarse = memory_[coarser_level(l)];
                 blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
-                restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
+
+                if (constraints_op_) {
+                    SFEM_ERROR("IMPLEMENT ME!");
+                } else {
+                    restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
+                }
             }
+        }
+
+        void penalty_pseudo_galerkin_assembly_constraints() {
+            // TODO
+            SFEM_ERROR("IMPLEMENT ME!");
+
+            // if (constraints_op_) {
+            //     smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
+            // } else {
         }
 
         void nonlinear_smooth() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_smooth");
 
-            const int level = finest_level();
-            auto mem = memory_[level];
-            auto smoother = smoother_[level];
-            auto op = operator_[level];
+            const int level    = finest_level();
+            auto      mem      = memory_[level];
+            auto      smoother = smoother_[level];
+            auto      op       = operator_[level];
 
             const ptrdiff_t n_dofs = op->rows();
             for (int ns = 0; ns < nlsmooth_steps; ns++) {
                 eval_residual_and_jacobian();
 
-                if(constraints_op_) {
-                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_, mem->diag);
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[finest_level()], mem->diag);
                 } else {
                     smoother->set_op_and_diag_shift(op, mem->diag);
                 }
@@ -495,13 +464,13 @@ namespace sfem {
         CycleReturnCode nonlinear_cycle() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_cycle");
 
-            const int level = finest_level();
-            auto mem = memory_[level];
-            auto smoother = smoother_[level];
-            auto sop = shifted_op(level);
-            auto restriction = restriction_[level];
-            auto prolongation = prolongation_[coarser_level(level)];
-            auto mem_coarse = memory_[coarser_level(level)];
+            const int level        = finest_level();
+            auto      mem          = memory_[level];
+            auto      smoother     = smoother_[level];
+            auto      sop          = shifted_op(level);
+            auto      restriction  = restriction_[level];
+            auto      prolongation = prolongation_[coarser_level(level)];
+            auto      mem_coarse   = memory_[coarser_level(level)];
 
             nonlinear_smooth();
 
@@ -526,26 +495,24 @@ namespace sfem {
                 prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                 if (line_search_enabled_) {
-                    assert(!constraints_op_); // IMPLEMENT ME?
+                    assert(!constraints_op_);  // IMPLEMENT ME?
                     T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
                     blas_.zeros(mem->work->size(), mem->work->data());
 
                     sop->apply(correction->data(), mem->work->data());
 
-                    alpha /= std::max(
-                            T(1e-16),
-                            blas_.dot(correction->size(), correction->data(), mem->work->data()));
+                    alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
                     blas_.scal(correction->size(), alpha, correction->data());
                 }
 
                 // FIXME if we find a good reason for this add GPU support here
                 if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
-                    assert(!constraints_op_); // FIXME not supported yet!!!
+                    assert(!constraints_op_);  // FIXME not supported yet!!!
 
-                    auto c = correction->data();
-                    auto ub = upper_bound_->data();
-                    auto x = mem->solution->data();
-                    const ptrdiff_t n = correction->size();
+                    auto            c  = correction->data();
+                    auto            ub = upper_bound_->data();
+                    auto            x  = mem->solution->data();
+                    const ptrdiff_t n  = correction->size();
 
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
@@ -565,33 +532,40 @@ namespace sfem {
 
         CycleReturnCode cycle(const int level) {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::cycle");
-            
-            auto mem = memory_[level];
+
+            auto mem      = memory_[level];
             auto smoother = smoother_[level];
-            auto op = operator_[level];
-            auto sop = shifted_op(level);
+            auto op       = operator_[level];
+            auto sop      = shifted_op(level);
 
             ptrdiff_t n_dofs = op->rows();
             if (coarsest_level() == level) {
-                smoother->set_op_and_diag_shift(op, mem->diag);
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
+                } else {
+                    smoother->set_op_and_diag_shift(op, mem->diag);
+                }
 
                 blas_.zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     return CYCLE_CONTINUE;
                 } else {
-                    fprintf(stderr,
-                            "Coarse grid solver did not reach desired tol in %d\n",
-                            smoother->iterations());
+                    fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
                     return CYCLE_FAILURE;
                 }
             }
 
-            auto restriction = restriction_[level];
+            auto restriction  = restriction_[level];
             auto prolongation = prolongation_[coarser_level(level)];
-            auto mem_coarse = memory_[coarser_level(level)];
+            auto mem_coarse   = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
-                smoother->set_op_and_diag_shift(op, mem->diag);
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
+                } else {
+                    smoother->set_op_and_diag_shift(op, mem->diag);
+                }
+
                 smoother->apply(mem->rhs->data(), mem->solution->data());
 
                 {
