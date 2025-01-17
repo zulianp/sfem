@@ -14,6 +14,8 @@
 extern "C" {  // begin extern "C"
 #endif
 
+typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
+
 real_t                 //
 min4(const real_t a,   //
      const real_t b,   //
@@ -79,7 +81,7 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
  * @return int Returns 1 if the point is inside the tetrahedron, 0 otherwise.
  */
 int                                           //
-check_p_inside_testreadnum(const real_t px,   //
+check_p_inside_tetrahedron(const real_t px,   //
                            const real_t py,   //
                            const real_t pz,   //
                            const real_t x0,   //
@@ -94,6 +96,28 @@ check_p_inside_testreadnum(const real_t px,   //
                            const real_t x3,   //
                            const real_t y3,   //
                            const real_t z3);  //
+
+/**
+ * @brief Apply a function to a mesh
+ *
+ * This function applies a given function to a mesh within the specified range of elements.
+ *
+ * @param start_element [in] The starting element index of the mesh to apply the function to.
+ * @param end_element [in] The ending element index of the mesh to apply the function to.
+ * @param nnodes [in] Number of nodes in the mesh.
+ * @param elems [in] Pointer to the array of element indices in the mesh.
+ * @param xyz [in] Pointer to the array of geometric coordinates of the nodes in the mesh.
+ * @param fun [in] The function to be applied to the mesh.
+ * @param weighted_field [out] Pointer to the output array where the weighted field will be stored.
+ */
+int                                                                  //
+apply_fun_to_mesh(const ptrdiff_t                    start_element,  // Mesh
+                  const ptrdiff_t                    end_element,    // Mesh
+                  const ptrdiff_t                    nnodes,         // Mesh
+                  const idx_t** const SFEM_RESTRICT  elems,          // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,            // Mesh
+                  const function_XYZ_t               fun,            // Function
+                  real_t* const SFEM_RESTRICT        weighted_field);       //   Output (weighted field)
 
 #ifdef __cplusplus
 }  // end extern "C"

@@ -129,7 +129,7 @@ tetrahedron_volume(const real_t x0,    // 1st vertex X
 // check_inside_testreadnum ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 int                                            //
-check_p_inside_testreadnum(const real_t px,    //
+check_p_inside_tetrahedron(const real_t px,    //
                            const real_t py,    //
                            const real_t pz,    //
                            const real_t x0,    //
@@ -292,7 +292,7 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                     const real_t grid_z = (k * dz + oz);
 
                     // Check if the grid point is inside the tetrahedron
-                    const int is_inside = check_p_inside_testreadnum(grid_x,
+                    const int is_inside = check_p_inside_tetrahedron(grid_x,
                                                                      grid_y,
                                                                      grid_z,  //
                                                                      x0,
@@ -309,7 +309,7 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                                                                      z3);
 
                     if (in_out_status == 1 && !is_inside) {
-                        // if the grid point is outside the tetrahedron
+                        // if the grid exit from the tetrahedron
                         // all the grid points after this point in the k loop
                         // are outside the tetrahedron
                         in_out_status = 0;
@@ -343,10 +343,64 @@ tet4_inv_resample_field_local(const ptrdiff_t                      start_element
                         // Update the field at the grid point
                         const ptrdiff_t index = i * stride[0] + j * stride[1] + k * stride[2];
                         data[index]           = val;
+                        // data[index]           = 2.2255;
                     }
                 }
             }
         }
+    }
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+int                                                                  //
+apply_fun_to_mesh(const ptrdiff_t                    start_element,  // Mesh
+                  const ptrdiff_t                    end_element,    // Mesh
+                  const ptrdiff_t                    nnodes,         // Mesh
+                  const idx_t** const SFEM_RESTRICT  elems,          // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,            // Mesh
+                  const function_XYZ_t               fun,            // Function
+                  real_t* const SFEM_RESTRICT        weighted_field) {      // Output (weighted field)
+
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    for (int element_id = start_element; element_id < end_element; element_id++) {
+        //
+        real_t x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
+        real_t y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
+        real_t z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
+
+        // And its weighted field
+        idx_t ev[4];
+        for (int v = 0; v < 4; v++) {
+            ev[v] = elems[v][element_id];
+        }
+
+        {
+            x0 = xyz[0][ev[0]];
+            x1 = xyz[0][ev[1]];
+            x2 = xyz[0][ev[2]];
+            x3 = xyz[0][ev[3]];
+
+            y0 = xyz[1][ev[0]];
+            y1 = xyz[1][ev[1]];
+            y2 = xyz[1][ev[2]];
+            y3 = xyz[1][ev[3]];
+
+            z0 = xyz[2][ev[0]];
+            z1 = xyz[2][ev[1]];
+            z2 = xyz[2][ev[2]];
+            z3 = xyz[2][ev[3]];
+        }
+
+        weighted_field[ev[0]] = fun(x0, y0, z0);
+        weighted_field[ev[1]] = fun(x1, y1, z1);
+        weighted_field[ev[2]] = fun(x2, y2, z2);
+        weighted_field[ev[3]] = fun(x3, y3, z3);
     }
 
     RETURN_FROM_FUNCTION(ret);

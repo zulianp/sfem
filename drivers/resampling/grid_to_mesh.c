@@ -339,132 +339,6 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
-            //             if (mpi_size == 1) {
-            //                 resample_field(
-            //                         // Mesh
-            //                         mesh.element_type,
-            //                         mesh.nelements,
-            //                         mesh.nnodes,
-            //                         mesh.elements,
-            //                         mesh.points,
-            //                         // discrete field
-            //                         nlocal,
-            //                         stride,
-            //                         origin,
-            //                         delta,
-            //                         field,
-            //                         // Output
-            //                         g,
-            //                         &info);
-
-            //                 // end if mpi_size == 1
-
-            //             } else {
-            //                 // mpi_size > 1
-
-            //                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
-            // #if SFEM_TET10_CUDA == ON
-            //                     const int ret =                                           //
-            //                             hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
-            //                                     mpi_size,                                 // MPI size
-            //                                     mpi_rank,                                 // MPI rank
-            //                                     &mesh,                                    // Mesh
-            //                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in
-            //                                     the kernel nlocal,                                   // number of nodes in
-            //                                     each direction stride,                                   // stride of the
-            //                                     data origin,                                   // origin of the domain
-            //                                     delta,                                    // delta of the domain
-            //                                     field,                                    // filed
-            //                                     g);                                       // output
-            // #endif
-            //                 } else {  // Other cases and CPU
-            //                     resample_field_local(
-            //                             // Mesh
-            //                             mesh.element_type,
-            //                             mesh.nelements,
-            //                             mesh.nnodes,
-            //                             mesh.elements,
-            //                             mesh.points,
-            //                             // discrete field
-            //                             nlocal,
-            //                             stride,
-            //                             origin,
-            //                             delta,
-            //                             field,
-            //                             // Output
-            //                             g,
-            //                             &info);
-            //                 }  // END if info.element_type == TET10 && SFEM_TET10_CUDA == ON /////
-
-            //                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
-
-            //                 if (mesh.element_type == TET10 && assemble_dual_mass_vector_cuda == 0) {
-            //                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
-
-            //                     // In case of CUDA == ON this is calculated in the CUDA kernels calls
-            //                     // Directely in the hex8_to_tet10_resample_field_local_CUDA function
-
-            //                     tet10_assemble_dual_mass_vector(mesh.nelements,  //
-            //                                                     mesh.nnodes,
-            //                                                     mesh.elements,
-            //                                                     mesh.points,
-            //                                                     mass_vector);
-
-            //                     // end if mesh.element_type == TET10
-            //                 } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
-            //                     enum ElemType st = shell_type(mesh.element_type);
-
-            //                     if (st == INVALID) {
-            //                         assemble_lumped_mass(
-            //                                 mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
-            //                                 mass_vector);
-
-            //                     } else {
-            //                         assemble_lumped_mass(st, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
-            //                         mass_vector);
-            //                     }
-
-            //                     // end if mesh.element_type == TET4
-
-            //                 }  // end if mesh.element_type == TET10
-
-            //                 if (assemble_dual_mass_vector_cuda == 0) {
-            //                     //// TODO In CPU must be called.
-            //                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed
-            //                     memory
-            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at
-            //                     the moment)
-
-            //                     // exchange ghost nodes and add contribution
-            //                     if (mpi_size > 1) {
-            //                         send_recv_t slave_to_master;
-            //                         mesh_create_nodal_send_recv(&mesh, &slave_to_master);
-
-            //                         ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
-            //                         real_t*   real_buffer = malloc(count * sizeof(real_t));
-
-            //                         exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
-            //                         exchange_add(&mesh, &slave_to_master, g, real_buffer);
-
-            //                         free(real_buffer);
-            //                         send_recv_destroy(&slave_to_master);
-            //                     }  // end if mpi_size > 1
-
-            //                     // divide by the mass vector
-            //                     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            //                         if (mass_vector[i] == 0) {
-            //                             fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh.n_owned_nodes,
-            //                             mesh.nnodes);
-            //                         }
-
-            //                         assert(mass_vector[i] != 0);
-            //                         g[i] /= mass_vector[i];
-            //                     }  // end for i < mesh.n_owned_nodes
-            //                 }      // end if SFEM_TET10_CUDA == OFF || SFEM_CUDA_MEMORY_MODEL == UNIFIED
-
-            //                 free(mass_vector);
-            //             }  // end if mpi_size > 1
-
         }  // end if SFEM_INTERPOLATE
         /////////////////////////////////
         // END resample_field_mesh
@@ -605,3 +479,129 @@ int main(int argc, char* argv[]) {
     const int return_value = MPI_Finalize();
     RETURN_FROM_FUNCTION(return_value);
 }
+
+//             if (mpi_size == 1) {
+//                 resample_field(
+//                         // Mesh
+//                         mesh.element_type,
+//                         mesh.nelements,
+//                         mesh.nnodes,
+//                         mesh.elements,
+//                         mesh.points,
+//                         // discrete field
+//                         nlocal,
+//                         stride,
+//                         origin,
+//                         delta,
+//                         field,
+//                         // Output
+//                         g,
+//                         &info);
+
+//                 // end if mpi_size == 1
+
+//             } else {
+//                 // mpi_size > 1
+
+//                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+// #if SFEM_TET10_CUDA == ON
+//                     const int ret =                                           //
+//                             hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
+//                                     mpi_size,                                 // MPI size
+//                                     mpi_rank,                                 // MPI rank
+//                                     &mesh,                                    // Mesh
+//                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in
+//                                     the kernel nlocal,                                   // number of nodes in
+//                                     each direction stride,                                   // stride of the
+//                                     data origin,                                   // origin of the domain
+//                                     delta,                                    // delta of the domain
+//                                     field,                                    // filed
+//                                     g);                                       // output
+// #endif
+//                 } else {  // Other cases and CPU
+//                     resample_field_local(
+//                             // Mesh
+//                             mesh.element_type,
+//                             mesh.nelements,
+//                             mesh.nnodes,
+//                             mesh.elements,
+//                             mesh.points,
+//                             // discrete field
+//                             nlocal,
+//                             stride,
+//                             origin,
+//                             delta,
+//                             field,
+//                             // Output
+//                             g,
+//                             &info);
+//                 }  // END if info.element_type == TET10 && SFEM_TET10_CUDA == ON /////
+
+//                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
+
+//                 if (mesh.element_type == TET10 && assemble_dual_mass_vector_cuda == 0) {
+//                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+
+//                     // In case of CUDA == ON this is calculated in the CUDA kernels calls
+//                     // Directely in the hex8_to_tet10_resample_field_local_CUDA function
+
+//                     tet10_assemble_dual_mass_vector(mesh.nelements,  //
+//                                                     mesh.nnodes,
+//                                                     mesh.elements,
+//                                                     mesh.points,
+//                                                     mass_vector);
+
+//                     // end if mesh.element_type == TET10
+//                 } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
+//                     enum ElemType st = shell_type(mesh.element_type);
+
+//                     if (st == INVALID) {
+//                         assemble_lumped_mass(
+//                                 mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
+//                                 mass_vector);
+
+//                     } else {
+//                         assemble_lumped_mass(st, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
+//                         mass_vector);
+//                     }
+
+//                     // end if mesh.element_type == TET4
+
+//                 }  // end if mesh.element_type == TET10
+
+//                 if (assemble_dual_mass_vector_cuda == 0) {
+//                     //// TODO In CPU must be called.
+//                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed
+//                     memory
+//                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at
+//                     the moment)
+
+//                     // exchange ghost nodes and add contribution
+//                     if (mpi_size > 1) {
+//                         send_recv_t slave_to_master;
+//                         mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+
+//                         ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
+//                         real_t*   real_buffer = malloc(count * sizeof(real_t));
+
+//                         exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
+//                         exchange_add(&mesh, &slave_to_master, g, real_buffer);
+
+//                         free(real_buffer);
+//                         send_recv_destroy(&slave_to_master);
+//                     }  // end if mpi_size > 1
+
+//                     // divide by the mass vector
+//                     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+//                         if (mass_vector[i] == 0) {
+//                             fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh.n_owned_nodes,
+//                             mesh.nnodes);
+//                         }
+
+//                         assert(mass_vector[i] != 0);
+//                         g[i] /= mass_vector[i];
+//                     }  // end for i < mesh.n_owned_nodes
+//                 }      // end if SFEM_TET10_CUDA == OFF || SFEM_CUDA_MEMORY_MODEL == UNIFIED
+
+//                 free(mass_vector);
+//             }  // end if mpi_size > 1
