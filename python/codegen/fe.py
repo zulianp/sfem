@@ -480,18 +480,22 @@ class FE:
 		return det_code
 
 	def generate_qp_based_code(self):
-		qp = sp.Matrix(self.spatial_dim(), 1, quadrature_point[0:self.spatial_dim()])
 		expr = []
-		tqp = self.inverse_transform(qp)
+		
+		if not self.is_isoparametric():
+			qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.spatial_dim()])
 
-		for i in range(0, len(tqp)):
-			expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
+			tqp = self.inverse_transform(qp)
+			for i in range(0, len(tqp)):
+				expr.append(ast.Assignment(sp.symbols(f'res[{i}]'), tqp[i]))
 
-		print("------ inverse transform -------")
-		c_log(c_gen(expr))
+			print("------ inverse transform -------")
+			c_log(c_gen(expr))
+		else:
+			print("------ TODO inverse transform -------")
 
 
-		qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.manifold_dim()])
+		qp = self.quadrature_point()
 		expr = []
 		tqp = self.transform(qp)
 
@@ -502,10 +506,10 @@ class FE:
 		c_log(c_gen(expr))
 
 
-		qp = sp.Matrix(self.manifold_dim(), 1, quadrature_point[0:self.manifold_dim()])
 		expr = []
 		tqp = self.measure(qp)
 		expr.append(ast.Assignment(sp.symbols(f'res[{0}]'), tqp))
+
 
 		print("------ measure -------")
 		c_log(c_gen(expr))

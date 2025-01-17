@@ -5,8 +5,20 @@ import sys, getopt
 import os
 import glob
 
+tri3_names = ("triangle", "tri", "tri3", "TRI3")
+quad4_names = ("quadrilateral", "quad", "quad4", "QUAD4")
+
 idx_t = np.int32
 geom_t = np.float32
+
+def to_sfem_element_type(elem_type):
+    if elem_type in tri3_names:
+        return "TRI3"
+    elif elem_type in quad4_names:
+        return "QUAD4"
+    else:
+        print(f"[Error] Unknow element_type: {elem_type}")
+        exit(1)
 
 def create(w, h, nx, ny, cell_type):
 	gx = np.linspace(0, w, num=nx, dtype=geom_t)
@@ -20,7 +32,7 @@ def create(w, h, nx, ny, cell_type):
 	points = [x, y]
 	idx = []
 
-	if cell_type == "quad":
+	if cell_type in quad4_names:
 		i0 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
 		i1 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
 		i2 = np.zeros((nx - 1) * (ny - 1), dtype=idx_t)
@@ -48,7 +60,7 @@ def create(w, h, nx, ny, cell_type):
 		idx.append(i2)
 		idx.append(i3)
 
-	elif cell_type == "triangle":
+	elif cell_type in tri3_names:
 		i0 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
 		i1 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)
 		i2 = np.zeros(2 * (nx - 1) * (ny - 1), dtype=idx_t)

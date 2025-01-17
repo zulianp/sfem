@@ -21,6 +21,7 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
+        std::function<void(const std::ptrdiff_t, const T, T* const)> reciprocal;
         std::function<T(const ptrdiff_t, const T* const)> norm2;
         std::function<
                 void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
@@ -42,7 +43,7 @@ namespace sfem {
             assert(scal);
 
             return allocate && destroy && copy && zeros && values && dot && norm2 && axpy &&
-                   axpby && zaxpby && scal;
+                   axpby && zaxpby && scal && reciprocal;
         }
     };
 

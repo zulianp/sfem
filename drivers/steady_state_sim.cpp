@@ -1,11 +1,10 @@
 #include <iostream>
-#include "mg_builder.hpp"
+
 #include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_mask.h"
-#include "smoother.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -13,6 +12,13 @@
 #include "sfem_cuda_solver.hpp"
 #endif
 #include "sfem_Stationary.hpp"
+
+#ifdef SFEM_ENABLE_AMG
+#include "mg_builder.hpp"
+#include "smoother.h"
+#endif
+
+#include "sfem_SSMultigrid.hpp"
 
 #include <vector>
 
@@ -53,7 +59,7 @@ int main(int argc, char *argv[]) {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_MAX_IT = 1000;
     bool SFEM_USE_GPU = true;
-    bool SFEM_USE_AMG = false;
+    int SFEM_USE_AMG = false;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
@@ -97,7 +103,15 @@ int main(int argc, char *argv[]) {
 
     std::shared_ptr<sfem::Operator<real_t>> solver;
 
-    if (SFEM_USE_AMG) {
+#ifdef SFEM_ENABLE_AMG
+
+    if (SFEM_USE_AMG == 2) {
+        auto ssmg = sfem::create_ssmg<sfem::Multigrid<real_t>>(f, es);
+        ssmg->set_max_it(30);
+        ssmg->set_atol(1e-8);
+        solver = ssmg;
+
+    } else if (SFEM_USE_AMG) {
         auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
 
         auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -124,14 +138,21 @@ int main(int argc, char *argv[]) {
         auto fine_mat = sfem::h_coosym<idx_t, real_t>(
                 mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 
-        auto near_null = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);
+        auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-        auto amg = builder(2.0, mask->data(), near_null->data(), fine_mat);
-        /*
-        amg->set_max_it(SFEM_MAX_IT);
+        real_t coarsening_factor = 7.5;
+        auto amg = builder(coarsening_factor, mask, near_null, fine_mat);
+        if (!amg->test_interp()) {
+            printf("tests passed\n");
+        } else {
+            printf("FAILEDDDDDD\n");
+        }
+
+#if 1
+        amg->set_max_it(100);
         amg->verbose = true;
+        // amg->debug = true;
         solver = amg;
-        */
 
         /*
         auto inv_diag = sfem::create_buffer<real_t>(mask_count(fs->n_dofs()), es);
@@ -145,7 +166,7 @@ int main(int argc, char *argv[]) {
                     inv_diag->data());
         auto l2_smoother = sfem::h_lpsmoother(inv_diag);
         */
-
+#else
         amg->set_max_it(1);
         amg->verbose = false;
         auto cg = sfem::create_cg<real_t>(fine_mat, es);
@@ -156,14 +177,16 @@ int main(int argc, char *argv[]) {
         cg->set_preconditioner_op(amg);
         // cg->set_preconditioner_op(l2_smoother);
         solver = cg;
-
+#endif
         /*
         auto stat_iter = sfem::h_stationary<real_t>(fine_mat, l2_smoother);
         stat_iter->set_max_it(100);
         stat_iter->verbose = true;
         solver = stat_iter;
         */
-    } else {
+    } else
+#endif  // SFEM_ENABLE_AMG
+    {
         auto linear_op = sfem::make_linear_op(f);
         auto cg = sfem::create_cg<real_t>(linear_op, es);
         cg->verbose = true;

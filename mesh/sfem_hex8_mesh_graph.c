@@ -4,7 +4,7 @@
 #include "sortreduce.h"
 
 #include "adj_table.h"
-#include "proteus_hex8.h"  //FIXME
+#include "sshex8.h"  //FIXME
 
 #include <assert.h>
 #include <mpi.h>
@@ -22,14 +22,6 @@
     } while (0)
 
 // According to exodus doc
-enum HEX8_Sides {
-    HEX8_LEFT = 3,
-    HEX8_RIGHT = 1,
-    HEX8_BOTTOM = 4,
-    HEX8_TOP = 5,
-    HEX8_FRONT = 0,
-    HEX8_BACK = 2
-};
 
 // PROTEUS
 // static idx_t hex8_edge_connectivity[8][3] =
@@ -55,15 +47,15 @@ static idx_t hex8_edge_connectivity[8][3] = {
         {2, 5, 7},
         {3, 4, 6}};
 
-static int hex8_build_edge_graph_from_n2e(const ptrdiff_t nelements,
-                                          const ptrdiff_t nnodes,
-                                          idx_t **const SFEM_RESTRICT elems,
-                                          const count_t *const SFEM_RESTRICT n2eptr,
+static int hex8_build_edge_graph_from_n2e(const ptrdiff_t                          nelements,
+                                          const ptrdiff_t                          nnodes,
+                                          idx_t **const SFEM_RESTRICT              elems,
+                                          const count_t *const SFEM_RESTRICT       n2eptr,
                                           const element_idx_t *const SFEM_RESTRICT elindex,
-                                          count_t **out_rowptr,
-                                          idx_t **out_colidx) {
+                                          count_t                                **out_rowptr,
+                                          idx_t                                  **out_colidx) {
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
-    idx_t *colidx = 0;
+    idx_t   *colidx = 0;
 
     static const int nnodesxelem = 8;
 
@@ -75,7 +67,7 @@ static int hex8_build_edge_graph_from_n2e(const ptrdiff_t nelements,
             idx_t n2nbuff[2048];
 
             count_t ebegin = n2eptr[node];
-            count_t eend = n2eptr[node + 1];
+            count_t eend   = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -101,7 +93,7 @@ static int hex8_build_edge_graph_from_n2e(const ptrdiff_t nelements,
                 }
             }
 
-            nneighs = sortreduce(n2nbuff, nneighs);
+            nneighs          = sortreduce(n2nbuff, nneighs);
             rowptr[node + 1] = nneighs;
         }
 
@@ -111,14 +103,14 @@ static int hex8_build_edge_graph_from_n2e(const ptrdiff_t nelements,
         }
 
         const ptrdiff_t nnz = rowptr[nnodes];
-        colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
+        colidx              = (idx_t *)malloc(nnz * sizeof(idx_t));
 
 #pragma omp parallel for
         for (ptrdiff_t node = 0; node < nnodes; ++node) {
             idx_t n2nbuff[2048];
 
             count_t ebegin = n2eptr[node];
-            count_t eend = n2eptr[node + 1];
+            count_t eend   = n2eptr[node + 1];
 
             idx_t nneighs = 0;
 
@@ -156,17 +148,16 @@ static int hex8_build_edge_graph_from_n2e(const ptrdiff_t nelements,
 
 int hex8_build_edge_graph(const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,
-                          idx_t **const elems,
-                          count_t **out_rowptr,
-                          idx_t **out_colidx) {
+                          idx_t **const   elems,
+                          count_t       **out_rowptr,
+                          idx_t         **out_colidx) {
     double tick = MPI_Wtime();
 
-    count_t *n2eptr;
+    count_t       *n2eptr;
     element_idx_t *elindex;
     build_n2e(nelements, nnodes, 8, elems, &n2eptr, &elindex);
 
-    int err = hex8_build_edge_graph_from_n2e(
-            nelements, nnodes, elems, n2eptr, elindex, out_rowptr, out_colidx);
+    int err = hex8_build_edge_graph_from_n2e(nelements, nnodes, elems, n2eptr, elindex, out_rowptr, out_colidx);
 
     free(n2eptr);
     free(elindex);
@@ -176,11 +167,7 @@ int hex8_build_edge_graph(const ptrdiff_t nelements,
     return err;
 }
 
-#define SFEM_INVALID_IDX (-1)
-
-ptrdiff_t nxe_max_node_id(const ptrdiff_t nelements,
-                          const int nxe,
-                          idx_t **const SFEM_RESTRICT elements) {
+ptrdiff_t nxe_max_node_id(const ptrdiff_t nelements, const int nxe, idx_t **const SFEM_RESTRICT elements) {
     ptrdiff_t ret = 0;
     for (int i = 0; i < nxe; i++) {
         for (ptrdiff_t e = 0; e < nelements; e++) {
@@ -190,9 +177,7 @@ ptrdiff_t nxe_max_node_id(const ptrdiff_t nelements,
     return ret;
 }
 
-static SFEM_INLINE int hex8_linear_search(const idx_t target,
-                                          const idx_t *const arr,
-                                          const int size) {
+static SFEM_INLINE int hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
@@ -215,10 +200,7 @@ static SFEM_INLINE int hex8_find_col(const idx_t key, const idx_t *const row, co
     }
 }
 
-static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets,
-                                              const idx_t *const row,
-                                              const int lenrow,
-                                              int *ks) {
+static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 3; ++d) {
             ks[d] = hex8_find_col(targets[d], row, lenrow);
@@ -238,19 +220,19 @@ static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets,
     }
 }
 
-static void index_face(const int L,
-                       mesh_t *mesh,
+static void index_face(const int        L,
+                       idx_t **const    m_elements,
                        const int *const local_side_table,
-                       int *lagr_to_proteus_corners,
-                       int **coords,
-                       const idx_t global_face_offset,
-                       const ptrdiff_t e,
-                       const int f,
-                       idx_t **const elements) {
-    int argmin = 0;
-    idx_t valmin = mesh->elements[local_side_table[f * 4 + 0]][e];
+                       int             *lagr_to_proteus_corners,
+                       int            **coords,
+                       const idx_t      global_face_offset,
+                       const ptrdiff_t  e,
+                       const int        f,
+                       idx_t **const    elements) {
+    int   argmin = 0;
+    idx_t valmin = m_elements[local_side_table[f * 4 + 0]][e];
     for (int i = 0; i < 4; i++) {
-        idx_t temp = mesh->elements[local_side_table[f * 4 + i]][e];
+        idx_t temp = m_elements[local_side_table[f * 4 + i]][e];
         if (temp < valmin) {
             argmin = i;
             valmin = temp;
@@ -260,11 +242,10 @@ static void index_face(const int L,
     int lst_o = argmin;
     int lst_u = ((lst_o + 1) % 4);
     int lst_v = ((lst_o + 3) % 4);
-    if (mesh->elements[local_side_table[f * 4 + lst_u]][e] >
-        mesh->elements[local_side_table[f * 4 + lst_v]][e]) {
+    if (m_elements[local_side_table[f * 4 + lst_u]][e] > m_elements[local_side_table[f * 4 + lst_v]][e]) {
         int temp = lst_v;
-        lst_v = lst_u;
-        lst_u = temp;
+        lst_v    = lst_u;
+        lst_u    = temp;
     }
 
     // o, u, v are sorted based on global indices
@@ -287,7 +268,7 @@ static void index_face(const int L,
 
     // O
     for (int d = 0; d < 3; d++) {
-        int o = coords[d][lidx_o];
+        int o      = coords[d][lidx_o];
         o_start[d] = o;
     }
 
@@ -304,12 +285,12 @@ static void index_face(const int L,
 
         if (x > 0) {
             x -= 1;
-            u_len[d] = x;
+            u_len[d]   = x;
             o_start[d] = 1;
         } else if (x < 0) {
             x += 1;
-            u_len[d] = x;
-            u_dir[d] = -1;
+            u_len[d]   = x;
+            u_dir[d]   = -1;
             o_start[d] = L - 1;
         }
     }
@@ -323,13 +304,13 @@ static void index_face(const int L,
 
         if (x > 0) {
             x -= 1;
-            v_len[d] = x;
+            v_len[d]   = x;
             o_start[d] = 1;
 
         } else if (x < 0) {
             x += 1;
-            v_len[d] = x;
-            v_dir[d] = -1;
+            v_len[d]   = x;
+            v_dir[d]   = -1;
             o_start[d] = L - 1;
         }
     }
@@ -357,10 +338,7 @@ static void index_face(const int L,
                             //        uyi + vyi + o_start[1],
                             //        uzi + vzi + o_start[2]);
 
-                            int pidx = proteus_hex8_lidx(L,
-                                                         uxi + vxi + o_start[0],
-                                                         uyi + vyi + o_start[1],
-                                                         uzi + vzi + o_start[2]);
+                            int pidx = sshex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
 
                             // idx_t u_offset = u_face_start + (uxi + uyi + uzi) * u_increment;
                             // idx_t v_offset = v_face_start + (vxi + vyi + vzi) * v_increment;
@@ -379,29 +357,32 @@ static void index_face(const int L,
     }
 }
 
-int proteus_hex8_create_full_idx(const int L,
-                                 mesh_t *mesh,
-                                 idx_t **elements,
-                                 ptrdiff_t *n_unique_nodes_out,
-                                 ptrdiff_t *interior_start_out) {
+int sshex8_generate_elements(const int       L,
+                             const ptrdiff_t m_nelements,
+                             const ptrdiff_t m_nnodes,
+                             idx_t **const   m_elements,
+                             idx_t         **elements,
+                             ptrdiff_t      *n_unique_nodes_out,
+                             ptrdiff_t      *interior_start_out) {
+    static const enum ElemType m_element_type = HEX8;
     assert(L >= 2);
     static int verbose = 0;
 
     double tick = MPI_Wtime();
 
-    const int nxe = proteus_hex8_nxe(L);
+    const int nxe = sshex8_nxe(L);
 
     // 1) Get the node indices from the HEX8 mesh
     int lagr_to_proteus_corners[8] = {// Bottom
-                                      proteus_hex8_lidx(L, 0, 0, 0),
-                                      proteus_hex8_lidx(L, L, 0, 0),
-                                      proteus_hex8_lidx(L, L, L, 0),
-                                      proteus_hex8_lidx(L, 0, L, 0),
+                                      sshex8_lidx(L, 0, 0, 0),
+                                      sshex8_lidx(L, L, 0, 0),
+                                      sshex8_lidx(L, L, L, 0),
+                                      sshex8_lidx(L, 0, L, 0),
                                       // Top
-                                      proteus_hex8_lidx(L, 0, 0, L),
-                                      proteus_hex8_lidx(L, L, 0, L),
-                                      proteus_hex8_lidx(L, L, L, L),
-                                      proteus_hex8_lidx(L, 0, L, L)};
+                                      sshex8_lidx(L, 0, 0, L),
+                                      sshex8_lidx(L, L, 0, L),
+                                      sshex8_lidx(L, L, L, L),
+                                      sshex8_lidx(L, 0, L, L)};
 
 #ifndef NDEBUG
     for (int i = 0; i < 8; i++) {
@@ -417,7 +398,7 @@ int proteus_hex8_create_full_idx(const int L,
     for (int zi = 0; zi <= L; zi++) {
         for (int yi = 0; yi <= L; yi++) {
             for (int xi = 0; xi <= L; xi++) {
-                int lidx = proteus_hex8_lidx(L, xi, yi, zi);
+                int lidx = sshex8_lidx(L, xi, yi, zi);
                 assert(lidx < nxe);
                 coords[0][lidx] = xi;
                 coords[1][lidx] = yi;
@@ -430,12 +411,12 @@ int proteus_hex8_create_full_idx(const int L,
     // Corner nodes
     // ------------------------------
     for (int d = 0; d < 8; d++) {
-        for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
-            elements[lagr_to_proteus_corners[d]][e] = mesh->elements[d][e];
+        for (ptrdiff_t e = 0; e < m_nelements; e++) {
+            elements[lagr_to_proteus_corners[d]][e] = m_elements[d][e];
         }
     }
 
-    idx_t index_base = mesh->nnodes;
+    idx_t index_base = m_nnodes;
 
     double tack = MPI_Wtime();
 
@@ -452,13 +433,13 @@ int proteus_hex8_create_full_idx(const int L,
         double temp_tick = MPI_Wtime();
 
         count_t *rowptr;
-        idx_t *colidx;
-        hex8_build_edge_graph(mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
+        idx_t   *colidx;
+        hex8_build_edge_graph(m_nelements, m_nnodes, m_elements, &rowptr, &colidx);
 
-        ptrdiff_t nedges = rowptr[mesh->nnodes] / 2;
+        ptrdiff_t nedges = rowptr[m_nnodes] / 2;
 
-        ptrdiff_t nnz = rowptr[mesh->nnodes];
-        idx_t *edge_idx = (idx_t *)malloc(nnz * sizeof(idx_t));
+        ptrdiff_t nnz      = rowptr[m_nnodes];
+        idx_t    *edge_idx = (idx_t *)malloc(nnz * sizeof(idx_t));
         memset(edge_idx, 0, nnz * sizeof(idx_t));
 
         // node-to-node for the hex edges in local indexing
@@ -474,10 +455,10 @@ int proteus_hex8_create_full_idx(const int L,
                                          {3, 4, 6}};
 
         ptrdiff_t edge_count = 0;
-        idx_t next_id = 0;
-        for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
+        idx_t     next_id    = 0;
+        for (ptrdiff_t i = 0; i < m_nnodes; i++) {
             const count_t begin = rowptr[i];
-            const count_t end = rowptr[i + 1];
+            const count_t end   = rowptr[i + 1];
 
             for (count_t k = begin; k < end; k++) {
                 const idx_t j = colidx[k];
@@ -491,15 +472,15 @@ int proteus_hex8_create_full_idx(const int L,
 
         assert(edge_count == nedges);
 
-        for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
+        for (ptrdiff_t e = 0; e < m_nelements; e++) {
             idx_t nodes[8];
             for (int d = 0; d < 8; d++) {
-                nodes[d] = mesh->elements[d][e];
+                nodes[d] = m_elements[d][e];
             }
 
             for (int d1 = 0; d1 < 8; d1++) {
-                idx_t node1 = nodes[d1];
-                const idx_t *const columns = &colidx[rowptr[node1]];
+                idx_t              node1     = nodes[d1];
+                const idx_t *const columns   = &colidx[rowptr[node1]];
                 const idx_t *const edge_view = &edge_idx[rowptr[node1]];
 
                 idx_t g_edges[3];
@@ -527,24 +508,24 @@ int proteus_hex8_create_full_idx(const int L,
 
                     int start[3], len[3], dir[3];
                     for (int d = 0; d < 3; d++) {
-                        int o = coords[d][lid1];
+                        int o    = coords[d][lid1];
                         start[d] = o;
                     }
 
                     int invert_dir = 0;
                     for (int d = 0; d < 3; d++) {
-                        int x = coords[d][lid2] - coords[d][lid1];
+                        int x  = coords[d][lid2] - coords[d][lid1];
                         dir[d] = 1;
                         len[d] = 1;
 
                         if (x > 0) {
                             x -= 1;
-                            len[d] = x;
+                            len[d]   = x;
                             start[d] = 1;
                         } else if (x < 0) {
                             x += 1;
-                            len[d] = x;
-                            dir[d] = -1;
+                            len[d]   = x;
+                            dir[d]   = -1;
                             start[d] = L - 1;
                         }
                     }
@@ -571,8 +552,7 @@ int proteus_hex8_create_full_idx(const int L,
                     for (int zi = 0; zi != len[2]; zi += dir[2]) {
                         for (int yi = 0; yi != len[1]; yi += dir[1]) {
                             for (int xi = 0; xi != len[0]; xi += dir[0]) {
-                                const int lidx_edge = proteus_hex8_lidx(
-                                        L, start[0] + xi, start[1] + yi, start[2] + zi);
+                                const int lidx_edge    = sshex8_lidx(L, start[0] + xi, start[1] + yi, start[2] + zi);
                                 elements[lidx_edge][e] = edge_start + en;
                                 en += 1;
 
@@ -606,26 +586,17 @@ int proteus_hex8_create_full_idx(const int L,
         fill_local_side_table(HEX8, local_side_table);
 
         element_idx_t *adj_table = 0;
-        create_element_adj_table(
-                mesh->nelements, mesh->nnodes, mesh->element_type, mesh->elements, &adj_table);
+        create_element_adj_table(m_nelements, m_nnodes, m_element_type, m_elements, &adj_table);
 
         idx_t n_unique_faces = 0;
-        for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
+        for (ptrdiff_t e = 0; e < m_nelements; e++) {
             for (int f = 0; f < 6; f++) {
                 element_idx_t neigh_element = adj_table[e * 6 + f];
                 // If this face is not boundary and it has already been processed continue
                 if (neigh_element != -1 && neigh_element < e) continue;
 
                 idx_t global_face_offset = index_base + n_unique_faces * nxf;
-                index_face(L,
-                           mesh,
-                           local_side_table,
-                           lagr_to_proteus_corners,
-                           coords,
-                           global_face_offset,
-                           e,
-                           f,
-                           elements);
+                index_face(L, m_elements, local_side_table, lagr_to_proteus_corners, coords, global_face_offset, e, f, elements);
 
                 if (neigh_element != -1) {
                     // find same face on neigh element
@@ -639,7 +610,7 @@ int proteus_hex8_create_full_idx(const int L,
                     assert(neigh_f != 6);
 
                     index_face(L,
-                               mesh,
+                               m_elements,
                                local_side_table,
                                lagr_to_proteus_corners,
                                coords,
@@ -666,20 +637,19 @@ int proteus_hex8_create_full_idx(const int L,
     // 4) Compute the unique internal nodes implicitly using the element id and the idx offset
     // of the total number of explicit indices (offset + element_id * n_internal_nodes +
     // local_internal_node_id) ptrdiff_t n_internal_nodes = ?;
-    int nxelement = (L - 1) * (L - 1) * (L - 1);
+    int       nxelement      = (L - 1) * (L - 1) * (L - 1);
     ptrdiff_t interior_start = index_base;
     if (nxelement) {
         double temp_tick = MPI_Wtime();
 
+#pragma omp parallel for collapse(3)
         for (int zi = 1; zi < L; zi++) {
             for (int yi = 1; yi < L; yi++) {
                 for (int xi = 1; xi < L; xi++) {
-                    const int lidx_vol = proteus_hex8_lidx(L, xi, yi, zi);
-                    int Lm1 = L - 1;
-                    int en = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
-
-#pragma omp parallel for
-                    for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
+                    const int lidx_vol = sshex8_lidx(L, xi, yi, zi);
+                    int       Lm1      = L - 1;
+                    int       en       = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
+                    for (ptrdiff_t e = 0; e < m_nelements; e++) {
                         elements[lidx_vol][e] = index_base + e * nxelement + en;
                         // printf("elements[%d][%ld] = %d + %ld * %d + %d\n", lidx_vol, e,
                         // index_base, e, nxelement, en);
@@ -696,154 +666,22 @@ int proteus_hex8_create_full_idx(const int L,
         free(coords[d]);
     }
 
-    *n_unique_nodes_out = interior_start + mesh->nelements * nxelement;
+    *n_unique_nodes_out = interior_start + m_nelements * nxelement;
     *interior_start_out = interior_start;
 
     double tock = MPI_Wtime();
-    printf("Create idx (%s) took\t%g [s]\n", type_to_string(mesh->element_type), tock - tick);
+    printf("Create idx (%s) took\t%g [s]\n", type_to_string(m_element_type), tock - tick);
+    printf("#microelements %ld, #micronodes %ld\n", m_nelements * (L * L * L), *n_unique_nodes_out);
 
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_mesh_skin(const int L,
-                           const ptrdiff_t nelements,
-                           idx_t **elements,
-                           ptrdiff_t *n_surf_elements,
-                           idx_t **const surf_elements,
-                           element_idx_t **parent_element) {
-    const int proteus_to_std[8] = {// Bottom
-                                   proteus_hex8_lidx(L, 0, 0, 0),
-                                   proteus_hex8_lidx(L, L, 0, 0),
-                                   proteus_hex8_lidx(L, L, L, 0),
-                                   proteus_hex8_lidx(L, 0, L, 0),
-                                   // Top
-                                   proteus_hex8_lidx(L, 0, 0, L),
-                                   proteus_hex8_lidx(L, L, 0, L),
-                                   proteus_hex8_lidx(L, L, L, L),
-                                   proteus_hex8_lidx(L, 0, L, L)};
-
-    idx_t *hex8_elements[8] = {elements[proteus_to_std[0]],
-                               elements[proteus_to_std[1]],
-                               elements[proteus_to_std[2]],
-                               elements[proteus_to_std[3]],
-                               elements[proteus_to_std[4]],
-                               elements[proteus_to_std[5]],
-                               elements[proteus_to_std[6]],
-                               elements[proteus_to_std[7]]};
-
-    ptrdiff_t hex8_n_nodes = nxe_max_node_id(nelements, 8, hex8_elements) + 1;
-
-    const int ns = elem_num_sides(HEX8);
-    element_idx_t *table = 0;
-    create_element_adj_table(nelements, hex8_n_nodes, HEX8, hex8_elements, &table);
-
-    // Num side-nodes
-    const int nn = (L + 1) * (L + 1);
-
-    *n_surf_elements = 0;
-    for (ptrdiff_t e = 0; e < nelements; e++) {
-        for (int s = 0; s < ns; s++) {
-            // Array of structures
-            const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
-                (*n_surf_elements)++;
-            }
-        }
-    }
-
-    *parent_element = malloc((*n_surf_elements) * sizeof(element_idx_t));
-    for (int s = 0; s < nn; s++) {
-        surf_elements[s] = malloc((*n_surf_elements) * sizeof(idx_t));
-    }
-
-    ptrdiff_t side_offset = 0;
-    for (ptrdiff_t e = 0; e < nelements; e++) {
-        for (int s = 0; s < ns; s++) {
-            // Array of structures
-            const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
-                int start[3] = {0, 0, 0};
-                int end[3] = {L + 1, L + 1, L + 1};
-                int increment[3] = {1, 1, 1};
-
-                // printf("side %d: ", s);
-
-                switch (s) {
-                    case HEX8_LEFT: {
-                        A3SET(start, 0, L, 0);
-                        A3SET(end, 1, -1, L + 1);
-                        A3SET(increment, 1, -1, 1);
-                        // printf("HEX8_LEFT\n");
-                        break;
-                    }
-                    case HEX8_RIGHT: {
-                        start[0] = L;
-                        end[0] = L + 1;
-                        // printf("HEX8_RIGHT\n");
-                        break;
-                    }
-                    case HEX8_BOTTOM: {
-                        start[2] = 0;
-                        end[2] = 1;
-                        A3SET(start, 0, L, 0);
-                        A3SET(end, L + 1, -1, 1);
-                        A3SET(increment, 1, -1, 1);
-                        // printf("HEX8_BOTTOM\n");
-                        break;
-                    }
-                    case HEX8_TOP: {
-                        start[2] = L;
-                        end[2] = L + 1;
-                        // printf("HEX8_TOP\n");
-                        break;
-                    }
-                    case HEX8_FRONT: {
-                        start[1] = 0;
-                        end[1] = 1;
-                        // printf("HEX8_FRONT\n");
-                        break;
-                    }
-                    case HEX8_BACK: {
-                        A3SET(start, L, L, 0);
-                        A3SET(end, -1, L + 1, L + 1);
-                        A3SET(increment, -1, 1, 1);
-                        // printf("HEX8_BACK\n");
-                        break;
-                    }
-                    default: {
-                        assert(0);
-                        break;
-                    }
-                }
-
-                int n = 0;
-                for (int zi = start[2]; zi != end[2]; zi += increment[2]) {
-                    for (int yi = start[1]; yi != end[1]; yi += increment[1]) {
-                        for (int xi = start[0]; xi != end[0]; xi += increment[0]) {
-                            const int lidx = proteus_hex8_lidx(L, xi, yi, zi);
-                            const idx_t node = elements[lidx][e];
-                            surf_elements[n++][side_offset] = node;
-                            // printf("(%d, %d, %d), l: %d => g:\t%d\n", xi, yi, zi, lidx, node);
-                        }
-                    }
-                }
-
-                (*parent_element)[side_offset] = e;
-                side_offset++;
-            }
-        }
-    }
-
-    free(table);
-    return SFEM_SUCCESS;
-}
-
-int proteus_hex8_build_n2e(const int L,
-                           const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t **const elems,
-                           count_t **out_n2eptr,
-                           element_idx_t **out_elindex) {
+int sshex8_build_n2e(const int       L,
+                     const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const   elems,
+                     count_t       **out_n2eptr,
+                     element_idx_t **out_elindex) {
     double tick = MPI_Wtime();
 
 #ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
@@ -861,14 +699,14 @@ int proteus_hex8_build_n2e(const int L,
         for (int zi = 0; zi < L; zi++) {
             for (int yi = 0; yi < L; yi++) {
                 for (int xi = 0; xi < L; xi++) {
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     // const ptrdiff_t e_macro = i * txe + zi * L * L + yi * L + xi;
 
@@ -895,14 +733,14 @@ int proteus_hex8_build_n2e(const int L,
         for (int zi = 0; zi < L; zi++) {
             for (int yi = 0; yi < L; yi++) {
                 for (int xi = 0; xi < L; xi++) {
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     const ptrdiff_t elidx = i * txe + zi * L * L + yi * L + xi;
 
@@ -918,7 +756,7 @@ int proteus_hex8_build_n2e(const int L,
 
     free(book_keeping);
 
-    *out_n2eptr = n2eptr;
+    *out_n2eptr  = n2eptr;
     *out_elindex = elindex;
 
     double tock = MPI_Wtime();
@@ -926,16 +764,16 @@ int proteus_hex8_build_n2e(const int L,
     return SFEM_SUCCESS;
 }
 
-static int proteus_hex8_build_crs_graph_from_n2e(const int L,
-                                                 const ptrdiff_t nelements,
-                                                 const ptrdiff_t nnodes,
-                                                 idx_t **const SFEM_RESTRICT elems,
-                                                 const count_t *const SFEM_RESTRICT n2eptr,
-                                                 const element_idx_t *const SFEM_RESTRICT elindex,
-                                                 count_t **out_rowptr,
-                                                 idx_t **out_colidx) {
+static int sshex8_build_crs_graph_from_n2e(const int                                L,
+                                           const ptrdiff_t                          nelements,
+                                           const ptrdiff_t                          nnodes,
+                                           idx_t **const SFEM_RESTRICT              elems,
+                                           const count_t *const SFEM_RESTRICT       n2eptr,
+                                           const element_idx_t *const SFEM_RESTRICT elindex,
+                                           count_t                                **out_rowptr,
+                                           idx_t                                  **out_colidx) {
     count_t *rowptr = (count_t *)malloc((nnodes + 1) * sizeof(count_t));
-    idx_t *colidx = 0;
+    idx_t   *colidx = 0;
 
     const int txe = L * L * L;
     {
@@ -947,7 +785,7 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
 #pragma omp for
             for (ptrdiff_t node = 0; node < nnodes; ++node) {
                 const count_t ebegin = n2eptr[node];
-                const count_t eend = n2eptr[node + 1];
+                const count_t eend   = n2eptr[node + 1];
 
                 idx_t nneighs = 0;
 
@@ -956,18 +794,18 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
                     assert(eidx < nelements * txe);
 
                     const ptrdiff_t e_macro = eidx / txe;
-                    const ptrdiff_t zi = (eidx - e_macro * txe) / (L * L);
-                    const ptrdiff_t yi = (eidx - e_macro * txe - zi * L * L) / L;
-                    const ptrdiff_t xi = eidx - e_macro * txe - zi * L * L - yi * L;
+                    const ptrdiff_t zi      = (eidx - e_macro * txe) / (L * L);
+                    const ptrdiff_t yi      = (eidx - e_macro * txe - zi * L * L) / L;
+                    const ptrdiff_t xi      = eidx - e_macro * txe - zi * L * L - yi * L;
 
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     for (int edof_i = 0; edof_i < 8; ++edof_i) {
                         idx_t neighnode = elems[lev[edof_i]][e_macro];
@@ -976,7 +814,7 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
                     }
                 }
 
-                nneighs = sortreduce(n2nbuff, nneighs);
+                nneighs          = sortreduce(n2nbuff, nneighs);
                 rowptr[node + 1] = nneighs;
             }
         }
@@ -987,16 +825,15 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
         }
 
         const ptrdiff_t nnz = rowptr[nnodes];
-        colidx = (idx_t *)malloc(nnz * sizeof(idx_t));
+        colidx              = (idx_t *)malloc(nnz * sizeof(idx_t));
 
-        
 #pragma omp parallel
         {
             idx_t n2nbuff[4096];
 #pragma omp for
             for (ptrdiff_t node = 0; node < nnodes; ++node) {
                 const count_t ebegin = n2eptr[node];
-                const count_t eend = n2eptr[node + 1];
+                const count_t eend   = n2eptr[node + 1];
 
                 idx_t nneighs = 0;
 
@@ -1005,18 +842,18 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
                     assert(eidx < nelements * txe);
 
                     const ptrdiff_t e_macro = eidx / txe;
-                    const ptrdiff_t zi = (eidx - e_macro * txe) / (L * L);
-                    const ptrdiff_t yi = (eidx - e_macro * txe - zi * L * L) / L;
-                    const ptrdiff_t xi = eidx - e_macro * txe - zi * L * L - yi * L;
+                    const ptrdiff_t zi      = (eidx - e_macro * txe) / (L * L);
+                    const ptrdiff_t yi      = (eidx - e_macro * txe - zi * L * L) / L;
+                    const ptrdiff_t xi      = eidx - e_macro * txe - zi * L * L - yi * L;
 
-                    const idx_t lev[8] = {proteus_hex8_lidx(L, xi, yi, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi),
-                                          proteus_hex8_lidx(L, xi, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi, zi + 1),
-                                          proteus_hex8_lidx(L, xi, yi + 1, zi + 1),
-                                          proteus_hex8_lidx(L, xi + 1, yi + 1, zi + 1)};
+                    const idx_t lev[8] = {sshex8_lidx(L, xi, yi, zi),
+                                          sshex8_lidx(L, xi + 1, yi, zi),
+                                          sshex8_lidx(L, xi, yi + 1, zi),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(L, xi, yi, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(L, xi, yi + 1, zi + 1),
+                                          sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
 
                     for (int edof_i = 0; edof_i < 8; ++edof_i) {
                         idx_t neighnode = elems[lev[edof_i]][e_macro];
@@ -1039,25 +876,620 @@ static int proteus_hex8_build_crs_graph_from_n2e(const int L,
     return SFEM_SUCCESS;
 }
 
-int proteus_hex8_crs_graph(const int L,
-                           const ptrdiff_t nelements,
-                           const ptrdiff_t nnodes,
-                           idx_t **const elements,
-                           count_t **out_rowptr,
-                           idx_t **out_colidx) {
+int sshex8_crs_graph(const int       L,
+                     const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const   elements,
+                     count_t       **out_rowptr,
+                     idx_t         **out_colidx) {
     double tick = MPI_Wtime();
 
-    count_t *n2eptr;
+    count_t       *n2eptr;
     element_idx_t *elindex;
-    proteus_hex8_build_n2e(L, nelements, nnodes, elements, &n2eptr, &elindex);
+    sshex8_build_n2e(L, nelements, nnodes, elements, &n2eptr, &elindex);
 
-    int err = proteus_hex8_build_crs_graph_from_n2e(
-            L, nelements, nnodes, elements, n2eptr, elindex, out_rowptr, out_colidx);
+    int err = sshex8_build_crs_graph_from_n2e(L, nelements, nnodes, elements, n2eptr, elindex, out_rowptr, out_colidx);
 
     free(n2eptr);
     free(elindex);
 
     double tock = MPI_Wtime();
-    printf("proteus_hex8_crs_graph \t%g seconds\n", tock - tick);
+    printf("sshex8_crs_graph \t%g seconds\n", tock - tick);
     return err;
+}
+
+int sshex8_hierarchical_n_levels(const int L) {
+    int count = 0;
+    int l     = L;
+    for (; l > 1 && l % 2 == 0; l /= 2) {
+        count++;
+    }
+
+    if (l >= 1) {
+        count++;
+    }
+
+    return count;
+}
+
+void sshex8_hierarchical_mesh_levels(const int L, const int nlevels, int *const levels) {
+    assert(sshex8_hierarchical_n_levels(L) == nlevels);
+
+    int count = 0;
+    int l     = L;
+    for (; l > 1 && l % 2 == 0; l /= 2) {
+        levels[nlevels - 1 - count] = l;
+        count++;
+    }
+
+    if (l >= 1) {
+        count++;
+        levels[0] = 1;
+    }
+}
+
+int sshex8_hierarchical_renumbering(const int       L,
+                                    const int       nlevels,
+                                    int *const      levels,
+                                    const ptrdiff_t nelements,
+                                    const ptrdiff_t nnodes,
+                                    idx_t **const   elements) {
+    idx_t *node_mapping = malloc(nnodes * sizeof(idx_t));
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        node_mapping[i] = -1;
+    }
+
+    idx_t next_id = 0;
+    // Preserve original ordering for base HEX8 mesh
+    for (int zi = 0; zi <= 1; zi++) {
+        for (int yi = 0; yi <= 1; yi++) {
+            for (int xi = 0; xi <= 1; xi++) {
+                for (ptrdiff_t e = 0; e < nelements; e++) {
+                    const int   v   = sshex8_lidx(L, xi * L, yi * L, zi * L);
+                    const idx_t idx = elements[v][e];
+
+                    assert(idx < nnodes);
+                    node_mapping[idx] = idx;
+                    next_id           = MAX(next_id, idx);
+                }
+            }
+        }
+    }
+
+    next_id++;
+
+    int stride = 1;
+    for (int k = 1; k < nlevels; k++) {
+        const int l           = levels[k];
+        const int step_factor = L / l;
+
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            for (int zi = 0; zi <= l; zi += stride) {
+                for (int yi = 0; yi <= l; yi += stride) {
+                    for (int xi = 0; xi <= l; xi += stride) {
+                        const int   v   = sshex8_lidx(L, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const idx_t idx = elements[v][e];
+                        assert(idx < nnodes);
+                        if (node_mapping[idx] == -1) {
+                            node_mapping[idx] = next_id++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // stride *= 2;
+    }
+
+    // for (int zi = 0; zi <= L; zi++) {
+    //     for (int yi = 0; yi <= L; yi++) {
+    //         for (int xi = 0; xi <= L; xi++) {
+    //             printf("(%d %d %d): ", xi, yi, zi);
+    //             for (ptrdiff_t e = 0; e < nelements; e++) {
+    //                 const int   v   = sshex8_lidx(L, xi, yi, zi);
+    //                 printf("%d (%d) ", elements[v][e], node_mapping[elements[v][e]]);
+    //             }
+    //             printf("\n");
+    //         }
+    //     }
+    // }
+
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = 0; yi <= L; yi++) {
+            for (int xi = 0; xi <= L; xi++) {
+                for (ptrdiff_t e = 0; e < nelements; e++) {
+                    const int   v   = sshex8_lidx(L, xi, yi, zi);
+                    const idx_t idx = elements[v][e];
+
+                    if (node_mapping[idx] == -1) {
+                        printf("%d %d %d [%ld]\n", xi, yi, zi, e);
+                        SFEM_ERROR("Uninitialized node mapping\n");
+                    }
+
+                    elements[v][e] = node_mapping[idx];
+                }
+            }
+        }
+    }
+
+    free(node_mapping);
+    return SFEM_SUCCESS;
+}
+
+static void sshex8_x_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = L; yi >= 0; yi--) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, 0, yi, zi)][e];
+        }
+    }
+}
+
+static void sshex8_x_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = 0; yi <= L; yi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, L, yi, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = L; xi >= 0; xi--) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, 0, zi)][e];
+        }
+    }
+}
+
+static void sshex8_y_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, L, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = L; yi >= 0; yi--) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, yi, 0)][e];
+        }
+    }
+}
+
+static void sshex8_z_rside(const int                   L,
+                           const ptrdiff_t             e,
+                           idx_t **const SFEM_RESTRICT elems,
+                           const ptrdiff_t             i,
+                           idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi <= L; yi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            sides[lidx++][i] = elems[sshex8_lidx(L, xi, yi, L)][e];
+        }
+    }
+}
+
+//////////////
+
+int         sshex8_extract_surface_from_sideset(const int                                L,
+                                                idx_t **const SFEM_RESTRICT              elems,
+                                                const ptrdiff_t                          n_surf_elements,
+                                                const element_idx_t *const SFEM_RESTRICT parent_element,
+                                                const int16_t *const SFEM_RESTRICT       side_idx,
+                                                idx_t **const SFEM_RESTRICT              sides) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside(L, e, elems, i, sides);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside(L, e, elems, i, sides);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside(L, e, elems, i, sides);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside(L, e, elems, i, sides);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+static void sshex8_x_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = L; yi >= 0; yi--) {
+            nodes[lidx++] = elems[sshex8_lidx(L, 0, yi, zi)][e];
+        }
+    }
+}
+
+static void sshex8_x_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int yi = 0; yi <= L; yi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, L, yi, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = L; xi >= 0; xi--) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, 0, zi)][e];
+        }
+    }
+}
+
+static void sshex8_y_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int zi = 0; zi <= L; zi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, L, zi)][e];
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int yi = L; yi >= 0; yi--) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, yi, 0)][e];
+        }
+    }
+}
+
+static void sshex8_z_rside_nodes(const int                   L,
+                                 const ptrdiff_t             e,
+                                 idx_t **const SFEM_RESTRICT elems,
+                                 idx_t *const SFEM_RESTRICT  nodes) {
+    int lidx = 0;
+    for (int yi = 0; yi <= L; yi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            nodes[lidx++] = elems[sshex8_lidx(L, xi, yi, L)][e];
+        }
+    }
+}
+
+int sshex8_extract_nodeset_from_sideset(const int                                L,
+                                        idx_t **const SFEM_RESTRICT              elems,
+                                        const ptrdiff_t                          n_surf_elements,
+                                        const element_idx_t *const SFEM_RESTRICT parent_element,
+                                        const int16_t *const SFEM_RESTRICT       side_idx,
+                                        ptrdiff_t                               *n_nodes_out,
+                                        idx_t **SFEM_RESTRICT                    nodes_out)
+
+{
+    const int       nnxs  = (L + 1) * (L + 1);
+    const ptrdiff_t n     = nnxs * n_surf_elements;
+    idx_t          *nodes = malloc(n * sizeof(idx_t));
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside_nodes(L, e, elems, &nodes[i * nnxs]);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
+    *n_nodes_out = sortreduce(nodes, n);
+    *nodes_out   = realloc(nodes, *n_nodes_out * sizeof(idx_t));
+    return SFEM_SUCCESS;
+}
+
+// 1) 1, 2, 6, 5, ---  9, 14, 17, 13, 26 (Y left)
+// 2) 2, 3, 7, 6, --- 10, 15, 18, 14, 25 (X right)
+// 3) 3, 4, 8, 7, --- 11, 16, 19, 15, 27 (Y right)
+// 4) 1, 5, 8, 4, --- 13, 20, 16, 12, 24 (X left)
+// 5) 1, 4, 3, 2, --- 12, 11, 10, 9,  22 (Z left)
+// 6) 5, 6, 7, 8, --- 17, 18, 19, 20, 23 (Z right)
+
+// Front face
+// 5 ---------- 6
+// |            |
+// |            |
+// |            |
+// |            |
+// 1/___________2/  x -->
+
+// Back face
+
+// /8 ----------/7
+// |            |
+// |            |
+// |            |
+// |            |
+// /4___________/3
+
+static void sshex8_x_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int yi = 0; yi < L; yi++) {
+            // 1, 5, 8, 4,
+            const idx_t i0 = sshex8_lidx(L, 0, yi, zi);
+            const idx_t i1 = sshex8_lidx(L, 0, yi, zi + 1);
+            const idx_t i2 = sshex8_lidx(L, 0, yi + 1, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, 0, yi + 1, zi);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_x_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int yi = 0; yi < L; yi++) {
+            // 2, 3, 7, 6
+            const idx_t i0 = sshex8_lidx(L, L, yi, zi);
+            const idx_t i1 = sshex8_lidx(L, L, yi + 1, zi);
+            const idx_t i2 = sshex8_lidx(L, L, yi + 1, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, L, yi, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_y_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 1, 2, 6, 5
+            const idx_t i0 = sshex8_lidx(L, xi, 0, zi);
+            const idx_t i1 = sshex8_lidx(L, xi + 1, 0, zi);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, 0, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, xi, 0, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_y_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int zi = 0; zi < L; zi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 3, 4, 8, 7
+            const idx_t i0 = sshex8_lidx(L, xi + 1, L, zi);
+            const idx_t i1 = sshex8_lidx(L, xi, L, zi);
+            const idx_t i2 = sshex8_lidx(L, xi, L, zi + 1);
+            const idx_t i3 = sshex8_lidx(L, xi + 1, L, zi + 1);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+static void sshex8_z_lside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi < L; yi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 1, 4, 3, 2
+            const idx_t i0 = sshex8_lidx(L, xi, yi, 0);
+            const idx_t i1 = sshex8_lidx(L, xi, yi + 1, 0);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, yi + 1, 0);
+            const idx_t i3 = sshex8_lidx(L, xi + 1, yi, 0);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+static void sshex8_z_rside_quadshell4(const int                   L,
+                                      const ptrdiff_t             e,
+                                      idx_t **const SFEM_RESTRICT elems,
+                                      const ptrdiff_t             offset,
+                                      idx_t **const SFEM_RESTRICT sides) {
+    int lidx = 0;
+    for (int yi = 0; yi < L; yi++) {
+        for (int xi = 0; xi < L; xi++) {
+            // 5, 6, 7, 8
+            const idx_t i0 = sshex8_lidx(L, xi, yi, L);
+            const idx_t i1 = sshex8_lidx(L, xi + 1, yi, L);
+            const idx_t i2 = sshex8_lidx(L, xi + 1, yi + 1, L);
+            const idx_t i3 = sshex8_lidx(L, xi, yi + 1, L);
+
+            sides[0][offset + lidx] = elems[i0][e];
+            sides[1][offset + lidx] = elems[i1][e];
+            sides[2][offset + lidx] = elems[i2][e];
+            sides[3][offset + lidx] = elems[i3][e];
+            lidx++;
+        }
+    }
+}
+
+//////////////
+
+int sshex8_extract_quadshell4_surface_from_sideset(const int                                L,
+                                                   idx_t **const SFEM_RESTRICT              elems,
+                                                   const ptrdiff_t                          n_surf_elements,
+                                                   const element_idx_t *const SFEM_RESTRICT parent_element,
+                                                   const int16_t *const SFEM_RESTRICT       side_idx,
+                                                   idx_t **const SFEM_RESTRICT              sides) {
+    const int nquadsxside = L * L;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_surf_elements; i++) {
+        const ptrdiff_t e = parent_element[i];
+        const int       s = side_idx[i];
+
+        switch (s) {
+            case 0: {
+                sshex8_y_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 1: {
+                sshex8_x_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 2: {
+                sshex8_y_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 3: {
+                sshex8_x_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 4: {
+                sshex8_z_lside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            case 5: {
+                sshex8_z_rside_quadshell4(L, e, elems, i * nquadsxside, sides);
+                break;
+            }
+            default: {
+                assert(0);
+                break;
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
