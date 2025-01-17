@@ -8,6 +8,8 @@ Hence, it is a lower bound that favors more unstructured over the other two vari
 #elements 16000000 	
 #nodes    16200801
 
+mesh indices and points are 32 bits (int32, float32)
+
 ## Fully unstructured
 mem_hex8_mesh:   0.512 		[GB]
 mem_points:      0.19441 	[GB]
