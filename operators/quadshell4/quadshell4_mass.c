@@ -100,6 +100,7 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elements[v][i];
+            assert(ev[v] < nnodes);
         }
 
         for (int enode = 0; enode < 4; ++enode) {

@@ -42,6 +42,10 @@ class Mesh:
 		y_file = glob.glob(f'{path}/y.raw', recursive=False)
 		z_file = glob.glob(f'{path}/z.raw', recursive=False)
 
+		if len(x_file) == 0 or len(y_file) == 0 or len(z_file) == 0:
+			print(f'Bad coordinates in xyz files at {path}, len(xyz) = ({len(x_file)}, {len(y_file)}, ({len(z_file)})\n')
+			exit(1)
+
 		point_files = [x_file[0], y_file[0]]
 
 		if len(z_file) > 0:
