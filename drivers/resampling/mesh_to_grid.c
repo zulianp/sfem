@@ -17,6 +17,7 @@
 
 #include "mesh_aura.h"
 #include "read_mesh.h"
+#include "sfem_inv_resample_field.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
 
@@ -32,6 +33,7 @@
 
 /**
  * @brief Get the option argument
+ * @note This function is used to get the argument and its unique option from the command line
  *
  * @param argc
  * @param argv
@@ -46,6 +48,12 @@ get_option_argument(int         argc,    //
                     const char *option,  //
                     char      **arg,     //
                     size_t     *arg_size) {  //
+
+    // check if option start with "--"
+    if (strncmp(option, "--", 2) != 0) {
+        fprintf(stderr, RED_TEXT "Error: option must start with '--'\n" RESET_TEXT);
+        exit(EXIT_FAILURE);
+    }
 
     for (int i = 1; i < argc; i++) {
         if (strncmp(argv[i], option, strlen(option)) == 0) {
@@ -80,28 +88,28 @@ handle_option_result(const int result, const char *option, const char *arg, cons
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-    if (mpi_rank == 0 && print_result) {
+    if (mpi_rank == 0) {
         if (result == 0) {
-            printf("Option: %s: %s\n", option, arg);
+            if (print_result) printf("Option: %s: %s\n", option, arg);
         } else if (result == -1) {
-            fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
             if (mandatory) {
                 exit(EXIT_FAILURE);
             }
         } else {
-            fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
             if (mandatory) {
                 exit(EXIT_FAILURE);
             }
         }
     } else if (result != 0 && mpi_rank == 0) {
         if (result == -1) {
-            fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
             if (mandatory) {
                 exit(EXIT_FAILURE);
             }
         } else {
-            fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
             if (mandatory) {
                 exit(EXIT_FAILURE);
             }
@@ -110,7 +118,7 @@ handle_option_result(const int result, const char *option, const char *arg, cons
 }
 
 void  //
-read_grid_options(int argc, char *argv[], ptrdiff_t *nglobal, geom_t *origin, geom_t *delta, const int print_result) {
+read_grid_cmd_options(int argc, char *argv[], ptrdiff_t *nglobal, geom_t *origin, geom_t *delta, const int print_result) {
     //
     int    result;
     size_t arg_size;
@@ -192,9 +200,16 @@ ndarray_allocate(MPI_Comm               comm,          //
                  void                 **data_ptr,      //
                  int                    segment_size,  //
                  ptrdiff_t *const       nlocal,        //
-                 const ptrdiff_t *const nglobal) {     //
+                 const ptrdiff_t *const nglobal,       //
+                 const int              init_zero) {                //
 
     // nlocal is ignored and overridden for now
+
+    if (*data_ptr != NULL) {
+        fprintf(stderr, RED_TEXT "Error: data_ptr must be NULL %s:%d\n" RESET_TEXT, __FILE__, __LINE__);
+        return EXIT_FAILURE;
+    }
+
     int mpi_rank, mpi_size;
 
     MPI_Comm_rank(comm, &mpi_rank);
@@ -232,17 +247,30 @@ ndarray_allocate(MPI_Comm               comm,          //
     long      offset = 0;
     long      nl     = nlast_local * stride;
 
-    // void *data = malloc(nl * mpi_type_size);
-    void *data = calloc(nl, mpi_type_size);  // it inits to 0
+    if (init_zero) {
+        *data_ptr = calloc(nl, mpi_type_size);
+    } else {
+        *data_ptr = malloc(nl * mpi_type_size);
+    }
 
-    int nrounds = nl / segment_size;
-    nrounds += nrounds * ((ptrdiff_t)segment_size) < nl;
+    // int nrounds = nl / segment_size;
+    // nrounds += nrounds * ((ptrdiff_t)segment_size) < nl;
 
-    MPI_CATCH_ERROR(MPI_Exscan(&nl, &offset, 1, MPI_LONG, MPI_SUM, comm));
-    MPI_CATCH_ERROR(MPI_Exscan(MPI_IN_PLACE, &nrounds, 1, MPI_INT, MPI_MAX, comm));
+    // MPI_CATCH_ERROR(MPI_Exscan(&nl, &offset, 1, MPI_LONG, MPI_SUM, comm));
+    // MPI_CATCH_ERROR(MPI_Exscan(MPI_IN_PLACE, &nrounds, 1, MPI_INT, MPI_MAX, comm));
 
-    *data_ptr = data;
+    // *data_ptr = data_ptr;
     return 0;
+}
+
+real_t                                      //
+test_fun_a(real_t x, real_t y, real_t z) {  //
+    return x * x + y * y + z * z;
+}
+
+real_t                                      //
+test_fun_b(real_t x, real_t y, real_t z) {  //
+    return x;
 }
 
 /**
@@ -305,13 +333,41 @@ int main(int argc, char *argv[]) {
     geom_t    origin[3];
     geom_t    delta[3];
 
-    read_grid_options(argc, argv, nglobal, origin, delta, mpi_rank == 0);
+    read_grid_cmd_options(argc, argv, nglobal, origin, delta, mpi_rank == 0);
 
     char *output_path = NULL;
     result            = get_option_argument(argc, argv, "--output_path", &output_path, &arg_size);
     handle_option_result(result, "--output_path", output_path, arg_size, 1, mpi_rank == 0);
 
-    ndarray_allocate(mpi_comm, MPI_FLOAT, 3, (void **)&field, 1, nlocal, nglobal);
+    int err = ndarray_allocate(mpi_comm, MPI_FLOAT, 3, (void **)&field, 1, nlocal, nglobal, 1);
+    if (err) {
+        fprintf(stderr, RED_TEXT "Error: ndarray_allocate failed\n" RESET_TEXT);
+        return EXIT_FAILURE;
+    } else {
+        if (mpi_rank == 0) printf(GREEN_TEXT "+ ndarray_allocate succeeded\n" RESET_TEXT);
+    }
+
+    real_t *weighed_filed = calloc(mesh.nnodes, sizeof(real_t));
+    apply_fun_to_mesh(0,                              //
+                      mesh.nelements,                 //
+                      mesh.nnodes,                    //
+                      (const idx_t **)mesh.elements,  //
+                      (const geom_t **)mesh.points,   //
+                      test_fun_b,                     //
+                      weighed_filed);                 //
+
+    ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};  //
+    tet4_inv_resample_field_local(0,                              //
+                                  mesh.nelements,                 //
+                                  mesh.nnodes,                    //
+                                  (const idx_t **)mesh.elements,  //
+                                  (const geom_t **)mesh.points,   //
+                                  weighed_filed,                  //
+                                  nlocal,                         //
+                                  stride,                         //
+                                  origin,                         //
+                                  delta,                          //
+                                  field);                         //
 
     // for (int i = 0; i < 3; i++) {
     //     printf("nlocal[%d] = %ld\n", i, nlocal[i]);
@@ -320,13 +376,21 @@ int main(int argc, char *argv[]) {
     int recv_buff;
     int send_buff = (int)nlocal[2];
 
-    MPI_Scan(&send_buff, &recv_buff, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    ndarray_write(mpi_comm, output_path, MPI_FLOAT, 3, field, nlocal, nglobal);
 
-    if (mpi_rank == mpi_size - 1) {
+    MPI_Reduce(&send_buff, &recv_buff, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (mpi_rank == 0) {
         printf("recv_buff = %d\n", recv_buff);
         printf("send = %d\n", send_buff);
         printf("nglobal[2] = %ld\n", nglobal[2]);
     }
+
+    mesh_write_nodal_field(&mesh, "/home/sriva/spz/sfem_test/field.raw", SFEM_MPI_REAL_T, weighed_filed);
+
+    free(field);
+    free(weighed_filed);
+    mesh_destroy(&mesh);
 
     MPI_Finalize();
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
