@@ -62,11 +62,21 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: |
         choco install openmpi
-
+     # Ensure the parent directories exist
+    - name: Create directory for external repositories
+      run: mkdir -p /github/workspace/external
+      
     - name: Download Matrix.IO
       run: |
          git clone https://zulianp@bitbucket.org/zulianp/matrix.io.git /github/workspace/external/matrix.io
-
+   # Cache dependencies (optional)
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: /github/workspace/external/matrix.io
+        key: ${{ runner.os }}-matrix-io-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-matrix-io-
     # - name: Set up environment variables
       # run: |
         # echo "MatrixIO_DIR=$(realpath external/matrix.io)" >> $GITHUB_ENV
