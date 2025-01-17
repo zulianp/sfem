@@ -11,7 +11,7 @@ add_custom_target(
     COMMAND
         ${CMAKE_COMMAND} -DSFEM_DIR=${CMAKE_INSTALL_PREFIX}/lib/cmake/
         -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-        ${CMAKE_SOURCE_DIR}/cmake/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils
     COMMAND ${CMAKE_COMMAND} --build . --target all
     COMMAND ${CMAKE_COMMAND} -P cmake_install.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/InstallMakefileConfig

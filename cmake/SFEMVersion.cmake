@@ -10,13 +10,13 @@ if(Git_FOUND)
 
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         RESULT_VARIABLE res
         OUTPUT_VARIABLE SFEM_GIT_VERSION
         ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
     set_property(GLOBAL APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-                                        "${CMAKE_SOURCE_DIR}/.git/index")
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/.git/index")
 
 endif()
 

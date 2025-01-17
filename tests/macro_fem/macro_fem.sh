@@ -75,7 +75,7 @@ fi
 # SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw p2_test.raw
 # SFEM_USE_MACRO=1 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $simulation_mesh linear_system/rhs.raw mea_test.raw
 # SFEM_USE_MACRO=0 SFEM_USE_OPT=1 $LAUNCH laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
-$LAUNCH proteus_tet4_laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
+$LAUNCH sstet4_laplacian_apply $refined_mesh linear_system/rhs.raw std_test.raw
 
 # raw_to_db.py $refined_mesh mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw,std_test.raw,p2_test.raw"
 # raw_to_db.py $simulation_mesh macro_mf_out.vtk --point_data="linear_system/rhs.raw,mea_test.raw,test.raw,test_macro.raw"

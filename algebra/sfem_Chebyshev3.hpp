@@ -25,6 +25,7 @@ namespace sfem {
         std::shared_ptr<PowerMethod<T>> power_method;
 
         std::shared_ptr<Buffer<T>> p_, temp_;
+        // std::shared_ptr<Buffer<T>> diag_;
 
         // Solver parameters
         T atol{1e-10};
@@ -32,6 +33,7 @@ namespace sfem {
         T eigen_solver_tol{1e-6};
         int eigen_solver_max_it{1000};
         int max_it{3};
+        int iterations_{0};
 
         T eig_max{0};
         T scale_eig_max{1};
@@ -41,6 +43,14 @@ namespace sfem {
         bool verbose{true};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
+
+        int iterations() const override { return iterations_; }
+
+        // int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
+        //                           const std::shared_ptr<Buffer<T>>& diag) override {
+        //     // TODO
+        //     return SFEM_SUCCESS;
+        // }
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }
@@ -77,9 +87,7 @@ namespace sfem {
             }
         }
 
-        bool good() const {
-            return blas.good() && apply_op;
-        }
+        bool good() const { return blas.good() && apply_op; }
 
         void monitor(const int iter, const T residual) {
             if (iter == max_it || iter % 100 == 0 || residual < atol) {
@@ -89,8 +97,12 @@ namespace sfem {
 
         T max_eigen_value(T* const guess_eigenvector, T* const work) {
             assert(power_method);
-            return power_method->max_eigen_value(
-                    apply_op, eigen_solver_max_it, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
+            return power_method->max_eigen_value(apply_op,
+                                                 eigen_solver_max_it,
+                                                 this->eigen_solver_tol,
+                                                 this->rows(),
+                                                 guess_eigenvector,
+                                                 work);
         }
 
         void init_with_ones() {
@@ -100,16 +112,15 @@ namespace sfem {
             init(ones->data());
         }
 
-        void init_with_random() 
-        {
+        void init_with_random() {
             T* work = blas.allocate(this->rows());
             auto random_vector = Buffer<T>::own(this->rows(), work, blas.destroy);
             assert(execution_space_ == EXECUTION_SPACE_HOST);
 
             auto v = random_vector->data();
-            for(ptrdiff_t i = 0; i < this->rows(); i++) {
-                v[i] = -0.5 + rand() * 1.0/RAND_MAX;;
-            }   
+            for (ptrdiff_t i = 0; i < this->rows(); i++) {
+                v[i] = -0.5 + rand() * 1.0 / RAND_MAX;
+            }
 
             init(random_vector->data());
         }
@@ -133,11 +144,9 @@ namespace sfem {
             return 0;
         }
 
-        int precond_apply(const T* const rhs,
-                          T* const x,
+        int precond_apply(const T* const rhs, T* const x,
                           // work-buffers
-                          T* const p,
-                          T* const temp) {
+                          T* const p, T* const temp) {
             if (!good()) {
                 return -1;
             }
@@ -189,7 +198,7 @@ namespace sfem {
             blas.axpy(n, -alpha, p, x);
 
             // Iteration i>=2
-            for (int i = 2; i < max_it; i++) {
+            for (iterations_ = 2; iterations_ < max_it; iterations_++) {
                 dea = eig_diff * alpha;
                 beta = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));

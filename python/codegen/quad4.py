@@ -91,22 +91,50 @@ class Quad4(FE):
 		return self.jacobian_determinant(q)
 
 class QuadShell4(Quad4):
-	def __init__(self):
+	def __init__(self, isoparam=False):
 		super().__init__()
+		self.isoparam = isoparam
+
+	def is_isoparametric(self):
+		return self.isoparam
+
+	def manifold_dim(self):
+		return 2
 
 	def spatial_dim(self):
 		return 3
 
+	def jacobian(self, q):
+		return self.isoparametric_jacobian(q)
+
 	def jacobian_inverse(self, q):
-		S = self.jacobian(q)
-		StS = S.T * S
-		Sinv = inv2(StS) * self.S.T
-		return Sinv
-	
+		return pseudo_inverse(self.isoparametric_jacobian(q))
+
+	def coords(self):
+		return  [coeffs('px', 4), coeffs('py', 4), coeffs('pz', 4) ]
+
+	def transform(self, q):
+		f = self.fun(q)
+		xyz = self.coords()
+
+		pp = sp.zeros(3, 1)
+
+		for i in range(0, 4):
+			for d in range(0, 3):
+				pp[d] += xyz[d][i] * f[i]
+
+
+		return pp
+
+	def inverse_transform(self, p):
+		assert False
+		return 0
+
 	def jacobian_determinant(self, q):
-		S = self.jacobian(q)
-		StS = S.T * S
-		return sp.sqrt(det2(StS))
+		return pseudo_determinant(self.jacobian(q))
+
+	def measure(self, q):
+		return self.jacobian_determinant(q)
 
 class AxisAlignedQuad4(FE):
 	def __init__(self):
@@ -185,5 +213,6 @@ class AxisAlignedQuad4(FE):
 
 
 if __name__ == '__main__':
-	AxisAlignedQuad4().generate_c_code()
+	# AxisAlignedQuad4().generate_c_code()
+	QuadShell4(True).generate_qp_based_code()
 	

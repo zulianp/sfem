@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
+#include <stddef.h>
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 

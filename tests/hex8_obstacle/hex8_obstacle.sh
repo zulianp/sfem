@@ -20,13 +20,13 @@ export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true 
 export CUDA_LAUNCH_BLOCKING=0
 
-export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
-export SFEM_ELEMENT_REFINE_LEVEL=4
-export SFEM_MAX_IT=20000
+export SFEM_ELEMENT_TYPE=SSHEX8 
+export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_MAX_IT=10000
 
 export SFEM_HEX8_ASSUME_AFFINE=1
 
-export CASE=3
+export CASE=1
 case $CASE in
 	1 | 2)
 		mesh=mesh
@@ -34,14 +34,15 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			create_cyclic_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+			create_cyclic_ss_mesh.sh 1 $SFEM_ELEMENT_REFINE_LEVEL
+			echo "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" > $mesh/meta.yaml
 		fi
 
 		sinlet=$mesh/surface/sidesets_aos/inlet.raw
 		soutlet=$mesh/surface/sidesets_aos/outlet.raw
 		sobstacle=$mesh/surface/sidesets_aos/wall1.raw
 		./compute_distance.py mesh/viz/ $sobstacle ub.raw
-		obstacle_surface=$mesh/surface/wall1/
+		export SFEM_OBSTACLE_SURF=$mesh/surface/wall1/
 	;;
 	3)
 		mesh=joint_hex_db
@@ -49,13 +50,13 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=3
+			# export SFEM_REFINE=3
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw
 		sobstacle=$mesh/surface/sidesets_aos/top.raw
 		./compute_distance_joint.py $mesh/viz/ $sobstacle ub.raw
-		obstacle_surface=$mesh/surface/top/
+		export SFEM_OBSTACLE_SURF=$mesh/surface/top/
 	;;
 	10 | 20)
 		mesh=mesh
@@ -75,6 +76,9 @@ case $CASE in
 		echo "Error wrong case"
 	;;
 esac
+
+echo "Checking SFEM_ELEMENT_REFINE_LEVEL..."
+grep "SFEM_ELEMENT_REFINE_LEVEL: $SFEM_ELEMENT_REFINE_LEVEL" $mesh/meta.yaml
 
 case $CASE in
 	1 | 10)
@@ -115,7 +119,9 @@ case $CASE in
 esac
 
 echo "Running: obstacle $mesh output"
-$LAUNCH obstacle $mesh output 
+
+FULL_EXEC_PATH=`which obstacle`
+$LAUNCH $FULL_EXEC_PATH $mesh output 
 # | tee obs.log.txt
 
 if [[ $SFEM_USE_ELASTICITY -eq 1 ]]
@@ -138,9 +144,9 @@ then
 
 	raw_to_db.py $mesh/viz output/hex8.vtk  --point_data="output/soa/*.raw" --point_data_type="$SFEM_REAL_T"
 
-	if [[ -d $obstacle_surface ]]
+	if [[ -d $SFEM_OBSTACLE_SURF ]]
 	then
-		raw_to_db.py $obstacle_surface output/obstacle.vtk --coords=$mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
+		raw_to_db.py $SFEM_OBSTACLE_SURF output/obstacle.vtk --coords=$mesh/viz --cell_type=quad --point_data="output/soa/upper_bound.1.*" --point_data_type="$SFEM_REAL_T"
 	fi
 else
 	raw_to_db.py $mesh/viz output/hex8.vtk --point_data=output/u.raw,output/rhs.raw,output/upper_bound.raw --point_data_type="$SFEM_REAL_T,$SFEM_REAL_T,$SFEM_REAL_T"

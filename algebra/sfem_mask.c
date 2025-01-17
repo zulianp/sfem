@@ -16,7 +16,7 @@ void mask_print(const ptrdiff_t n, mask_t *const mask) {
     for (ptrdiff_t i = 0; i < n; i++) {
         int val = mask_get(i, mask);
         if (val) {
-            printf("%ld ", i, val);
+            printf("%ld ", i);
         }
     }
     printf("\n");

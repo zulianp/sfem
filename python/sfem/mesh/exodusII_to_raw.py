@@ -12,6 +12,7 @@ except NameError:
     print('exodusII_to_raw: self contained mode')
     geom_t = np.float32
     idx_t = np.int32
+    element_idx_t = np.int32
 
 def exodusII_to_raw(input_mesh, output_folder):
 	def mkdir(path):
@@ -244,9 +245,16 @@ def exodusII_to_raw(input_mesh, output_folder):
 		for d in range(0, nnodesxside):
 			idx[d] = []
 
+
+		parent = np.zeros(len(e_ss[:]), dtype=element_idx_t)
+		local_face_idx = np.zeros(len(e_ss[:]), dtype=np.int16)
+
 		for n in range(0, len(e_ss[:])):
 			e = e_ss[n] - 1
 			s = s_ss[n] - 1
+
+			parent[n] = e
+			local_face_idx[n] = s
 
 			lnodes = s2n_map[s]
 
@@ -258,6 +266,9 @@ def exodusII_to_raw(input_mesh, output_folder):
 				# 	pdb.set_trace()
 
 				idx[d].append(node)
+
+		local_face_idx.tofile(f'{this_sideset_dir}/lfi.int16.raw')
+		parent.tofile(f'{this_sideset_dir}/parent.{str(element_idx_t.__name__)}.raw')
 
 		for d in range(0, nnodesxside):
 			path = f'{this_sideset_dir}/{name}.{d}.raw'

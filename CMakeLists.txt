@@ -33,21 +33,23 @@ endif()
 ######################################################
 
 find_package(MatrixIO REQUIRED)
-find_package(ISolver REQUIRED)
+
+if(SFEM_ENABLE_ISOLVER)
+    find_package(ISolver REQUIRED)
+endif()
 
 set(SFEM_MODULES
-    algebra base matrix mesh pizzastack solver
+    algebra base matrix 
+    mesh 
+    mesh/sshex8
+    pizzastack solver
     algebra/openmp
-    amg
     operators 
     operators/beam2 
     operators/cvfem 
-    # operators/kernels 
     operators/navier_stokes
-    # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
-    operators/tet4/vectorized
     operators/tri3
     operators/tri6
     operators/trishell3
@@ -57,11 +59,26 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
-    operators/proteus_tet4
-    operators/proteus_hex8
+    operators/sstet4
+    operators/sshex8
     operators/hierarchical
     operators/hex8
+    operators/ssquad4
+    operators/boundary_conditions
+    ssmg
 )
+
+if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
+    list(APPEND SFEM_MODULES operators/tet4/vectorized)
+endif()
+
+if(SFEM_ENABLE_AMG)
+    list(APPEND SFEM_MODULES amg)
+endif()
+
+if(WIN32)
+set(SFEM_ENABLE_RESAMPLING OFF)
+endif()
 
 if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
@@ -69,6 +86,14 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling/tet10
     )
 endif()
+
+list(APPEND SFEM_MODULES 
+    resampling/interpolate
+    resampling/quadshell4
+    resampling/trishell3
+    resampling/beam2
+    resampling/surface
+    )
 
 list(APPEND SFEM_MODULES frontend)
 
@@ -84,20 +109,25 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         operators/macro_tet4/cuda
         operators/tet10/cuda
-        operators/proteus_tet4/cuda
+        operators/sstet4/cuda
         operators/hex8/cuda
-        operators/proteus_hex8/cuda
+        operators/sshex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
+        operators/boundary_conditions/cuda
         )
+
+    if(SFEM_ENABLE_AMG)
+        list(APPEND SFEM_MODULES amg/cuda)
+    endif()
 endif()
 
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -115,12 +145,16 @@ endif()
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
 
-if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
-elseif (SFEM_VEC_SIZE STREQUAL "8")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
+string(TOLOWER ${CMAKE_BUILD_TYPE} LBT)
+
+if(NOT LBT STREQUAL "debug" AND NOT LBT STREQUAL "asan" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
+    elseif (SFEM_VEC_SIZE STREQUAL "8")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
+    endif()
 endif()
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
@@ -147,7 +181,7 @@ foreach(include ${SFEM_BUILD_INCLUDES})
 endforeach()
 
 target_include_directories(sfem BEFORE
-     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
@@ -176,12 +210,15 @@ set(SFEM_TARGETS sfem)
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
 
-message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
 
 if(SFEM_ENABLE_CUDA)
 # set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set_property(TARGET sfem PROPERTY SFEM_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      set(CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      set_property(TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
+      # get_property(${TEST_CUDA_ARCH} TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES)
+
+      message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
 endif()
 
 ######################################################
@@ -204,6 +241,11 @@ if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
 endif()
 
+if(NOT ${SFEM_ENABLE_ISOLVER})
+    message(WARNING "ISOLVER is disabled!")
+     list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+endif()
+
 if(SFEM_ENABLE_RESAMPLING)
     file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
     file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")
@@ -219,7 +261,7 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
     list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
 else()
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free")
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
 endif()
 
 if(NOT SFEM_ENABLE_CUSPARSE)
@@ -240,9 +282,36 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
-# if(SFEM_ENABLE_TESTING)
-#     include(tests/tests.cmake)
-# endif()
+if(SFEM_ENABLE_TESTING)
+    enable_testing()
+
+    list(APPEND SFEM_UNIT_TESTS
+        operators/ssquad4/tests
+        operators/sshex8/tests
+        mesh/tests
+        frontend/tests
+        ssmg/tests
+    )
+
+    foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
+    
+    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+
+    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+
+    endforeach(UNIT_TEST)
+
+    message(STATUS "TEST_DRIVERS=${TEST_DRIVERS}")
+
+    foreach(TEST_DRIVER ${TEST_DRIVERS})
+        get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
+        add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
+        target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
+        add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
+    endforeach(TEST_DRIVER ${TEST_DRIVERS})
+endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
 #     include(benchmarks/benchmarks.cmake)
@@ -254,6 +323,10 @@ if(SFEM_ENABLE_PYTHON)
 endif()
 
 # message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
+
+if(SFEM_SUBMODULES)
+    target_link_libraries(sfem PUBLIC ${SFEM_SUBMODULES})
+endif()
 
 ######################################################
 ######################################################
@@ -321,7 +394,10 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
   DESTINATION lib/cmake/)
 
-include(cmake/PostInstall.cmake)
+
+if(NOT SFEM_ENABLE_SUBMODULE)
+    include(cmake/PostInstall.cmake)
+endif()
 
 ######################################################
 ######################################################
