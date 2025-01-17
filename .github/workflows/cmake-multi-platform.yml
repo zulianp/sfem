@@ -64,16 +64,20 @@ jobs:
         choco install openmpi
      # Ensure the parent directories exist
     - name: Create directory for external repositories
-      run: mkdir -p /github/workspace/external
+      run: mkdir -p external
       
     - name: Download Matrix.IO
       run: |
-         git clone https://zulianp@bitbucket.org/zulianp/matrix.io.git /github/workspace/external/matrix.io
+         git clone https://zulianp@bitbucket.org/zulianp/matrix.io.git external/matrix.io
+
+    - name: Set up environment variables
+      run: |
+        echo "MatrixIO_DIR=$(realpath external/matrix.io)" >> $GITHUB_ENV
    # Cache dependencies (optional)
     - name: Cache dependencies
       uses: actions/cache@v3
       with:
-        path: /github/workspace/external/matrix.io
+        path: external/matrix.io
         key: ${{ runner.os }}-matrix-io-${{ hashFiles('**/CMakeLists.txt') }}
         restore-keys: |
           ${{ runner.os }}-matrix-io-
@@ -96,7 +100,7 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -S ${{ github.workspace }} -DSFEM_ENABLE_RESAMPLING=OFF -DSFEM_ENABLE_PYTHON=OFF -DMatrixIO_DIR=/github/workspace/external/matrix.io
+        -S ${{ github.workspace }} -DSFEM_ENABLE_RESAMPLING=OFF -DSFEM_ENABLE_PYTHON=OFF -DMatrixIO_DIR=$MatrixIO_DIR
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
