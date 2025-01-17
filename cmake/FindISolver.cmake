@@ -4,22 +4,22 @@ if(NOT ISolverFunction_DIR OR NOT ISolverLSolve_DIR OR NOT ISolverLSolveFrontend
 
     find_path(
         ISolverFunction_DIR  isolver_function.h 
-        HINTS ${CMAKE_SOURCE_DIR}/../isolver/interfaces/nlsolve/
+        HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../isolver/interfaces/nlsolve/
         )
 
     find_path(
         ISolverLSolve_DIR  isolver_lsolve.h
-        HINTS ${CMAKE_SOURCE_DIR}/../isolver/interfaces/lsolve/
+        HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../isolver/interfaces/lsolve/
         )
 
     find_path(
         ISolverLSolveFrontend_DIR  isolver_lsolve_frontend.cpp
-        HINTS ${CMAKE_SOURCE_DIR}/../isolver/plugin/lsolve/
+        HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../isolver/plugin/lsolve/
         )
 
     find_path(
         ISolverPlugin_DIR  isolver_PlugIn.hpp
-        HINTS ${CMAKE_SOURCE_DIR}/../isolver/plugin
+        HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../isolver/plugin
         )
 
 endif()

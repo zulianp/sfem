@@ -40,7 +40,7 @@ then
 	exit -1
 fi
 
-export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
+export SFEM_ELEMENT_TYPE=SSHEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$2
 
 mesh=mesh
@@ -53,10 +53,10 @@ db_to_raw.py model.vtk $mesh --select_elem_type=hexahedron
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
 
-proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
+ssquad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
 
 # Generate full-mesh for visualization
-proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
+sshex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
 
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 1.925 -0.01 0.46 0.99 	$mesh/surface/sides_outlet.raw
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -1.925 -0.01 0.46 0.99 	$mesh/surface/sides_inlet.raw

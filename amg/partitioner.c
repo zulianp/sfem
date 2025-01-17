@@ -1,33 +1,23 @@
 #include "partitioner.h"
 #include <stdio.h>
-#include <stdlib.h>
+#include "coo_sort.h"
+#include "sfem_base.h"
 #include "sfem_mask.h"
-#include "sparse.h"
 
-// Helper functions... not public API so I don't think they go in header file?
-// idk I don't code in C.
-void sort_weights(PartitionerWorkspace *ws, count_t nweights);
-int pairwise_aggregation(const real_t coarsening_factor,
-                         const real_t inv_total,
-                         const ptrdiff_t fine_nrows,
-                         SymmCOOMatrix *a_bar,
-                         PartitionerWorkspace *ws);
+int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, count_t *offdiag_nnz,
+                         ptrdiff_t *ndofs, idx_t *offdiag_row_indices, idx_t *offdiag_col_indices,
+                         real_t *offdiag_values, PartitionerWorkspace *ws);
 
-// Global variables needed for qsort...
-real_t *global_weights;
-
-int partition(real_t *near_null,
-              const mask_t *bdy_dofs,
-              const real_t coarsening_factor,
-              SymmCOOMatrix *symm_coo,
-              PartitionerWorkspace *ws) {
-    ptrdiff_t nrows = symm_coo->dim;
-    count_t nnz = symm_coo->offdiag_nnz;
+int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *near_null,
+              idx_t *offdiag_row_indices, idx_t *offdiag_col_indices, real_t *offdiag_values,
+              count_t *offdiag_nnz, ptrdiff_t *ndofs, PartitionerWorkspace *ws) {
     real_t current_cf = 1.0;
+
+    ptrdiff_t fine_ndofs = *ndofs;
 
     // We start with each free DOF in its own aggregate
     idx_t aggs = 0;
-    for (idx_t row = 0; row < nrows; row++) {
+    for (idx_t row = 0; row < *ndofs; row++) {
         if ((!bdy_dofs) || !mask_get(row, bdy_dofs)) {
             ws->partition[row] = aggs;
             near_null[aggs] = near_null[row];
@@ -36,45 +26,44 @@ int partition(real_t *near_null,
             ws->partition[row] = -1;
         }
     }
-    symm_coo->dim = aggs;
+    *ndofs = aggs;
 
     // If we have boundary restriction shift everything
     if (bdy_dofs) {
         count_t restricted_nnz = 0;
-        for (idx_t k = 0; k < nnz; k++) {
-            idx_t i = symm_coo->offdiag_row_indices[k];
-            idx_t j = symm_coo->offdiag_col_indices[k];
-            real_t val = symm_coo->offdiag_values[k];
+        for (idx_t k = 0; k < *offdiag_nnz; k++) {
+            idx_t i = offdiag_row_indices[k];
+            idx_t j = offdiag_col_indices[k];
+            real_t val = offdiag_values[k];
             if (ws->partition[i] >= 0 && ws->partition[j] >= 0) {
-                symm_coo->offdiag_row_indices[restricted_nnz] = ws->partition[i];
-                symm_coo->offdiag_col_indices[restricted_nnz] = ws->partition[j];
-                symm_coo->offdiag_values[restricted_nnz] = val;
+                offdiag_row_indices[restricted_nnz] = ws->partition[i];
+                offdiag_col_indices[restricted_nnz] = ws->partition[j];
+                offdiag_values[restricted_nnz] = val;
                 restricted_nnz++;
             }
         }
-        nnz = restricted_nnz;
-        symm_coo->offdiag_nnz = nnz;
+        *offdiag_nnz = restricted_nnz;
     }
 
     // Calculate the row sums of the augmented matrix and the weights for the
     // strength of connection graph
-    for (idx_t k = 0; k < nnz; k++) {
-        idx_t i = symm_coo->offdiag_row_indices[k];
-        idx_t j = symm_coo->offdiag_col_indices[k];
-        real_t val = symm_coo->offdiag_values[k];
+    for (idx_t k = 0; k < *offdiag_nnz; k++) {
+        idx_t i = offdiag_row_indices[k];
+        idx_t j = offdiag_col_indices[k];
+        real_t val = offdiag_values[k];
 
         // printf("%d, %d\n", i, j);
         real_t weight = -val * near_null[i] * near_null[j];
         // only not thread safe part here, could parallel this...
         ws->rowsums[i] += weight;
         ws->rowsums[j] += weight;
-        symm_coo->offdiag_values[k] = weight;
+        offdiag_values[k] = weight;
     }
 
     // Calculate the total sum of the augmented matrix and fix any negative
     // rowsums
     real_t inv_total = 0.0;
-    for (idx_t row = 0; row < nrows; row++) {
+    for (idx_t row = 0; row < *ndofs; row++) {
         // TODO negative rowsums handling.... maybe log it? idk
         real_t rowsum = ws->rowsums[row];
         if (rowsum < 0.0) {
@@ -85,39 +74,49 @@ int partition(real_t *near_null,
     }
     inv_total = 1.0 / inv_total;
 
-    real_t fine_nrows_float = (real_t)nrows;
+    real_t fine_ndofs_float = (real_t)fine_ndofs;
 
     while (current_cf < coarsening_factor) {
-        if (pairwise_aggregation(coarsening_factor, inv_total, nrows, symm_coo, ws)) {
+        if (pairwise_aggregation(inv_total,
+                                 fine_ndofs,
+                                 offdiag_nnz,
+                                 ndofs,
+                                 offdiag_row_indices,
+                                 offdiag_col_indices,
+                                 offdiag_values,
+                                 ws)) {
             return 1;
         }
 
-        real_t coarse_nrows = (real_t)symm_coo->dim;
-        current_cf = fine_nrows_float / coarse_nrows;
+        real_t coarse_nrows = (real_t)*ndofs;
+        current_cf = fine_ndofs_float / coarse_nrows;
         /*
-        printf("Matching step completed, cf: %.2f nrows: %d nnz: %d\n", current_cf,
-               symm_coo->dim, symm_coo->dim + (symm_coo->offdiag_nnz * 2));
+        printf("Matching step completed, cf: %.2f nrows: %d offdiag nnz: %d\n",
+               current_cf,
+               (int)*ndofs,
+               (int)*offdiag_nnz);
         */
     }
+
+    /* only nuemann
+    for (int i = 0; i < fine_ndofs; i++) {
+        assert(ws->partition[i] >= 0);
+    }
+    */
 
     return 0;
 }
 
-int pairwise_aggregation(const real_t coarsening_factor,
-                         const real_t inv_total,
-                         const ptrdiff_t fine_nrows,
-                         SymmCOOMatrix *a_bar,
-                         PartitionerWorkspace *ws) {
-    count_t nnz = a_bar->offdiag_nnz;
-    ptrdiff_t nrows = a_bar->dim;
-
+int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, count_t *offdiag_nnz,
+                         ptrdiff_t *ndofs, idx_t *offdiag_row_indices, idx_t *offdiag_col_indices,
+                         real_t *offdiag_values, PartitionerWorkspace *ws) {
     // Compute the modularity weights for the augmented graph, storing only
     // positive modularity weights
     count_t n_mod_weights = 0;
-    for (idx_t k = 0; k < nnz; k++) {
-        idx_t i = a_bar->offdiag_row_indices[k];
-        idx_t j = a_bar->offdiag_col_indices[k];
-        real_t val = a_bar->offdiag_values[k];
+    for (idx_t k = 0; k < *offdiag_nnz; k++) {
+        idx_t i = offdiag_row_indices[k];
+        idx_t j = offdiag_col_indices[k];
+        real_t val = offdiag_values[k];
         real_t mod_weight = val - inv_total * ws->rowsums[i] * ws->rowsums[j];
 
         if (mod_weight > 0.0) {
@@ -134,13 +133,17 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     // Sorting modularity weights makes greedy matching efficient
-    sort_weights(ws, n_mod_weights);
+    sort_weights(ws->sort_indices,
+                 offdiag_row_indices,
+                 offdiag_col_indices,
+                 offdiag_values,
+                 n_mod_weights);
 
     // Repurpose sorting array to track which DOFs have been assigned coarse
     // locations
-    idx_t *alive = ws->sort_indices;
+    count_t *alive = ws->sort_indices;
 #pragma omp parallel for
-    for (idx_t row = 0; row < nrows; row++) {
+    for (idx_t row = 0; row < *ndofs; row++) {
         alive[row] = -1;
     }
 
@@ -157,7 +160,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     // Assign any unmatched DOF to singleton on coarse grid
-    for (idx_t row = 0; row < nrows; row++) {
+    for (idx_t row = 0; row < *ndofs; row++) {
         if (alive[row] < 0) {
             alive[row] = coarse_counter;
             coarse_counter += 1;
@@ -165,7 +168,7 @@ int pairwise_aggregation(const real_t coarsening_factor,
     }
 
     // Update the partition to reflect the assigned matching
-    for (idx_t row = 0; row < fine_nrows; row++) {
+    for (idx_t row = 0; row < fine_ndofs; row++) {
         if (ws->partition[row] >= 0) {
             idx_t old_agg = ws->partition[row];
             ws->partition[row] = alive[old_agg];
@@ -174,38 +177,39 @@ int pairwise_aggregation(const real_t coarsening_factor,
 
     // Update the augmented matrix
     // TODO verify this with a spmm implementation
+    // also could be abstracted away to the PWCpartition->coarsen API
     idx_t new_nnz = 0;
-    for (idx_t k = 0; k < nnz; k++) {
-        idx_t i = alive[a_bar->offdiag_row_indices[k]];
-        idx_t j = alive[a_bar->offdiag_col_indices[k]];
+    for (idx_t k = 0; k < *offdiag_nnz; k++) {
+        idx_t i = alive[offdiag_row_indices[k]];
+        idx_t j = alive[offdiag_col_indices[k]];
 
         if (j > i) {
-            a_bar->offdiag_row_indices[new_nnz] = i;
-            a_bar->offdiag_col_indices[new_nnz] = j;
-            a_bar->offdiag_values[new_nnz] = a_bar->offdiag_values[k];
+            offdiag_row_indices[new_nnz] = i;
+            offdiag_col_indices[new_nnz] = j;
+            offdiag_values[new_nnz] = offdiag_values[k];
             new_nnz += 1;
         } else if (i > j) {
-            a_bar->offdiag_row_indices[new_nnz] = j;
-            a_bar->offdiag_col_indices[new_nnz] = i;
-            a_bar->offdiag_values[new_nnz] = a_bar->offdiag_values[k];
+            offdiag_row_indices[new_nnz] = j;
+            offdiag_col_indices[new_nnz] = i;
+            offdiag_values[new_nnz] = offdiag_values[k];
             new_nnz += 1;
         }
     }
-    a_bar->dim = coarse_counter;
+    *ndofs = coarse_counter;
+    *offdiag_nnz = new_nnz;
 
     // Fix augmented matrix
-    sum_duplicates(a_bar->offdiag_row_indices,
-                   a_bar->offdiag_col_indices,
-                   a_bar->offdiag_values,
-                   ws->sort_indices,
-                   &new_nnz);
-    a_bar->offdiag_nnz = new_nnz;
+    sum_duplicates(ws->sort_indices,
+                   offdiag_row_indices,
+                   offdiag_col_indices,
+                   offdiag_values,
+                   offdiag_nnz);
 
     // Update rowsums using weights workspace
     for (idx_t row = 0; row < coarse_counter; row++) {
         ws->weights[row] = 0.0;
     }
-    for (idx_t row = 0; row < nrows; row++) {
+    for (idx_t row = 0; row < *ndofs; row++) {
         if (alive[row] >= 0) {
             idx_t coarse_idx = alive[row];
             ws->weights[coarse_idx] += ws->rowsums[row];
@@ -218,26 +222,25 @@ int pairwise_aggregation(const real_t coarsening_factor,
     return 0;
 }
 
-int compare_indices(const void *a, const void *b) {
-    idx_t idx_a = *(const idx_t *)a;
-    idx_t idx_b = *(const idx_t *)b;
-    if (global_weights[idx_a] < global_weights[idx_b]) return 1;
-    if (global_weights[idx_a] > global_weights[idx_b]) return -1;
-    return 0;
+PartitionerWorkspace *create_partition_ws(const ptrdiff_t fine_ndofs, const count_t offdiag_nnz) {
+    PartitionerWorkspace *ws = malloc(sizeof(PartitionerWorkspace));
+    ws->partition = (idx_t *)malloc((fine_ndofs) * sizeof(idx_t));
+    ws->rowsums = (real_t *)calloc((fine_ndofs), sizeof(real_t));
+    ws->ptr_i = (idx_t *)malloc(offdiag_nnz * sizeof(idx_t));
+    ws->ptr_j = (idx_t *)malloc(offdiag_nnz * sizeof(idx_t));
+    ws->weights = (real_t *)malloc(offdiag_nnz * sizeof(real_t));
+    ws->sort_indices = (count_t *)malloc(offdiag_nnz * sizeof(count_t));
+    return ws;
 }
 
-void sort_weights(PartitionerWorkspace *ws, count_t nweights) {
-    idx_t *indices = ws->sort_indices;
-    idx_t *ptr_i = ws->ptr_i;
-    idx_t *ptr_j = ws->ptr_j;
-    real_t *weights = ws->weights;
-    global_weights = weights;
+int free_partition_ws(PartitionerWorkspace *ws) {
+    free(ws->partition);
+    free(ws->rowsums);
+    free(ws->ptr_i);
+    free(ws->ptr_j);
+    free(ws->weights);
+    free(ws->sort_indices);
+    free(ws);
 
-    for (idx_t i = 0; i < nweights; i++) {
-        indices[i] = i;
-    }
-
-    // TODO parallel sort is must here
-    qsort(indices, nweights, sizeof(idx_t), compare_indices);
-    cycle_leader_swap(ptr_i, ptr_j, weights, indices, nweights);
+    return SFEM_SUCCESS;
 }

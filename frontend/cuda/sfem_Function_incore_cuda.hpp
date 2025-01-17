@@ -17,7 +17,7 @@ namespace sfem {
             const enum ElemType element_type);
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> d_buffer(const std::ptrdiff_t n) {
+    std::shared_ptr<Buffer<T>> create_device_buffer(const std::ptrdiff_t n) {
         auto ret = std::make_shared<Buffer<T>>(
             n, (T *)d_buffer_alloc(n * sizeof(T)), &d_buffer_destroy, MEMORY_SPACE_DEVICE);
         return ret;

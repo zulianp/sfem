@@ -2,13 +2,9 @@
 #include <math.h>
 #include "sfem_mask.h"
 
-int l2_smoother(const ptrdiff_t dim,
-                const mask_t *const bdy_dofs,
-                const count_t offdiag_nnz,
-                const real_t *const diag,
-                const real_t *const offdiag_values,
-                const idx_t *const offdiag_row_indices,
-                const idx_t *const offdiag_col_indices,
+int l2_smoother(const ptrdiff_t dim, const mask_t *const bdy_dofs, const count_t offdiag_nnz,
+                const real_t *const diag, const real_t *const offdiag_values,
+                const idx_t *const offdiag_row_indices, const idx_t *const offdiag_col_indices,
                 real_t *smoother) {
 #pragma omp parallel for
     for (idx_t i = 0; i < dim; i++) {
@@ -32,7 +28,7 @@ int l2_smoother(const ptrdiff_t dim,
 #pragma omp parallel for
     for (idx_t i = 0; i < dim; i++) {
         if ((!bdy_dofs) || !mask_get(i, bdy_dofs)) {
-            smoother[i] = 1.0 / smoother[i];
+            // smoother[i] = 1.0 / smoother[i];
         } else {
             smoother[i] = 0.0;
         }
@@ -41,13 +37,9 @@ int l2_smoother(const ptrdiff_t dim,
     return 0;
 }
 
-int l1_smoother(const ptrdiff_t dim,
-                const mask_t *const bdy_dofs,
-                const count_t offdiag_nnz,
-                const real_t *const diag,
-                const real_t *const offdiag_values,
-                const idx_t *const offdiag_row_indices,
-                const idx_t *const offdiag_col_indices,
+int l1_smoother(const ptrdiff_t dim, const mask_t *const bdy_dofs, const count_t offdiag_nnz,
+                const real_t *const diag, const real_t *const offdiag_values,
+                const idx_t *const offdiag_row_indices, const idx_t *const offdiag_col_indices,
                 real_t *smoother) {
 #pragma omp parallel for
     for (idx_t i = 0; i < dim; i++) {
@@ -68,7 +60,7 @@ int l1_smoother(const ptrdiff_t dim,
 #pragma omp parallel for
     for (idx_t i = 0; i < dim; i++) {
         if ((!bdy_dofs) || !mask_get(i, bdy_dofs)) {
-            smoother[i] = 1.0 / smoother[i];
+            // smoother[i] = 1.0 / smoother[i];
         } else {
             smoother[i] = 0.0;
         }

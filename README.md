@@ -73,8 +73,6 @@ uenv image pull prgenv-gnu/24.7:v3
 uenv start prgenv-gnu/24.7:v3
 uenv view default
 
-# Remeber to compile matrix.io
-
 # In the sfem folder
 mkdir build && \
 cd build && \
