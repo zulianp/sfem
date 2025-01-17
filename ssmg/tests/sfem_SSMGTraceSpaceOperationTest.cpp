@@ -65,7 +65,7 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
                                                          sideset->lfi()->data(),
                                                          fine_sides->data()) == SFEM_SUCCESS);
 
-    std::cout << "fine_sides: " << fine_sides->extent(0) << " x " << fine_sides->extent(1) << "\n";
+    // std::cout << "fine_sides: " << fine_sides->extent(0) << " x " << fine_sides->extent(1) << "\n";
 
     SFEM_TEST_ASSERT(ssquad4_prolongate(fine_sides->extent(1),                        // nelements,
                                         coarse_ssmesh.level(),                        // rom_level
@@ -78,7 +78,7 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
                                         coarse_x->data(),
                                         fine_x->data()) == SFEM_SUCCESS);
 
-#if 1
+#if 0
     sfem::create_directory(name.c_str());
     sfem::create_directory((name + "/fields").c_str());
 
@@ -90,7 +90,7 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     out.set_output_dir((name + "/fields").c_str());
     SFEM_TEST_ASSERT(out.write("u", fine_x->data()) == SFEM_SUCCESS);
 #endif
-    
+
     return SFEM_TEST_SUCCESS;
 }
 
