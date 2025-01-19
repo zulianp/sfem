@@ -38,6 +38,13 @@ int main(int argc, char *argv[]) {
     {
         auto st = side_table->data();
         auto si = side_ids->data();
+
+#ifndef NDEBUG
+        for (ptrdiff_t e = 0; e < n_elements * 4; e++) {
+            si[e] = -1;
+        }
+#endif
+
         for (ptrdiff_t e = 0; e < n_elements; e++) {
             for (int s = 0; s < nsxe; s++) {
                 const ptrdiff_t     offset = e * nsxe + s;
@@ -46,14 +53,20 @@ int main(int argc, char *argv[]) {
                     // Create new id
                     si[offset] = id_offset + n_unique_sides;
                     n_unique_sides++;
-                } else if (neigh != -1) {
+                }  else if (neigh != -1 && e > neigh) {
                     // Search id in neighbor
+                    bool found = false;
                     for (int sneigh = 0; sneigh < nsxe; sneigh++) {
                         const ptrdiff_t offset_neigh = neigh * nsxe + sneigh;
                         if (st[offset_neigh] == e) {
-                            si[offset_neigh] = si[offset];
+                            assert(si[offset_neigh] != -1);
+                            si[offset] = si[offset_neigh];
+                            found = true;
+                            break;
                         }
                     }
+
+                    assert(found);
                 }
             }
         }
@@ -109,6 +122,11 @@ int main(int argc, char *argv[]) {
                 ii[11] = si[e * nsxe + 1];
                 ii[12] = si[e * nsxe + 2];
                 ii[13] = si[e * nsxe + 3];
+
+                assert(ii[10] >= n_nodes + n_edges);
+                assert(ii[11] >= n_nodes + n_edges);
+                assert(ii[12] >= n_nodes + n_edges);
+                assert(ii[13] >= n_nodes + n_edges);
             }
 
             // Volume
@@ -164,10 +182,16 @@ int main(int argc, char *argv[]) {
                 ii[11] = tet15_elems[11][e];
                 ii[12] = tet15_elems[12][e];
                 ii[13] = tet15_elems[13][e];
+
+                assert(ii[10] >= n_nodes + n_edges);
+                assert(ii[11] >= n_nodes + n_edges);
+                assert(ii[12] >= n_nodes + n_edges);
+                assert(ii[13] >= n_nodes + n_edges);
             }
 
             // Volume
             ii[14] = tet15_elems[14][e];
+            assert(ii[14] >= n_nodes + n_edges + n_unique_sides);
 
             // Compute points
             for (int d = 0; d < 3; d++) {
@@ -182,7 +206,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
+    
     // Output
     sfem::create_directory(output_folder);
 
