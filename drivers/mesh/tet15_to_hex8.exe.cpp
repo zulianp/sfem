@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 
         for (int sub_e = 0; sub_e < 4; sub_e++) {
             for (int node = 0; node < 8; node++) {
-                elems[node][ e * 4 + sub_e] = hex8[sub_e][node];
+                elems[node][e * 4 + sub_e] = hex8[sub_e][node];
             }
         }
     }

@@ -1447,8 +1447,13 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply");
 
         for (auto &c : impl_->conditions) {
+            if(c.values) {
+                constraint_nodes_to_values_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x);
+            } else {
             constraint_nodes_to_value_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x);
+            }
         }
 
         return SFEM_SUCCESS;
