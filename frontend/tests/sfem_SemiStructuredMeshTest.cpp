@@ -56,7 +56,7 @@ int test_derefine_cube() {
 
 int test_derefine_mesh() {
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto     m    = sfem::Mesh::create_from_file(comm, "pinion");
+    auto     m    = sfem::Mesh::create_from_file(comm, "impeller");
     return test_derefine(m, "test_derefine_mesh");
 }
 
@@ -201,7 +201,7 @@ int test_restrict_cube() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_derefine_cube);
-    // SFEM_RUN_TEST(test_derefine_mesh);
+    SFEM_RUN_TEST(test_derefine_mesh);
     SFEM_RUN_TEST(test_prolongation_cube);
     SFEM_RUN_TEST(test_restrict_cube);
     SFEM_UNIT_TEST_FINALIZE();
