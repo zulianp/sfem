@@ -3261,8 +3261,11 @@ namespace sfem {
         for (int np = 0; np < n_files; np++) {
             printf("%s\n", files[np].c_str());
 
+            char path[1024 * 10];
+            sprintf(path, "%s/i%d.raw", folder, np);
+
             idx_t *idx = 0;
-            err |= array_create_from_file(comm, files[np].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm, path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }
