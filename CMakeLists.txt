@@ -225,14 +225,16 @@ endif()
 ######################################################
 # Executables
 
-file(GLOB C_DRIVERS CONFIGURE_DEPENDS "drivers/*.c")
-file(GLOB CPP_DRIVERS CONFIGURE_DEPENDS "drivers/*.cpp")
-# file(GLOB CPP_EXAMPLES CONFIGURE_DEPENDS "examples/*.cpp")
-file(GLOB C_EXAMPLES CONFIGURE_DEPENDS "examples/*.c")
+list(APPEND SFEM_DRIVER_MODULES . mesh examples) 
 
-set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
+foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
+    file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
+    file(GLOB MODULE_CPP_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.cpp")
+    list(APPEND CPP_DRIVERS ${MODULE_CPP_DRIVERS})
+    list(APPEND C_DRIVERS ${MODULE_C_DRIVERS})
+endforeach()
 
-# list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
 list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
 

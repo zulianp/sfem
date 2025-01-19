@@ -14,6 +14,9 @@
 #endif
 #endif
 
+// Consider these:
+// HXTSort: https://git.immc.ucl.ac.be/hextreme/HXTSort/-/tree/master?ref_type=heads
+
 extern "C" void sort_idx(idx_t *arr, idx_t size) {
     std::sort(arr,  arr + size);
 }

@@ -82,6 +82,7 @@ namespace sfem {
 
         std::shared_ptr<CRSGraph> node_to_node_graph();
         std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
+        std::shared_ptr<Buffer<element_idx_t>> half_face_table();
         std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
 
         std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;

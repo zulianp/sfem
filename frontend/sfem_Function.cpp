@@ -245,6 +245,16 @@ namespace sfem {
         return impl_->crs_graph;
     }
 
+    std::shared_ptr<Buffer<element_idx_t>> Mesh::half_face_table()
+    {
+        // FIXME it should be allocated outisde
+        element_idx_t * table{nullptr};
+        create_element_adj_table(n_elements(), n_nodes(), element_type(),elements()->data(), &table);
+
+        int nsxe = elem_num_sides(element_type());
+        return manage_host_buffer<element_idx_t>(n_elements() * nsxe, table);
+    }
+
     std::shared_ptr<CRSGraph> Mesh::create_node_to_node_graph(const enum ElemType element_type) {
         auto mesh = &impl_->mesh;
         if (mesh->element_type == element_type) {
