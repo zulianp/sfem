@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
             }
 
             for (int d = 0; d < 3; d++) {
-                tet15_pts[d][ii[14]] = (tet4_pts[d][ii[0]] + tet4_pts[d][ii[1]] + tet4_pts[d][ii[2]] + +tet4_pts[d][ii[3]]) / 4;
+                tet15_pts[d][ii[14]] = (tet4_pts[d][ii[0]] + tet4_pts[d][ii[1]] + tet4_pts[d][ii[2]] + tet4_pts[d][ii[3]]) / 4;
             }
         }
     }
