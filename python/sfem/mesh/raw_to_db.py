@@ -24,7 +24,7 @@ except NameError:
     geom_t = np.float32
     idx_t = np.int32
 
-max_nodes_x_element = 27
+max_nodes_x_element = 10
 
 
 # def ssquad4_to_standard(ssref, idx, points):

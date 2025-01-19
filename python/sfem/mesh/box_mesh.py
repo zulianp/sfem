@@ -819,28 +819,25 @@ if __name__ == '__main__':
         if not os.path.exists(sideset_dir):
             os.mkdir(f'{sideset_dir}')
 
-        meta['sidesets'] = []
-        sidesets = create_sidesets(cell_type, nx, ny, nz)
-        for k, v in sidesets.items():
-            path = f'{sideset_dir}/{k}'
+        if cell_type == "HEX8":
+            meta['sidesets'] = []
+            sidesets = create_sidesets(cell_type, nx, ny, nz)
+            for k, v in sidesets.items():
+                path = f'{sideset_dir}/{k}'
 
-            if not os.path.exists(path):
-                os.mkdir(f'{path}')
+                if not os.path.exists(path):
+                    os.mkdir(f'{path}')
 
-            meta['sidesets'].append({k:f'surface/sidesets/{k}'}) 
+                meta['sidesets'].append({k:f'surface/sidesets/{k}'}) 
 
-            sideset_meta = {}
-            sideset_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
-            sideset_meta['parent'] = 'parent.raw'
-            sideset_meta['lfi'] = 'lfi.int16.raw'
+                sideset_meta = {}
+                sideset_meta['element_type'] = side_type(to_sfem_element_type(cell_type))
+                sideset_meta['parent'] = 'parent.raw'
+                sideset_meta['lfi'] = 'lfi.int16.raw'
 
-            v['parent'].tofile(f'{path}/parent.raw')
-            v['lfi'].tofile(f'{path}/lfi.int16.raw')
+                v['parent'].tofile(f'{path}/parent.raw')
+                v['lfi'].tofile(f'{path}/lfi.int16.raw')
 
-            write_meta(path, sideset_meta)
+                write_meta(path, sideset_meta)
   
-
-
-
-
     write_meta(output_folder, meta);
