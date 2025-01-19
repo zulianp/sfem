@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
                     // Create new id
                     si[offset] = id_offset + n_unique_sides;
                     n_unique_sides++;
-                }  else if (neigh != -1 && e > neigh) {
+                } else if (neigh != -1 && e > neigh) {
                     // Search id in neighbor
                     bool found = false;
                     for (int sneigh = 0; sneigh < nsxe; sneigh++) {
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
                         if (st[offset_neigh] == e) {
                             assert(si[offset_neigh] != -1);
                             si[offset] = si[offset_neigh];
-                            found = true;
+                            found      = true;
                             break;
                         }
                     }
@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    
+
     // Output
     sfem::create_directory(output_folder);
 
