@@ -6,9 +6,9 @@
 #include "sfem_hex8_mesh_graph.h"
 
 #include "hex8_inline_cpu.h"
+#include "hex8_linear_elasticity.h"
 #include "hex8_linear_elasticity_inline_cpu.h"
 #include "line_quadrature.h"
-#include "hex8_linear_elasticity.h"
 
 namespace sfem {
     class HEX8Smooth final : public Op {
@@ -26,21 +26,21 @@ namespace sfem {
             return SFEM_FAILURE;
         }
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-        	// FIXME Find out a good mesh smoothing operator
+            // FIXME Find out a good mesh smoothing operator
             return affine_hex8_linear_elasticity_apply(space->mesh_ptr()->n_elements(),
-                                     space->mesh_ptr()->n_nodes(),
-                                     space->mesh_ptr()->elements()->data(),
-                                     space->mesh_ptr()->points()->data(),
-                                     1.,
-                                     1.,
-                                     3,
-                                     &h[0],
-                                     &h[1],
-                                     &h[2],
-                                     3,
-                                     &out[0],
-                                     &out[1],
-                                     &out[2]);
+                                                       space->mesh_ptr()->n_nodes(),
+                                                       space->mesh_ptr()->elements()->data(),
+                                                       space->mesh_ptr()->points()->data(),
+                                                       1.,
+                                                       1.,
+                                                       3,
+                                                       &h[0],
+                                                       &h[1],
+                                                       &h[2],
+                                                       3,
+                                                       &out[0],
+                                                       &out[1],
+                                                       &out[2]);
         }
 
         int value(const real_t *x, real_t *const out) override {
@@ -92,9 +92,9 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
-    ptrdiff_t      n_surf_elements = 0;
-    element_idx_t *parent          = 0;
-    int16_t       *side_idx        = 0;
+    ptrdiff_t      n_surf_elements{0};
+    element_idx_t *parent{nullptr};
+    int16_t       *side_idx{nullptr};
 
     if (extract_skin_sideset(
                 m->n_elements(), m->n_nodes(), m->element_type(), m->elements()->data(), &n_surf_elements, &parent, &side_idx) !=
@@ -102,17 +102,17 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
         SFEM_ERROR("Failed extract_skin_sideset!\n");
     }
 
-    auto surface = std::make_shared<sfem::Sideset>(m->comm(),
+    auto sideset = std::make_shared<sfem::Sideset>(m->comm(),
                                                    sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent),
                                                    sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx));
 
-    auto sides = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(m->element_type())), surface->parent()->size());
+    auto sides = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(m->element_type())), sideset->parent()->size());
 
     if (extract_surface_from_sideset(m->element_type(),
                                      m->elements()->data(),
-                                     surface->parent()->size(),
-                                     surface->parent()->data(),
-                                     surface->lfi()->data(),
+                                     sideset->parent()->size(),
+                                     sideset->parent()->data(),
+                                     sideset->lfi()->data(),
                                      sides->data()) != SFEM_SUCCESS) {
         SFEM_ERROR("Failed extract_surface_from_sideset!\n");
     }
@@ -133,9 +133,9 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
         sz->data()[i] = points[2][idx[i]];
     }
 
-    sfem::DirichletConditions::Condition s0{.sideset = surface, .nodeset = nodeset, .values = sx, .component = 0};
-    sfem::DirichletConditions::Condition s1{.sideset = surface, .nodeset = nodeset, .values = sy, .component = 1};
-    sfem::DirichletConditions::Condition s2{.sideset = surface, .nodeset = nodeset, .values = sz, .component = 2};
+    sfem::DirichletConditions::Condition s0{.sideset = sideset, .nodeset = nodeset, .values = sx, .component = 0};
+    sfem::DirichletConditions::Condition s1{.sideset = sideset, .nodeset = nodeset, .values = sy, .component = 1};
+    sfem::DirichletConditions::Condition s2{.sideset = sideset, .nodeset = nodeset, .values = sz, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {s0, s1, s2}, es);
     auto f     = sfem::Function::create(fs);
