@@ -20,22 +20,13 @@ export SFEM_CONTACT_LINEARIZATIONS=10
 export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER=1
 
-# sleft=mesh/surface/sidesets_aos/left.raw 
-# # soutlet=$mesh/surface/sidesets_aos/right.raw
+# nodeset=mesh/boundary_nodes/back.int32.raw
+# export SFEM_DIRICHLET_NODESET="$nodeset,$nodeset,$nodeset" 
 
-# export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft"
-# export SFEM_DIRICHLET_VALUE="0.6,0,0"
-# export SFEM_DIRICHLET_COMPONENT="0,1,2"
-# export SFEM_CONTACT_CONDITIONS=obstacle
+sideset=mesh/surface/sidesets/back 
+export SFEM_DIRICHLET_SIDESET="$sideset,$sideset,$sideset" 
 
-# node_set=mesh/boundary_nodes/right.int32.raw
-# node_set=BC.int32.raw
-# node_set=mesh/boundary_nodes/left.int32.raw
-node_set=mesh/boundary_nodes/back.int32.raw
-
-export SFEM_DIRICHLET_NODESET="$node_set,$node_set,$node_set" 
-export SFEM_DIRICHLET_VALUE="0,0,0.6" # LEFT
-# export SFEM_DIRICHLET_VALUE="-0.7,0,0.7"  # RIGHT
+export SFEM_DIRICHLET_VALUE="0,0,0.6"
 export SFEM_DIRICHLET_COMPONENT="0,1,2"
 export SFEM_CONTACT_CONDITIONS=obstacle
 export SFEM_DAMPING=1
@@ -46,6 +37,8 @@ export SFEM_FINE_OP_TYPE=MF
 HERE=$PWD
 CASE_DIR=$1
 cd $CASE_DIR
+
+ls $sideset
 
 # export SFEM_ELEMENT_REFINE_LEVEL=`grep "refine_level" input.yaml | awk '{print $2}'`
 export SFEM_ELEMENT_REFINE_LEVEL=0

@@ -245,7 +245,7 @@ namespace sfem {
                                 const count_t *const /*rowptr*/,
                                 const idx_t *const /*colidx*/,
                                 real_t *const /*values*/) {
-            SFEM_ERROR("Called unimplemented methdo!\n");
+            SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
@@ -255,7 +255,7 @@ namespace sfem {
                                      const ptrdiff_t /*block_stride*/,
                                      real_t **const /*diag_values*/,
                                      real_t **const /*off_diag_values*/) {
-            SFEM_ERROR("Called unimplemented methdo!\n");
+            SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
@@ -264,17 +264,17 @@ namespace sfem {
                                     const idx_t *const   colidx,
                                     real_t *const        diag_values,
                                     real_t *const        off_diag_values) {
-            SFEM_ERROR("Called unimplemented methdo!\n");
+            SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
         virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
-            SFEM_ERROR("Called unimplemented methdo!\n");
+            SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
         virtual int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-            SFEM_ERROR("Called unimplemented methdo!\n");
+            SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
