@@ -102,8 +102,7 @@ namespace sfem {
         }
 
         static void error_not_found(const std::string &str) {
-            fprintf(stderr, "[Error] YAMLNoIndent: Unable to find required key \"%s\"!\n", str.c_str());
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("[Error] YAMLNoIndent: Unable to find required key \"%s\"!\n", str.c_str());
         }
 
         static void error_invalid_format(const std::string &str) {
