@@ -7,7 +7,7 @@ elem_type=HEX8
 which box_mesh.py
 which highfreq_surface.py      
 
-N=4
+N=8
 # Generate mesh with standard HEX8
 box_mesh.py mesh -x $N -y $N -z $N --cell_type=$elem_type --tx=0.5 --ty=0.5 --tz=-1.2
 
@@ -25,10 +25,21 @@ highfreq_surface.py obstacle_mesh -x 160 -y 160 --width=2 --height=2
 raw_to_db.py obstacle_mesh obs.vtk
 raw_to_db.py mesh mesh.vtk
 
-# raw_to_db.py mesh/surface/bottom bottom.vtk --coords=mesh --cell_type=quad
-# raw_to_db.py mesh/surface/top top.vtk --coords=mesh --cell_type=quad
-# raw_to_db.py mesh/surface/back back.vtk --coords=mesh --cell_type=quad
-# raw_to_db.py mesh/surface/front front.vtk --coords=mesh --cell_type=quad
+raw_to_db.py mesh/surface/bottom bottom.vtk --coords=mesh --cell_type=quad
+raw_to_db.py mesh/surface/top top.vtk --coords=mesh --cell_type=quad
+raw_to_db.py mesh/surface/back back.vtk --coords=mesh --cell_type=quad
+raw_to_db.py mesh/surface/front front.vtk --coords=mesh --cell_type=quad
+
+# mkdir -p test_sideset
+# surface_from_sideset mesh mesh/surface/sidesets/back 	test_sideset/back
+# surface_from_sideset mesh mesh/surface/sidesets/top 	test_sideset/top
+# surface_from_sideset mesh mesh/surface/sidesets/front 	test_sideset/front
+# surface_from_sideset mesh mesh/surface/sidesets/bottom 	test_sideset/bottom
+
+# raw_to_db.py test_sideset/back 	 test_back.vtk  	--coords=mesh --cell_type=quad
+# raw_to_db.py test_sideset/top 	 test_top.vtk 		--coords=mesh --cell_type=quad
+# raw_to_db.py test_sideset/front  test_front.vtk 	--coords=mesh --cell_type=quad
+# raw_to_db.py test_sideset/bottom test_bottom.vtk 	--coords=mesh --cell_type=quad
 
 skin mesh mesh/skin
 raw_to_db.py mesh/skin skin.vtk --cell_type=quad
@@ -42,11 +53,11 @@ echo "rpath: true" >> obstacle/meta.yaml
 echo "variational: true" >> obstacle/meta.yaml
 
 # To skip expensive SDF generation uncomment following line
-exit 0
+# exit 0
 
 margin=1
-hmax=0.01
-# hmax=0.02
+# hmax=0.01
+hmax=0.02
 mkdir -p obstacle/sdf
 mesh_to_sdf.py obstacle_mesh obstacle/sdf/sdf.float32.raw --hmax=$hmax --margin=$margin
 raw_to_xdmf.py obstacle/sdf/sdf.float32.raw

@@ -429,7 +429,7 @@ def create_sidesets(cell_type, nx, ny, nz):
 
             idx += 1
 
-
+    # FIXME
     return {
         "left" : {
             "parent" : parent_left,
@@ -439,23 +439,51 @@ def create_sidesets(cell_type, nx, ny, nz):
             "parent" : parent_right,
             "lfi" : lfi_right
         },
-         "bottom" : {
+         "back" : {
             "parent" : parent_bottom,
             "lfi" : lfi_bottom
         },
-         "top" : {
+         "front" : {
             "parent" : parent_top,
             "lfi" : lfi_top
         },
-         "front" : {
+         "top" : {
             "parent" : parent_front,
             "lfi" : lfi_front
         },
-         "back" : {
+         "bottom" : {
             "parent" : parent_back,
             "lfi" : lfi_back
         }
-        }
+    }
+
+
+    # return {
+    #     "left" : {
+    #         "parent" : parent_left,
+    #         "lfi" : lfi_left
+    #     },
+    #     "right" : {
+    #         "parent" : parent_right,
+    #         "lfi" : lfi_right
+    #     },
+    #      "bottom" : {
+    #         "parent" : parent_bottom,
+    #         "lfi" : lfi_bottom
+    #     },
+    #      "top" : {
+    #         "parent" : parent_top,
+    #         "lfi" : lfi_top
+    #     },
+    #      "front" : {
+    #         "parent" : parent_front,
+    #         "lfi" : lfi_front
+    #     },
+    #      "back" : {
+    #         "parent" : parent_back,
+    #         "lfi" : lfi_back
+    #     }
+    #     }
 
 def create(w, h, t, nx, ny, nz, cell_type):
     cell_type = cell_type.lower()

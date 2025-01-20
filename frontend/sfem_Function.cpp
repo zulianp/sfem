@@ -2292,8 +2292,23 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
+            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_block_diag_sym");
+
+            auto &ssm = space->semi_structured_mesh();
+            return affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
+                                                                  ssm.n_elements(),
+                                                                  ssm.interior_start(),
+                                                                  ssm.element_data(),
+                                                                  ssm.point_data(),
+                                                                  mu,
+                                                                  lambda,
+                                                                  6,
+                                                                  &values[0],
+                                                                  &values[1],
+                                                                  &values[2],
+                                                                  &values[3],
+                                                                  &values[4],
+                                                                  &values[5]);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
