@@ -25,7 +25,10 @@ out=resampled
 skinned=skinned
 sdf=sdf.float32.raw
 mesh_sorted=sorted
+mesh_sorted=/home/sriva/spz/sfem_test/impeller_tet4
+
 resample_target=$mesh_sorted
+
 
 export SFEM_INTERPOLATE=0 
 export SFEM_READ_FP32=1
