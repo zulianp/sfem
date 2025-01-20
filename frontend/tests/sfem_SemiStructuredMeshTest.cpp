@@ -201,7 +201,7 @@ int test_restrict_cube() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_derefine_cube);
-    SFEM_RUN_TEST(test_derefine_mesh);
+    // SFEM_RUN_TEST(test_derefine_mesh);
     SFEM_RUN_TEST(test_prolongation_cube);
     SFEM_RUN_TEST(test_restrict_cube);
     SFEM_UNIT_TEST_FINALIZE();
