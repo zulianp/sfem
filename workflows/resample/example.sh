@@ -24,11 +24,17 @@ export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
+
 mesh=mesh
+# mesh=impeller_tet4
+
 out=resampled
 skinned=skinned
 sdf=sdf.float32.raw
+
 mesh_sorted=sorted
+# mesh_sorted=impeller_tet4
+
 resample_target=$mesh_sorted
 
 # resample_target=$skinned

@@ -347,14 +347,14 @@ int main(int argc, char *argv[]) {
         if (mpi_rank == 0) printf(GREEN_TEXT "+ ndarray_allocate succeeded\n" RESET_TEXT);
     }
 
-    real_t *weighed_filed = calloc(mesh.nnodes, sizeof(real_t));
+    real_t *mesh_field = calloc(mesh.nnodes, sizeof(real_t));
     apply_fun_to_mesh(0,                              //
                       mesh.nelements,                 //
                       mesh.nnodes,                    //
                       (const idx_t **)mesh.elements,  //
                       (const geom_t **)mesh.points,   //
                       test_fun_b,                     //
-                      weighed_filed);                 //
+                      mesh_field);                 //
 
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};  //
     tet4_inv_resample_field_local(0,                              //
@@ -362,7 +362,7 @@ int main(int argc, char *argv[]) {
                                   mesh.nnodes,                    //
                                   (const idx_t **)mesh.elements,  //
                                   (const geom_t **)mesh.points,   //
-                                  weighed_filed,                  //
+                                  mesh_field,                  //
                                   nlocal,                         //
                                   stride,                         //
                                   origin,                         //
@@ -386,10 +386,10 @@ int main(int argc, char *argv[]) {
         printf("nglobal[2] = %ld\n", nglobal[2]);
     }
 
-    mesh_write_nodal_field(&mesh, "/home/sriva/spz/sfem_test/field.raw", SFEM_MPI_REAL_T, weighed_filed);
+    mesh_write_nodal_field(&mesh, "/home/sriva/spz/sfem_test/field.raw", SFEM_MPI_REAL_T, mesh_field);
 
     free(field);
-    free(weighed_filed);
+    free(mesh_field);
     mesh_destroy(&mesh);
 
     MPI_Finalize();
