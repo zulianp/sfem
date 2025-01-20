@@ -30,6 +30,6 @@ resample_target=$mesh_sorted
 export SFEM_INTERPOLATE=0 
 export SFEM_READ_FP32=1
 
-mpirun -n 1 mesh_to_grid --mesh_folder /home/sriva/spz/sfem_test/mesh/ --nx 100 --ny 100 --nz 100 --ox -0.88 --oy -0.88 --oz -0.88 --dx 0.0176 --dy 0.0176 --dz 0.0176 --output_path /home/sriva/spz/sfem_test/text.raw
+mpirun -n 1 mesh_to_grid --mesh_folder $resample_target --nx 100 --ny 100 --nz 100 --ox -0.88 --oy -0.88 --oz -0.88 --dx 0.0176 --dy 0.0176 --dz 0.0176 --output_path /home/sriva/spz/sfem_test/text.raw
 
 raw_to_db.py $resample_target /home/sriva/spz/sfem_test/out.vtk --point_data=/home/sriva/spz/sfem_test/field.raw  --point_data_type=float32
