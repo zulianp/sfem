@@ -245,11 +245,10 @@ namespace sfem {
         return impl_->crs_graph;
     }
 
-    std::shared_ptr<Buffer<element_idx_t>> Mesh::half_face_table()
-    {
+    std::shared_ptr<Buffer<element_idx_t>> Mesh::half_face_table() {
         // FIXME it should be allocated outisde
-        element_idx_t * table{nullptr};
-        create_element_adj_table(n_elements(), n_nodes(), element_type(),elements()->data(), &table);
+        element_idx_t *table{nullptr};
+        create_element_adj_table(n_elements(), n_nodes(), element_type(), elements()->data(), &table);
 
         int nsxe = elem_num_sides(element_type());
         return manage_host_buffer<element_idx_t>(n_elements() * nsxe, table);
@@ -1169,6 +1168,7 @@ namespace sfem {
         impl_->conditions.push_back(cdc);
     }
 
+    // FIXME check for duplicate sidesets read from disk!
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_env");
 
@@ -1181,6 +1181,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_DIRICHLET_NODESET, );
         SFEM_READ_ENV(SFEM_DIRICHLET_VALUE, );
         SFEM_READ_ENV(SFEM_DIRICHLET_COMPONENT, );
+        SFEM_READ_ENV(SFEM_DIRICHLET_SIDESET, );
 
         assert(!SFEM_DIRICHLET_NODESET || !SFEM_DIRICHLET_SIDESET);
 
@@ -1226,6 +1227,7 @@ namespace sfem {
                     cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
                     cdc.sideset = Sideset::create_from_file(comm, pch);
+                    cdc.nodeset = create_nodeset_from_sideset(space, cdc.sideset);
                 }
 
                 conds.push_back(cdc);
@@ -1447,12 +1449,12 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply");
 
         for (auto &c : impl_->conditions) {
-            if(c.values) {
+            if (c.values) {
                 constraint_nodes_to_values_vec(
                         c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x);
             } else {
-            constraint_nodes_to_value_vec(
-                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x);
+                constraint_nodes_to_value_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x);
             }
         }
 
@@ -2219,7 +2221,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::derefine_op");
 
             assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
-            
+
             if (space->has_semi_structured_mesh()) {
                 auto ret                      = std::make_shared<SemiStructuredLinearElasticity>(space);
                 ret->element_type             = element_type;
@@ -2287,6 +2289,11 @@ namespace sfem {
                                                         &out[0],
                                                         &out[1],
                                                         &out[2]);
+        }
+
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
+            SFEM_ERROR("Called unimplemented method!\n");
+            return SFEM_FAILURE;
         }
 
         int gradient(const real_t *const x, real_t *const out) override {

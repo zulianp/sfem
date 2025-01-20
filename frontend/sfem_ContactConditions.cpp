@@ -386,7 +386,12 @@ namespace sfem {
 
             collect_points();
 
-            auto st           = shell_type(side_type(space->element_type()));
+            ElemType element_type = space->element_type();
+            if(space->has_semi_structured_mesh()) {
+                element_type = macro_base_elem(element_type);
+            }
+
+            auto st           = shell_type(side_type(element_type));
             auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->spatial_dimension(),
                                                        st,
                                                        sides->extent(1),
@@ -765,7 +770,13 @@ namespace sfem {
         auto sdf = impl_->sdf;
 
         if (impl_->variational) {
-            auto st = shell_type(side_type(impl_->space->element_type()));
+            ElemType element_type = space()->element_type();
+            if(space()->has_semi_structured_mesh()) {
+                element_type = macro_base_elem(element_type);
+            }
+
+            auto st = shell_type(side_type(element_type));
+
             return resample_gap_normals(
                     // Mesh
                     st,
@@ -831,7 +842,13 @@ namespace sfem {
 
         int err = 0;
         if (impl_->variational) {
-            auto st = shell_type(side_type(impl_->space->element_type()));
+            ElemType element_type = space()->element_type();
+            if(space()->has_semi_structured_mesh()) {
+                element_type = macro_base_elem(element_type);
+            }
+
+            auto st = shell_type(side_type(element_type));
+
             err     = resample_gap_value(
                     // Mesh
                     st,
