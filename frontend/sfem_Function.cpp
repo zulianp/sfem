@@ -2151,7 +2151,7 @@ namespace sfem {
         enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
-        bool   use_affine_approximation{false};
+        bool   use_affine_approximation{true}; // FIXME the iso-parametric version has probably a bug
         long   calls{0};
         double total_time{0};
 
