@@ -30,10 +30,10 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 // int check_string_in_args(int argc, char* argv[], const char* target);
 
 // Function definition
-int check_string_in_args(const int argc, const char* argv[], const char* target) {
+int check_string_in_args(const int argc, const char* argv[], const char* target, int print_message) {
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], target) == 0) {
-            printf("Found %s in argv[%d]\n", target, i);
+            if (print_message) printf("Found %s in argv[%d]\n", target, i);
             return 1;
         }
     }
@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
     const char* folder      = argv[11];
     const char* output_path = argv[12];
 
-    if (check_string_in_args(argc, (const char**)argv, "TET4")) {
+    if (check_string_in_args(argc, (const char**)argv, "TET4", mpi_rank == 0)) {
         info.element_type = TET4;
-    } else if (check_string_in_args(argc, (const char**)argv, "TET10")) {
+    } else if (check_string_in_args(argc, (const char**)argv, "TET10", mpi_rank == 0)) {
         info.element_type = TET10;
     } else {
         fprintf(stderr, "Error: Invalid element type\n\n");
@@ -107,11 +107,11 @@ int main(int argc, char* argv[]) {
 
 #ifdef SFEM_ENABLE_CUDA
 
-    if (check_string_in_args(argc, (const char**)argv, "CUDA")) {
+    if (check_string_in_args(argc, (const char**)argv, "CUDA", mpi_rank == 0)) {
         info.use_accelerator = SFEM_ACCELERATOR_TYPE_CUDA;
         if (mpi_rank == 0) printf("info.use_accelerator = 1\n");
 
-    } else if (check_string_in_args(argc, (const char**)argv, "CPU")) {
+    } else if (check_string_in_args(argc, (const char**)argv, "CPU", mpi_rank == 0)) {
         info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
         if (mpi_rank == 0) printf("info.use_accelerator = 0\n");
 
@@ -351,18 +351,23 @@ int main(int argc, char* argv[]) {
         int mpi_size;
         MPI_Comm_size(comm, &mpi_size);
 
-        int* elements_v = malloc(mpi_size * sizeof(int));
+        // int* elements_v = malloc(mpi_size * sizeof(int));
 
-        MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
+        // MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
+
+        // int tot_nelements = 0;
+        // if (mpi_rank == 0) {
+        //     for (int i = 0; i < mpi_size; i++) {
+        //         tot_nelements += elements_v[i];
+        //     }
+        // }
+        // free(elements_v);
 
         int tot_nelements = 0;
-        if (mpi_rank == 0) {
-            for (int i = 0; i < mpi_size; i++) {
-                tot_nelements += elements_v[i];
-            }
-        }
+        MPI_Reduce(&mesh.nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
-        free(elements_v);
+        int tot_nnodes = 0;
+        MPI_Reduce(&mesh.n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
         double* flops_v = NULL;
         flops_v         = malloc(mpi_size * sizeof(double));
@@ -386,25 +391,62 @@ int main(int argc, char* argv[]) {
         MPI_Barrier(MPI_COMM_WORLD);
 
         if (!mpi_rank) {
-            const int    nelements       = mesh.nelements;
-            const double elements_second = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            // const int nelements    = tot_nelements;
+            // const int nnodes       = tot_nnodes;
+            const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
+
+            const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
+            const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
 
             printf("\n");
             printf("===========================================\n");
             printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
 
-            printf("Rank: [%d]  Nr of elements  %d\n",                    //
-                   mpi_rank,                                              //
-                   nelements * mpi_size);                                 //
-            printf("Rank: [%d]  Resample        %g (seconds)\n",          //
-                   mpi_rank,                                              //
-                   resample_tock - resample_tick);                        //
+            printf("Rank: [%d]  Nr of elements  %d\n",  //
+                   mpi_rank,                            //
+                   tot_nelements);                      //
+
+            printf("Rank: [%d]  Nr of nodes     %d\n",  //
+                   mpi_rank,                            //
+                   tot_nnodes);                         //
+
+            printf("Rank: [%d]  Nr of point_struc %d\n",  //
+                   mpi_rank,                              //
+                   npoint_struc);                         //
+
+            printf("Rank: [%d]  Resample        %g (seconds)\n",  //
+                   mpi_rank,                                      //
+                   resample_tock - resample_tick);                //
+
             printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
                    mpi_rank,                                              //
                    elements_second);                                      //
-            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",           //
-                   mpi_rank,                                              //
-                   tot_flops);                                            //
+
+            printf("Rank: [%d]  Throughput      %e (nodes/second)\n",  //
+                   mpi_rank,                                           //
+                   nodes_second);                                      //
+
+            printf("Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
+                   mpi_rank,                                                 //
+                   nodes_struc_second);                                      //
+
+            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
+                   mpi_rank,                                     //
+                   tot_flops);                                   //
+
+            printf("<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
+                   "nodes_struc_second\n");
+            printf("<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g\n",  //
+                   mpi_rank,                                                         //
+                   mpi_size,                                                         //
+                   tot_nelements,                                                    //
+                   tot_nnodes,                                                       //
+                   npoint_struc,                                                     //
+                   (resample_tock - resample_tick),                                    //
+                   elements_second,                                                  //
+                   nodes_second,                                                     //
+                   nodes_struc_second);                                              //
             printf("===========================================\n");
 
             printf("\n");
