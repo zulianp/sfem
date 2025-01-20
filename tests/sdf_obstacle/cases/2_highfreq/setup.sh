@@ -7,8 +7,19 @@ elem_type=HEX8
 which box_mesh.py
 which highfreq_surface.py      
 
-N=60
+N=4
+# Generate mesh with standard HEX8
 box_mesh.py mesh -x $N -y $N -z $N --cell_type=$elem_type --tx=0.5 --ty=0.5 --tz=-1.2
+
+# Generate the mesh by converting tet4 to hex8
+# box_mesh.py mesh_tet4 -x $N -y $N -z $N --cell_type=TET4 --tx=0.5 --ty=0.5 --tz=-1.2
+# tet4_to_tet15 mesh_tet4 mesh_tet15
+# tet15_to_hex8 mesh_tet15 mesh
+# mv mesh_tet15/x0.raw mesh/x.raw
+# mv mesh_tet15/x1.raw mesh/y.raw
+# mv mesh_tet15/x2.raw mesh/z.raw
+# TODO remap sidesets
+
 highfreq_surface.py obstacle_mesh -x 160 -y 160 --width=2 --height=2
 
 raw_to_db.py obstacle_mesh obs.vtk
@@ -31,7 +42,7 @@ echo "rpath: true" >> obstacle/meta.yaml
 echo "variational: true" >> obstacle/meta.yaml
 
 # To skip expensive SDF generation uncomment following line
-# exit 0
+exit 0
 
 margin=1
 hmax=0.01
