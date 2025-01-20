@@ -32,29 +32,39 @@ static void print_matrix(int r, int c, const scalar_t *const m) {
 }
 
 static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const scalar_t determinant, const scalar_t h,
-                                       scalar_t *const SFEM_RESTRICT sub_adjugate,
-                                       scalar_t *const SFEM_RESTRICT sub_determinant) {
-    const scalar_t x0 = POW2(h);
-    sub_adjugate[0] = adjugate[0] * x0;
-    sub_adjugate[1] = adjugate[1] * x0;
-    sub_adjugate[2] = adjugate[2] * x0;
-    sub_adjugate[3] = adjugate[3] * x0;
-    sub_adjugate[4] = adjugate[4] * x0;
-    sub_adjugate[5] = adjugate[5] * x0;
-    sub_adjugate[6] = adjugate[6] * x0;
-    sub_adjugate[7] = adjugate[7] * x0;
-    sub_adjugate[8] = adjugate[8] * x0;
+                                       const scalar_t                      determinant,
+                                       const scalar_t                      h,
+                                       scalar_t *const SFEM_RESTRICT       sub_adjugate,
+                                       scalar_t *const SFEM_RESTRICT       sub_determinant) {
+    const scalar_t x0  = POW2(h);
+    sub_adjugate[0]    = adjugate[0] * x0;
+    sub_adjugate[1]    = adjugate[1] * x0;
+    sub_adjugate[2]    = adjugate[2] * x0;
+    sub_adjugate[3]    = adjugate[3] * x0;
+    sub_adjugate[4]    = adjugate[4] * x0;
+    sub_adjugate[5]    = adjugate[5] * x0;
+    sub_adjugate[6]    = adjugate[6] * x0;
+    sub_adjugate[7]    = adjugate[7] * x0;
+    sub_adjugate[8]    = adjugate[8] * x0;
     sub_determinant[0] = determinant * (POW3(h));
 }
 
 // FIXME there is probably a bug in here!
-int sshex8_linear_elasticity_apply(
-        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
-        const real_t lambda, const ptrdiff_t u_stride, const real_t *const ux,
-        const real_t *const uy, const real_t *const uz, const ptrdiff_t out_stride,
-        real_t *const outx, real_t *const outy, real_t *const outz) {
+int sshex8_linear_elasticity_apply(const int                    level,
+                                   const ptrdiff_t              nelements,
+                                   const ptrdiff_t              nnodes,
+                                   idx_t **const SFEM_RESTRICT  elements,
+                                   geom_t **const SFEM_RESTRICT points,
+                                   const real_t                 mu,
+                                   const real_t                 lambda,
+                                   const ptrdiff_t              u_stride,
+                                   const real_t *const          ux,
+                                   const real_t *const          uy,
+                                   const real_t *const          uz,
+                                   const ptrdiff_t              out_stride,
+                                   real_t *const                outx,
+                                   real_t *const                outy,
+                                   real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -74,31 +84,31 @@ int sshex8_linear_elasticity_apply(
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = line_q3_n;
-    const scalar_t *qx = line_q3_x;
-    const scalar_t *qw = line_q3_w;
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
-        qx = line_q2_x;
-        qw = line_q2_w;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
-        qx = line_q6_x;
-        qw = line_q6_w;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
     }
 
-    int Lm1 = level - 1;
+    int Lm1  = level - 1;
     int Lm13 = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
         // Allocation per thread
-        scalar_t *eu[3];
+        scalar_t      *eu[3];
         accumulator_t *v[3];
 
         for (int d = 0; d < 3; d++) {
             eu[d] = malloc(nxe * sizeof(scalar_t));
-            v[d] = malloc(nxe * sizeof(accumulator_t));
+            v[d]  = malloc(nxe * sizeof(accumulator_t));
         }
 
         idx_t *ev = malloc(nxe * sizeof(idx_t));
@@ -193,23 +203,12 @@ int sshex8_linear_elasticity_apply(
                                     // 2) Evaluate Adjugate
                                     scalar_t adjugate[9];
                                     scalar_t jacobian_determinant;
-                                    hex8_adjugate_and_det(x,
-                                                          y,
-                                                          z,
-                                                          qx[kx],
-                                                          qx[ky],
-                                                          qx[kz],
-                                                          adjugate,
-                                                          &jacobian_determinant);
+                                    hex8_adjugate_and_det(x, y, z, qx[kx], qx[ky], qx[kz], adjugate, &jacobian_determinant);
 
                                     // 3) Transform to sub-FFF
                                     scalar_t sub_adjugate[9];
                                     scalar_t sub_determinant;
-                                    hex8_sub_adj_0(adjugate,
-                                                   jacobian_determinant,
-                                                   h,
-                                                   sub_adjugate,
-                                                   &sub_determinant);
+                                    hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
 
                                     assert(sub_determinant == sub_determinant);
                                     assert(sub_determinant != 0);
@@ -286,29 +285,38 @@ int sshex8_linear_elasticity_apply(
 
 // ---------------
 
-int affine_sshex8_linear_elasticity_apply(
-        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
-        const real_t lambda, const ptrdiff_t u_stride, const real_t *const ux,
-        const real_t *const uy, const real_t *const uz, const ptrdiff_t out_stride,
-        real_t *const outx, real_t *const outy, real_t *const outz) {
+int affine_sshex8_linear_elasticity_apply(const int                    level,
+                                          const ptrdiff_t              nelements,
+                                          const ptrdiff_t              nnodes,
+                                          idx_t **const SFEM_RESTRICT  elements,
+                                          geom_t **const SFEM_RESTRICT points,
+                                          const real_t                 mu,
+                                          const real_t                 lambda,
+                                          const ptrdiff_t              u_stride,
+                                          const real_t *const          ux,
+                                          const real_t *const          uy,
+                                          const real_t *const          uz,
+                                          const ptrdiff_t              out_stride,
+                                          real_t *const                outx,
+                                          real_t *const                outy,
+                                          real_t *const                outz) {
 #define SSHEX8_USE_MV  // assemblying the elemental matrix is much faster
 #ifndef SSHEX8_USE_MV
     int SFEM_HEX8_QUADRATURE_ORDER = 1;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
     // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
 
-    int n_qp = line_q3_n;
-    const scalar_t *qx = line_q3_x;
-    const scalar_t *qw = line_q3_w;
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
     if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
         n_qp = line_q2_n;
-        qx = line_q2_x;
-        qw = line_q2_w;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
     } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
         n_qp = line_q6_n;
-        qx = line_q6_x;
-        qw = line_q6_w;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
     }
 #endif
 
@@ -326,18 +334,18 @@ int affine_sshex8_linear_elasticity_apply(
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int Lm1 = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
+    int       Lm1                            = level - 1;
+    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
         // Allocation per thread
-        scalar_t *eu[3];
+        scalar_t      *eu[3];
         accumulator_t *v[3];
 
         for (int d = 0; d < 3; d++) {
             eu[d] = malloc(nxe * sizeof(scalar_t));
-            v[d] = malloc(nxe * sizeof(accumulator_t));
+            v[d]  = malloc(nxe * sizeof(accumulator_t));
         }
 
         idx_t *ev = malloc(nxe * sizeof(idx_t));
@@ -348,9 +356,9 @@ int affine_sshex8_linear_elasticity_apply(
 
         scalar_t m_adjugate[9], adjugate[9];
 
-        scalar_t element_u[3][8];
+        scalar_t      element_u[3][8];
         accumulator_t element_out[3][8];
-        scalar_t element_matrix[(3 * 8) * (3 * 8)];
+        scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
@@ -398,8 +406,7 @@ int affine_sshex8_linear_elasticity_apply(
             // print_matrix(8*3, 8*3, element_matrix);
 
 #ifdef SSHEX8_USE_MV
-            hex8_linear_elasticity_matrix(
-                    mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+            hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 #endif
 
             // Iterate over sub-elements
@@ -529,13 +536,16 @@ int affine_sshex8_linear_elasticity_apply(
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_elasticity_bsr(const int level, const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes, idx_t **const SFEM_RESTRICT elements,
-                                       geom_t **const SFEM_RESTRICT points, const real_t mu,
-                                       const real_t lambda,
-                                       const count_t *const SFEM_RESTRICT rowptr,
-                                       const idx_t *const SFEM_RESTRICT colidx,
-                                       real_t *const SFEM_RESTRICT values) {
+int affine_sshex8_elasticity_bsr(const int                          level,
+                                 const ptrdiff_t                    nelements,
+                                 const ptrdiff_t                    nnodes,
+                                 idx_t **const SFEM_RESTRICT        elements,
+                                 geom_t **const SFEM_RESTRICT       points,
+                                 const real_t                       mu,
+                                 const real_t                       lambda,
+                                 const count_t *const SFEM_RESTRICT rowptr,
+                                 const idx_t *const SFEM_RESTRICT   colidx,
+                                 real_t *const SFEM_RESTRICT        values) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -550,8 +560,8 @@ int affine_sshex8_elasticity_bsr(const int level, const ptrdiff_t nelements,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int Lm1 = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
+    int       Lm1                            = level - 1;
+    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -591,8 +601,7 @@ int affine_sshex8_elasticity_bsr(const int level, const ptrdiff_t nelements,
             scalar_t sub_determinant;
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
 
-            hex8_linear_elasticity_matrix(
-                    mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+            hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
@@ -623,25 +632,34 @@ int affine_sshex8_elasticity_bsr(const int level, const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_elasticity_crs_sym(
-        const int level, const ptrdiff_t nelements, const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements, geom_t **const SFEM_RESTRICT points, const real_t mu,
-        const real_t lambda, const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        // Output in SoA format (6)
-        real_t **const SFEM_RESTRICT block_diag, real_t **const SFEM_RESTRICT block_offdiag) {
+int affine_sshex8_elasticity_crs_sym(const int                          level,
+                                     const ptrdiff_t                    nelements,
+                                     const ptrdiff_t                    nnodes,
+                                     idx_t **const SFEM_RESTRICT        elements,
+                                     geom_t **const SFEM_RESTRICT       points,
+                                     const real_t                       mu,
+                                     const real_t                       lambda,
+                                     const count_t *const SFEM_RESTRICT rowptr,
+                                     const idx_t *const SFEM_RESTRICT   colidx,
+                                     // Output in SoA format (6)
+                                     real_t **const SFEM_RESTRICT block_diag,
+                                     real_t **const SFEM_RESTRICT block_offdiag) {
     // TODO Implement
     assert(0);
     return SFEM_FAILURE;
 }
 
-int affine_sshex8_linear_elasticity_diag(const int level, const ptrdiff_t nelements,
-                                               const ptrdiff_t nnodes,
-                                               idx_t **const SFEM_RESTRICT elements,
-                                               geom_t **const SFEM_RESTRICT points, const real_t mu,
-                                               const real_t lambda, const ptrdiff_t out_stride,
-                                               real_t *const outx, real_t *const outy,
-                                               real_t *const outz) {
+int affine_sshex8_linear_elasticity_diag(const int                    level,
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         const ptrdiff_t              out_stride,
+                                         real_t *const                outx,
+                                         real_t *const                outy,
+                                         real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -656,8 +674,8 @@ int affine_sshex8_linear_elasticity_diag(const int level, const ptrdiff_t neleme
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int Lm1 = level - 1;
-    int Lm13 = Lm1 * Lm1 * Lm1;
+    int       Lm1                            = level - 1;
+    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -757,6 +775,156 @@ int affine_sshex8_linear_elasticity_diag(const int level, const ptrdiff_t neleme
         for (int d = 0; d < 3; d++) {
             free(v[d]);
         }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_linear_elasticity_block_diag_sym(const int                    level,
+                                                   const ptrdiff_t              nelements,
+                                                   const ptrdiff_t              nnodes,
+                                                   idx_t **const SFEM_RESTRICT  elements,
+                                                   geom_t **const SFEM_RESTRICT points,
+                                                   const real_t                 mu,
+                                                   const real_t                 lambda,
+                                                   const ptrdiff_t              out_stride,
+                                                   real_t *const                out0,
+                                                   real_t *const                out1,
+                                                   real_t *const                out2,
+                                                   real_t *const                out3,
+                                                   real_t *const                out4,
+                                                   real_t *const                out5) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
+
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
+    }
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                sshex8_lidx(level, 0, 0, 0),
+                                                sshex8_lidx(level, level, 0, 0),
+                                                sshex8_lidx(level, level, level, 0),
+                                                sshex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                sshex8_lidx(level, 0, 0, level),
+                                                sshex8_lidx(level, level, 0, level),
+                                                sshex8_lidx(level, level, level, level),
+                                                sshex8_lidx(level, 0, level, level)};
+    int       Lm1                            = level - 1;
+    int       Lm13                           = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            {
+                // 2) Evaluate Adjugate
+                scalar_t adjugate[9];
+                scalar_t jacobian_determinant;
+                hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
+
+                // 3) Transform to sub-FFF
+                hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+            }
+
+            accumulator_t blocks[8][6];
+
+            // Assemble the diagonal part of the matrix
+            for (int edof_i = 0; edof_i < 8; edof_i++) {
+                for (int k = 0; k < 6; k++) {
+                    blocks[edof_i][k] = 0;
+                }
+
+                for (int zi = 0; zi < n_qp; zi++) {
+                    for (int yi = 0; yi < n_qp; yi++) {
+                        for (int xi = 0; xi < n_qp; xi++) {
+                            scalar_t test_grad[3];
+                            hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], test_grad);
+                            linear_elasticity_matrix_sym(mu,
+                                                         lambda,
+                                                         sub_adjugate,
+                                                         sub_determinant,
+                                                         test_grad,
+                                                         test_grad,
+                                                         qw[xi] * qw[yi] * qw[zi],
+                                                         blocks[edof_i]);
+                        }
+                    }
+                }
+            }
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      sshex8_lidx(level, xi, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                      sshex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      sshex8_lidx(level, xi, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        for (int edof_i = 0; edof_i < 8; edof_i++) {
+                            const ptrdiff_t v = ev[lev[edof_i]];
+                            // local to global
+                            out0[v * out_stride] += blocks[edof_i][0];
+                            out1[v * out_stride] += blocks[edof_i][1];
+                            out2[v * out_stride] += blocks[edof_i][2];
+                            out3[v * out_stride] += blocks[edof_i][3];
+                            out4[v * out_stride] += blocks[edof_i][4];
+                            out5[v * out_stride] += blocks[edof_i][5];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
     }
 
     return SFEM_SUCCESS;

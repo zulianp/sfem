@@ -651,7 +651,12 @@ namespace sfem {
 
         int err = 0;
         if (impl_->variational) {
-            auto st = shell_type(side_type(impl_->space->element_type()));
+            ElemType element_type = impl_->space->element_type();
+            if(impl_->space->has_semi_structured_mesh()) {
+                element_type = macro_base_elem(element_type);
+            }
+
+            auto st = shell_type(side_type(element_type));
             err     = resample_gap(
                     // Mesh
                     st,
