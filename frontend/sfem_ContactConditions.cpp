@@ -489,6 +489,7 @@ namespace sfem {
             remap_elements_to_contiguous_index(
                     this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
             this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
+            this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
         }
 
         void read_surface(const std::string &path_surface, Input &in) {
@@ -607,7 +608,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        if (in_surface->key_exists("side_idx")) {  // Detect sideset file!
+        if (in_surface->key_exists("lfi")) {  // Detect sideset file!
             cc->impl_->read_sideset(path_surface, *in_surface);
         } else {
             cc->impl_->read_surface(path_surface, *in_surface);
