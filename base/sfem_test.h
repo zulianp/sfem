@@ -8,6 +8,10 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_base.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,8 +20,27 @@ extern "C" {
 #define SFEM_TEST_FAILURE 1
 #define SFEM_TEST_SKIPPED 2
 
+static void sfem_print_test_info() {
+    printf("=======================\n");
+    printf("SFEM_TESTING Info:\n");
+#ifdef _OPENMP
+#pragma omp parallel
+    {
+        size_t start, len;
+        int    id  = omp_get_thread_num();
+        int    num = omp_get_num_threads();
+
+        if (!id) {
+            printf("OMP_NUM_THREADS=%d\n", num);
+        }
+    }
+#endif
+    printf("=======================\n");
+}
+
 #define SFEM_UNIT_TEST_INIT(argc, argv) \
     MPI_Init(&argc, &argv);             \
+    sfem_print_test_info();             \
     int err = 0;
 #define SFEM_RUN_TEST(test_)                                                                                    \
     do {                                                                                                        \
