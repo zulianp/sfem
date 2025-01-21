@@ -308,6 +308,7 @@ namespace sfem {
 
                     if (dot_pAp < 0) {
                         fprintf(stderr, "[Warning][MPRGP] Detected negative curvature\n");
+                        return SFEM_FAILURE;
                     }
 
                     alpha_cg = this->blas.dot(n_dofs, g, p) / dot_pAp;

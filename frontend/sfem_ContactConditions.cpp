@@ -275,6 +275,8 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
 
+        std::shared_ptr<Buffer<idx_t *>> ss_sides;
+
         std::shared_ptr<Buffer<real_t>> gap_xnormal;
         std::shared_ptr<Buffer<real_t>> gap_ynormal;
         std::shared_ptr<Buffer<real_t>> gap_znormal;
@@ -387,7 +389,7 @@ namespace sfem {
             collect_points();
 
             ElemType element_type = space->element_type();
-            if(space->has_semi_structured_mesh()) {
+            if (space->has_semi_structured_mesh()) {
                 element_type = macro_base_elem(element_type);
             }
 
@@ -455,6 +457,8 @@ namespace sfem {
             if (space->has_semi_structured_mesh()) {
                 auto &&ssmesh = space->semi_structured_mesh();
 
+                // FIXME this extra surface mesh should be removed during optimization
+
                 const int nnxs = 4;
                 const int nexs = ssmesh.level() * ssmesh.level();
                 this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
@@ -464,6 +468,18 @@ namespace sfem {
                                                                    ss->parent()->data(),
                                                                    ss->lfi()->data(),
                                                                    this->sides->data()) != SFEM_SUCCESS) {
+                    SFEM_ERROR("Unable to extract surface from sideset!\n");
+                }
+
+                this->ss_sides =
+                        sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), ss->parent()->size());
+
+                if (sshex8_extract_surface_from_sideset(ssmesh.level(),
+                                                        ssmesh.element_data(),
+                                                        ss->parent()->size(),
+                                                        ss->parent()->data(),
+                                                        ss->lfi()->data(),
+                                                        this->ss_sides->data()) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
@@ -488,7 +504,7 @@ namespace sfem {
             ptrdiff_t n_contiguous = -1;
             remap_elements_to_contiguous_index(
                     this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
-            this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
+            this->node_mapping   = sfem::manage_host_buffer(n_contiguous, idx);
             this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
         }
 
@@ -561,6 +577,8 @@ namespace sfem {
             this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
         }
     };
+
+    std::shared_ptr<Buffer<idx_t *>> ContactConditions::ss_sides() { return impl_->ss_sides; }
 
     ptrdiff_t ContactConditions::n_constrained_dofs() const { return impl_->node_mapping->size(); }
 
@@ -653,7 +671,7 @@ namespace sfem {
         int err = 0;
         if (impl_->variational) {
             ElemType element_type = impl_->space->element_type();
-            if(impl_->space->has_semi_structured_mesh()) {
+            if (impl_->space->has_semi_structured_mesh()) {
                 element_type = macro_base_elem(element_type);
             }
 
@@ -777,7 +795,7 @@ namespace sfem {
 
         if (impl_->variational) {
             ElemType element_type = space()->element_type();
-            if(space()->has_semi_structured_mesh()) {
+            if (space()->has_semi_structured_mesh()) {
                 element_type = macro_base_elem(element_type);
             }
 
@@ -849,13 +867,13 @@ namespace sfem {
         int err = 0;
         if (impl_->variational) {
             ElemType element_type = space()->element_type();
-            if(space()->has_semi_structured_mesh()) {
+            if (space()->has_semi_structured_mesh()) {
                 element_type = macro_base_elem(element_type);
             }
 
             auto st = shell_type(side_type(element_type));
 
-            err     = resample_gap_value(
+            err = resample_gap_value(
                     // Mesh
                     st,
                     impl_->sides->extent(1),
