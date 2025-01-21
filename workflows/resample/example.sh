@@ -52,7 +52,7 @@ else
 	create_sphere.sh 4
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
-	skin $mesh $skinned
+	SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
 	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
 	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf

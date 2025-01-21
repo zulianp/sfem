@@ -696,7 +696,7 @@ int vec_real_check_nan(const vec_real a) {
 }
 
 /**
- * @brief
+ * @brief Resample a field from hex8 to tet10
  *
  * @param nelements
  * @param nnodes
