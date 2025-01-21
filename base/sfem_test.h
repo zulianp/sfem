@@ -12,6 +12,8 @@
 #include <omp.h>
 #endif
 
+#include <mpi.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,6 +25,15 @@ extern "C" {
 static void sfem_print_test_info() {
     printf("=======================\n");
     printf("SFEM_TESTING Info:\n");
+
+    int size, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if(!rank) {
+        printf("MPI_Comm_size=%d\n", size);
+    }
+
 #ifdef _OPENMP
 #pragma omp parallel
     {
