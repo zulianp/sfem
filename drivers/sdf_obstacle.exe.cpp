@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_USE_GPU) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
-    
+
     sfem::create_directory(output_path);
 
     double tick = MPI_Wtime();
@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
 
     auto cg     = sfem::create_cg(linear_op, es);
     cg->verbose = false;
-    auto diag   = sfem::create_buffer<real_t>((fs->n_dofs()/block_size) * (block_size == 3 ? 6 : 3), es);
+    auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
     auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
     f->hessian_block_diag_sym(nullptr, diag->data());
 
@@ -264,9 +264,9 @@ int main(int argc, char *argv[]) {
     auto upper_bound_viz = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);
     contact_conds->signed_distance_for_mesh_viz(x->data(), upper_bound_viz->data());
 
-    if( fs->has_semi_structured_mesh()) {
+    if (fs->has_semi_structured_mesh()) {
         std::string path = output_path;
-        path +=  "/ssmesh";
+        path += "/ssmesh";
         fs->semi_structured_mesh().export_as_standard(path.c_str());
     }
 
