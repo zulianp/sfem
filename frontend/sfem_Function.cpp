@@ -2493,7 +2493,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
-        bool                           use_affine_approximation{false};
+        bool                           use_affine_approximation{true};
 
         long   calls{0};
         double total_time{0};
