@@ -161,7 +161,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
 #endif
 
     restriction->apply(fine_field->data(), coarse_field->data());
-    coarse_field->print(std::cout);
+    // coarse_field->print(std::cout);
 
     sfem::create_directory(output_dir.c_str());
     SFEM_TEST_ASSERT(m->write((output_dir + "/input_mesh").c_str()) == SFEM_SUCCESS);
@@ -201,7 +201,7 @@ int test_restrict_cube() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_derefine_cube);
-    // SFEM_RUN_TEST(test_derefine_mesh);
+    // SFEM_RUN_TEST(test_derefine_mesh); // FIXME use mesh that is always available
     SFEM_RUN_TEST(test_prolongation_cube);
     SFEM_RUN_TEST(test_restrict_cube);
     SFEM_UNIT_TEST_FINALIZE();

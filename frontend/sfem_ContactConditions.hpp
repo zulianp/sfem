@@ -46,6 +46,8 @@ namespace sfem {
                                              const bool                            as_zero) const override;
         std::shared_ptr<Constraint> lor() const override;
 
+
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -107,6 +109,8 @@ namespace sfem {
         ptrdiff_t n_constrained_dofs() const;
 
         int signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const;
+
+        std::shared_ptr<Buffer<idx_t *>> ss_sides();
 
     private:
         class Impl;

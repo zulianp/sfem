@@ -41,7 +41,7 @@ cd $CASE_DIR
 ls $sideset
 
 # export SFEM_ELEMENT_REFINE_LEVEL=`grep "refine_level" input.yaml | awk '{print $2}'`
-export SFEM_ELEMENT_REFINE_LEVEL=16
+export SFEM_ELEMENT_REFINE_LEVEL=2
 echo "SFEM_ELEMENT_REFINE_LEVEL=$SFEM_ELEMENT_REFINE_LEVEL"
 
 export SFEM_HEX8_ASSUME_AFFINE=1
