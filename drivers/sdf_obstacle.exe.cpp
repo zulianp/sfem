@@ -11,11 +11,11 @@
 #include <cstdio>
 #include <vector>
 
+#include "sfem_API.hpp"
+#include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
-#include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.h"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     int SFEM_MAX_IT = 20;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 
-    int SFEM_CONTACT_LINEARIZATIONS = 20;
+    int SFEM_CONTACT_LINEARIZATIONS = 1;
     SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
 
     bool SFEM_USE_GPU = true;
@@ -162,17 +162,20 @@ int main(int argc, char *argv[]) {
     contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
     auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
-    // std::shared_ptr<sfem::Operator<real_t>> solver;
+#if 0
     // if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
-    //     printf("Using Shifted-Penalty Multigrid\n");
-    //     auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
-    //     spmg->set_max_it(30);
-    //     spmg->set_atol(1e-8);
-    //     spmg->set_upper_bound(upper_bound);
-    //     spmg->set_constraints_op(cc_op, cc_op_t);
-    //     //        spmg->debug = true;
-    //     solver = spmg;
+    printf("Using Shifted-Penalty Multigrid\n");
+
+    auto spmg = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+    // auto spmg = sfem::create_ssmg<sfem::ShiftedPenaltyMultigrid<real_t>>(f, es);
+    // spmg->set_max_it(30);
+    // spmg->set_atol(1e-8);
+    // spmg->set_upper_bound(upper_bound);
+    // spmg->set_constraints_op(cc_op, cc_op_t);
+    //        spmg->debug = true;
+    auto solver = spmg;
     // } else {
+#else
     printf("Using Shifted-Penalty\n");
     int SFEM_USE_STEEPEST_DESCENT = 0;
     SFEM_READ_ENV(SFEM_USE_STEEPEST_DESCENT, atoi);
@@ -207,6 +210,7 @@ int main(int argc, char *argv[]) {
 
     auto solver = sp;
     // }
+#endif
 
     solver->set_upper_bound(upper_bound);
     solver->set_constraints_op(cc_op, cc_op_t, sbv);
