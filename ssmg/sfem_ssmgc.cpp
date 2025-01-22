@@ -1,6 +1,7 @@
 #include "sfem_ssmgc.hpp"
 
 #include "sfem_API.hpp"
+#include "ssquad4_interpolate.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
@@ -20,7 +21,7 @@ namespace sfem {
             SFEM_ERROR("create_ssmgc cannot build MG without a semistructured mesh");
         }
 
-        auto fs        = f->space();
+        auto fs = f->space();
 
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
@@ -118,15 +119,67 @@ namespace sfem {
         auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
         contact_conds->signed_distance(upper_bound->data());
 
+        // Top-level only
+        mg->set_upper_bound(upper_bound);
+        mg->set_constraints_op(cc_op, cc_op_t);
+
+        // All levels
+        // Add transformation matrices
 
         int  sym_block_size = (fs->block_size() == 3 ? 6 : 3);
         auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
         contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
-        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
+        auto fine_sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
-        mg->set_upper_bound(upper_bound);
-        mg->set_constraints_op(cc_op, cc_op_t, sbv);
+        auto    &&fine_ssmesh            = fs->semi_structured_mesh();
+        auto      fine_sides             = contact_conds->ss_sides();
+        auto      coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
+        ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+
+        auto coarse_node_mapping = sfem::create_host_buffer<idx_t>(n_coarse_contact_nodes);
+        auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * n_coarse_contact_nodes, es);
+
+        auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
+
+        auto count = sfem::create_host_buffer<uint16_t>(fine_ssmesh.n_nodes());
+
+        ssquad4_element_node_incidence_count(fine_ssmesh.level(), 1, 1, fine_sides->data(), count->data());
+
+        ssquad4_restrict(fine_sides->extent(1),  // nelements
+                         fine_ssmesh.level(),    // from_level
+                         1,                      // from_level_stride
+                         fine_sides->data(),     // from_elements
+                         count->data(),          // from_element_to_node_incidence_count
+                         1,                      // to_level
+                         1,                      // to_level_stride
+                         coarse_sides->data(),   // to_elements
+                         6,                      // vec_size
+                         fine_sbv->data()->data(),
+                         coarse_sbv->data()->data());
+
+        auto c_restriction = sfem::make_op<real_t>(
+                n_coarse_contact_nodes,
+                contact_conds->node_mapping()->size(),
+                [=](const real_t *const from, real_t *const to) {
+                    auto &fine_ssmesh = fs->semi_structured_mesh();
+                    ssquad4_restrict(fine_sides->extent(1),  // nelements
+                                     fine_ssmesh.level(),    // from_level
+                                     1,                      // from_level_stride
+                                     fine_sides->data(),     // from_elements
+                                     count->data(),          // from_element_to_node_incidence_count
+                                     1,                      // to_level
+                                     1,                      // to_level_stride
+                                     coarse_sides->data(),   // to_elements
+                                     1,                      // vec_size
+                                     from,
+                                     to);
+                },
+                es);
+
+        mg->add_level_constraint_op_x_op(fine_sbv);
+        mg->add_constraints_restriction(c_restriction);
+        mg->add_level_constraint_op_x_op(coarse_sbv);
 
         ////////////////////////////////////////////////////////////////////////////////////
 

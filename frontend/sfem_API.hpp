@@ -43,6 +43,8 @@ namespace sfem {
 #include "sshex8.h"
 #include "sshex8_interpolate.h"
 
+#include "ssquad4.h"
+
 #include <sys/stat.h>
 #include "matrixio_crs.h"
 
@@ -429,10 +431,10 @@ namespace sfem {
         {
             auto buff = element_to_node_incidence_count->data();
 
-// #pragma omp parallel for // BAD performance with parallel for
+            // #pragma omp parallel for // BAD performance with parallel for
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
-// #pragma omp atomic update
+                    // #pragma omp atomic update
                     buff[elements[d][i]]++;
                 }
             }
@@ -1045,6 +1047,50 @@ namespace sfem {
         }
 
         return sfem::hessian_bcrs_sym(f, nullptr, es);
+    }
+
+    static std::shared_ptr<Buffer<idx_t *>> ssquad4_derefine_element_connectivity(
+            const int                               from_level,
+            const int                               to_level,
+            const std::shared_ptr<Buffer<idx_t *>> &elements) {
+        const int       step_factor = from_level / to_level;
+        const int       nxe         = (to_level + 1) * (to_level + 1);
+        const ptrdiff_t nelements   = elements->extent(1);
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                nelements,
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        for (int yi = 0; yi <= to_level; yi++) {
+            for (int xi = 0; xi <= to_level; xi++) {
+                const int from_lidx   = ssquad4_lidx(from_level, xi * step_factor, yi * step_factor);
+                const int to_lidx     = ssquad4_lidx(to_level, xi, yi);
+                view->data()[to_lidx] = elements->data()[from_lidx];
+            }
+        }
+
+        return view;
+    }
+
+    static ptrdiff_t ss_elements_max_node_id(const std::shared_ptr<Buffer<idx_t *>> &elements) {
+        ptrdiff_t max_node_id{-1};
+        {
+            auto            vv        = elements->data();
+            const ptrdiff_t nelements = elements->extent(1);
+            for (int v = 0; v < elements->extent(0); v++) {
+                for (ptrdiff_t e = 0; e < nelements; e++) {
+                    max_node_id = (vv[v][e] > max_node_id ? vv[v][e] : max_node_id);
+                }
+            }
+        }
+
+        return max_node_id;
     }
 
 }  // namespace sfem
