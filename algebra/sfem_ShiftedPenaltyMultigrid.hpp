@@ -34,11 +34,16 @@ namespace sfem {
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>&          op,
-                                const std::shared_ptr<Operator<T>>&          op_t,
-                                const std::shared_ptr<SparseBlockVector<T>>& op_x_op) {
+                                const std::shared_ptr<Operator<T>>&          op_t) {
             constraints_op_           = op;
             constraints_op_transpose_ = op_t;
-            constraints_op_x_op_.push_back(op_x_op);
+            // constraints_op_x_op_.clear();
+            // constraints_op_x_op_.push_back(op_x_op);
+        }
+
+        void add_level_constraint_op_x_op(const std::shared_ptr<SparseBlockVector<T>> &constraints_op_x_op)
+        {
+            constraints_op_x_op_.push_back(constraints_op_x_op);
         }
 
         enum CycleType {
@@ -245,6 +250,11 @@ namespace sfem {
             restriction_.push_back(restriction);
         }
 
+        inline void add_constraints_restriction(//const std::shared_ptr<Operator<T>>& restict_op_x_op,
+                                                const std::shared_ptr<Operator<T>>& restict_diag) {
+            constraints_restriction_.push_back(restict_diag);
+        }
+
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas_);
             OpenMP_ShiftedPenalty<T>::build(impl_);
@@ -276,7 +286,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>                       constraints_op_;
         std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
         std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
-        std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
+        std::vector<std::shared_ptr<Operator<T>>> constraints_restriction_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -426,14 +436,15 @@ namespace sfem {
             }
         }
 
-        void penalty_pseudo_galerkin_assembly_constraints() {
-            // TODO
-            SFEM_ERROR("IMPLEMENT ME!");
-
-            // if (constraints_op_) {
-            //     smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
-            // } else {
-        }
+        // void penalty_pseudo_galerkin_assembly_constraints() {
+        //     if (constraints_op_) {
+        //         for(int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
+        //             constraints_op_x_op_restriction_[l]->apply(
+        //                 constraints_op_x_op_[l], 
+        //                 constraints_op_x_op_[coarser_level(l)]);
+        //         }
+        //     } 
+        // }
 
         void nonlinear_smooth() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_smooth");
