@@ -33,7 +33,7 @@ namespace sfem {
         std::string coarse_op_type                     = "MF";
         int         linear_smoothing_steps             = 3;
         bool        enable_coarse_space_preconditioner = false;
-        bool        coarse_solver_verbose              = false;
+        bool        coarse_solver_verbose              = true;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -97,6 +97,7 @@ namespace sfem {
 
         auto solver_coarse     = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = coarse_solver_verbose;
+        solver_coarse->set_rtol(1e-5);
 
         if (enable_coarse_space_preconditioner) {
             auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs() / fs_coarse->block_size() * (fs_coarse->block_size() == 3 ? 6 : 3), es);
@@ -185,7 +186,7 @@ namespace sfem {
         mg->add_level_constraint_op_x_op(coarse_sbv);
 
         ////////////////////////////////////////////////////////////////////////////////////
-
+        mg->debug = true;
         return mg;
     }
 
