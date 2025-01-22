@@ -57,7 +57,7 @@ namespace sfem {
         auto diag = sfem::create_buffer<real_t>(fs->n_dofs() / fs->block_size() * (fs->block_size() == 3 ? 6 : 3), es);
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
 
-        assert(false); // Fill the mask
+        f->constaints_mask(mask->data());
         f->hessian_block_diag_sym(nullptr, diag->data());
 
         auto sj                  = sfem::h_shiftable_block_sym_jacobi(diag, mask);
@@ -103,8 +103,8 @@ namespace sfem {
             f_coarse->hessian_block_diag_sym(nullptr, diag->data());
 
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
-            assert(false); // Fill the mask
-            
+            f_coarse->constaints_mask(mask->data());
+
             auto sj_coarse = sfem::h_shiftable_block_sym_jacobi(diag, mask);
             sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             solver_coarse->set_preconditioner_op(sj_coarse);
