@@ -403,9 +403,9 @@ int main(int argc, char* argv[]) {
             printf("\n");
             printf("===========================================\n");
             printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
-            printf("Rank: [%d]  Float_t bits    %d\n",  //
-                   mpi_rank,                            //
-                   real_t_bits);                        //
+            printf("Rank: [%d]  real_t bits    %d\n",  //
+                   mpi_rank,                           //
+                   real_t_bits);                       //
 
             printf("Rank: [%d]  Nr of elements  %d\n",  //
                    mpi_rank,                            //
