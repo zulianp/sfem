@@ -66,14 +66,19 @@ __device__ void tet4_transform_cu(
 ////////////////////////////////////////////////////////
 // tet4_measure_v2
 ////////////////////////////////////////////////////////
-__device__ real_type  //
-tet4_measure_cu(
-        // X-coordinates
-        const real_type px0, const real_type px1, const real_type px2, const real_type px3,
-        // Y-coordinates
-        const real_type py0, const real_type py1, const real_type py2, const real_type py3,
-        // Z-coordinates
-        const real_type pz0, const real_type pz1, const real_type pz2, const real_type pz3) {
+__device__ inline real_type             //
+tet4_measure_cu(const real_type px0,    // X-coordinates
+                const real_type px1,    // X-coordinates
+                const real_type px2,    // X-coordinates
+                const real_type px3,    // X-coordinates
+                const real_type py0,    // Y-coordinates
+                const real_type py1,    // Y-coordinates
+                const real_type py2,    // Y-coordinates
+                const real_type py3,    // Y-coordinates
+                const real_type pz0,    // Z-coordinates
+                const real_type pz1,    // Z-coordinates
+                const real_type pz2,    // Z-coordinates
+                const real_type pz3) {  // Z-coordinates
     //
     // determinant of the Jacobian
     // M = [px0, py0, pz0, 1]
@@ -101,24 +106,22 @@ tet4_measure_cu(
 ////////////////////////////////////////////////////////
 // hex_aa_8_eval_fun_V
 ////////////////////////////////////////////////////////
-__device__ void hex_aa_8_eval_fun_cu(
-        // Quadrature point (local coordinates)
-        // With respect to the hat functions of a cube element
-        // In a local coordinate system
-        //
-        const real_t x,  //
-        const real_t y,  //
-        const real_t z,  //
-        //
-        //
-        real_t* const MY_RESTRICT f0,    //
-        real_t* const MY_RESTRICT f1,    //
-        real_t* const MY_RESTRICT f2,    //
-        real_t* const MY_RESTRICT f3,    //
-        real_t* const MY_RESTRICT f4,    //
-        real_t* const MY_RESTRICT f5,    //
-        real_t* const MY_RESTRICT f6,    //
-        real_t* const MY_RESTRICT f7) {  //
+// Quadrature point (local coordinates)
+// With respect to the hat functions of a cube element
+// In a local coordinate system
+//
+__device__ void                                       //
+hex_aa_8_eval_fun_cu(const real_t              x,     //
+                     const real_t              y,     //
+                     const real_t              z,     //
+                     real_t* const MY_RESTRICT f0,    // Output
+                     real_t* const MY_RESTRICT f1,    // Output
+                     real_t* const MY_RESTRICT f2,    // Output
+                     real_t* const MY_RESTRICT f3,    // Output
+                     real_t* const MY_RESTRICT f4,    // Output
+                     real_t* const MY_RESTRICT f5,    // Output
+                     real_t* const MY_RESTRICT f6,    // Output
+                     real_t* const MY_RESTRICT f7) {  // Output
     //
     const real_t r1 = 1.0;
 
@@ -416,15 +419,38 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 template <typename Real_Type>
-__device__ void quadrature_node(const Real_Type tet4_qx_v, const Real_Type tet4_qy_v, const Real_Type tet4_qz_v,
-                                const Real_Type tet4_qw_v, const Real_Type theta_volume, const Real_Type x0, const Real_Type x1,
-                                const Real_Type x2, const Real_Type x3, const Real_Type y0, const Real_Type y1,
-                                const Real_Type y2, const Real_Type y3, const Real_Type z0, const Real_Type z1,
-                                const Real_Type z2, const Real_Type z3, const Real_Type dx, const Real_Type dy,
-                                const Real_Type dz, const Real_Type ox, const Real_Type oy, const Real_Type oz,
-                                const ptrdiff_t stride0, const ptrdiff_t stride1, const ptrdiff_t stride2,
-                                const real_type* const MY_RESTRICT data, Real_Type& element_field0, Real_Type& element_field1,
-                                Real_Type& element_field2, Real_Type& element_field3) {
+__device__ void                                                     //
+quadrature_node(const Real_Type                    tet4_qx_v,       //
+                const Real_Type                    tet4_qy_v,       //
+                const Real_Type                    tet4_qz_v,       //
+                const Real_Type                    tet4_qw_v,       //
+                const Real_Type                    theta_volume,    //
+                const Real_Type                    x0,              //
+                const Real_Type                    x1,              //
+                const Real_Type                    x2,              //
+                const Real_Type                    x3,              //
+                const Real_Type                    y0,              //
+                const Real_Type                    y1,              //
+                const Real_Type                    y2,              //
+                const Real_Type                    y3,              //
+                const Real_Type                    z0,              //
+                const Real_Type                    z1,              //
+                const Real_Type                    z2,              //
+                const Real_Type                    z3,              //
+                const Real_Type                    dx,              //
+                const Real_Type                    dy,              //
+                const Real_Type                    dz,              //
+                const Real_Type                    ox,              //
+                const Real_Type                    oy,              //
+                const Real_Type                    oz,              //
+                const ptrdiff_t                    stride0,         //
+                const ptrdiff_t                    stride1,         //
+                const ptrdiff_t                    stride2,         //
+                const real_type* const MY_RESTRICT data,            //
+                Real_Type&                         element_field0,  //
+                Real_Type&                         element_field1,  //
+                Real_Type&                         element_field2,  //
+                Real_Type&                         element_field3) {                        //
     //
     Real_Type g_qx = 0.0, g_qy = 0.0, g_qz = 0.0;
 

@@ -50,9 +50,13 @@ then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
 	create_sphere.sh 5
-	sfc $mesh $mesh_sorted
+	
+	refine $mesh refined
+	# sfc $mesh $mesh_sorted
+	sfc refined $mesh_sorted
+
 	mkdir -p $skinned
-	SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
+	skin $mesh $skinned
 	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
 	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
@@ -69,14 +73,14 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+
 # n_procs=2
 # n_procs=8
 
 Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
 Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
-LAUNCH="mpiexec -np $n_procs "
+
 # LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 # LAUNCH="srun -p debug -n $n_procs -N 1 "
 # LAUNCH=""
@@ -90,7 +94,27 @@ GRID_TO_MESH="grid_to_mesh"
 # export OMP_PROC_BIND=true
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
+
+output_file="output_bench.log"
+bench_file="tet4_bench.csv"
+
+n_proc_max=18
+
+export SFEM_INTERPOLATE=0
+export SFEM_READ_FP32=1
+
+for n_procs in $(seq 1 $n_proc_max); do
+    LAUNCH="mpiexec -np $n_procs "
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA > "$output_file" 2>&1
+
+	if [ $n_procs -eq 1 ]; then
+        # First iteration: capture lines beginning with <BenchH> and append to bench_file
+        grep '^<BenchH>' "$output_file" | sed 's/^<BenchH>//' >> "$bench_file"
+    fi
+
+    grep '^<BenchR>' "$output_file" | sed 's/^<BenchR>//' >> "$bench_file"
+done
+
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
 
