@@ -16,7 +16,7 @@ namespace sfem {
     std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
                                                                   const std::shared_ptr<ContactConditions> contact_conds,
                                                                   const enum ExecutionSpace                es,
-                                                                  std::shared_ptr<Input>                  &in) {
+                                                                  const std::shared_ptr<Input>            &in) {
         if (!f->space()->has_semi_structured_mesh()) {
             SFEM_ERROR("create_ssmgc cannot build MG without a semistructured mesh");
         }
@@ -26,29 +26,25 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        bool nlsmooth_steps = 10;
-        in->get("nlsmooth_steps", nlsmooth_steps);
+        bool        nlsmooth_steps                     = 10;
+        bool        project_coarse_correction          = false;
+        bool        enable_line_search                 = false;
+        std::string fine_op_type                       = "MF";
+        std::string coarse_op_type                     = "MF";
+        int         linear_smoothing_steps             = 3;
+        bool        enable_coarse_space_preconditioner = false;
+        bool        coarse_solver_verbose              = false;
 
-        bool project_coarse_correction = false;
-        in->get("project_coarse_correction", project_coarse_correction);
-
-        bool enable_line_search = false;
-        in->get("enable_line_search", enable_line_search);
-
-        std::string fine_op_type = "MF";
-        in->get("fine_op_type", fine_op_type);
-
-        std::string coarse_op_type = fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM";
-        in->get("coarse_op_type", coarse_op_type);
-
-        int linear_smoothing_steps = 3;
-        in->get("linear_smoothing_steps", linear_smoothing_steps);
-
-        bool enable_coarse_space_preconditioner = false;
-        in->get("enable_coarse_space_preconditioner", enable_coarse_space_preconditioner);
-
-        bool coarse_solver_verbose = false;
-        in->get("coarse_solver_verbose", coarse_solver_verbose);
+        if (in) {
+            in->get("nlsmooth_steps", nlsmooth_steps);
+            in->get("project_coarse_correction", project_coarse_correction);
+            in->get("enable_line_search", enable_line_search);
+            in->get("fine_op_type", fine_op_type);
+            in->get("coarse_op_type", coarse_op_type);
+            in->get("linear_smoothing_steps", linear_smoothing_steps);
+            in->get("enable_coarse_space_preconditioner", enable_coarse_space_preconditioner);
+            in->get("coarse_solver_verbose", coarse_solver_verbose);
+        }
 
         ////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,8 +54,10 @@ namespace sfem {
         auto linear_op        = sfem::create_linear_operator(fine_op_type, f, nullptr, es);
         auto linear_op_coarse = sfem::create_linear_operator(coarse_op_type, f_coarse, nullptr, es);
 
-        auto diag = sfem::create_buffer<real_t>(fs->mesh_ptr()->n_nodes() * (fs->block_size() == 3 ? 6 : 3), es);
+        auto diag = sfem::create_buffer<real_t>(fs->n_dofs() / fs->block_size() * (fs->block_size() == 3 ? 6 : 3), es);
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+
+        assert(false); // Fill the mask
         f->hessian_block_diag_sym(nullptr, diag->data());
 
         auto sj                  = sfem::h_shiftable_block_sym_jacobi(diag, mask);
@@ -101,9 +99,14 @@ namespace sfem {
         solver_coarse->verbose = coarse_solver_verbose;
 
         if (enable_coarse_space_preconditioner) {
-            auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
-            f_coarse->hessian_diag(nullptr, diag->data());
-            auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
+            auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs() / fs_coarse->block_size() * (fs_coarse->block_size() == 3 ? 6 : 3), es);
+            f_coarse->hessian_block_diag_sym(nullptr, diag->data());
+
+            auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
+            assert(false); // Fill the mask
+            
+            auto sj_coarse = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+            sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             solver_coarse->set_preconditioner_op(sj_coarse);
         }
 
@@ -132,10 +135,10 @@ namespace sfem {
 
         auto fine_sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
-        auto    &&fine_ssmesh            = fs->semi_structured_mesh();
-        auto      fine_sides             = contact_conds->ss_sides();
-        auto      coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
-        ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+        auto          &&fine_ssmesh            = fs->semi_structured_mesh();
+        auto            fine_sides             = contact_conds->ss_sides();
+        auto            coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
+        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
 
         auto coarse_node_mapping = sfem::create_host_buffer<idx_t>(n_coarse_contact_nodes);
         auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * n_coarse_contact_nodes, es);

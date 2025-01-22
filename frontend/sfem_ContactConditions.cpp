@@ -483,6 +483,13 @@ namespace sfem {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
+
+                idx_t    *idx          = nullptr;
+                ptrdiff_t n_contiguous = -1;
+                remap_elements_to_contiguous_index(
+                        this->ss_sides->extent(1), this->ss_sides->extent(0), this->ss_sides->data(), &n_contiguous, &idx);
+                sfem::manage_host_buffer(n_contiguous, idx);
+
             } else {
                 enum ElemType st   = side_type(space->element_type());
                 const int     nnxs = elem_num_nodes(st);

@@ -19,7 +19,7 @@ export SFEM_CONTACT_LINEARIZATIONS=10
 # export SFEM_USE_STEEPEST_DESCENT=1
 export SFEM_HEX8_ASSUME_AFFINE=1
 export SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER=1
-
+# export SFEM_USE_SHIFTED_PENALTY=1
 # nodeset=mesh/boundary_nodes/back.int32.raw
 # export SFEM_DIRICHLET_NODESET="$nodeset,$nodeset,$nodeset" 
 

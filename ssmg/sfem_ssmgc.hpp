@@ -13,7 +13,7 @@ namespace sfem {
     std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
                                                                   const std::shared_ptr<ContactConditions> contact_conds,
                                                                   const enum ExecutionSpace                es,
-                                                                  std::shared_ptr<Input>                  &in);
+                                                                  const std::shared_ptr<Input>                  &in);
 }
 
 #endif  // SFEM_SSMGC_HPP
