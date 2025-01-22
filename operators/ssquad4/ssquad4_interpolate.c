@@ -2,6 +2,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include "ssquad4.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,23 +11,6 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-static SFEM_INLINE int ssquad4_lidx(const int L, const int x, const int y) {
-    int Lp1 = L + 1;
-    int ret = y * Lp1 + x;
-
-    assert(ret < Lp1 * Lp1);
-    assert(ret >= 0);
-    return ret;
-}
-
-static SFEM_INLINE int ssquad4_txe(int level) { return level * level; }
-
-static SFEM_INLINE int ssquad4_nxe(int level) {
-    const int corners    = 4;
-    const int edge_nodes = 4 * (level - 1);
-    const int area_nodes = (level - 1) * (level - 1);
-    return corners + edge_nodes + area_nodes;
-}
 
 int ssquad4_element_node_incidence_count(const int                     level,
                                          const int                     stride,
