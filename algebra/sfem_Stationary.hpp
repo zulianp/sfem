@@ -96,6 +96,15 @@ namespace sfem {
             //     return SFEM_FAILURE;
             // }
         }
+
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
+                                  const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                  const std::shared_ptr<Buffer<T>>&            diag) override
+        {
+            SFEM_ERROR("StationaryIteration::set_op_and_diag_shift not implemented!");
+            // shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling)
+            return SFEM_FAILURE;
+        }
     };
 
     template <typename T>
