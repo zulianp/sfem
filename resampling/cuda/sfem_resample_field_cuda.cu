@@ -3,6 +3,7 @@
 #include <cooperative_groups.h>
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "sfem_base.h"
 #include "sfem_cuda_math.cuh"
@@ -215,27 +216,28 @@ launch_kernels_tet4_resample_field_CUDA_unified(const int         mpi_size,     
     int ret = 0;
 
     {
-        tet4_resample_field_reduce_local_kernel<<<numBlocks, threadsPerBlock>>>(0,             //
-                                                                                nelements,     //
-                                                                                nnodes,        //
-                                                                                elems_device,  //
-                                                                                xyz_device,    //
-                                                                                //  NULL, //
+        tet4_resample_field_reduce_local_kernel<<<numBlocks,                        //
+                                                  threadsPerBlock>>>(0,             //
+                                                                     nelements,     //
+                                                                     nnodes,        //
+                                                                     elems_device,  //
+                                                                     xyz_device,    //
+                                                                     //  NULL, //
 
-                                                                                stride[0],
-                                                                                stride[1],
-                                                                                stride[2],
+                                                                     stride[0],
+                                                                     stride[1],
+                                                                     stride[2],
 
-                                                                                origin[0],
-                                                                                origin[1],
-                                                                                origin[2],
+                                                                     origin[0],
+                                                                     origin[1],
+                                                                     origin[2],
 
-                                                                                delta[0],
-                                                                                delta[1],
-                                                                                delta[2],
+                                                                     delta[0],
+                                                                     delta[1],
+                                                                     delta[2],
 
-                                                                                data_device,
-                                                                                weighted_field_device_g);
+                                                                     data_device,
+                                                                     weighted_field_device_g);
 
         cudaDeviceSynchronize();
         cudaError_t error = cudaGetLastError();
@@ -693,6 +695,20 @@ tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,           
 }
 
 /**
+ * Calculates the elapsed time between two timespec structures.
+ *
+ * @param start The starting timespec structure.
+ * @param end The ending timespec structure.
+ * @return The elapsed time in milliseconds.
+ */
+double get_time(struct timespec start, struct timespec end) {
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
+    elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
+
+    return elapsed;
+}
+
+/**
  * @brief Construct a new tet4 resample field local reduce CUDA managed object
  *
  * @param mpi_size
@@ -775,15 +791,9 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
     // Number of blocks
     const ptrdiff_t numBlocks = (mesh->nelements / warp_per_block) + (mesh->nelements % warp_per_block) + 1;
 
-    cudaEvent_t start, stop;
+    struct timespec start, end;
 
-    cudaDeviceSynchronize();
-
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-
-    cudaEventRecord(start);
-
+    clock_gettime(CLOCK_MONOTONIC, &start);
     // TODO Launch the kernel
     launch_kernels_tet4_resample_field_CUDA_unified(mpi_size,                        //
                                                     mpi_rank,                        //
@@ -803,14 +813,25 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
                                                     mass_vector,                     //
                                                     weighted_field_device);          //
 
-    cudaDeviceSynchronize();
-    cudaEventRecord(stop);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    double clock_ms = get_time(start, end);
 
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    const double seconds                      = clock_ms / 1000.0;
+    const double elements_per_second          = (double)(mesh->nelements) / seconds;
+    const double nodes_per_second             = (double)(mesh->n_owned_nodes) / seconds;
+    const double quadrature_points_per_second = (double)(mesh->n_owned_nodes * TET4_NQP) / seconds;
+
+    printf("GPU: =======================================================\n");
+    printf("GPU: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+    printf("GPU: Number of elements:               %ld\n", mesh->nelements);
+    printf("GPU: Elapsed time:                     %e s\n", seconds);
+    printf("GPU: Elapsed time:                     %e ms\n", clock_ms);
+    printf("GPU: Elements/second:                  %e\n", elements_per_second);
+    printf("GPU: Nodes/second:                     %e\n", nodes_per_second);
+    printf("GPU: Points/second:                    %e\n", (double)size_data / seconds);
+    printf("GPU: Quadrature points/second:         %e\n", quadrature_points_per_second);
+    printf("GPU: =======================================================\n");
 
     // Free memory on the device
     free_elems_tet4_device(&elems_device);
