@@ -158,6 +158,7 @@ namespace sfem {
                     }
                 }
 
+                assert(false); // FIXME needs to handle constraints op properly
                 const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
                                 ((lb) ? impl_.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
 
@@ -429,7 +430,7 @@ namespace sfem {
                 blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
 
                 if (constraints_op_) {
-                    SFEM_ERROR("IMPLEMENT ME!");
+                    constraints_restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
                 } else {
                     restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
                 }
