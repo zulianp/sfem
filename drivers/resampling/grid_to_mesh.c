@@ -398,14 +398,14 @@ int main(int argc, char* argv[]) {
             const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
             const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
             const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
-            const int    float_t_bits       = sizeof(float) * 8;
+            const int    real_t_bits        = sizeof(real_t) * 8;
 
             printf("\n");
             printf("===========================================\n");
             printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
             printf("Rank: [%d]  Float_t bits    %d\n",  //
                    mpi_rank,                            //
-                   float_t_bits);                       //
+                   real_t_bits);                        //
 
             printf("Rank: [%d]  Nr of elements  %d\n",  //
                    mpi_rank,                            //
