@@ -28,7 +28,6 @@ search_string_in_args() {
     return 1
 }
 
-
 if search_name_number_in_args "np" "$@"
 then
 	n_procs=${BASH_REMATCH[1]}
@@ -118,7 +117,7 @@ then
 	echo "Reusing existing mesh $p2_mesh!"
 else
 	# create_sphere.sh 5
-	export SFEM_ORDER_WITH_COORDINATE=2
+	
 	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	sfc $mesh temp_mesh
 	SFEM_ORDER_WITH_COORDINATE=2 sfc temp_mesh $mesh_sorted
@@ -191,8 +190,27 @@ fi
 # Enable second order mesh parametrizations
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
+output_file="output_bench_p2.log"
+bench_file="tet10_bench_p2.csv"
+
+n_proc_max=18
+
+export SFEM_INTERPOLATE=0
+export SFEM_READ_FP32=1
+
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
+
+for n_procs in $(seq 1 $n_proc_max); do
+    LAUNCH="mpiexec -np $n_procs "
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA > "$output_file" 2>&1
+
+	if [ $n_procs -eq 1 ]; then
+        # First iteration: capture lines beginning with <BenchH> and write to bench_file
+        grep '^<BenchH>' "$output_file" | sed 's/^<BenchH>//' >> "$bench_file"
+    fi
+
+    grep '^<BenchR>' "$output_file" | sed 's/^<BenchR>//' >> "$bench_file"
+done
 
 if [[ "$FLOAT_64" == "1" ]]
 then

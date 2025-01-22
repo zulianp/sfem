@@ -480,8 +480,6 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
                                                                    mass_vector,                     //
                                                                    g_device);                       //
 
-    PRINT_CURRENT_FUNCTION;
-
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -490,14 +488,23 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     const double seconds = milliseconds / 1000.0;
 
+    const int n_points_struct = n[0] * n[1] * n[2];
+
+    const double elements_per_second          = (double)(mesh->nelements) / seconds;
+    const double nodes_per_second             = (double)(mesh->n_owned_nodes) / seconds;
+    const double quadrature_points_per_second = (double)(mesh->n_owned_nodes * TET4_NQP) / seconds;
+
     printf("============================================================================\n");
     printf("GPU:    Time for the kernel (%s):\n"  //
            "GPU:    %f seconds\n",                //
            kernel_name,
            seconds);
-    const double elements_per_second = (double)(mesh->nelements) / seconds;
+    printf("GPU:    file: %s:%d, function: %s \n", __FILE__, __LINE__, __FUNCTION__);
     printf("GPU:    Number of elements: %d.\n", mesh->nelements);
     printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    printf("GPU:    Trougput for the kernel: %e points_struct/second\n", n_points_struct / seconds);
+    printf("GPU:    Trougput for the kernel: %e nodes/second\n", nodes_per_second);
+    printf("GPU:    Trougput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
     printf("GPU:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
     printf("============================================================================\n");
 

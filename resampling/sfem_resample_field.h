@@ -142,40 +142,73 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
                          real_t* const SFEM_RESTRICT          g,         // Output
                          sfem_resample_field_info*            info);                //
 
-int interpolate_field(const ptrdiff_t nnodes, geom_t** const SFEM_RESTRICT xyz,
-                      // SDF
-                      const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-                      const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta,
-                      const real_t* const SFEM_RESTRICT data,
-                      // Output
-                      real_t* const SFEM_RESTRICT field);
+int                                                             //
+interpolate_field(const ptrdiff_t                      nnodes,  //
+                  geom_t** const SFEM_RESTRICT         xyz,     //
+                  const ptrdiff_t* const SFEM_RESTRICT n,       // SDF
+                  const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                  const geom_t* const SFEM_RESTRICT    origin,  //
+                  const geom_t* const SFEM_RESTRICT    delta,   //
+                  const real_t* const SFEM_RESTRICT    data,    //
+                  real_t* const SFEM_RESTRICT          field);           // Output
 
-int field_view(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate, const ptrdiff_t* const nlocal,
-               const ptrdiff_t* const SFEM_RESTRICT nglobal, const ptrdiff_t* const SFEM_RESTRICT stride,
-               const geom_t* const origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const field, real_t** field_out,
-               ptrdiff_t* z_nlocal_out, geom_t* const SFEM_RESTRICT z_origin_out);
+int                                                            //
+field_view(MPI_Comm                             comm,          //
+           const ptrdiff_t                      nnodes,        //
+           const geom_t* SFEM_RESTRICT          z_coordinate,  //
+           const ptrdiff_t* const               nlocal,        //
+           const ptrdiff_t* const SFEM_RESTRICT nglobal,       //
+           const ptrdiff_t* const SFEM_RESTRICT stride,        //
+           const geom_t* const                  origin,        //
+           const geom_t* const SFEM_RESTRICT    delta,         //
+           const real_t* const                  field,         //
+           real_t**                             field_out,     //
+           ptrdiff_t*                           z_nlocal_out,  //
+           geom_t* const SFEM_RESTRICT          z_origin_out);          //
 
-int field_view_ensure_margin(MPI_Comm comm, const ptrdiff_t nnodes, const geom_t* SFEM_RESTRICT z_coordinate,
-                             const ptrdiff_t* const nlocal, const ptrdiff_t* const SFEM_RESTRICT nglobal,
-                             const ptrdiff_t* const SFEM_RESTRICT stride, const geom_t* const origin,
-                             const geom_t* const SFEM_RESTRICT delta, const real_t* const field, const ptrdiff_t z_margin,
-                             real_t** field_out, ptrdiff_t* z_nlocal_out, geom_t* const SFEM_RESTRICT z_origin_out);
+int                                                                          //
+field_view_ensure_margin(MPI_Comm                             comm,          //
+                         const ptrdiff_t                      nnodes,        //
+                         const geom_t* SFEM_RESTRICT          z_coordinate,  //
+                         const ptrdiff_t* const               nlocal,        //
+                         const ptrdiff_t* const SFEM_RESTRICT nglobal,       //
+                         const ptrdiff_t* const SFEM_RESTRICT stride,        //
+                         const geom_t* const                  origin,        //
+                         const geom_t* const SFEM_RESTRICT    delta,         //
+                         const real_t* const                  field,         //
+                         const ptrdiff_t                      z_margin,      //
+                         real_t**                             field_out,     //
+                         ptrdiff_t*                           z_nlocal_out,  //
+                         geom_t* const SFEM_RESTRICT          z_origin_out);          //
 
-int tet4_resample_field_local_v2(
-        // Mesh
-        const ptrdiff_t              start_element,  //
-        const ptrdiff_t              end_element,    //
-        const ptrdiff_t              nnodes,         //
-        idx_t** const SFEM_RESTRICT  elems,          //
-        geom_t** const SFEM_RESTRICT xyz,            //
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       //
-        const ptrdiff_t* const SFEM_RESTRICT stride,  //
-        const geom_t* const SFEM_RESTRICT    origin,  //
-        const geom_t* const SFEM_RESTRICT    delta,   //
-        const real_t* const SFEM_RESTRICT    data,    //
-        // Output
-        real_t* const SFEM_RESTRICT weighted_field);  //
+/**
+ * @brief Resample a field on a mesh
+ *
+ * @param start_element
+ * @param end_element
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param data
+ * @param weighted_field
+ * @return int
+ */
+int                                                                               //
+tet4_resample_field_local_v2(const ptrdiff_t                      start_element,  // Mesh
+                             const ptrdiff_t                      end_element,    // Mesh
+                             const ptrdiff_t                      nnodes,         // Mesh
+                             idx_t** const SFEM_RESTRICT          elems,          // Mesh
+                             geom_t** const SFEM_RESTRICT         xyz,            // Mesh
+                             const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                             const ptrdiff_t* const SFEM_RESTRICT stride,         // SDF
+                             const geom_t* const SFEM_RESTRICT    origin,         // SDF
+                             const geom_t* const SFEM_RESTRICT    delta,          // SDF
+                             const real_t* const SFEM_RESTRICT    data,           // SDF
+                             real_t* const SFEM_RESTRICT          weighted_field);         // Output
 
 #ifdef __cplusplus
 }

@@ -30,10 +30,10 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 // int check_string_in_args(int argc, char* argv[], const char* target);
 
 // Function definition
-int check_string_in_args(const int argc, const char* argv[], const char* target) {
+int check_string_in_args(const int argc, const char* argv[], const char* target, int print_message) {
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], target) == 0) {
-            printf("Found %s in argv[%d]\n", target, i);
+            if (print_message) printf("Found %s in argv[%d]\n", target, i);
             return 1;
         }
     }
@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
     const char* folder      = argv[11];
     const char* output_path = argv[12];
 
-    if (check_string_in_args(argc, (const char**)argv, "TET4")) {
+    if (check_string_in_args(argc, (const char**)argv, "TET4", mpi_rank == 0)) {
         info.element_type = TET4;
-    } else if (check_string_in_args(argc, (const char**)argv, "TET10")) {
+    } else if (check_string_in_args(argc, (const char**)argv, "TET10", mpi_rank == 0)) {
         info.element_type = TET10;
     } else {
         fprintf(stderr, "Error: Invalid element type\n\n");
@@ -107,11 +107,11 @@ int main(int argc, char* argv[]) {
 
 #ifdef SFEM_ENABLE_CUDA
 
-    if (check_string_in_args(argc, (const char**)argv, "CUDA")) {
+    if (check_string_in_args(argc, (const char**)argv, "CUDA", mpi_rank == 0)) {
         info.use_accelerator = SFEM_ACCELERATOR_TYPE_CUDA;
         if (mpi_rank == 0) printf("info.use_accelerator = 1\n");
 
-    } else if (check_string_in_args(argc, (const char**)argv, "CPU")) {
+    } else if (check_string_in_args(argc, (const char**)argv, "CPU", mpi_rank == 0)) {
         info.use_accelerator = SFEM_ACCELERATOR_TYPE_CPU;
         if (mpi_rank == 0) printf("info.use_accelerator = 0\n");
 
@@ -154,7 +154,23 @@ int main(int argc, char* argv[]) {
         if (SFEM_READ_FP32) {
             float* temp = NULL;
 
-            if (ndarray_create_from_file(comm, data_path, MPI_FLOAT, 3, (void**)&temp, nlocal, nglobal)) {
+            // int ndarray_create_from_file_segmented(
+            //                MPI_Comm comm,
+            //                const char *path,
+            //                MPI_Datatype type,
+            //                int ndims,
+            //                void **data_ptr,
+            //                int segment_size, // INT_MAX (ignored) in this case
+            //                ptrdiff_t *const nlocal,
+            //                const ptrdiff_t *const nglobal);
+
+            if (ndarray_create_from_file(comm,           //
+                                         data_path,      //
+                                         MPI_FLOAT,      //
+                                         3,              //
+                                         (void**)&temp,  //
+                                         nlocal,         //
+                                         nglobal)) {     //
                 exit(EXIT_FAILURE);
             }
 
@@ -298,7 +314,7 @@ int main(int argc, char* argv[]) {
                                                       &info);    //
                     break;                                       //
 
-                case TET4:  // TET4 case
+                case TET4:                                      // TET4 case
                     ret_resample =                              //
                             resample_field_mesh_tet4(mpi_size,  //
                                                      mpi_rank,  //
@@ -323,132 +339,6 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
-            //             if (mpi_size == 1) {
-            //                 resample_field(
-            //                         // Mesh
-            //                         mesh.element_type,
-            //                         mesh.nelements,
-            //                         mesh.nnodes,
-            //                         mesh.elements,
-            //                         mesh.points,
-            //                         // discrete field
-            //                         nlocal,
-            //                         stride,
-            //                         origin,
-            //                         delta,
-            //                         field,
-            //                         // Output
-            //                         g,
-            //                         &info);
-
-            //                 // end if mpi_size == 1
-
-            //             } else {
-            //                 // mpi_size > 1
-
-            //                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
-            // #if SFEM_TET10_CUDA == ON
-            //                     const int ret =                                           //
-            //                             hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
-            //                                     mpi_size,                                 // MPI size
-            //                                     mpi_rank,                                 // MPI rank
-            //                                     &mesh,                                    // Mesh
-            //                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in
-            //                                     the kernel nlocal,                                   // number of nodes in
-            //                                     each direction stride,                                   // stride of the
-            //                                     data origin,                                   // origin of the domain
-            //                                     delta,                                    // delta of the domain
-            //                                     field,                                    // filed
-            //                                     g);                                       // output
-            // #endif
-            //                 } else {  // Other cases and CPU
-            //                     resample_field_local(
-            //                             // Mesh
-            //                             mesh.element_type,
-            //                             mesh.nelements,
-            //                             mesh.nnodes,
-            //                             mesh.elements,
-            //                             mesh.points,
-            //                             // discrete field
-            //                             nlocal,
-            //                             stride,
-            //                             origin,
-            //                             delta,
-            //                             field,
-            //                             // Output
-            //                             g,
-            //                             &info);
-            //                 }  // END if info.element_type == TET10 && SFEM_TET10_CUDA == ON /////
-
-            //                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
-
-            //                 if (mesh.element_type == TET10 && assemble_dual_mass_vector_cuda == 0) {
-            //                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
-
-            //                     // In case of CUDA == ON this is calculated in the CUDA kernels calls
-            //                     // Directely in the hex8_to_tet10_resample_field_local_CUDA function
-
-            //                     tet10_assemble_dual_mass_vector(mesh.nelements,  //
-            //                                                     mesh.nnodes,
-            //                                                     mesh.elements,
-            //                                                     mesh.points,
-            //                                                     mass_vector);
-
-            //                     // end if mesh.element_type == TET10
-            //                 } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
-            //                     enum ElemType st = shell_type(mesh.element_type);
-
-            //                     if (st == INVALID) {
-            //                         assemble_lumped_mass(
-            //                                 mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
-            //                                 mass_vector);
-
-            //                     } else {
-            //                         assemble_lumped_mass(st, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
-            //                         mass_vector);
-            //                     }
-
-            //                     // end if mesh.element_type == TET4
-
-            //                 }  // end if mesh.element_type == TET10
-
-            //                 if (assemble_dual_mass_vector_cuda == 0) {
-            //                     //// TODO In CPU must be called.
-            //                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed
-            //                     memory
-            //                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at
-            //                     the moment)
-
-            //                     // exchange ghost nodes and add contribution
-            //                     if (mpi_size > 1) {
-            //                         send_recv_t slave_to_master;
-            //                         mesh_create_nodal_send_recv(&mesh, &slave_to_master);
-
-            //                         ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
-            //                         real_t*   real_buffer = malloc(count * sizeof(real_t));
-
-            //                         exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
-            //                         exchange_add(&mesh, &slave_to_master, g, real_buffer);
-
-            //                         free(real_buffer);
-            //                         send_recv_destroy(&slave_to_master);
-            //                     }  // end if mpi_size > 1
-
-            //                     // divide by the mass vector
-            //                     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            //                         if (mass_vector[i] == 0) {
-            //                             fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh.n_owned_nodes,
-            //                             mesh.nnodes);
-            //                         }
-
-            //                         assert(mass_vector[i] != 0);
-            //                         g[i] /= mass_vector[i];
-            //                     }  // end for i < mesh.n_owned_nodes
-            //                 }      // end if SFEM_TET10_CUDA == OFF || SFEM_CUDA_MEMORY_MODEL == UNIFIED
-
-            //                 free(mass_vector);
-            //             }  // end if mpi_size > 1
-
         }  // end if SFEM_INTERPOLATE
         /////////////////////////////////
         // END resample_field_mesh
@@ -461,18 +351,23 @@ int main(int argc, char* argv[]) {
         int mpi_size;
         MPI_Comm_size(comm, &mpi_size);
 
-        int* elements_v = malloc(mpi_size * sizeof(int));
+        // int* elements_v = malloc(mpi_size * sizeof(int));
 
-        MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
+        // MPI_Gather(&mesh.nelements, 1, MPI_INT, elements_v, 1, MPI_INT, 0, comm);
+
+        // int tot_nelements = 0;
+        // if (mpi_rank == 0) {
+        //     for (int i = 0; i < mpi_size; i++) {
+        //         tot_nelements += elements_v[i];
+        //     }
+        // }
+        // free(elements_v);
 
         int tot_nelements = 0;
-        if (mpi_rank == 0) {
-            for (int i = 0; i < mpi_size; i++) {
-                tot_nelements += elements_v[i];
-            }
-        }
+        MPI_Reduce(&mesh.nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
-        free(elements_v);
+        int tot_nnodes = 0;
+        MPI_Reduce(&mesh.n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
         double* flops_v = NULL;
         flops_v         = malloc(mpi_size * sizeof(double));
@@ -496,25 +391,62 @@ int main(int argc, char* argv[]) {
         MPI_Barrier(MPI_COMM_WORLD);
 
         if (!mpi_rank) {
-            const int    nelements       = mesh.nelements;
-            const double elements_second = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            // const int nelements    = tot_nelements;
+            // const int nnodes       = tot_nnodes;
+            const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
+
+            const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
+            const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
 
             printf("\n");
             printf("===========================================\n");
             printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
 
-            printf("Rank: [%d]  Nr of elements  %d\n",                    //
-                   mpi_rank,                                              //
-                   nelements * mpi_size);                                 //
-            printf("Rank: [%d]  Resample        %g (seconds)\n",          //
-                   mpi_rank,                                              //
-                   resample_tock - resample_tick);                        //
+            printf("Rank: [%d]  Nr of elements  %d\n",  //
+                   mpi_rank,                            //
+                   tot_nelements);                      //
+
+            printf("Rank: [%d]  Nr of nodes     %d\n",  //
+                   mpi_rank,                            //
+                   tot_nnodes);                         //
+
+            printf("Rank: [%d]  Nr of point_struc %d\n",  //
+                   mpi_rank,                              //
+                   npoint_struc);                         //
+
+            printf("Rank: [%d]  Resample        %g (seconds)\n",  //
+                   mpi_rank,                                      //
+                   resample_tock - resample_tick);                //
+
             printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
                    mpi_rank,                                              //
                    elements_second);                                      //
-            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",           //
-                   mpi_rank,                                              //
-                   tot_flops);                                            //
+
+            printf("Rank: [%d]  Throughput      %e (nodes/second)\n",  //
+                   mpi_rank,                                           //
+                   nodes_second);                                      //
+
+            printf("Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
+                   mpi_rank,                                                 //
+                   nodes_struc_second);                                      //
+
+            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
+                   mpi_rank,                                     //
+                   tot_flops);                                   //
+
+            printf("<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
+                   "nodes_struc_second\n");
+            printf("<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g\n",  //
+                   mpi_rank,                                                         //
+                   mpi_size,                                                         //
+                   tot_nelements,                                                    //
+                   tot_nnodes,                                                       //
+                   npoint_struc,                                                     //
+                   (resample_tock - resample_tick),                                    //
+                   elements_second,                                                  //
+                   nodes_second,                                                     //
+                   nodes_struc_second);                                              //
             printf("===========================================\n");
 
             printf("\n");
@@ -589,3 +521,129 @@ int main(int argc, char* argv[]) {
     const int return_value = MPI_Finalize();
     RETURN_FROM_FUNCTION(return_value);
 }
+
+//             if (mpi_size == 1) {
+//                 resample_field(
+//                         // Mesh
+//                         mesh.element_type,
+//                         mesh.nelements,
+//                         mesh.nnodes,
+//                         mesh.elements,
+//                         mesh.points,
+//                         // discrete field
+//                         nlocal,
+//                         stride,
+//                         origin,
+//                         delta,
+//                         field,
+//                         // Output
+//                         g,
+//                         &info);
+
+//                 // end if mpi_size == 1
+
+//             } else {
+//                 // mpi_size > 1
+
+//                 if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+// #if SFEM_TET10_CUDA == ON
+//                     const int ret =                                           //
+//                             hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
+//                                     mpi_size,                                 // MPI size
+//                                     mpi_rank,                                 // MPI rank
+//                                     &mesh,                                    // Mesh
+//                                     assemble_dual_mass_vector_cuda,           // assemble dual mass vector in
+//                                     the kernel nlocal,                                   // number of nodes in
+//                                     each direction stride,                                   // stride of the
+//                                     data origin,                                   // origin of the domain
+//                                     delta,                                    // delta of the domain
+//                                     field,                                    // filed
+//                                     g);                                       // output
+// #endif
+//                 } else {  // Other cases and CPU
+//                     resample_field_local(
+//                             // Mesh
+//                             mesh.element_type,
+//                             mesh.nelements,
+//                             mesh.nnodes,
+//                             mesh.elements,
+//                             mesh.points,
+//                             // discrete field
+//                             nlocal,
+//                             stride,
+//                             origin,
+//                             delta,
+//                             field,
+//                             // Output
+//                             g,
+//                             &info);
+//                 }  // END if info.element_type == TET10 && SFEM_TET10_CUDA == ON /////
+
+//                 real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
+
+//                 if (mesh.element_type == TET10 && assemble_dual_mass_vector_cuda == 0) {
+//                     // FIXME (we should wrap mass vector assembly in sfem_resample_field.c)
+
+//                     // In case of CUDA == ON this is calculated in the CUDA kernels calls
+//                     // Directely in the hex8_to_tet10_resample_field_local_CUDA function
+
+//                     tet10_assemble_dual_mass_vector(mesh.nelements,  //
+//                                                     mesh.nnodes,
+//                                                     mesh.elements,
+//                                                     mesh.points,
+//                                                     mass_vector);
+
+//                     // end if mesh.element_type == TET10
+//                 } else if (mesh.element_type == TET4) {  // mesh.element_type == TET4
+//                     enum ElemType st = shell_type(mesh.element_type);
+
+//                     if (st == INVALID) {
+//                         assemble_lumped_mass(
+//                                 mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
+//                                 mass_vector);
+
+//                     } else {
+//                         assemble_lumped_mass(st, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points,
+//                         mass_vector);
+//                     }
+
+//                     // end if mesh.element_type == TET4
+
+//                 }  // end if mesh.element_type == TET10
+
+//                 if (assemble_dual_mass_vector_cuda == 0) {
+//                     //// TODO In CPU must be called.
+//                     //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed
+//                     memory
+//                     //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at
+//                     the moment)
+
+//                     // exchange ghost nodes and add contribution
+//                     if (mpi_size > 1) {
+//                         send_recv_t slave_to_master;
+//                         mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+
+//                         ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
+//                         real_t*   real_buffer = malloc(count * sizeof(real_t));
+
+//                         exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
+//                         exchange_add(&mesh, &slave_to_master, g, real_buffer);
+
+//                         free(real_buffer);
+//                         send_recv_destroy(&slave_to_master);
+//                     }  // end if mpi_size > 1
+
+//                     // divide by the mass vector
+//                     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+//                         if (mass_vector[i] == 0) {
+//                             fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh.n_owned_nodes,
+//                             mesh.nnodes);
+//                         }
+
+//                         assert(mass_vector[i] != 0);
+//                         g[i] /= mass_vector[i];
+//                     }  // end for i < mesh.n_owned_nodes
+//                 }      // end if SFEM_TET10_CUDA == OFF || SFEM_CUDA_MEMORY_MODEL == UNIFIED
+
+//                 free(mass_vector);
+//             }  // end if mpi_size > 1
