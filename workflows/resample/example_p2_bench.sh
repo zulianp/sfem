@@ -197,10 +197,8 @@ fi
 # Enable second order mesh parametrizations
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
-output_file="output_bench_p2.log"
+output_file="output_Throughput.log"
 bench_file="tet10_bench_p2.csv"
-
-
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
@@ -216,7 +214,7 @@ n_proc_max=18
 for n_procs in $(seq 1 $n_proc_max); do
 	LAUNCH="srun --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
     LAUNCH="mpiexec -np $n_procs " ### 
-    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA > "$output_file" 2>&1
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA write
 
 	if [ $n_procs -eq 1 ]; then
         # First iteration: capture lines beginning with <BenchH> and write to bench_file

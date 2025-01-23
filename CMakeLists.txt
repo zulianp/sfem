@@ -139,6 +139,11 @@ message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
 ######################################################
+# SFEM_LOG_LEVEL
+set(SFEM_LOG_LEVEL 5 CACHE STRING "Set the default log level for SFEM")
+message(STATUS "SFEM_LOG_LEVEL: ${SFEM_LOG_LEVEL}")
+
+######################################################
 # include
 
 foreach(include ${SFEM_BUILD_INCLUDES})

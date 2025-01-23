@@ -141,7 +141,7 @@ hex_aa_8_eval_fun_V(const real_t x, const real_t y, const real_t z,
 void                                                                    //
 hex_aa_8_collect_coeffs_V(const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
                           const ptrdiff_t                      i,       // Indices of the element
-                          const ptrdiff_t                      j,       // 
+                          const ptrdiff_t                      j,       //
                           const ptrdiff_t                      k,       //
                           const real_t* const SFEM_RESTRICT    data,    // Input
                           real_t* const SFEM_RESTRICT          out0,    // Output
@@ -190,10 +190,12 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
                              const geom_t* const SFEM_RESTRICT    delta,          //
                              const real_type* const SFEM_RESTRICT data,           //
                              real_type* const SFEM_RESTRICT       weighted_field) {     // Output
-    //
+//
+#if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
     printf("Start: tet4_resample_field_local  v2 [%s] \n", __FILE__);
     printf("============================================================\n");
+#endif
     //
     const real_type ox = (real_type)origin[0];
     const real_type oy = (real_type)origin[1];
