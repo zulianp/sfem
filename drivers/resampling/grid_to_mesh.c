@@ -391,7 +391,7 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
-        if (!mpi_rank) {
+        if (mpi_rank == 0) {
             // const int nelements    = tot_nelements;
             // const int nnodes       = tot_nnodes;
             const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
@@ -403,68 +403,104 @@ int main(int argc, char* argv[]) {
             const int    real_t_bits              = sizeof(real_t) * 8;
             const int    ptrdiff_t_bits           = sizeof(ptrdiff_t) * 8;
 
-            printf("\n");
-            printf("===========================================\n");
-            printf("Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
-            printf("Rank: [%d]  real_t bits    %d\n",  //
-                   mpi_rank,                           //
-                   real_t_bits);                       //
-            printf("Rank: [%d]  ptrdiff_t bits %d\n",  //
-                   mpi_rank,                           //
-                   ptrdiff_t_bits);                    //
+            int std_out = 1;
 
-            printf("Rank: [%d]  Nr of elements  %d\n",  //
-                   mpi_rank,                            //
-                   tot_nelements);                      //
+            if (check_string_in_args(argc, (const char**)argv, "write", 0)) {
+                std_out = 0;
+            }
 
-            printf("Rank: [%d]  Nr of nodes     %d\n",  //
-                   mpi_rank,                            //
-                   tot_nnodes);                         //
+            FILE* output_file = NULL;
 
-            printf("Rank: [%d]  Nr of point_struc %d\n",  //
-                   mpi_rank,                              //
-                   npoint_struc);                         //
+            if (std_out == 1) {
+                output_file = stdout;
+            } else {
+                output_file = fopen("output_Throughput.log", "w");
+            }
 
-            printf("Rank: [%d]  Resample        %g (seconds)\n",  //
-                   mpi_rank,                                      //
-                   resample_tock - resample_tick);                //
+            if (output_file == NULL) {
+                fprintf(stderr, "Error opening file for writing\n");
+                return EXIT_FAILURE;
+            }
 
-            printf("Rank: [%d]  Throughput      %e (elements/second)\n",  //
-                   mpi_rank,                                              //
-                   elements_second);                                      //
+            fprintf(output_file, "\n");
+            fprintf(output_file, "===========================================\n");
+            fprintf(output_file, "Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
+            fprintf(output_file,
+                    "Rank: [%d]  real_t bits    %d\n",  //
+                    mpi_rank,                           //
+                    real_t_bits);                       //
+            fprintf(output_file,
+                    "Rank: [%d]  ptrdiff_t bits %d\n",  //
+                    mpi_rank,                           //
+                    ptrdiff_t_bits);                    //
 
-            printf("Rank: [%d]  Throughput      %e (nodes/second)\n",  //
-                   mpi_rank,                                           //
-                   nodes_second);                                      //
+            fprintf(output_file,
+                    "Rank: [%d]  Nr of elements  %d\n",  //
+                    mpi_rank,                            //
+                    tot_nelements);                      //
 
-            printf("Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
-                   mpi_rank,                                                 //
-                   nodes_struc_second);                                      //
+            fprintf(output_file,
+                    "Rank: [%d]  Nr of nodes     %d\n",  //
+                    mpi_rank,                            //
+                    tot_nnodes);                         //
 
-            printf("Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
-                   mpi_rank,                                                       //
-                   quadrature_points_second);                                      //
+            fprintf(output_file,
+                    "Rank: [%d]  Nr of point_struc %d\n",  //
+                    mpi_rank,                              //
+                    npoint_struc);                         //
 
-            printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
-                   mpi_rank,                                     //
-                   tot_flops);                                   //
+            fprintf(output_file,
+                    "Rank: [%d]  Resample        %g (seconds)\n",  //
+                    mpi_rank,                                      //
+                    resample_tock - resample_tick);                //
 
-            printf("<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
-                   "nodes_struc_second, quadrature_points_second\n");
-            printf("<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
-                   mpi_rank,                                                              //
-                   mpi_size,                                                              //
-                   tot_nelements,                                                         //
-                   tot_nnodes,                                                            //
-                   npoint_struc,                                                          //
-                   (resample_tock - resample_tick),                                       //
-                   elements_second,                                                       //
-                   nodes_second,                                                          //
-                   nodes_struc_second,                                                    //
-                   quadrature_points_second);                                             //
-            printf("===========================================\n");
+            fprintf(output_file,
+                    "Rank: [%d]  Throughput      %e (elements/second)\n",  //
+                    mpi_rank,                                              //
+                    elements_second);                                      //
 
-            printf("\n");
+            fprintf(output_file,
+                    "Rank: [%d]  Throughput      %e (nodes/second)\n",  //
+                    mpi_rank,                                           //
+                    nodes_second);                                      //
+
+            fprintf(output_file,
+                    "Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
+                    mpi_rank,                                                 //
+                    nodes_struc_second);                                      //
+
+            fprintf(output_file,
+                    "Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
+                    mpi_rank,                                                       //
+                    quadrature_points_second);                                      //
+
+            fprintf(output_file,
+                    "Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
+                    mpi_rank,                                     //
+                    tot_flops);                                   //
+
+            fprintf(output_file,
+                    "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
+                    "nodes_struc_second, quadrature_points_second\n");
+            fprintf(output_file,
+                    "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+                    mpi_rank,                                                              //
+                    mpi_size,                                                              //
+                    tot_nelements,                                                         //
+                    tot_nnodes,                                                            //
+                    npoint_struc,                                                          //
+                    (resample_tock - resample_tick),                                       //
+                    elements_second,                                                       //
+                    nodes_second,                                                          //
+                    nodes_struc_second,                                                    //
+                    quadrature_points_second);                                             //
+            fprintf(output_file, "===========================================\n");
+
+            fprintf(output_file, "\n");
+
+            if (std_out == 0) {
+                fclose(output_file);
+            }
         }
     }
 
