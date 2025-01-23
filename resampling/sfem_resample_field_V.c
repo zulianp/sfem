@@ -336,9 +336,11 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
     //
     PRINT_CURRENT_FUNCTION;
 
+#if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
     printf("Start: tet4_resample_field_local_V_aligned  V8 [%s:%d] \n", __FILE__, __LINE__);
     printf("============================================================\n");
+#endif
     //
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -574,14 +576,17 @@ int tet4_resample_field_local_V(const ptrdiff_t                      nelements, 
                                 real_t* const SFEM_RESTRICT          weighted_field) {    // Output
     //
     PRINT_CURRENT_FUNCTION;
+    
 
     const ptrdiff_t nelements_aligned = nelements - (nelements % _VL_);
     const ptrdiff_t nelements_tail    = nelements % _VL_;
 
+#if SFEM_LOG_LEVEL >= 5
     printf("=============================================\n");
     printf("nelements_aligned = %ld\n", nelements_aligned);
     printf("nelements_tail =    %ld\n", nelements_tail);
     printf("=============================================\n");
+#endif
 
     int ret = 0;
 

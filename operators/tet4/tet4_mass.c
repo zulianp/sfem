@@ -213,7 +213,9 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
     }
 
     double tock = MPI_Wtime();
+#if SFEM_LOG_LEVEL >= 5
     printf("tet4_mass.c: assemble_mass\t%g seconds\n", tock - tick);
+#endif
 }
 
 /**

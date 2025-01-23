@@ -97,8 +97,10 @@ GRID_TO_MESH="grid_to_mesh"
 
 set -x
 
-output_file="output_bench.log"
+output_file="output_Throughput.log"
 bench_file="tet4_bench.csv"
+
+rm -fv $output_file $bench_file
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
@@ -109,7 +111,7 @@ n_proc_max=192
 for n_procs in $(seq 1 $n_proc_max); do
 	LAUNCH="srun --exclusive -p workq --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
     #LAUNCH="mpiexec -np $n_procs "
-    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA > "$output_file" 2>&1
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA write
 
 	if [ $n_procs -eq 1 ]; then
         # First iteration: capture lines beginning with <BenchH> and append to bench_file
