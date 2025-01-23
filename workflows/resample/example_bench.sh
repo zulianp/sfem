@@ -24,7 +24,7 @@ export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
 LAUNCH_TEST="srun --nodes=1 --ntasks=1 " ### FOR HPC with SLURM ###
-LAUNCH_TEST=" "
+#LAUNCH_TEST=" "
 
 field=field.raw
 
@@ -33,7 +33,7 @@ mesh=mesh
 
 out=resampled
 skinned=skinned
-sdf=sdf.float32.raw
+sdf=$PWD/sdf.float32.raw
 
 mesh_sorted=sorted
 # mesh_sorted=impeller_tet4
@@ -61,7 +61,7 @@ else
 	mkdir -p $skinned
 	${LAUNCH_TEST} skin $mesh $skinned
 	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	${LAUNCH_TEST} mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
+	#${LAUNCH_TEST} mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
 fi
 
@@ -104,11 +104,11 @@ export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 
 ################ run benchmark ################
-n_proc_max=18
+n_proc_max=192
 
 for n_procs in $(seq 1 $n_proc_max); do
-	LAUNCH="srun --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
-    LAUNCH="mpiexec -np $n_procs "
+	LAUNCH="srun --exclusive -p workq --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
+    #LAUNCH="mpiexec -np $n_procs "
     $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA > "$output_file" 2>&1
 
 	if [ $n_procs -eq 1 ]; then
