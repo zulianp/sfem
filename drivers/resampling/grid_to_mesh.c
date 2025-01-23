@@ -15,6 +15,7 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
 
+#include "quadratures_rule.h"
 #include "tet10_resample_field.h"
 
 #include "mesh_utils.h"
@@ -395,11 +396,12 @@ int main(int argc, char* argv[]) {
             // const int nnodes       = tot_nnodes;
             const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
 
-            const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
-            const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
-            const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
-            const int    real_t_bits        = sizeof(real_t) * 8;
-            const int    ptrdiff_t_bits     = sizeof(ptrdiff_t) * 8;
+            const double elements_second          = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            const double nodes_second             = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
+            const double nodes_struc_second       = (double)npoint_struc / (double)(resample_tock - resample_tick);
+            const double quadrature_points_second = (double)(tot_nelements * TET4_NQP) / (double)(resample_tock - resample_tick);
+            const int    real_t_bits              = sizeof(real_t) * 8;
+            const int    ptrdiff_t_bits           = sizeof(ptrdiff_t) * 8;
 
             printf("\n");
             printf("===========================================\n");
@@ -439,22 +441,27 @@ int main(int argc, char* argv[]) {
                    mpi_rank,                                                 //
                    nodes_struc_second);                                      //
 
+            printf("Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
+                   mpi_rank,                                                       //
+                   quadrature_points_second);                                      //
+
             printf("Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
                    mpi_rank,                                     //
                    tot_flops);                                   //
 
             printf("<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
-                   "nodes_struc_second\n");
-            printf("<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g\n",  //
-                   mpi_rank,                                                         //
-                   mpi_size,                                                         //
-                   tot_nelements,                                                    //
-                   tot_nnodes,                                                       //
-                   npoint_struc,                                                     //
-                   (resample_tock - resample_tick),                                  //
-                   elements_second,                                                  //
-                   nodes_second,                                                     //
-                   nodes_struc_second);                                              //
+                   "nodes_struc_second, quadrature_points_second\n");
+            printf("<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+                   mpi_rank,                                                              //
+                   mpi_size,                                                              //
+                   tot_nelements,                                                         //
+                   tot_nnodes,                                                            //
+                   npoint_struc,                                                          //
+                   (resample_tock - resample_tick),                                       //
+                   elements_second,                                                       //
+                   nodes_second,                                                          //
+                   nodes_struc_second,                                                    //
+                   quadrature_points_second);                                             //
             printf("===========================================\n");
 
             printf("\n");

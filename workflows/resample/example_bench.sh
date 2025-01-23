@@ -23,6 +23,9 @@ NCORES=8
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
+LAUNCH_TEST="srun --nodes=1 --ntasks=1 " ### FOR HPC with SLURM ###
+LAUNCH_TEST=" "
+
 field=field.raw
 
 mesh=mesh
@@ -49,21 +52,20 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5
+	${LAUNCH_TEST} create_sphere.sh 5
 	
-	refine $mesh refined
+	${LAUNCH_TEST} refine $mesh refined
 	# sfc $mesh $mesh_sorted
-	sfc refined $mesh_sorted
+	${LAUNCH_TEST} sfc refined $mesh_sorted
 
 	mkdir -p $skinned
-	skin $mesh $skinned
+	${LAUNCH_TEST} skin $mesh $skinned
 	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
+	${LAUNCH_TEST} mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
 fi
 
-## raw_to_xdmf.py $sdf
-sdf_test.py $sdf
+${LAUNCH_TEST} sdf_test.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
@@ -98,12 +100,14 @@ set -x
 output_file="output_bench.log"
 bench_file="tet4_bench.csv"
 
-n_proc_max=18
-
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 
+################ run benchmark ################
+n_proc_max=18
+
 for n_procs in $(seq 1 $n_proc_max); do
+	LAUNCH="srun --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
     LAUNCH="mpiexec -np $n_procs "
     $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA > "$output_file" 2>&1
 
