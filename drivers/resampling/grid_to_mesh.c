@@ -399,6 +399,7 @@ int main(int argc, char* argv[]) {
             const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
             const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
             const int    real_t_bits        = sizeof(real_t) * 8;
+            const int    ptrdiff_t_bits     = sizeof(ptrdiff_t) * 8;
 
             printf("\n");
             printf("===========================================\n");
@@ -406,6 +407,9 @@ int main(int argc, char* argv[]) {
             printf("Rank: [%d]  real_t bits    %d\n",  //
                    mpi_rank,                           //
                    real_t_bits);                       //
+            printf("Rank: [%d]  ptrdiff_t bits %d\n",  //
+                   mpi_rank,                           //
+                   ptrdiff_t_bits);                    //
 
             printf("Rank: [%d]  Nr of elements  %d\n",  //
                    mpi_rank,                            //
