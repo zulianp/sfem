@@ -164,15 +164,19 @@ then
 elif [[ "$USE_MPI_NORMAL" == "1" ]]
 then
 	LAUNCH="srun -n $n_procs -p debug "
+
 elif [[ "$USE_MPI_GH200" == "1" ]]
 then
-	LAUNCH="srun -n $n_procs -p gh200 "
+	LAUNCH="srun -p debug -n $n_procs -N 1 ./mps-wrapper.sh "
+
 elif [[ "$USE_NSIGNT" == "1" ]]
 then
 	LAUNCH="${Nsight_PATH}/ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 else
 	LAUNCH=""
 fi
+
+echo Launching: $LAUNCH
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 GRID_TO_MESH="grid_to_mesh"
