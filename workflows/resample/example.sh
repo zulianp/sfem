@@ -69,16 +69,16 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=1
+n_procs=4
 # n_procs=2
 # n_procs=8
 
-Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
-Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
+Nsight_PATH="/capstor/scratch/cscs/sriva/app/nsight-compute/2024.3.1"
+Nsight_OUTPUT="/capstor/scratch/cscs/sriva/app/NVidia_prof_out/ncu_grid_to_mesh"
 
 LAUNCH="mpiexec -np $n_procs "
-# LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
-# LAUNCH="srun -p debug -n $n_procs -N 1 "
+LAUNCH="srun -p debug -n $n_procs  ${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
+LAUNCH="srun -p debug -n $n_procs -N 1 ./mps-wrapper.sh "
 # LAUNCH=""
 
 GRID_TO_MESH="grid_to_mesh"
