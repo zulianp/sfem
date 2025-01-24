@@ -793,6 +793,7 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
 
     struct timespec start, end;
 
+    MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &start);
     // TODO Launch the kernel
     launch_kernels_tet4_resample_field_CUDA_unified(mpi_size,                        //
@@ -813,25 +814,36 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
                                                     mass_vector,                     //
                                                     weighted_field_device);          //
 
+    MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
     double clock_ms = get_time(start, end);
 
-    const double seconds                      = clock_ms / 1000.0;
-    const double elements_per_second          = (double)(mesh->nelements) / seconds;
-    const double nodes_per_second             = (double)(mesh->n_owned_nodes) / seconds;
-    const double quadrature_points_per_second = (double)(mesh->n_owned_nodes * TET4_NQP) / seconds;
+    MPI_Comm comm = MPI_COMM_WORLD;
 
-    printf("GPU: =======================================================\n");
-    printf("GPU: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-    printf("GPU: Number of elements:               %ld\n", mesh->nelements);
-    printf("GPU: Elapsed time:                     %e s\n", seconds);
-    printf("GPU: Elapsed time:                     %e ms\n", clock_ms);
-    printf("GPU: Elements/second:                  %e\n", elements_per_second);
-    printf("GPU: Nodes/second:                     %e\n", nodes_per_second);
-    printf("GPU: Points/second:                    %e\n", (double)size_data / seconds);
-    printf("GPU: Quadrature points/second:         %e\n", quadrature_points_per_second);
-    printf("GPU: =======================================================\n");
+    int tot_nelements = 0;
+    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nnodes = 0;
+    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    const double seconds                      = clock_ms / 1000.0;
+    const double elements_per_second          = (double)(tot_nelements) / seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nnodes * TET4_NQP) / seconds;
+
+    if (mpi_rank == 0) {
+        printf("GPU: =======================================================\n");
+        printf("GPU: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+        printf("GPU: Number of elements:               %ld\n", tot_nelements);
+        printf("GPU: Elapsed time:                     %e s\n", seconds);
+        printf("GPU: Elapsed time:                     %e ms\n", clock_ms);
+        printf("GPU: Elements/second:                  %e\n", elements_per_second);
+        printf("GPU: Nodes/second:                     %e\n", nodes_per_second);
+        printf("GPU: Points/second:                    %e\n", (double)size_data / seconds);
+        printf("GPU: Quadrature points/second:         %e\n", quadrature_points_per_second);
+        printf("GPU: =======================================================\n");
+    }
 
     // Free memory on the device
     free_elems_tet4_device(&elems_device);
