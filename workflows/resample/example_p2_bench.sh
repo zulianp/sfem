@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 
+LAUNCH_TEST="srun --nodes=1 --ntasks=1 " ### FOR HPC with SLURM ###
+LAUNCH_TEST=" "
+
 search_name_number_in_args() {
     local name="$1"
     shift
@@ -119,13 +122,17 @@ else
 	# create_sphere.sh 5
 	
 	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	sfc $mesh temp_mesh
-	SFEM_ORDER_WITH_COORDINATE=2 sfc temp_mesh $mesh_sorted
+	${LAUNCH_TEST} sfc $mesh temp_mesh
+	
+	export SFEM_ORDER_WITH_COORDINATE=2 
+	${LAUNCH_TEST} sfc temp_mesh $mesh_sorted
 	
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
-	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
+	export SFEM_SPERE_TOL=1e-5 
+	export SFEM_MAP_TO_SPHERE=1 
+	${LAUNCH_TEST} mesh_p1_to_p2 $mesh_sorted $p2_mesh
 
-	raw_to_db.py $p2_mesh test_mapping.vtk 
+	${LAUNCH_TEST} raw_to_db.py $p2_mesh test_mapping.vtk 
 fi
 
 if [[ -f "$sdf" ]]
@@ -134,12 +141,12 @@ then
 else
 	echo "Computing SDF!"
 	mkdir -p $skinned
-	skin $mesh_sorted $skinned
-	mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	raw_to_xdmf.py $sdf
+	${LAUNCH_TEST} skin $mesh_sorted $skinned
+	${LAUNCH_TEST} mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
+	${LAUNCH_TEST} raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf
+${LAUNCH_TEST} sdf_test.py $sdf
 # raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
@@ -190,19 +197,24 @@ fi
 # Enable second order mesh parametrizations
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
-output_file="output_bench_p2.log"
+output_file="output_Throughput.log"
 bench_file="tet10_bench_p2.csv"
-
-n_proc_max=18
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 
 set -x
 
+rm -vf $output_file $bench_file
+
+################ run benchmark ################
+
+n_proc_max=18
+
 for n_procs in $(seq 1 $n_proc_max); do
-    LAUNCH="mpiexec -np $n_procs "
-    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA > "$output_file" 2>&1
+	LAUNCH="srun --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
+    LAUNCH="mpiexec -np $n_procs " ### 
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA write
 
 	if [ $n_procs -eq 1 ]; then
         # First iteration: capture lines beginning with <BenchH> and write to bench_file

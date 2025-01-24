@@ -727,9 +727,11 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
     //
     PRINT_CURRENT_FUNCTION;
 
+#if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
     printf("Start: hex8_to_isoparametric_tet10_resample_field_local_V\n");
     printf("============================================================\n");
+#endif
 
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];

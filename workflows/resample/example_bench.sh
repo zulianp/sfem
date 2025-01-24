@@ -23,6 +23,9 @@ NCORES=8
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
+LAUNCH_TEST="srun --nodes=1 --ntasks=1 " ### FOR HPC with SLURM ###
+#LAUNCH_TEST=" "
+
 field=field.raw
 
 mesh=mesh
@@ -30,7 +33,7 @@ mesh=mesh
 
 out=resampled
 skinned=skinned
-sdf=sdf.float32.raw
+sdf=$PWD/sdf.float32.raw
 
 mesh_sorted=sorted
 # mesh_sorted=impeller_tet4
@@ -49,21 +52,20 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5
+	${LAUNCH_TEST} create_sphere.sh 5
 	
-	refine $mesh refined
+	${LAUNCH_TEST} refine $mesh refined
 	# sfc $mesh $mesh_sorted
-	sfc refined $mesh_sorted
+	${LAUNCH_TEST} sfc refined $mesh_sorted
 
 	mkdir -p $skinned
-	skin $mesh $skinned
+	${LAUNCH_TEST} skin $mesh $skinned
 	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
+	#${LAUNCH_TEST} mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
 fi
 
-## raw_to_xdmf.py $sdf
-sdf_test.py $sdf
+${LAUNCH_TEST} sdf_test.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
 origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
@@ -95,17 +97,21 @@ GRID_TO_MESH="grid_to_mesh"
 
 set -x
 
-output_file="output_bench.log"
+output_file="output_Throughput.log"
 bench_file="tet4_bench.csv"
 
-n_proc_max=18
+rm -fv $output_file $bench_file
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 
+################ run benchmark ################
+n_proc_max=192
+
 for n_procs in $(seq 1 $n_proc_max); do
-    LAUNCH="mpiexec -np $n_procs "
-    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA > "$output_file" 2>&1
+	LAUNCH="srun --exclusive -p workq --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
+    #LAUNCH="mpiexec -np $n_procs "
+    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA write
 
 	if [ $n_procs -eq 1 ]; then
         # First iteration: capture lines beginning with <BenchH> and append to bench_file

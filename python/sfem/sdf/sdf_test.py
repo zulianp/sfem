@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import os
+import os, sys
 import time
 # from concurrent.futures import ThreadPoolExecutor
 
 
-output_path = os.path.join(
-    os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
+#output_path = os.path.join(
+   # os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
 # output_path = os.path.join(os.environ['SCRATCH'], 'prj/sfem/workflows/resample/sdf.float32.raw')
+output_path = sys.argv[1] 
 
 print("sdf_test.py: ==========================================")
 print(f'sdf_test.py: Writing field to {output_path}')

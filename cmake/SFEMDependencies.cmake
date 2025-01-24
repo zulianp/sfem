@@ -156,3 +156,9 @@ if(SFEM_ENABLE_CUDA)
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
 endif()
+
+
+if(SFEM_ENABLE_AVX512_SORT)
+	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
+endif()
+
