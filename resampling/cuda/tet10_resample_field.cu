@@ -2,6 +2,7 @@
 #include <cuda_profiler_api.h>
 #include <sfem_base.h>
 #include <stdio.h>
+#include <time.h>
 
 // #define real_type real_t
 
@@ -450,7 +451,8 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
     fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
-    fprintf(output_file, "GPU TET10:    file: %s:%d, function: %s \n", file, line, function);
+    fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
+    fprintf(output_file, "GPU TET10:    function: %s\n", function);
     fprintf(output_file, "GPU TET10:    Number of elements: %d.\n", mesh->nelements);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
@@ -469,12 +471,27 @@ print_performance_metrics(FILE*       output_file,      //
             tot_nelements,                                                              //
             tot_nnodes,                                                                 //
             n_points_struct,                                                            //
-            (seconds),                                                                  //
+            seconds,                                                                    //
             elements_per_second,                                                        //
             nodes_per_second,                                                           //
             nodes_struc_second,                                                         //
             quadrature_points_per_second);                                              //
     fprintf(output_file, "============================================================================\n");
+}
+
+/**
+ * Calculates the elapsed time between two timespec structures.
+ *
+ * @param start The starting timespec structure.
+ * @param end The ending timespec structure.
+ * @return The elapsed time in milliseconds.
+ */
+double get_time_tet10(struct timespec start,  //
+                      struct timespec end) {
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
+    elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
+
+    return elapsed;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -547,11 +564,10 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     cudaDeviceSynchronize();
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    struct timespec start, end;
 
-    cudaEventRecord(start);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     ////  Launch the kernel
     launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(mpi_size,                        //
@@ -572,13 +588,12 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
                                                                    mass_vector,                     //
                                                                    g_device);                       //
 
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    double clock_ms = get_time_tet10(start, end);
 
-    const double seconds = milliseconds / 1000.0;
+    const double seconds = clock_ms / 1000.0;
 
     const int n_points_struct = n[0] * n[1] * n[2];
 
