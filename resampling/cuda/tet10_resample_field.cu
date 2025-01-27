@@ -426,10 +426,13 @@ print_performance_metrics(FILE*       output_file,      //
     const double quadrature_points_per_second = (double)(tot_nnodes * quad_nodes_cnt) / seconds;
     const double nodes_struc_second           = (double)(n_points_struct) / seconds;
 
+    const int real_t_bits = sizeof(real_t) * 8;
+
     fprintf(output_file, "============================================================================\n");
     fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
     fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
     fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
+    fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
     fprintf(output_file, "GPU TET10:    file: %s:%d, function: %s \n", file, line, function);
     fprintf(output_file, "GPU TET10:    Number of elements: %d.\n", mesh->nelements);
@@ -439,20 +442,22 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
     fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
     fprintf(output_file,
-            "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
+            "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
+            "nodes_second, "
             "nodes_struc_second, quadrature_points_second\n");
     fprintf(output_file,
-            "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
-            mpi_rank,                                                              //
-            mpi_size,                                                              //
-            tot_nelements,                                                         //
-            tot_nnodes,                                                            //
-            n_points_struct,                                                       //
-            (seconds),                                                             //
-            elements_per_second,                                                   //
-            nodes_per_second,                                                      //
-            nodes_struc_second,                                                    //
-            quadrature_points_per_second);                                         //
+            "<BenchR> %d,   %d,  %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            mpi_rank,                                                                   //
+            mpi_size,                                                                   //
+            real_t_bits,                                                                //
+            tot_nelements,                                                              //
+            tot_nnodes,                                                                 //
+            n_points_struct,                                                            //
+            (seconds),                                                                  //
+            elements_per_second,                                                        //
+            nodes_per_second,                                                           //
+            nodes_struc_second,                                                         //
+            quadrature_points_per_second);                                              //
     fprintf(output_file, "============================================================================\n");
 }
 
