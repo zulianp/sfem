@@ -413,6 +413,10 @@ print_performance_metrics(FILE*       output_file,      //
                           int         quad_nodes_cnt,   //
                           mesh_t*     mesh) {               //
 
+    if (mpi_rank != 0) {
+        return;
+    }
+
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int tot_nelements = 0;
