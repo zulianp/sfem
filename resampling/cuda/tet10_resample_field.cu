@@ -430,6 +430,9 @@ print_performance_metrics(FILE*       output_file,      //
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
+    int tot_npoints_struct = 0;
+    MPI_Reduce(&n_points_struct, &tot_npoints_struct, 1, MPI_INT, MPI_SUM, 0, comm);
+
     int tot_nelements = 0;
     MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
@@ -441,7 +444,7 @@ print_performance_metrics(FILE*       output_file,      //
     const double elements_per_second          = (double)(tot_nelements) / seconds;
     const double nodes_per_second             = (double)(tot_nnodes) / seconds;
     const double quadrature_points_per_second = (double)(tot_nnodes * quad_nodes_cnt) / seconds;
-    const double nodes_struc_second           = (double)(n_points_struct) / seconds;
+    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
 
     const int real_t_bits = sizeof(real_t) * 8;
 
@@ -470,7 +473,7 @@ print_performance_metrics(FILE*       output_file,      //
             real_t_bits,                                                                //
             tot_nelements,                                                              //
             tot_nnodes,                                                                 //
-            n_points_struct,                                                            //
+            tot_npoints_struct,                                                         //
             seconds,                                                                    //
             elements_per_second,                                                        //
             nodes_per_second,                                                           //
