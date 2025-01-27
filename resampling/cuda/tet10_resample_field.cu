@@ -399,6 +399,63 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
     RETURN_FROM_FUNCTION(0);
 }
 
+// Function to print the performance metrics
+void                                                    //
+print_performance_metrics(FILE*       output_file,      //
+                          const char* kernel_name,      //
+                          int         mpi_rank,         //
+                          int         mpi_size,         //
+                          double      seconds,          //
+                          const char* file,             //
+                          int         line,             //
+                          const char* function,         //
+                          int         n_points_struct,  //
+                          int         quad_nodes_cnt,   //
+                          mesh_t*     mesh) {               //
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    int tot_nelements = 0;
+    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nnodes = 0;
+    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    const double elements_per_second          = (double)(tot_nelements) / seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nnodes * quad_nodes_cnt) / seconds;
+    const double nodes_struc_second           = (double)(n_points_struct) / seconds;
+
+    fprintf(output_file, "============================================================================\n");
+    fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
+    fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
+    fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
+    fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
+    fprintf(output_file, "GPU TET10:    file: %s:%d, function: %s \n", file, line, function);
+    fprintf(output_file, "GPU TET10:    Number of elements: %d.\n", mesh->nelements);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
+    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
+    fprintf(output_file,
+            "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
+            "nodes_struc_second, quadrature_points_second\n");
+    fprintf(output_file,
+            "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            mpi_rank,                                                              //
+            mpi_size,                                                              //
+            tot_nelements,                                                         //
+            tot_nnodes,                                                            //
+            n_points_struct,                                                       //
+            (seconds),                                                             //
+            elements_per_second,                                                   //
+            nodes_per_second,                                                      //
+            nodes_struc_second,                                                    //
+            quadrature_points_per_second);                                         //
+    fprintf(output_file, "============================================================================\n");
+}
+
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_unified
 ////////////////////////////////////////////////////////////////////////
@@ -504,56 +561,46 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     const int n_points_struct = n[0] * n[1] * n[2];
 
-<<<<<<< HEAD
-    int tot_nelements = 0;
-    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+    if (SFEM_LOG_LEVEL >= 5) {
+        const int print_to_file = 1;
 
-    int tot_nnodes = 0;
-    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+        FILE* output_file = stdout;
 
-    const double elements_per_second          = (double)(tot_nelements) / seconds;
-    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nnodes * TET4_NQP) / seconds;
+        FILE* output_file_print = NULL;
 
-    printf("============================================================================\n");
-    printf("GPU TET4:    Time for the kernel (%s):\n", kernel_name);
-    printf("GPU TET4:    MPI rank: %d\n", mpi_rank);
-    printf("GPU TET4:    MPI size: %d\n", mpi_size);
-    printf("GPU TET4:    %f seconds\n", seconds);
-    printf("GPU TET4:    file: %s:%d, function: %s \n", __FILE__, __LINE__, __FUNCTION__);
-    printf("GPU TET4:    Number of elements: %d.\n", mesh->nelements);
-    printf("GPU TET4:    Throughput for the kernel: %e elements/second\n", elements_per_second);
-    printf("GPU TET4:    Trougput for the kernel: %e points_struct/second\n", n_points_struct / seconds);
-    printf("GPU TET4:    Trougput for the kernel: %e nodes/second\n", nodes_per_second);
-    printf("GPU TET4:    Trougput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
-    printf("GPU TET4:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
-    printf("============================================================================\n");
-=======
-    MPI_Comm comm = MPI_COMM_WORLD;
+        if (print_to_file == 1) {
+            char filename[1000];
+            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d.log", mpi_size);
+            output_file_print = fopen(filename, "w");
+        }
 
-    int tot_nelements = 0;
-    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+        print_performance_metrics(output_file,
+                                  kernel_name,
+                                  mpi_rank,
+                                  mpi_size,
+                                  seconds,
+                                  __FILE__,
+                                  __LINE__,
+                                  __FUNCTION__,
+                                  n_points_struct,
+                                  TET4_NQP,
+                                  mesh);
 
-    int tot_nnodes = 0;
-    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
-
-    const double elements_per_second          = (double)(tot_nelements) / seconds;
-    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nnodes * TET4_NQP) / seconds;
-
-    if (mpi_rank == 0) {
-        printf("GPU TET10: =======================================================\n");
-        printf("GPU TET10: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-        printf("GPU TET10: Number of elements:               %ld\n", tot_nelements);
-        printf("GPU TET10: Elapsed time:                     %e s\n", seconds);
-        printf("GPU TET10: Elapsed time:                     %e ms\n", milliseconds);
-        printf("GPU TET10: Elements/second:                  %e\n", elements_per_second);
-        printf("GPU TET10: Nodes/second:                     %e\n", nodes_per_second);
-        printf("GPU TET10: Points/second:                    %e\n", (double)size_data / seconds);
-        printf("GPU TET10: Quadrature points/second:         %e\n", quadrature_points_per_second);
-        printf("GPU TET10: =======================================================\n");
+        if (print_to_file == 1) {
+            print_performance_metrics(output_file_print,
+                                      kernel_name,
+                                      mpi_rank,
+                                      mpi_size,
+                                      seconds,
+                                      __FILE__,
+                                      __LINE__,
+                                      __FUNCTION__,
+                                      n_points_struct,
+                                      TET4_NQP,
+                                      mesh);
+            fclose(output_file);
+        }
     }
->>>>>>> c71ea0d1162698e551fcddf7393343bbaa9b18db
 
     cudaMemcpy(g_host,                         //
                g_device,                       //
