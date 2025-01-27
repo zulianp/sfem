@@ -570,7 +570,7 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     const int n_points_struct = n[0] * n[1] * n[2];
 
-    if (SFEM_LOG_LEVEL >= 5) {
+    if (SFEM_LOG_LEVEL >= 5 and mpi_rank == 0) {
         const int print_to_file = 1;
 
         FILE* output_file = stdout;
