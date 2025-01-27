@@ -107,18 +107,22 @@ export SFEM_READ_FP32=1
 
 ################ run benchmark ################
 n_proc_max=192
+n_nodes_max=1
 
-for n_procs in $(seq 1 $n_proc_max); do
-	LAUNCH="srun --exclusive -p workq --nodes=1 --ntasks=$n_procs " ### FOR HPC with SLURM ###
-    #LAUNCH="mpiexec -np $n_procs "
-    $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA write
+for n_nodes in $(seq 1 $n_nodes_max); do
+	for n_procs in $(seq 1 $n_proc_max); do
+		LAUNCH="srun -p debug -n $n_procs -N $n_nodes ./mps-wrapper.sh "
+		LAUNCH="srun --exclusive -p workq --nodes=$n_nodes --ntasks=$n_procs " ### FOR HPC with SLURM ###
+		#LAUNCH="mpiexec -np $n_procs "
+		$LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA write
 
-	if [ $n_procs -eq 1 ]; then
-        # First iteration: capture lines beginning with <BenchH> and append to bench_file
-        grep '^<BenchH>' "$output_file" | sed 's/^<BenchH>//' >> "$bench_file"
-    fi
+		if [ $n_procs -eq 1 ]; then
+			# First iteration: capture lines beginning with <BenchH> and append to bench_file
+			grep '^<BenchH>' "$output_file" | sed 's/^<BenchH>//' >> "$bench_file"
+		fi
 
-    grep '^<BenchR>' "$output_file" | sed 's/^<BenchR>//' >> "$bench_file"
+		grep '^<BenchR>' "$output_file" | sed 's/^<BenchR>//' >> "$bench_file"
+	done
 done
 
 
