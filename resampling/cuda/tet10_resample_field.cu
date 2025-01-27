@@ -399,7 +399,21 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
     RETURN_FROM_FUNCTION(0);
 }
 
-// Function to print the performance metrics
+/**
+ * @brief Print the performance metrics
+ *
+ * @param output_file
+ * @param kernel_name
+ * @param mpi_rank
+ * @param mpi_size
+ * @param seconds
+ * @param file
+ * @param line
+ * @param function
+ * @param n_points_struct
+ * @param quad_nodes_cnt
+ * @param mesh
+ */
 void                                                    //
 print_performance_metrics(FILE*       output_file,      //
                           const char* kernel_name,      //
@@ -413,10 +427,6 @@ print_performance_metrics(FILE*       output_file,      //
                           int         quad_nodes_cnt,   //
                           mesh_t*     mesh) {               //
 
-    if (mpi_rank != 0) {
-        return;
-    }
-
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int tot_nelements = 0;
@@ -424,6 +434,8 @@ print_performance_metrics(FILE*       output_file,      //
 
     int tot_nnodes = 0;
     MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    if (mpi_rank != 0) return;
 
     const double elements_per_second          = (double)(tot_nelements) / seconds;
     const double nodes_per_second             = (double)(tot_nnodes) / seconds;
@@ -444,7 +456,7 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
-    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n", mesh->nelements, elements_per_second);
+    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n\n", mesh->nelements, elements_per_second);
     fprintf(output_file,
             "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
             "nodes_second, "
@@ -570,20 +582,21 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     const int n_points_struct = n[0] * n[1] * n[2];
 
-    if (SFEM_LOG_LEVEL >= 5 and mpi_rank == 0) {
+    if (SFEM_LOG_LEVEL >= 5) {
         const int print_to_file = 1;
-
-        FILE* output_file = stdout;
 
         FILE* output_file_print = NULL;
 
-        if (print_to_file == 1) {
+        if (print_to_file == 1 and mpi_rank == 0) {
             char filename[1000];
             snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d.log", mpi_size);
             output_file_print = fopen(filename, "w");
         }
 
-        print_performance_metrics(output_file,
+        // This function must be called by all ranks
+        // Internally it will check if the rank is 0
+        // The all ranks are used to calculate the performance metrics
+        print_performance_metrics(stdout,
                                   kernel_name,
                                   mpi_rank,
                                   mpi_size,
@@ -607,7 +620,8 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
                                       n_points_struct,
                                       TET4_NQP,
                                       mesh);
-            fclose(output_file);
+
+            if (output_file_print != NULL) fclose(output_file_print);
         }
     }
 
