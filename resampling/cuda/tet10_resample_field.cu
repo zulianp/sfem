@@ -455,8 +455,9 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
     fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
-    fprintf(output_file, "GPU TET10:    function: %s\n", function);
-    fprintf(output_file, "GPU TET10:    Number of elements: %d.\n", mesh->nelements);
+    fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
+    fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", mesh->nelements);
+    fprintf(output_file, "GPU TET10:    Number of points struct:   %d.\n", tot_npoints_struct);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
@@ -607,7 +608,10 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
         if (print_to_file == 1 and mpi_rank == 0) {
             char filename[1000];
-            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d.log", mpi_size);
+
+            const int real_t_bits = sizeof(real_t) * 8;
+
+            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
             output_file_print = fopen(filename, "w");
         }
 
