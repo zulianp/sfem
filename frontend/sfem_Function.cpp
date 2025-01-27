@@ -677,6 +677,9 @@ namespace sfem {
         ss << "mem_sshex8_mesh:  " << mem_sshex8_mesh << " [GB]\n";
         ss << "mem_points:       " << mem_points << " [GB]\n";
         ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
+        ss << "mem_disc_ss:      " << (mem_points + mem_macro_points) << " [GB]\n";
+        ss << "mem_disc_std:     " << (mem_hex8_mesh + mem_sshex8_mesh) << " [GB]\n";
+        ss << "n_macro_elements: " << elements->extent(1)  << "\n";
 
         std::string   meta_path = folder + "/meta.yaml";
         std::ofstream os(meta_path.c_str());
