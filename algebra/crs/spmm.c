@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <string.h>
+#include "crs.h"
 #include "sfem_base.h"
 
 int crs_spmm(const count_t                      rows_a,
