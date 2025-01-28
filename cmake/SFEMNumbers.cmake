@@ -15,6 +15,14 @@ set(SFEM_COUNT_TYPE         "int32"             CACHE STRING "Set SFEM count_t t
 set(SFEM_ELEMENT_IDX_TYPE   "int32"             CACHE STRING "Set SFEM element_idx_t type")
 set(SFEM_LOCAL_IDX_TYPE     "int16"             CACHE STRING "Set SFEM local_idx_t type")
 
+if(SFEM_REAL_TYPE STREQUAL "float64" )
+    set(SFEM_SIZEOF_REAL_T 8)
+elseif(SFEM_REAL_TYPE STREQUAL "float32" )
+    set(SFEM_SIZEOF_REAL_T 4)
+else()
+    message(FATAL_ERROR "Not real number type for `${SFEM_REAL_TYPE}`!")
+endif()
+
 function(sfem_simd_vector_size type vec_size)
     if("${type}" STREQUAL "float32")
         set(${vec_size} 8 PARENT_SCOPE)

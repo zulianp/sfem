@@ -10,6 +10,8 @@
 #include "sfem_mask.h"
 #include "sfem_openmp_blas.hpp"
 
+#include "sfem_Tracer.hpp"
+
 // This class might be better off as just a sparse matrix, but the coarsen method is an optimized
 // version of the matrix triple product ptap and transposing is basically a NOP
 namespace sfem {
@@ -35,6 +37,8 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
+            SFEM_TRACE_SCOPE("CooSymSpMV::apply");
+
             apply_(x, y);
             return 0;
         }

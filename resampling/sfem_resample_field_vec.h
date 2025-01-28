@@ -6,7 +6,7 @@
 
 #include "sfem_base.h"
 
-#if SFEM_VEC_SIZE == 8 && real_t == double
+#if SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 8
 
 #pragma message "USING SIMD 512 double"
 
@@ -15,7 +15,7 @@
 
 #define ptrdiff_t_sfem_tet4 int64_t
 
-#elif SFEM_VEC_SIZE == 4 && real_t == double
+#elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 8
 
 #pragma message "USING SIMD 256 double"
 
@@ -24,7 +24,7 @@
 
 #define ptrdiff_t_sfem_tet4 int64_t
 
-#elif SFEM_VEC_SIZE == 4 && real_t == float
+#elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 4
 
 #pragma message "USING SIMD 256 float"
 
@@ -33,7 +33,7 @@
 
 #define ptrdiff_t_sfem_tet4 int32_t
 
-#elif SFEM_VEC_SIZE == 8 && real_t == float
+#elif SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 4
 
 #pragma message "USING SIMD 512 float"
 

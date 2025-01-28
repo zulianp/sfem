@@ -23,6 +23,7 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #else
 #include "sfem_ShiftedPenalty_impl.hpp"
@@ -94,13 +95,13 @@ namespace sfem {
         auto spmg = std::dynamic_pointer_cast<ShiftedPenaltyMultigrid<real_t>>(mg);
         if (spmg) {
             // spmg->set_nlsmooth_steps(30);
-            int SFEM_MG_NL_SMOOTH_STEPS = 3;
+            int SFEM_MG_NL_SMOOTH_STEPS = 10;
             SFEM_READ_ENV(SFEM_MG_NL_SMOOTH_STEPS, atoi);
             spmg->set_nlsmooth_steps(SFEM_MG_NL_SMOOTH_STEPS);
 
             int SFEM_MG_PROJECT_COARSE_CORRECTION = 0;
             SFEM_READ_ENV(SFEM_MG_PROJECT_COARSE_CORRECTION, atoi);
-            spmg->set_project_coarse_grid_correction(SFEM_MG_PROJECT_COARSE_CORRECTION);
+            spmg->set_project_coarse_space_correction(SFEM_MG_PROJECT_COARSE_CORRECTION);
             printf("SFEM_MG_PROJECT_COARSE_CORRECTION=%d\n", SFEM_MG_PROJECT_COARSE_CORRECTION);
 
             int SFEM_MG_ENABLE_LINESEARCH = 0;
@@ -167,9 +168,9 @@ namespace sfem {
 
         PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
         // Weighted connectivity graph in COO format
-        auto offdiag_row_indices = h_buffer<idx_t>(offdiag_nnz);
-        auto offdiag_col_indices = h_buffer<idx_t>(offdiag_nnz);
-        auto offdiag_values = h_buffer<real_t>(offdiag_nnz);
+        auto offdiag_row_indices = create_host_buffer<idx_t>(offdiag_nnz);
+        auto offdiag_col_indices = create_host_buffer<idx_t>(offdiag_nnz);
+        auto offdiag_values = create_host_buffer<real_t>(offdiag_nnz);
 
         idx_t amg_levels = 1;
 
@@ -263,8 +264,8 @@ namespace sfem {
             }
 
             ptrdiff_t coarser_dim = ndofs;
-            auto partition_buff = h_buffer<idx_t>(finer_dim);
-            auto weights_buff = h_buffer<real_t>(finer_dim);
+            auto partition_buff = create_host_buffer<idx_t>(finer_dim);
+            auto weights_buff = create_host_buffer<real_t>(finer_dim);
 
             for (idx_t k = 0; k < finer_dim; k++) {
                 partition_buff->data()[k] = ws->partition[k];
@@ -341,6 +342,19 @@ namespace sfem {
 #else
         auto solver_coarse = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = false;
+        // solver_coarse->verbose = true;
+
+        int SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER = 0;
+        SFEM_READ_ENV(SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER, atoi);
+
+        if (SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER) {
+            printf("SFEM_MG_ENABLE_COARSE_SPACE_PRECONDITIONER=1\n");
+            auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), es);
+            f_coarse->hessian_diag(nullptr, diag->data());
+            auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
+            solver_coarse->set_preconditioner_op(sj_coarse);
+        }
+
         mg->add_level(linear_op_coarse, solver_coarse, prolongation, nullptr);
 #endif
         return mg;

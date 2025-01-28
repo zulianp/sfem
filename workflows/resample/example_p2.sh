@@ -1,8 +1,58 @@
 #!/usr/bin/env bash
 
-if [[ "$1" == "mpi" ]]
+
+search_name_number_in_args() {
+    local name="$1"
+    shift
+    for arg in "$@"
+    do
+        if [[ "$arg" =~ ^${name}[0-9]+$ ]]
+        then
+            echo "${BASH_REMATCH[0]}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+search_string_in_args() {
+    local search_string="$1"
+    shift
+    for arg in "$@"
+    do
+        if [[ "$arg" == "$search_string" ]]
+        then
+            return 0
+        fi
+    done
+    return 1
+}
+
+n_procs=4
+
+export USE_MPI=0
+export USE_MPI_GH200=0
+export USE_MPI_NORMAL=0
+export PERF="no"
+
+if search_string_in_args "mpi" "$@"
 then
-	export USE_MPI=1
+    export USE_MPI=1
+fi
+    
+if search_string_in_args "mpi_gh200" "$@"
+then
+	export USE_MPI_GH200=1
+fi
+
+if search_string_in_args "mpi_normal" "$@"
+then
+	export USE_MPI_NORMAL=1
+fi
+
+if search_string_in_args "perf" "$@"
+then
+	export PERF="yes"
 fi
 
 # launcher
@@ -81,26 +131,19 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
-n_procs=18
-# n_procs=1
-# n_procs=2
-# n_procs=1
 
-PERF="yes"
-PERF="no"
-
-# if [[ -z "$LAUNCH" ]]
-# then
-# 	LAUNCH="mpiexec -np $n_procs"
-# 	LAUNCH=""
-# fi
 
 if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
+elif [[ "$USE_MPI_NORMAL" == "1" ]]
+then
+	LAUNCH="srun -n $n_procs -p debug "
+elif [[ "$USE_MPI_GH200" == "1" ]]
+then
+	LAUNCH="srun -n $n_procs -p gh200 "
 else
-	LAUNCH="srun -n 288 -p debug "
-	LAUNCH=" "
+	LAUNCH=""
 fi
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
@@ -122,4 +165,6 @@ export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
 time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
-raw_to_db.py $resample_target out.vtk --point_data=$field
+
+
+raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64

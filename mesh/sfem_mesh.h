@@ -17,15 +17,15 @@ static const int SFEM_MEM_SPACE_NONE = -1;
 
 typedef struct {
     MPI_Comm comm;
-    int mem_space;
+    int      mem_space;
 
-    int spatial_dim;
-    int element_type;
+    int           spatial_dim;
+    enum ElemType element_type;
 
     ptrdiff_t nelements;
     ptrdiff_t nnodes;
 
-    idx_t **elements;
+    idx_t  **elements;
     geom_t **points;
 
     ptrdiff_t n_owned_nodes;
@@ -36,14 +36,13 @@ typedef struct {
     ptrdiff_t n_shared_elements;
 
     idx_t *node_mapping;
-    int *node_owner;
+    int   *node_owner;
 
     idx_t *element_mapping;
 
     idx_t *node_offsets;
     idx_t *ghosts;
 } mesh_t;
-
 
 /**
  * @brief Initialize mesh data structure to empty
@@ -63,6 +62,17 @@ void mesh_init(mesh_t *mesh);
  */
 void mesh_destroy(mesh_t *mesh);
 
+void mesh_create_reference_hex8_cube(mesh_t *mesh);
+void mesh_create_hex8_cube(mesh_t      *mesh,
+                           const int    nx,
+                           const int    ny,
+                           const int    nz,
+                           const geom_t xmin,
+                           const geom_t ymin,
+                           const geom_t zmin,
+                           const geom_t xmax,
+                           const geom_t ymax,
+                           const geom_t zmax);
 
 /**
  * @brief Create mesh in serial mode
@@ -72,31 +82,29 @@ void mesh_destroy(mesh_t *mesh);
  * @param mesh Pointer to the mesh data structure
  * @param spatial_dim Spatial dimension
  */
-void mesh_create_serial(
-    mesh_t *mesh,
-    int spatial_dim,
-    enum ElemType element_type,
-    ptrdiff_t nelements,
-    idx_t **elements,
-    ptrdiff_t nnodes,
-    geom_t **points
-    );
+void mesh_create_serial(mesh_t       *mesh,
+                        int           spatial_dim,
+                        enum ElemType element_type,
+                        ptrdiff_t     nelements,
+                        idx_t       **elements,
+                        ptrdiff_t     nnodes,
+                        geom_t      **points);
 
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax);
 
 typedef struct {
     ptrdiff_t nelements;
-    idx_t **elements;
+    idx_t   **elements;
 } element_block_t;
 
 void mesh_create_shared_elements_block(mesh_t *mesh, element_block_t *block);
 void mesh_destroy_shared_elements_block(mesh_t *mesh, element_block_t *block);
 
-void remap_elements_to_contiguous_index(
-    const ptrdiff_t n_elements, 
-    const int nxe, idx_t **elements,
-    ptrdiff_t *const out_n_contiguous,
-    idx_t **const out_node_mapping);
+void remap_elements_to_contiguous_index(const ptrdiff_t  n_elements,
+                                        const int        nxe,
+                                        idx_t          **elements,
+                                        ptrdiff_t *const out_n_contiguous,
+                                        idx_t **const    out_node_mapping);
 
 #ifdef __cplusplus
 }

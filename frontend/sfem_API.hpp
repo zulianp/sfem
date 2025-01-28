@@ -21,7 +21,7 @@
 #include "sfem_mprgp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_proteus_hex8_interpolate.h"
+#include "cu_sshex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
@@ -37,14 +37,18 @@ namespace sfem {
 }  // namespace sfem
 #endif
 
-#include "proteus_hex8.h"
-#include "proteus_hex8_interpolate.h"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_prolongation_restriction.h"
+#include "sshex8.h"
+#include "sshex8_interpolate.h"
+
+#include "ssquad4.h"
 
 #include <sys/stat.h>
 #include "matrixio_crs.h"
+
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -63,10 +67,8 @@ namespace sfem {
         return blas;
     }
 
-
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling,
-                                                const ExecutionSpace es) {
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es) {
         const std::ptrdiff_t n = diagonal_scaling->size();
 
         // // FIXME make simpler version
@@ -74,7 +76,7 @@ namespace sfem {
         return std::make_shared<LambdaOperator<T>>(
                 n,
                 n,
-                [n, diagonal_scaling, impl](const T* const x, T* const y) {
+                [n, diagonal_scaling, impl](const T *const x, T *const y) {
                     auto d = diagonal_scaling->data();
                     impl(n, x, d, 0, y);
                 },
@@ -84,22 +86,20 @@ namespace sfem {
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == MEMORY_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
-        return sfem::h_buffer<T>(n);
+        return sfem::create_host_buffer<T>(n);
     }
 
     template <typename T>
-    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n,
-                                                    const ExecutionSpace es) {
+    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::d_buffer<T>(n);
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
-        return sfem::h_buffer<T>(n);
+        return sfem::create_host_buffer<T>(n);
     }
 
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
-                                         const char *name, const ExecutionSpace es) {
+    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name);
 #endif  // SFEM_ENABLE_CUDA
@@ -107,8 +107,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op,
-                                                           const ExecutionSpace es) {
+    static std::shared_ptr<ConjugateGradient<T>> create_cg(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
         std::shared_ptr<ConjugateGradient<T>> cg;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -126,8 +125,8 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(
-            const std::shared_ptr<Buffer<T>> &diag, const ExecutionSpace es) {
+    static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const std::shared_ptr<Buffer<T>> &diag,
+                                                                       const ExecutionSpace              es) {
         auto ret = std::make_shared<sfem::ShiftableJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -145,13 +144,13 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<StationaryIteration<T>> create_stationary(
-            const std::shared_ptr<Operator<T>> &op,
-            const std::shared_ptr<Operator<T>> &preconditioner, const ExecutionSpace es) {
-        auto ret = std::make_shared<StationaryIteration<T>>();
-        ret->op = op;
+    static std::shared_ptr<StationaryIteration<T>> create_stationary(const std::shared_ptr<Operator<T>> &op,
+                                                                     const std::shared_ptr<Operator<T>> &preconditioner,
+                                                                     const ExecutionSpace                es) {
+        auto ret            = std::make_shared<StationaryIteration<T>>();
+        ret->op             = op;
         ret->preconditioner = preconditioner;
-        ret->n_dofs = op->cols();
+        ret->n_dofs         = op->cols();
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -167,8 +166,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op,
-                                                    const ExecutionSpace es) {
+    static std::shared_ptr<BiCGStab<T>> create_bcgs(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
         std::shared_ptr<BiCGStab<T>> bcgs;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -186,8 +184,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op,
-                                                       const ExecutionSpace es) {
+    static std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
         std::shared_ptr<Chebyshev3<T>> cheb;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -203,8 +200,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op,
-                                                  const ExecutionSpace es) {
+    static std::shared_ptr<MPRGP<T>> create_mprgp(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
         auto mprgp = std::make_shared<sfem::MPRGP<real_t>>();
         mprgp->set_op(op);
 
@@ -240,8 +236,8 @@ namespace sfem {
         return mg;
     }
 
-    static std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(
-            const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es) {
+    static std::shared_ptr<Constraint> create_dirichlet_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                            const ExecutionSpace                  es) {
         auto conds = sfem::DirichletConditions::create_from_env(space);
 
 #ifdef SFEM_ENABLE_CUDA
@@ -253,8 +249,22 @@ namespace sfem {
         return conds;
     }
 
-    static std::shared_ptr<Constraint> create_contact_conditions_from_env(
-            const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es) {
+    static std::shared_ptr<Constraint> create_dirichlet_conditions(const std::shared_ptr<FunctionSpace>              &space,
+                                                                   const std::vector<DirichletConditions::Condition> &conditions,
+                                                                   const ExecutionSpace                               es) {
+        auto conds = sfem::DirichletConditions::create(space, conditions);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return sfem::to_device(conds);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return conds;
+    }
+
+    static std::shared_ptr<Constraint> create_contact_conditions_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                          const ExecutionSpace                  es) {
         auto conds = sfem::AxisAlignedContactConditions::create_from_env(space);
 
 #ifdef SFEM_ENABLE_CUDA
@@ -267,25 +277,24 @@ namespace sfem {
     }
 
     static std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph) {
-        const ptrdiff_t rows = crs_graph.n_nodes();
-        auto p2_vertices = h_buffer<idx_t>(crs_graph.nnz());
+        const ptrdiff_t rows        = crs_graph.n_nodes();
+        auto            p2_vertices = create_host_buffer<idx_t>(crs_graph.nnz());
 
-        build_p1_to_p2_edge_map(
-                rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
+        build_p1_to_p2_edge_map(rows, crs_graph.rowptr()->data(), crs_graph.colidx()->data(), p2_vertices->data());
 
         return p2_vertices;
     }
 
     static std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space) {
-        auto et = (enum ElemType)space.element_type();
+        auto et        = (enum ElemType)space.element_type();
         auto coarse_et = macro_base_elem(et);
         auto crs_graph = space.mesh().create_node_to_node_graph(coarse_et);
         return crs_graph;
     }
 
-    static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(
-            const std::shared_ptr<FunctionSpace> &from_space,
-            const std::shared_ptr<FunctionSpace> &to_space, const ExecutionSpace es) {
+    static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(const std::shared_ptr<FunctionSpace> &from_space,
+                                                                              const std::shared_ptr<FunctionSpace> &to_space,
+                                                                              const ExecutionSpace                  es) {
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             auto elements = to_space->device_elements();
@@ -300,18 +309,18 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = to_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_prolongation(ssm.level(),
-                                                                      ssm.n_elements(),
-                                                                      ssm.n_elements(),
-                                                                      elements->data(),
-                                                                      from_space->block_size(),
-                                                                      SFEM_REAL_DEFAULT,
-                                                                      1,
-                                                                      from,
-                                                                      SFEM_REAL_DEFAULT,
-                                                                      1,
-                                                                      to,
-                                                                      SFEM_DEFAULT_STREAM);
+                            cu_sshex8_hierarchical_prolongation(ssm.level(),
+                                                                ssm.n_elements(),
+                                                                ssm.n_elements(),
+                                                                elements->data(),
+                                                                from_space->block_size(),
+                                                                SFEM_REAL_DEFAULT,
+                                                                1,
+                                                                from,
+                                                                SFEM_REAL_DEFAULT,
+                                                                1,
+                                                                to,
+                                                                SFEM_DEFAULT_STREAM);
                         },
                         es);
             } else {
@@ -320,18 +329,17 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                            cu_macrotet4_to_tet4_prolongation_element_based(
-                                    mesh->nelements,
-                                    mesh->nelements,
-                                    elements->data(),
-                                    from_space->block_size(),
-                                    SFEM_REAL_DEFAULT,
-                                    1,
-                                    from,
-                                    SFEM_REAL_DEFAULT,
-                                    1,
-                                    to,
-                                    SFEM_DEFAULT_STREAM);
+                            cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
+                                                                            mesh->nelements,
+                                                                            elements->data(),
+                                                                            from_space->block_size(),
+                                                                            SFEM_REAL_DEFAULT,
+                                                                            1,
+                                                                            from,
+                                                                            SFEM_REAL_DEFAULT,
+                                                                            1,
+                                                                            to,
+                                                                            SFEM_DEFAULT_STREAM);
                         },
                         es);
             }
@@ -340,24 +348,49 @@ namespace sfem {
 #endif
         {
             if (to_space->has_semi_structured_mesh()) {
-                return std::make_shared<LambdaOperator<real_t>>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            auto &ssm = to_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_prolongation(ssm.level(),
-                                                                   ssm.n_elements(),
-                                                                   ssm.element_data(),
-                                                                   from_space->block_size(),
-                                                                   from,
-                                                                   to);
-                        },
-                        EXECUTION_SPACE_HOST);
+                if (!from_space->has_semi_structured_mesh()) {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
+
+                                auto &ssm = to_space->semi_structured_mesh();
+                                sshex8_hierarchical_prolongation(
+                                        ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                } else {
+                    assert(from_space->semi_structured_mesh().level() > 1);
+
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_prolongate");
+                                auto &from_ssm = from_space->semi_structured_mesh();
+                                auto &to_ssm   = to_space->semi_structured_mesh();
+
+                                sshex8_prolongate(from_ssm.n_elements(),     // nelements,
+                                                  from_ssm.level(),          // from_level
+                                                  1,                         // from_level_stride
+                                                  from_ssm.element_data(),   // from_elements
+                                                  to_ssm.level(),            // to_level
+                                                  1,                         // to_level_stride
+                                                  to_ssm.element_data(),     // to_elements
+                                                  from_space->block_size(),  // vec_size
+                                                  from,
+                                                  to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                }
             } else {
-                return std::make_shared<LambdaOperator<real_t>>(
+                return make_op<real_t>(
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("hierarchical_prolongation");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_prolongation(from_space->element_type(),
                                                       to_space->element_type(),
@@ -372,36 +405,36 @@ namespace sfem {
         }
     }
 
-    static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(
-            const std::shared_ptr<FunctionSpace> &from_space,
-            const std::shared_ptr<FunctionSpace> &to_space, const ExecutionSpace es) {
-        auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-        auto from_element = (enum ElemType)from_space->element_type();
-        auto to_element = (enum ElemType)to_space->element_type();
-        const int block_size = from_space->block_size();
+    static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(const std::shared_ptr<FunctionSpace> &from_space,
+                                                                             const std::shared_ptr<FunctionSpace> &to_space,
+                                                                             const ExecutionSpace                  es) {
+        auto      mesh         = (mesh_t *)from_space->mesh().impl_mesh();
+        auto      from_element = (enum ElemType)from_space->element_type();
+        auto      to_element   = (enum ElemType)to_space->element_type();
+        const int block_size   = from_space->block_size();
 
-        ptrdiff_t nnodes = 0;
-        idx_t **elements = nullptr;
-        int nxe;
+        ptrdiff_t nnodes   = 0;
+        idx_t   **elements = nullptr;
+        int       nxe;
         if (from_space->has_semi_structured_mesh()) {
-            auto &mesh = from_space->semi_structured_mesh();
-            nxe = proteus_hex8_nxe(mesh.level());
-            elements = mesh.element_data();
-            nnodes = mesh.n_nodes();
+            auto &ssmesh = from_space->semi_structured_mesh();
+            nxe          = sshex8_nxe(ssmesh.level());
+            elements     = ssmesh.element_data();
+            nnodes       = ssmesh.n_nodes();
         } else {
-            nxe = elem_num_nodes(from_element);
+            nxe      = elem_num_nodes(from_element);
             elements = mesh->elements;
-            nnodes = mesh->nnodes;
+            nnodes   = mesh->nnodes;
         }
 
         auto element_to_node_incidence_count = create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
         {
             auto buff = element_to_node_incidence_count->data();
 
+            // #pragma omp parallel for // BAD performance with parallel for
             for (int d = 0; d < nxe; d++) {
-#pragma omp parallel for
                 for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
-#pragma omp atomic update
+                    // #pragma omp atomic update
                     buff[elements[d][i]]++;
                 }
             }
@@ -425,19 +458,19 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto &ssm = from_space->semi_structured_mesh();
-                            cu_proteus_hex8_hierarchical_restriction(ssm.level(),
-                                                                     ssm.n_elements(),
-                                                                     ssm.n_elements(),
-                                                                     elements->data(),
-                                                                     dbuff->data(),
-                                                                     block_size,
-                                                                     SFEM_REAL_DEFAULT,
-                                                                     1,
-                                                                     from,
-                                                                     SFEM_REAL_DEFAULT,
-                                                                     1,
-                                                                     to,
-                                                                     SFEM_DEFAULT_STREAM);
+                            cu_sshex8_hierarchical_restriction(ssm.level(),
+                                                               ssm.n_elements(),
+                                                               ssm.n_elements(),
+                                                               elements->data(),
+                                                               dbuff->data(),
+                                                               block_size,
+                                                               SFEM_REAL_DEFAULT,
+                                                               1,
+                                                               from,
+                                                               SFEM_REAL_DEFAULT,
+                                                               1,
+                                                               to,
+                                                               SFEM_DEFAULT_STREAM);
                         },
                         es);
 
@@ -466,36 +499,60 @@ namespace sfem {
 #endif
         {
             if (from_space->has_semi_structured_mesh()) {
-                return std::make_shared<LambdaOperator<real_t>>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            auto &ssm = from_space->semi_structured_mesh();
-                            proteus_hex8_hierarchical_restriction(
-                                    ssm.level(),
-                                    ssm.n_elements(),
-                                    ssm.element_data(),
-                                    element_to_node_incidence_count->data(),
-                                    block_size,
-                                    from,
-                                    to);
-                        },
-                        EXECUTION_SPACE_HOST);
+                if (!to_space->has_semi_structured_mesh()) {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
+                                auto &ssm = from_space->semi_structured_mesh();
+                                sshex8_hierarchical_restriction(ssm.level(),
+                                                                ssm.n_elements(),
+                                                                ssm.element_data(),
+                                                                element_to_node_incidence_count->data(),
+                                                                block_size,
+                                                                from,
+                                                                to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                } else {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("sshex8_restrict");
+
+                                auto &from_ssm = from_space->semi_structured_mesh();
+                                auto &to_ssm   = to_space->semi_structured_mesh();
+
+                                sshex8_restrict(from_ssm.n_elements(),    // nelements,
+                                                from_ssm.level(),         // from_level
+                                                1,                        // from_level_stride
+                                                from_ssm.element_data(),  // from_elements
+                                                element_to_node_incidence_count->data(),
+                                                to_ssm.level(),         // to_level
+                                                1,                      // to_level_stride
+                                                to_ssm.element_data(),  // to_elements
+                                                block_size,             // vec_size
+                                                from,
+                                                to);
+                            },
+                            EXECUTION_SPACE_HOST);
+                }
             } else {
-                return std::make_shared<LambdaOperator<real_t>>(
+                return make_op<real_t>(
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                            hierarchical_restriction_with_counting(
-                                    from_element,
-                                    to_element,
-                                    mesh->nelements,
-                                    mesh->elements,
-                                    element_to_node_incidence_count->data(),
-                                    block_size,
-                                    from,
-                                    to);
+                            hierarchical_restriction_with_counting(from_element,
+                                                                   to_element,
+                                                                   mesh->nelements,
+                                                                   mesh->elements,
+                                                                   element_to_node_incidence_count->data(),
+                                                                   block_size,
+                                                                   from,
+                                                                   to);
                         },
                         EXECUTION_SPACE_HOST);
             }
@@ -503,9 +560,11 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
-            const ptrdiff_t n_fine_nodes, const int block_size,
-            const std::shared_ptr<CRSGraph> &crs_graph, const std::shared_ptr<Buffer<idx_t>> &edges,
-            const ExecutionSpace es) {
+            const ptrdiff_t                       n_fine_nodes,
+            const int                             block_size,
+            const std::shared_ptr<CRSGraph>      &crs_graph,
+            const std::shared_ptr<Buffer<idx_t>> &edges,
+            const ExecutionSpace                  es) {
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
         ptrdiff_t rows = n_coarse_nodes * block_size;
@@ -513,7 +572,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto d_edges = to_device(edges);
+            auto d_edges     = to_device(edges);
             auto d_crs_graph = to_device(crs_graph);
 
             return std::make_shared<LambdaOperator<real_t>>(
@@ -552,10 +611,12 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation_from_graph(
-            const std::shared_ptr<Function> &function, const std::shared_ptr<CRSGraph> &crs_graph,
-            const std::shared_ptr<Buffer<idx_t>> &edges, const ExecutionSpace es) {
-        const ptrdiff_t n_fine_nodes = function->space()->mesh().n_nodes();
-        int block_size = function->space()->block_size();
+            const std::shared_ptr<Function>      &function,
+            const std::shared_ptr<CRSGraph>      &crs_graph,
+            const std::shared_ptr<Buffer<idx_t>> &edges,
+            const ExecutionSpace                  es) {
+        const ptrdiff_t n_fine_nodes   = function->space()->mesh().n_nodes();
+        int             block_size     = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
         ptrdiff_t rows = n_fine_nodes * block_size;
@@ -563,7 +624,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto d_edges = to_device(edges);
+            auto d_edges     = to_device(edges);
             auto d_crs_graph = to_device(crs_graph);
 
             return std::make_shared<LambdaOperator<real_t>>(
@@ -607,8 +668,8 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(
-            const std::shared_ptr<Buffer<T>> &diag, const ExecutionSpace es) {
+    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(const std::shared_ptr<Buffer<T>> &diag,
+                                                                        const ExecutionSpace              es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             auto d_diag = to_device(diag);
@@ -646,9 +707,8 @@ namespace sfem {
                 f->execution_space());
     }
 
-    static std::shared_ptr<Operator<real_t>> make_linear_op_variant(
-            const std::shared_ptr<Function> &f,
-            const std::vector<std::pair<std::string, int>> &opts) {
+    static std::shared_ptr<Operator<real_t>> make_linear_op_variant(const std::shared_ptr<Function>                &f,
+                                                                    const std::vector<std::pair<std::string, int>> &opts) {
         auto variant = f->linear_op_variant(opts);
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
@@ -657,17 +717,13 @@ namespace sfem {
                 f->execution_space());
     }
 
-    static auto hessian_crs(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph,
-                            const sfem::ExecutionSpace es) {
+    static auto hessian_crs(sfem::Function &f, const std::shared_ptr<CRSGraph> &crs_graph, const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
-            auto values = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
+            auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
-            f.hessian_crs(nullptr,
-                          d_crs_graph->rowptr()->data(),
-                          d_crs_graph->colidx()->data(),
-                          values->data());
+            f.hessian_crs(nullptr, d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
             return sfem::d_crs_spmv(d_crs_graph->n_nodes(),
                                     d_crs_graph->n_nodes(),
@@ -677,34 +733,26 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz());
 
-        f.hessian_crs(
-                nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
+        f.hessian_crs(nullptr, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
-        return sfem::h_crs_spmv(crs_graph->n_nodes(),
-                                crs_graph->n_nodes(),
-                                crs_graph->rowptr(),
-                                crs_graph->colidx(),
-                                values,
-                                (real_t)1);
+        return sfem::h_crs_spmv(
+                crs_graph->n_nodes(), crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), values, (real_t)1);
     }
 
     static auto hessian_crs(const std::shared_ptr<sfem::Function> &f,
                             const std::shared_ptr<Buffer<real_t>> &x,
-                            const sfem::ExecutionSpace es) {
+                            const sfem::ExecutionSpace             es) {
         auto crs_graph = f->crs_graph();
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
-            auto values = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
+            auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz(), es);
 
-            f->hessian_crs(x->data(),
-                           d_crs_graph->rowptr()->data(),
-                           d_crs_graph->colidx()->data(),
-                           values->data());
+            f->hessian_crs(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
             return sfem::d_crs_spmv(d_crs_graph->n_nodes(),
                                     d_crs_graph->n_nodes(),
@@ -714,38 +762,29 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz());
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz());
 
         const real_t *const x_data = (x) ? x->data() : nullptr;
-        f->hessian_crs(
-                x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
+        f->hessian_crs(x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
-        return sfem::h_crs_spmv(crs_graph->n_nodes(),
-                                crs_graph->n_nodes(),
-                                crs_graph->rowptr(),
-                                crs_graph->colidx(),
-                                values,
-                                (real_t)1);
+        return sfem::h_crs_spmv(
+                crs_graph->n_nodes(), crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), values, (real_t)1);
     }
 
     static auto hessian_bsr(const std::shared_ptr<sfem::Function> &f,
                             const std::shared_ptr<Buffer<real_t>> &x,
-                            const sfem::ExecutionSpace es) {
+                            const sfem::ExecutionSpace             es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
-        auto crs_graph = f->space()->node_to_node_graph();
+        auto      crs_graph  = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
-            auto values =
-                    sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
+            auto values      = sfem::create_buffer<real_t>(d_crs_graph->nnz() * block_size * block_size, es);
 
-            f->hessian_bsr(x->data(),
-                           d_crs_graph->rowptr()->data(),
-                           d_crs_graph->colidx()->data(),
-                           values->data());
+            f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
             return sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
                                     d_crs_graph->n_nodes(),
@@ -756,12 +795,11 @@ namespace sfem {
                                     (real_t)1);
         }
 #endif
-        auto values = sfem::h_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
+        auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
 
         real_t *x_data = (x) ? x->data() : nullptr;
 
-        f->hessian_bsr(
-                x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
+        f->hessian_bsr(x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
         // Owns the pointers
         auto spmv = sfem::h_bsr_spmv(crs_graph->n_nodes(),
@@ -776,14 +814,14 @@ namespace sfem {
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
                                  const std::shared_ptr<Buffer<real_t>> &x,
-                                 const sfem::ExecutionSpace es) {
+                                 const sfem::ExecutionSpace             es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
 
-        auto crs_graph = f->space()->mesh().node_to_node_graph_upper_triangular();
+        auto      crs_graph  = f->space()->mesh().node_to_node_graph_upper_triangular();
         const int block_size = f->space()->block_size();
 
-        int nblock_entries = ((block_size + 1) * block_size) / 2;
-        ptrdiff_t block_stride = 1;
+        int       nblock_entries = ((block_size + 1) * block_size) / 2;
+        ptrdiff_t block_stride   = 1;
 
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
@@ -792,13 +830,12 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t *>> off_diag_values;
 
         if (SFEM_BCRS_SYM_USE_AOS) {
-            block_stride = nblock_entries;
-            off_diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values = sfem::h_buffer_fake_SoA<real_t>(nblock_entries,
-                                                          f->space()->n_dofs() / block_size);
+            block_stride    = nblock_entries;
+            off_diag_values = sfem::create_host_buffer_fake_SoA<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values     = sfem::create_host_buffer_fake_SoA<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
         } else {
-            off_diag_values = sfem::h_buffer<real_t>(nblock_entries, crs_graph->nnz());
-            diag_values = sfem::h_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
+            off_diag_values = sfem::create_host_buffer<real_t>(nblock_entries, crs_graph->nnz());
+            diag_values     = sfem::create_host_buffer<real_t>(nblock_entries, f->space()->n_dofs() / block_size);
         }
 
         real_t *x_data = (x) ? x->data() : nullptr;
@@ -831,11 +868,11 @@ namespace sfem {
 
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
                                 const std::shared_ptr<Buffer<real_t>> &x,
-                                const sfem::ExecutionSpace es) {
-        auto fs = f->space();
+                                const sfem::ExecutionSpace             es) {
+        auto fs        = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
 
-        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
 
         real_t *x_data = nullptr;
@@ -854,13 +891,11 @@ namespace sfem {
                                diag_values->data(),
                                off_diag_values->data());
 
-            auto h_row_idx =
-                    sfem::create_buffer<idx_t>(crs_graph->nnz(), sfem::EXECUTION_SPACE_HOST);
+            auto h_row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), sfem::EXECUTION_SPACE_HOST);
             crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), h_row_idx->data());
             auto row_idx = sfem::to_device(h_row_idx);
 
-            spmv = sfem::d_sym_coo_spmv(
-                    fs->n_dofs(), row_idx, crs_graph->colidx(), off_diag_values, diag_values, 1);
+            spmv = sfem::d_sym_coo_spmv(fs->n_dofs(), row_idx, crs_graph->colidx(), off_diag_values, diag_values, 1);
 
         } else
 #endif
@@ -876,8 +911,7 @@ namespace sfem {
             // auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
             // f->constaints_mask(mask->data());
 
-            spmv = sfem::h_coosym<idx_t, real_t>(
-                    nullptr, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
+            spmv = sfem::h_coosym<idx_t, real_t>(nullptr, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
         }
 
         // Owns the pointers
@@ -893,10 +927,10 @@ namespace sfem {
 
     static auto hessian_crs_sym(const std::shared_ptr<sfem::Function> &f,
                                 const std::shared_ptr<Buffer<real_t>> &x,
-                                const sfem::ExecutionSpace es) {
-        auto fs = f->space();
-        auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
-        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+                                const sfem::ExecutionSpace             es) {
+        auto fs              = f->space();
+        auto crs_graph       = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
+        auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
 
         real_t *x_data = nullptr;
@@ -926,12 +960,12 @@ namespace sfem {
                                off_diag_values->data());
 
             spmv = sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
-                                                                     fs->n_dofs(),
-                                                                     crs_graph->rowptr(),
-                                                                     crs_graph->colidx(),
-                                                                     diag_values,
-                                                                     off_diag_values,
-                                                                     (real_t)1);
+                                                                fs->n_dofs(),
+                                                                crs_graph->rowptr(),
+                                                                crs_graph->colidx(),
+                                                                diag_values,
+                                                                off_diag_values,
+                                                                (real_t)1);
         }
 
         // Owns the pointers
@@ -945,8 +979,7 @@ namespace sfem {
                 es);
     }
 
-    static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs,
-                           const real_t *const x, real_t *const r) {
+    static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs, const real_t *const x, real_t *const r) {
 #ifdef SFEM_ENABLE_CUDA
         if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
             d_memset(r, 0, op.rows() * sizeof(real_t));
@@ -970,30 +1003,27 @@ namespace sfem {
     }
 
     static int write_crs(const std::string &path, CRSGraph &graph, sfem::Buffer<real_t> &values) {
-        struct stat st = {0};
-        if (stat(path.c_str(), &st) == -1) {
-            mkdir(path.c_str(), 0700);
-        }
-
+        sfem::create_directory(path.c_str());
         crs_t crs_out;
-        crs_out.rowptr = (char *)graph.rowptr()->data();
-        crs_out.colidx = (char *)graph.colidx()->data();
-        crs_out.values = (char *)values.data();
-        crs_out.grows = graph.rowptr()->size() - 1;
-        crs_out.lrows = graph.rowptr()->size() - 1;
-        crs_out.lnnz = values.size();
-        crs_out.gnnz = values.size();
-        crs_out.start = 0;
-        crs_out.rowoffset = 0;
+        crs_out.rowptr      = (char *)graph.rowptr()->data();
+        crs_out.colidx      = (char *)graph.colidx()->data();
+        crs_out.values      = (char *)values.data();
+        crs_out.grows       = graph.rowptr()->size() - 1;
+        crs_out.lrows       = graph.rowptr()->size() - 1;
+        crs_out.lnnz        = values.size();
+        crs_out.gnnz        = values.size();
+        crs_out.start       = 0;
+        crs_out.rowoffset   = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
         crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = SFEM_MPI_REAL_T;
         return crs_write_folder(MPI_COMM_SELF, path.c_str(), &crs_out);
     }
 
-    static std::shared_ptr<sfem::Operator<real_t>> create_linear_operator(
-            const std::string &format, const std::shared_ptr<sfem::Function> &f,
-            const std::shared_ptr<sfem::Buffer<real_t>> &x, enum sfem::ExecutionSpace es) {
+    static std::shared_ptr<sfem::Operator<real_t>> create_linear_operator(const std::string                           &format,
+                                                                          const std::shared_ptr<sfem::Function>       &f,
+                                                                          const std::shared_ptr<sfem::Buffer<real_t>> &x,
+                                                                          enum sfem::ExecutionSpace                    es) {
         if (format == "MF") {
             return sfem::make_linear_op(f);
         }
@@ -1005,9 +1035,7 @@ namespace sfem {
                 return sfem::hessian_coo_sym(f, nullptr, es);
 
             if (format != "CRS") {
-                fprintf(stderr,
-                        "[Warning] fallback to CRS format as \"%s\" is not supported!\n",
-                        format.c_str());
+                fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
             return sfem::hessian_crs(f, nullptr, es);
@@ -1015,12 +1043,54 @@ namespace sfem {
 
         if (format == "BSR") return sfem::hessian_bsr(f, nullptr, es);
         if (format != "BCRS_SYM") {
-            fprintf(stderr,
-                    "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n",
-                    format.c_str());
+            fprintf(stderr, "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n", format.c_str());
         }
 
         return sfem::hessian_bcrs_sym(f, nullptr, es);
+    }
+
+    static std::shared_ptr<Buffer<idx_t *>> ssquad4_derefine_element_connectivity(
+            const int                               from_level,
+            const int                               to_level,
+            const std::shared_ptr<Buffer<idx_t *>> &elements) {
+        const int       step_factor = from_level / to_level;
+        const int       nxe         = (to_level + 1) * (to_level + 1);
+        const ptrdiff_t nelements   = elements->extent(1);
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                nelements,
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        for (int yi = 0; yi <= to_level; yi++) {
+            for (int xi = 0; xi <= to_level; xi++) {
+                const int from_lidx   = ssquad4_lidx(from_level, xi * step_factor, yi * step_factor);
+                const int to_lidx     = ssquad4_lidx(to_level, xi, yi);
+                view->data()[to_lidx] = elements->data()[from_lidx];
+            }
+        }
+
+        return view;
+    }
+
+    static ptrdiff_t ss_elements_max_node_id(const std::shared_ptr<Buffer<idx_t *>> &elements) {
+        ptrdiff_t max_node_id{-1};
+        {
+            auto            vv        = elements->data();
+            const ptrdiff_t nelements = elements->extent(1);
+            for (int v = 0; v < elements->extent(0); v++) {
+                for (ptrdiff_t e = 0; e < nelements; e++) {
+                    max_node_id = (vv[v][e] > max_node_id ? vv[v][e] : max_node_id);
+                }
+            }
+        }
+
+        return max_node_id;
     }
 
 }  // namespace sfem

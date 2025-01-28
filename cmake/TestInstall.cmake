@@ -8,7 +8,7 @@ add_custom_target(
             ${CMAKE_CURRENT_BINARY_DIR}/TestInstall/CMakeFiles
     COMMAND
         ${CMAKE_COMMAND} -DSFEM_DIR=${CMAKE_INSTALL_PREFIX}/lib/cmake/
-        ${CMAKE_SOURCE_DIR}/examples/usage_from_external_cmake_project
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/usage_from_external_cmake_project
     COMMAND ${CMAKE_COMMAND} --build . --config $<IF:$<CONFIG:Debug>,Debug,Release>
     COMMAND ${CMAKE_CTEST_COMMAND} -V -C $<IF:$<CONFIG:Debug>,Debug,Release>
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/TestInstall

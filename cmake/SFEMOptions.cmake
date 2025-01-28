@@ -7,7 +7,6 @@ option(BUILD_SHARED_LIBS "build shared libraries" OFF)
 # option(SFEM_ENABLE_SANITIZER "check for memory access problems" OFF)
 option(SFEM_ENABLE_GLIBCXX_DEBUG
        "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
-option(SFEM_ENABLE_PROFILER "Allows producing profiles of the runs" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_DEV_MODE
        "Add additional flags for more strict compilation" OFF)
@@ -21,11 +20,24 @@ option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
+option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
+option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
+option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
+
+
+if(WIN32)        
+    set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
+        OFF
+        CACHE STRING "Enable explicit vectorization kernels" FORCE)
+endif()
+
+
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 # option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
 
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" ON)
+option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
@@ -33,7 +45,7 @@ if(HAS_PARENT)
     option(SFEM_ENABLE_TESTING "Build the tests" OFF)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
 else()
-    option(SFEM_ENABLE_TESTING "Build the tests" OFF)
+    option(SFEM_ENABLE_TESTING "Build the tests" ON)
     option(SFEM_ENABLE_BENCHMARK "enable benchmark suite" OFF)
 endif()
 
@@ -90,9 +102,6 @@ if(SFEM_ENABLE_GLIBCXX_DEBUG)
         "${SFEM_SPECIAL_DEBUG_FLAGS} -D_GLIBCXX_DEBUG")
 endif()
 
-if(SFEM_ENABLE_PROFILER)
-    set(SFEM_PROFILING_ENABLED TRUE)
-endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SFEM_DEV_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG

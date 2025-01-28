@@ -7,7 +7,7 @@
 #include "sfem_base.h"
 #include "tet10_weno.h"
 
-#if SFEM_VEC_SIZE == 8 && real_t == double
+#if SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 8
 #pragma message "SIMD 512 double"
 
 #define SIMD_512_DOUBLE
@@ -15,7 +15,7 @@
 
 #define ptrdiff_t_sfem int64_t
 
-#elif SFEM_VEC_SIZE == 4 && real_t == double
+#elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 8
 #pragma message "SIMD 256 double"
 
 #define SIMD_256_DOUBLE
@@ -23,7 +23,7 @@
 
 #define ptrdiff_t_sfem int64_t
 
-#elif SFEM_VEC_SIZE == 4 && real_t == float
+#elif SFEM_VEC_SIZE == 4 && SIZEOF_REAL_T == 4
 
 #pragma message "SIMD 256 float"
 
@@ -32,7 +32,7 @@
 
 #define ptrdiff_t_sfem int32_t
 
-#elif SFEM_VEC_SIZE == 8 && real_t == float
+#elif SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 4
 
 #pragma message "SIMD 512 float"
 
@@ -49,6 +49,8 @@ typedef real_t vec_real __attribute__((vector_size(_VL_ * sizeof(real_t)),  //
 
 typedef ptrdiff_t_sfem vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrdiff_t_sfem)),  //
                                                   aligned(sizeof(ptrdiff_t_sfem))));
+
+int vec_real_check_nan(const vec_real a);
 
 #if _VL_ == 8
 
@@ -73,6 +75,16 @@ typedef ptrdiff_t_sfem vec_indices __attribute__((vector_size(_VL_ * sizeof(ptrd
                 __X__, __X__, __X__                                                                \
     }
 
+#define CONST_VEC(__X__)                                                                           \
+    {                                                                                              \
+        __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, __X__, \
+                __X__, __X__, __X__                                                                \
+    }
+
 #endif
+
+#define POW2_VEC(__X__) ((__X__) * (__X__))
+
+#define POW3_VEC(__X__) ((__X__) * (__X__) * (__X__))
 
 #endif  // __TET10_VEC_H__

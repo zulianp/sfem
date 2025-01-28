@@ -1,15 +1,19 @@
 #ifndef SFEM_CONFIG_HPP
+#define SFEM_CONFIG_HPP
 
-#cmakedefine SFEM_ENABLE_CUDA
-#cmakedefine SFEM_ENABLE_CUBLAS
-#cmakedefine SFEM_ENABLE_CUSPARSE
-#cmakedefine SFEM_ENABLE_OPENMP
-#cmakedefine SFEM_ENABLE_METIS
+#cmakedefine SFEM_ENABLE_AMG
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
-#cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#cmakedefine SFEM_ENABLE_CUBLAS
+#cmakedefine SFEM_ENABLE_CUDA
+#cmakedefine SFEM_ENABLE_CUSPARSE
 #cmakedefine SFEM_ENABLE_MEM_DIAGNOSTICS
-#cmakedefine SFEM_ENABLE_AMG
+#cmakedefine SFEM_ENABLE_METIS
+#cmakedefine SFEM_ENABLE_OPENMP
+#cmakedefine SFEM_ENABLE_RYAML
+#cmakedefine SFEM_ENABLE_TRACE
+#cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#cmakedefine SFEM_ENABLE_EXPLICIT_VECTORIZATION
 
 #ifdef SFEM_ENABLE_CUDA
 #define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
@@ -17,6 +21,10 @@
 
 // It will be removed in the future (i.e., always true)
 #cmakedefine SFEM_ENABLE_CUSTOM_NUMBERS
+
+#define CUDA_UNIFIED_MEMORY 0
+#define CUDA_MANAGED_MEMORY 1
+#define CUDA_HOST_MEMORY 2
 
 #ifdef SFEM_ENABLE_CUSTOM_NUMBERS
 
@@ -40,6 +48,10 @@ typedef @SFEM_REAL_C_TYPE@ real_t;
 #define SFEM_CUSPARSE_REAL_T @SFEM_REAL_CUSPARSE_TYPE@
 #define d_REAL_T "@SFEM_REAL_PRINT_TYPE@"
 #define dtype_REAL_T "@SFEM_REAL_TYPE@"
+#define SIZEOF_REAL_T @SFEM_SIZEOF_REAL_T@
+
+#define SFEM_REAL_T_IS_FLOAT64 (SIZEOF_REAL_T == 8)
+#define SFEM_REAL_T_IS_FLOAT32 (SIZEOF_REAL_T == 4)
 
 // computation real numbers and explicit vectorized types
 typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
@@ -48,10 +60,14 @@ typedef @SFEM_SCALAR_C_TYPE@ scalar_t;
 #define d_SCALAR_T "@SFEM_SCALAR_PRINT_TYPE@"
 #define dtype_SCALAR_T "@SFEM_SCALAR_TYPE@"
 
+#ifndef _WIN32
 #define SFEM_VEC_SIZE @SFEM_VEC_SIZE@
-typedef scalar_t vec_t
-        __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)), aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
-
+typedef scalar_t vec_t __attribute__((vector_size(SFEM_VEC_SIZE * sizeof(scalar_t)),
+                                      aligned(SFEM_VEC_SIZE * sizeof(scalar_t))));
+#else
+#define SFEM_VEC_SIZE 1
+typedef scalar_t vec_t;
+#endif
 // Jacobian
 typedef @SFEM_JACOBIAN_CPU_C_TYPE@ jacobian_t;
 #define SFEM_MPI_JACOBIAN_CPU_T @SFEM_JACOBIAN_CPU_MPI_TYPE@
@@ -107,6 +123,8 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define SFEM_TET10_CUDA @SFEM_TET10_CUDA@
 #define SFEM_TET10_WENO @SFEM_TET10_WENO@
 
+#define SFEM_CUDA_MEMORY_MODEL @SFEM_CUDA_MEMORY_MODEL@
+
 #endif  // SFEM_ENABLE_CUSTOM_NUMBERS
 
 #define INVALID_IDX (-1)
@@ -116,6 +134,7 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 
 typedef char mask_t;
 #define SFEM_MPI_MASK_T MPI_CHAR
+#define SFEM_INVALID_IDX (-1)
 
 // typedef long mask_t;
 // #define SFEM_MPI_MASK_T MPI_LONG

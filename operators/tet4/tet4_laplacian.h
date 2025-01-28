@@ -4,6 +4,11 @@
 #include <stddef.h>
 #include "sfem_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 // UNTESTED
 int tet4_laplacian_assemble_value(const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
@@ -58,5 +63,10 @@ int tet4_laplacian_diag_opt(const ptrdiff_t nelements,
                             idx_t **const SFEM_RESTRICT elements,
                             const jacobian_t *const SFEM_RESTRICT fff,
                             real_t *const SFEM_RESTRICT diag);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif  // TET4_LAPLACIAN_H

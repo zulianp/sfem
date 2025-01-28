@@ -11,9 +11,9 @@
 #include <cstdio>
 #include <vector>
 
-#include "proteus_hex8.h"
-#include "proteus_hex8_laplacian.h"
-#include "proteus_hex8_linear_elasticity.h"
+#include "sshex8.h"
+#include "sshex8_laplacian.h"
+#include "sshex8_linear_elasticity.h"
 #include "sfem_API.hpp"
 #include "sfem_hex8_mesh_graph.h"
 
@@ -24,6 +24,7 @@
 #include "matrixio_array.h"
 
 #include "sfem_SSMultigrid.hpp"
+#include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -93,10 +94,7 @@ int main(int argc, char *argv[]) {
         es = sfem::EXECUTION_SPACE_DEVICE;
     }
 
-    struct stat st = {0};
-    if (stat(output_path, &st) == -1) {
-        mkdir(output_path, 0700);
-    }
+    sfem::create_directory(output_path);
 
     double tick = MPI_Wtime();
 
@@ -209,7 +207,7 @@ int main(int argc, char *argv[]) {
         cg->set_max_it(8000);
         cg->verbose = false;
         sp->linear_solver_ = cg;
-        sp->use_steepest_descent = SFEM_USE_STEEPEST_DESCENT;
+        sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
 
         sp->verbose = true;
         sp->set_upper_bound(upper_bound);

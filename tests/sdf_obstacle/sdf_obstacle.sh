@@ -2,22 +2,22 @@
 
 set -e
 
-elem_type=HEX8
+if (($# != 1))
+then
+	echo "usage $0 <case_dir>"
+	exit 1
+fi
 
-box_mesh.py box -x 10 -y 9 -z 8 --cell_type=$elem_type
-box_mesh.py obstacle_mesh -x 2 -y 2 -z 2 --cell_type=TET4 --height=2 --width=2 --depth=2
+HERE=$PWD
+CASE_DIR=$1
+cd $CASE_DIR
 
-skin box box/skin
-skin obstacle_mesh obstacle_mesh/skin
+export SFEM_HEX8_ASSUME_AFFINE=1
+# export SFEM_FIRST_LAME_PARAMETER=3.333
+# export SFEM_SHEAR_MODULUS=0.357
 
-margin=0.5
-hmax=0.008
+$LAUNCH $HERE/sdf_obstacle.py input.yaml
 
-mkdir -p obstacle/sdf
-mesh_to_sdf.py obstacle_mesh/skin obstacle/sdf/sdf.float32.raw --hmax=$hmax --margin=$margin
-raw_to_xdmf.py obstacle/sdf/sdf.float32.raw
-cp obstacle/sdf/metadata_sdf.float32.yml obstacle/sdf/meta.yaml 
+cd -
 
-./sdf_obstacle.py contact_elasticity.yaml
-
-raw_to_db.py box output/out.vtk -p output/g.0.raw
+raw_to_db.py $CASE_DIR/mesh out.vtk -p "$CASE_DIR/output/*.raw"

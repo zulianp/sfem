@@ -165,3 +165,30 @@ if(SFEM_ENABLE_CUDA)
         message(WARNING "Thrust not found!")
     endif()
 endif()
+
+
+if(SFEM_ENABLE_RYAML)
+    set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
+    set(RYML_BRANCH_NAME master CACHE STRING "")
+    include(FetchContent)
+    FetchContent_Declare(ryml
+        GIT_REPOSITORY ${RYML_REPO_URL}
+        GIT_TAG ${RYML_BRANCH_NAME}
+        GIT_SHALLOW FALSE  # ensure submodules are checked out
+    )
+    FetchContent_MakeAvailable(ryml)
+    list(APPEND SFEM_SUBMODULES ryml::ryml)
+endif()
+
+if(WIN32)
+    set(GLOB_REPO_URL https://github.com/p-ranav/glob.git CACHE STRING "")
+    set(GLOB_BRANCH_NAME master CACHE STRING "")
+    include(FetchContent)
+    FetchContent_Declare(Glob
+        GIT_REPOSITORY ${GLOB_REPO_URL}
+        GIT_TAG ${GLOB_BRANCH_NAME}
+        GIT_SHALLOW FALSE  # ensure submodules are checked out
+    )
+    FetchContent_MakeAvailable(Glob)
+    list(APPEND SFEM_SUBMODULES Glob)
+endif()

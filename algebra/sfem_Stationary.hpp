@@ -14,22 +14,21 @@ namespace sfem {
     template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
-        ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        ptrdiff_t n_dofs{-1};
-        int max_it{3};
-        std::shared_ptr<Buffer<T>> workspace;
+        ExecutionSpace               execution_space_{EXECUTION_SPACE_INVALID};
+        ptrdiff_t                    n_dofs{-1};
+        int                          max_it{3};
+        std::shared_ptr<Buffer<T>>   workspace;
         std::shared_ptr<Operator<T>> op;
         std::shared_ptr<Operator<T>> preconditioner;
-        bool verbose{false};
-        BLAS_Tpl<T> blas;
+        bool                         verbose{false};
+        BLAS_Tpl<T>                  blas;
 
         int iterations_{0};
 
         int iterations() const override { return iterations_; }
 
-        void ensure_workspace()
-        {
-            if(!workspace || workspace->size() != n_dofs) {
+        void ensure_workspace() {
+            if (!workspace || workspace->size() != n_dofs) {
                 workspace = Buffer<T>::own(n_dofs, blas.allocate(n_dofs), this->blas.destroy);
             }
         }
@@ -54,35 +53,30 @@ namespace sfem {
                 }
                 preconditioner->apply(r, x);
             }
-            
+
             return 0;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
-        ExecutionSpace execution_space() const override { return execution_space_; }
+        ExecutionSpace        execution_space() const override { return execution_space_; }
 
         /* MatrixFreeLinearSolver */
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->op = op;
-            n_dofs = op->rows();
+            n_dofs   = op->rows();
         }
-        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
-            this->preconditioner = op;
-        }
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override { this->preconditioner = op; }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
-        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-                                  const std::shared_ptr<Buffer<T>>& diag) override {
-            this->op = op + sfem::diag_op(diag, execution_space());
-            auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner); 
-            if(shiftable) {
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) override {
+            this->op       = op + sfem::diag_op(diag, execution_space());
+            auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
+            if (shiftable) {
                 return shiftable->shift(diag);
             } else {
-                    fprintf(stderr,
-                            "Tried to call shift on object that is not subclass of ShiftableOperator!\n");
-                    assert(false);
-                    return SFEM_FAILURE;
+                SFEM_ERROR("Tried to call shift on object that is not subclass of ShiftableOperator!\n");
+                return SFEM_FAILURE;
             }
 
             // auto prec = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(preconditioner);
@@ -96,16 +90,31 @@ namespace sfem {
             //     return SFEM_FAILURE;
             // }
         }
+
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
+                                  const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                  const std::shared_ptr<Buffer<T>>&            diag) override {
+            this->op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
+
+            auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
+            if (shiftable) {
+                return shiftable->shift(sbv, diag);
+            } else {
+                SFEM_ERROR("Tried to call shift on object that is not subclass of ShiftableOperator!\n");
+                return SFEM_FAILURE;
+            }
+
+            return SFEM_FAILURE;
+        }
     };
 
     template <typename T>
-    std::shared_ptr<StationaryIteration<T>> h_stationary(
-            const std::shared_ptr<Operator<T>>& op,
-            const std::shared_ptr<Operator<T>>& preconditioner) {
-        auto solver = std::make_shared<StationaryIteration<T>>();
-        solver->op = op;
+    std::shared_ptr<StationaryIteration<T>> h_stationary(const std::shared_ptr<Operator<T>>& op,
+                                                         const std::shared_ptr<Operator<T>>& preconditioner) {
+        auto solver            = std::make_shared<StationaryIteration<T>>();
+        solver->op             = op;
         solver->preconditioner = preconditioner;
-        solver->n_dofs = op->cols();
+        solver->n_dofs         = op->cols();
         solver->default_init();
         return solver;
     }
