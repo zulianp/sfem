@@ -183,6 +183,7 @@ int ssquad4_restrict(const ptrdiff_t                     nelements,
                             const ptrdiff_t gid = from_elements[strided_v][e];
 
                             for (int d = 0; d < vec_size; d++) {
+                                assert(from_element_to_node_incidence_count[gid] != 0);
                                 from_coeffs[d][v] = from[gid * vec_size + d] / from_element_to_node_incidence_count[gid];
                             }
                         }
@@ -257,6 +258,7 @@ int ssquad4_restrict(const ptrdiff_t                     nelements,
                             const int from_lidx = ssquad4_lidx(from_level, xi * step_factor, yi * step_factor);
 
                             const idx_t idx = to_elements[to_lidx][e];
+                            assert(from_coeffs[d][from_lidx] == from_coeffs[d][from_lidx]);
     #pragma omp atomic update
                             to[idx * vec_size + d] += from_coeffs[d][from_lidx];
                         }

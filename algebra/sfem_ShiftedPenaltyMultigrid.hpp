@@ -158,16 +158,23 @@ namespace sfem {
                     }
                 }
 
-                assert(false); // FIXME needs to handle constraints op properly
-                const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_dofs, mem->solution->data(), ub) : T(0)) +
-                                ((lb) ? impl_.sq_norm_ramp_m(n_dofs, mem->solution->data(), lb) : T(0));
+                auto Tx = x;
+
+                if (constraints_op_) {
+                    blas_.zeros(n_constrained_dofs, correction->data());
+                    constraints_op_->apply(x, correction->data());
+                    Tx = correction->data();
+                }
+
+                const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
+                                ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
                 const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
                 if (norm_pen < penetration_tol) {
-                    if (ub) impl_.update_lagr_p(n_dofs, penalty_param_, mem->solution->data(), ub, lagr_ub->data());
-                    if (lb) impl_.update_lagr_m(n_dofs, penalty_param_, mem->solution->data(), lb, lagr_lb->data());
+                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
                     omega           = omega / penalty_param_;
@@ -180,11 +187,11 @@ namespace sfem {
                 }
 
                 if (debug && ub) {
-                    printf("lagr_ub: %e\n", blas_.norm2(n_dofs, lagr_ub->data()));
+                    printf("lagr_ub: %e\n", blas_.norm2(n_constrained_dofs, lagr_ub->data()));
                 }
 
                 if (debug && lb) {
-                    printf("lagr_lb: %e\n", blas_.norm2(n_dofs, lagr_lb->data()));
+                    printf("lagr_lb: %e\n", blas_.norm2(n_constrained_dofs, lagr_lb->data()));
                 }
 
                 monitor(iterations_,
