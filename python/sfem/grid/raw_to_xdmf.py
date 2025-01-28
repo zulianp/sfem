@@ -4,21 +4,8 @@
 import sys
 import os
 
-def raw_to_xdmf(path):
+def raw_to_xdmf(path_to_meta_file):
     # Initial variable definition.
-    path = os.path.abspath(path) 
-    binary_path = path
-    pdir = os.path.dirname(path)
-    fname, fextension = os.path.splitext(path)
-    fname = os.path.basename(fname)
-
-    if pdir == "":
-        pdir = "./"
-
-    path = pdir
-    xdmf_path = fname + '.xdmf'
-    file_name = fname
-
     ox = oy = oz = 0
     nx = ny = nz = 0
     dx = dy = dz = 1
@@ -26,13 +13,10 @@ def raw_to_xdmf(path):
     time_steps = 0
     endianess = tp = precision = number_type = ''
     attribute_type = 'Vector'
-    final_path = pdir + '/' + 'metadata_' + file_name + '.yml'
+    binary_path = ""
+    rpath = True
 
-    if not os.path.exists(pdir):
-        os.mkdir(f'{pdir}')
-
-    # print(f'reading {final_path} ...')
-    with open(final_path, 'r'
+    with open(path_to_meta_file, 'r'
               ) as f:
         Lines = f.readlines()
         for i in Lines:
@@ -61,6 +45,10 @@ def raw_to_xdmf(path):
                 block_size = int(i[12:])
             elif i[:12] == 'time_steps: ':
                 time_steps = int(i[12:])
+            elif i[:6] == 'path: ':
+                binary_path = i[6:]
+            elif i[:6] == 'rpath: ':
+                rpath = int(i[7:])
             elif i[:6] == 'type: ':
                 tp = i[6:]
                 if tp == 'long\n':
@@ -78,6 +66,27 @@ def raw_to_xdmf(path):
                 elif tp == 'char\n':
                     precision = '1'
                     number_type = 'Int'
+
+    path = os.path.abspath(path_to_meta_file) 
+    pdir = os.path.dirname(path)
+    fname, fextension = os.path.splitext(binary_path)
+    fname = os.path.basename(fname)
+
+
+    if rpath:
+        binary_path = pdir + "/" + binary_path
+
+    print(binary_path)
+
+    if pdir == "":
+        pdir = "./"
+
+    if not os.path.exists(pdir):
+        os.mkdir(f'{pdir}')
+
+    path = pdir
+    xdmf_path = fname + '.xdmf'
+    file_name = fname
 
     # Define attribute_type
     if block_size == 1:
