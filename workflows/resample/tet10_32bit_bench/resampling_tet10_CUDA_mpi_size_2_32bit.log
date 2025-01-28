@@ -1,0 +1,19 @@
+============================================================================
+GPU TET10:    Time for the kernel (hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel):
+GPU TET10:    MPI rank: 0
+GPU TET10:    MPI size: 2
+GPU TET10:    32-bit real_t
+GPU TET10:    0.064876 seconds
+GPU TET10:    file: /capstor/scratch/cscs/sriva/prj/sfem/resampling/cuda/tet10_resample_field.cu:640 
+GPU TET10:    function:                  hex8_to_tet10_resample_field_local_CUDA_Managed
+GPU TET10:    Number of elements:        10485760.
+GPU TET10:    Number of points struct:   428490000.
+GPU TET10:    Throughput for the kernel: 3.232540e+08 elements/second
+GPU TET10:    Throughput for the kernel: 6.604724e+09 points_struct/second
+GPU TET10:    Throughput for the kernel: 4.361004e+08 nodes/second
+GPU TET10:    Throughput for the kernel: 2.442162e+10 quadrature_points/second
+GPU TET10:    10485760, 323253966.286855   (CSV friendly) 
+
+<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, nodes_struc_second, quadrature_points_second
+<BenchR> 0,   2,  32,   20971520,   28292577,   428490000,   0.0648763,   3.23254e+08,   4.361e+08,   6.60472e+09,  2.44216e+10
+============================================================================
