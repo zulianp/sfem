@@ -3,38 +3,49 @@
 
 #include "sfem_Buffer.hpp"
 
-#include <string>
 #include <cstddef>
 #include <memory>
+#include <string>
 
 #include <mpi.h>
 
 #include "sfem_defs.h"
 
 namespace sfem {
-    template<class T>
+    template <class T>
     class Grid {
     public:
         static std::unique_ptr<Grid> create_from_file(MPI_Comm comm, const std::string &path);
 
+        static std::unique_ptr<Grid> create(MPI_Comm     comm,
+                                            const int    nx,
+                                            const int    ny,
+                                            const int    nz,
+                                            const geom_t xmin,
+                                            const geom_t ymin,
+                                            const geom_t zmin,
+                                            const geom_t xmax,
+                                            const geom_t ymax,
+                                            const geom_t zmax);
+
         Grid(MPI_Comm comm);
         ~Grid();
-        
+
         ptrdiff_t stride(int dim) const;
         ptrdiff_t extent(int dim) const;
         ptrdiff_t size() const;
-        int spatial_dimension() const;
-        int block_size() const;
+        int       spatial_dimension() const;
+        int       block_size() const;
 
-        const ptrdiff_t * const nlocal() const;
-        const ptrdiff_t * const nglobal() const;
-        const ptrdiff_t * const stride() const;
+        const ptrdiff_t *const nlocal() const;
+        const ptrdiff_t *const nglobal() const;
+        const ptrdiff_t *const stride() const;
 
         const geom_t *const origin() const;
         const geom_t *const delta() const;
 
         std::shared_ptr<Buffer<T>> buffer();
-        T *data();
+        T                         *data();
 
         MPI_Datatype mpi_data_type() const;
 
@@ -42,6 +53,18 @@ namespace sfem {
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
-}
 
-#endif //SFEM_GRID_HPP
+    std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
+                                             const int                                                       nx,
+                                             const int                                                       ny,
+                                             const int                                                       nz,
+                                             const geom_t                                                    xmin,
+                                             const geom_t                                                    ymin,
+                                             const geom_t                                                    zmin,
+                                             const geom_t                                                    xmax,
+                                             const geom_t                                                    ymax,
+                                             const geom_t                                                    zmax,
+                                             std::function<geom_t(const geom_t, const geom_t, const geom_t)> f);
+}  // namespace sfem
+
+#endif  // SFEM_GRID_HPP

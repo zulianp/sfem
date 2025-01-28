@@ -9,10 +9,10 @@ namespace sfem {
     template <class T>
     class Grid<T>::Impl {
     public:
-        MPI_Comm comm;
+        MPI_Comm                   comm;
         std::shared_ptr<Buffer<T>> field;
-        int block_size{1};
-        int spatial_dimension{3};
+        int                        block_size{1};
+        int                        spatial_dimension{3};
 
         ptrdiff_t nlocal[3];
         ptrdiff_t nglobal[3];
@@ -56,7 +56,7 @@ namespace sfem {
     template <class T>
     std::unique_ptr<Grid<T>> Grid<T>::create_from_file(MPI_Comm comm, const std::string &path) {
         auto ret = std::make_unique<Grid<T>>(comm);
-        auto in = YAMLNoIndent::create_from_file(path + "/meta.yaml");
+        auto in  = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
         std::string field_path;
         in->require("path", field_path);
@@ -100,7 +100,7 @@ namespace sfem {
         ret->impl_->stride[1] = ret->impl_->nlocal[0];
         ret->impl_->stride[2] = ret->impl_->nlocal[0] * ret->impl_->nlocal[1];
 
-        ptrdiff_t size = ret->impl_->stride[2] * ret->impl_->nlocal[2];
+        ptrdiff_t size    = ret->impl_->stride[2] * ret->impl_->nlocal[2];
         ret->impl_->field = Buffer<T>::own(size, data, free, MEMORY_SPACE_HOST);
         return ret;
     }
@@ -134,7 +134,7 @@ namespace sfem {
     const ptrdiff_t *const Grid<T>::nglobal() const {
         return impl_->nglobal;
     }
-    
+
     template <class T>
     const ptrdiff_t *const Grid<T>::stride() const {
         return impl_->stride;
@@ -165,7 +165,89 @@ namespace sfem {
         return impl_->delta;
     }
 
+    template <class T>
+    std::unique_ptr<Grid<T>> Grid<T>::create(MPI_Comm     comm,
+                                             const int    nx,
+                                             const int    ny,
+                                             const int    nz,
+                                             const geom_t xmin,
+                                             const geom_t ymin,
+                                             const geom_t zmin,
+                                             const geom_t xmax,
+                                             const geom_t ymax,
+                                             const geom_t zmax) {
+        auto ret = std::make_unique<Grid<T>>(comm);
+
+        auto &impl = ret->impl_;
+
+        impl->block_size        = 1;
+        impl->spatial_dimension = 3;
+
+        // FIXME
+        impl->nlocal[0] = nx;
+        impl->nlocal[1] = ny;
+        impl->nlocal[2] = nz;
+
+        // FIXME
+        impl->stride[0] = 1;
+        impl->stride[1] = nx;
+        impl->stride[2] = nx * ny;
+
+        // FIXME
+        impl->nglobal[0] = nx;
+        impl->nglobal[1] = ny;
+        impl->nglobal[2] = nz;
+
+        // Grid geometry
+        impl->origin[0] = xmin;
+        impl->origin[1] = ymin;
+        impl->origin[2] = zmin;
+
+        impl->delta[0] = xmax - xmin;
+        impl->delta[1] = ymax - ymin;
+        impl->delta[2] = zmax - zmin;
+
+        impl->field = create_host_buffer<T>(nx * ny * nz);
+        return ret;
+    }
+
     // Explicit instantiation
     template class Grid<float>;
     template class Grid<double>;
+
+    std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
+                                             const int                                                       nx,
+                                             const int                                                       ny,
+                                             const int                                                       nz,
+                                             const geom_t                                                    xmin,
+                                             const geom_t                                                    ymin,
+                                             const geom_t                                                    zmin,
+                                             const geom_t                                                    xmax,
+                                             const geom_t                                                    ymax,
+                                             const geom_t                                                    zmax,
+                                             std::function<geom_t(const geom_t, const geom_t, const geom_t)> f) {
+        auto g = Grid<geom_t>::create(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+
+        const geom_t hx = (xmax - xmin) / (nx - 1);
+        const geom_t hy = (ymax - ymin) / (ny - 1);
+        const geom_t hz = (zmax - zmin) / (nz - 1);
+
+        geom_t *const field  = g->buffer()->data();
+        auto          stride = g->stride();
+
+#pragma omp parallel for
+        for (int zi = 0; zi < nz; zi++) {
+            for (int yi = 0; yi < ny; yi++) {
+                for (int xi = 0; xi < nx; xi++) {
+                    const geom_t x                                          = xmin + xi * hx;
+                    const geom_t y                                          = ymin + yi * hy;
+                    const geom_t z                                          = zmin + zi * hz;
+                    const geom_t fx                                         = f(x, y, z);
+                    field[xi * stride[0] + yi * stride[1] + zi * stride[2]] = fx;
+                }
+            }
+        }
+
+        return g;
+    }
 }  // namespace sfem

@@ -483,7 +483,6 @@ namespace sfem {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
-
                 idx_t    *idx          = nullptr;
                 ptrdiff_t n_contiguous = -1;
                 remap_elements_to_contiguous_index(
@@ -609,6 +608,14 @@ namespace sfem {
     }
 
     ContactConditions::~ContactConditions() = default;
+
+    std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace> &space,
+                                                                 const std::shared_ptr<Grid<geom_t>>  &sdf,
+                                                                 const std::shared_ptr<Sideset>       &sideset,
+                                                                 const enum ExecutionSpace             es) {
+        SFEM_ERROR("IMPLEMENT ME!\n");
+        return nullptr;
+    }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                            const std::string                    &path) {
