@@ -444,15 +444,9 @@ namespace sfem {
             assert(false);  // IMPLEMENT ME!
         }
 
-        void read_sideset(const std::string &path_surface, Input &in) {
-            SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
-
+        void init_from_sideset(const std::shared_ptr<Sideset> &ss)
+        {
             auto mesh = space->mesh_ptr();
-
-            auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
-            if (!ss) {
-                SFEM_ERROR("Unable to read sideset at: %s\n", path_surface.c_str());
-            }
 
             if (space->has_semi_structured_mesh()) {
                 auto &&ssmesh = space->semi_structured_mesh();
@@ -512,6 +506,17 @@ namespace sfem {
                     this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
             this->node_mapping   = sfem::manage_host_buffer(n_contiguous, idx);
             this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
+        }
+
+        void read_sideset(const std::string &path_surface, Input &in) {
+            SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
+
+            auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
+            if (!ss) {
+                SFEM_ERROR("Unable to read sideset at: %s\n", path_surface.c_str());
+            }
+
+            return init_from_sideset(ss);
         }
 
         void read_surface(const std::string &path_surface, Input &in) {
@@ -613,8 +618,14 @@ namespace sfem {
                                                                  const std::shared_ptr<Grid<geom_t>>  &sdf,
                                                                  const std::shared_ptr<Sideset>       &sideset,
                                                                  const enum ExecutionSpace             es) {
-        SFEM_ERROR("IMPLEMENT ME!\n");
-        return nullptr;
+        auto cc     = std::make_unique<ContactConditions>(space);
+        cc->impl_->init_from_sideset(sideset);
+        cc->impl_->sdf = sdf;
+        cc->impl_->gap_xnormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_ynormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_znormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->assemble_mass_vector();
+        return cc;
     }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
