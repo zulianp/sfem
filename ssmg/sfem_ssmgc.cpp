@@ -146,9 +146,12 @@ namespace sfem {
 
         auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
 
-        auto count = sfem::create_host_buffer<uint16_t>(fine_ssmesh.n_nodes());
+        auto count = sfem::create_host_buffer<uint16_t>(contact_conds->n_constrained_dofs());
 
-        ssquad4_element_node_incidence_count(fine_ssmesh.level(), 1, 1, fine_sides->data(), count->data());
+        ssquad4_element_node_incidence_count(fine_ssmesh.level(), 1, fine_sides->extent(1), fine_sides->data(), count->data());
+
+        // count->print(std::cout);
+        // fine_sides->print(std::cout);
 
         ssquad4_restrict(fine_sides->extent(1),  // nelements
                          fine_ssmesh.level(),    // from_level

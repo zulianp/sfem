@@ -26,7 +26,7 @@ int test_contact() {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_BASE_RESOLUTION = 2;
+    int SFEM_BASE_RESOLUTION = 8;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
@@ -109,6 +109,7 @@ int test_contact() {
     out->write("rhs", rhs->data());
 
 #if 0 // FIXME
+// #if 1 // FIXME
     auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
     f->apply_constraints(x->data());
     solver->apply(rhs->data(), x->data());
