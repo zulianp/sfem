@@ -305,11 +305,22 @@ print_performance_metrics(FILE*       output_file,      //
 
     const int real_t_bits = sizeof(real_t) * 8;
 
+    char memory_model[1000];
+
+    if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
+        snprintf(memory_model, 1000, "Host Memory Model");
+    } else if (SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY) {
+        snprintf(memory_model, 1000, "Managed Memory Model");
+    } else {
+        snprintf(memory_model, 1000, "Unified Memory Model");
+    }
+
     fprintf(output_file, "============================================================================\n");
     fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
     fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
     fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
     fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
+    fprintf(output_file, "GPU TET10:    Memory model: %s\n", memory_model);
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
     fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
     fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
@@ -319,7 +330,6 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
-    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n\n", mesh->nelements, elements_per_second);
     fprintf(output_file,
             "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
             "nodes_second, "
@@ -691,24 +701,25 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                                        //
-hex8_to_tet10_resample_field_local_CUDA(                              //
-                                                                      // Mesh
-        const ptrdiff_t              nelements,                       // number of elements
-        const ptrdiff_t              nnodes,                          // number of nodes
-        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
-        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
-        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
+extern "C" int                                                                                        //
+hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,                        // MPI size
+                                        const int                    mpi_rank,                        // MPI rank
+                                        mesh_t* const SFEM_RESTRICT  mesh,                            // Mesh data
+                                        const ptrdiff_t              nelements,                       // number of elements Mesh
+                                        const ptrdiff_t              nnodes,                          // number of nodes
+                                        const int                    bool_assemble_dual_mass_vector,  // assemble dual mass vector
+                                        idx_t** const SFEM_RESTRICT  elems,                           // connectivity
+                                        geom_t** const SFEM_RESTRICT xyz,                             // coordinates
+                                        // SDF
+                                        const ptrdiff_t* const SFEM_RESTRICT n,       // number of nodes in each direction
+                                        const ptrdiff_t* const SFEM_RESTRICT stride,  // stride of the data
 
-        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
-        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
-        const real_t* const SFEM_RESTRICT data,    // SDF
-        // Output //
-        real_t* const SFEM_RESTRICT g_host) {  //
-                                               // geom_t** const SFEM_RESTRICT xyz
+                                        const geom_t* const SFEM_RESTRICT origin,  // origin of the domain
+                                        const geom_t* const SFEM_RESTRICT delta,   // delta of the domain
+                                        const real_t* const SFEM_RESTRICT data,    // SDF
+                                        // Output //
+                                        real_t* const SFEM_RESTRICT g_host) {  //
+                                                                               // geom_t** const SFEM_RESTRICT xyz
 
     PRINT_CURRENT_FUNCTION;
 
@@ -756,11 +767,10 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
 
     cudaDeviceSynchronize();
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    struct timespec start, end;
 
-    cudaEventRecord(start);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     // Launch the kernels
     launch_kernels_hex8_to_tet10_resample_field_local_CUDA(numBlocks,                       //
@@ -778,24 +788,60 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
                                                            mass_vector,                     //
                                                            g_device);                       //
 
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    double clock_ms = get_time_tet10(start, end);
 
-    const double seconds = milliseconds / 1000.0;
+    const double seconds = clock_ms / 1000.0;
 
-    printf("============================================================================\n");
-    printf("GPU:    Time for the kernel (%s):\n"  //
-           "GPU:    %f seconds\n",                //
-           kernel_name,
-           seconds);
-    const double elements_per_second = (double)(nelements) / seconds;
-    printf("GPU:    Number of elements: %d.\n", nelements);
-    printf("GPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
-    printf("GPU:    %d, %f   (CSV friendly) \n", nelements, elements_per_second);
-    printf("============================================================================\n");
+    const int n_points_struct = n[0] * n[1] * n[2];
+
+    if (SFEM_LOG_LEVEL >= 5) {
+        const int print_to_file = 1;
+
+        FILE* output_file_print = NULL;
+
+        if (print_to_file == 1 and mpi_rank == 0) {
+            char filename[1000];
+
+            const int real_t_bits = sizeof(real_t) * 8;
+
+            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
+            output_file_print = fopen(filename, "w");
+        }
+
+        // This function must be called by all ranks
+        // Internally it will check if the rank is 0
+        // The all ranks are used to calculate the performance metrics
+        print_performance_metrics(stdout,
+                                  kernel_name,
+                                  mpi_rank,
+                                  mpi_size,
+                                  seconds,
+                                  __FILE__,
+                                  __LINE__,
+                                  __FUNCTION__,
+                                  n_points_struct,
+                                  TET4_NQP,
+                                  mesh);
+
+        if (print_to_file == 1) {
+            print_performance_metrics(output_file_print,
+                                      kernel_name,
+                                      mpi_rank,
+                                      mpi_size,
+                                      seconds,
+                                      __FILE__,
+                                      __LINE__,
+                                      __FUNCTION__,
+                                      n_points_struct,
+                                      TET4_NQP,
+                                      mesh);
+
+            if (output_file_print != NULL) fclose(output_file_print);
+        }
+    }
 
     {
         cudaError_t errdd = cudaFree(data_device);
@@ -882,7 +928,10 @@ hex8_to_tet10_resample_field_local_CUDA_wrapper(const int mpi_size,             
     const int mesh_nnodes           = mpi_size >= 1 ? mesh->nnodes : mesh->n_owned_nodes;
     *bool_assemble_dual_mass_vector = 0;
 
-    return hex8_to_tet10_resample_field_local_CUDA(mesh->nelements,                  //
+    return hex8_to_tet10_resample_field_local_CUDA(mpi_size,                         //
+                                                   mpi_rank,                         //
+                                                   mesh,                             //
+                                                   mesh->nelements,                  //
                                                    mesh_nnodes,                      //
                                                    *bool_assemble_dual_mass_vector,  //
                                                    mesh->elements,                   //
