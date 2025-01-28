@@ -2,6 +2,7 @@
 #define SFEM_CONTACT_CONDITIONS_HPP
 
 #include "sfem_Function.hpp"
+#include "sfem_Grid.hpp"
 
 namespace sfem {
 
@@ -46,8 +47,6 @@ namespace sfem {
                                              const bool                            as_zero) const override;
         std::shared_ptr<Constraint> lor() const override;
 
-
-
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -66,6 +65,11 @@ namespace sfem {
 
         static std::shared_ptr<ContactConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
                                                                    const std::string                    &path);
+
+        static std::shared_ptr<ContactConditions> create(const std::shared_ptr<FunctionSpace> &space,
+                                                         const std::shared_ptr<Grid<geom_t>>  &sdf,
+                                                         const std::shared_ptr<Sideset>       &sideset,
+                                                         const enum ExecutionSpace             es);
 
         /// $x \in R^{n}$
         int apply(real_t *const x) override;
