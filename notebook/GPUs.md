@@ -61,7 +61,7 @@ GPU Memory 141GB 141GB
 GPU Memory Bandwidth 4.8TB/s 4.8TB/s
 
 Rough expected speed-up for FP64
-P100 > V100  7.8/4.7 = 1.65x (reached ?)
-P100 > A100  9.7/4.7 = 2x 	 (reached 1.7-2x)
-P100 > H100  34/4.7  = 7.23x (reached 5.4x)
+P100 -> V100  7.8/4.7 = 1.65x (reached ?)
+P100 -> A100  9.7/4.7 = 2x 	  (reached 1.7-2x)
+P100 -> H100  34/4.7  = 7.23x (reached 5.4x)
 
