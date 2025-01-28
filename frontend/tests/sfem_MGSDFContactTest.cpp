@@ -73,9 +73,9 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = sfem::create_sdf(comm,
-                                SFEM_BASE_RESOLUTION * 2,
-                                SFEM_BASE_RESOLUTION * 2,
-                                SFEM_BASE_RESOLUTION * 2,
+                                SFEM_BASE_RESOLUTION * 10,
+                                SFEM_BASE_RESOLUTION * 10,
+                                SFEM_BASE_RESOLUTION * 10,
                                 -0.5,
                                 -0.5,
                                 -0.5,
@@ -86,6 +86,9 @@ int test_contact() {
                                     const geom_t plane = -0.1;
                                     return plane - y;
                                 });
+
+    sfem::create_directory("test_contact");
+    sdf->to_file("test_contact/sdf");
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
 

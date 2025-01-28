@@ -4,6 +4,11 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
+#include "sfem_glob.hpp"
+
+#include <sstream>
+#include <fstream>
+
 namespace sfem {
 
     template <class T>
@@ -106,6 +111,41 @@ namespace sfem {
     }
 
     template <class T>
+    int Grid<T>::to_file(const std::string &folder)
+    {
+        std::stringstream ss;
+
+        std::string field_path;
+        ss << "path: " << "sdf.raw\n";
+        ss << "spatial_dimension: " << impl_->spatial_dimension << "\n";
+        ss << "nx: " << impl_->nglobal[0] << "\n";
+        ss << "ox: " << impl_->origin[0] << "\n";
+        ss << "dx: " << impl_->delta[0] << "\n";
+
+        if (impl_->spatial_dimension > 1) {
+            ss << "ny: " << impl_->nglobal[1] << "\n";
+            ss << "oy: " << impl_->origin[1] << "\n";
+            ss << "dy: " << impl_->delta[1] << "\n";
+        }
+
+        if (impl_->spatial_dimension > 2) {
+            ss << "nz: " << impl_->nglobal[2] << "\n";
+            ss << "oz: " << impl_->origin[2] << "\n";
+            ss << "dz: " << impl_->delta[2] << "\n";
+        }
+
+        ss << "block_size: " << impl_->block_size << "\n";
+
+        sfem::create_directory(folder.c_str());
+        std::ofstream os(folder + "/meta.yaml");
+        if(!os.good()) return SFEM_FAILURE;
+        os << ss.str();
+        os.close();
+
+        return impl_->field->to_file((folder + "/sdf.raw").c_str());
+    }
+
+    template <class T>
     ptrdiff_t Grid<T>::stride(int dim) const {
         return impl_->stride[dim];
     }
@@ -203,9 +243,9 @@ namespace sfem {
         impl->origin[1] = ymin;
         impl->origin[2] = zmin;
 
-        impl->delta[0] = xmax - xmin;
-        impl->delta[1] = ymax - ymin;
-        impl->delta[2] = zmax - zmin;
+        impl->delta[0] = (xmax - xmin) / (nx - 1);
+        impl->delta[1] = (ymax - ymin) / (ny - 1);
+        impl->delta[2] = (zmax - zmin) / (nz - 1);
 
         impl->field = create_host_buffer<T>(nx * ny * nz);
         return ret;

@@ -58,7 +58,7 @@ skin $mesh_raw $skinned
 # OMP_NUM_THREADS=8 OMP_PROC_BIND=true 
 # lldb -- 
 mesh_to_sdf $skinned $hmax $margin $db_out 
-raw_to_xdmf.py $db_out/sdf.float32.raw
+raw_to_xdmf.py $db_out/metadata_sdf.float32.yml
 
 raw_to_db.py $skinned $surf --point_data="nx.float32.raw,ny.float32.raw,nz.float32.raw" --point_data_type="float32,float32,float32"
 
