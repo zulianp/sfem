@@ -84,6 +84,9 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
         }
     }
 
+    free(rowptr_unsmoothed);
+    free(colidx_unsmoothed);
+    free(values_unsmoothed);
     count_t *rowptr_ap;
     idx_t   *colidx_ap;
     real_t  *values_ap;
@@ -109,22 +112,19 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
     // Pt A P
     crs_spmm(ndofs_coarse,
              ndofs_coarse,
-             rowptr_a,
-             colidx_a,
-             values_a,
-             *rowptr_p,
-             *colidx_p,
-             *values_p,
-             &rowptr_ap,
-             &colidx_ap,
-             &values_ap);
+             *rowptr_pt,
+             *colidx_pt,
+             *values_pt,
+             rowptr_ap,
+             colidx_ap,
+             values_ap,
+             rowptr_coarse,
+             colidx_coarse,
+             values_coarse);
 
     free(rowptr_ap);
     free(colidx_ap);
     free(values_ap);
-    free(rowptr_unsmoothed);
-    free(colidx_unsmoothed);
-    free(values_unsmoothed);
     free(agg_norms);
     free(diag_inv);
     return 0;
