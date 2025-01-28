@@ -4,11 +4,12 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
-            "name": "(lldb) Obstacle.exe",
+            "name": "(lldb) PoissonTest.exe",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/obstacle",
+            "program": "${workspaceFolder}/build/Debug/sfem_PoissonTest.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

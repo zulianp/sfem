@@ -29,7 +29,7 @@ then
 	exit -1
 fi
 
-export SFEM_ELEMENT_TYPE=PROTEUS_HEX8 
+export SFEM_ELEMENT_TYPE=SSHEX8 
 export SFEM_ELEMENT_REFINE_LEVEL=$1
 
 mesh=joint_hex_db
@@ -45,7 +45,7 @@ db_to_raw.py $SCRIPTPATH/joint-hex.vtk $mesh/original --select_elem_type=hexahed
 if [[ $SFEM_REFINE -ge 1 ]]
 then
 	echo "Refined mesh!"
-	proteus_hex8_to_hex8 $(( 1 + $SFEM_REFINE )) $mesh/original $mesh/refined
+	sshex8_to_hex8 $(( 1 + $SFEM_REFINE )) $mesh/original $mesh/refined
 	sfc $mesh/refined $mesh
 else
 	sfc $mesh/original $mesh
@@ -55,9 +55,9 @@ hex8_fix_ordering $mesh $mesh
 skin $mesh $mesh/macro_quad_surface
 cp $mesh/{x,y,z}.raw $mesh/macro_quad_surface
 
-proteus_quad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
+ssquad4_to_quad4.py $SFEM_ELEMENT_REFINE_LEVEL $mesh/macro_quad_surface $mesh/surface
 
-proteus_hex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
+sshex8_to_hex8 $SFEM_ELEMENT_REFINE_LEVEL $mesh $mesh/viz
 
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface -0.41 	0.095 	-0.094 	0.99 $mesh/surface/sides_base.raw
 SFEM_ELEMENT_TYPE=QUAD4 select_surf $mesh/surface 0.426 	0.248 	-0.222 	0.90 $mesh/surface/sides_top.raw

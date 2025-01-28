@@ -102,16 +102,23 @@ MS := Milestone
 **MS 1: ()**
 
    - [x] Two-level method matrix-free SPGMG on GPU (basic)
+   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
+   - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
+   - [x] Basic tracing facilities for timing different parts of the code (CPU only)
+   - [ ] GMG: Hierarchical indexing for no redundancy multilevel discretization
+   - [ ] SSHEX8-Mesh online generation from HEX8
+   - [ ] Multilevel GMG on CPU
+   - [ ] Contact stresses post-processor for SSHEX8
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [ ] Boundary mass-matrix
-   - [ ] Support non-axis aligned normal fields for contact
-   - [ ] Actual obstacle problem with SDF (recuced size of constrained dofs and quanties, normal field, nonlinear obstacle)
+   - [ ] MG with Support non-axis aligned normal fields for contact
+   - [ ] Chebyshev smoother
    - [ ] Export facilities for Paper 1
+   - [ ] Nonlinear obstacle contact loop (Optional)
 
 **MS 2: ()**
-
    - [ ] Drafting/Finalizing P1
-   - [ ] Chebyshev smoother
+   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 
@@ -160,11 +167,10 @@ MS := Milestone
 - [ ] Authorship: Hardik, Austen, Rolf, Panayot, Patrick
 - [ ] GMG for solving A x = b, B * x <= g, A in R^{n x n}, B in R^{m x n}
 - [ ] Details of optimization algorithm
+- [ ] Fully geometric MG
 - [ ] Examples in 2D and 3D including constrained Poisson problem, linear elasticity
 - [ ] Matlab Implementation
 - [ ] Convergence of the method on toy problems (no Perf)
-- [ ] If Hypre AMG ops work involve also Rui Peng Li
-
 
 If rejected content goes to **P2**
 
@@ -181,3 +187,6 @@ If rejected content goes to **P2**
    2) Comparing matrix-based (different formats) and matrix-free operator in the context of **P2** (Either Conference Proceeding or CCF Transactions on High Performance Computing):
 
 
+## Maybes
+
+- [ ] If Hypre AMG transfer ops work involve also Rui Peng Li?

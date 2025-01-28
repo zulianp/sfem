@@ -29,9 +29,9 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
     PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
     // Weighted connectivity graph in COO format
-    auto offdiag_row_indices = sfem::h_buffer<idx_t>(offdiag_nnz);
-    auto offdiag_col_indices = sfem::h_buffer<idx_t>(offdiag_nnz);
-    auto offdiag_values = sfem::h_buffer<real_t>(offdiag_nnz);
+    auto offdiag_row_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
+    auto offdiag_col_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
+    auto offdiag_values = sfem::create_host_buffer<real_t>(offdiag_nnz);
 
     idx_t amg_levels = 1;
 
@@ -43,7 +43,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
     auto prev_mat = fine_mat;
     std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p, pt = nullptr;
 
-    auto diag_smoother = sfem::h_buffer<real_t>(fine_ndofs);
+    auto diag_smoother = sfem::create_host_buffer<real_t>(fine_ndofs);
     l2_smoother(fine_ndofs,
                 bdy_dofs,
                 prev_mat->values->size(),
@@ -100,8 +100,8 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
         }
 
         ptrdiff_t coarser_dim = ndofs;
-        auto partition_buff = sfem::h_buffer<idx_t>(finer_dim);
-        auto weights_buff = sfem::h_buffer<real_t>(finer_dim);
+        auto partition_buff = sfem::create_host_buffer<idx_t>(finer_dim);
+        auto weights_buff = sfem::create_host_buffer<real_t>(finer_dim);
 
         for (idx_t k = 0; k < finer_dim; k++) {
             partition_buff->data()[k] = ws->partition[k];

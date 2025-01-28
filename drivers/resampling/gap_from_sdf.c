@@ -11,6 +11,7 @@
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_gap.h"
+#include "node_interpolate.h"
 
 #include "mesh_utils.h"
 

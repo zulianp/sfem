@@ -15,30 +15,154 @@ namespace sfem {
     template <typename T>
     class Operator {
     public:
-        virtual ~Operator() = default;
-        virtual int apply(const T* const x, T* const y) = 0;
-        virtual std::ptrdiff_t rows() const = 0;
-        virtual std::ptrdiff_t cols() const = 0;
-        virtual ExecutionSpace execution_space() const = 0;
+        virtual ~Operator()                                        = default;
+        virtual int            apply(const T* const x, T* const y) = 0;
+        virtual std::ptrdiff_t rows() const                        = 0;
+        virtual std::ptrdiff_t cols() const                        = 0;
+        virtual ExecutionSpace execution_space() const             = 0;
     };
+
+    template <typename T>
+    class SparseBlockVector /*: public Operator<T>*/ {
+    public:
+        int                            block_size_{0};
+        std::shared_ptr<Buffer<idx_t>> idx_;
+        std::shared_ptr<Buffer<T>>     data_;
+
+        inline int                            block_size() const { return block_size_; }
+        const std::shared_ptr<Buffer<idx_t>>& idx() const { return idx_; }
+        const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
+        ptrdiff_t                             n_blocks() const { return idx_->size(); }
+
+        void print(std::ostream& os) const {
+            for (ptrdiff_t i = 0; i < n_blocks(); i++) {
+                os << idx_->data()[i] << ") ";
+
+                for (int d = 0; d < block_size(); d++) {
+                    os << data_->data()[i * 6 + d];
+                    os << " ";
+                }
+
+                os << "\n";
+            }
+
+            os << "\n";
+        }
+
+        // TODO maybe
+        // int apply(const T* const x, T* const y) override {
+
+        //     return SFEM_SUCCESS;
+        // }
+
+        // std::ptrdiff_t rows() const override { return data_->size(); }
+        // std::ptrdiff_t cols() const override { return data_->size(); }
+        // ExecutionSpace execution_space() const override { return data_->mem_space(); }
+    };
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector(const std::shared_ptr<Buffer<idx_t>>& idx,
+                                                                     const std::shared_ptr<Buffer<T>>&     data) {
+        auto ret         = std::make_shared<SparseBlockVector<T>>();
+        ret->block_size_ = data->size() / idx->size();
+        ret->idx_        = idx;
+        ret->data_       = data;
+        return ret;
+    }
+
+    template <typename T>
+    class ScaledBlockVectorMult : public Operator<T> {
+    public:
+        std::shared_ptr<SparseBlockVector<T>> sbv;
+        std::shared_ptr<Buffer<T>>            scaling;
+
+        int apply(const T* const x, T* const y) override {
+            const ptrdiff_t    n_blocks   = sbv->n_blocks();
+            const idx_t* const idx        = sbv->idx()->data();
+            const T* const     dd         = sbv->data()->data();
+            const T* const     s          = scaling->data();
+            const int          block_size = 3;
+            assert(sbv->block_size() == 6);
+
+            for (ptrdiff_t i = 0; i < scaling->size(); i++) {
+                y[i] = 0;
+            }
+
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                auto di = &dd[i * 6];
+                auto si = s[i];
+
+                const idx_t b  = idx[i];
+                auto        xi = &x[b * block_size];
+                auto        yi = &y[b * block_size];
+
+                T buff[3] = {0, 0, 0};
+
+                int d_idx = 0;
+                for (int d1 = 0; d1 < block_size; d1++) {
+                    const auto m = si * di[d_idx++];
+                    buff[d1] += m * xi[d1];
+                    for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                        const auto m = si * di[d_idx++];
+                        buff[d1] += m * xi[d2];
+                        buff[d2] += m * xi[d1];
+                    }
+                }
+
+                yi[0] += buff[0];
+                yi[1] += buff[1];
+                yi[2] += buff[2];
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        std::ptrdiff_t rows() const override { return sbv->data()->size(); }
+        std::ptrdiff_t cols() const override { return sbv->data()->size(); }
+        ExecutionSpace execution_space() const override { return (enum ExecutionSpace)sbv->data()->mem_space(); }
+    };
+
+    template <typename T>
+    std::shared_ptr<Operator<T>> create_sparse_block_vector_mult(const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                                                 const std::shared_ptr<Buffer<T>>&            scaling) {
+        auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
+        ret->sbv     = sbv;
+        ret->scaling = scaling;
+
+        const ptrdiff_t    n_blocks   = sbv->n_blocks();
+        const idx_t* const idx        = sbv->idx()->data();
+        const T* const     dd         = sbv->data()->data();
+        const T* const     s          = scaling->data();
+        const int          block_size = 3;
+        assert(sbv->block_size() == 6);
+        return ret;
+    }
 
     template <typename T>
     class ShiftableOperator : public Operator<T> {
     public:
-        virtual ~ShiftableOperator() = default;
+        virtual ~ShiftableOperator()                              = default;
         virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
+        virtual int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) {
+            assert(false);
+            SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
+            return SFEM_FAILURE;
+        }
     };
 
     template <typename T>
     class LambdaOperator final : public Operator<T> {
     public:
-        std::ptrdiff_t rows_{0};
-        std::ptrdiff_t cols_{0};
+        std::ptrdiff_t                                rows_{0};
+        std::ptrdiff_t                                cols_{0};
         std::function<void(const T* const, T* const)> apply_;
-        ExecutionSpace execution_space_;
+        ExecutionSpace                                execution_space_;
 
-        LambdaOperator(const std::ptrdiff_t rows, const std::ptrdiff_t cols,
-                       std::function<void(const T* const, T* const)> apply, const ExecutionSpace es)
+        LambdaOperator(const std::ptrdiff_t                          rows,
+                       const std::ptrdiff_t                          cols,
+                       std::function<void(const T* const, T* const)> apply,
+                       const ExecutionSpace                          es)
             : rows_(rows), cols_(cols), apply_(apply), execution_space_(es) {}
 
         inline std::ptrdiff_t rows() const override { return rows_; }
@@ -52,13 +176,13 @@ namespace sfem {
     };
 
     template <typename T>
-    inline std::shared_ptr<Operator<T>> make_op(const std::ptrdiff_t rows,
-                                                const std::ptrdiff_t cols,
+    inline std::shared_ptr<Operator<T>> make_op(const std::ptrdiff_t                          rows,
+                                                const std::ptrdiff_t                          cols,
                                                 std::function<void(const T* const, T* const)> op,
-                                                const ExecutionSpace es) {
+                                                const ExecutionSpace                          es) {
         return std::make_shared<LambdaOperator<T>>(rows, cols, op, es);
     }
-    
+
     template <typename T>
     inline std::shared_ptr<Operator<T>> operator+(const std::shared_ptr<Operator<T>>& left,
                                                   const std::shared_ptr<Operator<T>>& right) {
@@ -75,19 +199,26 @@ namespace sfem {
     template <typename T>
     class MatrixFreeLinearSolver : public Operator<T> {
     public:
-        virtual ~MatrixFreeLinearSolver() = default;
-        virtual void set_op(const std::shared_ptr<Operator<T>>& op) = 0;
+        virtual ~MatrixFreeLinearSolver()                                          = default;
+        virtual void set_op(const std::shared_ptr<Operator<T>>& op)                = 0;
         virtual void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) = 0;
-        virtual void set_max_it(const int it) = 0;
-        virtual void set_n_dofs(const ptrdiff_t n) = 0;
+        virtual void set_max_it(const int it)                                      = 0;
+        virtual void set_n_dofs(const ptrdiff_t n)                                 = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
-        virtual int iterations() const = 0;
-        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-                                          const std::shared_ptr<Buffer<T>>& diag) {
-            fprintf(stderr,
+        virtual int  iterations() const = 0;
+        virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) {
+            SFEM_ERROR(
+                    "set_op_and_diag_shift: not implemented for subclass of "
+                     "MatrixFreeLinearSolver!\n");
+            return SFEM_FAILURE;
+        }
+
+        virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
+                                          const std::shared_ptr<SparseBlockVector<T>>& sbv,
+                                          const std::shared_ptr<Buffer<T>>&            diag) {
+            SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                     "MatrixFreeLinearSolver!\n");
-            assert(false);
             return SFEM_FAILURE;
         }
     };

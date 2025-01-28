@@ -56,15 +56,15 @@ SFEM_INLINE static void LagrangePolyArrayHOne_V(const vec_real x,             //
     const vec_real xx = Power2_V(x);
 
     List3_V(lagrange_poly_0,  //
-            (2.0 - 3.0 * x + xx) / 2.,
-            -((-2.0 + x) * x),
-            ((-1.0 + x) * x) / 2.  //
-    );                             //
+            ((real_t)2.0 - (real_t)3.0 * x + xx) / 2.,
+            -(((real_t)(-2.0) + x) * x),
+            (((real_t)(-1.0) + x) * x) / (real_t)2.  //
+    );                                               //
 
     List3_V(lagrange_poly_1,  //
-            (6.0 - 5.0 * x + xx) / 2.,
-            -3.0 + 4.0 * x - xx,         //
-            (2.0 - 3.0 * x + xx) / 2.);  //
+            ((real_t)6.0 - (real_t)5.0 * x + xx) / (real_t)2.,
+            (real_t)(-3.0) + (real_t)4.0 * x - xx,               //
+            ((real_t)2.0 - (real_t)3.0 * x + xx) / (real_t)2.);  //
 }
 
 /**
@@ -87,19 +87,21 @@ SFEM_INLINE static void getNonLinearWeightsHOne_V(const vec_real x,             
     vec_real alpha[2];
     // const vec_real h = 1.0;
 
-    const vec_real a = Abs_V(3. * y0 - 7. * y1 + 5. * y2 - 1. * y3);
-    const vec_real b = Power2_V(-3. * (a) + Abs_V(y0 - 12. * y1 + 3. * y2 + 2. * y3));
+    const vec_real a = Abs_V(3. * y0 - (real_t)7. * y1 + (real_t)5. * y2 - (real_t)1. * y3);
+    const vec_real b = Power2_V((real_t)(-3.) * (a) +
+                                Abs_V(y0 - (real_t)12. * y1 + (real_t)3. * y2 + (real_t)2. * y3));
 
     List2_V(alpha,
             //
-            Power_m1p5_V(eps + 0.1111111111111111 * (b)) -
-                    (0.3333333333333333 * x) / Power1p5_V(eps + 0.1111111111111111 * (b))
+            Power_m1p5_V(eps + (real_t)(0.1111111111111111) * (b)) -
+                    ((real_t)(0.3333333333333333) * x) /
+                            Power1p5_V(eps + (real_t)0.1111111111111111 * (b))
             //
             ,
             //
-            (0.3333333333333333 * x) /
-                    Power1p5_V(eps + Power2_V(-2. * Abs_V(y0 - 1.5 * y1 + 4. * y2 -
-                                                          1.8333333333333333 * y3) +
+            ((real_t)0.3333333333333333 * x) /
+                    Power1p5_V(eps + Power2_V((real_t)(-2.) * Abs_V(y0 - (real_t)(1.5) * y1 + (real_t)(4.) * y2 -
+                                                          (real_t)1.8333333333333333 * y3) +
                                               Abs_V(y0 - 1. * y1 - 1. * y2 + y3)))
             //
     );

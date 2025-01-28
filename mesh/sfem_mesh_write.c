@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+//#include <unistd.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -111,7 +111,7 @@ int mesh_write(const char *path, const mesh_t *mesh) {
     fprintf(meta_file, "rpath: true\n");
     fclose(meta_file);
 
-    return 0;
+    return SFEM_SUCCESS;
     // } else {
     //     // TODO
     //     assert(0);

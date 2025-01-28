@@ -33,20 +33,23 @@ endif()
 ######################################################
 
 find_package(MatrixIO REQUIRED)
-find_package(ISolver REQUIRED)
+
+if(SFEM_ENABLE_ISOLVER)
+    find_package(ISolver REQUIRED)
+endif()
 
 set(SFEM_MODULES
-    algebra base matrix mesh pizzastack solver
+    algebra base matrix 
+    mesh 
+    mesh/sshex8
+    pizzastack solver
     algebra/openmp
     operators 
     operators/beam2 
     operators/cvfem 
-    # operators/kernels 
     operators/navier_stokes
-    # operators/phase_field_for_fracture
     operators/tet10
     operators/tet4
-    operators/tet4/vectorized
     operators/tri3
     operators/tri6
     operators/trishell3
@@ -56,15 +59,25 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/macro_tri3
     operators/macro_tet4
-    operators/proteus_tet4
-    operators/proteus_hex8
+    operators/sstet4
+    operators/sshex8
     operators/hierarchical
     operators/hex8
+    operators/ssquad4
+    operators/boundary_conditions
     ssmg
 )
 
+if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
+    list(APPEND SFEM_MODULES operators/tet4/vectorized)
+endif()
+
 if(SFEM_ENABLE_AMG)
     list(APPEND SFEM_MODULES amg)
+endif()
+
+if(WIN32)
+set(SFEM_ENABLE_RESAMPLING OFF)
 endif()
 
 if(SFEM_ENABLE_RESAMPLING)
@@ -73,6 +86,14 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling/tet10
     )
 endif()
+
+list(APPEND SFEM_MODULES 
+    resampling/interpolate
+    resampling/quadshell4
+    resampling/trishell3
+    resampling/beam2
+    resampling/surface
+    )
 
 list(APPEND SFEM_MODULES frontend)
 
@@ -88,11 +109,12 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         operators/macro_tet4/cuda
         operators/tet10/cuda
-        operators/proteus_tet4/cuda
+        operators/sstet4/cuda
         operators/hex8/cuda
-        operators/proteus_hex8/cuda
+        operators/sshex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
+        operators/boundary_conditions/cuda
         )
 
     if(SFEM_ENABLE_AMG)
@@ -101,11 +123,11 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -159,7 +181,7 @@ foreach(include ${SFEM_BUILD_INCLUDES})
 endforeach()
 
 target_include_directories(sfem BEFORE
-     PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external>)
+     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>)
 
 target_include_directories(
     sfem BEFORE
@@ -203,20 +225,27 @@ endif()
 ######################################################
 # Executables
 
-file(GLOB C_DRIVERS CONFIGURE_DEPENDS "drivers/*.c")
-file(GLOB CPP_DRIVERS CONFIGURE_DEPENDS "drivers/*.cpp")
-# file(GLOB CPP_EXAMPLES CONFIGURE_DEPENDS "examples/*.cpp")
-file(GLOB C_EXAMPLES CONFIGURE_DEPENDS "examples/*.c")
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions) 
 
-set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS};${C_EXAMPLES}")
+foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
+    file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
+    file(GLOB MODULE_CPP_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.cpp")
+    list(APPEND CPP_DRIVERS ${MODULE_CPP_DRIVERS})
+    list(APPEND C_DRIVERS ${MODULE_C_DRIVERS})
+endforeach()
 
-# list(APPEND SFEM_EXCLUDED_EXEC "grad_and_project;heat_equation;integrate_divergence;partition_mesh_based_on_operator;taylor_hood_navier_stokes;ssolve")
+set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
 list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
 
 if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     # FIXME these executables need to be fixed when compiling with real_t=float32
     list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+endif()
+
+if(NOT ${SFEM_ENABLE_ISOLVER})
+    message(WARNING "ISOLVER is disabled!")
+     list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
 endif()
 
 if(SFEM_ENABLE_RESAMPLING)
@@ -255,9 +284,36 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
-# if(SFEM_ENABLE_TESTING)
-#     include(tests/tests.cmake)
-# endif()
+if(SFEM_ENABLE_TESTING)
+    enable_testing()
+
+    list(APPEND SFEM_UNIT_TESTS
+        operators/ssquad4/tests
+        operators/sshex8/tests
+        mesh/tests
+        frontend/tests
+        ssmg/tests
+    )
+
+    foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
+    
+    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+
+    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+
+    endforeach(UNIT_TEST)
+
+    message(STATUS "TEST_DRIVERS=${TEST_DRIVERS}")
+
+    foreach(TEST_DRIVER ${TEST_DRIVERS})
+        get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
+        add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
+        target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
+        add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
+    endforeach(TEST_DRIVER ${TEST_DRIVERS})
+endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
 #     include(benchmarks/benchmarks.cmake)
@@ -269,6 +325,10 @@ if(SFEM_ENABLE_PYTHON)
 endif()
 
 # message(STATUS "SFEM_TARGETS: ${SFEM_TARGETS}")
+
+if(SFEM_SUBMODULES)
+    target_link_libraries(sfem PUBLIC ${SFEM_SUBMODULES})
+endif()
 
 ######################################################
 ######################################################
@@ -336,7 +396,10 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/SFEMConfigVersion.cmake
   DESTINATION lib/cmake/)
 
-include(cmake/PostInstall.cmake)
+
+if(NOT SFEM_ENABLE_SUBMODULE)
+    include(cmake/PostInstall.cmake)
+endif()
 
 ######################################################
 ######################################################
