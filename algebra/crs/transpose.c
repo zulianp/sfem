@@ -2,25 +2,14 @@
 #include "crs.h"
 #include "sfem_base.h"
 
-/**
- * Transpose a CSR matrix A of dimension (rows x cols) into At (cols x rows).
- *
- *  rowptr, colidx, values -> input
- *  rowptr_t, colidx_t, values_t -> output
- *
- * On entry, rowptr_t, colidx_t, values_t must be allocated by the caller to the
- * correct lengths:
- *   - rowptr_t must be length (cols + 1)
- *   - colidx_t, values_t must be length (rowptr[rows]) i.e. NNZ of A and At
- */
-void transpose_csr(const count_t        rows,
-                   const count_t        cols,
-                   const count_t *const rowptr,
-                   const idx_t *const   colidx,
-                   const real_t *const  values,
-                   count_t *const       rowptr_t,  // out
-                   idx_t *const         colidx_t,  // out
-                   real_t *const        values_t   // out
+int crs_transpose(const count_t        rows,
+                  const count_t        cols,
+                  const count_t *const rowptr,
+                  const idx_t *const   colidx,
+                  const real_t *const  values,
+                  count_t *const       rowptr_t,  // out
+                  idx_t *const         colidx_t,  // out
+                  real_t *const        values_t   // out
 ) {
     count_t nnz = rowptr[rows];
     for (int i = 0; i <= cols; ++i) {
@@ -57,4 +46,5 @@ void transpose_csr(const count_t        rows,
     }
 
     free(offset);
+    return 0;
 }
