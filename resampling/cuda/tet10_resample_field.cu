@@ -242,6 +242,104 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
     RETURN_FROM_FUNCTION(0);
 }
 
+/**
+ * Calculates the elapsed time between two timespec structures.
+ *
+ * @param start The starting timespec structure.
+ * @param end The ending timespec structure.
+ * @return The elapsed time in milliseconds.
+ */
+double get_time_tet10(struct timespec start,  //
+                      struct timespec end) {
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
+    elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
+
+    return elapsed;
+}
+
+/**
+ * @brief Print the performance metrics
+ *
+ * @param output_file
+ * @param kernel_name
+ * @param mpi_rank
+ * @param mpi_size
+ * @param seconds
+ * @param file
+ * @param line
+ * @param function
+ * @param n_points_struct
+ * @param quad_nodes_cnt
+ * @param mesh
+ */
+void                                                    //
+print_performance_metrics(FILE*       output_file,      //
+                          const char* kernel_name,      //
+                          int         mpi_rank,         //
+                          int         mpi_size,         //
+                          double      seconds,          //
+                          const char* file,             //
+                          int         line,             //
+                          const char* function,         //
+                          int         n_points_struct,  //
+                          int         quad_nodes_cnt,   //
+                          mesh_t*     mesh) {               //
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    int tot_npoints_struct = 0;
+    MPI_Reduce(&n_points_struct, &tot_npoints_struct, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nelements = 0;
+    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nnodes = 0;
+    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    if (mpi_rank != 0) return;
+
+    const double elements_per_second          = (double)(tot_nelements) / seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nelements * quad_nodes_cnt) / seconds;
+    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
+
+    const int real_t_bits = sizeof(real_t) * 8;
+
+    fprintf(output_file, "============================================================================\n");
+    fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
+    fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
+    fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
+    fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
+    fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
+    fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
+    fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
+    fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", mesh->nelements);
+    fprintf(output_file, "GPU TET10:    Number of points struct:   %d.\n", tot_npoints_struct);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
+    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
+    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n\n", mesh->nelements, elements_per_second);
+    fprintf(output_file,
+            "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
+            "nodes_second, "
+            "nodes_struc_second, quadrature_points_second\n");
+    fprintf(output_file,
+            "<BenchR> %d,   %d,  %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            mpi_rank,                                                                   //
+            mpi_size,                                                                   //
+            real_t_bits,                                                                //
+            tot_nelements,                                                              //
+            tot_nnodes,                                                                 //
+            tot_npoints_struct,                                                         //
+            seconds,                                                                    //
+            elements_per_second,                                                        //
+            nodes_per_second,                                                           //
+            nodes_struc_second,                                                         //
+            quadrature_points_per_second);                                              //
+    fprintf(output_file, "============================================================================\n");
+}
+
 ////////////////////////////////////////////////////////////////////////
 // calculate_threads_and_blocks
 // Function to calculate the number of threads and blocks
@@ -260,18 +358,18 @@ calculate_threads_and_blocks(ptrdiff_t  nelements,        //
 ////////////////////////////////////////////////////////////////////////
 // hex8_to_tet10_resample_field_local_CUDA_unified
 ////////////////////////////////////////////////////////////////////////
-extern "C" int                                                                //
-hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
-        const int                            mpi_size,                        // MPI size
-        const int                            mpi_rank,                        // MPI rank
-        mesh_t*                              mesh,                            // Mesh data
-        const int                            bool_assemble_dual_mass_vector,  // assemble dual mass vector: 0 or 1
-        const ptrdiff_t* const SFEM_RESTRICT n,                               // SDF: number of nodes in each direction
-        const ptrdiff_t* const SFEM_RESTRICT stride,                          // SDF: stride of the data
-        const geom_t* const SFEM_RESTRICT    origin,                          // Geometry: origin of the domain
-        const geom_t* const SFEM_RESTRICT    delta,                           // Geometry: delta of the domain
-        const real_t* const SFEM_RESTRICT    data,                            // Data: SDF
-        real_t* const SFEM_RESTRICT          g_host) {                                 // Output: g_host
+extern "C" int                                                                                //
+hex8_to_tet10_resample_field_local_CUDA_unified_v2(const int mpi_size,                        // MPI size
+                                                   const int mpi_rank,                        // MPI rank
+                                                   mesh_t*   mesh,                            // Mesh data
+                                                   const int bool_assemble_dual_mass_vector,  // assemble dual mass vector: 0 or 1
+                                                   const ptrdiff_t* const SFEM_RESTRICT
+                                                           n,  // SDF: number of nodes in each direction
+                                                   const ptrdiff_t* const SFEM_RESTRICT stride,  // SDF: stride of the data
+                                                   const geom_t* const SFEM_RESTRICT    origin,  // Geometry: origin of the domain
+                                                   const geom_t* const SFEM_RESTRICT    delta,   // Geometry: delta of the domain
+                                                   const real_t* const SFEM_RESTRICT    data,    // Data: SDF
+                                                   real_t* const SFEM_RESTRICT          g_host) {         // Output: g_host
 
     PRINT_CURRENT_FUNCTION;
 
@@ -327,11 +425,10 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
 
     cudaDeviceSynchronize();
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    struct timespec start, end;
 
-    cudaEventRecord(start);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     ////  Launch the kernel
     launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(mpi_size,
@@ -352,37 +449,59 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
                                                                    mass_vector,
                                                                    g_device);
 
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    double clock_ms = get_time_tet10(start, end);
 
-    const double seconds = milliseconds / 1000.0;
+    const double seconds = clock_ms / 1000.0;
 
-    MPI_Comm comm = MPI_COMM_WORLD;
+    const int n_points_struct = n[0] * n[1] * n[2];
 
-    int tot_nelements = 0;
-    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+    if (SFEM_LOG_LEVEL >= 5) {
+        const int print_to_file = 1;
 
-    int tot_nnodes = 0;
-    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+        FILE* output_file_print = NULL;
 
-    const double elements_per_second          = (double)(tot_nelements) / seconds;
-    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nnodes * TET4_NQP) / seconds;
+        if (print_to_file == 1 and mpi_rank == 0) {
+            char filename[1000];
 
-    if (mpi_rank == 0) {
-        printf("GPU TET10: =======================================================\n");
-        printf("GPU TET10: Function: %s, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-        printf("GPU TET10: Number of elements:               %ld\n", tot_nelements);
-        printf("GPU TET10: Elapsed time:                     %e s\n", seconds);
-        printf("GPU TET10: Elapsed time:                     %e ms\n", milliseconds);
-        printf("GPU TET10: Elements/second:                  %e\n", elements_per_second);
-        printf("GPU TET10: Nodes/second:                     %e\n", nodes_per_second);
-        printf("GPU TET10: Points/second:                    %e\n", (double)size_data / seconds);
-        printf("GPU TET10: Quadrature points/second:         %e\n", quadrature_points_per_second);
-        printf("GPU TET10: =======================================================\n");
+            const int real_t_bits = sizeof(real_t) * 8;
+
+            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
+            output_file_print = fopen(filename, "w");
+        }
+
+        // This function must be called by all ranks
+        // Internally it will check if the rank is 0
+        // The all ranks are used to calculate the performance metrics
+        print_performance_metrics(stdout,
+                                  kernel_name,
+                                  mpi_rank,
+                                  mpi_size,
+                                  seconds,
+                                  __FILE__,
+                                  __LINE__,
+                                  __FUNCTION__,
+                                  n_points_struct,
+                                  TET4_NQP,
+                                  mesh);
+
+        if (print_to_file == 1) {
+            print_performance_metrics(output_file_print,
+                                      kernel_name,
+                                      mpi_rank,
+                                      mpi_size,
+                                      seconds,
+                                      __FILE__,
+                                      __LINE__,
+                                      __FUNCTION__,
+                                      n_points_struct,
+                                      TET4_NQP,
+                                      mesh);
+
+            if (output_file_print != NULL) fclose(output_file_print);
+        }
     }
 
     ////////////////////////////////////////
@@ -398,104 +517,6 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(                           //
     free_xyz_tet10_device_unified(&xyz_device);
 
     RETURN_FROM_FUNCTION(0);
-}
-
-/**
- * @brief Print the performance metrics
- *
- * @param output_file
- * @param kernel_name
- * @param mpi_rank
- * @param mpi_size
- * @param seconds
- * @param file
- * @param line
- * @param function
- * @param n_points_struct
- * @param quad_nodes_cnt
- * @param mesh
- */
-void                                                    //
-print_performance_metrics(FILE*       output_file,      //
-                          const char* kernel_name,      //
-                          int         mpi_rank,         //
-                          int         mpi_size,         //
-                          double      seconds,          //
-                          const char* file,             //
-                          int         line,             //
-                          const char* function,         //
-                          int         n_points_struct,  //
-                          int         quad_nodes_cnt,   //
-                          mesh_t*     mesh) {               //
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int tot_npoints_struct = 0;
-    MPI_Reduce(&n_points_struct, &tot_npoints_struct, 1, MPI_INT, MPI_SUM, 0, comm);
-
-    int tot_nelements = 0;
-    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
-
-    int tot_nnodes = 0;
-    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
-
-    if (mpi_rank != 0) return;
-
-    const double elements_per_second          = (double)(tot_nelements) / seconds;
-    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nnodes * quad_nodes_cnt) / seconds;
-    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
-
-    const int real_t_bits = sizeof(real_t) * 8;
-
-    fprintf(output_file, "============================================================================\n");
-    fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
-    fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
-    fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
-    fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
-    fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
-    fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
-    fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
-    fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", mesh->nelements);
-    fprintf(output_file, "GPU TET10:    Number of points struct:   %d.\n", tot_npoints_struct);
-    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
-    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
-    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
-    fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
-    fprintf(output_file, "GPU TET10:    %d, %f   (CSV friendly) \n\n", mesh->nelements, elements_per_second);
-    fprintf(output_file,
-            "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
-            "nodes_second, "
-            "nodes_struc_second, quadrature_points_second\n");
-    fprintf(output_file,
-            "<BenchR> %d,   %d,  %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
-            mpi_rank,                                                                   //
-            mpi_size,                                                                   //
-            real_t_bits,                                                                //
-            tot_nelements,                                                              //
-            tot_nnodes,                                                                 //
-            tot_npoints_struct,                                                         //
-            seconds,                                                                    //
-            elements_per_second,                                                        //
-            nodes_per_second,                                                           //
-            nodes_struc_second,                                                         //
-            quadrature_points_per_second);                                              //
-    fprintf(output_file, "============================================================================\n");
-}
-
-/**
- * Calculates the elapsed time between two timespec structures.
- *
- * @param start The starting timespec structure.
- * @param end The ending timespec structure.
- * @return The elapsed time in milliseconds.
- */
-double get_time_tet10(struct timespec start,  //
-                      struct timespec end) {
-    double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
-    elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
-
-    return elapsed;
 }
 
 ////////////////////////////////////////////////////////////////////////
