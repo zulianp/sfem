@@ -39,7 +39,7 @@ if(SFEM_ENABLE_ISOLVER)
 endif()
 
 set(SFEM_MODULES
-    algebra base matrix 
+    algebra algebra/crs base matrix 
     mesh 
     mesh/sshex8
     pizzastack solver
