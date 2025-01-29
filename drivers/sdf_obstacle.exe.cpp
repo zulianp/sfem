@@ -187,6 +187,7 @@ int main(int argc, char *argv[]) {
         auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
         auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->hessian_block_diag_sym(nullptr, diag->data());
+        f->constaints_mask(mask->data());
 
         auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
         cg->set_preconditioner_op(sj);

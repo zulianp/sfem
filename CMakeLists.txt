@@ -293,6 +293,7 @@ if(SFEM_ENABLE_TESTING)
         mesh/tests
         frontend/tests
         ssmg/tests
+        amg/tests
     )
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
