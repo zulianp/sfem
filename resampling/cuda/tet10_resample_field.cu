@@ -294,7 +294,7 @@ print_performance_metrics_tet10(FILE*         output_file,      //
     MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
     int tot_nnodes = 0;
-    MPI_Reduce(&mesh->nnodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
     if (mpi_rank != 0) return;
 
