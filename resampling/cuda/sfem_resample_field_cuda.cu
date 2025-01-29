@@ -24,6 +24,138 @@
     }
 
 /**
+ * @brief Calculate the number of floating point operations
+ *
+ * @param output_file
+ * @param kernel_name
+ * @param mpi_rank
+ * @param mpi_size
+ * @param seconds
+ * @param file
+ * @param line
+ * @param function
+ * @param n_points_struct
+ * @param quad_nodes_cnt
+ * @param mesh
+ */
+void                                                           //
+print_performance_metrics_tet4(FILE*         output_file,      //
+                               const char*   kernel_name,      //
+                               const int     mpi_rank,         //
+                               const int     mpi_size,         //
+                               const double  seconds,          //
+                               const char*   file,             //
+                               const int     line,             //
+                               const char*   function,         //
+                               const int     n_points_struct,  //
+                               const int     quad_nodes_cnt,   //
+                               const mesh_t* mesh) {           //
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    int tot_npoints_struct = 0;
+    MPI_Reduce(&n_points_struct, &tot_npoints_struct, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nelements = 0;
+    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nnodes = 0;
+    MPI_Reduce(&mesh->nnodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    if (mpi_rank != 0) return;
+
+    const double elements_per_second          = (double)(tot_nelements) / seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nelements * quad_nodes_cnt) / seconds;
+    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
+
+    const int real_t_bits = sizeof(real_t) * 8;
+
+    char memory_model[1000];
+
+    if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY) {
+        snprintf(memory_model, 1000, "Host Memory Model");
+    } else if (SFEM_CUDA_MEMORY_MODEL == CUDA_MANAGED_MEMORY) {
+        snprintf(memory_model, 1000, "Managed Memory Model");
+    } else {
+        snprintf(memory_model, 1000, "Unified Memory Model");
+    }
+
+    fprintf(output_file, "============================================================================\n");
+    fprintf(output_file, "GPU TET4:    Time for the kernel (%s):\n", kernel_name);
+    fprintf(output_file, "GPU TET4:    MPI rank: %d\n", mpi_rank);
+    fprintf(output_file, "GPU TET4:    MPI size: %d\n", mpi_size);
+    fprintf(output_file, "GPU TET4:    %d-bit real_t\n", real_t_bits);
+    fprintf(output_file, "GPU TET4:    Memory model: %s\n", memory_model);
+    fprintf(output_file, "GPU TET4:    %f seconds\n", seconds);
+    fprintf(output_file, "GPU TET4:    file: %s:%d \n", file, line);
+    fprintf(output_file, "GPU TET4:    function:                  %s\n", function);
+    fprintf(output_file, "GPU TET4:    Number of elements:        %d.\n", tot_nelements);
+    fprintf(output_file, "GPU TET4:    Number of nodes:           %d.\n", tot_nnodes);
+    fprintf(output_file, "GPU TET4:    Number of points struct:   %d.\n", tot_npoints_struct);
+    fprintf(output_file, "GPU TET4:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    fprintf(output_file, "GPU TET4:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
+    fprintf(output_file, "GPU TET4:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
+    fprintf(output_file, "GPU TET4:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
+    fprintf(output_file, "============================================================================\n\n");
+    fprintf(output_file,
+            "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
+            "nodes_second, "
+            "nodes_struc_second, quadrature_points_second\n");
+    fprintf(output_file,
+            "<BenchR> %d,   %d,  %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            mpi_rank,                                                                   //
+            mpi_size,                                                                   //
+            real_t_bits,                                                                //
+            tot_nelements,                                                              //
+            tot_nnodes,                                                                 //
+            tot_npoints_struct,                                                         //
+            seconds,                                                                    //
+            elements_per_second,                                                        //
+            nodes_per_second,                                                           //
+            nodes_struc_second,                                                         //
+            quadrature_points_per_second);                                              //
+    fprintf(output_file, "============================================================================\n");
+}
+
+// Function to handle printing performance metrics
+void                                                                  //
+handle_print_performance_metrics_tet4(const char*   kernel_name,      //
+                                      const int     mpi_rank,         //
+                                      const int     mpi_size,         //
+                                      const double  seconds,          //
+                                      const char*   file,             //
+                                      const int     line,             //
+                                      const char*   function,         //
+                                      const int     n_points_struct,  //
+                                      const int     npq,              //
+                                      const mesh_t* mesh,             //
+                                      const int     print_to_file) {      //
+
+    FILE* output_file_print = NULL;
+
+    if (print_to_file == 1 && mpi_rank == 0) {
+        char      filename[1000];
+        const int real_t_bits = sizeof(real_t) * 8;
+        snprintf(filename, 1000, "resampling_tet4_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
+        output_file_print = fopen(filename, "w");
+    }
+
+    // This function must be called by all ranks
+    // Internally it will check if the rank is 0
+    // All ranks are used to calculate the performance metrics
+    print_performance_metrics_tet4(
+            stdout, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+
+    if (print_to_file == 1) {
+        print_performance_metrics_tet4(
+                output_file_print, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+
+        if (output_file_print != NULL) fclose(output_file_print);
+    }
+}
+
+/**
  * @brief Exchange ghost nodes and add contribution
  */
 extern "C" void                                   //
@@ -444,7 +576,10 @@ tet4_resample_field_local_CUDA(const ptrdiff_t                    nelements,   /
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 extern "C" int                                                                        //
-tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelements,   // Mesh: Number of elements
+tet4_resample_field_local_reduce_CUDA(const int                          mpi_size,    // MPI size
+                                      const int                          mpi_rank,    // MPI rank
+                                      const mesh_t*                      mesh,        // Mesh
+                                      const ptrdiff_t                    nelements,   // Mesh: Number of elements
                                       const ptrdiff_t                    nnodes,      // Mesh: Number of nodes
                                       int** const MY_RESTRICT            elems,       // Mesh: Elements
                                       float** const MY_RESTRICT          xyz,         // Mesh: Coordinates
@@ -459,11 +594,13 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
 
     //
     //
-    printf("=============================================\n");
-    printf("== tet4_resample_field_local_reduce_CUDA ====\n");
-    printf("=============================================\n");
-    printf("nelements = %ld\n", nelements);
-    printf("=============================================\n");
+    if (SFEM_LOG_LEVEL >= 5) {
+        printf("=============================================\n");
+        printf("== tet4_resample_field_local_reduce_CUDA ====\n");
+        printf("=============================================\n");
+        printf("nelements = %ld\n", nelements);
+        printf("=============================================\n");
+    }
 
     //////////////////////////////////////////////////////////////////////////
     // Allocate memory on the device
@@ -512,16 +649,18 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
 
+    if (SFEM_LOG_LEVEL >= 5) {
+        printf("============================================================================\n");
+        printf("GPU:    Launching the kernel Reduce \n");
+        printf("GPU:    Number of blocks:            %ld\n", numBlocks);
+        printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
+        printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
+        printf("GPU:    Number of elements:           %ld\n", nelements);
+        printf("============================================================================\n");
+    }
+
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
-
-    printf("============================================================================\n");
-    printf("GPU:    Launching the kernel Reduce \n");
-    printf("GPU:    Number of blocks:            %ld\n", numBlocks);
-    printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
-    printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
-    printf("GPU:    Number of elements:           %ld\n", nelements);
-    printf("============================================================================\n");
 
     cudaEventRecord(start);
 
@@ -553,6 +692,7 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
     //////////////////////////////////////
 
     // Stop the timer
+    cudaDeviceSynchronize();
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -574,15 +714,29 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
 
     const double elements_second = (double)nelements / time;
 
-    printf("============================================================================\n");
-    printf("GPU:    End kernel Reduce \n");
-    printf("GPU:    Elapsed time:  %e s\n", time);
-    printf("GPU:    Throughput:    %e elements/second\n", elements_second);
-    printf("GPU:    FLOPS:         %e FLOP/S \n", flops);
-    printf("============================================================================\n");
+    if (SFEM_LOG_LEVEL >= 5) {
+        const int print_to_file = 1;
+        handle_print_performance_metrics_tet4("tet4_resample_field_reduce_local_kernel",  //
+                                              mpi_rank,                                   //
+                                              mpi_size,                                   //
+                                              time,                                       //
+                                              __FILE__,                                   //
+                                              __LINE__,                                   //
+                                              __FUNCTION__,                               //
+                                              size_data,                                  //
+                                              TET4_NQP,                                   //
+                                              mesh,                                       //
+                                              print_to_file);                             //
+    }
+
+    // printf("============================================================================\n");
+    // printf("GPU:    End kernel Reduce \n");
+    // printf("GPU:    Elapsed time:  %e s\n", time);
+    // printf("GPU:    Throughput:    %e elements/second\n", elements_second);
+    // printf("GPU:    FLOPS:         %e FLOP/S \n", flops);
+    // printf("============================================================================\n");
 
     // Wait for GPU to finish before accessing on host
-    cudaDeviceSynchronize();
 
     // Free memory on the device
     free_elems_tet4_device(&elems_device);
@@ -595,11 +749,9 @@ tet4_resample_field_local_reduce_CUDA(const ptrdiff_t                    nelemen
                cudaMemcpyDeviceToHost);     //
 
     cudaFree(weighted_field_device);
-
     cudaFree(data_device);
 
     RETURN_FROM_FUNCTION(0);
-    // return 0;
 }
 
 int                                                                                          //
@@ -933,7 +1085,10 @@ tet4_resample_field_local_reduce_CUDA_wrapper(const int     mpi_size,           
     *bool_assemble_dual_mass_vector = 0;
     const int mesh_nnodes           = mpi_size > 1 ? mesh->nnodes : mesh->n_owned_nodes;
 
-    ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
+    ret = tet4_resample_field_local_reduce_CUDA(mpi_size,         //
+                                                mpi_rank,         //
+                                                mesh,             //
+                                                mesh->nelements,  //
                                                 mesh_nnodes,      //
                                                 mesh->elements,   //
                                                 mesh->points,     //
