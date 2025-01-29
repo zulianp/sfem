@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stddef.h>
 #include <string.h>
 #include "crs.h"
@@ -28,6 +29,7 @@ int crs_spmm(const count_t                      rows_a,
         free(*rowptr_c);
         if (*colidx_c) free(*colidx_c);
         if (*values_c) free(*values_c);
+        assert(0);
         return -1;
     }
 
@@ -35,16 +37,20 @@ int crs_spmm(const count_t                      rows_a,
 
     // Temporary buffer to accumulate each row's partial sums.
     // Could improve this a lot by using hashmap instead
-    real_t *partial_sum = (real_t *)calloc(cols_b, sizeof(real_t));
+    real_t *partial_sum = (real_t *)malloc(cols_b * sizeof(real_t));
     if (!partial_sum) {
         free(*rowptr_c);
         free(*colidx_c);
         free(*values_c);
+        assert(0);
         return -1;
     }
 
     for (count_t ai = 0; ai < rows_a; ai++) {
-        memset(partial_sum, 0, cols_b * sizeof(real_t));
+#pragma omp parallel for
+        for (idx_t i = 0; i < cols_b; i++) {
+            partial_sum[i] = 0.0;
+        }
 
         // could pragma omp one of these loops but everything will be fighting
         // for partial_sum syncronization... probably only want to make parallel
@@ -72,6 +78,7 @@ int crs_spmm(const count_t                      rows_a,
                     if (!(*colidx_c) || !(*values_c)) {
                         free(*rowptr_c);
                         free(partial_sum);
+                        assert(0);
                         return -1;
                     }
                 }
@@ -91,6 +98,7 @@ int crs_spmm(const count_t                      rows_a,
     if (nnz_so_far < capacity) {
         *colidx_c = (idx_t *)realloc(*colidx_c, nnz_so_far * sizeof(idx_t));
         *values_c = (real_t *)realloc(*values_c, nnz_so_far * sizeof(real_t));
+        assert(*colidx_c && *values_c);
     }
 
     return 0;

@@ -45,6 +45,12 @@ int crs_transpose(const count_t        rows,
                   real_t *const        values_t   // [out]
 );
 
+int crs_validate(const count_t                      rows,
+                 const count_t                      cols,
+                 const count_t *const SFEM_RESTRICT rowptr,
+                 const idx_t *const SFEM_RESTRICT   colidx,
+                 const real_t *const SFEM_RESTRICT  values);
+
 #ifdef __cplusplus
 }
 #endif
