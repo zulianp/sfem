@@ -626,10 +626,10 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
 
     // loop over the 4 vertices of the tetrahedron
     int ev[4];
-    ev[0] = elems.elems_v0[element_i];
-    ev[1] = elems.elems_v1[element_i];
-    ev[2] = elems.elems_v2[element_i];
-    ev[3] = elems.elems_v3[element_i];
+    ev[0] = __ldg(&elems.elems_v0[element_i]);
+    ev[1] = __ldg(&elems.elems_v1[element_i]);
+    ev[2] = __ldg(&elems.elems_v2[element_i]);
+    ev[3] = __ldg(&elems.elems_v3[element_i]);
 
     {
         x0 = xyz.x[ev[0]];
