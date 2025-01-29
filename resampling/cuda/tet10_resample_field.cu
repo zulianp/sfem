@@ -272,18 +272,18 @@ double get_time_tet10(struct timespec start,  //
  * @param quad_nodes_cnt
  * @param mesh
  */
-void                                                    //
-print_performance_metrics(FILE*       output_file,      //
-                          const char* kernel_name,      //
-                          int         mpi_rank,         //
-                          int         mpi_size,         //
-                          double      seconds,          //
-                          const char* file,             //
-                          int         line,             //
-                          const char* function,         //
-                          int         n_points_struct,  //
-                          int         quad_nodes_cnt,   //
-                          mesh_t*     mesh) {               //
+void                                                            //
+print_performance_metrics_tet10(FILE*         output_file,      //
+                                const char*   kernel_name,      //
+                                const int     mpi_rank,         //
+                                const int     mpi_size,         //
+                                const double  seconds,          //
+                                const char*   file,             //
+                                const int     line,             //
+                                const char*   function,         //
+                                const int     n_points_struct,  //
+                                const int     quad_nodes_cnt,   //
+                                const mesh_t* mesh) {           //
 
     MPI_Comm comm = MPI_COMM_WORLD;
 
@@ -294,7 +294,7 @@ print_performance_metrics(FILE*       output_file,      //
     MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
     int tot_nnodes = 0;
-    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+    MPI_Reduce(&mesh->nnodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
     if (mpi_rank != 0) return;
 
@@ -324,12 +324,14 @@ print_performance_metrics(FILE*       output_file,      //
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
     fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
     fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
-    fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", mesh->nelements);
+    fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", tot_nelements);
+    fprintf(output_file, "GPU TET10:    Number of nodes:           %d.\n", tot_nnodes);
     fprintf(output_file, "GPU TET10:    Number of points struct:   %d.\n", tot_npoints_struct);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e elements/second\n", elements_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
     fprintf(output_file, "GPU TET10:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
+    fprintf(output_file, "============================================================================\n\n");
     fprintf(output_file,
             "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
             "nodes_second, "
@@ -348,6 +350,43 @@ print_performance_metrics(FILE*       output_file,      //
             nodes_struc_second,                                                         //
             quadrature_points_per_second);                                              //
     fprintf(output_file, "============================================================================\n");
+}
+
+// Function to handle printing performance metrics
+void                                                           //
+handle_print_performance_metrics(const char* kernel_name,      //
+                                 int         mpi_rank,         //
+                                 int         mpi_size,         //
+                                 double      seconds,          //
+                                 const char* file,             //
+                                 int         line,             //
+                                 const char* function,         //
+                                 int         n_points_struct,  //
+                                 int         npq,              //
+                                 mesh_t*     mesh,             //
+                                 int         print_to_file) {          //
+
+    FILE* output_file_print = NULL;
+
+    if (print_to_file == 1 && mpi_rank == 0) {
+        char      filename[1000];
+        const int real_t_bits = sizeof(real_t) * 8;
+        snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
+        output_file_print = fopen(filename, "w");
+    }
+
+    // This function must be called by all ranks
+    // Internally it will check if the rank is 0
+    // All ranks are used to calculate the performance metrics
+    print_performance_metrics_tet10(
+            stdout, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+
+    if (print_to_file == 1) {
+        print_performance_metrics_tet10(
+                output_file_print, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+
+        if (output_file_print != NULL) fclose(output_file_print);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -400,14 +439,22 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(const int mpi_size,          
     elems_tet10_device elems_device =                          //
             make_elems_tet10_device_unified(mesh->nelements);  //
 
-    copy_elems_tet10_device_unified(mesh->nelements, &elems_device, (const idx_t**)mesh->elements);
-    memory_hint_elems_tet10_device_unified(mesh->nelements, &elems_device);
+    copy_elems_tet10_device_unified(mesh->nelements,                 //
+                                    &elems_device,                   //
+                                    (const idx_t**)mesh->elements);  //
+
+    memory_hint_elems_tet10_device_unified(mesh->nelements,  //
+                                           &elems_device);   //
 
     xyz_tet10_device xyz_device =                         //
             make_xyz_tet10_device_unified(mesh->nnodes);  //
 
-    copy_xyz_tet10_device_unified(mesh->nnodes, &xyz_device, (const float**)mesh->points);
-    memory_hint_xyz_tet10_device_unified(mesh->nnodes, &xyz_device);
+    copy_xyz_tet10_device_unified(mesh->nnodes,                  //
+                                  &xyz_device,                   //
+                                  (const float**)mesh->points);  //
+
+    memory_hint_xyz_tet10_device_unified(mesh->nnodes,  //
+                                         &xyz_device);  //
 
     const ptrdiff_t warp_per_block  = 8;  /// 8 warps per block /////
     ptrdiff_t       threadsPerBlock = 0;
@@ -470,48 +517,17 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(const int mpi_size,          
 
     if (SFEM_LOG_LEVEL >= 5) {
         const int print_to_file = 1;
-
-        FILE* output_file_print = NULL;
-
-        if (print_to_file == 1 and mpi_rank == 0) {
-            char filename[1000];
-
-            const int real_t_bits = sizeof(real_t) * 8;
-
-            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
-            output_file_print = fopen(filename, "w");
-        }
-
-        // This function must be called by all ranks
-        // Internally it will check if the rank is 0
-        // The all ranks are used to calculate the performance metrics
-        print_performance_metrics(stdout,
-                                  kernel_name,
-                                  mpi_rank,
-                                  mpi_size,
-                                  seconds,
-                                  __FILE__,
-                                  __LINE__,
-                                  __FUNCTION__,
-                                  n_points_struct,
-                                  TET4_NQP,
-                                  mesh);
-
-        if (print_to_file == 1) {
-            print_performance_metrics(output_file_print,
-                                      kernel_name,
-                                      mpi_rank,
-                                      mpi_size,
-                                      seconds,
-                                      __FILE__,
-                                      __LINE__,
-                                      __FUNCTION__,
-                                      n_points_struct,
-                                      TET4_NQP,
-                                      mesh);
-
-            if (output_file_print != NULL) fclose(output_file_print);
-        }
+        handle_print_performance_metrics(kernel_name,      //
+                                         mpi_rank,         //
+                                         mpi_size,         //
+                                         seconds,          //
+                                         __FILE__,         //
+                                         __LINE__,         //
+                                         __FUNCTION__,     //
+                                         n_points_struct,  //
+                                         TET4_NQP,         //
+                                         mesh,             //
+                                         print_to_file);   //
     }
 
     ////////////////////////////////////////
@@ -634,48 +650,17 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
 
     if (SFEM_LOG_LEVEL >= 5) {
         const int print_to_file = 1;
-
-        FILE* output_file_print = NULL;
-
-        if (print_to_file == 1 and mpi_rank == 0) {
-            char filename[1000];
-
-            const int real_t_bits = sizeof(real_t) * 8;
-
-            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
-            output_file_print = fopen(filename, "w");
-        }
-
-        // This function must be called by all ranks
-        // Internally it will check if the rank is 0
-        // The all ranks are used to calculate the performance metrics
-        print_performance_metrics(stdout,
-                                  kernel_name,
-                                  mpi_rank,
-                                  mpi_size,
-                                  seconds,
-                                  __FILE__,
-                                  __LINE__,
-                                  __FUNCTION__,
-                                  n_points_struct,
-                                  TET4_NQP,
-                                  mesh);
-
-        if (print_to_file == 1) {
-            print_performance_metrics(output_file_print,
-                                      kernel_name,
-                                      mpi_rank,
-                                      mpi_size,
-                                      seconds,
-                                      __FILE__,
-                                      __LINE__,
-                                      __FUNCTION__,
-                                      n_points_struct,
-                                      TET4_NQP,
-                                      mesh);
-
-            if (output_file_print != NULL) fclose(output_file_print);
-        }
+        handle_print_performance_metrics(kernel_name,      //
+                                         mpi_rank,         //
+                                         mpi_size,         //
+                                         seconds,          //
+                                         __FILE__,         //
+                                         __LINE__,         //
+                                         __FUNCTION__,     //
+                                         n_points_struct,  //
+                                         TET4_NQP,         //
+                                         mesh,             //
+                                         print_to_file);   //
     }
 
     cudaMemcpy(g_host,                         //
@@ -799,48 +784,17 @@ hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,  
 
     if (SFEM_LOG_LEVEL >= 5) {
         const int print_to_file = 1;
-
-        FILE* output_file_print = NULL;
-
-        if (print_to_file == 1 and mpi_rank == 0) {
-            char filename[1000];
-
-            const int real_t_bits = sizeof(real_t) * 8;
-
-            snprintf(filename, 1000, "resampling_tet10_CUDA_mpi_size_%d_%dbit.log", mpi_size, real_t_bits);
-            output_file_print = fopen(filename, "w");
-        }
-
-        // This function must be called by all ranks
-        // Internally it will check if the rank is 0
-        // The all ranks are used to calculate the performance metrics
-        print_performance_metrics(stdout,
-                                  kernel_name,
-                                  mpi_rank,
-                                  mpi_size,
-                                  seconds,
-                                  __FILE__,
-                                  __LINE__,
-                                  __FUNCTION__,
-                                  n_points_struct,
-                                  TET4_NQP,
-                                  mesh);
-
-        if (print_to_file == 1) {
-            print_performance_metrics(output_file_print,
-                                      kernel_name,
-                                      mpi_rank,
-                                      mpi_size,
-                                      seconds,
-                                      __FILE__,
-                                      __LINE__,
-                                      __FUNCTION__,
-                                      n_points_struct,
-                                      TET4_NQP,
-                                      mesh);
-
-            if (output_file_print != NULL) fclose(output_file_print);
-        }
+        handle_print_performance_metrics(kernel_name,      //
+                                         mpi_rank,         //
+                                         mpi_size,         //
+                                         seconds,          //
+                                         __FILE__,         //
+                                         __LINE__,         //
+                                         __FUNCTION__,     //
+                                         n_points_struct,  //
+                                         TET4_NQP,         //
+                                         mesh,             //
+                                         print_to_file);   //
     }
 
     {
