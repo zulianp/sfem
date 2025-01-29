@@ -412,8 +412,7 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(const int mpi_size,          
                                                    const int mpi_rank,                        // MPI rank
                                                    mesh_t*   mesh,                            // Mesh data
                                                    const int bool_assemble_dual_mass_vector,  // assemble dual mass vector: 0 or 1
-                                                   const ptrdiff_t* const SFEM_RESTRICT
-                                                           n,  // SDF: number of nodes in each direction
+                                                   const ptrdiff_t* const SFEM_RESTRICT n,    // SDF: number of nodes in x y z
                                                    const ptrdiff_t* const SFEM_RESTRICT stride,  // SDF: stride of the data
                                                    const geom_t* const SFEM_RESTRICT    origin,  // Geometry: origin of the domain
                                                    const geom_t* const SFEM_RESTRICT    delta,   // Geometry: delta of the domain

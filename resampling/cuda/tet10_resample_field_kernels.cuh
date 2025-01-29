@@ -730,8 +730,9 @@ hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t  
     ev[8] = __ldg(&elems.elems_v8[element_i]);
     ev[9] = __ldg(&elems.elems_v9[element_i]);
 
-    // ISOPARAMETRIC
+#pragma unroll
     for (int v = 0; v < 10; ++v) {
+        // ISOPARAMETRIC
         x[v] = __ldg(&xyz.x[ev[v]]);  // x-coordinates
         y[v] = __ldg(&xyz.y[ev[v]]);  // y-coordinates
         z[v] = __ldg(&xyz.z[ev[v]]);  // z-coordinates
