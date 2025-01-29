@@ -719,22 +719,22 @@ hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t  
     real_t tet10_f[10];
 
     // loop over the ndes of the element
-    ev[0] = elems.elems_v0[element_i];
-    ev[1] = elems.elems_v1[element_i];
-    ev[2] = elems.elems_v2[element_i];
-    ev[3] = elems.elems_v3[element_i];
-    ev[4] = elems.elems_v4[element_i];
-    ev[5] = elems.elems_v5[element_i];
-    ev[6] = elems.elems_v6[element_i];
-    ev[7] = elems.elems_v7[element_i];
-    ev[8] = elems.elems_v8[element_i];
-    ev[9] = elems.elems_v9[element_i];
+    ev[0] = __ldg(&elems.elems_v0[element_i]);
+    ev[1] = __ldg(&elems.elems_v1[element_i]);
+    ev[2] = __ldg(&elems.elems_v2[element_i]);
+    ev[3] = __ldg(&elems.elems_v3[element_i]);
+    ev[4] = __ldg(&elems.elems_v4[element_i]);
+    ev[5] = __ldg(&elems.elems_v5[element_i]);
+    ev[6] = __ldg(&elems.elems_v6[element_i]);
+    ev[7] = __ldg(&elems.elems_v7[element_i]);
+    ev[8] = __ldg(&elems.elems_v8[element_i]);
+    ev[9] = __ldg(&elems.elems_v9[element_i]);
 
     // ISOPARAMETRIC
     for (int v = 0; v < 10; ++v) {
-        x[v] = xyz.x[ev[v]];  // x-coordinates
-        y[v] = xyz.y[ev[v]];  // y-coordinates
-        z[v] = xyz.z[ev[v]];  // z-coordinates
+        x[v] = __ldg(&xyz.x[ev[v]]);  // x-coordinates
+        y[v] = __ldg(&xyz.y[ev[v]]);  // y-coordinates
+        z[v] = __ldg(&xyz.z[ev[v]]);  // z-coordinates
     }
 
     // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
@@ -772,10 +772,10 @@ hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t  
         // Transform quadrature point to physical space
         // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
         // space
-        tet10_transform_cu(x,
-                           y,
-                           z,  //
-                           tet4_qx_v,
+        tet10_transform_cu(x,          //
+                           y,          //
+                           z,          //
+                           tet4_qx_v,  //
                            tet4_qy_v,
                            tet4_qz_v,
                            &g_qx,
