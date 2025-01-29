@@ -62,22 +62,12 @@ int test_amg_poisson() {
 #if 0
     auto solver = sfem::create_cg<real_t>(linear_op, es);
 #else
-    // FIXME use AMG instead (e.g., sfem::create_amg<real_t>(linear_op, ..., es))
     auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
     f->constaints_mask(mask->data());
-    count_t *row_ptr     = linear_op->row_ptr->data();
-    idx_t   *col_indices = linear_op->col_idx->data();
-    real_t  *values      = linear_op->values->data();
-    auto     near_null   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-
+    auto   near_null         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     real_t coarsening_factor = 7.5;
     auto   amg               = builder_sa(coarsening_factor, mask, near_null, linear_op);
-
-    if (!amg->test_interp()) {
-        printf("tests passed\n");
-    } else {
-        printf("FAILEDDDDDD\n");
-    }
+    assert(!amg->test_interp());
 
     amg->set_max_it(100);
     amg->verbose = true;
