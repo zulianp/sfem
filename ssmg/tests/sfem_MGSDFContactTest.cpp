@@ -109,7 +109,7 @@ int test_contact() {
     out->write("rhs", rhs->data());
 
 #if 0 // FIXME
-// #if 1 // FIXME
+// #if 1 
     auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
     f->apply_constraints(x->data());
     solver->apply(rhs->data(), x->data());

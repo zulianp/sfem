@@ -212,6 +212,33 @@ static SFEM_INLINE void hex8_find_cols(const idx_t *SFEM_RESTRICT targets,
 #endif
 }
 
+
+static SFEM_INLINE void hex8_local_to_global(const idx_t *const SFEM_RESTRICT ev,
+                                             const accumulator_t *const SFEM_RESTRICT
+                                                     element_matrix,
+                                             const count_t *const SFEM_RESTRICT rowptr,
+                                             const idx_t *const SFEM_RESTRICT colidx,
+                                             real_t *const SFEM_RESTRICT values) {
+    idx_t ks[8];
+    for (int edof_i = 0; edof_i < 8; ++edof_i) {
+        const idx_t dof_i = ev[edof_i];
+        const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+        const idx_t *row = &colidx[rowptr[dof_i]];
+
+        hex8_find_cols(ev, row, lenrow, ks);
+
+        real_t *rowvalues = &values[rowptr[dof_i]];
+        const accumulator_t *element_row = &element_matrix[edof_i * 8];
+
+#pragma unroll(8)
+        for (int edof_j = 0; edof_j < 8; ++edof_j) {
+            assert(ks[edof_j] >= 0);
+#pragma omp atomic update
+            rowvalues[ks[edof_j]] += element_row[edof_j];
+        }
+    }
+}
+
 static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRICT ev,
                                                   const accumulator_t *const SFEM_RESTRICT
                                                           element_matrix,
