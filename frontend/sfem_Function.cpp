@@ -882,7 +882,7 @@ namespace sfem {
         return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
     }
 
-    static std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
                                                                       const std::shared_ptr<Sideset>       &sideset) {
         ptrdiff_t n_nodes{0};
         idx_t    *nodes{nullptr};
