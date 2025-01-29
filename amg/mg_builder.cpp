@@ -51,12 +51,17 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
 
     ptrdiff_t ndofs = fine_ndofs;
 
+    printf("\nAMG info:\n level      cf         dofs       nnz   "
+           "sparsity "
+           "factor\n");
+    printf("|%-10d|%-10.2f|%-10td|%-10td|%-16.2f|\n", 1, 1.0, fine_ndofs, fine_mat->values->size(), 1.0);
     while (amg_levels < max_levels && ndofs > coarsest_ndofs) {
         count_t *rowptr = prev_mat->row_ptr->data();
         idx_t   *colidx = prev_mat->col_idx->data();
         real_t  *values = prev_mat->values->data();
 
-        count_t k = 0;
+        count_t offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
+        count_t k           = 0;
         for (idx_t i = 0; i < ndofs; i++) {
             for (count_t idx = rowptr[i]; idx < rowptr[i + 1]; idx++) {
                 idx_t  j   = colidx[idx];
@@ -71,10 +76,11 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                 }
             }
         }
-        offdiag_nnz = k;
+        printf("%d == %d\n", k, offdiag_nnz);
+        assert(k == offdiag_nnz);
 
         auto diag_smoother = sfem::create_host_buffer<real_t>(ndofs);
-        l2_smoother(fine_ndofs,
+        l1_smoother(ndofs,
                     bdy_dofs,
                     offdiag_nnz,
                     diag_values->data(),
@@ -116,6 +122,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         idx_t   *colidx_coarse;
         real_t  *values_coarse;
 
+        printf("Partition: %td coarse dofs\n", coarser_dim);
         smoothed_aggregation(finer_dim,
                              coarser_dim,
                              0.66,
@@ -138,6 +145,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         auto                                    stat_iter = sfem::create_stationary<real_t>(op, amg_smoother, es);
         stat_iter->set_max_it(smoothing_steps);
 
+        assert(rowptr_p[finer_dim] == rowptr_pt[coarser_dim]);
         count_t interp_weights = rowptr_p[finer_dim];
 
         pt = sfem::h_crs_spmv(coarser_dim,
@@ -165,19 +173,32 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                                          sfem::manage_host_buffer(nnz_coarse, values_coarse),
                                          1.0);
 
-        offdiag_nnz = (nnz_coarse - coarser_dim) / 2;
-        prev_mat    = a_coarse;
-        bdy_dofs    = nullptr;
+        count_t prev_nnz = prev_mat->values->size();
+        prev_mat         = a_coarse;
+        bdy_dofs         = nullptr;
+        printf("|%-10d|%-10.2f|%-10td|%-10d|%-16.2f|\n",
+               amg_levels,
+               (real_t)finer_dim / (real_t)coarser_dim,
+               ndofs,
+               nnz_coarse,
+               (real_t)nnz_coarse / (real_t)prev_nnz);
     }
 
     // Create a coarsest level solver, could also just smooth here if coarsest problem isn't
     // small enough to solve exactly. Direct solver by cholesky is also probably better here
+#if 1
     auto cg     = sfem::create_cg<real_t>(prev_mat, es);
     cg->verbose = false;
     cg->set_max_it(10000);  // Keep it large just to be sure!
     cg->set_rtol(1e-12);
     cg->set_preconditioner_op(amg_smoother);
     amg->add_level(prev_mat, cg, p, nullptr);
+#else
+    std::shared_ptr<sfem::Operator<real_t>> op        = prev_mat;
+    auto                                    stat_iter = sfem::create_stationary<real_t>(op, amg_smoother, es);
+    stat_iter->set_max_it(smoothing_steps);
+    amg->add_level(prev_mat, stat_iter, p, nullptr);
+#endif
 
     if (amg_levels == max_levels) {
         printf("AMG constructed successfully with max levels hit (%d levels)\n", amg_levels);
@@ -225,7 +246,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_pwc(const real_t               
     std::shared_ptr<sfem::PiecewiseConstantInterpolator<idx_t, real_t>> p, pt = nullptr;
 
     auto diag_smoother = sfem::create_host_buffer<real_t>(fine_ndofs);
-    l2_smoother(fine_ndofs,
+    l1_smoother(fine_ndofs,
                 bdy_dofs,
                 prev_mat->values->size(),
                 prev_mat->diag_values->data(),
@@ -313,7 +334,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_pwc(const real_t               
         bdy_dofs = nullptr;
 
         diag_smoother = sfem::create_buffer<real_t>(ndofs, es);
-        l2_smoother(ndofs,
+        l1_smoother(ndofs,
                     bdy_dofs,
                     prev_mat->values->size(),
                     prev_mat->diag_values->data(),

@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "mg_builder.hpp"
+#include "sfem_Stationary.hpp"
 #include "sfem_test.h"
 
 #include "sfem_Function.hpp"
@@ -25,7 +27,7 @@ int test_amg_poisson() {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_MESH_RESOLUTION = 8;
+    int SFEM_MESH_RESOLUTION = 25;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
@@ -57,10 +59,30 @@ int test_amg_poisson() {
 
     auto linear_op = sfem::hessian_crs(f, x, es);
 
-#if 1
+#if 0
     auto solver = sfem::create_cg<real_t>(linear_op, es);
 #else
     // FIXME use AMG instead (e.g., sfem::create_amg<real_t>(linear_op, ..., es))
+    auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+    f->constaints_mask(mask->data());
+    count_t *row_ptr     = linear_op->row_ptr->data();
+    idx_t   *col_indices = linear_op->col_idx->data();
+    real_t  *values      = linear_op->values->data();
+    auto     near_null   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+    real_t coarsening_factor = 7.5;
+    auto   amg               = builder_sa(coarsening_factor, mask, near_null, linear_op);
+
+    if (!amg->test_interp()) {
+        printf("tests passed\n");
+    } else {
+        printf("FAILEDDDDDD\n");
+    }
+
+    amg->set_max_it(100);
+    amg->verbose = true;
+    // amg->debug = true;
+    auto solver = amg;
 #endif
 
     f->apply_constraints(x->data());
@@ -72,7 +94,7 @@ int test_amg_poisson() {
 
     auto out = f->output();
     out->set_output_dir("test_amg_poisson/out");
-    if (block_size > 1) out->enable_AoS_to_SoA(true); // Needed only for vector problem
+    if (block_size > 1) out->enable_AoS_to_SoA(true);  // Needed only for vector problem
     SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);
 
@@ -121,8 +143,8 @@ int test_amg_sqp() {
         auto idx = bottom->data();
         auto u   = upper_bound->data();
 
-        for(ptrdiff_t i = 0; i < ndofs; i++) {
-            u[i] = 10000; // kind of infinity
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            u[i] = 10000;  // kind of infinity
         }
 
         for (ptrdiff_t i = 0; i < bottom->size(); i++) {

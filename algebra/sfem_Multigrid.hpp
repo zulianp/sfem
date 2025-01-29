@@ -133,10 +133,10 @@ namespace sfem {
                 int coarse_dim = Ac->rows();
                 int fine_dim = A->rows();
 
-                assert(p->rows() == coarse_dim);
-                assert(p->cols() == fine_dim);
-                assert(pt->rows() == fine_dim);
-                assert(pt->cols() == coarse_dim);
+                assert(pt->rows() == coarse_dim);
+                assert(pt->cols() == fine_dim);
+                assert(p->rows() == fine_dim);
+                assert(p->cols() == coarse_dim);
 
                 auto coarse_vec = create_host_buffer<T>(coarse_dim);
                 for (int i = 0; i < coarse_dim; i++) {
