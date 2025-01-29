@@ -23,6 +23,14 @@
         exit(EXIT_FAILURE);                                    \
     }
 
+double get_time_tet4(struct timespec start,  //
+                      struct timespec end) {
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
+    elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
+
+    return elapsed;
+}
+
 /**
  * @brief Calculate the number of floating point operations
  *
@@ -640,7 +648,7 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     ///////////////////////////////////////////////////////////////////////////////
     // Call the kernel
-    cudaEvent_t start, stop;
+    // cudaEvent_t start, stop;
 
     // Number of threads
     const ptrdiff_t warp_per_block  = 8;
@@ -659,10 +667,10 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
         printf("============================================================================\n");
     }
 
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    struct timespec start, end;
 
-    cudaEventRecord(start);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     {
         tet4_resample_field_reduce_local_kernel<<<numBlocks, threadsPerBlock>>>(0,             //
@@ -693,26 +701,23 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     // Stop the timer
     cudaDeviceSynchronize();
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    MPI_Barrier(MPI_COMM_WORLD);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
+    double clock_ms = get_time_tet4(start, end);
 
-    // get cuda error
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) {
-        printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
-    }
+    const double time = clock_ms / 1000.0;
+
+    // if (error != cudaSuccess) {
+    //     printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
+    // }
 
     // end kernel
     ///////////////////////////////////////////////////////////////////////////////
 
-    double time = milliseconds / 1000.0;
+    // const double flops = calculate_flops(nelements, TET4_NQP, time);
 
-    const double flops = calculate_flops(nelements, TET4_NQP, time);
-
-    const double elements_second = (double)nelements / time;
+    // const double elements_second = (double)nelements / time;
 
     if (SFEM_LOG_LEVEL >= 5) {
         const int print_to_file = 1;
