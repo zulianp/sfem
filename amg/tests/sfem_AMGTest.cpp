@@ -72,7 +72,7 @@ int test_amg_poisson() {
 
     auto out = f->output();
     out->set_output_dir("test_amg_poisson/out");
-    if (block_size > 1) out->enable_AoS_to_SoA(true);
+    if (block_size > 1) out->enable_AoS_to_SoA(true); // Needed only for vector problem
     SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);
 
@@ -120,6 +120,11 @@ int test_amg_sqp() {
     {
         auto idx = bottom->data();
         auto u   = upper_bound->data();
+
+        for(ptrdiff_t i = 0; i < ndofs; i++) {
+            u[i] = 10000; // kind of infinity
+        }
+
         for (ptrdiff_t i = 0; i < bottom->size(); i++) {
             u[idx[i]] = -1;
         }
