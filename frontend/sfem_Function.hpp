@@ -80,10 +80,10 @@ namespace sfem {
         ptrdiff_t     n_elements() const;
         enum ElemType element_type() const;
 
-        std::shared_ptr<CRSGraph> node_to_node_graph();
-        std::shared_ptr<CRSGraph> node_to_node_graph_upper_triangular();
+        std::shared_ptr<CRSGraph>              node_to_node_graph();
+        std::shared_ptr<CRSGraph>              node_to_node_graph_upper_triangular();
         std::shared_ptr<Buffer<element_idx_t>> half_face_table();
-        std::shared_ptr<CRSGraph> create_node_to_node_graph(const enum ElemType element_type);
+        std::shared_ptr<CRSGraph>              create_node_to_node_graph(const enum ElemType element_type);
 
         std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
         std::shared_ptr<Buffer<idx_t>>   node_to_node_colidx() const;
@@ -157,7 +157,7 @@ namespace sfem {
         }
 
         std::vector<int> derefinement_levels();
-        int apply_hierarchical_renumbering();
+        int              apply_hierarchical_renumbering();
 
         int       n_nodes_per_element() const;
         ptrdiff_t n_nodes() const;
@@ -191,9 +191,7 @@ namespace sfem {
             return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh,
-                                                     const int                    block_size   = 1);
-
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
@@ -222,8 +220,8 @@ namespace sfem {
 
         // private
         FunctionSpace();
+
     private:
-        
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
@@ -567,6 +565,9 @@ namespace sfem {
 
     std::string                      d_op_str(const std::string &name);
     std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
+
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+                                                               const std::shared_ptr<Sideset>       &sideset);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP
