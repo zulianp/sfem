@@ -24,7 +24,7 @@
     }
 
 double get_time_tet4(struct timespec start,  //
-                      struct timespec end) {
+                     struct timespec end) {
     double elapsed = (double)(end.tv_sec - start.tv_sec) * (double)1000LL;  // Convert seconds to milliseconds
     elapsed += (double)(end.tv_nsec - start.tv_nsec) / (double)1000000LL;   // Convert nanoseconds to milliseconds
 
@@ -126,7 +126,21 @@ print_performance_metrics_tet4(FILE*         output_file,      //
     fprintf(output_file, "============================================================================\n");
 }
 
-// Function to handle printing performance metrics
+/**
+ * @brief Print performance metrics for the kernel
+ *
+ * @param kernel_name
+ * @param mpi_rank
+ * @param mpi_size
+ * @param seconds
+ * @param file
+ * @param line
+ * @param function
+ * @param n_points_struct
+ * @param npq
+ * @param mesh
+ * @param print_to_file
+ */
 void                                                                  //
 handle_print_performance_metrics_tet4(const char*   kernel_name,      //
                                       const int     mpi_rank,         //
@@ -701,10 +715,11 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     // Stop the timer
     cudaDeviceSynchronize();
+
     MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    double clock_ms = get_time_tet4(start, end);
+    const double clock_ms = get_time_tet4(start, end);
 
     const double time = clock_ms / 1000.0;
 
@@ -734,16 +749,7 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
                                               print_to_file);                             //
     }
 
-    // printf("============================================================================\n");
-    // printf("GPU:    End kernel Reduce \n");
-    // printf("GPU:    Elapsed time:  %e s\n", time);
-    // printf("GPU:    Throughput:    %e elements/second\n", elements_second);
-    // printf("GPU:    FLOPS:         %e FLOP/S \n", flops);
-    // printf("============================================================================\n");
-
-    // Wait for GPU to finish before accessing on host
-
-    // Free memory on the device
+     // Free memory on the device
     free_elems_tet4_device(&elems_device);
     free_xyz_tet4_device(&xyz_device);
 
