@@ -26,7 +26,7 @@ int test_contact() {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_BASE_RESOLUTION = 8;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
@@ -58,7 +58,7 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
     
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.11, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -112,6 +112,7 @@ int test_contact() {
 #if 1 // FIXME
 // #if 1 
     auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+    // auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr); // This works!
     f->apply_constraints(x->data());
     solver->apply(rhs->data(), x->data());
 
