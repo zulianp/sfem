@@ -2,17 +2,18 @@
 #include <assert.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdio.h>
 #include "crs.h"
 #include "sfem_base.h"
 
 int smoothed_aggregation(const ptrdiff_t                    ndofs,
                          const ptrdiff_t                    ndofs_coarse,
                          const real_t                       jacobi_weight,
-                         const real_t *const SFEM_RESTRICT  near_null,
                          const idx_t *const SFEM_RESTRICT   partition,
                          const count_t *const SFEM_RESTRICT rowptr_a,
                          const idx_t *const SFEM_RESTRICT   colidx_a,
                          const real_t *const SFEM_RESTRICT  values_a,
+                         real_t                            *near_null,
                          count_t                          **rowptr_p,       // [out]
                          idx_t                            **colidx_p,       // [out]
                          real_t                           **values_p,       // [out]
@@ -36,7 +37,7 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
         real_t diag_val;
 
         for (count_t idx = rowptr_a[i]; idx < rowptr_a[i + 1]; idx++) {
-            // could binary search...
+            // could binary search... or pass in because builder has this info
             if (colidx_a[idx] == i) {
                 diag_inv[i] = jacobi_weight / values_a[idx];
                 break;
@@ -58,7 +59,6 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
         agg_norms[ic] = sqrt(agg_norms[ic]);
     }
 
-#pragma omp parallel for
     idx_t counter = 0;
     for (idx_t i = 0; i < ndofs; i++) {
         idx_t ic = partition[i];
@@ -68,6 +68,11 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
             counter++;
         }
         rowptr_unsmoothed[i + 1] = counter;
+    }
+
+#pragma omp parallel for
+    for (idx_t ic = 0; ic < ndofs_coarse; ic++) {
+        near_null[ic] = agg_norms[ic];
     }
 
     assert(!crs_validate(ndofs, ndofs_coarse, rowptr_unsmoothed, colidx_unsmoothed, values_unsmoothed));
@@ -85,12 +90,21 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
              values_p);
 
     assert(!crs_validate(ndofs, ndofs_coarse, *rowptr_p, *colidx_p, *values_p));
+
+    // sanity validation still looking for bug
+    for (idx_t i = 0; i < ndofs; i++) {
+        if (partition[i] < 0) {
+            assert((*rowptr_p)[i] == (*rowptr_p)[i + 1]);
+        }
+    }
+
     // (I - w D^-1 A) P
     for (idx_t i = 0; i < ndofs; i++) {
         for (count_t idx = (*rowptr_p)[i]; idx < (*rowptr_p)[i + 1]; idx++) {
             (*values_p)[idx] *= -diag_inv[i];
             if (partition[i] == (*colidx_p)[idx]) {
-                (*values_p)[idx] += values_unsmoothed[i];
+                count_t idx_unsmoothed = rowptr_unsmoothed[i];
+                (*values_p)[idx] += values_unsmoothed[idx_unsmoothed];
             }
         }
     }
@@ -137,6 +151,8 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
              values_coarse);
 
     assert(!crs_validate(ndofs_coarse, ndofs_coarse, *rowptr_coarse, *colidx_coarse, *values_coarse));
+    assert(crs_is_symmetric(ndofs_coarse, *rowptr_coarse, *colidx_coarse, *values_coarse));
+
     free(rowptr_ap);
     free(colidx_ap);
     free(values_ap);

@@ -12,11 +12,11 @@ extern "C" {
 int smoothed_aggregation(const ptrdiff_t                    ndofs,
                          const ptrdiff_t                    ndofs_coarse,
                          const real_t                       jacobi_weight,
-                         const real_t *const SFEM_RESTRICT  near_null,
                          const idx_t *const SFEM_RESTRICT   partition,
                          const count_t *const SFEM_RESTRICT rowptr_a,
                          const idx_t *const SFEM_RESTRICT   colidx_a,
                          const real_t *const SFEM_RESTRICT  values_a,
+                         real_t                            *near_null,
                          count_t                          **rowptr_p,       // [out]
                          idx_t                            **colidx_p,       // [out]
                          real_t                           **values_p,       // [out]
