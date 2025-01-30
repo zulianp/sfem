@@ -77,6 +77,7 @@ Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
 Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
 LAUNCH="mpiexec -np $n_procs "
+
 # LAUNCH="srun -p debug -n $n_procs  ${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 # LAUNCH="srun -p debug -n $n_procs -N 1 ./mps-wrapper.sh "
 # LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
