@@ -7,7 +7,64 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
+
+
 namespace sfem {
+    std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(
+            const std::shared_ptr<Function>         &f,
+            const std::shared_ptr<ContactConditions> contact_conds,
+            const enum ExecutionSpace                es,
+            const std::shared_ptr<Input>            &in)
+    {
+        auto fs = f->space();
+        const int block_size = fs->block_size();
+        auto cc_op       = contact_conds->linear_constraints_op();
+        auto cc_op_t     = contact_conds->linear_constraints_op_transpose();
+        auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+        contact_conds->signed_distance(upper_bound->data());
+
+        int  sym_block_size = (block_size == 3 ? 6 : 3);
+        auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
+        contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
+        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
+
+        auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
+
+        auto linear_op        = sfem::create_linear_operator("MF", f, nullptr, es);
+        sp->set_op(linear_op);
+        sp->default_init();
+
+        sp->set_atol(1e-12);
+        sp->set_max_it(20);
+        sp->set_max_inner_it(30);
+        sp->set_damping(1);
+        sp->set_penalty_param(10);
+
+        auto cg     = sfem::create_cg(linear_op, es);
+        cg->verbose = false;
+        auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
+        auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->hessian_block_diag_sym(nullptr, diag->data());
+        f->constaints_mask(mask->data());
+
+        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        cg->set_preconditioner_op(sj);
+
+        cg->set_atol(1e-12);
+        cg->set_rtol(1e-4);
+        cg->set_max_it(20000);
+
+        sp->linear_solver_ = cg;
+        // sp->enable_steepest_descent(SFEM_USE_STEEPEST_DESCENT);
+
+        sp->verbose = true;
+
+        sp->set_upper_bound(upper_bound);
+        sp->set_constraints_op(cc_op, cc_op_t, sbv);
+        return sp;
+    }
+
+
     // TODO improve contact integration in SSMG
     // auto coarse_contact_conditions = contact_conds->derefine(fs_coarse, true);
     // auto coarse_contact_mask = sfem::create_buffer<mask_t>(fs_coarse->n_dofs(), es);
@@ -26,12 +83,12 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        bool        nlsmooth_steps                     = 10;
+        int        nlsmooth_steps                     = 100;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
-        int         linear_smoothing_steps             = 3;
+        int         linear_smoothing_steps             = 10;
         bool        enable_coarse_space_preconditioner = false;
         bool        coarse_solver_verbose              = false;
 
