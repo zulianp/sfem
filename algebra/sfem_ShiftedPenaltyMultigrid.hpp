@@ -33,16 +33,14 @@ namespace sfem {
         void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
-        void set_constraints_op(const std::shared_ptr<Operator<T>>&          op,
-                                const std::shared_ptr<Operator<T>>&          op_t) {
+        void set_constraints_op(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Operator<T>>& op_t) {
             constraints_op_           = op;
             constraints_op_transpose_ = op_t;
             // constraints_op_x_op_.clear();
             // constraints_op_x_op_.push_back(op_x_op);
         }
 
-        void add_level_constraint_op_x_op(const std::shared_ptr<SparseBlockVector<T>> &constraints_op_x_op)
-        {
+        void add_level_constraint_op_x_op(const std::shared_ptr<SparseBlockVector<T>>& constraints_op_x_op) {
             constraints_op_x_op_.push_back(constraints_op_x_op);
         }
 
@@ -284,6 +282,8 @@ namespace sfem {
 
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
+        bool       skip_coarse{false};
+
     private:
         std::vector<std::shared_ptr<Operator<T>>>               operator_;
         std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;
@@ -327,6 +327,7 @@ namespace sfem {
 
         ptrdiff_t count_smoothing_steps{0};
 
+        
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
         inline int coarser_level(int level) const { return level + 1; }
@@ -386,14 +387,14 @@ namespace sfem {
             if (constraints_op_) {
                 // Jacobian
 
-                blas_.zeros(n_constrained_dofs, mem->work->data());
+                blas_.zeros(n_constrained_dofs, correction->data());
 
                 // Solution space to constraints space
-                constraints_op_->apply(mem->solution->data(), mem->work->data());
+                constraints_op_->apply(mem->solution->data(), correction->data());
                 blas_.zeros(n_dofs, mem->diag->data());
 
                 blas_.zeros(n_constrained_dofs, mem->diag->data());
-                impl_.calc_J_pen(n_constrained_dofs, mem->work->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
+                impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
 
                 // Residual
                 blas_.zeros(n_constrained_dofs, mem->work->data());
@@ -503,9 +504,10 @@ namespace sfem {
                 blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
             }
 
-            penalty_pseudo_galerkin_assembly();
+            if (!skip_coarse) {
+                penalty_pseudo_galerkin_assembly();
 
-            int ret = cycle(coarser_level(finest_level()));
+                int ret = cycle(coarser_level(finest_level()));
             assert(ret != CYCLE_FAILURE);
 
             {
@@ -540,7 +542,8 @@ namespace sfem {
 
                 } else {
                     // Apply coarse space correction
-                    blas_.axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
+                        blas_.axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
+                    }
                 }
             }
 

@@ -238,6 +238,11 @@ int main(int argc, char *argv[]) {
         spmg->set_max_it(30);
         spmg->set_atol(1e-8);
         spmg->set_upper_bound(upper_bound);
+            
+        // Uncomment to check if fine level is working on its own
+        // spmg->set_nlsmooth_steps(100);
+        // spmg->skip_coarse = true;
+
         solver = spmg;
     } else {
         auto mprgp = sfem::create_mprgp(linear_op, es);
