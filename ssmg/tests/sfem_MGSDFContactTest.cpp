@@ -58,7 +58,7 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
     
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.11, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -101,6 +101,7 @@ int test_contact() {
     contact_conds->update(x->data());
     contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
 
+    fs->mesh_ptr()->write("test_contact/coarse_mesh");
     fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
     auto out = f->output();
     out->set_output_dir("test_contact/out");
@@ -108,11 +109,13 @@ int test_contact() {
     out->write("gap", gap->data());
     out->write("rhs", rhs->data());
 
-#if 0 // FIXME
+#if 1 // FIXME
 // #if 1 
     auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
     f->apply_constraints(x->data());
     solver->apply(rhs->data(), x->data());
+
+    out->write("disp", x->data());
 #endif
     return SFEM_TEST_SUCCESS;
 }
