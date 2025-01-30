@@ -627,11 +627,41 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     auto      tile      = cg::tiled_partition<__WARP_SIZE__>(g);
     const int tile_rank = tile.thread_rank();
 
+    typedef struct {
+        int ev0;
+        int ev1;
+        int ev2;
+        int ev3;
+    } ev_t;
+
     // loop over the 4 vertices of the tetrahedron
-    const int ev[4] = {elems.elems_v0[element_i],  //
-                       elems.elems_v1[element_i],
-                       elems.elems_v2[element_i],
-                       elems.elems_v3[element_i]};
+    // const int ev[4] = {elems.elems_v0[element_i],  //
+    //                    elems.elems_v1[element_i],
+    //                    elems.elems_v2[element_i],
+    //                    elems.elems_v3[element_i]};
+
+    ev_t evs;
+    if (tile_rank == 0)
+        evs = {elems.elems_v0[element_i], elems.elems_v1[element_i], elems.elems_v2[element_i], elems.elems_v3[element_i]};
+
+    evs = tile.shfl(evs, 0);
+
+    {
+        x0 = xyz.x[evs.ev0];
+        x1 = xyz.x[evs.ev1];
+        x2 = xyz.x[evs.ev2];
+        x3 = xyz.x[evs.ev3];
+
+        y0 = xyz.y[evs.ev0];
+        y1 = xyz.y[evs.ev1];
+        y2 = xyz.y[evs.ev2];
+        y3 = xyz.y[evs.ev3];
+
+        z0 = xyz.z[evs.ev0];
+        z1 = xyz.z[evs.ev1];
+        z2 = xyz.z[evs.ev2];
+        z3 = xyz.z[evs.ev3];
+    }
 
     // ev[0] = (elems.elems_v0[element_i]);
     // ev[1] = (elems.elems_v1[element_i]);
@@ -639,20 +669,20 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     // ev[3] = (elems.elems_v3[element_i]);
 
     {
-        x0 = xyz.x[ev[0]];
-        x1 = xyz.x[ev[1]];
-        x2 = xyz.x[ev[2]];
-        x3 = xyz.x[ev[3]];
+        x0 = xyz.x[evs.ev0];
+        x1 = xyz.x[evs.ev1];
+        x2 = xyz.x[evs.ev2];
+        x3 = xyz.x[evs.ev3];
 
-        y0 = xyz.y[ev[0]];
-        y1 = xyz.y[ev[1]];
-        y2 = xyz.y[ev[2]];
-        y3 = xyz.y[ev[3]];
+        y0 = xyz.y[evs.ev0];
+        y1 = xyz.y[evs.ev1];
+        y2 = xyz.y[evs.ev2];
+        y3 = xyz.y[evs.ev3];
 
-        z0 = xyz.z[ev[0]];
-        z1 = xyz.z[ev[1]];
-        z2 = xyz.z[ev[2]];
-        z3 = xyz.z[ev[3]];
+        z0 = xyz.z[evs.ev0];
+        z1 = xyz.z[evs.ev1];
+        z2 = xyz.z[evs.ev2];
+        z3 = xyz.z[evs.ev3];
     }
 
     // Volume of the tetrahedron
@@ -732,10 +762,10 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     element_field3_reduce = cg::reduce(tile, element_field3_reduce, cg::plus<real_type>());
 
     if (tile_rank == 0) {
-        atomicAdd(&weighted_field[ev[0]], element_field0_reduce);
-        atomicAdd(&weighted_field[ev[1]], element_field1_reduce);
-        atomicAdd(&weighted_field[ev[2]], element_field2_reduce);
-        atomicAdd(&weighted_field[ev[3]], element_field3_reduce);
+        atomicAdd(&weighted_field[evs.ev0], element_field0_reduce);
+        atomicAdd(&weighted_field[evs.ev1], element_field1_reduce);
+        atomicAdd(&weighted_field[evs.ev2], element_field2_reduce);
+        atomicAdd(&weighted_field[evs.ev3], element_field3_reduce);
     }
 }
 
