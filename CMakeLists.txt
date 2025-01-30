@@ -293,8 +293,14 @@ if(SFEM_ENABLE_TESTING)
         mesh/tests
         frontend/tests
         ssmg/tests
-        amg/tests
+        
     )
+
+    if(SFEM_ENABLE_AMG)
+        list(APPEND SFEM_UNIT_TESTS
+            amg/tests
+        )
+    endif()
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
     
