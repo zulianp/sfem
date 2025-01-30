@@ -2,8 +2,10 @@
 #define SFEM_RESAMPLE_FIELD_CUDA_CUH
 
 #include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
 #include <cuda_profiler_api.h>
 #include <stdio.h>
+
 #include "sfem_base.h"
 
 // #define real_t double
@@ -143,9 +145,9 @@ __device__ void                                                      //
 hex_aa_8_collect_coeffs_cu(const ptrdiff_t MY_RESTRICT     stride0,  // stride0
                            const ptrdiff_t MY_RESTRICT     stride1,  // stride1
                            const ptrdiff_t MY_RESTRICT     stride2,  // stride2
-                           const ptrdiff_t                 i,        //
-                           const ptrdiff_t                 j,        //
-                           const ptrdiff_t                 k,        //
+                           const ptrdiff_t MY_RESTRICT     i,        //
+                           const ptrdiff_t MY_RESTRICT     j,        //
+                           const ptrdiff_t MY_RESTRICT     k,        //
                            const real_t* const MY_RESTRICT data,  // Attention this is geometric data transformed to solver data!
                            real_t* MY_RESTRICT             out0,  // output
                            real_t* MY_RESTRICT             out1,  //
@@ -156,23 +158,23 @@ hex_aa_8_collect_coeffs_cu(const ptrdiff_t MY_RESTRICT     stride0,  // stride0
                            real_t* MY_RESTRICT             out6,  //
                            real_t* MY_RESTRICT             out7) {            //
     //
-    const ptrdiff_t i0 = i * stride0 + j * stride1 + k * stride2;
-    const ptrdiff_t i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    const ptrdiff_t i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    const ptrdiff_t i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    const ptrdiff_t i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    const ptrdiff_t i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    const ptrdiff_t i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    const ptrdiff_t i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const unsigned int i0 = i * stride0 + j * stride1 + k * stride2;
+    const unsigned int i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
+    const unsigned int i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
+    const unsigned int i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
+    const unsigned int i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
+    const unsigned int i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
+    const unsigned int i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    const unsigned int i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 
-    *out0 = data[i0];
-    *out1 = data[i1];
-    *out2 = data[i2];
-    *out3 = data[i3];
-    *out4 = data[i4];
-    *out5 = data[i5];
-    *out6 = data[i6];
-    *out7 = data[i7];
+    *out0 = __ldg(&data[i0]);
+    *out1 = __ldg(&data[i1]);
+    *out2 = __ldg(&data[i2]);
+    *out3 = __ldg(&data[i3]);
+    *out4 = __ldg(&data[i4]);
+    *out5 = __ldg(&data[i5]);
+    *out6 = __ldg(&data[i6]);
+    *out7 = __ldg(&data[i7]);
 }
 
 //////////////////////////////////////////////////////////
@@ -181,9 +183,9 @@ hex_aa_8_collect_coeffs_cu(const ptrdiff_t MY_RESTRICT     stride0,  // stride0
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 __global__ void                                                                      //
-tet4_resample_field_local_kernel(const ptrdiff_t                     start_element,  // Mesh
-                                 const ptrdiff_t                     end_element,    // Mesh
-                                 const ptrdiff_t                     nnodes,         // Mesh
+tet4_resample_field_local_kernel(const ptrdiff_t MY_RESTRICT         start_element,  // Mesh
+                                 const ptrdiff_t MY_RESTRICT         end_element,    // Mesh
+                                 const ptrdiff_t MY_RESTRICT         nnodes,         // Mesh
                                  const elems_tet4_device MY_RESTRICT elems,          // Mesh
                                  const xyz_tet4_device MY_RESTRICT   xyz,            // Mesh
                                  const ptrdiff_t MY_RESTRICT         stride0,        // SDF stride0
@@ -419,51 +421,50 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 // quadrature_node ///////////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-template <typename Real_Type>
 __device__ inline void                                              //
-quadrature_node(const Real_Type                    tet4_qx_v,       //
-                const Real_Type                    tet4_qy_v,       //
-                const Real_Type                    tet4_qz_v,       //
-                const Real_Type                    tet4_qw_v,       //
-                const Real_Type                    theta_volume,    //
-                const Real_Type                    x0,              //
-                const Real_Type                    x1,              //
-                const Real_Type                    x2,              //
-                const Real_Type                    x3,              //
-                const Real_Type                    y0,              //
-                const Real_Type                    y1,              //
-                const Real_Type                    y2,              //
-                const Real_Type                    y3,              //
-                const Real_Type                    z0,              //
-                const Real_Type                    z1,              //
-                const Real_Type                    z2,              //
-                const Real_Type                    z3,              //
-                const Real_Type                    dx,              //
-                const Real_Type                    dy,              //
-                const Real_Type                    dz,              //
-                const Real_Type                    ox,              //
-                const Real_Type                    oy,              //
-                const Real_Type                    oz,              //
-                const ptrdiff_t                    stride0,         //
-                const ptrdiff_t                    stride1,         //
-                const ptrdiff_t                    stride2,         //
+quadrature_node(const real_type                    tet4_qx_v,       //
+                const real_type                    tet4_qy_v,       //
+                const real_type                    tet4_qz_v,       //
+                const real_type                    tet4_qw_v,       //
+                const real_type                    theta_volume,    //
+                const real_type                    x0,              //
+                const real_type                    x1,              //
+                const real_type                    x2,              //
+                const real_type                    x3,              //
+                const real_type                    y0,              //
+                const real_type                    y1,              //
+                const real_type                    y2,              //
+                const real_type                    y3,              //
+                const real_type                    z0,              //
+                const real_type                    z1,              //
+                const real_type                    z2,              //
+                const real_type                    z3,              //
+                const real_type                    dx,              //
+                const real_type                    dy,              //
+                const real_type                    dz,              //
+                const real_type                    ox,              //
+                const real_type                    oy,              //
+                const real_type                    oz,              //
+                const ptrdiff_t MY_RESTRICT        stride0,         //
+                const ptrdiff_t MY_RESTRICT        stride1,         //
+                const ptrdiff_t MY_RESTRICT        stride2,         //
                 const real_type* const MY_RESTRICT data,            //
-                Real_Type&                         element_field0,  //
-                Real_Type&                         element_field1,  //
-                Real_Type&                         element_field2,  //
-                Real_Type&                         element_field3) {                        //
+                real_type&                         element_field0,  //
+                real_type&                         element_field1,  //
+                real_type&                         element_field2,  //
+                real_type&                         element_field3) {                        //
     //
-    Real_Type g_qx = 0.0, g_qy = 0.0, g_qz = 0.0;
+    real_type g_qx = 0.0, g_qy = 0.0, g_qz = 0.0;
 
     // real_type tet4_f[4];
-    Real_Type tet4_f0 = 0.0, tet4_f1 = 0.0, tet4_f2 = 0.0, tet4_f3 = 0.0;
+    real_type tet4_f0 = 0.0, tet4_f1 = 0.0, tet4_f2 = 0.0, tet4_f3 = 0.0;
 
     // real_type hex8_f[8];
-    Real_Type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0, hex8_f4 = 0.0, hex8_f5 = 0.0, hex8_f6 = 0.0,
+    real_type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0, hex8_f4 = 0.0, hex8_f5 = 0.0, hex8_f6 = 0.0,
               hex8_f7 = 0.0;
 
     // real_type coeffs[8];
-    Real_Type coeffs0 = 0.0, coeffs1 = 0.0, coeffs2 = 0.0, coeffs3 = 0.0, coeffs4 = 0.0, coeffs5 = 0.0, coeffs6 = 0.0,
+    real_type coeffs0 = 0.0, coeffs1 = 0.0, coeffs2 = 0.0, coeffs3 = 0.0, coeffs4 = 0.0, coeffs5 = 0.0, coeffs6 = 0.0,
               coeffs7 = 0.0;
 
     // element_field0 = 0.0;
@@ -496,13 +497,13 @@ quadrature_node(const Real_Type                    tet4_qx_v,       //
 
     // DUAL basis function
     {
-        const Real_Type r4 = 4.0;
-        const Real_Type r1 = 1.0;
+        const real_type r4 = 4.0;
+        const real_type r1 = 1.0;
 
-        const Real_Type f0 = r1 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
-        const Real_Type f1 = tet4_qx_v;
-        const Real_Type f2 = tet4_qy_v;
-        const Real_Type f3 = tet4_qz_v;
+        const real_type f0 = r1 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
+        const real_type f1 = tet4_qx_v;
+        const real_type f2 = tet4_qy_v;
+        const real_type f3 = tet4_qz_v;
 
         tet4_f0 = r4 * f0 - f1 - f2 - f3;
         tet4_f1 = -f0 + r4 * f1 - f2 - f3;
@@ -510,18 +511,18 @@ quadrature_node(const Real_Type                    tet4_qx_v,       //
         tet4_f3 = -f0 - f1 - f2 + r4 * f3;
     }
 
-    const Real_Type grid_x = (g_qx - ox) / dx;
-    const Real_Type grid_y = (g_qy - oy) / dy;
-    const Real_Type grid_z = (g_qz - oz) / dz;
+    const real_type grid_x = (g_qx - ox) / dx;
+    const real_type grid_y = (g_qy - oy) / dy;
+    const real_type grid_z = (g_qz - oz) / dz;
 
-    const ptrdiff_t i = floor_real_t(grid_x);
-    const ptrdiff_t j = floor_real_t(grid_y);
-    const ptrdiff_t k = floor_real_t(grid_z);
+    const real_type i = floor_real_t(grid_x);
+    const real_type j = floor_real_t(grid_y);
+    const real_type k = floor_real_t(grid_z);
 
     // Get the reminder [0, 1]
-    Real_Type l_x = (grid_x - (Real_Type)i);
-    Real_Type l_y = (grid_y - (Real_Type)j);
-    Real_Type l_z = (grid_z - (Real_Type)k);
+    real_type l_x = (grid_x - (real_type)i);
+    real_type l_y = (grid_y - (real_type)j);
+    real_type l_z = (grid_z - (real_type)k);
 
     // Critical point
     hex_aa_8_eval_fun_cu(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
@@ -584,20 +585,20 @@ quadrature_node(const Real_Type                    tet4_qx_v,       //
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 __global__ void                                                                             //
-tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     start_element,  //
-                                        const ptrdiff_t                     end_element,    //
-                                        const ptrdiff_t                     nnodes,         //
+tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         start_element,  //
+                                        const ptrdiff_t MY_RESTRICT         end_element,    //
+                                        const ptrdiff_t MY_RESTRICT         nnodes,         //
                                         const elems_tet4_device MY_RESTRICT elems,          //
                                         const xyz_tet4_device MY_RESTRICT   xyz,            //
-                                        const ptrdiff_t                     stride0,        //
-                                        const ptrdiff_t                     stride1,        //
-                                        const ptrdiff_t                     stride2,        //
-                                        const float                         origin_x,       //
-                                        const float                         origin_y,       //
-                                        const float                         origin_z,       //
-                                        const float                         delta_x,        //
-                                        const float                         delta_y,        //
-                                        const float                         delta_z,        //
+                                        const ptrdiff_t MY_RESTRICT         stride0,        //
+                                        const ptrdiff_t MY_RESTRICT         stride1,        //
+                                        const ptrdiff_t MY_RESTRICT         stride2,        //
+                                        const geom_t                        origin_x,       //
+                                        const geom_t                        origin_y,       //
+                                        const geom_t                        origin_z,       //
+                                        const geom_t                        delta_x,        //
+                                        const geom_t                        delta_y,        //
+                                        const geom_t                        delta_z,        //
                                         const real_type* const MY_RESTRICT  data,           //
                                         real_type* const MY_RESTRICT        weighted_field) {      //// Output
 
@@ -623,8 +624,8 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
         return;
     }
 
-    auto           tile      = cg::tiled_partition<__WARP_SIZE__>(g);
-    const unsigned tile_rank = tile.thread_rank();
+    auto               tile      = cg::tiled_partition<__WARP_SIZE__>(g);
+    const unsigned int tile_rank = tile.thread_rank();
 
     // loop over the 4 vertices of the tetrahedron
     int ev[4];
@@ -685,48 +686,46 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
         const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
         const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
         const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
+        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
-        quadrature_node<real_type>(tet4_qx_v,
-                                   tet4_qy_v,
-                                   tet4_qz_v,
-                                   tet4_qw_v,
-                                   theta_volume,
-                                   x0,
-                                   x1,
-                                   x2,
-                                   x3,
-                                   y0,
-                                   y1,
-                                   y2,
-                                   y3,
-                                   z0,
-                                   z1,
-                                   z2,
-                                   z3,
-                                   dx,
-                                   dy,
-                                   dz,
-                                   ox,
-                                   oy,
-                                   oz,
-                                   stride0,
-                                   stride1,
-                                   stride2,
-                                   data,
-                                   // Output: Accumulate the field
-                                   element_field0_reduce,
-                                   element_field1_reduce,
-                                   element_field2_reduce,
-                                   element_field3_reduce);
+        quadrature_node(tet4_qx_v,
+                        tet4_qy_v,
+                        tet4_qz_v,
+                        tet4_qw_v,
+                        theta_volume,
+                        x0,
+                        x1,
+                        x2,
+                        x3,
+                        y0,
+                        y1,
+                        y2,
+                        y3,
+                        z0,
+                        z1,
+                        z2,
+                        z3,
+                        dx,
+                        dy,
+                        dz,
+                        ox,
+                        oy,
+                        oz,
+                        stride0,
+                        stride1,
+                        stride2,
+                        data,
+                        // Output: Accumulate the field
+                        element_field0_reduce,
+                        element_field1_reduce,
+                        element_field2_reduce,
+                        element_field3_reduce);
     }
 
-    for (int i = tile.size() / 2; i > 0; i /= 2) {
-        element_field0_reduce += tile.shfl_down(element_field0_reduce, i);
-        element_field1_reduce += tile.shfl_down(element_field1_reduce, i);
-        element_field2_reduce += tile.shfl_down(element_field2_reduce, i);
-        element_field3_reduce += tile.shfl_down(element_field3_reduce, i);
-    }
+    element_field0_reduce = cg::reduce(tile, element_field0_reduce, cg::plus<real_type>());
+    element_field1_reduce = cg::reduce(tile, element_field1_reduce, cg::plus<real_type>());
+    element_field2_reduce = cg::reduce(tile, element_field2_reduce, cg::plus<real_type>());
+    element_field3_reduce = cg::reduce(tile, element_field3_reduce, cg::plus<real_type>());
 
     if (tile_rank == 0) {
         atomicAdd(&weighted_field[ev[0]], element_field0_reduce);

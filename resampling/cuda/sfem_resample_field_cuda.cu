@@ -238,7 +238,7 @@ lumped_mass_cu(const real_t px0, const real_t px1, const real_t px2, const real_
  * @param values
  * @return __global__
  */
-__global__ inline void                                                      //
+__global__ void                                                             //
 tet4_assemble_lumped_mass_kernel(const ptrdiff_t             nelements,     //
                                  const ptrdiff_t             nnodes,        //
                                  elems_tet4_device           elems_device,  //
@@ -687,6 +687,8 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     {
+        // tet4_resample_field_local_kernel
+
         tet4_resample_field_reduce_local_kernel<<<numBlocks, threadsPerBlock>>>(0,             //
                                                                                 nelements,     //
                                                                                 nnodes,        //
@@ -749,7 +751,7 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
                                               print_to_file);                             //
     }
 
-     // Free memory on the device
+    // Free memory on the device
     free_elems_tet4_device(&elems_device);
     free_xyz_tet4_device(&xyz_device);
 
