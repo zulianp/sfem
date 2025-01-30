@@ -17,35 +17,8 @@
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
 ////////////////////////////////////////////////////////
-__device__ void tet4_transform_cu(
-        /****************************************************************************************
-         ****************************************************************************************
-        \begin{bmatrix}
-        out_x \\
-        out_y \\
-        out_z
-        \end{bmatrix}
-        =
-        \begin{bmatrix}
-        px_0 \\
-        py_0 \\
-        pz_0
-        \end{bmatrix}
-        +
-        \begin{bmatrix}
-        px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
-        py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
-        pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
-        \end{bmatrix}
-        \cdot
-        \begin{bmatrix}
-        qx \\
-        qy \\
-        qz
-        \end{bmatrix}
-        *************************************************************************************************
-      */
-
+__device__ void  //
+tet4_transform_cu(
         // X-coordinates
         const real_type px0, const real_type px1, const real_type px2, const real_type px3,
         // Y-coordinates
@@ -57,7 +30,35 @@ __device__ void tet4_transform_cu(
         // Output
         real_type* const out_x, real_type* const out_y, real_type* const out_z) {
     //
-    //
+
+    /****************************************************************************************
+     ****************************************************************************************
+    \begin{bmatrix}
+    out_x \\
+    out_y \\
+    out_z
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+    px_0 \\
+    py_0 \\
+    pz_0
+    \end{bmatrix}
+    +
+    \begin{bmatrix}
+    px_1 - px_0 & px_2 - px_0 & px_3 - px_0 \\
+    py_1 - py_0 & py_2 - py_0 & py_3 - py_0 \\
+    pz_1 - pz_0 & pz_2 - pz_0 & pz_3 - pz_0
+    \end{bmatrix}
+    \cdot
+    \begin{bmatrix}
+    qx \\
+    qy \\
+    qz
+    \end{bmatrix}
+    *************************************************************************************************
+  */
+
     *out_x = px0 + qx * (-px0 + px1) + qy * (-px0 + px2) + qz * (-px0 + px3);
     *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
@@ -337,14 +338,14 @@ tet4_resample_field_local_kernel(const ptrdiff_t                     start_eleme
         const real_type grid_y = (g_qy - oy) / dy;
         const real_type grid_z = (g_qz - oz) / dz;
 
-        const ptrdiff_t i = floor(grid_x);
-        const ptrdiff_t j = floor(grid_y);
-        const ptrdiff_t k = floor(grid_z);
+        const ptrdiff_t i = floor_real_t(grid_x);
+        const ptrdiff_t j = floor_real_t(grid_y);
+        const ptrdiff_t k = floor_real_t(grid_z);
 
         // Get the reminder [0, 1]
-        real_type l_x = (grid_x - (double)i);
-        real_type l_y = (grid_y - (double)j);
-        real_type l_z = (grid_z - (double)k);
+        real_type l_x = (grid_x - (real_t)i);
+        real_type l_y = (grid_y - (real_t)j);
+        real_type l_z = (grid_z - (real_t)k);
 
         // Critical point
         hex_aa_8_eval_fun_cu(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
@@ -419,7 +420,7 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 template <typename Real_Type>
-__device__ void                                                     //
+__device__ inline void                                              //
 quadrature_node(const Real_Type                    tet4_qx_v,       //
                 const Real_Type                    tet4_qy_v,       //
                 const Real_Type                    tet4_qz_v,       //
@@ -572,7 +573,8 @@ quadrature_node(const Real_Type                    tet4_qx_v,       //
         element_field3 += eval_field * tet4_f3 * dV;
 
     }  // end integrate gap function
-}
+}  // end quadrature_node function
+//////////////////////////////////////////////////////////
 
 #define __WARP_SIZE__ 32
 
@@ -615,7 +617,7 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
 
     cg::thread_block g = cg::this_thread_block();
 
-    const ptrdiff_t element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
+    const unsigned int element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
 
     if (element_i < start_element || element_i >= end_element) {
         return;
@@ -626,10 +628,10 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
 
     // loop over the 4 vertices of the tetrahedron
     int ev[4];
-    ev[0] = __ldg(&elems.elems_v0[element_i]);
-    ev[1] = __ldg(&elems.elems_v1[element_i]);
-    ev[2] = __ldg(&elems.elems_v2[element_i]);
-    ev[3] = __ldg(&elems.elems_v3[element_i]);
+    ev[0] = (elems.elems_v0[element_i]);
+    ev[1] = (elems.elems_v1[element_i]);
+    ev[2] = (elems.elems_v2[element_i]);
+    ev[3] = (elems.elems_v3[element_i]);
 
     {
         x0 = xyz.x[ev[0]];
@@ -685,38 +687,38 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t                     star
         const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
         const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : 0.0;
 
-        quadrature_node(tet4_qx_v,
-                        tet4_qy_v,
-                        tet4_qz_v,
-                        tet4_qw_v,
-                        theta_volume,
-                        x0,
-                        x1,
-                        x2,
-                        x3,
-                        y0,
-                        y1,
-                        y2,
-                        y3,
-                        z0,
-                        z1,
-                        z2,
-                        z3,
-                        dx,
-                        dy,
-                        dz,
-                        ox,
-                        oy,
-                        oz,
-                        stride0,
-                        stride1,
-                        stride2,
-                        data,
-                        // Output: Accumulate the field
-                        element_field0_reduce,
-                        element_field1_reduce,
-                        element_field2_reduce,
-                        element_field3_reduce);
+        quadrature_node<real_type>(tet4_qx_v,
+                                   tet4_qy_v,
+                                   tet4_qz_v,
+                                   tet4_qw_v,
+                                   theta_volume,
+                                   x0,
+                                   x1,
+                                   x2,
+                                   x3,
+                                   y0,
+                                   y1,
+                                   y2,
+                                   y3,
+                                   z0,
+                                   z1,
+                                   z2,
+                                   z3,
+                                   dx,
+                                   dy,
+                                   dz,
+                                   ox,
+                                   oy,
+                                   oz,
+                                   stride0,
+                                   stride1,
+                                   stride2,
+                                   data,
+                                   // Output: Accumulate the field
+                                   element_field0_reduce,
+                                   element_field1_reduce,
+                                   element_field2_reduce,
+                                   element_field3_reduce);
     }
 
     for (int i = tile.size() / 2; i > 0; i /= 2) {
