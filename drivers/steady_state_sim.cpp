@@ -111,12 +111,12 @@ int main(int argc, char *argv[]) {
         solver = ssmg;
 
     } else if (SFEM_USE_AMG) {
-        /* old version with piecewise constant interpolation
+        // old version with piecewise constant interpolation
         auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph_upper_triangular();
 
-        auto diag_values = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        auto diag_values     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
         auto off_diag_values = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
-        auto off_diag_rows = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
+        auto off_diag_rows   = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
 
         f->hessian_crs_sym(x->data(),
                            crs_graph->rowptr()->data(),
@@ -124,8 +124,8 @@ int main(int argc, char *argv[]) {
                            diag_values->data(),
                            off_diag_values->data());
 
-        count_t *row_ptr = crs_graph->rowptr()->data();
-        idx_t *col_indices = crs_graph->colidx()->data();
+        count_t *row_ptr     = crs_graph->rowptr()->data();
+        idx_t   *col_indices = crs_graph->colidx()->data();
         for (idx_t i = 0; i < fs->n_dofs(); i++) {
             for (idx_t idx = row_ptr[i]; idx < row_ptr[i + 1]; idx++) {
                 off_diag_rows->data()[idx] = i;
@@ -135,16 +135,15 @@ int main(int argc, char *argv[]) {
 
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         f->constaints_mask(mask->data());
-        auto fine_mat = sfem::h_coosym<idx_t, real_t>(
-                mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
+        auto fine_mat = sfem::h_coosym<idx_t, real_t>(mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 
         auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
         real_t coarsening_factor = 7.5;
-        auto amg = builder_pwc(coarsening_factor, mask, near_null, fine_mat);
-        */
+        auto   amg               = builder_pwc(coarsening_factor, mask, near_null, fine_mat);
 
         // New version with smoothed aggregation
+        /*
         auto crs_graph = f->space()->mesh_ptr()->node_to_node_graph();
         auto values    = sfem::create_buffer<real_t>(crs_graph->nnz(), es);
 
@@ -161,6 +160,7 @@ int main(int argc, char *argv[]) {
 
         real_t coarsening_factor = 7.5;
         auto   amg               = builder_sa(coarsening_factor, mask, near_null, fine_mat);
+        */
 
         if (!amg->test_interp()) {
             printf("tests passed\n");

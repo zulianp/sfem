@@ -39,9 +39,10 @@ int crs_transpose(const count_t        rows,
             idx_t  c = colidx[j];
             real_t v = values[j];
 
-            count_t pos   = offset[c]++;
+            count_t pos   = offset[c];
             colidx_t[pos] = i;
             values_t[pos] = v;
+            offset[c]++;
         }
     }
 

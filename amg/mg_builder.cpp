@@ -14,9 +14,36 @@
 #include "smoothed_aggregation.h"
 #include "smoother.h"
 
+int csr_to_coosym(ptrdiff_t ndofs,
+                  count_t  *rowptr,
+                  idx_t    *colidx,
+                  real_t   *values,
+                  idx_t    *offdiag_row_indices,
+                  idx_t    *offdiag_col_indices,
+                  real_t   *offdiag_values,
+                  real_t   *diag_values) {
+    count_t k = 0;
+    for (idx_t i = 0; i < ndofs; i++) {
+        for (count_t idx = rowptr[i]; idx < rowptr[i + 1]; idx++) {
+            idx_t  j   = colidx[idx];
+            real_t val = values[idx];
+            if (i == j) {
+                diag_values[i] = val;
+            } else if (j > i) {
+                offdiag_row_indices[k] = i;
+                offdiag_col_indices[k] = j;
+                offdiag_values[k]      = val;
+                k++;
+            }
+        }
+    }
+    return k;
+}
+
 std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                                            coarsening_factor,
                                                     const std::shared_ptr<sfem::Buffer<mask_t>>             bdy_dofs_buff,
                                                     std::shared_ptr<sfem::Buffer<real_t>>                   near_null,
+                                                    std::shared_ptr<sfem::Buffer<real_t>>                   zeros,
                                                     std::shared_ptr<sfem::CRSSpMV<count_t, idx_t, real_t>> &fine_mat) {
     std::shared_ptr<sfem::Multigrid<real_t>> amg = sfem::h_mg<real_t>();
 
@@ -25,10 +52,6 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
 
     ptrdiff_t fine_ndofs  = fine_mat->rows();
     count_t   offdiag_nnz = (fine_mat->values->size() - fine_ndofs) / 2;
-
-    for (idx_t i = 0; i < fine_ndofs; i++) {
-        near_null->data()[i] = 1.0;
-    }
 
     PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
     // Weighted connectivity graph in COO format
@@ -61,21 +84,14 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         real_t  *values = prev_mat->values->data();
 
         count_t offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
-        count_t k           = 0;
-        for (idx_t i = 0; i < ndofs; i++) {
-            for (count_t idx = rowptr[i]; idx < rowptr[i + 1]; idx++) {
-                idx_t  j   = colidx[idx];
-                real_t val = values[idx];
-                if (i == j) {
-                    diag_values->data()[i] = val;
-                } else if (j > i) {
-                    offdiag_row_indices->data()[k] = i;
-                    offdiag_col_indices->data()[k] = j;
-                    offdiag_values->data()[k]      = val;
-                    k++;
-                }
-            }
-        }
+        count_t k           = csr_to_coosym(ndofs,
+                                  rowptr,
+                                  colidx,
+                                  values,
+                                  offdiag_row_indices->data(),
+                                  offdiag_col_indices->data(),
+                                  offdiag_values->data(),
+                                  diag_values->data());
         printf("%d == %d\n", k, offdiag_nnz);
         assert(k == offdiag_nnz);
 
@@ -90,6 +106,11 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                     diag_smoother->data());
         amg_smoother                       = sfem::create_shiftable_jacobi(diag_smoother, es);
         amg_smoother->relaxation_parameter = 1.0;
+
+        std::shared_ptr<sfem::Operator<real_t>> op        = prev_mat;
+        auto                                    stat_iter = sfem::create_stationary<real_t>(op, amg_smoother, es);
+        stat_iter->set_max_it(smoothing_steps);
+        stat_iter->apply(zeros->data(), near_null->data());
 
         ptrdiff_t finer_dim = ndofs;
 
@@ -126,11 +147,11 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         smoothed_aggregation(finer_dim,
                              coarser_dim,
                              0.66,
-                             near_null->data(),
                              ws->partition,
-                             prev_mat->row_ptr->data(),
-                             prev_mat->col_idx->data(),
-                             prev_mat->values->data(),
+                             rowptr,
+                             colidx,
+                             values,
+                             near_null->data(),
                              &rowptr_p,
                              &colidx_p,
                              &values_p,
@@ -140,10 +161,6 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                              &rowptr_coarse,
                              &colidx_coarse,
                              &values_coarse);
-
-        std::shared_ptr<sfem::Operator<real_t>> op        = prev_mat;
-        auto                                    stat_iter = sfem::create_stationary<real_t>(op, amg_smoother, es);
-        stat_iter->set_max_it(smoothing_steps);
 
         assert(rowptr_p[finer_dim] == rowptr_pt[coarser_dim]);
         count_t interp_weights = rowptr_p[finer_dim];
@@ -183,6 +200,30 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                nnz_coarse,
                (real_t)nnz_coarse / (real_t)prev_nnz);
     }
+
+    offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
+    count_t k   = csr_to_coosym(ndofs,
+                              prev_mat->row_ptr->data(),
+                              prev_mat->col_idx->data(),
+                              prev_mat->values->data(),
+                              offdiag_row_indices->data(),
+                              offdiag_col_indices->data(),
+                              offdiag_values->data(),
+                              diag_values->data());
+    printf("%d == %d\n", k, offdiag_nnz);
+    assert(k == offdiag_nnz);
+
+    auto diag_smoother = sfem::create_host_buffer<real_t>(ndofs);
+    l1_smoother(ndofs,
+                bdy_dofs,
+                offdiag_nnz,
+                diag_values->data(),
+                offdiag_values->data(),
+                offdiag_row_indices->data(),
+                offdiag_col_indices->data(),
+                diag_smoother->data());
+    amg_smoother                       = sfem::create_shiftable_jacobi(diag_smoother, es);
+    amg_smoother->relaxation_parameter = 1.0;
 
     // Create a coarsest level solver, could also just smooth here if coarsest problem isn't
     // small enough to solve exactly. Direct solver by cholesky is also probably better here

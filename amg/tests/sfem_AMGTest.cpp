@@ -2,6 +2,7 @@
 
 #include "mg_builder.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_mask.h"
 #include "sfem_test.h"
 
 #include "sfem_Function.hpp"
@@ -64,20 +65,49 @@ int test_amg_poisson() {
 #else
     auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
     f->constaints_mask(mask->data());
-    auto   near_null         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto near_null = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+#pragma omp parallel for
+    for (idx_t i = 0; i < ndofs; i++) {
+        near_null->data()[i] = 1.0;
+    }
+    auto zeros = sfem::create_host_buffer<real_t>(ndofs);
+    f->apply_constraints(near_null->data());
+    f->apply_constraints(zeros->data());
+
     real_t coarsening_factor = 7.5;
-    auto   amg               = builder_sa(coarsening_factor, mask, near_null, linear_op);
+    auto   amg               = builder_sa(coarsening_factor, mask, near_null, zeros, linear_op);
     assert(!amg->test_interp());
 
     amg->set_max_it(100);
     amg->verbose = true;
-    // amg->debug = true;
+    // amg->debug   = true;
     auto solver = amg;
 #endif
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
     solver->apply(rhs->data(), x->data());
+
+    /*
+    auto test = sfem::create_buffer<real_t>(ndofs, es);
+    f->apply_constraints(test->data());
+    for (idx_t i = 0; i < ndofs; i++) {
+        if (mask_get(i, mask->data())) {
+            assert(x->data()[i] == test->data()[i]);
+            printf("%f, %f\n", x->data()[i], test->data()[i]);
+        }
+        test->data()[i] = 0.0;
+    }
+
+    linear_op->apply(x->data(), test->data());
+    for (idx_t i = 0; i < ndofs; i++) {
+        if (mask_get(i, mask->data())) {
+            assert(rhs->data()[i] == test->data()[i]);
+            printf("%f, %f\n", rhs->data()[i], test->data()[i]);
+        }
+    }
+    */
 
     SFEM_TEST_ASSERT(sfem::create_directory("test_amg_poisson") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(m->write("test_amg_poisson/mesh") == SFEM_SUCCESS);

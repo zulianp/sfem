@@ -51,6 +51,12 @@ int crs_validate(const count_t                      rows,
                  const idx_t *const SFEM_RESTRICT   colidx,
                  const real_t *const SFEM_RESTRICT  values);
 
+// Returns 1 if the crs is symmetric, crashes if crs isn't valid
+int crs_is_symmetric(const count_t                      rows,
+                     const count_t *const SFEM_RESTRICT rowptr,
+                     const idx_t *const SFEM_RESTRICT   colidx,
+                     const real_t *const SFEM_RESTRICT  values);
+
 #ifdef __cplusplus
 }
 #endif
