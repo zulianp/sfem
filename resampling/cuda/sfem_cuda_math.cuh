@@ -4,6 +4,24 @@
 #include "sfem_base.h"
 #include "sfem_config.h"
 
+
+/**
+ * @brief FMA function for real_t: a * b + c
+ * 
+ * @param a 
+ * @param b 
+ * @param c 
+ * @return __device__ 
+ */
+__device__ inline real_t  //
+fma_real_t(const real_t a, const real_t b, const real_t c) {
+#if SFEM_REAL_T_IS_FLOAT64
+    return fma(a, b, c);
+#else
+    return fmaf(a, b, c);
+#endif
+}
+
 /**
  * @brief floor function for real_t
  *

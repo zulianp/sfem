@@ -551,14 +551,14 @@ quadrature_node(const real_type                    tet4_qx_v,       //
         // for (int edof_j = 0; edof_j < 8; edof_j++) {
         //     eval_field += hex8_f[edof_j] * coeffs[edof_j];
         // }
-        eval_field += hex8_f0 * coeffs0;
-        eval_field += hex8_f1 * coeffs1;
-        eval_field += hex8_f2 * coeffs2;
-        eval_field += hex8_f3 * coeffs3;
-        eval_field += hex8_f4 * coeffs4;
-        eval_field += hex8_f5 * coeffs5;
-        eval_field += hex8_f6 * coeffs6;
-        eval_field += hex8_f7 * coeffs7;
+        eval_field = fma_real_t(hex8_f0, coeffs0, eval_field);
+        eval_field = fma_real_t(hex8_f1, coeffs1, eval_field);
+        eval_field = fma_real_t(hex8_f2, coeffs2, eval_field);
+        eval_field = fma_real_t(hex8_f3, coeffs3, eval_field);
+        eval_field = fma_real_t(hex8_f4, coeffs4, eval_field);
+        eval_field = fma_real_t(hex8_f5, coeffs5, eval_field);
+        eval_field = fma_real_t(hex8_f6, coeffs6, eval_field);
+        eval_field = fma_real_t(hex8_f7, coeffs7, eval_field);
 
         // UNROLL_ZERO
         // for (int edof_i = 0; edof_i < 4; edof_i++) {
@@ -568,10 +568,10 @@ quadrature_node(const real_type                    tet4_qx_v,       //
         const real_type dV = theta_volume * tet4_qw_v;
         // dV = 1.0;
 
-        element_field0 += eval_field * tet4_f0 * dV;
-        element_field1 += eval_field * tet4_f1 * dV;
-        element_field2 += eval_field * tet4_f2 * dV;
-        element_field3 += eval_field * tet4_f3 * dV;
+        element_field0 = fma_real_t(eval_field * tet4_f0, dV, element_field0);
+        element_field1 = fma_real_t(eval_field * tet4_f1, dV, element_field1);
+        element_field2 = fma_real_t(eval_field * tet4_f2, dV, element_field2);
+        element_field3 = fma_real_t(eval_field * tet4_f3, dV, element_field3);
 
     }  // end integrate gap function
 }  // end quadrature_node function
@@ -624,15 +624,19 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
         return;
     }
 
-    auto               tile      = cg::tiled_partition<__WARP_SIZE__>(g);
-    const unsigned int tile_rank = tile.thread_rank();
+    auto      tile      = cg::tiled_partition<__WARP_SIZE__>(g);
+    const int tile_rank = tile.thread_rank();
 
     // loop over the 4 vertices of the tetrahedron
-    int ev[4];
-    ev[0] = (elems.elems_v0[element_i]);
-    ev[1] = (elems.elems_v1[element_i]);
-    ev[2] = (elems.elems_v2[element_i]);
-    ev[3] = (elems.elems_v3[element_i]);
+    const int ev[4] = {elems.elems_v0[element_i],  //
+                       elems.elems_v1[element_i],
+                       elems.elems_v2[element_i],
+                       elems.elems_v3[element_i]};
+
+    // ev[0] = (elems.elems_v0[element_i]);
+    // ev[1] = (elems.elems_v1[element_i]);
+    // ev[2] = (elems.elems_v2[element_i]);
+    // ev[3] = (elems.elems_v3[element_i]);
 
     {
         x0 = xyz.x[ev[0]];
@@ -667,16 +671,16 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
                                                    z2,
                                                    z3);
 
-    const size_t nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
-                                ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
+    const int nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
+                             ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
 
     real_type element_field0_reduce = real_t(0.0);
     real_type element_field1_reduce = real_t(0.0);
     real_type element_field2_reduce = real_t(0.0);
     real_type element_field3_reduce = real_t(0.0);
 
-    for (size_t i = 0; i < nr_warp_loop; i++) {
-        const size_t q_i = i * size_t(__WARP_SIZE__) + tile_rank;
+    for (int i = 0; i < nr_warp_loop; i++) {
+        const int q_i = i * int(__WARP_SIZE__) + tile_rank;
 
         // real_type element_field0 = 0.0;
         // real_type element_field1 = 0.0;
