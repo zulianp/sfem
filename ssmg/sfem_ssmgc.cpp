@@ -33,7 +33,7 @@ namespace sfem {
         std::string coarse_op_type                     = "MF";
         int         linear_smoothing_steps             = 3;
         bool        enable_coarse_space_preconditioner = false;
-        bool        coarse_solver_verbose              = true;
+        bool        coarse_solver_verbose              = false;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
