@@ -591,6 +591,11 @@ namespace sfem {
         return impl_->points;
     }
 
+    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements()
+    {
+        return impl_->elements;
+    }
+
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
         if (impl_->node_to_node_graph) {
@@ -679,7 +684,7 @@ namespace sfem {
         ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
         ss << "mem_disc_ss:      " << (mem_points + mem_macro_points) << " [GB]\n";
         ss << "mem_disc_std:     " << (mem_hex8_mesh + mem_sshex8_mesh) << " [GB]\n";
-        ss << "n_macro_elements: " << elements->extent(1)  << "\n";
+        ss << "n_macro_elements: " << elements->extent(1) << "\n";
 
         std::string   meta_path = folder + "/meta.yaml";
         std::ofstream os(meta_path.c_str());
@@ -883,7 +888,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
-                                                                      const std::shared_ptr<Sideset>       &sideset) {
+                                                               const std::shared_ptr<Sideset>       &sideset) {
         ptrdiff_t n_nodes{0};
         idx_t    *nodes{nullptr};
         if (space->has_semi_structured_mesh()) {
@@ -2154,7 +2159,7 @@ namespace sfem {
         enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
-        bool   use_affine_approximation{true}; // FIXME the iso-parametric version has probably a bug
+        bool   use_affine_approximation{true};  // FIXME the iso-parametric version has probably a bug
         long   calls{0};
         double total_time{0};
 

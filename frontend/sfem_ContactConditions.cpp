@@ -20,6 +20,7 @@
 #include "adj_table.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sfem_sshex8_skin.h"
+#include "sshex8_mesh.h"
 
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -274,6 +275,7 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>>  sides;
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
+        std::shared_ptr<Sideset>          sideset;
 
         std::shared_ptr<Buffer<idx_t *>> ss_sides;
 
@@ -282,7 +284,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
         std::shared_ptr<Buffer<real_t>> mass_vector;
-        bool                            variational{true};
+        bool                            variational{false};
         bool                            debug{false};
 
         ~Impl() {}
@@ -444,26 +446,12 @@ namespace sfem {
             assert(false);  // IMPLEMENT ME!
         }
 
-        void init_from_sideset(const std::shared_ptr<Sideset> &ss)
-        {
-            auto mesh = space->mesh_ptr();
+        void init_from_sideset(const std::shared_ptr<Sideset> &ss) {
+            this->sideset = ss;
+            auto mesh     = space->mesh_ptr();
 
             if (space->has_semi_structured_mesh()) {
                 auto &&ssmesh = space->semi_structured_mesh();
-
-                // FIXME this extra surface mesh should be removed during optimization
-
-                const int nnxs = 4;
-                const int nexs = ssmesh.level() * ssmesh.level();
-                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
-                if (sshex8_extract_quadshell4_surface_from_sideset(ssmesh.level(),
-                                                                   ssmesh.element_data(),
-                                                                   ss->parent()->size(),
-                                                                   ss->parent()->data(),
-                                                                   ss->lfi()->data(),
-                                                                   this->sides->data()) != SFEM_SUCCESS) {
-                    SFEM_ERROR("Unable to extract surface from sideset!\n");
-                }
 
                 this->ss_sides =
                         sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), ss->parent()->size());
@@ -477,11 +465,43 @@ namespace sfem {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
-                idx_t    *idx          = nullptr;
-                ptrdiff_t n_contiguous = -1;
-                remap_elements_to_contiguous_index(
-                        this->ss_sides->extent(1), this->ss_sides->extent(0), this->ss_sides->data(), &n_contiguous, &idx);
-                sfem::manage_host_buffer(n_contiguous, idx);
+                idx_t           *idx          = nullptr;
+                ptrdiff_t        n_contiguous = -1;
+                std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+
+                // FiXME harcoded for sshex8
+                sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+
+
+                // printf("SS SIDES (VID) #nodes %ld \n", ssmesh.n_nodes());
+                // this->ss_sides->print(std::cout);
+
+                ssquad4_hierarchical_remapping(ssmesh.level(),
+                                               levels.size(),
+                                               levels.data(),
+                                               this->ss_sides->extent(1),
+                                               ssmesh.n_nodes(),
+                                               this->ss_sides->data(),
+                                               &idx,
+                                               &n_contiguous);
+
+                this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
+
+                // FIXME this extra surface mesh should be removed during optimization
+                const int nnxs = 4;
+                const int nexs = ssmesh.level() * ssmesh.level();
+                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
+
+                ssquad4_to_standard_quad4_mesh(ssmesh.level(), ss->parent()->size(), this->ss_sides->data(), this->sides->data());
+
+                // printf("SS SIDES\n");
+                // this->ss_sides->print(std::cout);
+
+                // printf("SIDES\n");
+                // this->sides->print(std::cout);
+
+                // printf("NODES\n");
+                // node_mapping->print(std::cout);
 
             } else {
                 enum ElemType st   = side_type(space->element_type());
@@ -498,13 +518,14 @@ namespace sfem {
                                                  this->sides->data()) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
+
+                idx_t    *idx          = nullptr;
+                ptrdiff_t n_contiguous = -1;
+                remap_elements_to_contiguous_index(
+                        this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
+                this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
             }
 
-            idx_t    *idx          = nullptr;
-            ptrdiff_t n_contiguous = -1;
-            remap_elements_to_contiguous_index(
-                    this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
-            this->node_mapping   = sfem::manage_host_buffer(n_contiguous, idx);
             this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
         }
 
@@ -618,9 +639,9 @@ namespace sfem {
                                                                  const std::shared_ptr<Grid<geom_t>>  &sdf,
                                                                  const std::shared_ptr<Sideset>       &sideset,
                                                                  const enum ExecutionSpace             es) {
-        auto cc     = std::make_unique<ContactConditions>(space);
+        auto cc = std::make_unique<ContactConditions>(space);
         cc->impl_->init_from_sideset(sideset);
-        cc->impl_->sdf = sdf;
+        cc->impl_->sdf         = sdf;
         cc->impl_->gap_xnormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
         cc->impl_->gap_ynormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
         cc->impl_->gap_znormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
@@ -1059,5 +1080,7 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
+
+    std::shared_ptr<Sideset> ContactConditions::sideset() { return impl_->sideset; }
 
 }  // namespace sfem

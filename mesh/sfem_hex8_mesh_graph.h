@@ -65,6 +65,15 @@ int sshex8_extract_quadshell4_surface_from_sideset(const int                    
                                                    const int16_t *const SFEM_RESTRICT       side_idx,
                                                    idx_t **const SFEM_RESTRICT              sides);
 
+int ssquad4_hierarchical_remapping(const int                   L,
+                                   const int                   nlevels,
+                                   int *const                  levels,
+                                   const ptrdiff_t             nelements,
+                                   const ptrdiff_t             nnodes,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   idx_t ** SFEM_RESTRICT  node_mapping_out,
+                                   ptrdiff_t *count_out);
+
 #ifdef __cplusplus
 }
 #endif

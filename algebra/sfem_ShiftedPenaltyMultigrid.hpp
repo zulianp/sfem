@@ -256,8 +256,8 @@ namespace sfem {
             restriction_.push_back(restriction);
         }
 
-        inline void add_constraints_restriction(//const std::shared_ptr<Operator<T>>& restict_op_x_op,
-                                                const std::shared_ptr<Operator<T>>& restict_diag) {
+        inline void add_constraints_restriction(  // const std::shared_ptr<Operator<T>>& restict_op_x_op,
+                const std::shared_ptr<Operator<T>>& restict_diag) {
             constraints_restriction_.push_back(restict_diag);
         }
 
@@ -282,7 +282,7 @@ namespace sfem {
 
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
-        bool       skip_coarse{false};
+        bool skip_coarse{false};
 
     private:
         std::vector<std::shared_ptr<Operator<T>>>               operator_;
@@ -294,7 +294,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>                       constraints_op_;
         std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
         std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
-        std::vector<std::shared_ptr<Operator<T>>> constraints_restriction_;
+        std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -327,7 +327,6 @@ namespace sfem {
 
         ptrdiff_t count_smoothing_steps{0};
 
-        
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
         inline int coarser_level(int level) const { return level + 1; }
@@ -449,10 +448,10 @@ namespace sfem {
         //     if (constraints_op_) {
         //         for(int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
         //             constraints_op_x_op_restriction_[l]->apply(
-        //                 constraints_op_x_op_[l], 
+        //                 constraints_op_x_op_[l],
         //                 constraints_op_x_op_[coarser_level(l)]);
         //         }
-        //     } 
+        //     }
         // }
 
         void nonlinear_smooth() {
@@ -508,40 +507,42 @@ namespace sfem {
                 penalty_pseudo_galerkin_assembly();
 
                 int ret = cycle(coarser_level(finest_level()));
-            assert(ret != CYCLE_FAILURE);
+                assert(ret != CYCLE_FAILURE);
 
-            {
-                // Prolongation
-                blas_.zeros(correction->size(), correction->data());
-                prolongation->apply(mem_coarse->solution->data(), correction->data());
+                {
+                    // Prolongation
+                    blas_.zeros(correction->size(), correction->data());
+                    prolongation->apply(mem_coarse->solution->data(), correction->data());
 
-                if (line_search_enabled_) {
-                    assert(!constraints_op_);  // IMPLEMENT ME?
-                    T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
-                    blas_.zeros(mem->work->size(), mem->work->data());
+                    if (line_search_enabled_) {
+                        // assert(!constraints_op_);  // IMPLEMENT ME?
+                        T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        blas_.zeros(mem->work->size(), mem->work->data());
 
-                    sop->apply(correction->data(), mem->work->data());
+                        sop->apply(correction->data(), mem->work->data());
 
-                    alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
-                    blas_.scal(correction->size(), alpha, correction->data());
-                }
+                        alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
 
-                // FIXME if we find a good reason for this add GPU support here
-                if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
-                    assert(!constraints_op_);  // FIXME not supported yet!!!
-
-                    auto            c  = correction->data();
-                    auto            ub = upper_bound_->data();
-                    auto            x  = mem->solution->data();
-                    const ptrdiff_t n  = correction->size();
-
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n; i++) {
-                        x[i] = std::min(x[i] + c[i], ub[i] + std::max(T(0), x[i] - ub[i]));
+                        // printf("alpha = %g\n", alpha);
+                        blas_.scal(correction->size(), alpha, correction->data());
                     }
 
-                } else {
-                    // Apply coarse space correction
+                    // FIXME if we find a good reason for this add GPU support here
+                    if (project_coarse_space_correction_ && execution_space() == EXECUTION_SPACE_HOST) {
+                        assert(!constraints_op_);  // FIXME not supported yet!!!
+
+                        auto            c  = correction->data();
+                        auto            ub = upper_bound_->data();
+                        auto            x  = mem->solution->data();
+                        const ptrdiff_t n  = correction->size();
+
+#pragma omp parallel for
+                        for (ptrdiff_t i = 0; i < n; i++) {
+                            x[i] = std::min(x[i] + c[i], ub[i] + std::max(T(0), x[i] - ub[i]));
+                        }
+
+                    } else {
+                        // Apply coarse space correction
                         blas_.axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
                     }
                 }
@@ -559,7 +560,7 @@ namespace sfem {
             auto smoother = smoother_[level];
             auto op       = operator_[level];
             auto sop      = shifted_op(level);
-
+            
             ptrdiff_t n_dofs = op->rows();
             if (coarsest_level() == level) {
                 if (constraints_op_) {
@@ -570,6 +571,17 @@ namespace sfem {
 
                 blas_.zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
+                    // static int count = 0;
+
+                    // if (count++ == 1) {
+                    //     mem->solution->to_file("test_contact/coarse_out/coarse_solution.raw");
+                    //     mem->rhs->to_file("test_contact/coarse_out/coarse_rhs.raw");
+                    //     mem->diag->print(std::cout);
+                    //     constraints_op_x_op_[level]->print(std::cout);
+                    //     // mem->diag->to_file("test_contact/coarse_out/coarse_diag.raw");
+                    //     exit(0);
+                    // }
+
                     return CYCLE_CONTINUE;
                 } else {
                     fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
