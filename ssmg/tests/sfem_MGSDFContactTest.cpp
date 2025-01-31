@@ -83,8 +83,12 @@ int test_contact() {
                                 1.5,
                                 1.5,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    const geom_t plane = -0.1;
-                                    return plane - y;
+                                    const geom_t cx = 0.6 * (1 - (x - .5)*(x - .5));
+                                    const geom_t cz = 0.6 * (1 - (z - .5)*(z - .5));
+                                    const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx;
+                                    const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz;
+                                    const geom_t obstacle = -0.1 - fx - fz;
+                                    return obstacle - y;
                                 });
 
     sfem::create_directory("test_contact");

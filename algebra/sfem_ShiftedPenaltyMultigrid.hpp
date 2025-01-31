@@ -321,7 +321,7 @@ namespace sfem {
         std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
 
         T   penalty_param_{10};  // mu
-        T   max_penalty_param_{1000};
+        T   max_penalty_param_{100000};
         int nlsmooth_steps{3};
         int max_inner_it{3};
 
@@ -444,16 +444,6 @@ namespace sfem {
             }
         }
 
-        // void penalty_pseudo_galerkin_assembly_constraints() {
-        //     if (constraints_op_) {
-        //         for(int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
-        //             constraints_op_x_op_restriction_[l]->apply(
-        //                 constraints_op_x_op_[l],
-        //                 constraints_op_x_op_[coarser_level(l)]);
-        //         }
-        //     }
-        // }
-
         void nonlinear_smooth() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_smooth");
 
@@ -515,15 +505,14 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                     if (line_search_enabled_) {
-                        // assert(!constraints_op_);  // IMPLEMENT ME?
                         T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
                         blas_.zeros(mem->work->size(), mem->work->data());
-
                         sop->apply(correction->data(), mem->work->data());
-
                         alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
 
-                        // printf("alpha = %g\n", alpha);
+                        if(debug)
+                            printf("alpha = %g\n", alpha);
+
                         blas_.scal(correction->size(), alpha, correction->data());
                     }
 
