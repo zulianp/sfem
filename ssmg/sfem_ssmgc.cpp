@@ -15,8 +15,8 @@ namespace sfem {
         auto      fs          = f->space();
         const int block_size  = fs->block_size();
         auto      cc_op       = contact_conds->linear_constraints_op();
-        auto cc_op_t     = contact_conds->linear_constraints_op_transpose();
-        auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+        auto      cc_op_t     = contact_conds->linear_constraints_op_transpose();
+        auto      upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
         contact_conds->signed_distance(upper_bound->data());
 
         int  sym_block_size = (block_size == 3 ? 6 : 3);
@@ -26,7 +26,7 @@ namespace sfem {
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
 
-        auto linear_op        = sfem::create_linear_operator("MF", f, nullptr, es);
+        auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
         sp->set_op(linear_op);
         sp->default_init();
 
@@ -112,9 +112,9 @@ namespace sfem {
         auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(linear_smoothing_steps);
 
-        auto restriction_unconstr      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
-        auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-        auto prolongation     = sfem::make_op<real_t>(
+        auto restriction_unconstr = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+        auto prolong_unconstr     = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+        auto prolongation         = sfem::make_op<real_t>(
                 prolong_unconstr->rows(),
                 prolong_unconstr->cols(),
                 [=](const real_t *const from, real_t *const to) {
@@ -123,7 +123,7 @@ namespace sfem {
                 },
                 es);
 
-        auto restriction     = sfem::make_op<real_t>(
+        auto restriction = sfem::make_op<real_t>(
                 restriction_unconstr->rows(),
                 restriction_unconstr->cols(),
                 [=](const real_t *const from, real_t *const to) {
@@ -164,7 +164,7 @@ namespace sfem {
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
             f_coarse->constaints_mask(mask->data());
 
-            auto sj_coarse = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+            auto sj_coarse                  = sfem::h_shiftable_block_sym_jacobi(diag, mask);
             sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             solver_coarse->set_preconditioner_op(sj_coarse);
         }
@@ -197,8 +197,9 @@ namespace sfem {
         auto   fine_sides  = contact_conds->ss_sides();
 
         auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
-        // FIXME unneccessary as it can be a view of the parent nodeset due to the hiearchical organization!
-        auto coarse_node_mapping = sfem::create_nodeset_from_sideset(fs_coarse, contact_conds->sideset());
+        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+        auto coarse_node_mapping = sfem::view(contact_conds->node_mapping(), 0, n_coarse_contact_nodes);
+
         auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
         auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
         auto count = sfem::create_host_buffer<uint16_t>(contact_conds->n_constrained_dofs());
