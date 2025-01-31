@@ -4,7 +4,8 @@
 #include "sortreduce.h"
 
 #include "adj_table.h"
-#include "sshex8.h"  //FIXME
+#include "sshex8.h"   //FIXME
+#include "ssquad4.h"  //FIXME
 
 #include <assert.h>
 #include <mpi.h>
@@ -1491,5 +1492,99 @@ int sshex8_extract_quadshell4_surface_from_sideset(const int                    
         }
     }
 
+    return SFEM_SUCCESS;
+}
+
+int ssquad4_hierarchical_remapping(const int                   L,
+                                   const int                   nlevels,
+                                   int *const                  levels,
+                                   const ptrdiff_t             nelements,
+                                   const ptrdiff_t             nnodes,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   idx_t **SFEM_RESTRICT       node_mapping_out,
+                                   ptrdiff_t                  *count_out) {
+    idx_t *node_mapping = malloc(nnodes * sizeof(idx_t));
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        node_mapping[i] = -1;
+    }
+
+    idx_t next_id = 0;
+    // Preserve original ordering for base SSQUAD4 mesh
+
+    for (int yi = 0; yi <= 1; yi++) {
+        for (int xi = 0; xi <= 1; xi++) {
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                const int   v   = ssquad4_lidx(L, xi * L, yi * L);
+                const idx_t idx = elements[v][e];
+
+                assert(idx < nnodes);
+                if (node_mapping[idx] == -1) {
+                    node_mapping[idx] = next_id++;
+                }
+            }
+        }
+    }
+
+    int stride = 1;
+    for (int k = 1; k < nlevels; k++) {
+        const int l           = levels[k];
+        const int step_factor = L / l;
+
+        for (ptrdiff_t e = 0; e < nelements; e++) {
+            for (int yi = 0; yi <= l; yi += stride) {
+                for (int xi = 0; xi <= l; xi += stride) {
+                    const int   v   = ssquad4_lidx(L, xi * step_factor, yi * step_factor);
+                    const idx_t idx = elements[v][e];
+                    assert(idx < nnodes);
+                    if (node_mapping[idx] == -1) {
+                        node_mapping[idx] = next_id++;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int yi = 0; yi <= L; yi++) {
+        for (int xi = 0; xi <= L; xi++) {
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                const int   v   = ssquad4_lidx(L, xi, yi);
+                const idx_t idx = elements[v][e];
+
+                if (node_mapping[idx] == -1) {
+                    printf("%d %d[%ld]\n", xi, yi, e);
+                    SFEM_ERROR("Uninitialized node mapping\n");
+                }
+
+                elements[v][e] = node_mapping[idx];
+            }
+        }
+    }
+
+    *count_out        = next_id;
+    *node_mapping_out = malloc(*count_out * sizeof(idx_t));
+
+#ifndef NDEBUG
+    for (ptrdiff_t i = 0; i < *count_out; i++) {
+        (*node_mapping_out)[i] = -1;
+    }
+
+#endif
+
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        if (node_mapping[i] != -1) {
+            (*node_mapping_out)[node_mapping[i]] = i;
+        }
+    }
+
+#ifndef NDEBUG
+    for (ptrdiff_t i = 0; i < *count_out; i++) {
+        assert((*node_mapping_out)[i] != -1);
+    }
+
+#endif
+
+    free(node_mapping);
     return SFEM_SUCCESS;
 }

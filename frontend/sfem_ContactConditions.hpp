@@ -115,6 +115,7 @@ namespace sfem {
         int signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const;
 
         std::shared_ptr<Buffer<idx_t *>> ss_sides();
+        std::shared_ptr<Sideset>       sideset();
 
     private:
         class Impl;
