@@ -244,6 +244,13 @@ namespace sfem {
                 MEMORY_SPACE_HOST);
         return ret;
     }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T>> view(const std::shared_ptr<Buffer<T>> &buffer, const ptrdiff_t begin, const ptrdiff_t end) {
+        return std::make_shared<Buffer<T>>(
+                end - begin, &buffer->data()[begin], [keep_alive = buffer](void *) { (void)keep_alive; }, buffer->mem_space());
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP
