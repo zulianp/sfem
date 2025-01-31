@@ -167,6 +167,7 @@ namespace sfem {
         std::shared_ptr<SemiStructuredMesh> derefine(const int to_level);
 
         std::shared_ptr<Buffer<geom_t *>> points();
+        std::shared_ptr<Buffer<idx_t *>> elements();
 
         int export_as_standard(const char *path);
         int write(const char *path);

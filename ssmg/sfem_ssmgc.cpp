@@ -83,12 +83,12 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int        nlsmooth_steps                     = 100;
+        int        nlsmooth_steps                      = 1;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
-        int         linear_smoothing_steps             = 10;
+        int         linear_smoothing_steps             = 3;
         bool        enable_coarse_space_preconditioner = false;
         bool        coarse_solver_verbose              = false;
 
@@ -122,7 +122,7 @@ namespace sfem {
         auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(linear_smoothing_steps);
 
-        auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+        auto restriction_unconstr      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
         auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
         auto prolongation     = sfem::make_op<real_t>(
                 prolong_unconstr->rows(),
@@ -130,6 +130,15 @@ namespace sfem {
                 [=](const real_t *const from, real_t *const to) {
                     prolong_unconstr->apply(from, to);
                     f->apply_zero_constraints(to);
+                },
+                es);
+
+        auto restriction     = sfem::make_op<real_t>(
+                restriction_unconstr->rows(),
+                restriction_unconstr->cols(),
+                [=](const real_t *const from, real_t *const to) {
+                    restriction_unconstr->apply(from, to);
+                    f_coarse->apply_zero_constraints(to);
                 },
                 es);
 
@@ -154,7 +163,7 @@ namespace sfem {
 
         auto solver_coarse     = sfem::create_cg<real_t>(linear_op_coarse, es);
         solver_coarse->verbose = coarse_solver_verbose;
-        solver_coarse->set_rtol(1e-5);
+        solver_coarse->set_rtol(1e-8);
 
         if (enable_coarse_space_preconditioner) {
             auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs() / fs_coarse->block_size() * (fs_coarse->block_size() == 3 ? 6 : 3), es);
@@ -195,11 +204,40 @@ namespace sfem {
 
         auto          &&fine_ssmesh            = fs->semi_structured_mesh();
         auto            fine_sides             = contact_conds->ss_sides();
-        auto            coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
-        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
 
-        auto coarse_node_mapping = sfem::create_host_buffer<idx_t>(n_coarse_contact_nodes);
-        auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * n_coarse_contact_nodes, es);
+        // FIXME fine_sides is in compressed indexing
+        // FIXME coarse_sides is NOT in compressed indexing
+        // FIXME Potential BUG here as we go from SSQUAD4 to standard QUAD4
+        auto            coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
+        // const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+
+        create_directory("test_contact/coarse_mesh/side/");
+        coarse_sides->to_files("test_contact/coarse_mesh/side/i%d.raw");
+
+        
+        auto coarse_node_mapping = sfem::create_nodeset_from_sideset(fs_coarse, contact_conds->sideset());
+        auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
+                
+        // printf("COARSE ELEMENTS\n");
+        // fs_coarse->mesh().elements()->print(std::cout);
+
+        // printf("FINE SIDES\n");
+        // fine_sides->print(std::cout);
+
+        // printf("FINE NODE MAPPING\n");
+        // contact_conds->node_mapping()->print(std::cout);
+
+        // printf("COARSE SIDES\n");
+        // coarse_sides->print(std::cout);
+
+        // printf("COARSE NODE MAPPING\n");
+        // coarse_node_mapping->print(std::cout);
+        // printf("%ld / %ld\n", coarse_node_mapping->size(), fs_coarse->mesh_ptr()->n_nodes());
+        // assert(n_coarse_contact_nodes == coarse_node_mapping->size());
+        
+        // FIXME create coarse node id
+        // coarse_node_mapping
+        // assert(false);
 
         auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
 
@@ -223,7 +261,7 @@ namespace sfem {
                          coarse_sbv->data()->data());
 
         auto c_restriction = sfem::make_op<real_t>(
-                n_coarse_contact_nodes,
+                coarse_node_mapping->size(),
                 contact_conds->node_mapping()->size(),
                 [=](const real_t *const from, real_t *const to) {
                     auto &fine_ssmesh = fs->semi_structured_mesh();
@@ -247,6 +285,7 @@ namespace sfem {
 
         ////////////////////////////////////////////////////////////////////////////////////
         mg->debug = true;
+        // mg->skip_coarse = true;
         return mg;
     }
 

@@ -1,5 +1,6 @@
 #include "sshex8_mesh.h"
 #include "sshex8.h"
+#include "ssquad4.h"
 
 static SFEM_INLINE void hex8_eval_f(const scalar_t x, const scalar_t y, const scalar_t z, scalar_t *const f) {
     const scalar_t xm = (1 - x);
@@ -48,6 +49,37 @@ int sshex8_to_standard_hex8_mesh(const int                   level,
             }
         }
     }
+
+    return SFEM_SUCCESS;
+}
+
+int ssquad4_to_standard_quad4_mesh(const int                   level,
+                                   const ptrdiff_t             nelements,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   idx_t **const SFEM_RESTRICT quad4_elements)
+{
+    const int txe = ssquad4_txe(level);
+
+    int lnode[4];
+        for (int yi = 0; yi < level; yi++) {
+            for (int xi = 0; xi < level; xi++) {
+                lnode[0] = ssquad4_lidx(level, xi, yi);
+                lnode[1] = ssquad4_lidx(level, xi + 1, yi);
+                lnode[2] = ssquad4_lidx(level, xi + 1, yi + 1);
+                lnode[3] = ssquad4_lidx(level, xi, yi + 1);
+
+                int le = yi * level + xi;
+                assert(le < txe);
+
+                for (int l = 0; l < 4; l++) {
+                    for (ptrdiff_t e = 0; e < nelements; e++) {
+                        idx_t node                     = elements[lnode[l]][e];
+                        quad4_elements[l][e * txe + le] = node;
+                    }
+                }
+            }
+        }
+
 
     return SFEM_SUCCESS;
 }

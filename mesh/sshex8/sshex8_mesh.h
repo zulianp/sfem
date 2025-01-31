@@ -20,6 +20,12 @@ int sshex8_to_standard_hex8_mesh(const int                   level,
                                  idx_t **const SFEM_RESTRICT elements,
                                  idx_t **const SFEM_RESTRICT hex8_elements);
 
+// FIXME move to appropriate file
+int ssquad4_to_standard_quad4_mesh(const int                   level,
+                                   const ptrdiff_t             nelements,
+                                   idx_t **const SFEM_RESTRICT elements,
+                                   idx_t **const SFEM_RESTRICT quad4_elements);
+
 #ifdef __cplusplus
 }
 #endif
