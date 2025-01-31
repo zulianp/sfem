@@ -16,6 +16,7 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
                          const count_t *const SFEM_RESTRICT rowptr_a,
                          const idx_t *const SFEM_RESTRICT   colidx_a,
                          const real_t *const SFEM_RESTRICT  values_a,
+                         const real_t *const SFEM_RESTRICT  diag_a,
                          real_t                            *near_null,
                          count_t                          **rowptr_p,       // [out]
                          idx_t                            **colidx_p,       // [out]

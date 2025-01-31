@@ -57,6 +57,13 @@ int crs_is_symmetric(const count_t                      rows,
                      const idx_t *const SFEM_RESTRICT   colidx,
                      const real_t *const SFEM_RESTRICT  values);
 
+int crs_write_mm(const count_t       ndofs,
+                 const mask_t *const bdy_dofs,
+                 const char *const   matfile,
+                 const char *const   bdyfile,
+                 count_t *const      rowptr,
+                 idx_t *const        colidx,
+                 real_t *const       values);
 #ifdef __cplusplus
 }
 #endif

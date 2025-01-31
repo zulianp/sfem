@@ -28,7 +28,9 @@ namespace sfem {
         std::shared_ptr<Buffer<R>> row_ptr;
         std::shared_ptr<Buffer<C>> col_idx;
         std::shared_ptr<Buffer<T>> values;
-        ptrdiff_t cols_{0};
+        ptrdiff_t                  cols_{0};
+
+        R nnz() { return row_ptr->data()[rows()]; }
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
@@ -36,17 +38,17 @@ namespace sfem {
     };
 
     template <typename R, typename C, typename T>
-    std::shared_ptr<CRSSpMV<R, C, T>> h_crs_spmv(const ptrdiff_t rows,
-                                                 const ptrdiff_t cols,
-                                                 const std::shared_ptr<Buffer<R>> &rowptr,
-                                                 const std::shared_ptr<Buffer<C>> &colidx,
-                                                 const std::shared_ptr<Buffer<T>> &values,
-                                                 const T scale_output) {
-        auto ret = std::make_shared<CRSSpMV<R, C, T>>();
+    std::shared_ptr<CRSSpMV<R, C, T>> h_crs_spmv(const ptrdiff_t                   rows,
+                                                 const ptrdiff_t                   cols,
+                                                 const std::shared_ptr<Buffer<R>>& rowptr,
+                                                 const std::shared_ptr<Buffer<C>>& colidx,
+                                                 const std::shared_ptr<Buffer<T>>& values,
+                                                 const T                           scale_output) {
+        auto ret     = std::make_shared<CRSSpMV<R, C, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
-        ret->values = values;
-        ret->cols_ = cols;
+        ret->values  = values;
+        ret->cols_   = cols;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
 
@@ -60,11 +62,11 @@ namespace sfem {
 #pragma omp parallel for  // nowait
                 for (ptrdiff_t i = 0; i < rows; i++) {
                     const R row_begin = rowptr_[i];
-                    const R row_end = rowptr_[i + 1];
+                    const R row_end   = rowptr_[i + 1];
 
                     T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
-                        const C j = colidx_[k];
+                        const C j   = colidx_[k];
                         const T aij = values_[k];
 
                         val += aij * x[j];
@@ -76,11 +78,11 @@ namespace sfem {
 #pragma omp parallel for  // nowait
                 for (ptrdiff_t i = 0; i < rows; i++) {
                     const R row_begin = rowptr_[i];
-                    const R row_end = rowptr_[i + 1];
+                    const R row_end   = rowptr_[i + 1];
 
                     T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
-                        const C j = colidx_[k];
+                        const C j   = colidx_[k];
                         const T aij = values_[k];
 
                         val += aij * x[j];
@@ -92,11 +94,11 @@ namespace sfem {
 #pragma omp parallel for  // nowait
                 for (ptrdiff_t i = 0; i < rows; i++) {
                     const R row_begin = rowptr_[i];
-                    const R row_end = rowptr_[i + 1];
+                    const R row_end   = rowptr_[i + 1];
 
                     T val = 0;
                     for (R k = row_begin; k < row_end; k++) {
-                        const C j = colidx_[k];
+                        const C j   = colidx_[k];
                         const T aij = values_[k];
 
                         val += aij * x[j];

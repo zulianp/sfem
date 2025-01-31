@@ -1,6 +1,7 @@
 #include "mg_builder.hpp"
 #include <stdio.h>
 #include <cstddef>
+#include "crs.h"
 #include "partitioner.h"
 #include "sfem_API.hpp"
 #include "sfem_Buffer.hpp"
@@ -8,12 +9,12 @@
 #include "sfem_LpSmoother.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_ShiftableJacobi.hpp"
-#include "sfem_Stationary.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_pwc_interpolator.hpp"
 #include "smoothed_aggregation.h"
 #include "smoother.h"
 
+// TODO this should probably move to crs module...
 int csr_to_coosym(ptrdiff_t ndofs,
                   count_t  *rowptr,
                   idx_t    *colidx,
@@ -50,14 +51,16 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
     sfem::ExecutionSpace es       = sfem::EXECUTION_SPACE_HOST;
     auto                 bdy_dofs = bdy_dofs_buff->data();
 
-    ptrdiff_t fine_ndofs  = fine_mat->rows();
-    count_t   offdiag_nnz = (fine_mat->values->size() - fine_ndofs) / 2;
+    ptrdiff_t fine_ndofs       = fine_mat->rows();
+    count_t   fine_offdiag_nnz = (fine_mat->values->size() - fine_ndofs) / 2;
+    count_t   fine_nnz         = fine_mat->nnz();
+    count_t   total_complexity = 0;
 
-    PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, offdiag_nnz);
+    PartitionerWorkspace *ws = create_partition_ws(fine_ndofs, fine_offdiag_nnz);
     // Weighted connectivity graph in COO format
-    auto offdiag_row_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
-    auto offdiag_col_indices = sfem::create_host_buffer<idx_t>(offdiag_nnz);
-    auto offdiag_values      = sfem::create_host_buffer<real_t>(offdiag_nnz);
+    auto offdiag_row_indices = sfem::create_host_buffer<idx_t>(fine_offdiag_nnz);
+    auto offdiag_col_indices = sfem::create_host_buffer<idx_t>(fine_offdiag_nnz);
+    auto offdiag_values      = sfem::create_host_buffer<real_t>(fine_offdiag_nnz);
     auto diag_values         = sfem::create_host_buffer<real_t>(fine_ndofs);
 
     idx_t amg_levels = 1;
@@ -74,7 +77,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
 
     ptrdiff_t ndofs = fine_ndofs;
 
-    printf("\nAMG info:\n level      cf         dofs       nnz   "
+    printf("\nAMG info:\n level      cf         dofs       nnz        "
            "sparsity "
            "factor\n");
     printf("|%-10d|%-10.2f|%-10td|%-10td|%-16.2f|\n", 1, 1.0, fine_ndofs, fine_mat->values->size(), 1.0);
@@ -82,9 +85,30 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         count_t *rowptr = prev_mat->row_ptr->data();
         idx_t   *colidx = prev_mat->col_idx->data();
         real_t  *values = prev_mat->values->data();
+        total_complexity += prev_mat->nnz();
 
-        count_t offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
-        count_t k           = csr_to_coosym(ndofs,
+        /* for debugging........
+        char matfile[sizeof "3d_laplace_001.mtx"];
+        char bdyfile[sizeof "3d_laplace_001.bdy"];
+        sprintf(matfile, "3d_laplace_%d.mtx", amg_levels);
+        sprintf(bdyfile, "3d_laplace_%d.bdy", amg_levels);
+        crs_write_mm(ndofs, bdy_dofs, matfile, bdyfile, rowptr, colidx, values);
+        */
+
+        count_t new_offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
+
+        // At too low of coarsening factors with smoothed aggregation
+        // the NNZ of a coarse level can actually increase.
+        if (new_offdiag_nnz > fine_offdiag_nnz) {
+            // TODO warn user?? this is probably bad but we will allow it
+            offdiag_row_indices = sfem::create_host_buffer<idx_t>(new_offdiag_nnz);
+            offdiag_col_indices = sfem::create_host_buffer<idx_t>(new_offdiag_nnz);
+            offdiag_values      = sfem::create_host_buffer<real_t>(new_offdiag_nnz);
+            free_partition_ws(ws);
+            ws = create_partition_ws(fine_ndofs, new_offdiag_nnz);
+        }
+
+        count_t k = csr_to_coosym(ndofs,
                                   rowptr,
                                   colidx,
                                   values,
@@ -92,13 +116,12 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                                   offdiag_col_indices->data(),
                                   offdiag_values->data(),
                                   diag_values->data());
-        printf("%d == %d\n", k, offdiag_nnz);
-        assert(k == offdiag_nnz);
+        assert(k == new_offdiag_nnz);
 
         auto diag_smoother = sfem::create_host_buffer<real_t>(ndofs);
         l1_smoother(ndofs,
                     bdy_dofs,
-                    offdiag_nnz,
+                    new_offdiag_nnz,
                     diag_values->data(),
                     offdiag_values->data(),
                     offdiag_row_indices->data(),
@@ -120,9 +143,15 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                                 offdiag_row_indices->data(),
                                 offdiag_col_indices->data(),
                                 offdiag_values->data(),
-                                &offdiag_nnz,
+                                &new_offdiag_nnz,
                                 &ndofs,
                                 ws);
+
+        /* prints the sizes of all the aggregates
+        for (count_t agg_id = 0; agg_id < ndofs; agg_id++) {
+            printf("%d ", ws->agg_sizes[agg_id]);
+        }
+        */
 
         if (failure) {
             printf("Failed to add new level, AMG levels: %d\n", amg_levels);
@@ -143,7 +172,6 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         idx_t   *colidx_coarse;
         real_t  *values_coarse;
 
-        printf("Partition: %td coarse dofs\n", coarser_dim);
         smoothed_aggregation(finer_dim,
                              coarser_dim,
                              0.66,
@@ -151,6 +179,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                              rowptr,
                              colidx,
                              values,
+                             diag_values->data(),
                              near_null->data(),
                              &rowptr_p,
                              &colidx_p,
@@ -193,6 +222,10 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         count_t prev_nnz = prev_mat->values->size();
         prev_mat         = a_coarse;
         bdy_dofs         = nullptr;
+        for (idx_t i = 0; i < ndofs; ++i) {
+            zeros->data()[i] = 0.0;
+        }
+
         printf("|%-10d|%-10.2f|%-10td|%-10d|%-16.2f|\n",
                amg_levels,
                (real_t)finer_dim / (real_t)coarser_dim,
@@ -201,8 +234,8 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                (real_t)nnz_coarse / (real_t)prev_nnz);
     }
 
-    offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
-    count_t k   = csr_to_coosym(ndofs,
+    count_t new_offdiag_nnz = (prev_mat->values->size() - ndofs) / 2;
+    count_t k               = csr_to_coosym(ndofs,
                               prev_mat->row_ptr->data(),
                               prev_mat->col_idx->data(),
                               prev_mat->values->data(),
@@ -210,13 +243,12 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
                               offdiag_col_indices->data(),
                               offdiag_values->data(),
                               diag_values->data());
-    printf("%d == %d\n", k, offdiag_nnz);
-    assert(k == offdiag_nnz);
+    assert(k == new_offdiag_nnz);
 
     auto diag_smoother = sfem::create_host_buffer<real_t>(ndofs);
     l1_smoother(ndofs,
                 bdy_dofs,
-                offdiag_nnz,
+                new_offdiag_nnz,
                 diag_values->data(),
                 offdiag_values->data(),
                 offdiag_row_indices->data(),
@@ -247,7 +279,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder_sa(const real_t                
         printf("AMG constructed successfully with coarsest target hit (%td dofs on coarsest)\n", ndofs);
     }
     // printf("Memory complexity: %.2f\n", (real_t)total_memory / (real_t)fine_memory);
-    // printf("Operator complexity: %.2f\n\n", (real_t)total_complexity / (real_t)fine_nnz);
+    printf("Operator complexity: %.2f\n\n", (real_t)total_complexity / (real_t)fine_nnz);
 
     free_partition_ws(ws);
 
