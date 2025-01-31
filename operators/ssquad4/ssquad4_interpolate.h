@@ -38,6 +38,7 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
                        const real_t *const SFEM_RESTRICT from,
                        real_t *const SFEM_RESTRICT       to);
 
+
 #ifdef __cplusplus
 }
 #endif
