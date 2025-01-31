@@ -1,6 +1,7 @@
 #ifndef SFEM_RESAMPLE_FIELD_CUDA_CUH
 #define SFEM_RESAMPLE_FIELD_CUDA_CUH
 
+#include <assert.h>
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cuda_profiler_api.h>
@@ -577,7 +578,8 @@ quadrature_node(const real_type                    tet4_qx_v,       //
 }  // end quadrature_node function
 //////////////////////////////////////////////////////////
 
-#define __WARP_SIZE__ 32
+#define __TET4_TILE_SIZE__ 8
+#define __TET4_THREADS_PER_BLOCK__ (32 * 28)
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -602,9 +604,9 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
                                         const real_type* const MY_RESTRICT  data,           //
                                         real_type* const MY_RESTRICT        weighted_field) {      //// Output
 
-    real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
-    real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
-    real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
+    // real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
+    // real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
+    // real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
 
     const real_type ox = (real_type)origin_x;
     const real_type oy = (real_type)origin_y;
@@ -618,21 +620,32 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
 
     cg::thread_block g = cg::this_thread_block();
 
-    const unsigned int element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __WARP_SIZE__;
+    const unsigned int element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __TET4_TILE_SIZE__;
 
     if (element_i < start_element || element_i >= end_element) {
         return;
     }
 
-    auto      tile      = cg::tiled_partition<__WARP_SIZE__>(g);
+    auto tile = cg::tiled_partition<__TET4_TILE_SIZE__>(g);
+    // auto tile = cg::coalesced_threads();
+
+    // if (tile.size() != 32) {
+    //     return;
+    // }
+
     const int tile_rank = tile.thread_rank();
 
-    typedef struct {
+    typedef __align__(8) struct {
         int ev0;
         int ev1;
         int ev2;
         int ev3;
     } ev_t;
+
+    if (sizeof(ev_t) != sizeof(int) * 4) {
+        printf("ERROR: sizeof(ev_t) != sizeof(int) * 4\n, %s:%d\n", __FILE__, __LINE__);
+        __trap();
+    }
 
     // loop over the 4 vertices of the tetrahedron
     // const int ev[4] = {elems.elems_v0[element_i],  //
@@ -642,48 +655,48 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
 
     ev_t evs;
     if (tile_rank == 0)
-        evs = {elems.elems_v0[element_i], elems.elems_v1[element_i], elems.elems_v2[element_i], elems.elems_v3[element_i]};
+        evs = {__ldg(&elems.elems_v0[element_i]),   //
+               __ldg(&elems.elems_v1[element_i]),   //
+               __ldg(&elems.elems_v2[element_i]),   //
+               __ldg(&elems.elems_v3[element_i])};  //
 
     evs = tile.shfl(evs, 0);
 
-    {
-        x0 = xyz.x[evs.ev0];
-        x1 = xyz.x[evs.ev1];
-        x2 = xyz.x[evs.ev2];
-        x3 = xyz.x[evs.ev3];
+    real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
+    real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
+    real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
 
-        y0 = xyz.y[evs.ev0];
-        y1 = xyz.y[evs.ev1];
-        y2 = xyz.y[evs.ev2];
-        y3 = xyz.y[evs.ev3];
+    if (tile_rank == 0) {
+        x0 = __ldg(&xyz.x[evs.ev0]);
+        x1 = __ldg(&xyz.x[evs.ev1]);
+        x2 = __ldg(&xyz.x[evs.ev2]);
+        x3 = __ldg(&xyz.x[evs.ev3]);
 
-        z0 = xyz.z[evs.ev0];
-        z1 = xyz.z[evs.ev1];
-        z2 = xyz.z[evs.ev2];
-        z3 = xyz.z[evs.ev3];
+        y0 = __ldg(&xyz.y[evs.ev0]);
+        y1 = __ldg(&xyz.y[evs.ev1]);
+        y2 = __ldg(&xyz.y[evs.ev2]);
+        y3 = __ldg(&xyz.y[evs.ev3]);
+
+        z0 = __ldg(&xyz.z[evs.ev0]);
+        z1 = __ldg(&xyz.z[evs.ev1]);
+        z2 = __ldg(&xyz.z[evs.ev2]);
+        z3 = __ldg(&xyz.z[evs.ev3]);
     }
 
-    // ev[0] = (elems.elems_v0[element_i]);
-    // ev[1] = (elems.elems_v1[element_i]);
-    // ev[2] = (elems.elems_v2[element_i]);
-    // ev[3] = (elems.elems_v3[element_i]);
+    x0 = tile.shfl(x0, 0);
+    x1 = tile.shfl(x1, 0);
+    x2 = tile.shfl(x2, 0);
+    x3 = tile.shfl(x3, 0);
 
-    {
-        x0 = xyz.x[evs.ev0];
-        x1 = xyz.x[evs.ev1];
-        x2 = xyz.x[evs.ev2];
-        x3 = xyz.x[evs.ev3];
+    y0 = tile.shfl(y0, 0);
+    y1 = tile.shfl(y1, 0);
+    y2 = tile.shfl(y2, 0);
+    y3 = tile.shfl(y3, 0);
 
-        y0 = xyz.y[evs.ev0];
-        y1 = xyz.y[evs.ev1];
-        y2 = xyz.y[evs.ev2];
-        y3 = xyz.y[evs.ev3];
-
-        z0 = xyz.z[evs.ev0];
-        z1 = xyz.z[evs.ev1];
-        z2 = xyz.z[evs.ev2];
-        z3 = xyz.z[evs.ev3];
-    }
+    z0 = tile.shfl(z0, 0);
+    z1 = tile.shfl(z1, 0);
+    z2 = tile.shfl(z2, 0);
+    z3 = tile.shfl(z3, 0);
 
     // Volume of the tetrahedron
     const real_type theta_volume = tet4_measure_cu(x0,
@@ -701,8 +714,8 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
                                                    z2,
                                                    z3);
 
-    const int nr_warp_loop = (TET4_NQP / __WARP_SIZE__) +                //
-                             ((TET4_NQP % __WARP_SIZE__) == 0 ? 0 : 1);  //
+    const int nr_warp_loop = (TET4_NQP / tile.size()) +                //
+                             ((TET4_NQP % tile.size()) == 0 ? 0 : 1);  //
 
     real_type element_field0_reduce = real_t(0.0);
     real_type element_field1_reduce = real_t(0.0);
@@ -710,7 +723,7 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     real_type element_field3_reduce = real_t(0.0);
 
     for (int i = 0; i < nr_warp_loop; i++) {
-        const int q_i = i * int(__WARP_SIZE__) + tile_rank;
+        const int q_i = i * int(tile.size()) + tile_rank;
 
         // real_type element_field0 = 0.0;
         // real_type element_field1 = 0.0;

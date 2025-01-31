@@ -665,8 +665,8 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     // cudaEvent_t start, stop;
 
     // Number of threads
-    const ptrdiff_t warp_per_block  = 8;
-    const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    const ptrdiff_t warp_per_block  = 256 / __TET4_TILE_SIZE__;
+    const ptrdiff_t threadsPerBlock = warp_per_block * __TET4_TILE_SIZE__;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
@@ -806,8 +806,8 @@ tet4_resample_field_local_reduce_CUDA_Unified(const int     mpi_size,           
     // Call the kernel
 
     // Number of threads
-    const ptrdiff_t warp_per_block  = 8;
-    const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    const ptrdiff_t warp_per_block  = 256 / __TET4_TILE_SIZE__;
+    const ptrdiff_t threadsPerBlock = warp_per_block * __TET4_TILE_SIZE__;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (mesh->nelements / warp_per_block) + (mesh->nelements % warp_per_block) + 1;
@@ -950,8 +950,8 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
     // Call the kernel
 
     // Number of threads
-    const ptrdiff_t warp_per_block  = 8;
-    const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    const ptrdiff_t warp_per_block  = 256 / __TET4_TILE_SIZE__;
+    const ptrdiff_t threadsPerBlock = warp_per_block * __TET4_TILE_SIZE__;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (mesh->nelements / warp_per_block) + (mesh->nelements % warp_per_block) + 1;
