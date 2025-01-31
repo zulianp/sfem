@@ -284,7 +284,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> gap_znormal;
 
         std::shared_ptr<Buffer<real_t>> mass_vector;
-        bool                            variational{false};
+        bool                            variational{true};
         bool                            debug{false};
 
         ~Impl() {}

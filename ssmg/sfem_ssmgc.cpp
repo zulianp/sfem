@@ -7,18 +7,14 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
-
-
 namespace sfem {
-    std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(
-            const std::shared_ptr<Function>         &f,
-            const std::shared_ptr<ContactConditions> contact_conds,
-            const enum ExecutionSpace                es,
-            const std::shared_ptr<Input>            &in)
-    {
-        auto fs = f->space();
-        const int block_size = fs->block_size();
-        auto cc_op       = contact_conds->linear_constraints_op();
+    std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
+                                                                   const std::shared_ptr<ContactConditions> contact_conds,
+                                                                   const enum ExecutionSpace                es,
+                                                                   const std::shared_ptr<Input>            &in) {
+        auto      fs          = f->space();
+        const int block_size  = fs->block_size();
+        auto      cc_op       = contact_conds->linear_constraints_op();
         auto cc_op_t     = contact_conds->linear_constraints_op_transpose();
         auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
         contact_conds->signed_distance(upper_bound->data());
@@ -64,12 +60,6 @@ namespace sfem {
         return sp;
     }
 
-
-    // TODO improve contact integration in SSMG
-    // auto coarse_contact_conditions = contact_conds->derefine(fs_coarse, true);
-    // auto coarse_contact_mask = sfem::create_buffer<mask_t>(fs_coarse->n_dofs(), es);
-    // coarse_contact_conditions->mask(coarse_contact_mask->data());
-
     std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
                                                                   const std::shared_ptr<ContactConditions> contact_conds,
                                                                   const enum ExecutionSpace                es,
@@ -83,13 +73,13 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int        nlsmooth_steps                      = 1;
+        int         nlsmooth_steps                     = 5;
         bool        project_coarse_correction          = false;
-        bool        enable_line_search                 = false;
+        bool        enable_line_search                 = true;
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
         int         linear_smoothing_steps             = 3;
-        bool        enable_coarse_space_preconditioner = false;
+        bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
 
         if (in) {
@@ -146,6 +136,7 @@ namespace sfem {
         mg->set_nlsmooth_steps(nlsmooth_steps);
         mg->set_project_coarse_space_correction(project_coarse_correction);
         mg->enable_line_search(enable_line_search);
+        mg->set_max_it(20);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -166,7 +157,8 @@ namespace sfem {
         solver_coarse->set_rtol(1e-8);
 
         if (enable_coarse_space_preconditioner) {
-            auto diag = sfem::create_buffer<real_t>(fs_coarse->n_dofs() / fs_coarse->block_size() * (fs_coarse->block_size() == 3 ? 6 : 3), es);
+            auto diag = sfem::create_buffer<real_t>(
+                    fs_coarse->n_dofs() / fs_coarse->block_size() * (fs_coarse->block_size() == 3 ? 6 : 3), es);
             f_coarse->hessian_block_diag_sym(nullptr, diag->data());
 
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
@@ -195,59 +187,25 @@ namespace sfem {
 
         // All levels
         // Add transformation matrices
-
         int  sym_block_size = (fs->block_size() == 3 ? 6 : 3);
         auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
         contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
 
         auto fine_sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
 
-        auto          &&fine_ssmesh            = fs->semi_structured_mesh();
-        auto            fine_sides             = contact_conds->ss_sides();
+        auto &&fine_ssmesh = fs->semi_structured_mesh();
+        auto   fine_sides  = contact_conds->ss_sides();
 
-        // FIXME fine_sides is in compressed indexing
-        // FIXME coarse_sides is NOT in compressed indexing
-        // FIXME Potential BUG here as we go from SSQUAD4 to standard QUAD4
-        auto            coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
-        // const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
-
-        create_directory("test_contact/coarse_mesh/side/");
-        coarse_sides->to_files("test_contact/coarse_mesh/side/i%d.raw");
-
-        
+        auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
+        // FIXME unneccessary as it can be a view of the parent nodeset due to the hiearchical organization!
         auto coarse_node_mapping = sfem::create_nodeset_from_sideset(fs_coarse, contact_conds->sideset());
         auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
-                
-        // printf("COARSE ELEMENTS\n");
-        // fs_coarse->mesh().elements()->print(std::cout);
-
-        // printf("FINE SIDES\n");
-        // fine_sides->print(std::cout);
-
-        // printf("FINE NODE MAPPING\n");
-        // contact_conds->node_mapping()->print(std::cout);
-
-        // printf("COARSE SIDES\n");
-        // coarse_sides->print(std::cout);
-
-        // printf("COARSE NODE MAPPING\n");
-        // coarse_node_mapping->print(std::cout);
-        // printf("%ld / %ld\n", coarse_node_mapping->size(), fs_coarse->mesh_ptr()->n_nodes());
-        // assert(n_coarse_contact_nodes == coarse_node_mapping->size());
-        
-        // FIXME create coarse node id
-        // coarse_node_mapping
-        // assert(false);
-
         auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
-
         auto count = sfem::create_host_buffer<uint16_t>(contact_conds->n_constrained_dofs());
 
         ssquad4_element_node_incidence_count(fine_ssmesh.level(), 1, fine_sides->extent(1), fine_sides->data(), count->data());
-
-        // count->print(std::cout);
-        // fine_sides->print(std::cout);
-
+        
+        // FIXME When SPMG does not converge this may be the reason (this restriction is not variationally consistent)
         ssquad4_restrict(fine_sides->extent(1),  // nelements
                          fine_ssmesh.level(),    // from_level
                          1,                      // from_level_stride
