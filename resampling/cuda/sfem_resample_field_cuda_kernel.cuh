@@ -5,6 +5,7 @@
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cuda_profiler_api.h>
+#include <cuda_runtime.h>
 #include <stdio.h>
 
 #include "sfem_base.h"
@@ -16,6 +17,40 @@
 
 #include "quadratures_rule_cuda.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
+
+int getNumberOfSMs() {
+    cudaDeviceProp deviceProp;
+    int            device;
+
+    // Get the current active device
+    cudaGetDevice(&device);
+
+    // Get properties of the active device
+    cudaGetDeviceProperties(&deviceProp, device);
+
+    // Return the number of SMs
+    return deviceProp.multiProcessorCount;
+}
+
+// Function to calculate ideal grid and block sizes
+void getIdealGridAndBlockSize(int& gridSize, int& blockSize, void* myKernel) {
+    // Get GPU properties
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);  // Assuming device 0
+
+    // Number of SMs
+    int numSMs = deviceProp.multiProcessorCount;
+
+    // Determine optimal block size
+    int minGridSize;
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, myKernel, 0, 0);
+
+    // Calculate grid size based on number of SMs
+    gridSize = numSMs * minGridSize;
+
+    // Adjust grid size to cover all elements
+    // gridSize = (N + blockSize - 1) / blockSize;
+}
 
 ////////////////////////////////////////////////////////
 // tet4_transform_v2
@@ -579,7 +614,7 @@ quadrature_node(const real_type                    tet4_qx_v,       //
 //////////////////////////////////////////////////////////
 
 #define __TET4_TILE_SIZE__ 8
-#define __TET4_THREADS_PER_BLOCK__ (32 * 28)
+#define __TET4_THREADS_PER_BLOCK__ (32 * 8)
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -604,9 +639,18 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
                                         const real_type* const MY_RESTRICT  data,           //
                                         real_type* const MY_RESTRICT        weighted_field) {      //// Output
 
-    // real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
-    // real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
-    // real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
+    namespace cg = cooperative_groups;
+
+    cg::thread_block g         = cg::this_thread_block();
+    auto             tile      = cg::tiled_partition<__TET4_TILE_SIZE__>(g);
+    const int        tile_rank = tile.thread_rank();
+    const auto       tile_size = tile.size();
+
+    const unsigned int element_i = (blockIdx.x * blockDim.x + threadIdx.x) / tile_size;
+
+    if (element_i < start_element || element_i >= end_element) {
+        return;
+    }
 
     const real_type ox = (real_type)origin_x;
     const real_type oy = (real_type)origin_y;
@@ -616,24 +660,11 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     const real_type dy = (real_type)delta_y;
     const real_type dz = (real_type)delta_z;
 
-    namespace cg = cooperative_groups;
-
-    cg::thread_block g = cg::this_thread_block();
-
-    const unsigned int element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __TET4_TILE_SIZE__;
-
-    if (element_i < start_element || element_i >= end_element) {
-        return;
-    }
-
-    auto tile = cg::tiled_partition<__TET4_TILE_SIZE__>(g);
     // auto tile = cg::coalesced_threads();
 
     // if (tile.size() != 32) {
     //     return;
     // }
-
-    const int tile_rank = tile.thread_rank();
 
     typedef __align__(8) struct {
         int ev0;
@@ -780,6 +811,210 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
         atomicAdd(&weighted_field[evs.ev2], element_field2_reduce);
         atomicAdd(&weighted_field[evs.ev3], element_field3_reduce);
     }
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_reduce_local_kernel ///////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+__global__ void                                                                                //
+tet4_resample_field_reduce_local_kernel_v2(const ptrdiff_t MY_RESTRICT         start_element,  //
+                                           const ptrdiff_t MY_RESTRICT         end_element,    //
+                                           const ptrdiff_t MY_RESTRICT         nnodes,         //
+                                           const elems_tet4_device MY_RESTRICT elems,          //
+                                           const xyz_tet4_device MY_RESTRICT   xyz,            //
+                                           const ptrdiff_t MY_RESTRICT         stride0,        //
+                                           const ptrdiff_t MY_RESTRICT         stride1,        //
+                                           const ptrdiff_t MY_RESTRICT         stride2,        //
+                                           const geom_t                        origin_x,       //
+                                           const geom_t                        origin_y,       //
+                                           const geom_t                        origin_z,       //
+                                           const geom_t                        delta_x,        //
+                                           const geom_t                        delta_y,        //
+                                           const geom_t                        delta_z,        //
+                                           const real_type* const MY_RESTRICT  data,           //
+                                           real_type* const MY_RESTRICT        weighted_field) {      //// Output
+
+    namespace cg = cooperative_groups;
+
+    cg::thread_block g         = cg::this_thread_block();
+    auto             tile      = cg::tiled_partition<__TET4_TILE_SIZE__>(g);
+    const int        tile_rank = tile.thread_rank();
+    const auto       tile_size = tile.size();
+
+    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    const unsigned int element_per_block = blockDim.x / tile_size;
+    const unsigned int tile_block_rank   = threadIdx.x / tile_size;
+
+    for (unsigned int el_ii = 0; true; el_ii += element_per_block) {
+        const unsigned int element_i = blockIdx.x * element_per_block + tile_block_rank + element_per_block * el_ii;
+
+        if (element_i >= end_element) {
+            break;
+        }
+
+        const real_type ox = (real_type)origin_x;
+        const real_type oy = (real_type)origin_y;
+        const real_type oz = (real_type)origin_z;
+
+        const real_type dx = (real_type)delta_x;
+        const real_type dy = (real_type)delta_y;
+        const real_type dz = (real_type)delta_z;
+
+        // auto tile = cg::coalesced_threads();
+
+        // if (tile.size() != 32) {
+        //     return;
+        // }
+
+        typedef __align__(8) struct {
+            int ev0;
+            int ev1;
+            int ev2;
+            int ev3;
+        } ev_t;
+
+        if (sizeof(ev_t) != sizeof(int) * 4) {
+            printf("ERROR: sizeof(ev_t) != sizeof(int) * 4\n, %s:%d\n", __FILE__, __LINE__);
+            __trap();
+        }
+
+        // loop over the 4 vertices of the tetrahedron
+        // const int ev[4] = {elems.elems_v0[element_i],  //
+        //                    elems.elems_v1[element_i],
+        //                    elems.elems_v2[element_i],
+        //                    elems.elems_v3[element_i]};
+
+        ev_t evs;
+        if (tile_rank == 0)
+            evs = {__ldg(&elems.elems_v0[element_i]),   //
+                   __ldg(&elems.elems_v1[element_i]),   //
+                   __ldg(&elems.elems_v2[element_i]),   //
+                   __ldg(&elems.elems_v3[element_i])};  //
+
+        evs = tile.shfl(evs, 0);
+
+        real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
+        real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
+        real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
+
+        if (tile_rank == 0) {
+            x0 = __ldg(&xyz.x[evs.ev0]);
+            x1 = __ldg(&xyz.x[evs.ev1]);
+            x2 = __ldg(&xyz.x[evs.ev2]);
+            x3 = __ldg(&xyz.x[evs.ev3]);
+
+            y0 = __ldg(&xyz.y[evs.ev0]);
+            y1 = __ldg(&xyz.y[evs.ev1]);
+            y2 = __ldg(&xyz.y[evs.ev2]);
+            y3 = __ldg(&xyz.y[evs.ev3]);
+
+            z0 = __ldg(&xyz.z[evs.ev0]);
+            z1 = __ldg(&xyz.z[evs.ev1]);
+            z2 = __ldg(&xyz.z[evs.ev2]);
+            z3 = __ldg(&xyz.z[evs.ev3]);
+        }
+
+        x0 = tile.shfl(x0, 0);
+        x1 = tile.shfl(x1, 0);
+        x2 = tile.shfl(x2, 0);
+        x3 = tile.shfl(x3, 0);
+
+        y0 = tile.shfl(y0, 0);
+        y1 = tile.shfl(y1, 0);
+        y2 = tile.shfl(y2, 0);
+        y3 = tile.shfl(y3, 0);
+
+        z0 = tile.shfl(z0, 0);
+        z1 = tile.shfl(z1, 0);
+        z2 = tile.shfl(z2, 0);
+        z3 = tile.shfl(z3, 0);
+
+        // Volume of the tetrahedron
+        const real_type theta_volume = tet4_measure_cu(x0,
+                                                       x1,
+                                                       x2,
+                                                       x3,
+                                                       //
+                                                       y0,
+                                                       y1,
+                                                       y2,
+                                                       y3,
+                                                       //
+                                                       z0,
+                                                       z1,
+                                                       z2,
+                                                       z3);
+
+        const int nr_warp_loop = (TET4_NQP / tile.size()) +                //
+                                 ((TET4_NQP % tile.size()) == 0 ? 0 : 1);  //
+
+        real_type element_field0_reduce = real_t(0.0);
+        real_type element_field1_reduce = real_t(0.0);
+        real_type element_field2_reduce = real_t(0.0);
+        real_type element_field3_reduce = real_t(0.0);
+
+        for (int i = 0; i < nr_warp_loop; i++) {
+            const int q_i = i * int(tile.size()) + tile_rank;
+
+            // real_type element_field0 = 0.0;
+            // real_type element_field1 = 0.0;
+            // real_type element_field2 = 0.0;
+            // real_type element_field3 = 0.0;
+
+            const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+            const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+            const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+            const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+
+            quadrature_node(tet4_qx_v,
+                            tet4_qy_v,
+                            tet4_qz_v,
+                            tet4_qw_v,
+                            theta_volume,
+                            x0,
+                            x1,
+                            x2,
+                            x3,
+                            y0,
+                            y1,
+                            y2,
+                            y3,
+                            z0,
+                            z1,
+                            z2,
+                            z3,
+                            dx,
+                            dy,
+                            dz,
+                            ox,
+                            oy,
+                            oz,
+                            stride0,
+                            stride1,
+                            stride2,
+                            data,
+                            // Output: Accumulate the field
+                            element_field0_reduce,
+                            element_field1_reduce,
+                            element_field2_reduce,
+                            element_field3_reduce);
+        }
+
+        element_field0_reduce = cg::reduce(tile, element_field0_reduce, cg::plus<real_type>());
+        element_field1_reduce = cg::reduce(tile, element_field1_reduce, cg::plus<real_type>());
+        element_field2_reduce = cg::reduce(tile, element_field2_reduce, cg::plus<real_type>());
+        element_field3_reduce = cg::reduce(tile, element_field3_reduce, cg::plus<real_type>());
+
+        if (tile_rank == 0) {
+            atomicAdd(&weighted_field[evs.ev0], element_field0_reduce);
+            atomicAdd(&weighted_field[evs.ev1], element_field1_reduce);
+            atomicAdd(&weighted_field[evs.ev2], element_field2_reduce);
+            atomicAdd(&weighted_field[evs.ev3], element_field3_reduce);
+        }
+    }  // end loop over elements
 }
 
 #endif

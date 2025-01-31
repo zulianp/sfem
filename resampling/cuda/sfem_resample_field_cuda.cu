@@ -665,11 +665,11 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     // cudaEvent_t start, stop;
 
     // Number of threads
-    const ptrdiff_t warp_per_block  = 256 / __TET4_TILE_SIZE__;
-    const ptrdiff_t threadsPerBlock = warp_per_block * __TET4_TILE_SIZE__;
+    const int warp_per_block  = __TET4_THREADS_PER_BLOCK__ / __TET4_TILE_SIZE__;
+    const int threadsPerBlock = warp_per_block * __TET4_TILE_SIZE__;
 
     // Number of blocks
-    const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
+    const int numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
 
     if (SFEM_LOG_LEVEL >= 5) {
         printf("============================================================================\n");
@@ -688,28 +688,76 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     {
         // tet4_resample_field_local_kernel
+        ptrdiff_t zero_element = 0;
 
-        tet4_resample_field_reduce_local_kernel<<<numBlocks, threadsPerBlock>>>(0,             //
-                                                                                nelements,     //
-                                                                                nnodes,        //
-                                                                                elems_device,  //
-                                                                                xyz_device,    //
-                                                                                //  NULL, //
+        int numBlocks_Occupancy;
 
-                                                                                stride[0],
-                                                                                stride[1],
-                                                                                stride[2],
+        int ideal_GridSize, ideal_BlockSize;
+        getIdealGridAndBlockSize(ideal_GridSize, ideal_BlockSize, (void*)tet4_resample_field_reduce_local_kernel);
 
-                                                                                origin[0],
-                                                                                origin[1],
-                                                                                origin[2],
+        printf("tet4_resample_field_reduce_local_kernel: ideal_GridSize = %d, ideal_BlockSize = %d\n",
+               ideal_GridSize,
+               ideal_BlockSize);
 
-                                                                                delta[0],
-                                                                                delta[1],
-                                                                                delta[2],
+        // void* kernelArgs[] = {
+        //         (void*)&zero_element,          //
+        //         (void*)&nelements,             //
+        //         (void*)&nnodes,                //
+        //         (void*)&elems_device,          //
+        //         (void*)&xyz_device,            //
+        //         (void*)&stride[0],             //
+        //         (void*)&stride[1],             //
+        //         (void*)&stride[2],             //
+        //         (void*)&origin[0],             //
+        //         (void*)&origin[1],             //
+        //         (void*)&origin[2],             //
+        //         (void*)&delta[0],              //
+        //         (void*)&delta[1],              //
+        //         (void*)&delta[2],              //
+        //         (void*)&data_device,           //
+        //         (void*)&weighted_field_device  //
+        // };
 
-                                                                                data_device,
-                                                                                weighted_field_device);
+        // dim3 grid(numBlocks, 1, 1);
+        // dim3 block(threadsPerBlock, 1, 1);
+
+        // cudaLaunchCooperativeKernel((void*)tet4_resample_field_reduce_local_kernel,  //
+        //                             grid,                                            //
+        //                             block,                                           //
+        //                             kernelArgs,                                      //
+        //                             0,                                               //
+        //                             NULL);
+
+        // tet4_resample_field_reduce_local_kernel_v2<<<ideal_GridSize,                        //
+        //                                           256>>>(zero_element,  //
+
+        tet4_resample_field_reduce_local_kernel<<<numBlocks,                        //
+                                                  threadsPerBlock>>>(zero_element,  //
+                                                                     nelements,     //
+                                                                     nnodes,        //
+                                                                     elems_device,  //
+                                                                     xyz_device,    //
+                                                                     //  NULL, //
+
+                                                                     stride[0],
+                                                                     stride[1],
+                                                                     stride[2],
+
+                                                                     origin[0],
+                                                                     origin[1],
+                                                                     origin[2],
+
+                                                                     delta[0],
+                                                                     delta[1],
+                                                                     delta[2],
+
+                                                                     data_device,
+                                                                     weighted_field_device);
+
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
+        }
     }
     //////////////////////////////////////
     //////////////////////////////////////
