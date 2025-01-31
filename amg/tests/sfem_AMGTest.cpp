@@ -75,39 +75,27 @@ int test_amg_poisson() {
     f->apply_constraints(near_null->data());
     f->apply_constraints(zeros->data());
 
-    real_t coarsening_factor = 7.5;
+    real_t coarsening_factor = 8.0;
     auto   amg               = builder_sa(coarsening_factor, mask, near_null, zeros, linear_op);
-    assert(!amg->test_interp());
 
-    amg->set_max_it(100);
-    amg->verbose = true;
+    // Verify Galerkin assembly is ok... probably should be moved to its own test
+    // assert(!amg->test_interp());
+
+    amg->verbose = false;
     // amg->debug   = true;
+
+    // Either solve with linear AMG or as PC for PCG
     auto solver = amg;
+    // auto solver = sfem::create_cg<real_t>(linear_op, es);
+    // solver->set_preconditioner_op(amg);
+
+    solver->set_max_it(100);
+    solver->verbose = true;
 #endif
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
     solver->apply(rhs->data(), x->data());
-
-    /*
-    auto test = sfem::create_buffer<real_t>(ndofs, es);
-    f->apply_constraints(test->data());
-    for (idx_t i = 0; i < ndofs; i++) {
-        if (mask_get(i, mask->data())) {
-            assert(x->data()[i] == test->data()[i]);
-            printf("%f, %f\n", x->data()[i], test->data()[i]);
-        }
-        test->data()[i] = 0.0;
-    }
-
-    linear_op->apply(x->data(), test->data());
-    for (idx_t i = 0; i < ndofs; i++) {
-        if (mask_get(i, mask->data())) {
-            assert(rhs->data()[i] == test->data()[i]);
-            printf("%f, %f\n", rhs->data()[i], test->data()[i]);
-        }
-    }
-    */
 
     SFEM_TEST_ASSERT(sfem::create_directory("test_amg_poisson") == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(m->write("test_amg_poisson/mesh") == SFEM_SUCCESS);

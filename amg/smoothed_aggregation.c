@@ -13,6 +13,7 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
                          const count_t *const SFEM_RESTRICT rowptr_a,
                          const idx_t *const SFEM_RESTRICT   colidx_a,
                          const real_t *const SFEM_RESTRICT  values_a,
+                         const real_t *const SFEM_RESTRICT  diag_a,
                          real_t                            *near_null,
                          count_t                          **rowptr_p,       // [out]
                          idx_t                            **colidx_p,       // [out]
@@ -28,22 +29,8 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
     idx_t   *colidx_unsmoothed = (idx_t *)malloc(ndofs * sizeof(idx_t));
     real_t  *values_unsmoothed = (real_t *)malloc(ndofs * sizeof(real_t));
     real_t  *agg_norms         = (real_t *)calloc(ndofs_coarse, sizeof(real_t));
-    real_t  *diag_inv          = (real_t *)malloc(ndofs * sizeof(real_t));
 
     assert(!crs_validate(ndofs, ndofs, rowptr_a, colidx_a, values_a));
-
-#pragma omp parallel for
-    for (idx_t i = 0; i < ndofs; i++) {
-        real_t diag_val;
-
-        for (count_t idx = rowptr_a[i]; idx < rowptr_a[i + 1]; idx++) {
-            // could binary search... or pass in because builder has this info
-            if (colidx_a[idx] == i) {
-                diag_inv[i] = jacobi_weight / values_a[idx];
-                break;
-            }
-        }
-    }
 
     rowptr_unsmoothed[0] = 0;
 
@@ -101,7 +88,7 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
     // (I - w D^-1 A) P
     for (idx_t i = 0; i < ndofs; i++) {
         for (count_t idx = (*rowptr_p)[i]; idx < (*rowptr_p)[i + 1]; idx++) {
-            (*values_p)[idx] *= -diag_inv[i];
+            (*values_p)[idx] *= -1.0 * jacobi_weight / diag_a[i];
             if (partition[i] == (*colidx_p)[idx]) {
                 count_t idx_unsmoothed = rowptr_unsmoothed[i];
                 (*values_p)[idx] += values_unsmoothed[idx_unsmoothed];
@@ -109,9 +96,10 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
         }
     }
 
-    // free(rowptr_unsmoothed);
-    // free(colidx_unsmoothed);
-    // free(values_unsmoothed);
+    free(rowptr_unsmoothed);
+    free(colidx_unsmoothed);
+    free(values_unsmoothed);
+
     count_t *rowptr_ap;
     idx_t   *colidx_ap;
     real_t  *values_ap;
@@ -157,6 +145,5 @@ int smoothed_aggregation(const ptrdiff_t                    ndofs,
     free(colidx_ap);
     free(values_ap);
     free(agg_norms);
-    free(diag_inv);
     return 0;
 }
