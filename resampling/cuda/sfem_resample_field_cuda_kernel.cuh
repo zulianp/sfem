@@ -613,8 +613,8 @@ quadrature_node(const real_type                    tet4_qx_v,       //
 }  // end quadrature_node function
 //////////////////////////////////////////////////////////
 
-#define __TET4_TILE_SIZE__ 8
-#define __TET4_THREADS_PER_BLOCK__ (32 * 8)
+#define __TET4_TILE_SIZE__ (8)
+#define __TET4_THREADS_PER_BLOCK__ (64 * __TET4_TILE_SIZE__)
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -843,17 +843,15 @@ tet4_resample_field_reduce_local_kernel_v2(const ptrdiff_t MY_RESTRICT         s
     const int        tile_rank = tile.thread_rank();
     const auto       tile_size = tile.size();
 
-    const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int tile_idx = (blockIdx.x * blockDim.x + threadIdx.x) / tile_size;
 
-    const unsigned int element_per_block = blockDim.x / tile_size;
-    const unsigned int tile_block_rank   = threadIdx.x / tile_size;
+    const unsigned int elements_per_iteration = (gridDim.x * blockDim.x) / tile_size;
+    // const unsigned int tile_block_rank        = threadIdx.x / tile_size;
 
-    for (unsigned int el_ii = 0; true; el_ii += element_per_block) {
-        const unsigned int element_i = blockIdx.x * element_per_block + tile_block_rank + element_per_block * el_ii;
+    for (unsigned int el_ii = start_element; el_ii < end_element; el_ii += elements_per_iteration) {
+        const unsigned int element_i = start_element + el_ii + tile_idx;
 
-        if (element_i >= end_element) {
-            break;
-        }
+        if (element_i >= end_element) break;
 
         const real_type ox = (real_type)origin_x;
         const real_type oy = (real_type)origin_y;
