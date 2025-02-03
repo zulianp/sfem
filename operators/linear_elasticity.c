@@ -56,7 +56,7 @@ int linear_elasticity_apply_soa(const enum ElemType                element_type,
                     nelements, nnodes, elements, points, mu, lambda, 1, u[0], u[1], u[2], 1, values[0], values[1], values[2]);
         }
         case HEX8: {
-            int SFEM_HEX8_ASSUME_AFFINE = 0;
+            int SFEM_HEX8_ASSUME_AFFINE = 1;
             SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
             if (SFEM_HEX8_ASSUME_AFFINE) {
                 return affine_hex8_linear_elasticity_apply(
@@ -216,7 +216,7 @@ int linear_elasticity_apply_aos(const enum ElemType               element_type,
                                                 &values[2]);
         }
         case HEX8: {
-            int SFEM_HEX8_ASSUME_AFFINE = 0;
+            int SFEM_HEX8_ASSUME_AFFINE = 1;
             SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
 
             if (SFEM_HEX8_ASSUME_AFFINE) {
