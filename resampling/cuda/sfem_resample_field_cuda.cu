@@ -772,6 +772,8 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
                 data_device,
                 weighted_field_device);
 
+        cudaDeviceSynchronize();
+
         cudaError_t error = cudaGetLastError();
         if (error != cudaSuccess) {
             printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
@@ -782,7 +784,6 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     //////////////////////////////////////
 
     // Stop the timer
-    cudaDeviceSynchronize();
 
     MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &end);
