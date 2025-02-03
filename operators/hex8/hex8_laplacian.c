@@ -15,7 +15,7 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
     SFEM_UNUSED(nnodes);
 
     int SFEM_HEX8_ASSUME_AXIS_ALIGNED = 0;
-    int SFEM_HEX8_ASSUME_AFFINE       = 0;
+    int SFEM_HEX8_ASSUME_AFFINE       = 1;
     SFEM_READ_ENV(SFEM_HEX8_ASSUME_AXIS_ALIGNED, atoi);
     SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
 

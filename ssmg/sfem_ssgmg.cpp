@@ -91,18 +91,36 @@ namespace sfem {
 
         auto mg = std::make_shared<Multigrid<real_t>>();
 
-
-        {  
+        {
             SFEM_TRACE_SCOPE("create_ssgmg::construct");
-        // Construct actual multigrid
-            mg->add_level(operators[0],
-                          smoothers_or_solver[0],
-                          nullptr,
-                          sfem::create_hierarchical_restriction(functions[0]->space(), functions[1]->space(), es));
+            // Construct actual multigrid
+
+            auto restriction_unconstr = sfem::create_hierarchical_restriction(functions[0]->space(), functions[1]->space(), es);
+            auto f_coarse             = functions[1];
+            auto restriction          = sfem::make_op<real_t>(
+                    restriction_unconstr->rows(),
+                    restriction_unconstr->cols(),
+                    [=](const real_t *const from, real_t *const to) {
+                        restriction_unconstr->apply(from, to);
+                        f_coarse->apply_zero_constraints(to);
+                    },
+                    es);
+
+            mg->add_level(operators[0], smoothers_or_solver[0], nullptr, restriction);
 
             // Intermediate levels
             for (int i = 1; i < nlevels - 1; i++) {
-                auto restriction = sfem::create_hierarchical_restriction(functions[i]->space(), functions[i + 1]->space(), es);
+                auto restriction_unconstr =
+                        sfem::create_hierarchical_restriction(functions[i]->space(), functions[i + 1]->space(), es);
+                auto f_coarse    = functions[i + 1];
+                auto restriction = sfem::make_op<real_t>(
+                        restriction_unconstr->rows(),
+                        restriction_unconstr->cols(),
+                        [=](const real_t *const from, real_t *const to) {
+                            restriction_unconstr->apply(from, to);
+                            f_coarse->apply_zero_constraints(to);
+                        },
+                        es);
 
                 auto prolong_unconstr =
                         sfem::create_hierarchical_prolongation(functions[i]->space(), functions[i - 1]->space(), es);

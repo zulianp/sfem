@@ -1978,6 +1978,10 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
 
+
+        long   calls{0};
+        double total_time{0};
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("LinearElasticity::create");
 
@@ -2025,6 +2029,18 @@ namespace sfem {
         int initialize() override { return SFEM_SUCCESS; }
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        ~LinearElasticity()
+        {
+            if (calls) {
+                printf("LinearElasticity::apply called %ld times. Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -2133,8 +2149,14 @@ namespace sfem {
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            double tick = MPI_Wtime();
+
             linear_elasticity_apply_aos(
                     element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, h, out);
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
 
             return SFEM_SUCCESS;
         }
@@ -2389,6 +2411,9 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
 
+        long   calls{0};
+        double total_time{0};
+
         const char *name() const override { return "Laplacian"; }
         inline bool is_linear() const override { return true; }
 
@@ -2419,6 +2444,16 @@ namespace sfem {
         int initialize() override { return SFEM_SUCCESS; }
 
         Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        ~Laplacian() {
+            if (calls) {
+                printf("Laplacian::apply called %ld times. Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -2483,7 +2518,14 @@ namespace sfem {
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+            double tick = MPI_Wtime();
+
+            int err = laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+            return err;
         }
 
         int value(const real_t *x, real_t *const out) override {
