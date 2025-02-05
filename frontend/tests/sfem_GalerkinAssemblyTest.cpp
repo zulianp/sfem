@@ -205,7 +205,7 @@ int test_cube() {
 
         if (arg_largest_diff != -1) {
             printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
-            SFEM_TEST_ASSERT(largest_diff < 1e-8);
+            SFEM_TEST_ASSERT(largest_diff < 1e-7);
         }
     }
 

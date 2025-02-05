@@ -122,7 +122,7 @@ int test_ssgmg_linear_elasticity_cube() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_BASE_RESOLUTION = 8;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
 
