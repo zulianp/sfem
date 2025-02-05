@@ -467,7 +467,7 @@ int ssquad4_prolongation_crs_nnz(const int                    level,
     for (int vi = 1; vi < level; vi++) {
         const int edges[4] = {
                 ssquad4_lidx(level, 0, vi),     // Left
-                ssquad4_lidx(level, level, 0),  // Right
+                ssquad4_lidx(level, level, vi),  // Right
                 ssquad4_lidx(level, vi, 0),     // Bottom
                 ssquad4_lidx(level, vi, level)  // Top
         };
@@ -493,8 +493,144 @@ int ssquad4_prolongation_crs_nnz(const int                    level,
         }
     }
 
-    for(ptrdiff_t i = 0; i < to_nnodes; i++) {
-        rowptr[i+1] += rowptr[i];
+    for (ptrdiff_t i = 0; i < to_nnodes; i++) {
+        assert(rowptr[i + 1] != 0);
+        rowptr[i + 1] += rowptr[i];
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int ssquad4_prolongation_crs_fill(const int                    level,
+                                  const ptrdiff_t              nelements,
+                                  idx_t **const SFEM_RESTRICT  elements,
+                                  const ptrdiff_t              to_nnodes,
+                                  count_t *const SFEM_RESTRICT rowptr,
+                                  idx_t *const SFEM_RESTRICT   colidx,
+                                  real_t *const SFEM_RESTRICT  values) {
+    const int corners[4] = {ssquad4_lidx(level, 0, 0),
+                            ssquad4_lidx(level, level, 0),
+                            ssquad4_lidx(level, level, level),
+                            ssquad4_lidx(level, 0, level)};
+
+    // Corners
+#pragma omp parallel for
+    for (int d = 0; d < 4; d++) {
+        const int c = corners[d];
+        for (ptrdiff_t i = 0; i < nelements; i++) {
+            const idx_t node = elements[c][i];
+            // Identity
+            colidx[rowptr[node]] = node;
+            values[rowptr[node]] = 1;
+        }
+    }
+
+    const real_t h = 1. / level;
+
+    const int ev0[4] = {corners[0], corners[1], corners[0], corners[3]};
+    const int ev1[4] = {corners[3], corners[2], corners[1], corners[2]};
+
+    // Edges
+#pragma omp parallel for
+    for (int vi = 1; vi < level; vi++) {
+        const int edges[4] = {
+                ssquad4_lidx(level, 0, vi),     // Left
+                ssquad4_lidx(level, level, vi),  // Right
+                ssquad4_lidx(level, vi, 0),     // Bottom
+                ssquad4_lidx(level, vi, level)  // Top
+        };
+
+        for (int d = 0; d < 4; d++) {
+            const int    e  = edges[d];
+            const real_t w0 = vi * h;
+            const real_t w1 = vi * (1 - h);
+            const int    v0 = ev0[d];
+            const int    v1 = ev1[d];
+
+            for (ptrdiff_t i = 0; i < nelements; i++) {
+                const idx_t node  = elements[e][i];
+                idx_t       node0 = elements[v0][i];
+                idx_t       node1 = elements[v1][i];
+                real_t      w0i   = w0;
+                real_t      w1i   = w1;
+
+                // Ensure sorted ordering
+                if (node1 < node0) {
+                    const idx_t temp = node0;
+                    node0            = node1;
+                    node1            = temp;
+
+                    w0i = w1;
+                    w1i = w0;
+                }
+
+                colidx[rowptr[node]] = node0;
+                values[rowptr[node]] = w0i;
+
+                colidx[rowptr[node] + 1] = node1;
+                values[rowptr[node] + 1] = w1i;
+            }
+        }
+    }
+
+    // Interior
+#pragma omp parallel for collapse(2)
+    for (int yi = 1; yi < level; yi++) {
+        for (int xi = 1; xi < level; xi++) {
+            const int ii = ssquad4_lidx(level, xi, yi);
+            const real_t w[4] = {
+                    (1 - xi * h) * (1 - yi * h),  // v0
+                    (xi * h) * (1 - yi * h),      // v1
+                    (xi * h) * (yi * h),          // v2
+                    (1 - xi * h) * (yi * h)       // v3
+            };
+
+            for (ptrdiff_t i = 0; i < nelements; i++) {
+                const idx_t node = elements[ii][i];
+                
+                idx_t c[4] = {
+                    elements[corners[0]][i],
+                    elements[corners[1]][i],
+                    elements[corners[2]][i],
+                    elements[corners[3]][i],
+                };
+
+                // Sorting network
+                int order[4] = {
+                    c[1] < c[0] ? 1 : 0,
+                    c[1] > c[0] ? 1 : 0,
+                    c[3] < c[2] ? 3 : 2,
+                    c[3] > c[2] ? 3 : 2,
+                };
+
+                if(c[order[2]] < c[order[0]]) {
+                    const int temp = order[0];
+                    order[0] = order[2];
+                    order[2] = temp;
+                }
+
+                if(c[order[3]] < c[order[1]]) {
+                    const int temp = order[1];
+                    order[1] = order[3];
+                    order[3] = temp;
+                }
+
+                if(c[order[3]] < c[order[2]]) {
+                    const int temp = order[2];
+                    order[2] = order[3];
+                    order[3] = temp;
+                }
+
+                assert(c[order[0]] < c[order[1]]);
+                assert(c[order[1]] < c[order[2]]);
+                assert(c[order[2]] < c[order[3]]);
+
+                for(int d = 0; d < 4; d++) {
+                    colidx[rowptr[node] + d] = c[order[d]];
+                    values[rowptr[node] + d] = w[order[d]];
+                }
+            }
+        }
     }
 
     return SFEM_SUCCESS;

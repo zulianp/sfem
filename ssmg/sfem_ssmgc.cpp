@@ -73,12 +73,12 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 5;
+        int         nlsmooth_steps                     = 4;
         bool        project_coarse_correction          = false;
-        bool        enable_line_search                 = true;
+        bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
-        int         linear_smoothing_steps             = 3;
+        int         linear_smoothing_steps             = 2;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
 
