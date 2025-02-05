@@ -1,13 +1,17 @@
 #include "sfem_Tracer.hpp"
 
 #include "sfem_base.h"
+
+#include "sfem_API.hpp"
+
 #include <mpi.h>
 
-#include <map>
-#include <fstream>
 #include <cassert>
 #include <cstdio>
+#include <fstream>
+#include <map>
 
+// #define SFEM_ENABLE_BLOCK_KERNELS
 
 namespace sfem {
     class Tracer::Impl {
@@ -29,8 +33,8 @@ namespace sfem {
     Tracer::Tracer() : impl_(std::make_unique<Impl>()) {}
 
     Tracer::~Tracer() {
-    	const char * SFEM_TRACE_FILE = "sfem.trace.csv";
-    	SFEM_READ_ENV(SFEM_TRACE_FILE, );
+        const char *SFEM_TRACE_FILE = "sfem.trace.csv";
+        SFEM_READ_ENV(SFEM_TRACE_FILE, );
 
         std::ofstream os(SFEM_TRACE_FILE);
 
@@ -40,14 +44,25 @@ namespace sfem {
 
         os << "name,calls,total,avg\n";
         for (auto &e : impl_->events) {
-            os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second/e.second.first <<"\n";
+            os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second / e.second.first << "\n";
         }
 
         os.close();
     }
 
-    ScopedEvent::ScopedEvent(const char *name) : name(name), elapsed(MPI_Wtime()) {}
+    ScopedEvent::ScopedEvent(const char *name) : name(name) {
+#ifdef SFEM_ENABLE_BLOCK_KERNELS
+        sfem::device_synchronize();
+#endif
+
+        elapsed = MPI_Wtime();
+    }
+
     ScopedEvent::~ScopedEvent() {
+#ifdef SFEM_ENABLE_BLOCK_KERNELS
+        sfem::device_synchronize();
+#endif
+
         elapsed = MPI_Wtime() - elapsed;
         Tracer::instance().record_event(name, elapsed);
     }

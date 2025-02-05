@@ -32,7 +32,7 @@ then
 		echo "Reusing mesh"
 	else
 		export SFEM_BOX_SIZE=1
-		create_box_ss_mesh.sh 4 $SFEM_ELEMENT_REFINE_LEVEL
+		create_box_ss_mesh.sh 60 $SFEM_ELEMENT_REFINE_LEVEL
 	fi
 else
 	if (($# != 2))

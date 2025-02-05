@@ -106,3 +106,5 @@ Rank: [0]  FLOPS           5.510323e+19 (FLOP/S)
 <BenchR> 0,   768,   167772160,   28292577,   729000000,   0.00126249,   1.3289e+11,   2.24102e+10,   5.77433e+11,  6.37874e+11
 ```
 
+
+https://www.hpc.kaust.edu.sa/content/chapter-5-slurm-job-scheduler

@@ -314,6 +314,56 @@ static int test_level1_to_level4() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_basic_interpolation_matrix() {
+    real_t from[4] = {0, 2, 2, 0};
+    real_t to[9] = {0};
+
+    auto elements = sfem::create_host_buffer<idx_t>(9, 1);
+    auto e  = elements->data();
+    e[0][0] = 0;
+    e[1][0] = 4;
+    e[2][0] = 1;
+
+    e[3][0] = 7;
+    e[4][0] = 8;
+    e[5][0] = 5;
+
+    e[6][0] = 3;
+    e[7][0] = 6;
+    e[8][0] = 2;
+
+    auto rowptr = sfem::create_host_buffer<count_t>(9 + 1);
+    SFEM_TEST_ASSERT(ssquad4_prolongation_crs_nnz(2, 1, e, 9, rowptr->data()) == SFEM_SUCCESS);
+
+    auto colidx = sfem::create_host_buffer<idx_t>(rowptr->data()[9]);
+    auto values = sfem::create_host_buffer<real_t>(rowptr->data()[9]);
+
+    SFEM_TEST_ASSERT(ssquad4_prolongation_crs_fill(2, 1, e, 9, rowptr->data(), colidx->data(), values->data()) == SFEM_SUCCESS);
+
+    // SpMV
+    for(ptrdiff_t i = 0;i < 9;i++) {
+        for(count_t k = rowptr->data()[i]; k < rowptr->data()[i+1]; k++) {
+            idx_t col = colidx->data()[k];
+            real_t val = values->data()[k];
+            to[i] += val * from[col];
+        }
+    }
+
+    SFEM_TEST_ASSERT(fabs(to[0]) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[1] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[2] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[3]) < 1e-8);
+    
+    SFEM_TEST_ASSERT(fabs(to[4] - 1) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[5] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[6] - 1) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(to[7]) < 1e-8);
+
+    SFEM_TEST_ASSERT(fabs(to[8] - 1) < 1e-8);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_incidence_count);
@@ -322,6 +372,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_level1_to_level4);
     SFEM_RUN_TEST(test_level2_to_level4);
     SFEM_RUN_TEST(test_level1_to_level2);
+    SFEM_RUN_TEST(test_basic_interpolation_matrix);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
