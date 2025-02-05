@@ -314,12 +314,12 @@ static int test_level1_to_level4() {
     return SFEM_TEST_SUCCESS;
 }
 
-int lumped_ptdp(const ptrdiff_t                    fine_nodes,
-                const count_t *const SFEM_RESTRICT rowptr,
-                const idx_t *const SFEM_RESTRICT   colidx,
-                const real_t *const SFEM_RESTRICT  values,
-                const real_t *const SFEM_RESTRICT  diagonal,
-                real_t *const SFEM_RESTRICT        coarse) {
+int lumped_ptdp_crs(const ptrdiff_t                    fine_nodes,
+                    const count_t *const SFEM_RESTRICT rowptr,
+                    const idx_t *const SFEM_RESTRICT   colidx,
+                    const real_t *const SFEM_RESTRICT  values,
+                    const real_t *const SFEM_RESTRICT  diagonal,
+                    real_t *const SFEM_RESTRICT        coarse) {
     for (ptrdiff_t m = 0; m < fine_nodes; m++) {
         const count_t len = rowptr[m + 1] - rowptr[m];
         const real_t  d   = diagonal[m];
@@ -366,8 +366,8 @@ int test_basic_interpolation_matrix() {
     // SpMV
     for (ptrdiff_t i = 0; i < 9; i++) {
         for (count_t k = rowptr->data()[i]; k < rowptr->data()[i + 1]; k++) {
-            idx_t  col = colidx->data()[k];
-            real_t val = values->data()[k];
+            const idx_t  col = colidx->data()[k];
+            const real_t val = values->data()[k];
             fine[i] += val * coarse[col];
         }
     }
@@ -403,7 +403,7 @@ int test_basic_interpolation_matrix() {
         fine[k] = 1;
     }
 
-    SFEM_TEST_ASSERT(lumped_ptdp(9, rowptr->data(), colidx->data(), values->data(), fine, coarse) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(lumped_ptdp_crs(9, rowptr->data(), colidx->data(), values->data(), fine, coarse) == SFEM_SUCCESS);
 
     for (ptrdiff_t k = 0; k < 4; k++) {
         SFEM_TEST_ASSERT(fabs(coarse[k] - 2.25) < 1e-8);

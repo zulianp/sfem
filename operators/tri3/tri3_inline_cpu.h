@@ -40,7 +40,7 @@ static SFEM_INLINE int tri3_find_col(const idx_t key,
 static SFEM_INLINE void tri3_find_cols(const idx_t *const SFEM_RESTRICT targets,
                                        const idx_t *const SFEM_RESTRICT row,
                                        const int lenrow,
-                                       int *const SFEM_RESTRICT ks) {
+                                       idx_t *const SFEM_RESTRICT ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 3; ++d) {
             ks[d] = tri3_find_col(targets[d], row, lenrow);

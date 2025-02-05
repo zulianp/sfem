@@ -182,8 +182,8 @@ int write_mapped_field(MPI_Comm comm,
         local_output_size = n_global - begin;
     }
 
-    idx_t *send_count = (idx_t *)malloc((size) * sizeof(idx_t));
-    memset(send_count, 0, (size) * sizeof(idx_t));
+    int *send_count = (int *)malloc((size) * sizeof(int));
+    memset(send_count, 0, (size) * sizeof(int));
 
     for (ptrdiff_t i = 0; i < n_local; ++i) {
         const idx_t idx = mapping[i];
@@ -191,7 +191,7 @@ int write_mapped_field(MPI_Comm comm,
         send_count[dest_rank]++;
     }
 
-    idx_t *recv_count = (idx_t *)malloc((size) * sizeof(idx_t));
+    int *recv_count = (int *)malloc((size) * sizeof(int));
     MPI_CATCH_ERROR(
         MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
 

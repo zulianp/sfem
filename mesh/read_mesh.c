@@ -466,8 +466,8 @@ int mesh_read_generic(MPI_Comm comm,
             input_node_partitions[r + 1] += input_node_partitions[r];
         }
 
-        idx_t *gather_node_count = malloc(size * sizeof(idx_t));
-        memset(gather_node_count, 0, size * sizeof(idx_t));
+        int *gather_node_count = malloc(size * sizeof(idx_t));
+        memset(gather_node_count, 0, size * sizeof(int));
 
         // int *owner_rank = malloc(n_unique * sizeof(int));
         // memset(owner_rank, 0, n_unique * sizeof(int));
@@ -486,14 +486,14 @@ int mesh_read_generic(MPI_Comm comm,
             // owner_rank[i] = owner;
         }
 
-        idx_t *scatter_node_count = malloc(size * sizeof(idx_t));
-        memset(scatter_node_count, 0, size * sizeof(idx_t));
+        int *scatter_node_count = malloc(size * sizeof(int));
+        memset(scatter_node_count, 0, size * sizeof(int));
 
         MPI_CATCH_ERROR(MPI_Alltoall(
             gather_node_count, 1, SFEM_MPI_IDX_T, scatter_node_count, 1, SFEM_MPI_IDX_T, comm));
 
-        idx_t *gather_node_displs = malloc((size + 1) * sizeof(idx_t));
-        idx_t *scatter_node_displs = malloc((size + 1) * sizeof(idx_t));
+        int *gather_node_displs = malloc((size + 1) * sizeof(int));
+        int *scatter_node_displs = malloc((size + 1) * sizeof(int));
 
         gather_node_displs[0] = 0;
         scatter_node_displs[0] = 0;
@@ -609,27 +609,27 @@ int mesh_read_generic(MPI_Comm comm,
             }
 
             for (int r = 0; r < size; ++r) {
-                idx_t begin = scatter_node_displs[r];
-                idx_t end = scatter_node_displs[r + 1];
+                int begin = scatter_node_displs[r];
+                int end = scatter_node_displs[r + 1];
 
-                for (idx_t i = begin; i < end; ++i) {
+                for (int i = begin; i < end; ++i) {
                     decide_node_owner[send_list[i]] = MIN(decide_node_owner[send_list[i]], r);
                 }
 
-                for (idx_t i = begin; i < end; ++i) {
+                for (int i = begin; i < end; ++i) {
                     decide_share_count[send_list[i]]++;
                 }
             }
 
             for (int r = 0; r < size; ++r) {
-                idx_t begin = scatter_node_displs[r];
-                idx_t end = scatter_node_displs[r + 1];
+                int begin = scatter_node_displs[r];
+                int end = scatter_node_displs[r + 1];
 
-                for (idx_t i = begin; i < end; ++i) {
+                for (int i = begin; i < end; ++i) {
                     send_node_owner[i] = decide_node_owner[send_list[i]];
                 }
 
-                for (idx_t i = begin; i < end; ++i) {
+                for (int i = begin; i < end; ++i) {
                     send_share_count[i] = decide_share_count[send_list[i]];
                 }
             }
@@ -779,6 +779,7 @@ int mesh_read_generic(MPI_Comm comm,
                 }
             }
 
+            // FIXME?
             idx_t *element_mapping = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
 
             ptrdiff_t counter = 0;

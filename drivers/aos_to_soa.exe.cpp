@@ -9,9 +9,6 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-typedef int idx_t;
-#define MPI_IDX_T MPI_INT
-
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 

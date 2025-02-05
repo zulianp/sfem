@@ -89,7 +89,7 @@ static SFEM_INLINE int tet10_find_col(const idx_t key, const idx_t *const row, c
 static SFEM_INLINE void tet10_find_cols(const idx_t *targets,
                                     const idx_t *const row,
                                     const int lenrow,
-                                    int *ks) {
+                                    idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 10; ++d) {
             ks[d] = tet10_find_col(targets[d], row, lenrow);
