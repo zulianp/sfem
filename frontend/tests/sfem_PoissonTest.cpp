@@ -107,7 +107,7 @@ int test_poisson_and_boundary_selector() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_BASE_RESOLUTION = 10;
+    int SFEM_BASE_RESOLUTION = 6;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(

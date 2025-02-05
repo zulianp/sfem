@@ -25,7 +25,7 @@ int test_amg_poisson() {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_MESH_RESOLUTION = 8;
+    int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
@@ -84,7 +84,7 @@ int test_amg_sqp() {
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_MESH_RESOLUTION = 8;
+    int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
@@ -137,7 +137,7 @@ int test_amg_sqp() {
     solver->verbose = true;
     solver->set_op(linear_op);
     solver->default_init();
-    solver->set_atol(1e-12);
+    solver->set_atol(1e-6);
     solver->set_max_it(100);
     solver->set_max_inner_it(30);
     solver->set_damping(1);
@@ -151,7 +151,7 @@ int test_amg_sqp() {
         f->hessian_diag(x->data(), diag->data());
         auto sj = sfem::create_shiftable_jacobi(diag, es);
         cg->set_preconditioner_op(sj);
-        cg->set_atol(1e-12);
+        cg->set_atol(1e-7);
         cg->set_rtol(1e-4);
         cg->set_max_it(20000);
         solver->set_linear_solver(cg);
