@@ -136,7 +136,7 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
     }
 }
 
-static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);

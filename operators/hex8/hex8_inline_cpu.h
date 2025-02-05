@@ -180,7 +180,7 @@ static SFEM_INLINE int hex8_find_col(const idx_t key, const idx_t *const row, co
 static SFEM_INLINE void hex8_find_cols(const idx_t *SFEM_RESTRICT targets,
                                        const idx_t *const SFEM_RESTRICT row,
                                        const int lenrow,
-                                       int *SFEM_RESTRICT ks) {
+                                       idx_t *SFEM_RESTRICT ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 8; ++d) {
             ks[d] = hex8_find_col(targets[d], row, lenrow);
