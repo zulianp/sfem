@@ -315,8 +315,8 @@ static int test_level1_to_level4() {
 }
 
 int test_basic_interpolation_matrix() {
-    real_t from[4] = {0, 2, 2, 0};
-    real_t to[9] = {0};
+    real_t coarse[4] = {0, 2, 2, 0};
+    real_t fine[9] = {0};
 
     auto elements = sfem::create_host_buffer<idx_t>(9, 1);
     auto e  = elements->data();
@@ -345,24 +345,62 @@ int test_basic_interpolation_matrix() {
         for(count_t k = rowptr->data()[i]; k < rowptr->data()[i+1]; k++) {
             idx_t col = colidx->data()[k];
             real_t val = values->data()[k];
-            to[i] += val * from[col];
+            fine[i] += val * coarse[col];
         }
     }
 
-    SFEM_TEST_ASSERT(fabs(to[0]) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[1] - 2) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[2] - 2) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[3]) < 1e-8);
-    
-    SFEM_TEST_ASSERT(fabs(to[4] - 1) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[5] - 2) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[6] - 1) < 1e-8);
-    SFEM_TEST_ASSERT(fabs(to[7]) < 1e-8);
+    // Corners
+    SFEM_TEST_ASSERT(fabs(fine[0]) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[1] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[2] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[3]) < 1e-8);
+        
+    // Edges
+    SFEM_TEST_ASSERT(fabs(fine[4] - 1) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[5] - 2) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[6] - 1) < 1e-8);
+    SFEM_TEST_ASSERT(fabs(fine[7]) < 1e-8);
 
-    SFEM_TEST_ASSERT(fabs(to[8] - 1) < 1e-8);
+    // Centroid
+    SFEM_TEST_ASSERT(fabs(fine[8] - 1) < 1e-8);
+
+    // Tiple product
+    // C = P^T * D, R = sum(C * P, 2)
+    // Cij += Pji * Djj
+    // Gkl = Ckm * Pml -> Gkl = Pmk * Dmm * Pml 
+
+    // Lumping
+    // Rk  = sum_l Gkl -> Rk = sum_l Pmk * Dmm * Pml 
+
+    for(ptrdiff_t k = 0; k < 4; k++) {
+        coarse[k] = 0;    
+    }
+
+    for(ptrdiff_t k = 0; k < 9; k++) {
+        fine[k] = 1;    
+    }
+
+    for(ptrdiff_t m = 0; m < 9; m++) {
+         count_t len = rowptr->data()[m+1] - rowptr->data()[m];
+         const real_t d = fine[m];
+
+         const idx_t * const cols = &colidx->data()[rowptr->data()[m]];
+         const real_t * const vals = &values->data()[rowptr->data()[m]];
+
+         for(count_t k = 0; k < len; k++) {
+            for(count_t l = 0; l < len; l++) {
+                coarse[cols[k]] += vals[k] * vals[l] * d;
+            }
+         }
+    }
+
+    for(ptrdiff_t k = 0; k < 4; k++) {
+        SFEM_TEST_ASSERT(fabs(coarse[k] - 2.25) < 1e-8);
+    }
 
     return SFEM_TEST_SUCCESS;
 }
+
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
