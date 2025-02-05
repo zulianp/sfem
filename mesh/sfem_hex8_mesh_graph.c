@@ -201,7 +201,7 @@ static SFEM_INLINE int hex8_find_col(const idx_t key, const idx_t *const row, co
     }
 }
 
-static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets, const idx_t *const row, const int lenrow, int *ks) {
+static SFEM_INLINE void hex8_find_corner_cols(const idx_t *targets, const idx_t *const row, const int lenrow, idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 3; ++d) {
             ks[d] = hex8_find_col(targets[d], row, lenrow);

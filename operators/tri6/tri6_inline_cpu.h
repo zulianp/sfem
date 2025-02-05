@@ -29,7 +29,7 @@ static SFEM_INLINE int tri6_find_col(const idx_t key, const idx_t *const row, co
 static SFEM_INLINE void tri6_find_cols(const idx_t *targets,
                                     const idx_t *const row,
                                     const int lenrow,
-                                    int *ks) {
+                                    idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 6; ++d) {
             ks[d] = tri6_find_col(targets[d], row, lenrow);

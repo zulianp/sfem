@@ -44,7 +44,7 @@ static SFEM_INLINE int tet4_find_col(const idx_t key,
 static SFEM_INLINE void tet4_find_cols(const idx_t *const SFEM_RESTRICT targets,
                                        const idx_t *const SFEM_RESTRICT row,
                                        const int lenrow,
-                                       int *const SFEM_RESTRICT ks) {
+                                       idx_t *const SFEM_RESTRICT ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = tet4_find_col(targets[d], row, lenrow);
