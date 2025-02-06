@@ -146,7 +146,7 @@ int sshex8_skin(const int       L,
         for (int s = 0; s < ns; s++) {
             // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 (*n_surf_elements)++;
             }
         }
@@ -162,7 +162,7 @@ int sshex8_skin(const int       L,
         for (int s = 0; s < ns; s++) {
             // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 int start[3]     = {0, 0, 0};
                 int end[3]       = {L + 1, L + 1, L + 1};
                 int increment[3] = {1, 1, 1};

@@ -32,7 +32,7 @@ void div_apply(const int element_type,
         }
 
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -58,7 +58,7 @@ void integrate_div(const int element_type,
         }
 
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -84,7 +84,7 @@ void cdiv(const int element_type,
         }
 
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }

@@ -231,9 +231,7 @@ void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *ema
     MPI_Comm_size(mesh->comm, &size);
 
     if (size > 1) {
-        // IMPLEMENT ME
-        assert(0);
-        MPI_Abort(mesh->comm, -1);
+        SFEM_ERROR("IMPLEMENT ME");
     }
 }
 
@@ -314,7 +312,7 @@ void remap_elements_to_contiguous_index(const ptrdiff_t  n_elements,
 
     idx_t *remap = (idx_t *)malloc(n * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < n; ++i) {
-        remap[i] = -1;
+        remap[i] = SFEM_IDX_INVALID;
     }
 
     ptrdiff_t n_contiguous = 0;
@@ -335,7 +333,7 @@ void remap_elements_to_contiguous_index(const ptrdiff_t  n_elements,
 
     idx_t *node_mapping = malloc(n_contiguous * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < n; ++i) {
-        if (remap[i] != -1) {
+        if (remap[i] != SFEM_IDX_INVALID) {
             node_mapping[remap[i]] = i;
         }
     }

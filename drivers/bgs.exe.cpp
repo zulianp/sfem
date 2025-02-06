@@ -43,11 +43,11 @@ static int bgs_init(const ptrdiff_t                    nnodes,
         }
         default: {
             assert(0);
-            return -1;
+            return SFEM_FAILURE;
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 static int residual(const ptrdiff_t                    nnodes,

@@ -40,8 +40,7 @@ namespace sfem {
     std::shared_ptr<MG> create_ssmg(const std::shared_ptr<Function> &f,
                                     const enum ExecutionSpace es) {
         if (!f->space()->has_semi_structured_mesh()) {
-            fprintf(stderr, "[Error] create_ssmg cannot build MG without a semistructured mesh");
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("[Error] create_ssmg cannot build MG without a semistructured mesh");
             return nullptr;
         }
 

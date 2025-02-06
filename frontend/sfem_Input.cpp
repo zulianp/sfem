@@ -106,8 +106,7 @@ namespace sfem {
         }
 
         static void error_invalid_format(const std::string &str) {
-            fprintf(stderr, "[Error] YAMLNoIndent: Unable to convert required key \"%s\"!\n", str.c_str());
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("[Error] YAMLNoIndent: Unable to convert required key \"%s\"!\n", str.c_str());
         }
 
         template <typename V>

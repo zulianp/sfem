@@ -12,7 +12,6 @@
 
 #define SFEM_MAX_NUM_SIDES 8
 #define SFEM_MAX_NUM_NODES_PER_SIDE 6
-#define SFEM_INVALID_IDX (-1)
 
 #define LST(i, j) local_side_table[(i)*nn + (j)]
 
@@ -119,8 +118,7 @@ void fill_local_side_table(enum ElemType element_type, int *local_side_table) {
         LST(5, 2) = 7 - 1;
         LST(5, 3) = 8 - 1;
     } else {
-        MPI_Abort(MPI_COMM_WORLD, -1);
-        assert(0);
+        SFEM_ERROR("fill_local_side_table");
     }
 }
 
@@ -159,7 +157,7 @@ void create_element_adj_table_from_dual_graph(const ptrdiff_t                   
         memset(assigned, 0, range * sizeof(int));
 
         for (int s1 = 0; s1 < ns; s1++) {
-            table[e * ns + s1] = SFEM_INVALID_IDX;
+            table[e * ns + s1] = SFEM_ELEMENT_IDX_INVALID;
 
             for (int j = 0; j < nn; j++) {
                 nodes1[j] = elems[LST(s1, j)][e];
@@ -230,7 +228,7 @@ void create_element_adj_table_from_dual_graph_soa(const ptrdiff_t               
         memset(assigned, 0, range * sizeof(int));
 
         for (int s1 = 0; s1 < ns; s1++) {
-            table[s1][e] = SFEM_INVALID_IDX;
+            table[s1][e] = SFEM_ELEMENT_IDX_INVALID;
 
             for (int j = 0; j < nn; j++) {
                 nodes1[j] = elems[LST(s1, j)][e];
@@ -326,7 +324,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t             n_e
         for (int s = 0; s < ns; s++) {
             // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 (*n_surf_elements)++;
             }
         }
@@ -342,7 +340,7 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t             n_e
         for (int s = 0; s < ns; s++) {
             // Array of structures
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 for (int n = 0; n < nn; n++) {
                     idx_t node                 = elems[LST(s, n)][e];
                     surf_elems[n][side_offset] = node;
@@ -382,7 +380,7 @@ int extract_skin_sideset(const ptrdiff_t               n_elements,
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 (*n_surf_elements)++;
             }
         }
@@ -395,7 +393,7 @@ int extract_skin_sideset(const ptrdiff_t               n_elements,
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         for (int s = 0; s < ns; s++) {
             const element_idx_t e_adj = table[e * ns + s];
-            if (e_adj == SFEM_INVALID_IDX) {
+            if (e_adj == SFEM_ELEMENT_IDX_INVALID) {
                 (*parent_element)[side_offset] = e;
                 (*side_idx)[side_offset]       = s;
                 side_offset++;

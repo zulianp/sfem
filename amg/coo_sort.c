@@ -18,8 +18,8 @@ void sum_duplicates(count_t *sort_indices, idx_t *row_indices, idx_t *col_indice
 
     // Compact the arrays
     idx_t write_pos = 0;
-    idx_t prev_row = -1;
-    idx_t prev_col = -1;
+    idx_t prev_row = SFEM_IDX_INVALID;
+    idx_t prev_col = SFEM_IDX_INVALID;
 
     for (idx_t k = 0; k < N; k++) {
         idx_t i = row_indices[k];

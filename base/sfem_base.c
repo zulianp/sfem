@@ -3,5 +3,5 @@
 #include <mpi.h>
 
 void sfem_abort(){ 
-	MPI_Abort(MPI_COMM_WORLD, -1);
+	MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);
 }

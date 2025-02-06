@@ -3,8 +3,8 @@
 
 #include "tri3_inline_cpu.h"
 
-static SFEM_INLINE int tri6_linear_search(const idx_t target, const idx_t *const arr, const int size) {
-    int i;
+static SFEM_INLINE idx_t tri6_linear_search(const idx_t target, const idx_t *const arr, const int size) {
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -14,10 +14,10 @@ static SFEM_INLINE int tri6_linear_search(const idx_t target, const idx_t *const
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int tri6_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static SFEM_INLINE idx_t tri6_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     if (lenrow <= 32) {
         return tri6_linear_search(key, row, lenrow);
     } else {
@@ -26,10 +26,7 @@ static SFEM_INLINE int tri6_find_col(const idx_t key, const idx_t *const row, co
     }
 }
 
-static SFEM_INLINE void tri6_find_cols(const idx_t *targets,
-                                    const idx_t *const row,
-                                    const int lenrow,
-                                    idx_t *ks) {
+static SFEM_INLINE void tri6_find_cols(const idx_t *targets, const idx_t *const row, const int lenrow, idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 6; ++d) {
             ks[d] = tri6_find_col(targets[d], row, lenrow);
@@ -49,20 +46,20 @@ static SFEM_INLINE void tri6_find_cols(const idx_t *targets,
     }
 }
 
-static SFEM_INLINE void tri6_local_to_global(const idx_t *const SFEM_RESTRICT ev,
+static SFEM_INLINE void tri6_local_to_global(const idx_t *const SFEM_RESTRICT         ev,
                                              const accumulator_t *const SFEM_RESTRICT element_matrix,
-                                             const count_t *const SFEM_RESTRICT rowptr,
-                                             const idx_t *const SFEM_RESTRICT colidx,
-                                             real_t *const SFEM_RESTRICT values) {
+                                             const count_t *const SFEM_RESTRICT       rowptr,
+                                             const idx_t *const SFEM_RESTRICT         colidx,
+                                             real_t *const SFEM_RESTRICT              values) {
     idx_t ks[6];
     for (int edof_i = 0; edof_i < 6; ++edof_i) {
-        const idx_t dof_i = ev[edof_i];
-        const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-        const idx_t *row = &colidx[rowptr[dof_i]];
+        const idx_t  dof_i  = ev[edof_i];
+        const idx_t  lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
+        const idx_t *row    = &colidx[rowptr[dof_i]];
 
         tri6_find_cols(ev, row, lenrow, ks);
 
-        real_t *rowvalues = &values[rowptr[dof_i]];
+        real_t              *rowvalues   = &values[rowptr[dof_i]];
         const accumulator_t *element_row = &element_matrix[edof_i * 6];
 
 #pragma unroll(6)
@@ -74,4 +71,4 @@ static SFEM_INLINE void tri6_local_to_global(const idx_t *const SFEM_RESTRICT ev
     }
 }
 
-#endif //TRI6_INLINE_CPU_H
+#endif  // TRI6_INLINE_CPU_H

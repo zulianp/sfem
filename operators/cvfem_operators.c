@@ -36,8 +36,7 @@ void cvfem_laplacian_crs(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -65,8 +64,7 @@ void cvfem_laplacian_apply(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -91,8 +89,7 @@ void cvfem_convection_assemble_hessian(const enum ElemType element_type,
         //     return;
         // }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -119,8 +116,7 @@ void cvfem_convection_apply(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -147,8 +143,7 @@ void cvfem_cv_volumes(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
