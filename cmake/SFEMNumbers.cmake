@@ -129,6 +129,24 @@ function(sfem_print_type type print_type)
     endif()
 endfunction()
 
+function(sfem_invalid_index type invalid_index)
+    if("${type}" STREQUAL "int16")
+        set(${invalid_index} "-1" PARENT_SCOPE)
+    elseif("${type}" STREQUAL "unint16")
+        set(${invalid_index} "65536" PARENT_SCOPE)
+    elseif("${type}" STREQUAL "int32")
+        set(${invalid_index} "-1" PARENT_SCOPE)
+    elseif("${type}" STREQUAL "int64")
+        set(${invalid_index} "-1" PARENT_SCOPE)
+    elseif("${type}" STREQUAL "uint32")
+        set(${invalid_index} "4294967296" PARENT_SCOPE)
+    elseif("${type}" STREQUAL "uint64")
+        set(${invalid_index} "18446744073709551616" PARENT_SCOPE)
+    else()
+        message(FATAL_ERROR "No invalid type for `${type}`!")
+    endif()
+endfunction()
+
 # C types
 sfem_num_bytes(${SFEM_REAL_TYPE} SFEM_REAL_SIZE)
 sfem_num_bytes(${SFEM_SCALAR_TYPE} SFEM_SCALAR_SIZE)
@@ -182,6 +200,12 @@ sfem_print_type(${SFEM_IDX_TYPE} SFEM_IDX_PRINT_TYPE)
 sfem_print_type(${SFEM_COUNT_TYPE} SFEM_COUNT_PRINT_TYPE)
 sfem_print_type(${SFEM_ELEMENT_IDX_TYPE} SFEM_ELEMENT_IDX_PRINT_TYPE)
 sfem_print_type(${SFEM_LOCAL_IDX_TYPE} SFEM_LOCAL_IDX_PRINT_TYPE)
+
+# Invalid index
+sfem_invalid_index(${SFEM_IDX_TYPE} SFEM_IDX_INVALID)
+sfem_invalid_index(${SFEM_COUNT_TYPE} SFEM_COUNT_INVALID)
+sfem_invalid_index(${SFEM_ELEMENT_IDX_TYPE} SFEM_ELEMENT_IDX_INVALID)
+sfem_invalid_index(${SFEM_LOCAL_IDX_TYPE} SFEM_LOCAL_IDX_INVALID)
 
 message(STATUS 
     "--------------------------------------------------------------------------------------\n"
