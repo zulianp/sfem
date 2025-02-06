@@ -2,6 +2,7 @@
 #include "sfem_defs.h"
 
 #include <math.h>
+#include <stdio.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
