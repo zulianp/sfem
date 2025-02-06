@@ -20,7 +20,7 @@ namespace sfem {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::function<void(const T* const, T* const)> apply_;
-        ptrdiff_t ndofs{-1};
+        ptrdiff_t ndofs{SFEM_PTRDIFF_INVALID};
         BLAS_Tpl<T> blas;
 
         std::shared_ptr<Buffer<mask_t>> bdy_dofs;
@@ -40,7 +40,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("CooSymSpMV::apply");
 
             apply_(x, y);
-            return 0;
+            return SFEM_SUCCESS;
         }
         inline std::ptrdiff_t rows() const override { return ndofs; }
         inline std::ptrdiff_t cols() const override { return ndofs; }

@@ -473,7 +473,7 @@ namespace sfem {
 #ifndef NDEBUG
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < macro_mesh->n_elements(); i++) {
-                    elements[d][i] = -1;
+                    elements[d][i] = SFEM_IDX_INVALID;
                 }
             }
 #endif
@@ -3330,8 +3330,8 @@ namespace sfem {
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
-        ptrdiff_t local_size = -1;
-        ptrdiff_t size       = -1;
+        ptrdiff_t local_size = SFEM_PTRDIFF_INVALID;
+        ptrdiff_t size       = SFEM_PTRDIFF_INVALID;
 
         printf("n_files (%d):\n", n_files);
         int err = 0;

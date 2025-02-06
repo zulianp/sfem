@@ -170,11 +170,7 @@ int main(int argc, char *argv[]) {
 
         free((void *)dirichlet_nodes);
     } else {
-        if(!rank) {
-            fprintf(stderr, "Dirichlet nodes are required for well-posedness!\n");
-        }
-
-        MPI_Abort(comm, -1);
+        SFEM_ERROR( "Dirichlet nodes are required for well-posedness!\n");
     }
 
     if (config["aux_out"]) {

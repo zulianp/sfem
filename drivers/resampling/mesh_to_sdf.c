@@ -179,7 +179,7 @@ ptrdiff_t select_submesh(const ptrdiff_t nelements,
         if (!contained) {
             for (int de = 0; de < nodesxelem; de++) {
                 // Remove element
-                elements[de][i] = -1;
+                elements[de][i] = SFEM_IDX_INVALID;
             }
 
             removed_elements++;
@@ -191,7 +191,7 @@ ptrdiff_t select_submesh(const ptrdiff_t nelements,
     for (int de = 0; de < nodesxelem; de++) {
         ptrdiff_t n_valid = 0;
         for (ptrdiff_t i = 0; i < nelements; i++) {
-            if (elements[de][i] == -1) continue;
+            if (elements[de][i] == SFEM_IDX_INVALID) continue;
             elements[de][n_valid++] = elements[de][i];
         }
 

@@ -466,12 +466,11 @@ namespace sfem {
                 }
 
                 idx_t           *idx          = nullptr;
-                ptrdiff_t        n_contiguous = -1;
+                ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
                 std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
 
                 // FiXME harcoded for sshex8
                 sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
-
 
                 // printf("SS SIDES (VID) #nodes %ld \n", ssmesh.n_nodes());
                 // this->ss_sides->print(std::cout);
@@ -520,7 +519,7 @@ namespace sfem {
                 }
 
                 idx_t    *idx          = nullptr;
-                ptrdiff_t n_contiguous = -1;
+                ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
                 remap_elements_to_contiguous_index(
                         this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
                 this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
@@ -558,7 +557,7 @@ namespace sfem {
             assert(space->has_semi_structured_mesh() || type_from_string(surface_elem_type.c_str()) == side_element_type);
 
             idx_t   **sides  = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            ptrdiff_t _nope_ = -1, len = -1;
+            ptrdiff_t _nope_ = SFEM_PTRDIFF_INVALID, len = SFEM_PTRDIFF_INVALID;
 
             char pattern[SFEM_MAX_PATH_LENGTH];
             sprintf(pattern, "%s/i*.*raw", path_surface.c_str());
@@ -571,14 +570,14 @@ namespace sfem {
 
             for (int d = 0; d < nxe; d++) {
                 idx_t    *idx   = nullptr;
-                ptrdiff_t len_d = -1;
+                ptrdiff_t len_d = SFEM_PTRDIFF_INVALID;
                 if (array_create_from_file(mesh->comm(), paths[d].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len_d)) {
                     SFEM_ERROR("Unable to read path %s\n", paths[d].c_str());
                 }
 
                 sides[d] = idx;
 
-                assert(len == -1 || len_d == len);
+                assert(len == SFEM_PTRDIFF_INVALID || len_d == len);
                 len = len_d;
             }
 
@@ -587,7 +586,7 @@ namespace sfem {
             bool has_parent_indexing = points == "parent";
             if (has_parent_indexing) {
                 idx_t    *idx          = nullptr;
-                ptrdiff_t n_contiguous = -1;
+                ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
                 remap_elements_to_contiguous_index(
                         this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
                 this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);

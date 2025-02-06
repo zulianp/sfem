@@ -28,7 +28,7 @@ namespace sfem {
         int       max_it{10};
         int       max_inner_it{10};
         int       check_each{1};
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool      verbose{true};
         bool      debug{false};
         T         penalty_param_{10};
@@ -343,7 +343,7 @@ namespace sfem {
             T energy = 0;
 
             SFEM_ERROR("IMPLEMENT ME!\n");
-            return -1;
+            return SFEM_FAILURE;
         }
 
         void monitor(const int iter,

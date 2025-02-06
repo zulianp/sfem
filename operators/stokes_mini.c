@@ -26,7 +26,7 @@
 //         //     break;
 //         // }
 //         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
+//             SFEM_ERROR("IMPLEMENT ME!\n");
 //         }
 //     }
 // }
@@ -52,7 +52,7 @@
 //         //     break;
 //         // }
 //         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
+//             SFEM_ERROR("IMPLEMENT ME!\n");
 //         }
 //     }
 // }
@@ -78,7 +78,7 @@ void stokes_mini_assemble_hessian_soa(const enum ElemType element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -102,7 +102,7 @@ void stokes_mini_assemble_hessian_soa(const enum ElemType element_type,
 //         //     values); break;
 //         // }
 //         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
+//             SFEM_ERROR("IMPLEMENT ME!\n");
 //         }
 //     }
 // }
@@ -128,7 +128,7 @@ void stokes_mini_assemble_hessian_soa(const enum ElemType element_type,
 //             break;
 //         }
 //         default: {
-//             MPI_Abort(MPI_COMM_WORLD, -1);
+//             SFEM_ERROR("IMPLEMENT ME!\n");
 //         }
 //     }
 // }
@@ -153,7 +153,7 @@ void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -179,7 +179,7 @@ void stokes_mini_assemble_hessian_aos(const enum ElemType element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -202,7 +202,7 @@ void stokes_mini_apply_aos(const enum ElemType element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -227,7 +227,7 @@ void stokes_mini_assemble_rhs_soa(enum ElemType element_type,
                 break;
             }
             default: {
-                MPI_Abort(MPI_COMM_WORLD, -1);
+                SFEM_ERROR("IMPLEMENT ME!\n");
             }
         }
 }
@@ -254,7 +254,7 @@ void stokes_mini_assemble_rhs_aos(enum ElemType element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }

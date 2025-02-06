@@ -27,8 +27,7 @@ void surface_e_projection_apply(const int element_type,
         }
 
         default: {
-           assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+           SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -52,8 +51,7 @@ void surface_e_projection_coeffs(const int element_type,
         }
 
         default: {
-           assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+           SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }

@@ -22,7 +22,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> right_preconditioner_op;
         BLAS_Tpl<T> blas;
 
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         int iterations_{0};
 
         bool verbose{true};
@@ -97,7 +97,7 @@ namespace sfem {
     private:
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
-                return -1;
+                return SFEM_FAILURE;
             }
 
             T* r0 = blas.allocate(n);
@@ -123,7 +123,7 @@ namespace sfem {
             blas.copy(n, r0, r);
             blas.copy(n, r0, p);
 
-            int info = -1;
+            int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, v);
                 apply_op(p, v);
@@ -182,7 +182,7 @@ namespace sfem {
 
         int aux_apply_precond(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
-                return -1;
+                return SFEM_FAILURE;
             }
 
             T* r0 = blas.allocate(n);
@@ -208,7 +208,7 @@ namespace sfem {
             blas.copy(n, r0, r);
             blas.copy(n, r0, p);
 
-            int info = -1;
+            int info = SFEM_FAILURE;
             for (int iterations_ = 0; iterations_ < max_it; iterations_++) {
                 auto y = t;  // reuse t as a temp for y
                 blas.zeros(n, y);
@@ -228,7 +228,7 @@ namespace sfem {
                 if (sqrt(sts) < tol) {
                     monitor(iterations_, sqrt(sts));
                     blas.copy(n, h, x);
-                    info = 0;
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
