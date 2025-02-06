@@ -4,6 +4,7 @@
 #include "tri3_stokes_mini.h"
 
 #include <mpi.h>
+#include <stdio.h>
 
 // void stokes_mini_assemble_value_soa(const enum ElemType element_type,
 //                                           const ptrdiff_t nelements,
