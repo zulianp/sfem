@@ -95,6 +95,7 @@ typedef @SFEM_IDX_C_TYPE@ idx_t;
 #define SFEM_CUSPARSE_IDX_T @SFEM_IDX_CUSPARSE_TYPE@
 #define d_IDX_T "@SFEM_IDX_PRINT_TYPE@"
 #define dtype_IDX_T "@SFEM_IDX_TYPE@"
+#define SFEM_IDX_INVALID @SFEM_IDX_INVALID@
 
 // nnz count
 typedef @SFEM_COUNT_C_TYPE@ count_t;
@@ -102,6 +103,7 @@ typedef @SFEM_COUNT_C_TYPE@ count_t;
 #define SFEM_CUSPARSE_COUNT_T @SFEM_COUNT_CUSPARSE_TYPE@
 #define d_COUNT_T "@SFEM_COUNT_PRINT_TYPE@"
 #define dtype_COUNT_T "@SFEM_COUNT_TYPE@"
+#define SFEM_COUNT_INVALID @SFEM_COUNT_INVALID@
 
 // element ids
 typedef @SFEM_ELEMENT_IDX_C_TYPE@ element_idx_t;
@@ -109,6 +111,7 @@ typedef @SFEM_ELEMENT_IDX_C_TYPE@ element_idx_t;
 #define SFEM_CUSPARSE_ELEMENT_IDX_T @SFEM_ELEMENT_IDX_CUSPARSE_TYPE@
 #define d_ELEMENT_IDX_T "@SFEM_ELEMENT_IDX_PRINT_TYPE@"
 #define dtype_ELEMENT_IDX_T "@SFEM_ELEMENT_IDX_TYPE@"
+#define SFEM_ELEMENT_IDX_INVALID @SFEM_ELEMENT_IDX_INVALID@
 
 // Local ids for small block of elements (goal is 16 bits with max id 65'536)
 typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
@@ -116,6 +119,7 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define SFEM_CUSPARSE_LOCAL_IDX_T @SFEM_LOCAL_IDX_CUSPARSE_TYPE@
 #define d_LOCAL_IDX_T "@SFEM_LOCAL_IDX_PRINT_TYPE@"
 #define dtype_LOCAL_IDX_T "@SFEM_LOCAL_IDX_TYPE@"
+#define SFEM_LOCAL_IDX_INVALID @SFEM_LOCAL_IDX_INVALID@
 
 // -----------------------------
 // Other types
