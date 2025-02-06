@@ -1724,7 +1724,7 @@ hex8_to_tet10_resample_field_local_CUDA(                              //
                                                            g_host);
 #elif SFEM_CUDA_MEMORY_MODEL == CUDA_MEMORY_MANAGED
 #pragma message "CUDA_MEMORY_MANAGED is enabled: Not implemented yet"
-    return -1;
+    return SFEM_FAILURE;
 #endif
 
     PRINT_CURRENT_FUNCTION;

@@ -23,7 +23,7 @@ int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *ne
             near_null[aggs] = near_null[row];
             aggs += 1;
         } else {
-            ws->partition[row] = -1;
+            ws->partition[row] = SFEM_IDX_INVALID;
         }
     }
     *ndofs = aggs;
@@ -35,7 +35,7 @@ int partition(const mask_t *bdy_dofs, const real_t coarsening_factor, real_t *ne
             idx_t i = offdiag_row_indices[k];
             idx_t j = offdiag_col_indices[k];
             real_t val = offdiag_values[k];
-            if (ws->partition[i] >= 0 && ws->partition[j] >= 0) {
+            if (ws->partition[i] != SFEM_IDX_INVALID && ws->partition[j] != SFEM_IDX_INVALID) {
                 offdiag_row_indices[restricted_nnz] = ws->partition[i];
                 offdiag_col_indices[restricted_nnz] = ws->partition[j];
                 offdiag_values[restricted_nnz] = val;
@@ -144,7 +144,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
     count_t *alive = ws->sort_indices;
 #pragma omp parallel for
     for (idx_t row = 0; row < *ndofs; row++) {
-        alive[row] = -1;
+        alive[row] = SFEM_COUNT_INVALID;
     }
 
     // Assign match pairs to coarse grid values
@@ -152,7 +152,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
     for (idx_t k = 0; k < n_mod_weights; k++) {
         idx_t i = ws->ptr_i[k];
         idx_t j = ws->ptr_j[k];
-        if (alive[i] < 0 && alive[j] < 0) {
+        if (alive[i] == SFEM_COUNT_INVALID && alive[j] == SFEM_COUNT_INVALID) {
             alive[i] = coarse_counter;
             alive[j] = coarse_counter;
             coarse_counter += 1;
@@ -161,7 +161,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
 
     // Assign any unmatched DOF to singleton on coarse grid
     for (idx_t row = 0; row < *ndofs; row++) {
-        if (alive[row] < 0) {
+        if (alive[row] == SFEM_COUNT_INVALID) {
             alive[row] = coarse_counter;
             coarse_counter += 1;
         }
@@ -169,7 +169,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
 
     // Update the partition to reflect the assigned matching
     for (idx_t row = 0; row < fine_ndofs; row++) {
-        if (ws->partition[row] >= 0) {
+        if (ws->partition[row] != SFEM_COUNT_INVALID) {
             idx_t old_agg = ws->partition[row];
             ws->partition[row] = alive[old_agg];
         }
@@ -210,7 +210,7 @@ int pairwise_aggregation(const real_t inv_total, const ptrdiff_t fine_ndofs, cou
         ws->weights[row] = 0.0;
     }
     for (idx_t row = 0; row < *ndofs; row++) {
-        if (alive[row] >= 0) {
+        if (alive[row] != SFEM_COUNT_INVALID) {
             idx_t coarse_idx = alive[row];
             ws->weights[coarse_idx] += ws->rowsums[row];
         }

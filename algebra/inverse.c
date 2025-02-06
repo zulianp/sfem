@@ -23,7 +23,7 @@ void dinvert1(const ptrdiff_t nnodes,
         const count_t r_extent = r_end - r_begin;
         const idx_t *cols = &colidx[r_begin];
 
-        count_t diag_idx = -1;
+        count_t diag_idx = SFEM_COUNT_INVALID;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
                 diag_idx = r_begin + k;
@@ -32,7 +32,7 @@ void dinvert1(const ptrdiff_t nnodes,
 
         }  // end for
 
-        assert(diag_idx != -1);
+        assert(diag_idx != SFEM_COUNT_INVALID);
 
         inverse1(values[0][diag_idx], &inv_diag[0][i]);
     }
@@ -67,7 +67,7 @@ void dinvert2(const ptrdiff_t nnodes,
         const count_t r_extent = r_end - r_begin;
         const idx_t *cols = &colidx[r_begin];
 
-        count_t diag_idx = -1;
+        count_t diag_idx = SFEM_COUNT_INVALID;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
                 diag_idx = r_begin + k;
@@ -76,7 +76,7 @@ void dinvert2(const ptrdiff_t nnodes,
 
         }  // end for
 
-        assert(diag_idx != -1);
+        assert(diag_idx != SFEM_COUNT_INVALID);
 
         inverse2(values[0][diag_idx],
                  values[1][diag_idx],
@@ -145,7 +145,7 @@ void dinvert3(const ptrdiff_t nnodes,
         const count_t r_extent = r_end - r_begin;
         const idx_t *cols = &colidx[r_begin];
 
-        count_t diag_idx = -1;
+        count_t diag_idx = SFEM_COUNT_INVALID;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
                 diag_idx = r_begin + k;
@@ -154,7 +154,7 @@ void dinvert3(const ptrdiff_t nnodes,
 
         }  // end for
 
-        assert(diag_idx != -1);
+        assert(diag_idx != SFEM_COUNT_INVALID);
 
         inverse3(values[0][diag_idx],
                  values[1][diag_idx],
@@ -301,7 +301,7 @@ void dinvert4(const ptrdiff_t nnodes,
         const count_t r_extent = r_end - r_begin;
         const idx_t *cols = &colidx[r_begin];
 
-        count_t diag_idx = -1;
+        count_t diag_idx = SFEM_COUNT_INVALID;
         for (count_t k = 0; k < r_extent; k++) {
             if (cols[k] == i) {
                 diag_idx = r_begin + k;
@@ -310,7 +310,7 @@ void dinvert4(const ptrdiff_t nnodes,
 
         }  // end for
 
-        assert(diag_idx != -1);
+        assert(diag_idx != SFEM_COUNT_INVALID);
 
         inverse4(values[0][diag_idx],
                  values[1][diag_idx],

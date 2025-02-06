@@ -28,9 +28,7 @@ int linear_elasticity_assemble_value_soa(const enum ElemType                elem
         //
         // }
         default: {
-            fprintf(stderr, "linear_elasticity_assemble_value_soa not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_assemble_value_soa not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -67,9 +65,7 @@ int linear_elasticity_apply_soa(const enum ElemType                element_type,
             }
         }
         default: {
-            fprintf(stderr, "linear_elasticity_apply_soa not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_apply_soa not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -93,9 +89,7 @@ int linear_elasticity_assemble_value_aos(const enum ElemType               eleme
             return tet4_linear_elasticity_value(nelements, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], value);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_assemble_value_aos not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_assemble_value_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -138,9 +132,7 @@ int linear_elasticity_crs_aos(const enum ElemType                element_type,
             return macro_tet4_linear_elasticity_crs(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_crs_aos not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_crs_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -176,9 +168,7 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType          element_typ
                     nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_assemble_diag_aos not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_assemble_diag_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -285,9 +275,7 @@ int linear_elasticity_apply_aos(const enum ElemType               element_type,
                                                  &values[2]);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_apply_aos not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_apply_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -309,9 +297,7 @@ int linear_elasticity_crs_soa(const enum ElemType                element_type,
             return tri3_linear_elasticity_crs_soa(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_crs_soa not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_crs_soa not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
@@ -336,9 +322,7 @@ int linear_elasticity_bsr(const enum ElemType                element_type,
             return affine_hex8_linear_elasticity_bsr(nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_bsr is not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_bsr is not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
         }
     }
@@ -362,9 +346,7 @@ int linear_elasticity_bcrs_sym(const enum ElemType                element_type,
                     nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, block_stride, diag_values, off_diag_values);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_bcrs_sym not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_bcrs_sym not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
         }
     }
@@ -384,9 +366,7 @@ int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_ty
                     nelements, nnodes, elements, points, mu, lambda, 6, &out[0], &out[1], &out[2], &out[3], &out[4], &out[5]);
         }
         default: {
-            fprintf(stderr, "linear_elasticity_block_diag_aos not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("linear_elasticity_block_diag_aos not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
         }
     }

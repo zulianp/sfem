@@ -37,19 +37,18 @@ extern "C" {
 #define POW2(a) ((a) * (a))
 
 static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
-                                        const count_t stride,
-                                        real_t *SFEM_RESTRICT element_matrix)
+                                        const count_t               stride,
+                                        real_t *SFEM_RESTRICT       element_matrix)
 
 {
     real_t dv;
     {
-        dv =
-            0.16666666666666666 / (jac_inv[0 * stride] * jac_inv[4 * stride] * jac_inv[8 * stride] -
-                                   jac_inv[0 * stride] * jac_inv[5 * stride] * jac_inv[7 * stride] -
-                                   jac_inv[1 * stride] * jac_inv[3 * stride] * jac_inv[8 * stride] +
-                                   jac_inv[1 * stride] * jac_inv[5 * stride] * jac_inv[6 * stride] +
-                                   jac_inv[2 * stride] * jac_inv[3 * stride] * jac_inv[7 * stride] -
-                                   jac_inv[2 * stride] * jac_inv[4 * stride] * jac_inv[6 * stride]);
+        dv = 0.16666666666666666 / (jac_inv[0 * stride] * jac_inv[4 * stride] * jac_inv[8 * stride] -
+                                    jac_inv[0 * stride] * jac_inv[5 * stride] * jac_inv[7 * stride] -
+                                    jac_inv[1 * stride] * jac_inv[3 * stride] * jac_inv[8 * stride] +
+                                    jac_inv[1 * stride] * jac_inv[5 * stride] * jac_inv[6 * stride] +
+                                    jac_inv[2 * stride] * jac_inv[3 * stride] * jac_inv[7 * stride] -
+                                    jac_inv[2 * stride] * jac_inv[4 * stride] * jac_inv[6 * stride]);
 
         assert(dv == dv);
     }
@@ -58,43 +57,34 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
         // FLOATING POINT OPS!
         //      - Result: 4*ADD + 16*ASSIGNMENT + 4*MUL + 12*POW
         //      - Subexpressions: 12*ADD + 24*MUL + 3*NEG + 6*SUB
-        const real_t x0 = -jac_inv[0 * stride] - jac_inv[3 * stride] - jac_inv[6 * stride];
-        const real_t x1 = -jac_inv[1 * stride] - jac_inv[4 * stride] - jac_inv[7 * stride];
-        const real_t x2 = -jac_inv[2 * stride] - jac_inv[5 * stride] - jac_inv[8 * stride];
-        const real_t x3 =
-            dv * (jac_inv[0 * stride] * x0 + jac_inv[1 * stride] * x1 + jac_inv[2 * stride] * x2);
-        const real_t x4 =
-            dv * (jac_inv[3 * stride] * x0 + jac_inv[4 * stride] * x1 + jac_inv[5 * stride] * x2);
-        const real_t x5 =
-            dv * (jac_inv[6 * stride] * x0 + jac_inv[7 * stride] * x1 + jac_inv[8 * stride] * x2);
-        const real_t x6 = dv * (jac_inv[0 * stride] * jac_inv[3 * stride] +
-                                jac_inv[1 * stride] * jac_inv[4 * stride] +
+        const real_t x0            = -jac_inv[0 * stride] - jac_inv[3 * stride] - jac_inv[6 * stride];
+        const real_t x1            = -jac_inv[1 * stride] - jac_inv[4 * stride] - jac_inv[7 * stride];
+        const real_t x2            = -jac_inv[2 * stride] - jac_inv[5 * stride] - jac_inv[8 * stride];
+        const real_t x3            = dv * (jac_inv[0 * stride] * x0 + jac_inv[1 * stride] * x1 + jac_inv[2 * stride] * x2);
+        const real_t x4            = dv * (jac_inv[3 * stride] * x0 + jac_inv[4 * stride] * x1 + jac_inv[5 * stride] * x2);
+        const real_t x5            = dv * (jac_inv[6 * stride] * x0 + jac_inv[7 * stride] * x1 + jac_inv[8 * stride] * x2);
+        const real_t x6            = dv * (jac_inv[0 * stride] * jac_inv[3 * stride] + jac_inv[1 * stride] * jac_inv[4 * stride] +
                                 jac_inv[2 * stride] * jac_inv[5 * stride]);
-        const real_t x7 = dv * (jac_inv[0 * stride] * jac_inv[6 * stride] +
-                                jac_inv[1 * stride] * jac_inv[7 * stride] +
+        const real_t x7            = dv * (jac_inv[0 * stride] * jac_inv[6 * stride] + jac_inv[1 * stride] * jac_inv[7 * stride] +
                                 jac_inv[2 * stride] * jac_inv[8 * stride]);
-        const real_t x8 = dv * (jac_inv[3 * stride] * jac_inv[6 * stride] +
-                                jac_inv[4 * stride] * jac_inv[7 * stride] +
+        const real_t x8            = dv * (jac_inv[3 * stride] * jac_inv[6 * stride] + jac_inv[4 * stride] * jac_inv[7 * stride] +
                                 jac_inv[5 * stride] * jac_inv[8 * stride]);
         element_matrix[0 * stride] = dv * (POW2(x0) + POW2(x1) + POW2(x2));
         element_matrix[1 * stride] = x3;
         element_matrix[2 * stride] = x4;
         element_matrix[3 * stride] = x5;
         element_matrix[4 * stride] = x3;
-        element_matrix[5 * stride] = dv * (POW2(jac_inv[0 * stride]) + POW2(jac_inv[1 * stride]) +
-                                           POW2(jac_inv[2 * stride]));
+        element_matrix[5 * stride] = dv * (POW2(jac_inv[0 * stride]) + POW2(jac_inv[1 * stride]) + POW2(jac_inv[2 * stride]));
         element_matrix[6 * stride] = x6;
         element_matrix[7 * stride] = x7;
         element_matrix[8 * stride] = x4;
         element_matrix[9 * stride] = x6;
-        element_matrix[10 * stride] = dv * (POW2(jac_inv[3 * stride]) + POW2(jac_inv[4 * stride]) +
-                                            POW2(jac_inv[5 * stride]));
+        element_matrix[10 * stride] = dv * (POW2(jac_inv[3 * stride]) + POW2(jac_inv[4 * stride]) + POW2(jac_inv[5 * stride]));
         element_matrix[11 * stride] = x8;
         element_matrix[12 * stride] = x5;
         element_matrix[13 * stride] = x7;
         element_matrix[14 * stride] = x8;
-        element_matrix[15 * stride] = dv * (POW2(jac_inv[6 * stride]) + POW2(jac_inv[7 * stride]) +
-                                            POW2(jac_inv[8 * stride]));
+        element_matrix[15 * stride] = dv * (POW2(jac_inv[6 * stride]) + POW2(jac_inv[7 * stride]) + POW2(jac_inv[8 * stride]));
     }
 
     // printf("[%g %g %g\n%g %g %g\n%g %g %g]\n",
@@ -127,10 +117,8 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT jac_inv,
     //        element_matrix[15 * stride]);
 }
 
-static inline __device__ __host__ int linear_search(const idx_t target,
-                                                    const idx_t *const arr,
-                                                    const int size) {
-    int i;
+static inline __device__ __host__ idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -140,12 +128,10 @@ static inline __device__ __host__ int linear_search(const idx_t target,
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static inline __device__ __host__ int find_col(const idx_t key,
-                                               const idx_t *const row,
-                                               const int lenrow) {
+static inline __device__ __host__ idx_t find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     // if (lenrow <= 32)
     // {
     return linear_search(key, row, lenrow);
@@ -162,10 +148,7 @@ static inline __device__ __host__ int find_col(const idx_t key,
     // }
 }
 
-static inline __device__ __host__ void find_cols4(const idx_t *targets,
-                                                  const idx_t *const row,
-                                                  const int lenrow,
-                                                  int *ks) {
+static inline __device__ __host__ void find_cols4(const idx_t *targets, const idx_t *const row, const int lenrow, idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 4; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);
@@ -185,20 +168,20 @@ static inline __device__ __host__ void find_cols4(const idx_t *targets,
     }
 }
 
-static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_t px0,
-                                                                     const real_t px1,
-                                                                     const real_t px2,
-                                                                     const real_t px3,
-                                                                     const real_t py0,
-                                                                     const real_t py1,
-                                                                     const real_t py2,
-                                                                     const real_t py3,
-                                                                     const real_t pz0,
-                                                                     const real_t pz1,
-                                                                     const real_t pz2,
-                                                                     const real_t pz3,
+static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_t  px0,
+                                                                     const real_t  px1,
+                                                                     const real_t  px2,
+                                                                     const real_t  px3,
+                                                                     const real_t  py0,
+                                                                     const real_t  py1,
+                                                                     const real_t  py2,
+                                                                     const real_t  py3,
+                                                                     const real_t  pz0,
+                                                                     const real_t  pz1,
+                                                                     const real_t  pz2,
+                                                                     const real_t  pz3,
                                                                      const count_t stride,
-                                                                     real_t *jac_inv) {
+                                                                     real_t       *jac_inv) {
     // printf("[%g %g %g] [%g %g %g] [%g %g %g] [%g %g %g] %ld\n",
     //        px0,
     //        py0,
@@ -217,21 +200,21 @@ static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_
     // FLOATING POINT OPS!
     //       - Result: 9*ADD + 9*ASSIGNMENT + 25*MUL
     //       - Subexpressions: 2*ADD + DIV + 12*MUL + 12*SUB
-    const real_t x0 = -py0 + py2;
-    const real_t x1 = -pz0 + pz3;
-    const real_t x2 = x0 * x1;
-    const real_t x3 = -py0 + py3;
-    const real_t x4 = -pz0 + pz2;
-    const real_t x5 = x3 * x4;
-    const real_t x6 = -px0 + px1;
-    const real_t x7 = -pz0 + pz1;
-    const real_t x8 = -px0 + px2;
-    const real_t x9 = x3 * x8;
-    const real_t x10 = -py0 + py1;
-    const real_t x11 = -px0 + px3;
-    const real_t x12 = x1 * x8;
-    const real_t x13 = x0 * x11;
-    const real_t x14 = 1.0 / (x10 * x11 * x4 - x10 * x12 - x13 * x7 + x2 * x6 - x5 * x6 + x7 * x9);
+    const real_t x0     = -py0 + py2;
+    const real_t x1     = -pz0 + pz3;
+    const real_t x2     = x0 * x1;
+    const real_t x3     = -py0 + py3;
+    const real_t x4     = -pz0 + pz2;
+    const real_t x5     = x3 * x4;
+    const real_t x6     = -px0 + px1;
+    const real_t x7     = -pz0 + pz1;
+    const real_t x8     = -px0 + px2;
+    const real_t x9     = x3 * x8;
+    const real_t x10    = -py0 + py1;
+    const real_t x11    = -px0 + px3;
+    const real_t x12    = x1 * x8;
+    const real_t x13    = x0 * x11;
+    const real_t x14    = 1.0 / (x10 * x11 * x4 - x10 * x12 - x13 * x7 + x2 * x6 - x5 * x6 + x7 * x9);
     jac_inv[0 * stride] = x14 * (x2 - x5);
     jac_inv[1 * stride] = x14 * (x11 * x4 - x12);
     jac_inv[2 * stride] = x14 * (-x13 + x9);
@@ -254,60 +237,56 @@ static inline __device__ __host__ void jacobian_inverse_micro_kernel(const real_
     //        jac_inv[8 * stride]);
 }
 
-__global__ void jacobian_inverse_kernel(const ptrdiff_t nelements,
+__global__ void jacobian_inverse_kernel(const ptrdiff_t                   nelements,
                                         const geom_t *const SFEM_RESTRICT xyz,
-                                        real_t *const SFEM_RESTRICT jacobian_inverse) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+                                        real_t *const SFEM_RESTRICT       jacobian_inverse) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         // Thy element coordinates and jacobian
-        const geom_t *const this_xyz = &xyz[e];
-        real_t *const this_jacobian_inverse = &jacobian_inverse[e];
+        const geom_t *const this_xyz              = &xyz[e];
+        real_t *const       this_jacobian_inverse = &jacobian_inverse[e];
 
         const ptrdiff_t xi = 0 * 4;
         const ptrdiff_t yi = 1 * 4;
         const ptrdiff_t zi = 2 * 4;
 
         jacobian_inverse_micro_kernel(
-            // X-coordinates
-            this_xyz[(xi + 0) * nelements],
-            this_xyz[(xi + 1) * nelements],
-            this_xyz[(xi + 2) * nelements],
-            this_xyz[(xi + 3) * nelements],
-            // Y-coordinates
-            this_xyz[(yi + 0) * nelements],
-            this_xyz[(yi + 1) * nelements],
-            this_xyz[(yi + 2) * nelements],
-            this_xyz[(yi + 3) * nelements],
-            // Z-coordinates
-            this_xyz[(zi + 0) * nelements],
-            this_xyz[(zi + 1) * nelements],
-            this_xyz[(zi + 2) * nelements],
-            this_xyz[(zi + 3) * nelements],
-            nelements,
-            this_jacobian_inverse);
+                // X-coordinates
+                this_xyz[(xi + 0) * nelements],
+                this_xyz[(xi + 1) * nelements],
+                this_xyz[(xi + 2) * nelements],
+                this_xyz[(xi + 3) * nelements],
+                // Y-coordinates
+                this_xyz[(yi + 0) * nelements],
+                this_xyz[(yi + 1) * nelements],
+                this_xyz[(yi + 2) * nelements],
+                this_xyz[(yi + 3) * nelements],
+                // Z-coordinates
+                this_xyz[(zi + 0) * nelements],
+                this_xyz[(zi + 1) * nelements],
+                this_xyz[(zi + 2) * nelements],
+                this_xyz[(zi + 3) * nelements],
+                nelements,
+                this_jacobian_inverse);
     }
 }
 
-__global__ void laplacian_crs_kernel(const ptrdiff_t nelements,
-                                                  const real_t *const SFEM_RESTRICT
-                                                      jacobian_inverse,
-                                                  real_t *const SFEM_RESTRICT values) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+__global__ void laplacian_crs_kernel(const ptrdiff_t                   nelements,
+                                     const real_t *const SFEM_RESTRICT jacobian_inverse,
+                                     real_t *const SFEM_RESTRICT       values) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         laplacian(&jacobian_inverse[e], nelements, &values[e]);
     }
 }
 
-__global__ void local_to_global_kernel(const ptrdiff_t nelements,
-                                       idx_t **const SFEM_RESTRICT elems,
-                                       const real_t *const SFEM_RESTRICT element_matrix,
+__global__ void local_to_global_kernel(const ptrdiff_t                    nelements,
+                                       idx_t **const SFEM_RESTRICT        elems,
+                                       const real_t *const SFEM_RESTRICT  element_matrix,
                                        const count_t *const SFEM_RESTRICT rowptr,
-                                       const idx_t *const SFEM_RESTRICT colidx,
-                                       real_t *const SFEM_RESTRICT values) {
+                                       const idx_t *const SFEM_RESTRICT   colidx,
+                                       real_t *const SFEM_RESTRICT        values) {
     idx_t ev[4];
     idx_t ks[4];
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][e];
@@ -319,7 +298,7 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
         // printf("%d)\n", (int)e);
 
         for (int edof_i = 0; edof_i < 4; ++edof_i) {
-            const idx_t dof_i = ev[edof_i];
+            const idx_t dof_i  = ev[edof_i];
             const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
 
             const idx_t *const row = &colidx[rowptr[dof_i]];
@@ -330,8 +309,8 @@ __global__ void local_to_global_kernel(const ptrdiff_t nelements,
 
             // #pragma unroll(4)
             for (int edof_j = 0; edof_j < 4; ++edof_j) {
-                ptrdiff_t idx = (edof_i * 4 + edof_j) * nelements;
-                const real_t v = this_matrix[idx];
+                ptrdiff_t    idx = (edof_i * 4 + edof_j) * nelements;
+                const real_t v   = this_matrix[idx];
 
                 // printf("(%d, %d) %g\n", dof_i, ev[edof_j], v);
 
@@ -501,13 +480,13 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
 
 #else
 
-extern "C" void laplacian_crs(const ptrdiff_t nelements,
-                                           const ptrdiff_t nnodes,
-                                           idx_t **const SFEM_RESTRICT elems,
-                                           geom_t **const SFEM_RESTRICT xyz,
-                                           const count_t *const SFEM_RESTRICT rowptr,
-                                           const idx_t *const SFEM_RESTRICT colidx,
-                                           real_t *const SFEM_RESTRICT values) {
+extern "C" void laplacian_crs(const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    nnodes,
+                              idx_t **const SFEM_RESTRICT        elems,
+                              geom_t **const SFEM_RESTRICT       xyz,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              real_t *const SFEM_RESTRICT        values) {
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -516,8 +495,8 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
     cudaEventRecord(start);
 
     // static int block_size = 256;
-    static int block_size = 128;
-    const ptrdiff_t nbatch = MIN(block_size * 500, nelements);
+    static int      block_size = 128;
+    const ptrdiff_t nbatch     = MIN(block_size * 500, nelements);
 
     ptrdiff_t n_blocks = std::max(ptrdiff_t(1), (nbatch + block_size - 1) / block_size);
 
@@ -543,11 +522,11 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
     idx_t **d_elems = nullptr;
 
     count_t *d_rowptr = nullptr;
-    idx_t *d_colidx = nullptr;
-    real_t *d_values = nullptr;
+    idx_t   *d_colidx = nullptr;
+    real_t  *d_values = nullptr;
 
     static const int nstreams = 2;
-    cudaStream_t stream[nstreams];
+    cudaStream_t     stream[nstreams];
     // cudaEvent_t cu_event[nstreams];
     for (int s = 0; s < nstreams; s++) {
         cudaStreamCreate(&stream[s]);
@@ -571,7 +550,7 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
 
     SFEM_RANGE_POP();
 
-    ptrdiff_t last_n = 0;
+    ptrdiff_t last_n              = 0;
     ptrdiff_t last_element_offset = 0;
     for (ptrdiff_t element_offset = 0; element_offset < nelements; element_offset += nbatch) {
         ptrdiff_t n = MIN(nbatch, nelements - element_offset);
@@ -581,9 +560,9 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
             {
                 for (int d = 0; d < 3; ++d) {
                     for (int e_node = 0; e_node < 4; e_node++) {
-                        const geom_t *const x = xyz[d];
-                        ptrdiff_t offset = (d * 4 + e_node) * n;
-                        const idx_t *const nodes = &elems[e_node][element_offset];
+                        const geom_t *const x      = xyz[d];
+                        ptrdiff_t           offset = (d * 4 + e_node) * n;
+                        const idx_t *const  nodes  = &elems[e_node][element_offset];
 
                         geom_t *buff = &he_xyz[offset];
 
@@ -604,14 +583,13 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
         if (last_n) {
             cudaStreamSynchronize(stream[0]);
             // Do this here to let the main kernel overlap with the packing
-            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
-                last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+            local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
+                    last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
-        SFEM_CUDA_CHECK(cudaMemcpyAsync(
-            de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
+        SFEM_CUDA_CHECK(cudaMemcpyAsync(de_xyz, he_xyz, 3 * 4 * n * sizeof(geom_t), cudaMemcpyHostToDevice, stream[0]));
 
         if (last_n) {
             // make sure that the previous copy async and kernel from stream 1 is finished!
@@ -626,32 +604,27 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
         SFEM_RANGE_POP();
 
         for (int e_node = 0; e_node < 4; e_node++) {
-            SFEM_CUDA_CHECK(cudaMemcpyAsync(hd_elems[e_node],
-                                            hh_elems[e_node],
-                                            n * sizeof(idx_t),
-                                            cudaMemcpyHostToDevice,
-                                            stream[1]));
+            SFEM_CUDA_CHECK(
+                    cudaMemcpyAsync(hd_elems[e_node], hh_elems[e_node], n * sizeof(idx_t), cudaMemcpyHostToDevice, stream[1]));
         }
 
-        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]>>>(
-            n, de_xyz, d_jacobian_inverse);
+        jacobian_inverse_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, de_xyz, d_jacobian_inverse);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
-        laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[0]>>>(
-            n, d_jacobian_inverse, de_matrix);
+        laplacian_crs_kernel<<<n_blocks, block_size, 0, stream[0]> > >(n, d_jacobian_inverse, de_matrix);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
-        last_n = n;
+        last_n              = n;
         last_element_offset = element_offset;
     }
 
     if (last_n) {
         cudaStreamSynchronize(stream[0]);
         // Do this here to let the main kernel overlap with the packing
-        local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]>>>(
-            last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
+        local_to_global_kernel<<<n_blocks, block_size, 0, stream[1]> > >(
+                last_n, d_elems, de_matrix, d_rowptr, d_colidx, d_values);
 
         SFEM_DEBUG_SYNCHRONIZE();
 
@@ -660,8 +633,7 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
 
     SFEM_RANGE_PUSH("lapl-values-device-to-host");
 
-    SFEM_CUDA_CHECK(
-        cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
+    SFEM_CUDA_CHECK(cudaMemcpy(values, d_values, rowptr[nnodes] * sizeof(real_t), cudaMemcpyDeviceToHost));
 
     SFEM_RANGE_POP();
 
@@ -700,18 +672,16 @@ extern "C" void laplacian_crs(const ptrdiff_t nelements,
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    printf("cuda_laplacian_2.c: laplacian_crs\t%g seconds\nloops %d\n",
-           milliseconds / 1000,
-           int(nelements / nbatch));
+    printf("cuda_laplacian_2.c: laplacian_crs\t%g seconds\nloops %d\n", milliseconds / 1000, int(nelements / nbatch));
 }
 
 #endif
 
-extern "C" void tet4_laplacian_assemble_value(const ptrdiff_t nelements,
-                                              const ptrdiff_t nnodes,
-                                              idx_t **const SFEM_RESTRICT elems,
-                                              geom_t **const SFEM_RESTRICT xyz,
+extern "C" void tet4_laplacian_assemble_value(const ptrdiff_t                   nelements,
+                                              const ptrdiff_t                   nnodes,
+                                              idx_t **const SFEM_RESTRICT       elems,
+                                              geom_t **const SFEM_RESTRICT      xyz,
                                               const real_t *const SFEM_RESTRICT u,
-                                              real_t *const SFEM_RESTRICT value) {
+                                              real_t *const SFEM_RESTRICT       value) {
     assert(false);
 }

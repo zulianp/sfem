@@ -96,7 +96,7 @@ void grad_and_project(const enum ElemType element_type,
         }
         default: {
             assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);
         }
     }
 }
@@ -198,7 +198,7 @@ void grad_and_project_coeffs(const enum ElemType element_type,
         }
         default: {
             assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);
         }
     }
 }

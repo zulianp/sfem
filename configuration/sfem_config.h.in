@@ -131,16 +131,11 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 
 #endif  // SFEM_ENABLE_CUSTOM_NUMBERS
 
-#define INVALID_IDX (-1)
-
 #define SFEM_WARP_SIZE 32
 #define SFEM_WARP_FULL_MASK 0xffffffff
 
 typedef char mask_t;
 #define SFEM_MPI_MASK_T MPI_CHAR
-#define SFEM_INVALID_IDX (-1)
-
-// typedef long mask_t;
-// #define SFEM_MPI_MASK_T MPI_LONG
+#define SFEM_PTRDIFF_INVALID -1
 
 #endif  // SFEM_CONFIG_HPP

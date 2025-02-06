@@ -204,14 +204,14 @@ int main(int argc, char *argv[]) {
 
     idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
     for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
-        vol2surf[i] = -1;
+        vol2surf[i] = SFEM_IDX_INVALID;
     }
 
     ptrdiff_t next_id = 0;
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
         for (int d = 0; d < nnxs; ++d) {
             idx_t idx = surf_elems[d][i];
-            if (vol2surf[idx] < 0) {
+            if (vol2surf[idx] == SFEM_IDX_INVALID) {
                 vol2surf[idx] = next_id++;
             }
         }

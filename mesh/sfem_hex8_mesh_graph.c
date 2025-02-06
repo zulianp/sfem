@@ -178,7 +178,7 @@ ptrdiff_t nxe_max_node_id(const ptrdiff_t nelements, const int nxe, idx_t **cons
     return ret;
 }
 
-static SFEM_INLINE int hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {
+static SFEM_INLINE idx_t hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
@@ -189,10 +189,10 @@ static SFEM_INLINE int hex8_linear_search(const idx_t target, const idx_t *const
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int hex8_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static SFEM_INLINE idx_t hex8_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     if (lenrow <= 32) {
         return hex8_linear_search(key, row, lenrow);
     } else {
@@ -594,12 +594,12 @@ int sshex8_generate_elements(const int       L,
             for (int f = 0; f < 6; f++) {
                 element_idx_t neigh_element = adj_table[e * 6 + f];
                 // If this face is not boundary and it has already been processed continue
-                if (neigh_element != -1 && neigh_element < e) continue;
+                if (neigh_element != SFEM_ELEMENT_IDX_INVALID && neigh_element < e) continue;
 
                 idx_t global_face_offset = index_base + n_unique_faces * nxf;
                 index_face(L, m_elements, local_side_table, lagr_to_proteus_corners, coords, global_face_offset, e, f, elements);
 
-                if (neigh_element != -1) {
+                if (neigh_element != SFEM_ELEMENT_IDX_INVALID) {
                     // find same face on neigh element
                     int neigh_f;
                     for (neigh_f = 0; neigh_f < 6; neigh_f++) {
@@ -938,7 +938,7 @@ int sshex8_hierarchical_renumbering(const int       L,
     idx_t *node_mapping = malloc(nnodes * sizeof(idx_t));
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        node_mapping[i] = -1;
+        node_mapping[i] = SFEM_IDX_INVALID;
     }
 
     idx_t next_id = 0;
@@ -972,7 +972,7 @@ int sshex8_hierarchical_renumbering(const int       L,
                         const int   v   = sshex8_lidx(L, xi * step_factor, yi * step_factor, zi * step_factor);
                         const idx_t idx = elements[v][e];
                         assert(idx < nnodes);
-                        if (node_mapping[idx] == -1) {
+                        if (node_mapping[idx] == SFEM_IDX_INVALID) {
                             node_mapping[idx] = next_id++;
                         }
                     }
@@ -1003,7 +1003,7 @@ int sshex8_hierarchical_renumbering(const int       L,
                     const int   v   = sshex8_lidx(L, xi, yi, zi);
                     const idx_t idx = elements[v][e];
 
-                    if (node_mapping[idx] == -1) {
+                    if (node_mapping[idx] == SFEM_IDX_INVALID) {
                         printf("%d %d %d [%ld]\n", xi, yi, zi, e);
                         SFEM_ERROR("Uninitialized node mapping\n");
                     }
@@ -1507,7 +1507,7 @@ int ssquad4_hierarchical_remapping(const int                   L,
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        node_mapping[i] = -1;
+        node_mapping[i] = SFEM_IDX_INVALID;
     }
 
     idx_t next_id = 0;
@@ -1520,7 +1520,7 @@ int ssquad4_hierarchical_remapping(const int                   L,
                 const idx_t idx = elements[v][e];
 
                 assert(idx < nnodes);
-                if (node_mapping[idx] == -1) {
+                if (node_mapping[idx] == SFEM_IDX_INVALID) {
                     node_mapping[idx] = next_id++;
                 }
             }
@@ -1538,7 +1538,7 @@ int ssquad4_hierarchical_remapping(const int                   L,
                     const int   v   = ssquad4_lidx(L, xi * step_factor, yi * step_factor);
                     const idx_t idx = elements[v][e];
                     assert(idx < nnodes);
-                    if (node_mapping[idx] == -1) {
+                    if (node_mapping[idx] == SFEM_IDX_INVALID) {
                         node_mapping[idx] = next_id++;
                     }
                 }
@@ -1552,7 +1552,7 @@ int ssquad4_hierarchical_remapping(const int                   L,
                 const int   v   = ssquad4_lidx(L, xi, yi);
                 const idx_t idx = elements[v][e];
 
-                if (node_mapping[idx] == -1) {
+                if (node_mapping[idx] == SFEM_IDX_INVALID) {
                     printf("%d %d[%ld]\n", xi, yi, e);
                     SFEM_ERROR("Uninitialized node mapping\n");
                 }
@@ -1567,20 +1567,20 @@ int ssquad4_hierarchical_remapping(const int                   L,
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < *count_out; i++) {
-        (*node_mapping_out)[i] = -1;
+        (*node_mapping_out)[i] = SFEM_IDX_INVALID;
     }
 
 #endif
 
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        if (node_mapping[i] != -1) {
+        if (node_mapping[i] != SFEM_IDX_INVALID) {
             (*node_mapping_out)[node_mapping[i]] = i;
         }
     }
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < *count_out; i++) {
-        assert((*node_mapping_out)[i] != -1);
+        assert((*node_mapping_out)[i] != SFEM_IDX_INVALID);
     }
 
 #endif

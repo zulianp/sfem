@@ -40,7 +40,8 @@
 // LST(3, 1) = 3 - 1;
 // LST(3, 2) = 2 - 1;
 
-#define SFEM_INVALID_IDX (-1)
+
+
 
 static void sstet4_create_full_idx(const int L, mesh_t *mesh, idx_t **elements) {
     double tick = MPI_Wtime();
@@ -164,7 +165,7 @@ static void sstet4_create_full_idx(const int L, mesh_t *mesh, idx_t **elements) 
         for (ptrdiff_t e = 0; e < mesh->nelements; e++) {
             for (int f = 0; f < 4; f++) {
                 element_idx_t neigh_element = adj_table[e * 4 + f];
-                if (neigh_element == SFEM_INVALID_IDX) {
+                if (neigh_element == SFEM_ELEMENT_IDX_INVALID) {
                     // Is boundary face
 
                     for (int fn = 0; fn < nxf; fn++) {
@@ -274,15 +275,13 @@ int main(int argc, char *argv[]) {
     real_t *y = (real_t *)calloc(nnodes_discont, sizeof(real_t));
 
     if (!x || !y) {
-        fprintf(stderr, "Unable to allocate memory!\n");
-        MPI_Abort(MPI_COMM_WORLD, -1);
+        SFEM_ERROR("Unable to allocate memory!\n");
     }
 
     fff_t fff;
     int err = tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
     if (err) {
-        fprintf(stderr, "Unable to create FFFs!\n");
-        MPI_Abort(MPI_COMM_WORLD, -1);
+        SFEM_ERROR("Unable to create FFFs!\n");
     }
 
     for (ptrdiff_t i = 0; i < nnodes_discont; i++) {

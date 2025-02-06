@@ -46,7 +46,7 @@ extern "C" idx_t safe_find_idx_binary_search(const idx_t key, const idx_t *arr, 
 {
     auto low = std::lower_bound(arr, arr+size, key); 
     if(low == arr+size || key != *low) {
-        return -1;
+        return SFEM_IDX_INVALID;
     }
     return std::distance(arr, low);
 }

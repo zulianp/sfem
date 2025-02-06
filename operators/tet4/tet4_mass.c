@@ -106,8 +106,8 @@ static SFEM_INLINE void lumped_mass(const real_t px0,
     element_vector[3] = x4;
 }
 
-static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
-    int i;
+static SFEM_INLINE idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -117,10 +117,10 @@ static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr,
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     if (lenrow <= 32) {
         return linear_search(key, row, lenrow);
 

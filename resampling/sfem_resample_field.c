@@ -910,10 +910,8 @@ int resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
         default: {
-            assert(0);
-            fprintf(stderr, "Unknown element type %d\n", st);
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            return EXIT_FAILURE;
+            SFEM_ERROR("Unknown element type %d\n", st);
+            return SFEM_FAILURE;
         }
     }
 
@@ -1129,11 +1127,7 @@ int field_view_ensure_margin(MPI_Comm comm, const ptrdiff_t nnodes,
     MPI_Comm_size(comm, &size);
 
     if (size == 1) {
-        if (!rank) {
-            fprintf(stderr, "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
-        }
-
-        MPI_Abort(comm, -1);
+       SFEM_ERROR( "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
         return 1;
     }
 

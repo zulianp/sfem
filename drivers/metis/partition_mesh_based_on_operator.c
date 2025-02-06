@@ -38,8 +38,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (size > 1) {
-        fprintf(stderr, "Parallel runs are not supported!\n");
-        MPI_Abort(comm, -1);
+        SFEM_ERROR("Parallel runs are not supported!\n");
     }
 
     const char *folder = argv[1];

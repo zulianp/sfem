@@ -45,13 +45,11 @@ int laplacian_assemble_value(int                               element_type,
         //
         // }
         default: {
-            fprintf(stderr, "laplacian_assemble_value not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("laplacian_assemble_value not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int laplacian_apply(int                               element_type,
@@ -84,13 +82,11 @@ int laplacian_apply(int                               element_type,
             return hex8_laplacian_apply(nelements, nnodes, elements, points, u, values);
         }
         default: {
-            fprintf(stderr, "laplacian_apply not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("laplacian_apply not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int laplacian_assemble_gradient(int                               element_type,
@@ -134,13 +130,11 @@ int laplacian_crs(int                                element_type,
             return macro_tri3_laplacian_crs(nelements, nnodes, elements, points, rowptr, colidx, values);
         }
         default: {
-            fprintf(stderr, "laplacian_crs not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("laplacian_crs not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int laplacian_diag(int                          element_type,
@@ -172,13 +166,11 @@ int laplacian_diag(int                          element_type,
             return macro_tri3_laplacian_diag(nelements, nnodes, elements, points, values);
         }
         default: {
-            fprintf(stderr, "laplacian_diag not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("laplacian_diag not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int laplacian_apply_opt(int                                   element_type,
@@ -207,13 +199,11 @@ int laplacian_apply_opt(int                                   element_type,
             return macro_tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
         default: {
-            fprintf(stderr, "laplacian_apply_opt not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("laplacian_apply_opt not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
-    return -1;
+    return SFEM_FAILURE;
 }
 
 int laplacian_crs_sym(int                                element_type,
@@ -229,10 +219,8 @@ int laplacian_crs_sym(int                                element_type,
         case HEX8: {
             return hex8_laplacian_crs_sym(nelements, nnodes, elements, points, rowptr, colidx, diag, offdiag);
         }
-        ult : {
-            fprintf(stderr, "laplacian_crs_sym not implemented for type %s\n", type_to_string(element_type));
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+        default : {
+            SFEM_ERROR("laplacian_crs_sym not implemented for type %s\n", type_to_string(element_type));
         }
     }
 

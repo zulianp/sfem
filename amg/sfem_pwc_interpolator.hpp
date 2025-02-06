@@ -16,8 +16,8 @@ namespace sfem {
     class PiecewiseConstantInterpolator final : public Operator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        ptrdiff_t fine_dim{-1};
-        ptrdiff_t coarse_dim{-1};
+        ptrdiff_t fine_dim{SFEM_PTRDIFF_INVALID};
+        ptrdiff_t coarse_dim{SFEM_PTRDIFF_INVALID};
         bool transposed{false};
         BLAS_Tpl<T> blas;
 

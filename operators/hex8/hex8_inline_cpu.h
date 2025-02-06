@@ -157,10 +157,10 @@ static SFEM_INLINE void hex8_adjugate_and_det(const scalar_t *const SFEM_RESTRIC
                             jacobian[6] * x3 - jacobian[6] * x4;
 }
 
-static SFEM_INLINE int hex8_linear_search(const idx_t target,
+static SFEM_INLINE idx_t hex8_linear_search(const idx_t target,
                                           const idx_t *const arr,
                                           const int size) {
-    int i;
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -170,10 +170,10 @@ static SFEM_INLINE int hex8_linear_search(const idx_t target,
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int hex8_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static SFEM_INLINE idx_t hex8_find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     return hex8_linear_search(key, row, lenrow);
 }
 
@@ -206,7 +206,7 @@ static SFEM_INLINE void hex8_find_cols(const idx_t *SFEM_RESTRICT targets,
             fflush(stdout);
         }
         assert(ks[d] >= 0 && ks[d] < lenrow);
-        assert(ks[d] != -1);
+        assert(ks[d] != SFEM_IDX_INVALID);
         assert(targets[d] == row[ks[d]]);
     }
 #endif

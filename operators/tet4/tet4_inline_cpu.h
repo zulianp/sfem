@@ -14,10 +14,10 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-static SFEM_INLINE int tet4_linear_search(const idx_t target,
+static SFEM_INLINE idx_t tet4_linear_search(const idx_t target,
                                           const idx_t *const arr,
                                           const int size) {
-    int i;
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -27,10 +27,10 @@ static SFEM_INLINE int tet4_linear_search(const idx_t target,
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int tet4_find_col(const idx_t key,
+static SFEM_INLINE idx_t tet4_find_col(const idx_t key,
                                      const idx_t *const SFEM_RESTRICT row,
                                      const int lenrow) {
     if (lenrow <= 32) {

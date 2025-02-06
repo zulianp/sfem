@@ -13,7 +13,7 @@ namespace sfem {
     class LpSmoother final : public Operator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         BLAS_Tpl<T> blas;
         std::shared_ptr<Buffer<T>> inv_diag;
 
@@ -25,7 +25,7 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             blas.xypaz(n_dofs, inv_diag->data(), b, 1, x);
-            return 0;
+            return SFEM_SUCCESS;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }

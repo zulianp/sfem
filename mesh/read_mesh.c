@@ -178,7 +178,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < n_lnodes_temp; i++) {
-        mapping[i] = -1;
+        mapping[i] = SFEM_IDX_INVALID;
     }
 #endif
 
@@ -906,7 +906,7 @@ int mesh_read_generic(MPI_Comm comm,
                                 "Inconsistent lenghts in input %ld != %ld\n",
                                 (long)n_local_elements0,
                                 (long)n_local_elements);
-                        MPI_Abort(comm, -1);
+                        MPI_Abort(comm, SFEM_FAILURE);
                     }
                 }
             }
@@ -998,7 +998,7 @@ int serial_read_tet_mesh(const char *folder,
 
         if (x_nnodes != y_nnodes || x_nnodes != z_nnodes) {
             fprintf(stderr, "Bad input lengths!\n");
-            return -1;
+            return SFEM_FAILURE;
         }
 
         x_nnodes /= sizeof(geom_t);
@@ -1023,8 +1023,7 @@ int serial_read_tet_mesh(const char *folder,
         assert(nindex3 == nindex2);
 
         if (nindex0 != nindex1 || nindex0 != nindex2 || nindex0 != nindex3) {
-            fprintf(stderr, "Bad input lengths!\n");
-            return -1;
+            SFEM_ERROR("Bad input lengths!\n");
         }
 
         nindex0 /= sizeof(idx_t);
@@ -1032,7 +1031,7 @@ int serial_read_tet_mesh(const char *folder,
         *nelements = nindex0;
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
@@ -1067,11 +1066,7 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     MPI_Bcast(counts, 2, MPI_INT, 0, comm);
 
     if (!counts[0] || !counts[1]) {
-        if (!rank) {
-            fprintf(stderr, "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
-        }
-        assert(0);
-        MPI_Abort(comm, -1);
+        SFEM_ERROR( "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
     }
 
     return mesh_read_generic(comm, counts[0], counts[1], folder, mesh);
