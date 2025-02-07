@@ -728,12 +728,22 @@ hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t  
     ev[8] = __ldg(&elems.elems_v8[element_i]);
     ev[9] = __ldg(&elems.elems_v9[element_i]);
 
+    if (tile_rank == 0) {
 #pragma unroll
+        for (int v = 0; v < 10; ++v) {
+            // ISOPARAMETRIC
+            x[v] = __ldg(&xyz.x[ev[v]]);  // x-coordinates
+            y[v] = __ldg(&xyz.y[ev[v]]);  // y-coordinates
+            z[v] = __ldg(&xyz.z[ev[v]]);  // z-coordinates
+        }
+    }
+
+    tile.sync();
     for (int v = 0; v < 10; ++v) {
         // ISOPARAMETRIC
-        x[v] = __ldg(&xyz.x[ev[v]]);  // x-coordinates
-        y[v] = __ldg(&xyz.y[ev[v]]);  // y-coordinates
-        z[v] = __ldg(&xyz.z[ev[v]]);  // z-coordinates
+        x[v] = tile.shfl(x[v], 0);
+        y[v] = tile.shfl(y[v], 0);
+        z[v] = tile.shfl(z[v], 0);
     }
 
     // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
