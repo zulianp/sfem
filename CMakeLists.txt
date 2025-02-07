@@ -192,6 +192,14 @@ target_include_directories(
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
+if(SFEM_ENABLE_HXTSORT)
+    if(NOT SFEM_ENABLE_OPENMP)
+        message(FATAL_ERROR "Option -DSFEM_ENABLE_HXTSORT=ON requires -DSFEM_ENABLE_OPENMP=ON")
+    endif()
+    target_include_directories(sfem PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/HXTSort")
+    # target_compile_definitions(sfem PRIVATE "-D_XOPEN_SOURCE=600")
+endif()
+
 ######################################################
 # link
 

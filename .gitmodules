@@ -1,3 +1,6 @@
 [submodule "external/x86-simd-sort"]
 	path = external/x86-simd-sort
 	url = https://github.com/intel/x86-simd-sort.git
+[submodule "external/HXTSort"]
+	path = external/HXTSort
+	url = https://git.immc.ucl.ac.be/hextreme/HXTSort
