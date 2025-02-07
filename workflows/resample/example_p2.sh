@@ -158,6 +158,9 @@ echo $scaling
 Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
 Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
+Nsight_PATH=""
+Nsight_OUTPUT="/capstor/scratch/cscs/sriva/prof/grid_to_mesh"
+
 if [[ "$USE_MPI" == "1" ]]
 then
 	LAUNCH="mpiexec -np $n_procs"
@@ -168,8 +171,8 @@ then
 elif [[ "$USE_MPI_GH200" == "1" ]]
 then
 	# LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs -N 1 ./mps-wrapper.sh nsys profile --trace=mpi --mpi-impl=mpich -o /capstor/scratch/cscs/sriva/prof/grid_to_mesh_%h_%p  "
-	# LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs -N 1 ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o  /capstor/scratch/cscs/sriva/prof/grid_to_mesh_ncu  "
-	LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
+	LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs -N 1 ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o  /capstor/scratch/cscs/sriva/prof/grid_to_mesh_ncu  "
+#	LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 
 elif [[ "$USE_NSIGNT" == "1" ]]
 then
