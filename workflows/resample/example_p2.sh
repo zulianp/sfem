@@ -158,8 +158,8 @@ echo $scaling
 Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
 Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
-Nsight_PATH=""
-Nsight_OUTPUT="/capstor/scratch/cscs/sriva/prof/grid_to_mesh"
+# Nsight_PATH=""
+# Nsight_OUTPUT="/capstor/scratch/cscs/sriva/prof/grid_to_mesh"
 
 if [[ "$USE_MPI" == "1" ]]
 then
