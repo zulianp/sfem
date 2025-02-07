@@ -3,6 +3,7 @@
 #include "sfem_defs.h"
 
 #include "ssquad4.h"
+#include "argsort.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -595,31 +596,8 @@ int ssquad4_prolongation_crs_fill(const int                    level,
                     elements[corners[3]][i],
                 };
 
-                // Sorting network
-                int order[4] = {
-                    c[1] < c[0] ? 1 : 0,
-                    c[1] > c[0] ? 1 : 0,
-                    c[3] < c[2] ? 3 : 2,
-                    c[3] > c[2] ? 3 : 2,
-                };
-
-                if(c[order[2]] < c[order[0]]) {
-                    const int temp = order[0];
-                    order[0] = order[2];
-                    order[2] = temp;
-                }
-
-                if(c[order[3]] < c[order[1]]) {
-                    const int temp = order[1];
-                    order[1] = order[3];
-                    order[3] = temp;
-                }
-
-                if(c[order[3]] < c[order[2]]) {
-                    const int temp = order[2];
-                    order[2] = order[3];
-                    order[3] = temp;
-                }
+                int order[4] = {0, 1, 2, 3};
+                argsort_i(4, c, order);
 
                 assert(c[order[0]] < c[order[1]]);
                 assert(c[order[1]] < c[order[2]]);

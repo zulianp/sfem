@@ -3,6 +3,8 @@
 #include "sfem_API.hpp"
 #include "ssquad4_interpolate.h"
 
+#include "lumped_ptdp.h"
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
@@ -81,6 +83,7 @@ namespace sfem {
         int         linear_smoothing_steps             = 2;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
+        bool        ptdp_check                         = false;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -196,51 +199,95 @@ namespace sfem {
         auto &&fine_ssmesh = fs->semi_structured_mesh();
         auto   fine_sides  = contact_conds->ss_sides();
 
-        auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
+        auto            coarse_sides           = sfem::ssquad4_derefine_element_connectivity(fine_ssmesh.level(), 1, fine_sides);
         const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
-        auto coarse_node_mapping = sfem::view(contact_conds->node_mapping(), 0, n_coarse_contact_nodes);
+        auto            coarse_node_mapping    = sfem::view(contact_conds->node_mapping(), 0, n_coarse_contact_nodes);
 
-        auto coarse_normal_prod  = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
-        auto coarse_sbv = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
-        auto count = sfem::create_host_buffer<uint16_t>(contact_conds->n_constrained_dofs());
-
-        ssquad4_element_node_incidence_count(fine_ssmesh.level(), 1, fine_sides->extent(1), fine_sides->data(), count->data());
-        
-        // FIXME When SPMG does not converge this may be the reason (this restriction is not variationally consistent)
-        ssquad4_restrict(fine_sides->extent(1),  // nelements
-                         fine_ssmesh.level(),    // from_level
-                         1,                      // from_level_stride
-                         fine_sides->data(),     // from_elements
-                         count->data(),          // from_element_to_node_incidence_count
-                         1,                      // to_level
-                         1,                      // to_level_stride
-                         coarse_sides->data(),   // to_elements
-                         6,                      // vec_size
-                         fine_sbv->data()->data(),
-                         coarse_sbv->data()->data());
-
-        auto c_restriction = sfem::make_op<real_t>(
-                coarse_node_mapping->size(),
-                contact_conds->node_mapping()->size(),
-                [=](const real_t *const from, real_t *const to) {
-                    auto &fine_ssmesh = fs->semi_structured_mesh();
-                    ssquad4_restrict(fine_sides->extent(1),  // nelements
-                                     fine_ssmesh.level(),    // from_level
-                                     1,                      // from_level_stride
-                                     fine_sides->data(),     // from_elements
-                                     count->data(),          // from_element_to_node_incidence_count
-                                     1,                      // to_level
-                                     1,                      // to_level_stride
-                                     coarse_sides->data(),   // to_elements
-                                     1,                      // vec_size
-                                     from,
-                                     to);
-                },
-                es);
+        auto coarse_normal_prod = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
+        auto coarse_sbv         = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
 
         mg->add_level_constraint_op_x_op(fine_sbv);
-        mg->add_constraints_restriction(c_restriction);
         mg->add_level_constraint_op_x_op(coarse_sbv);
+
+        // CRS-based with lumping
+        if (ptdp_check) {
+            ptrdiff_t nconstr = contact_conds->node_mapping()->size();
+            auto      rowptr  = sfem::create_host_buffer<count_t>(nconstr + 1);
+            ssquad4_prolongation_crs_nnz(fine_ssmesh.level(),
+                                         fine_sides->extent(1),
+                                         fine_sides->data(),
+                                         contact_conds->node_mapping()->size(),
+                                         rowptr->data());
+
+            auto colidx = sfem::create_host_buffer<idx_t>(rowptr->data()[nconstr]);
+            auto values = sfem::create_host_buffer<real_t>(rowptr->data()[nconstr]);
+
+            ssquad4_prolongation_crs_fill(fine_ssmesh.level(),
+                                          fine_sides->extent(1),
+                                          fine_sides->data(),
+                                          nconstr,
+                                          rowptr->data(),
+                                          colidx->data(),
+                                          values->data());
+
+            lumped_ptdp_crs_v(nconstr,
+                              rowptr->data(),
+                              colidx->data(),
+                              values->data(),
+                              sym_block_size,
+                              fine_sbv->data()->data(),
+                              coarse_sbv->data()->data());
+
+            auto c_restriction = sfem::make_op<real_t>(
+                    coarse_node_mapping->size(),
+                    contact_conds->node_mapping()->size(),
+                    [=](const real_t *const from, real_t *const to) {
+                        SFEM_TRACE_SCOPE("lumped_ptdp_crs");
+                        lumped_ptdp_crs(nconstr, rowptr->data(), colidx->data(), values->data(), from, to);
+                    },
+                    es);
+
+            mg->add_constraints_restriction(c_restriction);
+
+        } else {
+            auto count = sfem::create_host_buffer<uint16_t>(contact_conds->n_constrained_dofs());
+            ssquad4_element_node_incidence_count(
+                    fine_ssmesh.level(), 1, fine_sides->extent(1), fine_sides->data(), count->data());
+            // FIXME When SPMG does not converge this may be the reason (this restriction is not variationally consistent)
+            ssquad4_restrict(fine_sides->extent(1),  // nelements
+                             fine_ssmesh.level(),    // from_level
+                             1,                      // from_level_stride
+                             fine_sides->data(),     // from_elements
+                             count->data(),          // from_element_to_node_incidence_count
+                             1,                      // to_level
+                             1,                      // to_level_stride
+                             coarse_sides->data(),   // to_elements
+                             sym_block_size,         // vec_size
+                             fine_sbv->data()->data(),
+                             coarse_sbv->data()->data());
+
+            auto c_restriction = sfem::make_op<real_t>(
+                    coarse_node_mapping->size(),
+                    contact_conds->node_mapping()->size(),
+                    [=](const real_t *const from, real_t *const to) {
+                        SFEM_TRACE_SCOPE("ssquad4_restrict");
+                        auto &fine_ssmesh = fs->semi_structured_mesh();
+                        ssquad4_restrict(fine_sides->extent(1),  // nelements
+                                         fine_ssmesh.level(),    // from_level
+                                         1,                      // from_level_stride
+                                         fine_sides->data(),     // from_elements
+                                         count->data(),          // from_element_to_node_incidence_count
+                                         1,                      // to_level
+                                         1,                      // to_level_stride
+                                         coarse_sides->data(),   // to_elements
+                                         1,                      // vec_size
+                                         from,
+                                         to);
+                    },
+                    es);
+
+            mg->add_constraints_restriction(c_restriction);
+        }
 
         ////////////////////////////////////////////////////////////////////////////////////
         mg->debug = true;

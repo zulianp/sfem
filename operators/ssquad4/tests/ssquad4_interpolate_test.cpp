@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "sfem_test.h"
+#include "lumped_ptdp.h"
 
 static int test_restrict_level2_to_level1() {
     real_t from[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
@@ -312,29 +313,6 @@ static int test_level1_to_level4() {
     }
 
     return SFEM_TEST_SUCCESS;
-}
-
-int lumped_ptdp_crs(const ptrdiff_t                    fine_nodes,
-                    const count_t *const SFEM_RESTRICT rowptr,
-                    const idx_t *const SFEM_RESTRICT   colidx,
-                    const real_t *const SFEM_RESTRICT  values,
-                    const real_t *const SFEM_RESTRICT  diagonal,
-                    real_t *const SFEM_RESTRICT        coarse) {
-    for (ptrdiff_t m = 0; m < fine_nodes; m++) {
-        const count_t len = rowptr[m + 1] - rowptr[m];
-        const real_t  d   = diagonal[m];
-
-        const idx_t *const  cols = &colidx[rowptr[m]];
-        const real_t *const vals = &values[rowptr[m]];
-
-        for (count_t k = 0; k < len; k++) {
-            for (count_t l = 0; l < len; l++) {
-                coarse[cols[k]] += vals[k] * vals[l] * d;
-            }
-        }
-    }
-
-    return SFEM_SUCCESS;
 }
 
 int test_basic_interpolation_matrix() {

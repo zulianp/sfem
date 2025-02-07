@@ -32,9 +32,9 @@ test_output=decomp.txt
 # refine $mesh refined
 
 
-export OMP_NUM_THREAD=2
+export OMP_NUM_THREAD=1
 export OMP_PROC_BIND=true
-time mpiexec -np 4 partition refined partitioned
+time mpiexec -np 8 partition refined partitioned
 
 # mkdir -p $matrix
 
