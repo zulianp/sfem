@@ -163,17 +163,37 @@ handle_print_performance_metrics_tet4(const char*   kernel_name,      //
         output_file_print = fopen(filename, "w");
     }
 
-    // This function must be called by all ranks
+    // This function must be called by all ranks since they are used to calculate the total metrics
     // Internally it will check if the rank is 0
-    // All ranks are used to calculate the performance metrics
-    print_performance_metrics_tet4(
-            stdout, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+    print_performance_metrics_tet4(stdout,           //
+                                   kernel_name,      //
+                                   mpi_rank,         //
+                                   mpi_size,         //
+                                   seconds,          //
+                                   file,             //
+                                   line,             //
+                                   function,         //
+                                   n_points_struct,  //
+                                   npq,              //
+                                   mesh);            //
 
     if (print_to_file == 1) {
-        print_performance_metrics_tet4(
-                output_file_print, kernel_name, mpi_rank, mpi_size, seconds, file, line, function, n_points_struct, npq, mesh);
+        print_performance_metrics_tet4(output_file_print,  //
+                                       kernel_name,        //
+                                       mpi_rank,           //
+                                       mpi_size,           //
+                                       seconds,            //
+                                       file,               //
+                                       line,               //
+                                       function,           //
+                                       n_points_struct,    //
+                                       npq,                //
+                                       mesh);              //
 
-        if (output_file_print != NULL) fclose(output_file_print);
+        if (output_file_print != NULL) {
+            fclose(output_file_print);
+            output_file_print = NULL;
+        }
     }
 }
 
@@ -212,16 +232,19 @@ lumped_mass_cu(const real_t px0, const real_t px1, const real_t px2, const real_
     // FLOATING POINT OPS!
     //       - Result: 4*ASSIGNMENT
     //       - Subexpressions: 11*ADD + 16*DIV + 48*MUL + 12*SUB
-    const real_t x0 = (1.0 / 24.0) * px0;
-    const real_t x1 = (1.0 / 24.0) * px1;
-    const real_t x2 = (1.0 / 24.0) * px2;
-    const real_t x3 = (1.0 / 24.0) * px3;
-    const real_t x4 = (1.0 / 24.0) * px0 * py1 * pz3 + (1.0 / 24.0) * px0 * py2 * pz1 + (1.0 / 24.0) * px0 * py3 * pz2 +
-                      (1.0 / 24.0) * px1 * py0 * pz2 + (1.0 / 24.0) * px1 * py2 * pz3 + (1.0 / 24.0) * px1 * py3 * pz0 +
-                      (1.0 / 24.0) * px2 * py0 * pz3 + (1.0 / 24.0) * px2 * py1 * pz0 + (1.0 / 24.0) * px2 * py3 * pz1 +
-                      (1.0 / 24.0) * px3 * py0 * pz1 + (1.0 / 24.0) * px3 * py1 * pz2 + (1.0 / 24.0) * px3 * py2 * pz0 -
+
+    const real_t r1_24 = 1.0 / 24.0;
+
+    const real_t x0 = r1_24 * px0;
+    const real_t x1 = r1_24 * px1;
+    const real_t x2 = r1_24 * px2;
+    const real_t x3 = r1_24 * px3;
+    const real_t x4 = r1_24 * px0 * py1 * pz3 + r1_24 * px0 * py2 * pz1 + r1_24 * px0 * py3 * pz2 + r1_24 * px1 * py0 * pz2 +
+                      r1_24 * px1 * py2 * pz3 + r1_24 * px1 * py3 * pz0 + r1_24 * px2 * py0 * pz3 + r1_24 * px2 * py1 * pz0 +
+                      r1_24 * px2 * py3 * pz1 + r1_24 * px3 * py0 * pz1 + r1_24 * px3 * py1 * pz2 + r1_24 * px3 * py2 * pz0 -
                       py0 * pz1 * x2 - py0 * pz2 * x3 - py0 * pz3 * x1 - py1 * pz0 * x3 - py1 * pz2 * x0 - py1 * pz3 * x2 -
                       py2 * pz0 * x1 - py2 * pz1 * x3 - py2 * pz3 * x0 - py3 * pz0 * x2 - py3 * pz1 * x0 - py3 * pz2 * x1;
+
     element_vector[0] = x4;
     element_vector[1] = x4;
     element_vector[2] = x4;
@@ -614,8 +637,6 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     //
     PRINT_CURRENT_FUNCTION;
 
-    //
-    //
     if (SFEM_LOG_LEVEL >= 5) {
         printf("=============================================\n");
         printf("== tet4_resample_field_local_reduce_CUDA ====\n");
@@ -747,34 +768,34 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
         // tet4_resample_field_reduce_local_kernel_v2<<<grid,  //
         //                                              block>>>(
 
-        tet4_resample_field_reduce_local_kernel<<<numBlocks,  //
-                                                  threadsPerBlock>>>(
+        tet4_resample_field_reduce_local_kernel<<<numBlocks,                        //
+                                                  threadsPerBlock>>>(zero_element,  //
+                                                                     nelements,     //
+                                                                     nnodes,        //
+                                                                     elems_device,  //
+                                                                     xyz_device,    //
+                                                                     //  NULL, //
 
-                zero_element,  //
-                nelements,     //
-                nnodes,        //
-                elems_device,  //
-                xyz_device,    //
-                //  NULL, //
+                                                                     stride[0],
+                                                                     stride[1],
+                                                                     stride[2],
 
-                stride[0],
-                stride[1],
-                stride[2],
+                                                                     origin[0],
+                                                                     origin[1],
+                                                                     origin[2],
 
-                origin[0],
-                origin[1],
-                origin[2],
+                                                                     delta[0],
+                                                                     delta[1],
+                                                                     delta[2],
 
-                delta[0],
-                delta[1],
-                delta[2],
+                                                                     data_device,
+                                                                     weighted_field_device);
 
-                data_device,
-                weighted_field_device);
+        cudaDeviceSynchronize();
 
-        cudaError_t error = cudaGetLastError();
-        if (error != cudaSuccess) {
-            printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
+        cudaError_t error_kernel = cudaGetLastError();
+        if (error_kernel != cudaSuccess) {
+            printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error_kernel));
         }
     }
     //////////////////////////////////////
@@ -782,18 +803,12 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     //////////////////////////////////////
 
     // Stop the timer
-    cudaDeviceSynchronize();
 
     MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
     const double clock_ms = get_time_tet4(start, end);
-
-    const double time = clock_ms / 1000.0;
-
-    // if (error != cudaSuccess) {
-    //     printf("!!!!!!!! ERROR: %s  !!!!!!!!!!!!!!!!!!!!!!!!!\n", cudaGetErrorString(error));
-    // }
+    const double time     = clock_ms / 1000.0;
 
     // end kernel
     ///////////////////////////////////////////////////////////////////////////////
