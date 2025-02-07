@@ -2,27 +2,21 @@
 
 # ##############################################################################
 option(BUILD_SHARED_LIBS "build shared libraries" OFF)
-# option(USE_XSDK_DEFAULTS "XSDK mode" OFF)
-
-# option(SFEM_ENABLE_SANITIZER "check for memory access problems" OFF)
-option(SFEM_ENABLE_GLIBCXX_DEBUG
-       "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
-option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
-option(SFEM_ENABLE_DEV_MODE
-       "Add additional flags for more strict compilation" OFF)
-
-option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
-option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
-option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
-
-option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
+option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
-option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
-option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
-option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
-option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
+option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
+option(SFEM_ENABLE_DEV_MODE "Add additional flags for more strict compilation" OFF)
 option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
+option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
+option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
+option(SFEM_ENABLE_HXTSORT "Enable HXTSort library for unsigned indices" OFF)
+option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
+option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
+option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
+option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
+option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
+option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
 
 
 if(WIN32)        
