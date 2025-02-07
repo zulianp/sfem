@@ -19,8 +19,8 @@
 
 #define MY_RESTRICT __restrict__
 
-#define __WARP_SIZE__ 32
-#define WENO_CUDA 1
+// #define __TET10_TILE_SIZE__ 32
+// #define WENO_CUDA 1
 
 #if SFEM_TET10_WENO == ON
 #define CUBE1 1
@@ -317,12 +317,13 @@ print_performance_metrics_tet10(FILE*         output_file,      //
 
     fprintf(output_file, "============================================================================\n");
     fprintf(output_file, "GPU TET10:    Time for the kernel (%s):\n", kernel_name);
+    fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
     fprintf(output_file, "GPU TET10:    MPI rank: %d\n", mpi_rank);
     fprintf(output_file, "GPU TET10:    MPI size: %d\n", mpi_size);
     fprintf(output_file, "GPU TET10:    %d-bit real_t\n", real_t_bits);
     fprintf(output_file, "GPU TET10:    Memory model: %s\n", memory_model);
+    fprintf(output_file, "GPU TET10:    Tile size: %d\n", __TET10_TILE_SIZE__);
     fprintf(output_file, "GPU TET10:    %f seconds\n", seconds);
-    fprintf(output_file, "GPU TET10:    file: %s:%d \n", file, line);
     fprintf(output_file, "GPU TET10:    function:                  %s\n", function);
     fprintf(output_file, "GPU TET10:    Number of elements:        %d.\n", tot_nelements);
     fprintf(output_file, "GPU TET10:    Number of nodes:           %d.\n", tot_nnodes);
@@ -400,7 +401,7 @@ calculate_threads_and_blocks(ptrdiff_t  nelements,        //
                              ptrdiff_t* threadsPerBlock,  //
                              ptrdiff_t* numBlocks) {      //
 
-    *threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    *threadsPerBlock = warp_per_block * __TET10_TILE_SIZE__;
     *numBlocks       = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
 }
 
@@ -725,7 +726,7 @@ hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,  
 
     // Number of threads
     const ptrdiff_t warp_per_block  = 8;
-    const ptrdiff_t threadsPerBlock = warp_per_block * __WARP_SIZE__;
+    const ptrdiff_t threadsPerBlock = warp_per_block * __TET10_TILE_SIZE__;
 
     // Number of blocks
     const ptrdiff_t numBlocks = (nelements / warp_per_block) + (nelements % warp_per_block) + 1;
@@ -739,15 +740,17 @@ hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,  
     char kernel_name[] = "hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel";
 #endif
 
-    printf("============================================================================\n");
-    printf("GPU:    Host Memory Model [Default] \n");
-    printf("GPU:    Launching the kernel %s \n", kernel_name);
-    printf("GPU:    Number of blocks:            %ld\n", numBlocks);
-    printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
-    printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
-    printf("GPU:    Number of elements:          %ld\n", nelements);
-    printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
-    printf("============================================================================\n");
+    if (SFEM_LOG_LEVEL >= 5) {
+        printf("============================================================================\n");
+        printf("GPU:    Host Memory Model [Default] \n");
+        printf("GPU:    Launching the kernel %s \n", kernel_name);
+        printf("GPU:    Number of blocks:            %ld\n", numBlocks);
+        printf("GPU:    Number of threads per block: %ld\n", threadsPerBlock);
+        printf("GPU:    Total number of threads:     %ld\n", (numBlocks * threadsPerBlock));
+        printf("GPU:    Number of elements:          %ld\n", nelements);
+        printf("GPU:    Use WENO:                    %s\n", (WENO_CUDA == 1 & CUBE1 == 1) ? "Yes" : "No");
+        printf("============================================================================\n");
+    }
 
     cudaDeviceSynchronize();
 
