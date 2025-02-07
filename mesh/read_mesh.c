@@ -437,7 +437,7 @@ int mesh_read_generic(MPI_Comm comm,
             memcpy(&unique_idx[d * n_local_elements], elems[d], sizeof(idx_t) * n_local_elements);
         }
 
-        ptrdiff_t n_unique = sortreduce(unique_idx, n_local_elements * nnodesxelem);
+        ptrdiff_t n_unique = psortreduce(unique_idx, n_local_elements * nnodesxelem);
 
         ////////////////////////////////////////////////////////////////////////////////
         // Read coordinates
