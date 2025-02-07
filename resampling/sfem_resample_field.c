@@ -1061,16 +1061,6 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
             RETURN_FROM_FUNCTION(ret);
         }
 
-        // ret = tet4_resample_field_local_reduce_CUDA(mesh->nelements,  //
-        //                                             mesh->nnodes,     //
-        //                                             mesh->elements,   //
-        //                                             mesh->points,     //
-        //                                             nlocal,           //
-        //                                             stride,           //
-        //                                             origin,           //
-        //                                             delta,            //
-        //                                             data,             //
-        //                                             g);               //
 #endif
     }
 
