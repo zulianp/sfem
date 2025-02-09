@@ -598,7 +598,7 @@ namespace sfem {
             auto c_restriction = sfem::make_op<real_t>(
                     coarse_node_mapping->size(),
                     fine_mapping->size(),
-                    [=](const real_t *const from, real_t *const to) {
+                    [=, f_coarse = functions[i]](const real_t *const from, real_t *const to) {
                         SFEM_TRACE_SCOPE("ssquad4_restrict");
                         ssquad4_restrict(fine_sides->extent(1),  // nelements
                                          level,                  // from_level
@@ -611,6 +611,21 @@ namespace sfem {
                                          1,                      // vec_size
                                          from,
                                          to);
+
+                        if (debug) {
+                            auto d_buff = sfem::create_host_buffer<real_t>(f_coarse->space()->n_dofs());
+
+                            ptrdiff_t n = coarse_node_mapping->size();
+                            auto      d = d_buff->data();
+                            auto      m = coarse_node_mapping->data();
+
+                            for (ptrdiff_t i = 0; i < n; i++) {
+                                d[m[i] * 3] = to[i];
+                            }
+
+                            static int count = 0;
+                            f_coarse->output()->write(("d" + std::to_string(count++)).c_str(), d);
+                        }
                     },
                     es);
 
