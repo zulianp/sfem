@@ -61,7 +61,7 @@ int test_contact() {
     });
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.11, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
