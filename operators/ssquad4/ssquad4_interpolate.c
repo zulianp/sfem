@@ -596,7 +596,7 @@ int ssquad4_prolongation_crs_fill(const int                    level,
                     elements[corners[3]][i],
                 };
 
-                int order[4] = {0, 1, 2, 3};
+                idx_t order[4] = {0, 1, 2, 3};
                 argsort_i(4, c, order);
 
                 assert(c[order[0]] < c[order[1]]);

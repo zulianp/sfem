@@ -56,9 +56,10 @@ int test_contact() {
     }
 #endif
 
-    auto top_ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (y_top - 1e-5) && y < (y_top + 1e-5); });
-    
+    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+    });
+
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
@@ -75,22 +76,22 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = sfem::create_sdf(comm,
-                                SFEM_BASE_RESOLUTION * 10,
-                                SFEM_BASE_RESOLUTION * 10,
-                                SFEM_BASE_RESOLUTION * 10,
-                                -0.5,
-                                -0.5,
-                                -0.5,
-                                1.5,
-                                1.5,
-                                1.5,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
+                                -0.1,
+                                -0.2,
+                                -0.1,
+                                1.1,
+                                y_top + 0.2,
+                                1.1,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    const geom_t cx = 0.6 * (1 - (x - .5)*(x - .5));
-                                    const geom_t cz = 0.6 * (1 - (z - .5)*(z - .5));
-                                    const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16) ;
-                                    const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16) ;;
-                                    const geom_t obstacle = -0.1 - fx - fz;
-                                    // const geom_t obstacle = -0.1;
+                                    // const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
+                                    // const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
+                                    // const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
+                                    // const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
+                                    // const geom_t obstacle = -0.1 - fx - fz;
+                                    const geom_t obstacle = -0.1;
                                     return obstacle - y;
                                 });
 
@@ -116,8 +117,8 @@ int test_contact() {
     out->write("gap", gap->data());
     out->write("rhs", rhs->data());
 
-#if 1 // FIXME
-// #if 1 
+#if 1  // FIXME
+       // #if 1
     auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
     // auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr); // This works!
     f->apply_constraints(x->data());

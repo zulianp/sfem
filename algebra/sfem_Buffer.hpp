@@ -251,6 +251,24 @@ namespace sfem {
                 end - begin, &buffer->data()[begin], [keep_alive = buffer](void *) { (void)keep_alive; }, buffer->mem_space());
     }
 
+    template <typename T>
+    std::shared_ptr<Buffer<T *>> view(const std::shared_ptr<Buffer<T *>> &buffer,
+                                      const ptrdiff_t                     begin0,
+                                      const ptrdiff_t                     end0,
+                                      const ptrdiff_t                     begin1,
+                                      const ptrdiff_t                     end1) {
+        const ptrdiff_t extent0 = end0 - begin0;
+        const ptrdiff_t extent1 = end1 - begin1;
+
+        T **new_buffer = (T **)malloc(extent0 * sizeof(T *));
+        for (ptrdiff_t i0 = 0; i0 < extent0; i0++) {
+            new_buffer[i0] = &(buffer->data()[begin0 + i0][begin1]);
+        }
+
+        return std::make_shared<Buffer<T *>>(
+                extent0, extent1, new_buffer, [keep_alive = buffer](int, void *buff) { free(buff); }, buffer->mem_space());
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP
