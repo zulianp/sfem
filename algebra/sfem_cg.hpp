@@ -166,7 +166,7 @@ namespace sfem {
             T rtr = rtr0;
 
             if (rtr0 == 0) {
-                return 0;
+                return SFEM_SUCCESS;
             }
 
             T* p  = blas.allocate(n);

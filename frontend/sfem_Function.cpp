@@ -554,13 +554,14 @@ namespace sfem {
             n_unique_nodes += 1;
         }
 
+        int sdim = this->impl_->points->extent(0);
         auto ret                   = std::make_shared<SemiStructuredMesh>();
         ret->impl_->macro_mesh     = this->impl_->macro_mesh;
         ret->impl_->level          = to_level;
         ret->impl_->elements       = view;
         ret->impl_->n_unique_nodes = n_unique_nodes;
         ret->impl_->interior_start = this->impl_->interior_start;
-        ret->impl_->points         = this->impl_->points;
+        ret->impl_->points         = sfem::view(this->impl_->points, 0, sdim, 0, n_unique_nodes);
         return ret;
     }
 
