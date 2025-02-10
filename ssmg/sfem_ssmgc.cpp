@@ -416,7 +416,7 @@ namespace sfem {
 
         // Coarse level
         auto f_coarse  = functions.back();
-        auto linear_op = sfem::create_linear_operator("MF", f_coarse, nullptr, es);
+        auto linear_op = sfem::create_linear_operator("BSR", f_coarse, nullptr, es);
         operators.push_back(linear_op);
 
         // Coarse-grid solver
