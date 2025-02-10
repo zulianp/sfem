@@ -76,9 +76,9 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = sfem::create_sdf(comm,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 20,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 1,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5,
                                 -0.1,
                                 -0.2,
                                 -0.1,
@@ -88,8 +88,14 @@ int test_contact() {
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
                                     const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
                                     const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
-                                    const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
-                                    const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
+                                    
+                                    geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
+                                    geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
+                                    fx += 0.005 * cos(cx * 3.14 * 32);
+                                    fz += 0.005 * cos(cz * 3.14 * 32);
+                                    fx += 0.0025 * cos(cx * 3.14 * 64);
+                                    fz += 0.0025 * cos(cz * 3.14 * 64);
+
                                     const geom_t obstacle = -0.1 - fx - fz;
                                     // const geom_t obstacle = -0.1;
                                     return obstacle - y;

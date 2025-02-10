@@ -321,7 +321,7 @@ namespace sfem {
         std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
 
         T   penalty_param_{10};  // mu
-        T   max_penalty_param_{100000};
+        T   max_penalty_param_{10000};
         int nlsmooth_steps{3};
         int max_inner_it{3};
 
