@@ -86,9 +86,11 @@ int test_contact() {
                                 y_top + 0.2,
                                 1.1,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+#if 0
+                                    // High-freq surface
                                     const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
                                     const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
-                                    
+
                                     geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
                                     geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
                                     fx += 0.005 * cos(cx * 3.14 * 32);
@@ -96,8 +98,8 @@ int test_contact() {
                                     fx += 0.0025 * cos(cx * 3.14 * 64);
                                     fz += 0.0025 * cos(cz * 3.14 * 64);
 
-                                    fx += 0.001 * cos(3.14  + cx * 3.14 * 128);
-                                    fz += 0.001 * cos(3.14  + cz * 3.14 * 128);
+                                    fx += 0.001 * cos(3.14 + cx * 3.14 * 128);
+                                    fz += 0.001 * cos(3.14 + cz * 3.14 * 128);
                                     fx += 0.001 * cos(cx * 3.14 * 256);
                                     fz += 0.001 * cos(cz * 3.14 * 256);
 
@@ -105,8 +107,20 @@ int test_contact() {
                                     fz += 0.001 * cos(cz * 3.14 * 512);
 
                                     const geom_t obstacle = -0.1 - fx - fz;
-                                    // const geom_t obstacle = -0.1;
+                                    const geom_t obstacle = -0.1;
                                     return obstacle - y;
+#else
+                                    // Half-sphere
+                                    geom_t cx = 0.5, cy = -0.5, cz = 0.5;
+                                    geom_t radius = 0.5;
+
+                                    geom_t dx = cx - x;
+                                    geom_t dy = cy - y;
+                                    geom_t dz = cz - z;
+
+                                    geom_t dd = radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                    return dd;
+#endif
                                 });
 
     sfem::create_directory("test_contact");
@@ -131,15 +145,20 @@ int test_contact() {
     out->write("gap", gap->data());
     out->write("rhs", rhs->data());
 
-#if 1  // FIXME
-       // #if 1
-    auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
-    // auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr); // This works!
     f->apply_constraints(x->data());
-    solver->apply(rhs->data(), x->data());
+
+    int SFEM_USE_SPMG = 1;
+    SFEM_READ_ENV(SFEM_USE_SPMG, atoi);
+
+    if (SFEM_USE_SPMG) {
+        auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+        solver->apply(rhs->data(), x->data());
+    } else {
+        auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr);
+        solver->apply(rhs->data(), x->data());
+    }
 
     out->write("disp", x->data());
-#endif
     return SFEM_TEST_SUCCESS;
 }
 
