@@ -554,14 +554,18 @@ namespace sfem {
             n_unique_nodes += 1;
         }
 
-        int sdim = this->impl_->points->extent(0);
         auto ret                   = std::make_shared<SemiStructuredMesh>();
         ret->impl_->macro_mesh     = this->impl_->macro_mesh;
         ret->impl_->level          = to_level;
         ret->impl_->elements       = view;
         ret->impl_->n_unique_nodes = n_unique_nodes;
         ret->impl_->interior_start = this->impl_->interior_start;
-        ret->impl_->points         = sfem::view(this->impl_->points, 0, sdim, 0, n_unique_nodes);
+
+        if (this->impl_->points) {
+            int sdim           = this->impl_->macro_mesh->spatial_dimension();
+            ret->impl_->points = sfem::view(this->impl_->points, 0, sdim, 0, n_unique_nodes);
+        }
+
         return ret;
     }
 
@@ -592,10 +596,7 @@ namespace sfem {
         return impl_->points;
     }
 
-    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements()
-    {
-        return impl_->elements;
-    }
+    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements() { return impl_->elements; }
 
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
@@ -1979,7 +1980,6 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
 
-
         long   calls{0};
         double total_time{0};
 
@@ -2031,8 +2031,7 @@ namespace sfem {
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        ~LinearElasticity()
-        {
+        ~LinearElasticity() {
             if (calls) {
                 printf("LinearElasticity::apply called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
