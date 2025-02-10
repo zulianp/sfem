@@ -242,6 +242,10 @@ namespace sfem {
             const T rtz0 = blas.dot(n, r, z);
             T       rtz  = rtz0;
 
+            if(rtz == 0) {
+                return SFEM_SUCCESS;
+            }
+
             monitor(0, sqrt(rtz), 1);
 
             {
