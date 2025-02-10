@@ -61,7 +61,7 @@ int test_contact() {
     });
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.11, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.08, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -86,12 +86,12 @@ int test_contact() {
                                 y_top + 0.2,
                                 1.1,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    // const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
-                                    // const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
-                                    // const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
-                                    // const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
-                                    // const geom_t obstacle = -0.1 - fx - fz;
-                                    const geom_t obstacle = -0.1;
+                                    const geom_t cx = 0.6 * (1 - (x - .5) * (x - .5));
+                                    const geom_t cz = 0.6 * (1 - (z - .5) * (z - .5));
+                                    const geom_t fx = 0.1 * cos(cx * 3.14 * 8) * cx * cx + 0.02 * cos(cx * 3.14 * 16);
+                                    const geom_t fz = 0.1 * cos(cz * 3.14 * 8) * cz * cz + 0.02 * cos(cx * 3.14 * 16);
+                                    const geom_t obstacle = -0.1 - fx - fz;
+                                    // const geom_t obstacle = -0.1;
                                     return obstacle - y;
                                 });
 

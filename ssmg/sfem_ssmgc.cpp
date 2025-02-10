@@ -307,15 +307,17 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 3;
+        int         nlsmooth_steps                     = 10;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
-        int         linear_smoothing_steps             = 1;
+        int         linear_smoothing_steps             = 2;
+        int         coarse_linear_smoothing_steps = 10;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
-        bool        debug                              = true;
+        real_t      max_penalty_param = 1e4;
+        bool        debug                              = false;
         std::string debug_folder                       = "debug_ssmgc";
 
         if (in) {
@@ -403,7 +405,11 @@ namespace sfem {
             sj->relaxation_parameter = 1. / fsi->block_size();
             auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
 
-            smoother->set_max_it(linear_smoothing_steps);
+            if(i == 0) {
+                smoother->set_max_it(linear_smoothing_steps);
+            } else {
+                smoother->set_max_it(coarse_linear_smoothing_steps);
+            }
             smoothers_or_solver.push_back(smoother);
         }
 
@@ -565,7 +571,6 @@ namespace sfem {
         auto fine_mapping = contact_conds->node_mapping();
 
         for (int i = 1; i < nlevels; i++) {
-            printf("fine_sides: %zu %zu\n", fine_sides->extent(0), fine_sides->extent(1));
             auto      fine_space   = functions[i - 1]->space();
             const int level        = fine_space->semi_structured_mesh().level();
             auto      coarse_space = functions[i]->space();
@@ -582,6 +587,14 @@ namespace sfem {
 
             auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
             ssquad4_element_node_incidence_count(level, 1, fine_sides->extent(1), fine_sides->data(), count->data());
+
+            // printf("Contact (level=%d):"
+            //        "fine_sides: %zu %zu\n"
+            //        "Node map %ld\n",
+            //        i,
+            //        fine_sides->extent(0),
+            //        fine_sides->extent(1),
+            //        coarse_node_mapping->size());
 
             ssquad4_restrict(fine_sides->extent(1),  // nelements
                              level,                  // from_level
@@ -656,7 +669,8 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         mg->debug = true;
         mg->enable_line_search(enable_line_search);
-        mg->set_max_it(1);
+        mg->set_max_it(50);
+        mg->set_max_penalty_param(max_penalty_param);
         // mg->skip_coarse = true;
         return mg;
     }

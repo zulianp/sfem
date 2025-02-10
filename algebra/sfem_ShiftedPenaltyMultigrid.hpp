@@ -279,7 +279,7 @@ namespace sfem {
 
         void set_cycle_type(const int val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
-
+        void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
         bool skip_coarse{false};
@@ -327,6 +327,7 @@ namespace sfem {
 
         ptrdiff_t count_smoothing_steps{0};
 
+        
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
         inline int coarser_level(int level) const { return level + 1; }
@@ -367,8 +368,12 @@ namespace sfem {
         }
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
-            auto J = operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
-            return J;
+            if (constraints_op_) {
+                return operator_[level] +
+                       sfem::create_sparse_block_vector_mult(constraints_op_x_op_[level], memory_[level]->diag);
+            } else {
+                return operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
+            }
         }
 
         void eval_residual_and_jacobian() {
@@ -514,8 +519,7 @@ namespace sfem {
                         sop->apply(correction->data(), mem->work->data());
                         alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
 
-                        if(debug)
-                            printf("alpha = %g\n", alpha);
+                        if (debug) printf("alpha = %g\n", alpha);
 
                         blas_.scal(correction->size(), alpha, correction->data());
                     }
@@ -553,7 +557,7 @@ namespace sfem {
             auto smoother = smoother_[level];
             auto op       = operator_[level];
             auto sop      = shifted_op(level);
-            
+
             const ptrdiff_t n_dofs = op->rows();
 
             assert(n_dofs == mem->solution->size());
@@ -592,6 +596,10 @@ namespace sfem {
 
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
+                    // printf("level = %d, Constr size %ld, op(%ld, %ld) \n", level, mem->diag->size(), op->rows(), op->cols());
+                    // constraints_op_x_op_[level]->print(std::cout);
+                    // mem->diag->print(std::cout);
+
                     smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
                 } else {
                     smoother->set_op_and_diag_shift(op, mem->diag);
