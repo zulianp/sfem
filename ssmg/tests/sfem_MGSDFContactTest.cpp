@@ -76,9 +76,9 @@ int test_contact() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
     auto sdf = sfem::create_sdf(comm,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 1,
-                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5 * 2,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 1 * 2,
+                                SFEM_ELEMENT_REFINE_LEVEL * SFEM_BASE_RESOLUTION * 5 * 2,
                                 -0.1,
                                 -0.2,
                                 -0.1,
@@ -95,6 +95,14 @@ int test_contact() {
                                     fz += 0.005 * cos(cz * 3.14 * 32);
                                     fx += 0.0025 * cos(cx * 3.14 * 64);
                                     fz += 0.0025 * cos(cz * 3.14 * 64);
+
+                                    fx += 0.001 * cos(3.14  + cx * 3.14 * 128);
+                                    fz += 0.001 * cos(3.14  + cz * 3.14 * 128);
+                                    fx += 0.001 * cos(cx * 3.14 * 256);
+                                    fz += 0.001 * cos(cz * 3.14 * 256);
+
+                                    fx += 0.001 * cos(cx * 3.14 * 512);
+                                    fz += 0.001 * cos(cz * 3.14 * 512);
 
                                     const geom_t obstacle = -0.1 - fx - fz;
                                     // const geom_t obstacle = -0.1;
