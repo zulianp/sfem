@@ -319,6 +319,7 @@ namespace sfem {
         real_t      max_penalty_param = 1e4;
         bool        debug                              = false;
         std::string debug_folder                       = "debug_ssmgc";
+        int max_inner_it = 5;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -670,6 +671,7 @@ namespace sfem {
         mg->debug = true;
         mg->enable_line_search(enable_line_search);
         mg->set_max_it(50);
+        mg->set_max_inner_it(max_inner_it);
         mg->set_max_penalty_param(max_penalty_param);
         // mg->skip_coarse = true;
         return mg;
