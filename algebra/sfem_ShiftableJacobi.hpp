@@ -289,6 +289,8 @@ namespace sfem {
         }
 
         void set_diag(const std::shared_ptr<Buffer<T>>& d) {
+            SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::set_diag");
+
             assert(block_size == 3);
             assert(is_symmetric);
             assert(execution_space_ == EXECUTION_SPACE_HOST);
@@ -304,6 +306,8 @@ namespace sfem {
 
         // TODO shift by sparse block vector
         int shift(const std::shared_ptr<Buffer<T>>& d) override {
+            SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::shift");
+
             assert(d->size() == diag->size());
 
             sym_diag_to_diag(diag, inv_diag);
@@ -315,6 +319,8 @@ namespace sfem {
         }
 
         int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
+            SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::shift");
+
             sym_diag_to_diag(diag, inv_diag);
             add_sparse_sym_diag_to_diag(block_diag, scaling, inv_diag);
             apply_mask(inv_diag);
@@ -325,6 +331,8 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const x, T* const y) override {
+            SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::apply");
+
             const ptrdiff_t n_blocks = inv_diag->size() / (block_size * block_size);
 
             const T* const dd = inv_diag->data();

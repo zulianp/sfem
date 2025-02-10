@@ -268,6 +268,7 @@ namespace sfem {
         }
 
         void set_max_it(const int val) { max_it_ = val; }
+        void set_max_inner_it(const int val) { max_inner_it = val; }
 
         void set_atol(const T val) { atol_ = val; }
 
