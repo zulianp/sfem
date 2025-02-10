@@ -137,11 +137,20 @@ namespace sfem {
                 mg->add_level(operators[i], smoothers_or_solver[i], prolongation, restriction);
             }
 
+            auto prolong_unconstr =
+                    sfem::create_hierarchical_prolongation(functions.back()->space(), functions[nlevels - 2]->space(), es);
+
+            auto prolongation = sfem::make_op<real_t>(
+                    prolong_unconstr->rows(),
+                    prolong_unconstr->cols(),
+                    [prolong_unconstr, f = functions.back()](const real_t *const from, real_t *const to) {
+                        prolong_unconstr->apply(from, to);
+                        f->apply_zero_constraints(to);
+                    },
+                    es);
+
             // Coarse level
-            mg->add_level(operators.back(),
-                          smoothers_or_solver.back(),
-                          sfem::create_hierarchical_prolongation(functions.back()->space(), functions[nlevels - 2]->space(), es),
-                          nullptr);
+            mg->add_level(operators.back(), smoothers_or_solver.back(), prolongation, nullptr);
         }
 
 #ifdef SFEM_ENABLE_CUDA

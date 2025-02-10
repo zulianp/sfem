@@ -356,7 +356,11 @@ namespace sfem {
                 }
 
                 memory_[l]->work = make_buffer(n);
-                memory_[l]->diag = make_buffer(n);
+                if (constraints_op_) {
+                    memory_[l]->diag = make_buffer(constraints_op_x_op_[l]->n_blocks());
+                } else {
+                    memory_[l]->diag = make_buffer(n);
+                }
             }
 
             return 0;
@@ -390,7 +394,7 @@ namespace sfem {
 
                 // Solution space to constraints space
                 constraints_op_->apply(mem->solution->data(), correction->data());
-                blas_.zeros(n_dofs, mem->diag->data());
+                blas_.zeros(n_constrained_dofs, mem->diag->data());
 
                 blas_.zeros(n_constrained_dofs, mem->diag->data());
                 impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
@@ -457,7 +461,7 @@ namespace sfem {
                 eval_residual_and_jacobian();
 
                 if (constraints_op_) {
-                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[finest_level()], mem->diag);
+                    smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
                 } else {
                     smoother->set_op_and_diag_shift(op, mem->diag);
                 }
@@ -550,7 +554,11 @@ namespace sfem {
             auto op       = operator_[level];
             auto sop      = shifted_op(level);
             
-            ptrdiff_t n_dofs = op->rows();
+            const ptrdiff_t n_dofs = op->rows();
+
+            assert(n_dofs == mem->solution->size());
+            assert(n_dofs == mem->rhs->size());
+
             if (coarsest_level() == level) {
                 if (constraints_op_) {
                     smoother->set_op_and_diag_shift(op, constraints_op_x_op_[level], mem->diag);
