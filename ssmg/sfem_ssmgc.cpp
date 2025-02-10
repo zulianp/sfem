@@ -313,7 +313,7 @@ namespace sfem {
         std::string fine_op_type                       = "MF";
         std::string coarse_op_type                     = "MF";
         int         linear_smoothing_steps             = 1;
-        bool        enable_coarse_space_preconditioner = false;
+        bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
         bool        debug                              = true;
         std::string debug_folder                       = "debug_ssmgc";
@@ -594,6 +594,24 @@ namespace sfem {
                              sym_block_size,         // vec_size
                              fine_sbv->data()->data(),
                              coarse_sbv->data()->data());
+            if (debug) {
+                auto      f_coarse = functions[i];
+                auto      buff     = sfem::create_host_buffer<real_t>(f_coarse->space()->n_dofs());
+                auto      csbv     = coarse_sbv->data()->data();
+                ptrdiff_t n        = coarse_node_mapping->size();
+                auto      d        = buff->data();
+                auto      m        = coarse_node_mapping->data();
+
+                for (int b = 0; b < 2; b++) {
+                    for (ptrdiff_t i = 0; i < n; i++) {
+                        d[m[i] * 3 + 0] = csbv[i * 6 + b * 3 + 0];
+                        d[m[i] * 3 + 1] = csbv[i * 6 + b * 3 + 1];
+                        d[m[i] * 3 + 2] = csbv[i * 6 + b * 3 + 2];
+                    }
+
+                    f_coarse->output()->write(("sbv" + std::to_string(b)).c_str(), d);
+                }
+            }
 
             auto c_restriction = sfem::make_op<real_t>(
                     coarse_node_mapping->size(),
