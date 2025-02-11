@@ -115,11 +115,11 @@ namespace sfem {
 
             Stats::header(os);
 
-            real_t prev_rate = stats[0].energy_norm_correction;
+            real_t prev_norm = stats[0].energy_norm_correction;
             for (auto& s : stats) {
                 os << s;
-                os << s.energy_norm_correction / prev_rate << "\n";
-                prev_rate = s.energy_norm_correction;
+                os << s.energy_norm_correction / prev_norm << "\n";
+                prev_norm = s.energy_norm_correction;
             }
 
             os.close();
