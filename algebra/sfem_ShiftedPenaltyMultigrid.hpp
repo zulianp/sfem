@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -65,6 +66,65 @@ namespace sfem {
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
+        struct Stats {
+            int    count_iter;
+            int    count_mg_cycles;
+            int    count_nl_smooth;
+            int    count_smooth;
+            real_t norm_penetration;
+            real_t norm_residual;
+            real_t energy_norm_correction;
+
+            static void header(std::ostream& os) {
+                os << "count_iter,";
+                os << "count_mg_cycles,";
+                os << "count_nl_smooth,";
+                os << "count_smooth,";
+                os << "norm_penetration,";
+                os << "norm_residual,";
+                os << "energy_norm_correction,";
+                os << "rate\n";
+
+            }
+
+            friend std::ostream& operator<<(std::ostream& os, const Stats& stats) {
+                os << stats.count_iter << ",";
+                os << stats.count_mg_cycles << ",";
+                os << stats.count_nl_smooth << ",";
+                os << stats.count_smooth << ",";
+                os << stats.norm_penetration << ",";
+                os << stats.norm_residual << ",";
+                os << stats.energy_norm_correction << ",";
+                return os;
+            }
+        };
+
+        std::vector<struct Stats> stats;
+        void                      collect_stats(struct Stats s) { stats.push_back(s); }
+
+        void write_stats() {
+            const char* SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH = "./spmg_stats.csv";
+            SFEM_READ_ENV(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH, );
+
+            std::ofstream os(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH);
+            if (!os.good()) {
+                fprintf(stderr,
+                        "Unable to open file SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH=%s\n",
+                        SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH);
+            }
+
+            Stats::header(os);
+
+            real_t prev_rate = stats[0].energy_norm_correction;
+            for (auto& s : stats) {
+                os << s;
+                os << s.energy_norm_correction / prev_rate << "\n";
+                prev_rate = s.energy_norm_correction;
+            }
+
+            os.close();
+        }
+
         int apply(const T* const rhs, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
 
@@ -100,6 +160,12 @@ namespace sfem {
             int count_inner_iter        = 0;
             int count_lagr_mult_updates = 0;
             T   omega                   = 1 / penalty_param_;
+
+            std::shared_ptr<Buffer<T>> x_old;
+            if (collect_energy_norm_correction_) {
+                x_old = make_buffer(n_dofs);
+                blas_.copy(n_dofs, x, x_old->data());
+            }
 
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
@@ -170,14 +236,15 @@ namespace sfem {
                 const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
-                if (norm_pen < penetration_tol) {
-                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                count_lagr_mult_updates++;
 
+                // I moved the previous three lines outside of the if
+                if (norm_pen < penetration_tol) {
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
                     omega           = omega / penalty_param_;
 
-                    count_lagr_mult_updates++;
                 } else {
                     penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
                     penetration_tol = 1 / pow(penalty_param_, 0.1);
@@ -192,7 +259,7 @@ namespace sfem {
                     printf("lagr_lb: %e\n", blas_.norm2(n_constrained_dofs, lagr_lb->data()));
                 }
 
-                monitor(iterations_,
+                monitor(iterations_ + 1,
                         count_inner_iter,
                         count_smoothing_steps,
                         count_lagr_mult_updates,
@@ -201,13 +268,33 @@ namespace sfem {
                         penetration_tol,
                         penalty_param_);
 
+                real_t energy_norm_correction = -1;
+                if (collect_energy_norm_correction_) {
+                    SFEM_TRACE_SCOPE("collect_energy_norm_correction");
+
+                    blas_.zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
+                    blas_.zeros(n_dofs, x_old->data());
+                    op->apply(correction->data(), x_old->data());
+                    energy_norm_correction = sqrt(blas_.dot(n_dofs, x_old->data(), correction->data()));
+                    blas_.copy(n_dofs, x, x_old->data());
+                }
+
+                collect_stats({.count_iter             = iterations_ + 1,
+                               .count_mg_cycles        = count_inner_iter,
+                               .count_nl_smooth        = (count_inner_iter * nlsmooth_steps),
+                               .count_smooth           = count_smoothing_steps,
+                               .norm_penetration       = norm_pen,
+                               .norm_residual          = norm_rpen,
+                               .energy_norm_correction = energy_norm_correction});
+
                 if (norm_pen < atol_ && norm_rpen < atol_) {
                     converged = true;
                     break;
                 }
             }
 
-            return 0;
+            write_stats();
+            return SFEM_SUCCESS;
         }
 
         void monitor(const int iter,
@@ -281,9 +368,13 @@ namespace sfem {
         void set_cycle_type(const int val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
         void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
+        void set_penalty_param(const real_t val) { penalty_param_ = val; }
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
 
         bool skip_coarse{false};
+        bool collect_energy_norm_correction_{false};
+
+        void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>>               operator_;
@@ -325,10 +416,8 @@ namespace sfem {
         T   max_penalty_param_{10000};
         int nlsmooth_steps{3};
         int max_inner_it{3};
+        int count_smoothing_steps{0};
 
-        ptrdiff_t count_smoothing_steps{0};
-
-        
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
         inline int coarser_level(int level) const { return level + 1; }

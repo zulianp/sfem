@@ -307,19 +307,21 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 10;
+        int         nlsmooth_steps                     = 6;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
-        std::string coarse_op_type                     = "MF";
+        std::string coarse_op_type                     = "BSR";
         int         linear_smoothing_steps             = 2;
-        int         coarse_linear_smoothing_steps = 10;
+        int         coarse_linear_smoothing_steps      = 10;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
-        real_t      max_penalty_param = 1e4;
+        real_t      max_penalty_param                  = 1e6;
+        real_t      penalty_param                      = 100;
         bool        debug                              = false;
         std::string debug_folder                       = "debug_ssmgc";
-        int max_inner_it = 5;
+        int         max_inner_it                       = 5;
+        bool        collect_energy_norm_correction     = true;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -393,7 +395,7 @@ namespace sfem {
         for (int i = 0; i < nlevels - 1; i++) {
             auto fi        = functions[i];
             auto fsi       = fi->space();
-            auto linear_op = sfem::create_linear_operator("MF", fi, nullptr, es);
+            auto linear_op = sfem::create_linear_operator(fine_op_type.c_str(), fi, nullptr, es);
             operators.push_back(linear_op);
 
             auto diag = sfem::create_buffer<real_t>(fsi->n_dofs() / fsi->block_size() * sym_block_size, es);
@@ -406,7 +408,7 @@ namespace sfem {
             sj->relaxation_parameter = 1. / fsi->block_size();
             auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
 
-            if(i == 0) {
+            if (i == 0) {
                 smoother->set_max_it(linear_smoothing_steps);
             } else {
                 smoother->set_max_it(coarse_linear_smoothing_steps);
@@ -416,7 +418,7 @@ namespace sfem {
 
         // Coarse level
         auto f_coarse  = functions.back();
-        auto linear_op = sfem::create_linear_operator("BSR", f_coarse, nullptr, es);
+        auto linear_op = sfem::create_linear_operator(coarse_op_type.c_str(), f_coarse, nullptr, es);
         operators.push_back(linear_op);
 
         // Coarse-grid solver
@@ -673,6 +675,9 @@ namespace sfem {
         mg->set_max_it(50);
         mg->set_max_inner_it(max_inner_it);
         mg->set_max_penalty_param(max_penalty_param);
+        mg->set_penalty_param(penalty_param);
+        mg->set_atol(1e-12);
+        mg->collect_energy_norm_correction(collect_energy_norm_correction);
         // mg->skip_coarse = true;
         return mg;
     }
