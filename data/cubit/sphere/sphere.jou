@@ -1,0 +1,63 @@
+reset
+create sphere radius 1.4 inner radius 1.25 
+create sphere radius 1.25
+merge all
+
+webcut body all xplane
+webcut body all yplane
+webcut body all zplane
+delete volume 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+merge all
+
+webcut body all cylinder radius 0.85 axis z imprint
+merge all
+
+compress all
+
+# Mesh top of cylinder
+surface 9  Scheme TriPrimitive
+surface 9  size auto factor 10
+mesh surface 9 
+
+# Mesh cyliner
+volume 3 4  redistribute nodes off 
+volume 3 4  Scheme Sweep sweep transform Translate  propagate bias  
+volume 3 4  autosmooth target off 
+volume 3 4  size auto factor 7
+
+ # Outer layers
+curve 1  interval 1
+curve 1  scheme equal
+
+ # Inner layers
+curve 6  interval 4
+curve 6  scheme equal
+mesh volume 3 4 
+
+
+# Inner Side
+surface 14  size auto factor 10
+surface 14  Scheme TriPrimitive
+mesh surface 14 
+volume 2  redistribute nodes off 
+volume 2  Scheme Sweep sweep transform Translate  propagate bias  
+volume 2  autosmooth target off 
+mesh volume 2 
+
+# Outer Side
+surface 5  size auto factor 10
+surface 5  Scheme Auto
+mesh surface 5 
+volume 1  redistribute nodes off 
+volume 1  Scheme Sweep sweep transform Translate  propagate bias  
+volume 1  autosmooth target off 
+mesh volume 1
+
+# Make the rest of the sphere
+Volume all copy reflect x 
+Volume all copy reflect z 
+Volume all copy reflect y 
+merge all
+
+#Blocks
+block 1 add volume 2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32 
