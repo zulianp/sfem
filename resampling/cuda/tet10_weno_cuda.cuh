@@ -609,91 +609,91 @@ weno4_3D_HOne_cuda(const real_type  x,         //
 
     real_type w1 = weno4_2D_HOne_cuda(x,
                                       y,
-                                      f[0 * stride_x + 0 * stride_y + 0 * stride_z],
-                                      f[1 * stride_x + 0 * stride_y + 0 * stride_z],
-                                      f[2 * stride_x + 0 * stride_y + 0 * stride_z],
-                                      f[3 * stride_x + 0 * stride_y + 0 * stride_z],
+                                      __ldg(&f[0 * stride_x + 0 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 0 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 0 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 0 * stride_y + 0 * stride_z]),
                                       //
-                                      f[0 * stride_x + 1 * stride_y + 0 * stride_z],
-                                      f[1 * stride_x + 1 * stride_y + 0 * stride_z],
-                                      f[2 * stride_x + 1 * stride_y + 0 * stride_z],
-                                      f[3 * stride_x + 1 * stride_y + 0 * stride_z],
+                                      __ldg(&f[0 * stride_x + 1 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 1 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 1 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 1 * stride_y + 0 * stride_z]),
                                       //
-                                      f[0 * stride_x + 2 * stride_y + 0 * stride_z],
-                                      f[1 * stride_x + 2 * stride_y + 0 * stride_z],
-                                      f[2 * stride_x + 2 * stride_y + 0 * stride_z],
-                                      f[3 * stride_x + 2 * stride_y + 0 * stride_z],
+                                      __ldg(&f[0 * stride_x + 2 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 2 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 2 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 2 * stride_y + 0 * stride_z]),
                                       //
-                                      f[0 * stride_x + 3 * stride_y + 0 * stride_z],
-                                      f[1 * stride_x + 3 * stride_y + 0 * stride_z],
-                                      f[2 * stride_x + 3 * stride_y + 0 * stride_z],
-                                      f[3 * stride_x + 3 * stride_y + 0 * stride_z]);
+                                      __ldg(&f[0 * stride_x + 3 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 3 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 3 * stride_y + 0 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 3 * stride_y + 0 * stride_z]));
 
     real_type w2 = weno4_2D_HOne_cuda(x,
                                       y,  //
-                                      f[0 * stride_x + 0 * stride_y + 1 * stride_z],
-                                      f[1 * stride_x + 0 * stride_y + 1 * stride_z],
-                                      f[2 * stride_x + 0 * stride_y + 1 * stride_z],
-                                      f[3 * stride_x + 0 * stride_y + 1 * stride_z],
+                                      __ldg(&f[0 * stride_x + 0 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 0 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 0 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 0 * stride_y + 1 * stride_z]),
                                       //
-                                      f[0 * stride_x + 1 * stride_y + 1 * stride_z],
-                                      f[1 * stride_x + 1 * stride_y + 1 * stride_z],
-                                      f[2 * stride_x + 1 * stride_y + 1 * stride_z],
-                                      f[3 * stride_x + 1 * stride_y + 1 * stride_z],
+                                      __ldg(&f[0 * stride_x + 1 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 1 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 1 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 1 * stride_y + 1 * stride_z]),
                                       //
-                                      f[0 * stride_x + 2 * stride_y + 1 * stride_z],
-                                      f[1 * stride_x + 2 * stride_y + 1 * stride_z],
-                                      f[2 * stride_x + 2 * stride_y + 1 * stride_z],
-                                      f[3 * stride_x + 2 * stride_y + 1 * stride_z],
+                                      __ldg(&f[0 * stride_x + 2 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 2 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 2 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 2 * stride_y + 1 * stride_z]),
                                       //
-                                      f[0 * stride_x + 3 * stride_y + 1 * stride_z],
-                                      f[1 * stride_x + 3 * stride_y + 1 * stride_z],
-                                      f[2 * stride_x + 3 * stride_y + 1 * stride_z],
-                                      f[3 * stride_x + 3 * stride_y + 1 * stride_z]);
+                                      __ldg(&f[0 * stride_x + 3 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 3 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 3 * stride_y + 1 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 3 * stride_y + 1 * stride_z]));
 
     real_type w3 = weno4_2D_HOne_cuda(x,
                                       y,  //
-                                      f[0 * stride_x + 0 * stride_y + 2 * stride_z],
-                                      f[1 * stride_x + 0 * stride_y + 2 * stride_z],
-                                      f[2 * stride_x + 0 * stride_y + 2 * stride_z],
-                                      f[3 * stride_x + 0 * stride_y + 2 * stride_z],
+                                      __ldg(&f[0 * stride_x + 0 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 0 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 0 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 0 * stride_y + 2 * stride_z]),
                                       //
-                                      f[0 * stride_x + 1 * stride_y + 2 * stride_z],
-                                      f[1 * stride_x + 1 * stride_y + 2 * stride_z],
-                                      f[2 * stride_x + 1 * stride_y + 2 * stride_z],
-                                      f[3 * stride_x + 1 * stride_y + 2 * stride_z],
+                                      __ldg(&f[0 * stride_x + 1 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 1 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 1 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 1 * stride_y + 2 * stride_z]),
                                       //
-                                      f[0 * stride_x + 2 * stride_y + 2 * stride_z],
-                                      f[1 * stride_x + 2 * stride_y + 2 * stride_z],
-                                      f[2 * stride_x + 2 * stride_y + 2 * stride_z],
-                                      f[3 * stride_x + 2 * stride_y + 2 * stride_z],
+                                      __ldg(&f[0 * stride_x + 2 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 2 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 2 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 2 * stride_y + 2 * stride_z]),
                                       //
-                                      f[0 * stride_x + 3 * stride_y + 2 * stride_z],
-                                      f[1 * stride_x + 3 * stride_y + 2 * stride_z],
-                                      f[2 * stride_x + 3 * stride_y + 2 * stride_z],
-                                      f[3 * stride_x + 3 * stride_y + 2 * stride_z]);
+                                      __ldg(&f[0 * stride_x + 3 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 3 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 3 * stride_y + 2 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 3 * stride_y + 2 * stride_z]));
 
     real_type w4 = weno4_2D_HOne_cuda(x,
                                       y,  //
-                                      f[0 * stride_x + 0 * stride_y + 3 * stride_z],
-                                      f[1 * stride_x + 0 * stride_y + 3 * stride_z],
-                                      f[2 * stride_x + 0 * stride_y + 3 * stride_z],
-                                      f[3 * stride_x + 0 * stride_y + 3 * stride_z],
+                                      __ldg(&f[0 * stride_x + 0 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 0 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 0 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 0 * stride_y + 3 * stride_z]),
                                       //
-                                      f[0 * stride_x + 1 * stride_y + 3 * stride_z],
-                                      f[1 * stride_x + 1 * stride_y + 3 * stride_z],
-                                      f[2 * stride_x + 1 * stride_y + 3 * stride_z],
-                                      f[3 * stride_x + 1 * stride_y + 3 * stride_z],
+                                      __ldg(&f[0 * stride_x + 1 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 1 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 1 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 1 * stride_y + 3 * stride_z]),
                                       //
-                                      f[0 * stride_x + 2 * stride_y + 3 * stride_z],
-                                      f[1 * stride_x + 2 * stride_y + 3 * stride_z],
-                                      f[2 * stride_x + 2 * stride_y + 3 * stride_z],
-                                      f[3 * stride_x + 2 * stride_y + 3 * stride_z],
+                                      __ldg(&f[0 * stride_x + 2 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 2 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 2 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 2 * stride_y + 3 * stride_z]),
                                       //
-                                      f[0 * stride_x + 3 * stride_y + 3 * stride_z],
-                                      f[1 * stride_x + 3 * stride_y + 3 * stride_z],
-                                      f[2 * stride_x + 3 * stride_y + 3 * stride_z],
-                                      f[3 * stride_x + 3 * stride_y + 3 * stride_z]);
+                                      __ldg(&f[0 * stride_x + 3 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[1 * stride_x + 3 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[2 * stride_x + 3 * stride_y + 3 * stride_z]),
+                                      __ldg(&f[3 * stride_x + 3 * stride_y + 3 * stride_z]));
 
     real_type wz = weno4_HOne_cuda(z, w1, w2, w3, w4);
 
