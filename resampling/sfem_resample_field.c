@@ -923,15 +923,18 @@ int resample_field_local(
 // resample_field /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-int resample_field(
-        // Mesh
-        const enum ElemType element_type, const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
-        geom_t** const SFEM_RESTRICT xyz,
-        // SDF
-        const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
-        const geom_t* const SFEM_RESTRICT origin, const geom_t* const SFEM_RESTRICT delta, const real_t* const SFEM_RESTRICT data,
-        // Output
-        real_t* const SFEM_RESTRICT g, sfem_resample_field_info* info) {
+int resample_field(const enum ElemType                  element_type,  // Mesh: element type
+                   const ptrdiff_t                      nelements,     // Mesh: number of elements
+                   const ptrdiff_t                      nnodes,        // Mesh: number of nodes
+                   idx_t** const SFEM_RESTRICT          elems,         // Mesh: connectivity
+                   geom_t** const SFEM_RESTRICT         xyz,           // Mesh: coordinates
+                   const ptrdiff_t* const SFEM_RESTRICT n,             // Sdf: number of nodes in each direction
+                   const ptrdiff_t* const SFEM_RESTRICT stride,        // Sdf: stride of the data
+                   const geom_t* const SFEM_RESTRICT    origin,        // Sdf: origin ox oy oz
+                   const geom_t* const SFEM_RESTRICT    delta,         // Sdf: delta dx dy dz
+                   const real_t* const SFEM_RESTRICT    data,          // Sdf: data
+                   real_t* const SFEM_RESTRICT          g,             // Sdf: gap function (output)
+                   sfem_resample_field_info*            info) {                   // Output
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -1067,7 +1070,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
     real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
 
     {
-        enum ElemType st = shell_type(mesh->element_type);
+        enum ElemType st = shell_type(mesh->element_type);  // The only possible outcome for TET4 is INVALID
         st               = (st == INVALID) ? mesh->element_type : st;
         assemble_lumped_mass(st,               //
                              mesh->nelements,  //
@@ -1084,7 +1087,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
         // exchange ghost nodes and add contribution
         if (mpi_size > 1) {
-            // perform_exchange_operations(mesh, mass_vector, g);
+            perform_exchange_operations(mesh, mass_vector, g);
         }  // end if mpi_size > 1
 
         // divide by the mass vector
