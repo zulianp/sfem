@@ -29,7 +29,6 @@ class LinearElasticityOpSymbolic:
 
 		point = coeffs('p', dims)
 		
-	
 		trial_grad = fe.trial_grad(q, dims)
 		test_grad  = fe.test_grad(q, dims)
 
@@ -127,7 +126,6 @@ class LinearElasticityOpSymbolic:
 		# 					H[i, j] = sp.simplify(H[i, j].subs(trial_grad[d0][d1, d2], test_grad[d0][d1, d2]))
 		# 		expr.append(ast.Assignment(var, H[i, j]))
 		# c_code(expr)
-
 
 class LinearElasticityOpTaylor:	
 	def __init__(self, fe):
@@ -398,6 +396,27 @@ class LinearElasticityOp:
 		c_log(S)
 		c_log(row_sum)
 
+	def cauchy_stress(self):
+		def assign_matrix(name, mat):
+			rows, cols = mat.shape
+			expr = []
+			for i in range(0, rows):
+				for j in range(0, cols):
+					var = sp.symbols(f'{name}[{i*cols + j}]')
+					expr.append(ast.Assignment(var, mat[i, j]))
+			return expr
+
+		dims = self.fe.manifold_dim()
+		de = self.de
+
+		if dims == 2:
+			CauchyStress = sp.Matrix(3, 1, [de[0, 0], de[0, 1], de[1, 1]])
+		elif dims == 3:
+			CauchyStress = sp.Matrix(6, 1, [de[0, 0], de[0, 1], de[0, 2], de[1, 1], de[1, 2], de[2, 2] ])
+
+		return assign_matrix("cauchy_stress", CauchyStress)
+
+
 	def hessian(self):
 		H = self.integr_hessian
 		rows, cols = H.shape
@@ -646,10 +665,17 @@ def main():
 	# c_log("--------------------------")
 	# c_code(op.apply())
 
+	# c_log("--------------------------")
+	# c_log("hessian_diag")	
+	# c_log("--------------------------")
+	# c_code(op.hessian_diag())
+
+
 	c_log("--------------------------")
-	c_log("hessian_diag")	
+	c_log("cauchy_stress")	
 	c_log("--------------------------")
-	c_code(op.hessian_diag())
+	c_code(op.cauchy_stress())
+
 
 	stop = perf_counter()
 	console.print(f'Overall: {stop - start} seconds')
