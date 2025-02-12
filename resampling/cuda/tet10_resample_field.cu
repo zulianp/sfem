@@ -48,21 +48,21 @@
  * @param g_device
  * @return int
  */
-int                                                                                               //
-launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int numBlocks,                       //
-                                                       const int threadsPerBlock,                 //
-                                                       const int bool_assemble_dual_mass_vector,  // assemble dual mass vector
-                                                       int       nelements,                       //
-                                                       ptrdiff_t nnodes,                          //
-                                                       elems_tet10_device                   elems_device,  //
-                                                       xyz_tet10_device                     xyz_device,    //
-                                                       const ptrdiff_t* const SFEM_RESTRICT n,             //
-                                                       const ptrdiff_t* const SFEM_RESTRICT stride,        //
-                                                       const geom_t* const SFEM_RESTRICT    origin,        //
-                                                       const geom_t* const SFEM_RESTRICT    delta,         //
-                                                       const real_t*                        data_device,   //
-                                                       real_t*                              mass_vector,   //
-                                                       real_t*                              g_device) {                                 //
+int                                                                                                                          //
+launch_kernels_hex8_to_tet10_resample_field_local_CUDA(const int                            numBlocks,                       //
+                                                       const int                            threadsPerBlock,                 //
+                                                       const int                            bool_assemble_dual_mass_vector,  //
+                                                       int                                  nelements,                       //
+                                                       ptrdiff_t                            nnodes,                          //
+                                                       elems_tet10_device                   elems_device,                    //
+                                                       xyz_tet10_device                     xyz_device,                      //
+                                                       const ptrdiff_t* const SFEM_RESTRICT n,                               //
+                                                       const ptrdiff_t* const SFEM_RESTRICT stride,                          //
+                                                       const geom_t* const SFEM_RESTRICT    origin,                          //
+                                                       const geom_t* const SFEM_RESTRICT    delta,                           //
+                                                       const real_t*                        data_device,                     //
+                                                       real_t*                              mass_vector,                     //
+                                                       real_t*                              g_device) {                                                   //
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -742,6 +742,7 @@ hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,  
 
     if (SFEM_LOG_LEVEL >= 5) {
         printf("============================================================================\n");
+        printf("GPU:    file: %s:%d \n", __FILE__, __LINE__);
         printf("GPU:    Host Memory Model [Default] \n");
         printf("GPU:    Launching the kernel %s \n", kernel_name);
         printf("GPU:    Number of blocks:            %ld\n", numBlocks);

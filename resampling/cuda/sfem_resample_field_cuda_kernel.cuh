@@ -685,49 +685,47 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
     //                    elems.elems_v3[element_i]};
 
     ev_t evs;
-    if (tile_rank == 0)
-        evs = {__ldg(&elems.elems_v0[element_i]),   //
-               __ldg(&elems.elems_v1[element_i]),   //
-               __ldg(&elems.elems_v2[element_i]),   //
-               __ldg(&elems.elems_v3[element_i])};  //
 
-    evs = tile.shfl(evs, 0);
+    evs = {__ldg(&elems.elems_v0[element_i]),   //
+           __ldg(&elems.elems_v1[element_i]),   //
+           __ldg(&elems.elems_v2[element_i]),   //
+           __ldg(&elems.elems_v3[element_i])};  //
+
+    // evs = tile.shfl(evs, 0);
 
     real_type x0 = 0.0, x1 = 0.0, x2 = 0.0, x3 = 0.0;
     real_type y0 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
     real_type z0 = 0.0, z1 = 0.0, z2 = 0.0, z3 = 0.0;
 
-    if (tile_rank == 0) {
-        x0 = __ldg(&xyz.x[evs.ev0]);
-        x1 = __ldg(&xyz.x[evs.ev1]);
-        x2 = __ldg(&xyz.x[evs.ev2]);
-        x3 = __ldg(&xyz.x[evs.ev3]);
+    x0 = __ldg(&xyz.x[evs.ev0]);
+    x1 = __ldg(&xyz.x[evs.ev1]);
+    x2 = __ldg(&xyz.x[evs.ev2]);
+    x3 = __ldg(&xyz.x[evs.ev3]);
 
-        y0 = __ldg(&xyz.y[evs.ev0]);
-        y1 = __ldg(&xyz.y[evs.ev1]);
-        y2 = __ldg(&xyz.y[evs.ev2]);
-        y3 = __ldg(&xyz.y[evs.ev3]);
+    y0 = __ldg(&xyz.y[evs.ev0]);
+    y1 = __ldg(&xyz.y[evs.ev1]);
+    y2 = __ldg(&xyz.y[evs.ev2]);
+    y3 = __ldg(&xyz.y[evs.ev3]);
 
-        z0 = __ldg(&xyz.z[evs.ev0]);
-        z1 = __ldg(&xyz.z[evs.ev1]);
-        z2 = __ldg(&xyz.z[evs.ev2]);
-        z3 = __ldg(&xyz.z[evs.ev3]);
-    }
+    z0 = __ldg(&xyz.z[evs.ev0]);
+    z1 = __ldg(&xyz.z[evs.ev1]);
+    z2 = __ldg(&xyz.z[evs.ev2]);
+    z3 = __ldg(&xyz.z[evs.ev3]);
 
-    x0 = tile.shfl(x0, 0);
-    x1 = tile.shfl(x1, 0);
-    x2 = tile.shfl(x2, 0);
-    x3 = tile.shfl(x3, 0);
+    // x0 = tile.shfl(x0, 0);
+    // x1 = tile.shfl(x1, 0);
+    // x2 = tile.shfl(x2, 0);
+    // x3 = tile.shfl(x3, 0);
 
-    y0 = tile.shfl(y0, 0);
-    y1 = tile.shfl(y1, 0);
-    y2 = tile.shfl(y2, 0);
-    y3 = tile.shfl(y3, 0);
+    // y0 = tile.shfl(y0, 0);
+    // y1 = tile.shfl(y1, 0);
+    // y2 = tile.shfl(y2, 0);
+    // y3 = tile.shfl(y3, 0);
 
-    z0 = tile.shfl(z0, 0);
-    z1 = tile.shfl(z1, 0);
-    z2 = tile.shfl(z2, 0);
-    z3 = tile.shfl(z3, 0);
+    // z0 = tile.shfl(z0, 0);
+    // z1 = tile.shfl(z1, 0);
+    // z2 = tile.shfl(z2, 0);
+    // z3 = tile.shfl(z3, 0);
 
     // Volume of the tetrahedron
     const real_type theta_volume = tet4_measure_cu(x0,
