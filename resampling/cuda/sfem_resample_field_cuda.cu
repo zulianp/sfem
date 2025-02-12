@@ -818,8 +818,8 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     // Stop the timer
 
-    MPI_Barrier(MPI_COMM_WORLD);
     clock_gettime(CLOCK_MONOTONIC, &end);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     const double clock_ms = get_time_tet4(start, end);
     const double time     = clock_ms / 1000.0;
