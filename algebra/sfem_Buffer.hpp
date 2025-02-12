@@ -9,6 +9,9 @@
 
 #include "sfem_base.h"
 
+#include "sfem_MPIType.hpp"
+#include "matrixio_array.h"
+
 namespace sfem {
 
     enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1, EXECUTION_SPACE_INVALID = -1 };
@@ -267,6 +270,14 @@ namespace sfem {
 
         return std::make_shared<Buffer<T *>>(
                 extent0, extent1, new_buffer, [keep_alive = buffer](int, void *buff) { free(buff); }, buffer->mem_space());
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T>> create_buffer_from_file(MPI_Comm comm, const char *path) {
+        T        *data{nullptr};
+        ptrdiff_t local_size{0}, global_size{0};
+        array_create_from_file(comm, path, sfem::MPIType<T>::value(), (void **)&data, &local_size, &global_size);
+        return manage_host_buffer<T>(local_size, data);
     }
 
 }  // namespace sfem

@@ -307,7 +307,7 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 6;
+        int         nlsmooth_steps                     = 10;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
@@ -320,7 +320,7 @@ namespace sfem {
         real_t      penalty_param                      = 100;
         bool        debug                              = false;
         std::string debug_folder                       = "debug_ssmgc";
-        int         max_inner_it                       = 5;
+        int         max_inner_it                       = 30;
         bool        collect_energy_norm_correction     = true;
 
         if (in) {

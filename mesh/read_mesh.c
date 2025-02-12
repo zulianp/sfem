@@ -1061,6 +1061,17 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
 
         sprintf(pattern, "%s/z.raw", folder);
         counts[1] += count_files(pattern);
+
+        // if(!counts[1]) {
+        //     sprintf(pattern, "%s/x0.raw", folder);
+        //     counts[1] += count_files(pattern);
+
+        //     sprintf(pattern, "%s/x1.raw", folder);
+        //     counts[1] += count_files(pattern);
+
+        //     sprintf(pattern, "%s/x2.raw", folder);
+        //     counts[1] += count_files(pattern);
+        // }
     }
 
     MPI_Bcast(counts, 2, MPI_INT, 0, comm);
