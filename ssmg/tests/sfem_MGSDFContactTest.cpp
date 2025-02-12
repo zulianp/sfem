@@ -61,7 +61,7 @@ int test_contact() {
     });
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.08, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -107,7 +107,7 @@ int test_contact() {
                                     fz += 0.001 * cos(cz * 3.14 * 512);
 
                                     const geom_t obstacle = -0.1 - fx - fz;
-                                    const geom_t obstacle = -0.1;
+                                    // const geom_t obstacle = -0.1;
                                     return obstacle - y;
 #else
                                     // Half-sphere

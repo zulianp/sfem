@@ -101,6 +101,24 @@ int affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t              ne
                                                  real_t *const                out4,
                                                  real_t *const                out5);
 
+int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t              nelements,
+                                                    const ptrdiff_t              nnodes,
+                                                    idx_t **const SFEM_RESTRICT  elements,
+                                                    geom_t **const SFEM_RESTRICT points,
+                                                    const real_t                 mu,
+                                                    const real_t                 lambda,
+                                                    const ptrdiff_t              u_stride,
+                                                    const real_t *const          ux,
+                                                    const real_t *const          uy,
+                                                    const real_t *const          uz,
+                                                    const ptrdiff_t              out_stride,
+                                                    real_t *const                s00,
+                                                    real_t *const                s01,
+                                                    real_t *const                s02,
+                                                    real_t *const                s11,
+                                                    real_t *const                s12,
+                                                    real_t *const                s22);
+
 #ifdef __cplusplus
 }
 #endif
