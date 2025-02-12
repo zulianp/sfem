@@ -70,12 +70,22 @@ print_performance_metrics_tet4(FILE*         output_file,      //
     int tot_nnodes = 0;
     MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
+    double average_seconds = 0.0;
+    MPI_Reduce(&seconds, &average_seconds, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
+    average_seconds /= double(mpi_size);
+
+    double max_seconds = 0.0;
+    MPI_Reduce(&seconds, &max_seconds, 1, MPI_DOUBLE, MPI_MAX, 0, comm);
+
+    double min_seconds = 0.0;
+    MPI_Reduce(&seconds, &min_seconds, 1, MPI_DOUBLE, MPI_MIN, 0, comm);
+
     if (mpi_rank != 0) return;
 
-    const double elements_per_second          = (double)(tot_nelements) / seconds;
-    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nelements * quad_nodes_cnt) / seconds;
-    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
+    const double elements_per_second          = (double)(tot_nelements) / average_seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / average_seconds;
+    const double quadrature_points_per_second = (double)(tot_nelements * quad_nodes_cnt) / average_seconds;
+    const double nodes_struc_second           = (double)(tot_npoints_struct) / average_seconds;
 
     const int real_t_bits = sizeof(real_t) * 8;
 
@@ -96,7 +106,10 @@ print_performance_metrics_tet4(FILE*         output_file,      //
     fprintf(output_file, "GPU TET4:    %d-bit real_t\n", real_t_bits);
     fprintf(output_file, "GPU TET4:    Tile size: %d\n", __TET4_TILE_SIZE__);
     fprintf(output_file, "GPU TET4:    Memory model: %s\n", memory_model);
-    fprintf(output_file, "GPU TET4:    %f seconds\n", seconds);
+    fprintf(output_file, "GPU TET4:    Clock:        %f seconds\n", seconds);
+    fprintf(output_file, "GPU TET4:    Average time: %f seconds\n", average_seconds);
+    fprintf(output_file, "GPU TET4:    Max time:     %f seconds\n", max_seconds);
+    fprintf(output_file, "GPU TET4:    Min time:     %f seconds\n", min_seconds);
     fprintf(output_file, "GPU TET4:    file: %s:%d \n", file, line);
     fprintf(output_file, "GPU TET4:    function:                  %s\n", function);
     fprintf(output_file, "GPU TET4:    Number of elements:        %d.\n", tot_nelements);
