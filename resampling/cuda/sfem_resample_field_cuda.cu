@@ -94,6 +94,7 @@ print_performance_metrics_tet4(FILE*         output_file,      //
     fprintf(output_file, "GPU TET4:    MPI rank: %d\n", mpi_rank);
     fprintf(output_file, "GPU TET4:    MPI size: %d\n", mpi_size);
     fprintf(output_file, "GPU TET4:    %d-bit real_t\n", real_t_bits);
+    fprintf(output_file, "GPU TET4:    Tile size: %d\n", __TET4_TILE_SIZE__);
     fprintf(output_file, "GPU TET4:    Memory model: %s\n", memory_model);
     fprintf(output_file, "GPU TET4:    %f seconds\n", seconds);
     fprintf(output_file, "GPU TET4:    file: %s:%d \n", file, line);

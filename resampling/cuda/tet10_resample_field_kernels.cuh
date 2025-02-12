@@ -1261,16 +1261,13 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t   
     ////////////////////////////////////////
     // Kernel specific variables
 
-    namespace cg = cooperative_groups;
-
-    cg::thread_block g = cg::this_thread_block();
+    namespace cg               = cooperative_groups;
+    cg::thread_block g         = cg::this_thread_block();
+    auto             tile      = cg::tiled_partition<__TET10_TILE_SIZE__>(g);
+    const unsigned   tile_rank = tile.thread_rank();
 
     const ptrdiff_t element_i = (blockIdx.x * blockDim.x + threadIdx.x) / __TET10_TILE_SIZE__;
-
     if (element_i < start_element or element_i >= end_element) return;
-
-    auto           tile      = cg::tiled_partition<__TET10_TILE_SIZE__>(g);
-    const unsigned tile_rank = tile.thread_rank();
 
     ////////////////////////////////////////
     // Quadrature points
@@ -1301,33 +1298,35 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t   
     const real_t cVolume = dx * dy * dz;
 
     // loop over the ndes of the element
-    ev[0] = elems.elems_v0[element_i];
-    ev[1] = elems.elems_v1[element_i];
-    ev[2] = elems.elems_v2[element_i];
-    ev[3] = elems.elems_v3[element_i];
-    ev[4] = elems.elems_v4[element_i];
-    ev[5] = elems.elems_v5[element_i];
-    ev[6] = elems.elems_v6[element_i];
-    ev[7] = elems.elems_v7[element_i];
-    ev[8] = elems.elems_v8[element_i];
-    ev[9] = elems.elems_v9[element_i];
 
-    // ISOPARAMETRIC
-    for (int v = 0; v < 10; ++v) {
-        x[v] = xyz.x[ev[v]];  // x-coordinates
-        y[v] = xyz.y[ev[v]];  // y-coordinates
-        z[v] = xyz.z[ev[v]];  // z-coordinates
-    }
+    ev[0] = __ldg(&elems.elems_v0[element_i]);
+    ev[1] = __ldg(&elems.elems_v1[element_i]);
+    ev[2] = __ldg(&elems.elems_v2[element_i]);
+    ev[3] = __ldg(&elems.elems_v3[element_i]);
+    ev[4] = __ldg(&elems.elems_v4[element_i]);
+    ev[5] = __ldg(&elems.elems_v5[element_i]);
+    ev[6] = __ldg(&elems.elems_v6[element_i]);
+    ev[7] = __ldg(&elems.elems_v7[element_i]);
+    ev[8] = __ldg(&elems.elems_v8[element_i]);
+    ev[9] = __ldg(&elems.elems_v9[element_i]);
+
+    // // ISOPARAMETRIC
+    // for (int v = 0; v < 10; ++v) {
+    //     x[v] = xyz.x[ev[v]];  // x-coordinates
+    //     y[v] = xyz.y[ev[v]];  // y-coordinates
+    //     z[v] = xyz.z[ev[v]];  // z-coordinates
+    // }
 
     // ISOPARAMETRIC
     // and search the node closest to the origin
     int    v_orig   = 0;
     real_t dist_min = 1e14;
 
+#pragma unroll
     for (int v = 0; v < 10; ++v) {
-        x[v] = xyz.x[ev[v]];  // x-coordinates
-        y[v] = xyz.y[ev[v]];  // y-coordinates
-        z[v] = xyz.z[ev[v]];  // z-coordinates
+        x[v] = __ldg(&xyz.x[ev[v]]);  // x-coordinates
+        y[v] = __ldg(&xyz.y[ev[v]]);  // y-coordinates
+        z[v] = __ldg(&xyz.z[ev[v]]);  // z-coordinates
 
         const real_t dist = sqrt_real_t((x[v] - ox) * (x[v] - ox) +  //
                                         (y[v] - oy) * (y[v] - oy) +  //
@@ -1386,7 +1385,15 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t   
         // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
         // the global space
         real_t g_qx_glob, g_qy_glob, g_qz_glob;
-        tet10_transform_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_glob, &g_qy_glob, &g_qz_glob);
+        tet10_transform_cu(x,  //
+                           y,
+                           z,
+                           tet4_qx_v,
+                           tet4_qy_v,
+                           tet4_qz_v,
+                           &g_qx_glob,
+                           &g_qy_glob,
+                           &g_qz_glob);
 
         tet10_dual_basis_hrt_cu(tet4_qx_v, tet4_qy_v, tet4_qz_v, tet10_f);
 
@@ -1394,7 +1401,15 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t   
         // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
         // the unitary space
         real_t g_qx_unit, g_qy_unit, g_qz_unit;
-        tet10_transform_cu(x_unit, y_unit, z_unit, tet4_qx_v, tet4_qy_v, tet4_qz_v, &g_qx_unit, &g_qy_unit, &g_qz_unit);
+        tet10_transform_cu(x_unit,  //
+                           y_unit,
+                           z_unit,
+                           tet4_qx_v,
+                           tet4_qy_v,
+                           tet4_qz_v,
+                           &g_qx_unit,
+                           &g_qy_unit,
+                           &g_qz_unit);
 
         ///// ======================================================
 
