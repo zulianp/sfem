@@ -82,7 +82,7 @@ LAUNCH="mpiexec -np $n_procs "
 # LAUNCH="srun -p debug -n $n_procs  ${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 # LAUNCH=""
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
-LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
+# LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 
 GRID_TO_MESH="grid_to_mesh"

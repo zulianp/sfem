@@ -15,12 +15,154 @@
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
 
+#include "mass.h"
+#include "mesh_utils.h"
 #include "quadratures_rule.h"
 #include "tet10_resample_field.h"
 
-#include "mesh_utils.h"
+void                                                                      //
+print_performance_metrics_cpu(sfem_resample_field_info* info,             //
+                              FILE*                     output_file,      //
+                              const int                 mpi_rank,         //
+                              const int                 mpi_size,         //
+                              const double              seconds,          //
+                              const char*               file,             //
+                              const int                 line,             //
+                              const char*               function,         //
+                              const int                 n_points_struct,  //
+                              const int                 quad_nodes_cnt,   //
+                              const mesh_t*             mesh) {                       //
 
-#include "mass.h"
+    MPI_Comm comm = MPI_COMM_WORLD;
+
+    int tot_npoints_struct = 0;
+    MPI_Reduce(&n_points_struct, &tot_npoints_struct, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nelements = 0;
+    MPI_Reduce(&mesh->nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    int tot_nnodes = 0;
+    MPI_Reduce(&mesh->n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+
+    if (mpi_rank != 0) return;
+
+    char tet_model[100];
+
+    if (info->element_type == TET4) {
+        snprintf(tet_model, 100, "TET4");
+    } else if (info->element_type == TET10) {
+        snprintf(tet_model, 100, "TET10");
+    } else {
+        snprintf(tet_model, 100, "UNKNOWN");
+    }
+
+    const double elements_per_second          = (double)(tot_nelements) / seconds;
+    const double nodes_per_second             = (double)(tot_nnodes) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nelements * quad_nodes_cnt) / seconds;
+    const double nodes_struc_second           = (double)(tot_npoints_struct) / seconds;
+
+    const int real_t_bits = sizeof(real_t) * 8;
+
+    fprintf(output_file, "============================================================================\n");
+    fprintf(output_file, "CPU:    file: %s:%d \n", file, line);
+    fprintf(output_file, "CPU:    MPI rank: %d\n", mpi_rank);
+    fprintf(output_file, "CPU:    MPI size: %d\n", mpi_size);
+    fprintf(output_file, "CPU:    %d-bit real_t\n", real_t_bits);
+    fprintf(output_file, "CPU:    Element type:              %s\n", tet_model);
+    fprintf(output_file, "CPU:    Clock                      %f seconds\n", seconds);
+    fprintf(output_file, "CPU:    function:                  %s\n", function);
+    fprintf(output_file, "CPU:    Number of elements:        %d.\n", tot_nelements);
+    fprintf(output_file, "CPU:    Number of nodes:           %d.\n", tot_nnodes);
+    fprintf(output_file, "CPU:    Number of points struct:   %d.\n", tot_npoints_struct);
+    fprintf(output_file, "CPU:    Throughput for the kernel: %e elements/second\n", elements_per_second);
+    fprintf(output_file, "CPU:    Throughput for the kernel: %e points_struct/second\n", nodes_struc_second);
+    fprintf(output_file, "CPU:    Throughput for the kernel: %e nodes/second\n", nodes_per_second);
+    fprintf(output_file, "CPU:    Throughput for the kernel: %e quadrature_points/second\n", quadrature_points_per_second);
+    fprintf(output_file, "============================================================================\n\n");
+    fprintf(output_file,
+            "<BenchH> mpi_rank, mpi_size, real_t_bits, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
+            "nodes_second, "
+            "nodes_struc_second, quadrature_points_second\n");
+    fprintf(output_file,
+            "<BenchR> %d,   %d,  %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            mpi_rank,                                                                   //
+            mpi_size,                                                                   //
+            real_t_bits,                                                                //
+            tot_nelements,                                                              //
+            tot_nnodes,                                                                 //
+            tot_npoints_struct,                                                         //
+            seconds,                                                                    //
+            elements_per_second,                                                        //
+            nodes_per_second,                                                           //
+            nodes_struc_second,                                                         //
+            quadrature_points_per_second);                                              //
+    fprintf(output_file, "============================================================================\n");
+}
+
+// Function to handle printing performance metrics
+void                                                                             //
+handle_print_performance_metrics_cpu(sfem_resample_field_info* info,             //
+                                     int                       mpi_rank,         //
+                                     int                       mpi_size,         //
+                                     double                    seconds,          //
+                                     const char*               file,             //
+                                     int                       line,             //
+                                     const char*               function,         //
+                                     int                       n_points_struct,  //
+                                     int                       npq,              //
+                                     mesh_t*                   mesh,             //
+                                     int                       print_to_file) {                        //
+
+    FILE* output_file_print = NULL;
+
+    char tet_model[100];
+
+    if (info->element_type == TET4) {
+        snprintf(tet_model, 100, "TET4");
+    } else if (info->element_type == TET10) {
+        snprintf(tet_model, 100, "TET10");
+    } else {
+        snprintf(tet_model, 100, "UNKNOWN");
+    }
+
+    if (print_to_file == 1 && mpi_rank == 0) {
+        char      filename[1000];
+        const int real_t_bits = sizeof(real_t) * 8;
+        snprintf(filename, 1000, "resampling_cpu_%s_mpi_size_%d_%dbit.log", tet_model, mpi_size, real_t_bits);
+        output_file_print = fopen(filename, "w");
+    }
+
+    // This function must be called by all ranks
+    // Internally it will check if the rank is 0
+    // All ranks are used to calculate the performance metrics
+    print_performance_metrics_cpu(info,  //
+                                  stdout,
+                                  mpi_rank,
+                                  mpi_size,
+                                  seconds,
+                                  file,
+                                  line,
+                                  function,
+                                  n_points_struct,
+                                  npq,
+                                  mesh);
+
+    if (print_to_file == 1) {
+        print_performance_metrics_cpu(info,  //
+                                      output_file_print,
+                                      mpi_rank,
+                                      mpi_size,
+                                      seconds,
+                                      file,
+                                      line,
+                                      function,
+                                      n_points_struct,
+                                      npq,
+                                      mesh);
+
+        if (output_file_print != NULL) fclose(output_file_print);
+    }
+}
 
 double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, double time_sec) {
     const double flops = (nelements * (35 + 166 * quad_nodes)) / time_sec;
@@ -391,118 +533,132 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
+        handle_print_performance_metrics_cpu(&info,                          //
+                                             mpi_rank,                       //
+                                             mpi_size,                       //
+                                             resample_tock - resample_tick,  //
+                                             __FILE__,                       //
+                                             __LINE__,                       //
+                                             "grid_to_mesh",                 //
+                                             mesh.nnodes,                    //
+                                             info.quad_nodes_cnt,            //
+                                             &mesh,                          //
+                                             1);                             //
         if (mpi_rank == 0) {
+            //
+
             // const int nelements    = tot_nelements;
             // const int nnodes       = tot_nnodes;
-            const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
+            // const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
 
-            const double elements_second          = (double)tot_nelements / (double)(resample_tock - resample_tick);
-            const double nodes_second             = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
-            const double nodes_struc_second       = (double)npoint_struc / (double)(resample_tock - resample_tick);
-            const double quadrature_points_second = (double)(tot_nelements * TET_QUAD_NQP) / (double)(resample_tock - resample_tick);
-            const int    real_t_bits              = sizeof(real_t) * 8;
-            const int    ptrdiff_t_bits           = sizeof(ptrdiff_t) * 8;
+            // const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
+            // const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
+            // const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
+            // const double quadrature_points_second =
+            //         (double)(tot_nelements * TET_QUAD_NQP) / (double)(resample_tock - resample_tick);
+            // const int real_t_bits    = sizeof(real_t) * 8;
+            // const int ptrdiff_t_bits = sizeof(ptrdiff_t) * 8;
 
-            int std_out = 1;
+            // int std_out = 1;
 
-            if (check_string_in_args(argc, (const char**)argv, "write", 0)) {
-                std_out = 0;
-            }
+            // if (check_string_in_args(argc, (const char**)argv, "write", 0)) {
+            //     std_out = 0;
+            // }
 
-            FILE* output_file = NULL;
+            // FILE* output_file = NULL;
 
-            if (std_out == 1) {
-                output_file = stdout;
-            } else {
-                output_file = fopen("output_Throughput.log", "w");
-            }
+            // if (std_out == 1) {
+            //     output_file = stdout;
+            // } else {
+            //     output_file = fopen("output_Throughput.log", "w");
+            // }
 
-            if (output_file == NULL) {
-                fprintf(stderr, "Error opening file for writing\n");
-                return EXIT_FAILURE;
-            }
+            // if (output_file == NULL) {
+            //     fprintf(stderr, "Error opening file for writing\n");
+            //     return EXIT_FAILURE;
+            // }
 
-            fprintf(output_file, "\n");
-            fprintf(output_file, "===========================================\n");
-            fprintf(output_file, "Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
-            fprintf(output_file,
-                    "Rank: [%d]  real_t bits    %d\n",  //
-                    mpi_rank,                           //
-                    real_t_bits);                       //
-            fprintf(output_file,
-                    "Rank: [%d]  ptrdiff_t bits %d\n",  //
-                    mpi_rank,                           //
-                    ptrdiff_t_bits);                    //
+            // fprintf(output_file, "\n");
+            // fprintf(output_file, "===========================================\n");
+            // fprintf(output_file, "Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
+            // fprintf(output_file,
+            //         "Rank: [%d]  real_t bits    %d\n",  //
+            //         mpi_rank,                           //
+            //         real_t_bits);                       //
+            // fprintf(output_file,
+            //         "Rank: [%d]  ptrdiff_t bits %d\n",  //
+            //         mpi_rank,                           //
+            //         ptrdiff_t_bits);                    //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Nr of elements  %d\n",  //
-                    mpi_rank,                            //
-                    tot_nelements);                      //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Nr of elements  %d\n",  //
+            //         mpi_rank,                            //
+            //         tot_nelements);                      //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Nr of nodes     %d\n",  //
-                    mpi_rank,                            //
-                    tot_nnodes);                         //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Nr of nodes     %d\n",  //
+            //         mpi_rank,                            //
+            //         tot_nnodes);                         //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Nr of point_struc %d\n",  //
-                    mpi_rank,                              //
-                    npoint_struc);                         //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Nr of point_struc %d\n",  //
+            //         mpi_rank,                              //
+            //         npoint_struc);                         //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Resample        %g (seconds)\n",  //
-                    mpi_rank,                                      //
-                    resample_tock - resample_tick);                //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Resample        %g (seconds)\n",  //
+            //         mpi_rank,                                      //
+            //         resample_tock - resample_tick);                //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Throughput      %e (elements/second)\n",  //
-                    mpi_rank,                                              //
-                    elements_second);                                      //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Throughput      %e (elements/second)\n",  //
+            //         mpi_rank,                                              //
+            //         elements_second);                                      //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Throughput      %e (nodes/second)\n",  //
-                    mpi_rank,                                           //
-                    nodes_second);                                      //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Throughput      %e (nodes/second)\n",  //
+            //         mpi_rank,                                           //
+            //         nodes_second);                                      //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
-                    mpi_rank,                                                 //
-                    nodes_struc_second);                                      //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
+            //         mpi_rank,                                                 //
+            //         nodes_struc_second);                                      //
 
-            fprintf(output_file,
-                    "Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
-                    mpi_rank,                                                       //
-                    quadrature_points_second);                                      //
+            // fprintf(output_file,
+            //         "Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
+            //         mpi_rank,                                                       //
+            //         quadrature_points_second);                                      //
 
-            fprintf(output_file,
-                    "Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
-                    mpi_rank,                                     //
-                    tot_flops);                                   //
+            // fprintf(output_file,
+            //         "Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
+            //         mpi_rank,                                     //
+            //         tot_flops);                                   //
 
-            fprintf(output_file,
-                    "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, nodes_second, "
-                    "nodes_struc_second, quadrature_points_second\n");
-            fprintf(output_file,
-                    "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
-                    mpi_rank,                                                              //
-                    mpi_size,                                                              //
-                    tot_nelements,                                                         //
-                    tot_nnodes,                                                            //
-                    npoint_struc,                                                          //
-                    (resample_tock - resample_tick),                                       //
-                    elements_second,                                                       //
-                    nodes_second,                                                          //
-                    nodes_struc_second,                                                    //
-                    quadrature_points_second);                                             //
-            fprintf(output_file, "===========================================\n");
+            // fprintf(output_file,
+            //         "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
+            //         "nodes_second, nodes_struc_second, quadrature_points_second\n");
+            // fprintf(output_file,
+            //         "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
+            //         mpi_rank,                                                              //
+            //         mpi_size,                                                              //
+            //         tot_nelements,                                                         //
+            //         tot_nnodes,                                                            //
+            //         npoint_struc,                                                          //
+            //         (resample_tock - resample_tick),                                       //
+            //         elements_second,                                                       //
+            //         nodes_second,                                                          //
+            //         nodes_struc_second,                                                    //
+            //         quadrature_points_second);
+            // fprintf(output_file, "===========================================\n");
 
-            fprintf(output_file, "\n");
+            // fprintf(output_file, "\n");
 
-            if (std_out == 0) {
-                fclose(output_file);
-            }
-        }
-    }
+            // if (std_out == 0) {
+            //     fclose(output_file);
+            // }
+        }  // end if mpi_rank == 0
+    }      // end resample_field_mesh
 
     // Write result to disk
     {
