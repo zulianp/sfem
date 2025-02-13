@@ -343,7 +343,7 @@ tet4_resample_field_local(const ptrdiff_t                      nelements,  // Me
 
             assert(measure > 0);
 
-            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
                 real_t g_qx, g_qy, g_qz;
                 // Transform quadrature point to physical space
@@ -850,7 +850,7 @@ int resample_field_local(
 
     switch (info->element_type) {
         case TET4: {
-            info->quad_nodes_cnt = TET4_NQP;
+            info->quad_nodes_cnt = TET_QUAD_NQP;
             info->nelements      = nelements;
 
             // tet4_resample_field_local_reduce_CUDA

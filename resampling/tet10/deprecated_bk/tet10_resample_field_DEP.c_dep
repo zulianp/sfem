@@ -351,7 +351,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_V_aligned(
                10 * sizeof(real_t));  // set to zero the element field
 
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-        for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+        for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
             const vec_double measure = tet10_measure_V(x0,
                                                        x1,

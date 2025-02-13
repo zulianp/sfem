@@ -423,7 +423,7 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
 
         //////////////////////////////////////////////////////////////////////
         // loop over the quadrature points
-        for (int quad_i = 0; quad_i < TET4_NQP; quad_i++) {
+        for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {
             //
             vec_real g_qx, g_qy, g_qz;
 

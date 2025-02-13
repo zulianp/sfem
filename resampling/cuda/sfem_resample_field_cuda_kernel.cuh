@@ -320,7 +320,7 @@ tet4_resample_field_local_kernel(const ptrdiff_t MY_RESTRICT         start_eleme
     ////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////
     // loop over the quadrature points
-    for (int quad_i = 0; quad_i < TET4_NQP; quad_i++) {  // loop over the quadrature points
+    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
         real_type g_qx, g_qy, g_qz;
 
@@ -743,8 +743,8 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
                                                    z2,
                                                    z3);
 
-    const int nr_warp_loop = (TET4_NQP / tile.size()) +                //
-                             ((TET4_NQP % tile.size()) == 0 ? 0 : 1);  //
+    const int nr_warp_loop = (TET_QUAD_NQP / tile.size()) +                //
+                             ((TET_QUAD_NQP % tile.size()) == 0 ? 0 : 1);  //
 
     real_type element_field0_reduce = real_t(0.0);
     real_type element_field1_reduce = real_t(0.0);
@@ -759,10 +759,10 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
         // real_type element_field2 = 0.0;
         // real_type element_field3 = 0.0;
 
-        const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+        const real_type tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_type tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_type tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_type tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
         quadrature_node(tet4_qx_v,
                         tet4_qy_v,
@@ -944,8 +944,8 @@ tet4_resample_field_reduce_local_kernel_v2(const ptrdiff_t MY_RESTRICT         s
                                                        z2,
                                                        z3);
 
-        const int nr_warp_loop = (TET4_NQP / tile.size()) +                //
-                                 ((TET4_NQP % tile.size()) == 0 ? 0 : 1);  //
+        const int nr_warp_loop = (TET_QUAD_NQP / tile.size()) +                //
+                                 ((TET_QUAD_NQP % tile.size()) == 0 ? 0 : 1);  //
 
         real_type element_field0_reduce = real_t(0.0);
         real_type element_field1_reduce = real_t(0.0);
@@ -960,10 +960,10 @@ tet4_resample_field_reduce_local_kernel_v2(const ptrdiff_t MY_RESTRICT         s
             // real_type element_field2 = 0.0;
             // real_type element_field3 = 0.0;
 
-            const real_type tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-            const real_type tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-            const real_type tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-            const real_type tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+            const real_type tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+            const real_type tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+            const real_type tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+            const real_type tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
             quadrature_node(tet4_qx_v,
                             tet4_qy_v,

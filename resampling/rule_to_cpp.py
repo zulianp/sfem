@@ -78,7 +78,7 @@ def rule_to_c(rule):
     """
     Convert a rule to a c++ string.
     """
-    TET4_NQP = rule.shape[0]
+    TET_QUAD_NQP = rule.shape[0]
     
     def column_to_nr_str(column, precision):
         """
@@ -92,20 +92,20 @@ def rule_to_c(rule):
             
         
     
-    rule_str = f"#define TET4_NQP  {TET4_NQP}\n"
-    rule_str += "static real_t tet4_qw[TET4_NQP] = {\n"
+    rule_str = f"#define TET_QUAD_NQP  {TET_QUAD_NQP}\n"
+    rule_str += "static real_t tet4_qw[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(3, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qx[TET4_NQP] = {\n"
+    rule_str += "static real_t tet4_qx[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(0, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qy[TET4_NQP] = {\n"
+    rule_str += "static real_t tet4_qy[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(1, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qz[TET4_NQP] = {\n"
+    rule_str += "static real_t tet4_qz[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(2, 16)
     rule_str += "};\n\n"
     

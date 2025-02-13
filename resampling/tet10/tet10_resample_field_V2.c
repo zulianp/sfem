@@ -62,211 +62,211 @@ vec_real vec_indices_to_real(const vec_indices a) {
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)       \
     {                                                                            \
-        _qx_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 3],  \
-                           (_q + 4) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 4],  \
-                           (_q + 5) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 5],  \
-                           (_q + 6) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 6],  \
-                           (_q + 7) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 7]}; \
+        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 3],  \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 4],  \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 5],  \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 6],  \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 7]}; \
                                                                                  \
-        _qy_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 3],  \
-                           (_q + 4) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 4],  \
-                           (_q + 5) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 5],  \
-                           (_q + 6) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 6],  \
-                           (_q + 7) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 7]}; \
+        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 3],  \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 4],  \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 5],  \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 6],  \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 7]}; \
                                                                                  \
-        _qz_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 3],  \
-                           (_q + 4) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 4],  \
-                           (_q + 5) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 5],  \
-                           (_q + 6) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 6],  \
-                           (_q + 7) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 7]}; \
+        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 3],  \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 4],  \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 5],  \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 6],  \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 7]}; \
                                                                                  \
-        _qw_V = (vec_real){(_q + 0) >= TET4_NQP ? 0.0 : tet4_qw[_q + 0],         \
-                           (_q + 1) >= TET4_NQP ? 0.0 : tet4_qw[_q + 1],         \
-                           (_q + 2) >= TET4_NQP ? 0.0 : tet4_qw[_q + 2],         \
-                           (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3],         \
-                           (_q + 4) >= TET4_NQP ? 0.0 : tet4_qw[_q + 4],         \
-                           (_q + 5) >= TET4_NQP ? 0.0 : tet4_qw[_q + 5],         \
-                           (_q + 6) >= TET4_NQP ? 0.0 : tet4_qw[_q + 6],         \
-                           (_q + 7) >= TET4_NQP ? 0.0 : tet4_qw[_q + 7]};        \
+        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 0],         \
+                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 1],         \
+                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 2],         \
+                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 3],         \
+                           (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 4],         \
+                           (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 5],         \
+                           (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 6],         \
+                           (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 7]};        \
     }
 
 #elif _VL_ == 4  //// AVX512
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)       \
     {                                                                            \
-        _qx_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 3]}; \
+        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 3]}; \
                                                                                  \
-        _qy_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 3]}; \
+        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 3]}; \
                                                                                  \
-        _qz_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 0],  \
-                           (_q + 1) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 1],  \
-                           (_q + 2) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 2],  \
-                           (_q + 3) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 3]}; \
+        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 0],  \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 1],  \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 2],  \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 3]}; \
                                                                                  \
-        _qw_V = (vec_real){(_q + 0) >= TET4_NQP ? 0.0 : tet4_qw[_q + 0],         \
-                           (_q + 1) >= TET4_NQP ? 0.0 : tet4_qw[_q + 1],         \
-                           (_q + 2) >= TET4_NQP ? 0.0 : tet4_qw[_q + 2],         \
-                           (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3]};        \
+        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 0],         \
+                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 1],         \
+                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 2],         \
+                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 3]};        \
     }
 
 #elif _VL_ == 16
 
 #define _qx_V                                                         \
-    (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],   \
-               (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],   \
-               (_q + 2) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 2],   \
-               (_q + 3) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 3],   \
-               (_q + 4) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 4],   \
-               (_q + 5) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 5],   \
-               (_q + 6) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 6],   \
-               (_q + 7) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 7],   \
-               (_q + 8) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 8],   \
-               (_q + 9) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 9],   \
-               (_q + 10) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 10], \
-               (_q + 11) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 11], \
-               (_q + 12) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 12], \
-               (_q + 13) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 13], \
-               (_q + 14) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 14], \
-               (_q + 15) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 15]};
+    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 0],   \
+               (_q + 1) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 1],   \
+               (_q + 2) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 2],   \
+               (_q + 3) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 3],   \
+               (_q + 4) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 4],   \
+               (_q + 5) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 5],   \
+               (_q + 6) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 6],   \
+               (_q + 7) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 7],   \
+               (_q + 8) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 8],   \
+               (_q + 9) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 9],   \
+               (_q + 10) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 10], \
+               (_q + 11) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 11], \
+               (_q + 12) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 12], \
+               (_q + 13) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 13], \
+               (_q + 14) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 14], \
+               (_q + 15) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 15]};
 
 #define _qy_V                                                         \
-    (vec_real){(_q + 0) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 0],   \
-               (_q + 1) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 1],   \
-               (_q + 2) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 2],   \
-               (_q + 3) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 3],   \
-               (_q + 4) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 4],   \
-               (_q + 5) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 5],   \
-               (_q + 6) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 6],   \
-               (_q + 7) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 7],   \
-               (_q + 8) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 8],   \
-               (_q + 9) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 9],   \
-               (_q + 10) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 10], \
-               (_q + 11) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 11], \
-               (_q + 12) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 12], \
-               (_q + 13) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 13], \
-               (_q + 14) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 14], \
-               (_q + 15) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 15]};
+    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 0],   \
+               (_q + 1) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 1],   \
+               (_q + 2) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 2],   \
+               (_q + 3) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 3],   \
+               (_q + 4) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 4],   \
+               (_q + 5) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 5],   \
+               (_q + 6) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 6],   \
+               (_q + 7) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 7],   \
+               (_q + 8) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 8],   \
+               (_q + 9) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 9],   \
+               (_q + 10) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 10], \
+               (_q + 11) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 11], \
+               (_q + 12) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 12], \
+               (_q + 13) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 13], \
+               (_q + 14) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 14], \
+               (_q + 15) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 15]};
 
 #define _qz_V                                                         \
-    (vec_real){(_q + 0) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 0],   \
-               (_q + 1) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 1],   \
-               (_q + 2) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 2],   \
-               (_q + 3) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 3],   \
-               (_q + 4) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 4],   \
-               (_q + 5) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 5],   \
-               (_q + 6) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 6],   \
-               (_q + 7) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 7],   \
-               (_q + 8) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 8],   \
-               (_q + 9) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 9],   \
-               (_q + 10) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 10], \
-               (_q + 11) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 11], \
-               (_q + 12) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 12], \
-               (_q + 13) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 13], \
-               (_q + 14) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 14], \
-               (_q + 15) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 15]};
+    (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 0],   \
+               (_q + 1) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 1],   \
+               (_q + 2) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 2],   \
+               (_q + 3) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 3],   \
+               (_q + 4) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 4],   \
+               (_q + 5) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 5],   \
+               (_q + 6) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 6],   \
+               (_q + 7) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 7],   \
+               (_q + 8) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 8],   \
+               (_q + 9) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 9],   \
+               (_q + 10) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 10], \
+               (_q + 11) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 11], \
+               (_q + 12) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 12], \
+               (_q + 13) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 13], \
+               (_q + 14) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 14], \
+               (_q + 15) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 15]};
 
 #define _qw_V                                                  \
-    (vec_real){(_q + 0) >= TET4_NQP ? 0.0 : tet4_qw[_q + 0],   \
-               (_q + 1) >= TET4_NQP ? 0.0 : tet4_qw[_q + 1],   \
-               (_q + 2) >= TET4_NQP ? 0.0 : tet4_qw[_q + 2],   \
-               (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3],   \
-               (_q + 4) >= TET4_NQP ? 0.0 : tet4_qw[_q + 4],   \
-               (_q + 5) >= TET4_NQP ? 0.0 : tet4_qw[_q + 5],   \
-               (_q + 6) >= TET4_NQP ? 0.0 : tet4_qw[_q + 6],   \
-               (_q + 7) >= TET4_NQP ? 0.0 : tet4_qw[_q + 7],   \
-               (_q + 8) >= TET4_NQP ? 0.0 : tet4_qw[_q + 8],   \
-               (_q + 9) >= TET4_NQP ? 0.0 : tet4_qw[_q + 9],   \
-               (_q + 10) >= TET4_NQP ? 0.0 : tet4_qw[_q + 10], \
-               (_q + 11) >= TET4_NQP ? 0.0 : tet4_qw[_q + 11], \
-               (_q + 12) >= TET4_NQP ? 0.0 : tet4_qw[_q + 12], \
-               (_q + 13) >= TET4_NQP ? 0.0 : tet4_qw[_q + 13], \
-               (_q + 14) >= TET4_NQP ? 0.0 : tet4_qw[_q + 14], \
-               (_q + 15) >= TET4_NQP ? 0.0 : tet4_qw[_q + 15]};
+    (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 0],   \
+               (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 1],   \
+               (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 2],   \
+               (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 3],   \
+               (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 4],   \
+               (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 5],   \
+               (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 6],   \
+               (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 7],   \
+               (_q + 8) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 8],   \
+               (_q + 9) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 9],   \
+               (_q + 10) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 10], \
+               (_q + 11) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 11], \
+               (_q + 12) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 12], \
+               (_q + 13) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 13], \
+               (_q + 14) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 14], \
+               (_q + 15) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 15]};
 
 #define ASSIGN_QUADRATURE_POINT_MACRO_TAIL(_q, _qx_V, _qy_V, _qz_V, _qw_V)         \
     {                                                                              \
-        _qx_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 0],    \
-                           (_q + 1) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 1],    \
-                           (_q + 2) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 2],    \
-                           (_q + 3) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 3],    \
-                           (_q + 4) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 4],    \
-                           (_q + 5) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 5],    \
-                           (_q + 6) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 6],    \
-                           (_q + 7) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 7],    \
-                           (_q + 8) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 8],    \
-                           (_q + 9) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 9],    \
-                           (_q + 10) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 10],  \
-                           (_q + 11) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 11],  \
-                           (_q + 12) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 12],  \
-                           (_q + 13) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 13],  \
-                           (_q + 14) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 14],  \
-                           (_q + 15) >= TET4_NQP ? tet4_qx[0] : tet4_qx[_q + 15]}; \
+        _qx_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 0],    \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 1],    \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 2],    \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 3],    \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 4],    \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 5],    \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 6],    \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 7],    \
+                           (_q + 8) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 8],    \
+                           (_q + 9) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 9],    \
+                           (_q + 10) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 10],  \
+                           (_q + 11) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 11],  \
+                           (_q + 12) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 12],  \
+                           (_q + 13) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 13],  \
+                           (_q + 14) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 14],  \
+                           (_q + 15) >= TET_QUAD_NQP ? tet4_qx[0] : tet4_qx[_q + 15]}; \
                                                                                    \
-        _qy_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 0],    \
-                           (_q + 1) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 1],    \
-                           (_q + 2) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 2],    \
-                           (_q + 3) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 3],    \
-                           (_q + 4) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 4],    \
-                           (_q + 5) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 5],    \
-                           (_q + 6) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 6],    \
-                           (_q + 7) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 7],    \
-                           (_q + 8) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 8],    \
-                           (_q + 9) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 9],    \
-                           (_q + 10) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 10],  \
-                           (_q + 11) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 11],  \
-                           (_q + 12) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 12],  \
-                           (_q + 13) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 13],  \
-                           (_q + 14) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 14],  \
-                           (_q + 15) >= TET4_NQP ? tet4_qy[0] : tet4_qy[_q + 15]}; \
+        _qy_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 0],    \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 1],    \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 2],    \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 3],    \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 4],    \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 5],    \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 6],    \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 7],    \
+                           (_q + 8) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 8],    \
+                           (_q + 9) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 9],    \
+                           (_q + 10) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 10],  \
+                           (_q + 11) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 11],  \
+                           (_q + 12) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 12],  \
+                           (_q + 13) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 13],  \
+                           (_q + 14) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 14],  \
+                           (_q + 15) >= TET_QUAD_NQP ? tet4_qy[0] : tet4_qy[_q + 15]}; \
                                                                                    \
-        _qz_V = (vec_real){(_q + 0) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 0],    \
-                           (_q + 1) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 1],    \
-                           (_q + 2) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 2],    \
-                           (_q + 3) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 3],    \
-                           (_q + 4) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 4],    \
-                           (_q + 5) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 5],    \
-                           (_q + 6) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 6],    \
-                           (_q + 7) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 7],    \
-                           (_q + 8) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 8],    \
-                           (_q + 9) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 9],    \
-                           (_q + 10) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 10],  \
-                           (_q + 11) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 11],  \
-                           (_q + 12) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 12],  \
-                           (_q + 13) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 13],  \
-                           (_q + 14) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 14],  \
-                           (_q + 15) >= TET4_NQP ? tet4_qz[0] : tet4_qz[_q + 15]}; \
+        _qz_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 0],    \
+                           (_q + 1) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 1],    \
+                           (_q + 2) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 2],    \
+                           (_q + 3) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 3],    \
+                           (_q + 4) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 4],    \
+                           (_q + 5) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 5],    \
+                           (_q + 6) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 6],    \
+                           (_q + 7) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 7],    \
+                           (_q + 8) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 8],    \
+                           (_q + 9) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 9],    \
+                           (_q + 10) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 10],  \
+                           (_q + 11) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 11],  \
+                           (_q + 12) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 12],  \
+                           (_q + 13) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 13],  \
+                           (_q + 14) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 14],  \
+                           (_q + 15) >= TET_QUAD_NQP ? tet4_qz[0] : tet4_qz[_q + 15]}; \
                                                                                    \
-        _qw_V = (vec_real){(_q + 0) >= TET4_NQP ? 0.0 : tet4_qw[_q + 0],           \
-                           (_q + 1) >= TET4_NQP ? 0.0 : tet4_qw[_q + 1],           \
-                           (_q + 2) >= TET4_NQP ? 0.0 : tet4_qw[_q + 2],           \
-                           (_q + 3) >= TET4_NQP ? 0.0 : tet4_qw[_q + 3],           \
-                           (_q + 4) >= TET4_NQP ? 0.0 : tet4_qw[_q + 4],           \
-                           (_q + 5) >= TET4_NQP ? 0.0 : tet4_qw[_q + 5],           \
-                           (_q + 6) >= TET4_NQP ? 0.0 : tet4_qw[_q + 6],           \
-                           (_q + 7) >= TET4_NQP ? 0.0 : tet4_qw[_q + 7],           \
-                           (_q + 8) >= TET4_NQP ? 0.0 : tet4_qw[_q + 8],           \
-                           (_q + 9) >= TET4_NQP ? 0.0 : tet4_qw[_q + 9],           \
-                           (_q + 10) >= TET4_NQP ? 0.0 : tet4_qw[_q + 10],         \
-                           (_q + 11) >= TET4_NQP ? 0.0 : tet4_qw[_q + 11],         \
-                           (_q + 12) >= TET4_NQP ? 0.0 : tet4_qw[_q + 12],         \
-                           (_q + 13) >= TET4_NQP ? 0.0 : tet4_qw[_q + 13],         \
-                           (_q + 14) >= TET4_NQP ? 0.0 : tet4_qw[_q + 14],         \
-                           (_q + 15) >= TET4_NQP ? 0.0 : tet4_qw[_q + 15]};        \
+        _qw_V = (vec_real){(_q + 0) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 0],           \
+                           (_q + 1) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 1],           \
+                           (_q + 2) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 2],           \
+                           (_q + 3) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 3],           \
+                           (_q + 4) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 4],           \
+                           (_q + 5) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 5],           \
+                           (_q + 6) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 6],           \
+                           (_q + 7) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 7],           \
+                           (_q + 8) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 8],           \
+                           (_q + 9) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 9],           \
+                           (_q + 10) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 10],         \
+                           (_q + 11) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 11],         \
+                           (_q + 12) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 12],         \
+                           (_q + 13) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 13],         \
+                           (_q + 14) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 14],         \
+                           (_q + 15) >= TET_QUAD_NQP ? 0.0 : tet4_qw[_q + 15]};        \
     }
 
 #endif  //// end SIMD implementation
@@ -785,14 +785,14 @@ int hex8_to_isoparametric_tet10_resample_field_local_V(
         }
 
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-        for (int q = 0; q < TET4_NQP; q += (_VL_)) {  // loop over the quadrature points
+        for (int q = 0; q < TET_QUAD_NQP; q += (_VL_)) {  // loop over the quadrature points
 
             vec_real tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
 
             const int q_next = q + _VL_;
             // printf("q + % d,  qq = %d\n", q, qq);
 
-            if (q_next < TET4_NQP) {
+            if (q_next < TET_QUAD_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
 
             } else {
@@ -1164,11 +1164,11 @@ int hex8_to_subparametric_tet10_resample_field_local_V(
         assert(measure > 0);
 
         // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-        for (int q = 0; q < TET4_NQP; q += _VL_) {  // loop over the quadrature points
+        for (int q = 0; q < TET_QUAD_NQP; q += _VL_) {  // loop over the quadrature points
 
             vec_real  qx_V, qy_V, qz_V, qw_V;
             const int q_next = q + _VL_;
-            if (q_next < TET4_NQP) {
+            if (q_next < TET_QUAD_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, qx_V, qy_V, qz_V, qw_V);
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, qx_V, qy_V, qz_V, qw_V);
@@ -1450,12 +1450,12 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1_V(
         // set to zero the element field
         // memset(element_field, 0, 10 * sizeof(real_t));
 
-        for (int q = 0; q < TET4_NQP; q += (_VL_)) {
+        for (int q = 0; q < TET_QUAD_NQP; q += (_VL_)) {
             vec_real tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
 
             const int q_next = q + (_VL_);
 
-            if (q_next < TET4_NQP) {
+            if (q_next < TET_QUAD_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
@@ -1608,13 +1608,13 @@ int isoparametric_tet10_assemble_dual_mass_vector_V(const ptrdiff_t             
         }
 
         // We do this numerical integration due to the det J
-        for (int q = 0; q < TET4_NQP; q += _VL_) {  // loop over the quadrature points
+        for (int q = 0; q < TET_QUAD_NQP; q += _VL_) {  // loop over the quadrature points
                                                     //
             vec_real tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V;
 
             const int q_next = q + (_VL_);
 
-            if (q_next < TET4_NQP) {
+            if (q_next < TET_QUAD_NQP) {
                 ASSIGN_QUADRATURE_POINT_MACRO(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
             } else {
                 ASSIGN_QUADRATURE_POINT_MACRO_TAIL(q, tet4_qx_V, tet4_qy_V, tet4_qz_V, tet4_qw_V);
