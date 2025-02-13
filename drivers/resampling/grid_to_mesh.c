@@ -399,7 +399,7 @@ int main(int argc, char* argv[]) {
             const double elements_second          = (double)tot_nelements / (double)(resample_tock - resample_tick);
             const double nodes_second             = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
             const double nodes_struc_second       = (double)npoint_struc / (double)(resample_tock - resample_tick);
-            const double quadrature_points_second = (double)(tot_nelements * TET4_NQP) / (double)(resample_tock - resample_tick);
+            const double quadrature_points_second = (double)(tot_nelements * TET_QUAD_NQP) / (double)(resample_tock - resample_tick);
             const int    real_t_bits              = sizeof(real_t) * 8;
             const int    ptrdiff_t_bits           = sizeof(ptrdiff_t) * 8;
 

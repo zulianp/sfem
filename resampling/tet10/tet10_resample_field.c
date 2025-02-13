@@ -718,7 +718,7 @@ int hex8_to_subparametric_tet10_resample_field_local(
             assert(measure > 0);
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
                 // det of jacobian
                 real_t g_qx, g_qy, g_qz;
@@ -1132,7 +1132,7 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                    10 * sizeof(real_t));  // set to zero the element field
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
                 // if (q == 8) {
                 //     break;
@@ -1360,7 +1360,7 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
             }
 
             // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
-            for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+            for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
                 // if (q == 8) {
                 //     break;
@@ -1581,7 +1581,7 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
         memset(element_diag, 0, 10 * sizeof(real_t));
 
         // We do this numerical integration due to the det J
-        for (int q = 0; q < TET4_NQP; q++) {  // loop over the quadrature points
+        for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
             real_t dV = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]) * tet4_qw[q];
             isoparametric_lumped_mass_kernel_hrt(dV,
                                                  // Quadrature

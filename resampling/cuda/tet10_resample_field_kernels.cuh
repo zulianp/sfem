@@ -759,17 +759,17 @@ hex8_to_isoparametric_tet10_resample_field_local_reduce_kernel(const ptrdiff_t  
     real_t element_field_v8_reduce = 0.0;
     real_t element_field_v9_reduce = 0.0;
 
-    const size_t nr_warp_loop = (TET4_NQP / __TET10_TILE_SIZE__) +                //
-                                ((TET4_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
+    const size_t nr_warp_loop = (TET_QUAD_NQP / __TET10_TILE_SIZE__) +                //
+                                ((TET_QUAD_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
 
     for (size_t warp_i = 0; warp_i < nr_warp_loop; warp_i++) {
         //
         const size_t q_i = warp_i * size_t(__TET10_TILE_SIZE__) + tile_rank;
 
-        const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+        const real_t tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_t tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_t tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_t tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
         const real_t measure = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v);
 
@@ -986,18 +986,18 @@ isoparametric_tet10_assemble_dual_mass_vector_kernel(const ptrdiff_t    start_el
         element_diag_9 = 0.0;
 
         // We do this numerical integration due to the det J
-        const size_t nr_warp_loop = (TET4_NQP / __TET10_TILE_SIZE__) +                //
-                                    ((TET4_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
+        const size_t nr_warp_loop = (TET_QUAD_NQP / __TET10_TILE_SIZE__) +                //
+                                    ((TET_QUAD_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
 
         for (size_t warp_i = 0; warp_i < nr_warp_loop; warp_i++) {
             // loop over the quadrature points
 
             const size_t q_i = warp_i * size_t(__TET10_TILE_SIZE__) + tile_rank;
 
-            const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-            const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-            const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-            const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+            const real_t tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+            const real_t tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+            const real_t tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+            const real_t tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
             const real_t dV = tet10_measure_cu(x, y, z, tet4_qx_v, tet4_qy_v, tet4_qz_v) * tet4_qw_v;
 
@@ -1359,16 +1359,16 @@ hex8_to_isoparametric_tet10_resample_field_local_cube1_kernel(const ptrdiff_t   
 
     // SUBPARAMETRIC (for iso-parametric tassellation of tet10 might be necessary)
 
-    const size_t nr_warp_loop = (TET4_NQP / __TET10_TILE_SIZE__) +                //
-                                ((TET4_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
+    const size_t nr_warp_loop = (TET_QUAD_NQP / __TET10_TILE_SIZE__) +                //
+                                ((TET_QUAD_NQP % __TET10_TILE_SIZE__) == 0 ? 0 : 1);  //
 
     for (size_t warp_i = 0; warp_i < nr_warp_loop; warp_i++) {
         const size_t q_i = warp_i * size_t(__TET10_TILE_SIZE__) + tile_rank;
 
-        const real_t tet4_qx_v = (q_i < TET4_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_t tet4_qy_v = (q_i < TET4_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_t tet4_qz_v = (q_i < TET4_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_t tet4_qw_v = (q_i < TET4_NQP) ? tet4_qw[q_i] : real_t(0.0);
+        const real_t tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
+        const real_t tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
+        const real_t tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
+        const real_t tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
 
         const real_t measure = tet10_measure_cu(x_unit,
                                                 y_unit,

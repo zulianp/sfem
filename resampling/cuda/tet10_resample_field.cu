@@ -525,7 +525,7 @@ hex8_to_tet10_resample_field_local_CUDA_unified_v2(const int mpi_size,          
                                          __LINE__,         //
                                          __FUNCTION__,     //
                                          n_points_struct,  //
-                                         TET4_NQP,         //
+                                         TET_QUAD_NQP,         //
                                          mesh,             //
                                          print_to_file);   //
     }
@@ -658,7 +658,7 @@ hex8_to_tet10_resample_field_local_CUDA_Managed(   //
                                          __LINE__,         //
                                          __FUNCTION__,     //
                                          n_points_struct,  //
-                                         TET4_NQP,         //
+                                         TET_QUAD_NQP,         //
                                          mesh,             //
                                          print_to_file);   //
     }
@@ -795,7 +795,7 @@ hex8_to_tet10_resample_field_local_CUDA(const int                    mpi_size,  
                                          __LINE__,         //
                                          __FUNCTION__,     //
                                          n_points_struct,  //
-                                         TET4_NQP,         //
+                                         TET_QUAD_NQP,         //
                                          mesh,             //
                                          print_to_file);   //
     }

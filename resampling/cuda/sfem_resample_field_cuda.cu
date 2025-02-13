@@ -599,7 +599,7 @@ tet4_resample_field_local_CUDA(const ptrdiff_t                    nelements,   /
 
     double time = milliseconds / 1000.0;
 
-    const double flops = calculate_flops(nelements, TET4_NQP, time);
+    const double flops = calculate_flops(nelements, TET_QUAD_NQP, time);
 
     const double elements_second = (double)nelements / time;
 
@@ -827,7 +827,7 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
     // end kernel
     ///////////////////////////////////////////////////////////////////////////////
 
-    // const double flops = calculate_flops(nelements, TET4_NQP, time);
+    // const double flops = calculate_flops(nelements, TET_QUAD_NQP, time);
 
     // const double elements_second = (double)nelements / time;
 
@@ -841,7 +841,7 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
                                               __LINE__,                                   //
                                               __FUNCTION__,                               //
                                               size_data,                                  //
-                                              TET4_NQP,                                   //
+                                              TET_QUAD_NQP,                                   //
                                               mesh,                                       //
                                               print_to_file);                             //
     }
@@ -1090,7 +1090,7 @@ tet4_resample_field_local_reduce_CUDA_Managed(const int     mpi_size,           
     const double seconds                      = clock_ms / 1000.0;
     const double elements_per_second          = (double)(tot_nelements) / seconds;
     const double nodes_per_second             = (double)(tot_nnodes) / seconds;
-    const double quadrature_points_per_second = (double)(tot_nnodes * TET4_NQP) / seconds;
+    const double quadrature_points_per_second = (double)(tot_nnodes * TET_QUAD_NQP) / seconds;
 
     if (mpi_rank == 0) {
         printf("GPU: =======================================================\n");
