@@ -717,12 +717,10 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
         printf("============================================================================\n");
     }
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    struct timespec start, end;
 
     MPI_Barrier(MPI_COMM_WORLD);
-    cudaEventRecord(start);
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     {
         // tet4_resample_field_local_kernel
@@ -820,13 +818,11 @@ tet4_resample_field_local_reduce_CUDA(const int                          mpi_siz
 
     // Stop the timer
 
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-
-    const double time = double(milliseconds) / 1000.0;
+    const double clock_ms = get_time_tet4(start, end);
+    const double time     = clock_ms / 1000.0;
 
     // end kernel
     ///////////////////////////////////////////////////////////////////////////////
