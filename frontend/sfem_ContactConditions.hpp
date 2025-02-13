@@ -114,6 +114,8 @@ namespace sfem {
 
         int signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const;
 
+        int full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s);
+
         std::shared_ptr<Buffer<idx_t *>> ss_sides();
         std::shared_ptr<Sideset>       sideset();
 

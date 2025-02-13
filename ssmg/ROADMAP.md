@@ -108,7 +108,7 @@ MS := Milestone
    - [x] GMG: Hierarchical indexing for no redundancy multilevel discretization
    - [x] SSHEX8-Mesh online generation from HEX8
    - [x] Multilevel GMG on CPU
-   - [ ] Contact stresses post-processor for SSHEX8
+   - [x] Contact stresses post-processor for SSHEX8
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact
@@ -174,11 +174,11 @@ MS := Milestone
 - [ ] Convergence of the method on toy problems (no Perf)
 - [ ] Experiements  
    - [ ] Elasticity 1) 2D Axis-aligned contact Matlab
-   - [ ] Elasticity 2) SDF cube vs half-sphere (s) (stresses), correct stress verification
-   - [ ] Elasticity 3) Complex showcase (displacement)
+   - [x] Elasticity 2) SDF cube vs half-sphere (s) (stresses), correct stress verification
+   - [x] Elasticity 3) Complex showcase (displacement)
 - [ ] Solver convergence: number of iterations, residuals
-   - [ ] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
-   - [ ] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
+   - [x] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
+   - [x] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
 
 
 

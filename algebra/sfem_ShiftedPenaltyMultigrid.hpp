@@ -74,6 +74,7 @@ namespace sfem {
             real_t norm_penetration;
             real_t norm_residual;
             real_t energy_norm_correction;
+            real_t penalty_param;
 
             static void header(std::ostream& os) {
                 os << "count_iter,";
@@ -83,8 +84,8 @@ namespace sfem {
                 os << "norm_penetration,";
                 os << "norm_residual,";
                 os << "energy_norm_correction,";
+                os << "penalty_param,";
                 os << "rate\n";
-
             }
 
             friend std::ostream& operator<<(std::ostream& os, const Stats& stats) {
@@ -95,6 +96,7 @@ namespace sfem {
                 os << stats.norm_penetration << ",";
                 os << stats.norm_residual << ",";
                 os << stats.energy_norm_correction << ",";
+                os << stats.penalty_param << ",";
                 return os;
             }
         };
@@ -240,6 +242,9 @@ namespace sfem {
                 if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
                 count_lagr_mult_updates++;
 
+                // Store it for diagonstics
+                const T prev_penalty_param = penalty_param_;
+
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
@@ -266,7 +271,7 @@ namespace sfem {
                         norm_pen,
                         norm_rpen,
                         penetration_tol,
-                        penalty_param_);
+                        prev_penalty_param);
 
                 real_t energy_norm_correction = -1;
                 if (collect_energy_norm_correction_) {
@@ -285,7 +290,8 @@ namespace sfem {
                                .count_smooth           = count_smoothing_steps,
                                .norm_penetration       = norm_pen,
                                .norm_residual          = norm_rpen,
-                               .energy_norm_correction = energy_norm_correction});
+                               .energy_norm_correction = energy_norm_correction,
+                               .penalty_param          = prev_penalty_param});
 
                 if (norm_pen < atol_ && norm_rpen < atol_) {
                     converged = true;

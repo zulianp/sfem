@@ -725,13 +725,9 @@ int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t             
         scalar_t luy[8];
         scalar_t luz[8];
 
-        int must_print = 0;
         for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v][i];
-            must_print += ev[v] == 215 || ev[v] == 38 || ev[v] == 216 || ev[v] == 221;
         }
-
-        must_print = must_print == 4;
 
         for (int v = 0; v < 8; v++) {
             lx[v] = x[ev[v]];
@@ -767,21 +763,6 @@ int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t             
                     scalar_t disp_grad[9];
                     hex8_displacement_gradient(
                             jacobian_adjugate, jacobian_determinant, qx[xi], qx[yi], qx[zi], lux, luy, luz, disp_grad);
-
-                    if (must_print) {
-                        printf("-------------------------\n");
-                        printf("%g %g %g\n%g %g %g\n%g %g %g\n",
-                               disp_grad[0],
-                               disp_grad[1],
-                               disp_grad[2],
-                               disp_grad[3],
-                               disp_grad[4],
-                               disp_grad[5],
-                               disp_grad[6],
-                               disp_grad[7],
-                               disp_grad[8]);
-                        printf("-------------------------\n");
-                    }
 
                     scalar_t cauchy_stress[6];
                     hex8_cauchy_stress(mu, lambda, disp_grad, cauchy_stress);
