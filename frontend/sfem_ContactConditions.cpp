@@ -830,6 +830,25 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int ContactConditions::full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s) {
+        const ptrdiff_t    n   = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+        auto               m   = impl_->mass_vector->data();
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (int d = 0; d < dim; d++) {
+                const real_t ri = r[idx[i] * dim + d] / m[i];
+                s[idx[i] * dim] += normals[d][i] * ri;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     int ContactConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         return update(x) || normal_project(h, out);
     }

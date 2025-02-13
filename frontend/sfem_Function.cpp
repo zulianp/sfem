@@ -2342,8 +2342,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            assert(false);
-            return SFEM_FAILURE;
+            return apply(nullptr, x, out);
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
