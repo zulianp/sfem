@@ -277,6 +277,8 @@ int main(int argc, char* argv[]) {
         if (mpi_rank == 0) printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
     }
 
+    info.quad_nodes_cnt = TET_QUAD_NQP;
+
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
@@ -544,7 +546,7 @@ int main(int argc, char* argv[]) {
                                              info.quad_nodes_cnt,            //
                                              &mesh,                          //
                                              1);                             //
-        if (mpi_rank == 0) {
+        // if (mpi_rank == 0) {
             //
 
             // const int nelements    = tot_nelements;
@@ -657,7 +659,7 @@ int main(int argc, char* argv[]) {
             // if (std_out == 0) {
             //     fclose(output_file);
             // }
-        }  // end if mpi_rank == 0
+        // }  // end if mpi_rank == 0
     }      // end resample_field_mesh
 
     // Write result to disk
