@@ -280,7 +280,15 @@ int test_contact() {
     SFEM_READ_ENV(SFEM_USE_SPMG, atoi);
 
     if (SFEM_USE_SPMG) {
-        auto solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+        std::shared_ptr<sfem::Input> in;
+        const char * SFEM_SSMGC_YAML{nullptr};
+        SFEM_READ_ENV(SFEM_SSMGC_YAML, );
+
+        if(SFEM_SSMGC_YAML) {
+            in = sfem::YAMLNoIndent::create_from_file(SFEM_SSMGC_YAML);
+        }
+
+        auto solver = sfem::create_ssmgc(f, contact_conds, es, in);
         solver->apply(rhs->data(), x->data());
     } else {
         auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr);
@@ -292,8 +300,7 @@ int test_contact() {
     auto blas = sfem::blas<real_t>(es);
     blas->zeros(rhs->size(), rhs->data());
     f->gradient(x->data(), rhs->data());
-    // out->write("residual", rhs->data());
-
+    
     blas->zeros(x->size(), x->data());
     contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
     out->write("contact_stress", x->data());

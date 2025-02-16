@@ -133,9 +133,7 @@ namespace sfem {
                         const T* const block_x = &x[j * block_size];
                         const T* const aij = &values_[k * block_matrix_size];
 
-#pragma unroll
                         for (int d1 = 0; d1 < block_size; d1++) {
-#pragma unroll
                             for (int d2 = 0; d2 < block_size; d2++) {
                                 block_y[d1] += aij[d1 * block_size + d2] * block_x[d2];
                             }

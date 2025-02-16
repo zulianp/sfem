@@ -307,21 +307,23 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 10;
+        int         nlsmooth_steps                     = 6;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
-        std::string coarse_op_type                     = "BSR";
+        std::string coarse_op_type                     = "MF";
         int         linear_smoothing_steps             = 2;
         int         coarse_linear_smoothing_steps      = 10;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
-        real_t      max_penalty_param                  = 1e6;
+        real_t      max_penalty_param                  = (sizeof(real_t) == 8) ? 1e5 : 1e4;
         real_t      penalty_param                      = 100;
         bool        debug                              = false;
         std::string debug_folder                       = "debug_ssmgc";
-        int         max_inner_it                       = 30;
+        int         max_inner_it                       = 40;
         bool        collect_energy_norm_correction     = true;
+        int         max_it                             = 50;
+        real_t      atol                               = (sizeof(real_t) == sizeof(double)) ? 1e-11 : 5e-7;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -330,8 +332,17 @@ namespace sfem {
             in->get("fine_op_type", fine_op_type);
             in->get("coarse_op_type", coarse_op_type);
             in->get("linear_smoothing_steps", linear_smoothing_steps);
+            in->get("coarse_linear_smoothing_steps", coarse_linear_smoothing_steps);
             in->get("enable_coarse_space_preconditioner", enable_coarse_space_preconditioner);
             in->get("coarse_solver_verbose", coarse_solver_verbose);
+            in->get("max_penalty_param", max_penalty_param);
+            in->get("penalty_param", penalty_param);
+            in->get("debug", debug);
+            in->get("debug_folder", debug_folder);
+            in->get("max_inner_it", max_inner_it);
+            in->get("collect_energy_norm_correction", collect_energy_norm_correction);
+            in->get("max_it", max_it);
+            in->get("atol", atol);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////
@@ -672,13 +683,12 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         mg->debug = true;
         mg->enable_line_search(enable_line_search);
-        mg->set_max_it(50);
+        mg->set_max_it(max_it);
         mg->set_max_inner_it(max_inner_it);
         mg->set_max_penalty_param(max_penalty_param);
         mg->set_penalty_param(penalty_param);
-        mg->set_atol(1e-12);
+        mg->set_atol(atol);
         mg->collect_energy_norm_correction(collect_energy_norm_correction);
-        // mg->skip_coarse = true;
         return mg;
     }
 

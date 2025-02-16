@@ -75,6 +75,7 @@ namespace sfem {
             real_t norm_residual;
             real_t energy_norm_correction;
             real_t penalty_param;
+            real_t omega;
 
             static void header(std::ostream& os) {
                 os << "count_iter,";
@@ -85,6 +86,7 @@ namespace sfem {
                 os << "norm_residual,";
                 os << "energy_norm_correction,";
                 os << "penalty_param,";
+                os << "omega,";
                 os << "rate\n";
             }
 
@@ -97,6 +99,7 @@ namespace sfem {
                 os << stats.norm_residual << ",";
                 os << stats.energy_norm_correction << ",";
                 os << stats.penalty_param << ",";
+                os << stats.omega << ",";
                 return os;
             }
         };
@@ -219,6 +222,10 @@ namespace sfem {
 
                     const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
 
+                    if(debug) {
+                        printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
+                    }
+
                     if (r_pen_norm < std::max(atol_, omega) && inner_iter != 0) {
                         break;
                     }
@@ -244,6 +251,7 @@ namespace sfem {
 
                 // Store it for diagonstics
                 const T prev_penalty_param = penalty_param_;
+                const T prev_omega = omega;
 
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
@@ -291,7 +299,8 @@ namespace sfem {
                                .norm_penetration       = norm_pen,
                                .norm_residual          = norm_rpen,
                                .energy_norm_correction = energy_norm_correction,
-                               .penalty_param          = prev_penalty_param});
+                               .penalty_param          = prev_penalty_param,
+                               .omega = prev_omega});
 
                 if (norm_pen < atol_ && norm_rpen < atol_) {
                     converged = true;
@@ -610,10 +619,16 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                     if (line_search_enabled_) {
-                        T alpha = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        // ATTENTION to code changes and side-effects
+
+                        //  dot(c, (b - A * x))
+                        T numerator = blas_.dot(correction->size(), correction->data(), mem->work->data());
                         blas_.zeros(mem->work->size(), mem->work->data());
                         sop->apply(correction->data(), mem->work->data());
-                        alpha /= std::max(T(1e-16), blas_.dot(correction->size(), correction->data(), mem->work->data()));
+
+                        // dot(c, A * c)
+                        T denominator = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        T alpha       = numerator / (denominator == 0 ? T(1e-16) : denominator);
 
                         if (debug) printf("alpha = %g\n", alpha);
 
