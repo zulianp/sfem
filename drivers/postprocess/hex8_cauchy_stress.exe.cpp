@@ -33,37 +33,47 @@ int main(int argc, char *argv[]) {
     auto stress = sfem::create_host_buffer<real_t>(6, nnodes);
     auto mass   = sfem::create_host_buffer<real_t>(nnodes);
 
-    hex8_linear_elasticity_l2_project_cauchy_stress(hex8_mesh->n_elements(),
-                                                    nnodes,
-                                                    hex8_mesh->elements()->data(),
-                                                    hex8_mesh->points()->data(),
-                                                    mu,
-                                                    lambda,
-                                                    1,
-                                                    ux->data(),
-                                                    uy->data(),
-                                                    uz->data(),
-                                                    1,
-                                                    stress->data()[0],
-                                                    stress->data()[1],
-                                                    stress->data()[2],
-                                                    stress->data()[3],
-                                                    stress->data()[4],
-                                                    stress->data()[5]);
+    {
+        SFEM_TRACE_SCOPE("hex8_linear_elasticity_l2_project_cauchy_stress");
+        hex8_linear_elasticity_l2_project_cauchy_stress(hex8_mesh->n_elements(),
+                                                        nnodes,
+                                                        hex8_mesh->elements()->data(),
+                                                        hex8_mesh->points()->data(),
+                                                        mu,
+                                                        lambda,
+                                                        1,
+                                                        ux->data(),
+                                                        uy->data(),
+                                                        uz->data(),
+                                                        1,
+                                                        stress->data()[0],
+                                                        stress->data()[1],
+                                                        stress->data()[2],
+                                                        stress->data()[3],
+                                                        stress->data()[4],
+                                                        stress->data()[5]);
+    }
 
-    hex8_assemble_lumped_mass(
-            hex8_mesh->n_elements(), nnodes, hex8_mesh->elements()->data(), hex8_mesh->points()->data(), 1, mass->data());
+    {
+        SFEM_TRACE_SCOPE("hex8_assemble_lumped_mass");
+        hex8_assemble_lumped_mass(
+                hex8_mesh->n_elements(), nnodes, hex8_mesh->elements()->data(), hex8_mesh->points()->data(), 1, mass->data());
+    }
 
-    auto s = stress->data();
-    auto m = mass->data();
+    {
+        SFEM_TRACE_SCOPE("ediv");
+
+        auto s = stress->data();
+        auto m = mass->data();
 
 #pragma omp parallel for
-    for (int k = 0; k < 6; k++) {
-        for (ptrdiff_t i = 0; i < nnodes; i++) {
-            assert(s[k][i] == s[k][i]);
-            assert(m[i] == m[i]);
+        for (int k = 0; k < 6; k++) {
+            for (ptrdiff_t i = 0; i < nnodes; i++) {
+                assert(s[k][i] == s[k][i]);
+                assert(m[i] == m[i]);
 
-            s[k][i] /= m[i];
+                s[k][i] /= m[i];
+            }
         }
     }
 

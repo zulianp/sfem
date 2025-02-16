@@ -17,6 +17,28 @@ namespace sfem {
     class Tracer::Impl {
     public:
         std::map<std::string, std::pair<int, double>> events;
+
+        void dump() {
+            const char *SFEM_TRACE_FILE = "sfem.trace.csv";
+            SFEM_READ_ENV(SFEM_TRACE_FILE, );
+
+            std::ofstream os(SFEM_TRACE_FILE);
+
+            if (!os.good()) {
+                SFEM_ERROR("Unable to write trace file!\n");
+            }
+
+            // printf("Writing trace file at %s\n", SFEM_TRACE_FILE);
+
+            os << "name,calls,total,avg\n";
+            for (auto &e : events) {
+                os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second / e.second.first
+                   << "\n";
+            }
+
+            os << std::flush;
+            os.close();
+        }
     };
 
     Tracer &Tracer::instance() {
@@ -33,21 +55,8 @@ namespace sfem {
     Tracer::Tracer() : impl_(std::make_unique<Impl>()) {}
 
     Tracer::~Tracer() {
-        const char *SFEM_TRACE_FILE = "sfem.trace.csv";
-        SFEM_READ_ENV(SFEM_TRACE_FILE, );
-
-        std::ofstream os(SFEM_TRACE_FILE);
-
-        if (!os.good()) {
-            SFEM_ERROR("Unable to write trace file!\n");
-        }
-
-        os << "name,calls,total,avg\n";
-        for (auto &e : impl_->events) {
-            os << e.first << "," << e.second.first << "," << e.second.second << "," << e.second.second / e.second.first << "\n";
-        }
-
-        os.close();
+        impl_->dump();
+        impl_ = nullptr;
     }
 
     ScopedEvent::ScopedEvent(const char *name) : name(name) {
