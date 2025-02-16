@@ -292,7 +292,7 @@ int test_contact() {
     auto blas = sfem::blas<real_t>(es);
     blas->zeros(rhs->size(), rhs->data());
     f->gradient(x->data(), rhs->data());
-    out->write("residual", rhs->data());
+    // out->write("residual", rhs->data());
 
     blas->zeros(x->size(), x->data());
     contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
