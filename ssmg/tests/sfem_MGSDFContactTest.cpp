@@ -54,7 +54,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
                                 -0.2,
                                 -0.1,
                                 1.1,
-                                y_top + 0.2,
+                                y_top * 0.5,
                                 1.1,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
                                     // Half-sphere
@@ -105,7 +105,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
                                 -0.2,
                                 -0.1,
                                 1.1,
-                                y_top + 0.2,
+                                y_top * 0.5,
                                 1.1,
                                 [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
                                     // High-freq surface
@@ -170,7 +170,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                 -0.2,
                                 -0.1,
                                 1.1,
-                                y_top + 0.2,
+                                y_top * 0.5,
                                 1.1,
                                 [SFEM_N_SPHERES](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
                                     geom_t dd        = 1000000;
@@ -187,7 +187,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                             const geom_t dy = cy - y;
                                             const geom_t dz = cz - z;
 
-                                            geom_t ddij = radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                            const geom_t ddij = radius - sqrt(dx * dx + dy * dy + dz * dz);
                                             dd = fabs(ddij) < fabs(dd) ? ddij : dd;
                                         }
                                     }
