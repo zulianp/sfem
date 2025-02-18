@@ -256,7 +256,7 @@ namespace sfem {
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
-                    omega           = omega / penalty_param_;
+                    omega           = std::max(atol_, omega / penalty_param_);
 
                 } else {
                     penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
