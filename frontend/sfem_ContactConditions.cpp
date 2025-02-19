@@ -20,6 +20,7 @@
 #include "adj_table.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sfem_sshex8_skin.h"
+#include "sshex8_mesh.h"
 
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -274,6 +275,7 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>>  sides;
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
+        std::shared_ptr<Sideset>          sideset;
 
         std::shared_ptr<Buffer<idx_t *>> ss_sides;
 
@@ -444,32 +446,12 @@ namespace sfem {
             assert(false);  // IMPLEMENT ME!
         }
 
-        void read_sideset(const std::string &path_surface, Input &in) {
-            SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
-
-            auto mesh = space->mesh_ptr();
-
-            auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
-            if (!ss) {
-                SFEM_ERROR("Unable to read sideset at: %s\n", path_surface.c_str());
-            }
+        void init_from_sideset(const std::shared_ptr<Sideset> &ss) {
+            this->sideset = ss;
+            auto mesh     = space->mesh_ptr();
 
             if (space->has_semi_structured_mesh()) {
                 auto &&ssmesh = space->semi_structured_mesh();
-
-                // FIXME this extra surface mesh should be removed during optimization
-
-                const int nnxs = 4;
-                const int nexs = ssmesh.level() * ssmesh.level();
-                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
-                if (sshex8_extract_quadshell4_surface_from_sideset(ssmesh.level(),
-                                                                   ssmesh.element_data(),
-                                                                   ss->parent()->size(),
-                                                                   ss->parent()->data(),
-                                                                   ss->lfi()->data(),
-                                                                   this->sides->data()) != SFEM_SUCCESS) {
-                    SFEM_ERROR("Unable to extract surface from sideset!\n");
-                }
 
                 this->ss_sides =
                         sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), ss->parent()->size());
@@ -483,11 +465,42 @@ namespace sfem {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
 
-                idx_t    *idx          = nullptr;
-                ptrdiff_t n_contiguous = -1;
-                remap_elements_to_contiguous_index(
-                        this->ss_sides->extent(1), this->ss_sides->extent(0), this->ss_sides->data(), &n_contiguous, &idx);
-                sfem::manage_host_buffer(n_contiguous, idx);
+                idx_t           *idx          = nullptr;
+                ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
+                std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+
+                // FiXME harcoded for sshex8
+                sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+
+                // printf("SS SIDES (VID) #nodes %ld \n", ssmesh.n_nodes());
+                // this->ss_sides->print(std::cout);
+
+                ssquad4_hierarchical_remapping(ssmesh.level(),
+                                               levels.size(),
+                                               levels.data(),
+                                               this->ss_sides->extent(1),
+                                               ssmesh.n_nodes(),
+                                               this->ss_sides->data(),
+                                               &idx,
+                                               &n_contiguous);
+
+                this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
+
+                // FIXME this extra surface mesh should be removed during optimization
+                const int nnxs = 4;
+                const int nexs = ssmesh.level() * ssmesh.level();
+                this->sides    = sfem::create_host_buffer<idx_t>(nnxs, ss->parent()->size() * nexs);
+
+                ssquad4_to_standard_quad4_mesh(ssmesh.level(), ss->parent()->size(), this->ss_sides->data(), this->sides->data());
+
+                // printf("SS SIDES\n");
+                // this->ss_sides->print(std::cout);
+
+                // printf("SIDES\n");
+                // this->sides->print(std::cout);
+
+                // printf("NODES\n");
+                // node_mapping->print(std::cout);
 
             } else {
                 enum ElemType st   = side_type(space->element_type());
@@ -504,14 +517,26 @@ namespace sfem {
                                                  this->sides->data()) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract surface from sideset!\n");
                 }
+
+                idx_t    *idx          = nullptr;
+                ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
+                remap_elements_to_contiguous_index(
+                        this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
+                this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
             }
 
-            idx_t    *idx          = nullptr;
-            ptrdiff_t n_contiguous = -1;
-            remap_elements_to_contiguous_index(
-                    this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
-            this->node_mapping   = sfem::manage_host_buffer(n_contiguous, idx);
             this->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), this->node_mapping->size());
+        }
+
+        void read_sideset(const std::string &path_surface, Input &in) {
+            SFEM_TRACE_SCOPE("ContactConditions::read_sideset");
+
+            auto ss = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
+            if (!ss) {
+                SFEM_ERROR("Unable to read sideset at: %s\n", path_surface.c_str());
+            }
+
+            return init_from_sideset(ss);
         }
 
         void read_surface(const std::string &path_surface, Input &in) {
@@ -532,7 +557,7 @@ namespace sfem {
             assert(space->has_semi_structured_mesh() || type_from_string(surface_elem_type.c_str()) == side_element_type);
 
             idx_t   **sides  = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            ptrdiff_t _nope_ = -1, len = -1;
+            ptrdiff_t _nope_ = SFEM_PTRDIFF_INVALID, len = SFEM_PTRDIFF_INVALID;
 
             char pattern[SFEM_MAX_PATH_LENGTH];
             sprintf(pattern, "%s/i*.*raw", path_surface.c_str());
@@ -545,14 +570,14 @@ namespace sfem {
 
             for (int d = 0; d < nxe; d++) {
                 idx_t    *idx   = nullptr;
-                ptrdiff_t len_d = -1;
+                ptrdiff_t len_d = SFEM_PTRDIFF_INVALID;
                 if (array_create_from_file(mesh->comm(), paths[d].c_str(), SFEM_MPI_IDX_T, (void **)&idx, &_nope_, &len_d)) {
                     SFEM_ERROR("Unable to read path %s\n", paths[d].c_str());
                 }
 
                 sides[d] = idx;
 
-                assert(len == -1 || len_d == len);
+                assert(len == SFEM_PTRDIFF_INVALID || len_d == len);
                 len = len_d;
             }
 
@@ -561,7 +586,7 @@ namespace sfem {
             bool has_parent_indexing = points == "parent";
             if (has_parent_indexing) {
                 idx_t    *idx          = nullptr;
-                ptrdiff_t n_contiguous = -1;
+                ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
                 remap_elements_to_contiguous_index(
                         this->sides->extent(1), this->sides->extent(0), this->sides->data(), &n_contiguous, &idx);
                 this->node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
@@ -613,8 +638,14 @@ namespace sfem {
                                                                  const std::shared_ptr<Grid<geom_t>>  &sdf,
                                                                  const std::shared_ptr<Sideset>       &sideset,
                                                                  const enum ExecutionSpace             es) {
-        SFEM_ERROR("IMPLEMENT ME!\n");
-        return nullptr;
+        auto cc = std::make_unique<ContactConditions>(space);
+        cc->impl_->init_from_sideset(sideset);
+        cc->impl_->sdf         = sdf;
+        cc->impl_->gap_xnormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_ynormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->gap_znormal = create_host_buffer<real_t>(cc->n_constrained_dofs());
+        cc->impl_->assemble_mass_vector();
+        return cc;
     }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_file(const std::shared_ptr<FunctionSpace> &space,
@@ -793,6 +824,25 @@ namespace sfem {
         if (impl_->debug) {
             for (ptrdiff_t i = 0; i < n; ++i) {
                 printf("CC_t: %g = %g  * %g * %g\n", out[idx[i] * dim + 0], normals[0][i], f[i], m[i]);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int ContactConditions::full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s) {
+        const ptrdiff_t    n   = impl_->node_mapping->size();
+        const idx_t *const idx = impl_->node_mapping->data();
+        auto               m   = impl_->mass_vector->data();
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+
+        const real_t *const normals[3] = {impl_->gap_xnormal->data(), impl_->gap_ynormal->data(), impl_->gap_znormal->data()};
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (int d = 0; d < dim; d++) {
+                const real_t ri = r[idx[i] * dim + d] / m[i];
+                s[idx[i] * dim] += normals[d][i] * ri;
             }
         }
 
@@ -1048,5 +1098,7 @@ namespace sfem {
 
         return SFEM_SUCCESS;
     }
+
+    std::shared_ptr<Sideset> ContactConditions::sideset() { return impl_->sideset; }
 
 }  // namespace sfem

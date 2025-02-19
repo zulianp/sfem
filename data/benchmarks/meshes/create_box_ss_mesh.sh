@@ -16,14 +16,14 @@ export PATH=$SFEM_ROOT/python/sfem/algebra:$PATH
 export PATH=$SFEM_ROOT/python/sfem/utils:$PATH
 export PATH=$SFEM_ROOT/data/benchmarks/meshes:$PATH
 
-if [[ -z $SFEM_BIN_DIR ]]
+if [[ -z $SFEM_DIR ]]
 then
 	PATH=$SFEM_ROOT/build:$PATH
 	source $SFEM_ROOT/build/sfem_config.sh
 else
-	echo "Using binaries in $SFEM_BIN_DIR"
-	PATH=$SFEM_BIN_DIR:$PATH
-	source $SFEM_BIN_DIR/sfem_config.sh
+	echo "Using binaries in $SFEM_DIR"
+	PATH=$SFEM_DIR/bin:$PATH
+	source $SFEM_DIR/workflows/sfem_config.sh
 fi
 
 if (($# != 2))

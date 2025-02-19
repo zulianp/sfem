@@ -15,7 +15,7 @@ namespace sfem {
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
         ExecutionSpace               execution_space_{EXECUTION_SPACE_INVALID};
-        ptrdiff_t                    n_dofs{-1};
+        ptrdiff_t                    n_dofs{SFEM_PTRDIFF_INVALID};
         int                          max_it{3};
         std::shared_ptr<Buffer<T>>   workspace;
         std::shared_ptr<Operator<T>> op;
@@ -94,6 +94,8 @@ namespace sfem {
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const std::shared_ptr<Buffer<T>>&            diag) override {
+            assert(sbv->n_blocks() == diag->size());
+            
             this->op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
 
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);

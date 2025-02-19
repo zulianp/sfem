@@ -3,18 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sfem_base.h"
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "utils.h"
-
-typedef int idx_t;
-#define MPI_IDX_T MPI_INT
 
 static void check_sizes(ptrdiff_t n_bytes, int n_bytes_x_entry) {
     ptrdiff_t n_values = n_bytes / n_bytes_x_entry;
     if ((n_values * n_bytes_x_entry) != n_bytes) {
         fprintf(stderr, "Bad input! %ld != %d * %ld\n", (long)n_bytes, n_bytes_x_entry, (long)n_values);
-        MPI_Abort(MPI_COMM_WORLD, -1);
+        MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);
     }
 }
 
@@ -60,14 +58,13 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t  n_override;
     idx_t *override_idx;
-    array_create_from_file(comm, path_idx, MPI_IDX_T, (void **)&override_idx, &_ignore_, &n_override);
+    array_create_from_file(comm, path_idx, SFEM_MPI_IDX_T, (void **)&override_idx, &_ignore_, &n_override);
 
     if (n_override != n_override_values) {
-        fprintf(stderr,
+        SFEM_ERROR(
                 "Inconsistent lenght of override values and idx! %ld != %ld\n",
                 (long)n_override_values,
                 (long)n_override);
-        MPI_Abort(comm, -1);
     }
 
     char *input;

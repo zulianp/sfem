@@ -33,7 +33,7 @@ namespace sfem {
         T eigen_solver_tol{1e-1};
         int max_it{10000};
         int check_each{10};
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool verbose{true};
         T max_eig_{0};
         bool debug{false};

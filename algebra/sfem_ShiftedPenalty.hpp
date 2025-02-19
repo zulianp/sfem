@@ -28,7 +28,7 @@ namespace sfem {
         int       max_it{10};
         int       max_inner_it{10};
         int       check_each{1};
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool      verbose{true};
         bool      debug{false};
         T         penalty_param_{10};
@@ -282,6 +282,7 @@ namespace sfem {
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
+                    // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the correction)
                     if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
                     if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
@@ -343,7 +344,7 @@ namespace sfem {
             T energy = 0;
 
             SFEM_ERROR("IMPLEMENT ME!\n");
-            return -1;
+            return SFEM_FAILURE;
         }
 
         void monitor(const int iter,

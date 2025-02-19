@@ -7,7 +7,7 @@
 #include "trishell3_l2_projection_p0_p1.h"
 #include "trishell6_l2_projection_p1_p2.h"
 
-
+#include <stdio.h>
 void surface_e_projection_apply(const int element_type,
                                 const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
@@ -27,8 +27,7 @@ void surface_e_projection_apply(const int element_type,
         }
 
         default: {
-           assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+           SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -52,8 +51,7 @@ void surface_e_projection_coeffs(const int element_type,
         }
 
         default: {
-           assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+           SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }

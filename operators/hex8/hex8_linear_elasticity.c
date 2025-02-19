@@ -8,6 +8,9 @@
 
 #include <stdio.h>
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 static void print_matrix(int r, int c, const accumulator_t *const m) {
     printf("-------------------\n");
     for (int i = 0; i < r; i++) {
@@ -570,18 +573,18 @@ int affine_hex8_linear_elasticity_diag(const ptrdiff_t              nelements,
 }
 
 int affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t              nelements,
-                                             const ptrdiff_t              nnodes,
-                                             idx_t **const SFEM_RESTRICT  elements,
-                                             geom_t **const SFEM_RESTRICT points,
-                                             const real_t                 mu,
-                                             const real_t                 lambda,
-                                             const ptrdiff_t              out_stride,
-                                             real_t *const                out0,
-                                             real_t *const                out1,
-                                             real_t *const                out2,
-                                             real_t *const                out3,
-                                             real_t *const                out4,
-                                             real_t *const                out5) {
+                                                 const ptrdiff_t              nnodes,
+                                                 idx_t **const SFEM_RESTRICT  elements,
+                                                 geom_t **const SFEM_RESTRICT points,
+                                                 const real_t                 mu,
+                                                 const real_t                 lambda,
+                                                 const ptrdiff_t              out_stride,
+                                                 real_t *const                out0,
+                                                 real_t *const                out1,
+                                                 real_t *const                out2,
+                                                 real_t *const                out3,
+                                                 real_t *const                out4,
+                                                 real_t *const                out5) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -663,6 +666,158 @@ int affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t              ne
             out4[v * out_stride] += element_matrix[4];
 #pragma omp atomic update
             out5[v * out_stride] += element_matrix[5];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t              nelements,
+                                                    const ptrdiff_t              nnodes,
+                                                    idx_t **const SFEM_RESTRICT  elements,
+                                                    geom_t **const SFEM_RESTRICT points,
+                                                    const real_t                 mu,
+                                                    const real_t                 lambda,
+                                                    const ptrdiff_t              u_stride,
+                                                    const real_t *const          ux,
+                                                    const real_t *const          uy,
+                                                    const real_t *const          uz,
+                                                    const ptrdiff_t              out_stride,
+                                                    real_t *const                s00,
+                                                    real_t *const                s01,
+                                                    real_t *const                s02,
+                                                    real_t *const                s11,
+                                                    real_t *const                s12,
+                                                    real_t *const                s22) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
+
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
+    }
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        scalar_t lux[8];
+        scalar_t luy[8];
+        scalar_t luz[8];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lux[v] = ux[ev[v] * u_stride];
+            luy[v] = uy[ev[v] * u_stride];
+            luz[v] = uz[ev[v] * u_stride];
+        }
+
+        // scalar_t jacobian_adjugate[9];
+        // scalar_t jacobian_determinant;
+        // hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, jacobian_adjugate, &jacobian_determinant);
+
+        accumulator_t projected_stress[6][8];
+        for (int k = 0; k < 6; k++) {
+            for (int edof_i = 0; edof_i < 8; edof_i++) {
+                projected_stress[k][edof_i] = 0;
+            }
+        }
+
+
+        for (int zi = 0; zi < n_qp; zi++) {
+            for (int yi = 0; yi < n_qp; yi++) {
+                for (int xi = 0; xi < n_qp; xi++) {
+                    scalar_t jacobian_adjugate[9];
+                    scalar_t jacobian_determinant;
+                    hex8_adjugate_and_det(lx, ly, lz, qx[xi], qx[yi], qx[zi], jacobian_adjugate, &jacobian_determinant);
+
+                    scalar_t disp_grad[9];
+                    hex8_displacement_gradient(
+                            jacobian_adjugate, jacobian_determinant, qx[xi], qx[yi], qx[zi], lux, luy, luz, disp_grad);
+
+                    scalar_t cauchy_stress[6];
+                    hex8_cauchy_stress(mu, lambda, disp_grad, cauchy_stress);
+                    // hex8_strain(jacobian_adjugate, jacobian_determinant, qx[xi], qx[yi], qx[zi], lux, luy, luz, cauchy_stress);
+
+                    for (int k = 0; k < 6; k++) {
+                        assert(cauchy_stress[k] == cauchy_stress[k]);
+                        hex8_l2_project(jacobian_determinant,
+                                        qx[xi],
+                                        qx[yi],
+                                        qx[zi],
+                                        qw[xi] * qw[yi] * qw[zi],
+                                        cauchy_stress[k],
+                                        projected_stress[k]);
+                    }
+                }
+            }
+        }
+
+        // local to global
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            s00[idx] += projected_stress[0][edof_i];
+        }
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+#pragma omp atomic update
+            s01[idx] += projected_stress[1][edof_i];
+        }
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+#pragma omp atomic update
+            s02[idx] += projected_stress[2][edof_i];
+        }
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+#pragma omp atomic update
+            s11[idx] += projected_stress[3][edof_i];
+        }
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+#pragma omp atomic update
+            s12[idx] += projected_stress[4][edof_i];
+        }
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+#pragma omp atomic update
+            s22[idx] += projected_stress[5][edof_i];
         }
     }
 

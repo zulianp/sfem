@@ -602,8 +602,7 @@ int main(int argc, char *argv[]) {
                     }
 
                     if (stop) {
-                        fprintf(stderr, "Encountered %ld NaN value! Stopping...\n", stop);
-                        MPI_Abort(comm, -1);
+                        SFEM_ERROR("Encountered %ld NaN value! Stopping...\n", stop);
                         break;
                     }
                 }

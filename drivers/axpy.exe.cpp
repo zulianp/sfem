@@ -40,11 +40,7 @@ int main(int argc, char *argv[]) {
     array_create_from_file(comm, y_path, SFEM_MPI_REAL_T, (void **)&y, &y_local_ndofs, &y_ndofs);
 
     if(y_ndofs != x_ndofs) {
-        if(!rank) {
-            fprintf(stderr, "Non matching vector sizes size(x) = %ld size(y) = %ld\n", x_ndofs, y_ndofs);
-        }
-
-        MPI_Abort(comm, -1);
+        SFEM_ERROR("Non matching vector sizes size(x) = %ld size(y) = %ld\n", x_ndofs, y_ndofs);
     }
 
     for(ptrdiff_t i = 0; i < x_local_ndofs; ++i) {

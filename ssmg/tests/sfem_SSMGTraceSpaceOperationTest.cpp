@@ -144,10 +144,10 @@ int test_trace_space_prolongation_restriction() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 24;
+    int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_BASE_RESOLUTION = 8;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;

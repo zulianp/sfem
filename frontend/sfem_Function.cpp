@@ -473,7 +473,7 @@ namespace sfem {
 #ifndef NDEBUG
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < macro_mesh->n_elements(); i++) {
-                    elements[d][i] = -1;
+                    elements[d][i] = SFEM_IDX_INVALID;
                 }
             }
 #endif
@@ -560,7 +560,12 @@ namespace sfem {
         ret->impl_->elements       = view;
         ret->impl_->n_unique_nodes = n_unique_nodes;
         ret->impl_->interior_start = this->impl_->interior_start;
-        ret->impl_->points         = this->impl_->points;
+
+        if (this->impl_->points) {
+            int sdim           = this->impl_->macro_mesh->spatial_dimension();
+            ret->impl_->points = sfem::view(this->impl_->points, 0, sdim, 0, n_unique_nodes);
+        }
+
         return ret;
     }
 
@@ -590,6 +595,8 @@ namespace sfem {
 
         return impl_->points;
     }
+
+    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements() { return impl_->elements; }
 
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
@@ -679,7 +686,7 @@ namespace sfem {
         ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
         ss << "mem_disc_ss:      " << (mem_points + mem_macro_points) << " [GB]\n";
         ss << "mem_disc_std:     " << (mem_hex8_mesh + mem_sshex8_mesh) << " [GB]\n";
-        ss << "n_macro_elements: " << elements->extent(1)  << "\n";
+        ss << "n_macro_elements: " << elements->extent(1) << "\n";
 
         std::string   meta_path = folder + "/meta.yaml";
         std::ofstream os(meta_path.c_str());
@@ -882,8 +889,8 @@ namespace sfem {
         return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, macro_type_variant(impl_->element_type));
     }
 
-    static std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
-                                                                      const std::shared_ptr<Sideset>       &sideset) {
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+                                                               const std::shared_ptr<Sideset>       &sideset) {
         ptrdiff_t n_nodes{0};
         idx_t    *nodes{nullptr};
         if (space->has_semi_structured_mesh()) {
@@ -1973,6 +1980,9 @@ namespace sfem {
 
         real_t mu{1}, lambda{1};
 
+        long   calls{0};
+        double total_time{0};
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("LinearElasticity::create");
 
@@ -2020,6 +2030,17 @@ namespace sfem {
         int initialize() override { return SFEM_SUCCESS; }
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        ~LinearElasticity() {
+            if (calls) {
+                printf("LinearElasticity::apply called %ld times. Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -2128,8 +2149,14 @@ namespace sfem {
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
+            double tick = MPI_Wtime();
+
             linear_elasticity_apply_aos(
                     element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, h, out);
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
 
             return SFEM_SUCCESS;
         }
@@ -2154,7 +2181,7 @@ namespace sfem {
         enum ElemType                  element_type { INVALID };
 
         real_t mu{1}, lambda{1};
-        bool   use_affine_approximation{true}; // FIXME the iso-parametric version has probably a bug
+        bool   use_affine_approximation{true};  // FIXME the iso-parametric version has probably a bug
         long   calls{0};
         double total_time{0};
 
@@ -2315,8 +2342,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            assert(false);
-            return SFEM_FAILURE;
+            return apply(nullptr, x, out);
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
@@ -2384,6 +2410,9 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
 
+        long   calls{0};
+        double total_time{0};
+
         const char *name() const override { return "Laplacian"; }
         inline bool is_linear() const override { return true; }
 
@@ -2414,6 +2443,16 @@ namespace sfem {
         int initialize() override { return SFEM_SUCCESS; }
 
         Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        ~Laplacian() {
+            if (calls) {
+                printf("Laplacian::apply called %ld times. Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -2478,7 +2517,14 @@ namespace sfem {
 
             auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            return laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+            double tick = MPI_Wtime();
+
+            int err = laplacian_apply(element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, h, out);
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+            return err;
         }
 
         int value(const real_t *x, real_t *const out) override {
@@ -3283,8 +3329,8 @@ namespace sfem {
 
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
-        ptrdiff_t local_size = -1;
-        ptrdiff_t size       = -1;
+        ptrdiff_t local_size = SFEM_PTRDIFF_INVALID;
+        ptrdiff_t size       = SFEM_PTRDIFF_INVALID;
 
         printf("n_files (%d):\n", n_files);
         int err = 0;

@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     int *nodes_in_block = (int*)calloc(num_blocks, sizeof(int));
 
     for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
-        node_lidx[i] = -1;
+        node_lidx[i] = SFEM_LOCAL_IDX_INVALID;
     }
 
     for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
             for (int d = 0; d < nnxe; d++) {
                 const idx_t node = mesh.elements[d][e];
 
-                if (node_lidx[node] == -1) {
+                if (node_lidx[node] == SFEM_LOCAL_IDX_INVALID) {
                     // Create index
                     node_lidx[node] = last_index++;
                     nodes_in_block[block_num]++;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
             for (int d = 0; d < nnxe; d++) {
                 const idx_t node = mesh.elements[d][e];
-                node_lidx[node] = -1;
+                node_lidx[node] = SFEM_LOCAL_IDX_INVALID;
             }
         }
     }
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "%d < %ld\n", nodes_in_block[b], max_rep_limit);
         }
 
-        MPI_Abort(comm, -1);
+        MPI_Abort(comm, SFEM_FAILURE);
     }
 
     idx_t *node_mapping = (idx_t *)calloc(new_num_nodes, sizeof(idx_t));

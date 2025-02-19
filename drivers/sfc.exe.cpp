@@ -25,7 +25,7 @@
 
 typedef uint32_t sfc_t;
 
-#define sort_function argsort_u32
+#define sort_function argsort_u32_element
 // typedef idx_t element_idx_t;
 
 // #define sort_function argsort_u32_ptrdiff_t
@@ -137,11 +137,7 @@ int main(int argc, char *argv[]) {
 
 #ifndef DSFEM_ENABLE_MPI_SORT
     if (size > 1) {
-        if (!rank) {
-            fprintf(stderr, "Parallel runs not supported. Compile with mpi-sort\n");
-        }
-
-        MPI_Abort(comm, -1);
+        SFEM_ERROR( "Parallel runs not supported. Compile with mpi-sort\n");
     }
 #endif
 

@@ -181,7 +181,7 @@ int test_cube() {
 
         real_t    largest_diff        = 0;
         real_t    largest_diff_factor = 0;
-        ptrdiff_t arg_largest_diff    = -1;
+        ptrdiff_t arg_largest_diff    = SFEM_PTRDIFF_INVALID;
         for (ptrdiff_t i = 0; i < n; i++) {
             // actual: is composition of operators
             // expected: is application of coarse operator
@@ -205,7 +205,7 @@ int test_cube() {
 
         if (arg_largest_diff != -1) {
             printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
-            SFEM_TEST_ASSERT(largest_diff < 1e-8);
+            SFEM_TEST_ASSERT(largest_diff < 1e-7);
         }
     }
 

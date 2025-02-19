@@ -18,7 +18,7 @@ def main(argv):
 
 	try:
 	    opts, args = getopt.getopt(
-	        argv[3:], "e:h",
+	        argv[2:], "e:h",
 	        ["refinements=", "radius=", "help"])
 
 	except getopt.GetoptError as err:
@@ -30,7 +30,7 @@ def main(argv):
 	    if opt in ('-h', '--help'):
 	        print(usage)
 	        sys.exit()
-	    elif opt in ("--refinemnts"):
+	    elif opt in ("--refinements"):
 	    	nrefs = int(arg)
 	    elif opt in ("--radius"):
 	    	radius = float(arg)
@@ -49,6 +49,7 @@ def main(argv):
 	model.mesh.generate(3)
 
 	for r in range(0, nrefs):
+		print(f"refinement {r} ...")
 		model.mesh.refine()
 
 	gmsh.write(output)

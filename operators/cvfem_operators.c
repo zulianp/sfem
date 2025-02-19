@@ -11,6 +11,8 @@
 #include "cvfem_tet4_convection.h"
 #include "tet4_laplacian.h"
 
+#include <stdio.h>
+
 void cvfem_laplacian_crs(const enum ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
@@ -36,8 +38,7 @@ void cvfem_laplacian_crs(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -65,8 +66,7 @@ void cvfem_laplacian_apply(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -91,8 +91,7 @@ void cvfem_convection_assemble_hessian(const enum ElemType element_type,
         //     return;
         // }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -119,8 +118,7 @@ void cvfem_convection_apply(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }
@@ -147,8 +145,7 @@ void cvfem_cv_volumes(const enum ElemType element_type,
             return;
         }
         default: {
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, -1);
+            SFEM_ERROR("IMPLEMENT ME!\n");
         }
     }
 }

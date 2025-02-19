@@ -8,16 +8,8 @@
 #include "sfem_config.h"
 #endif
 
-// static int DEPTH_LEVEL = 0;
-
-// inline char* depth_call(int depth) {
-//     static char buffer[256];
-//     for (int i = 0; i < depth; i++) {
-//         buffer[i] = '.';
-//     }
-//     buffer[depth] = '\0';
-//     return buffer;
-// }
+#define SFEM_SUCCESS 0
+#define SFEM_FAILURE 1
 
 #define PRINT_CURRENT_FUNCTION \
     printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
@@ -42,7 +34,7 @@
         } else {                                                                          \
             fprintf(stderr, "[Error] %s is required (%s:%d)", #name, __FILE__, __LINE__); \
             assert(0);                                                                    \
-            MPI_Abort(MPI_COMM_WORLD, -1);                                                \
+            MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);                                                \
         }                                                                                 \
     } while (0)
 
@@ -70,8 +62,7 @@
 
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
-#define SFEM_SUCCESS 0
-#define SFEM_FAILURE 1
+
 
 #define ON 1
 #define OFF 0

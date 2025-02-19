@@ -88,7 +88,7 @@ void read_boundary_conditions(MPI_Comm comm,
                                            (void **)&conds[i].values,
                                            &local_check_size,
                                            &check_size)) {
-                    MPI_Abort(comm, -1);
+                    MPI_Abort(comm, SFEM_FAILURE);
                 }
 
                 if (local_check_size != conds[i].local_size) {

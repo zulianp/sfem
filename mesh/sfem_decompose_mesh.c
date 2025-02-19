@@ -102,7 +102,7 @@ int create_mesh_blocks(const mesh_t *mesh,
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {
             owner[i] = n_blocks + 1;
-            global_to_local[i] = -1;
+            global_to_local[i] = SFEM_IDX_INVALID;
         }
 
         for (int b = 0; b < n_blocks; b++) {
@@ -152,7 +152,7 @@ int create_mesh_blocks(const mesh_t *mesh,
                 for (ptrdiff_t i = 0; i < blocks[b].nelements; i++) {
                     const idx_t node = blocks[b].elements[d][i];
 
-                    if (global_to_local[node] == -1) {
+                    if (global_to_local[node] == SFEM_IDX_INVALID) {
                         if (owner[node] == b) {
                             if (max_share[node] != b) {
                                 global_to_local[node] = offset_owned_ghosted++;
@@ -178,7 +178,7 @@ int create_mesh_blocks(const mesh_t *mesh,
 // Clean-up mapping
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < ntotal; i++) {
-                global_to_local[blocks[b].node_mapping[i]] = -1;
+                global_to_local[blocks[b].node_mapping[i]] = SFEM_IDX_INVALID;
             }
         }
 
@@ -256,7 +256,7 @@ int create_mesh_blocks(const mesh_t *mesh,
                 // Clean-up
                 for (ptrdiff_t i = 0; i < blocks[b].nshared; i++) {
                     idx_t node = blocks[b].node_mapping[offset + i];
-                    global_to_local[node] = -1;
+                    global_to_local[node] = SFEM_IDX_INVALID;
                 }
             }
 
