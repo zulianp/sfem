@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (max_nodes > mesh.nnodes) {
-        MPI_Abort(comm, -1);
+        SFEM_ERROR("max_nodes > mesh.nnodes");
     }
 
     // double tack = MPI_Wtime();
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
     printf("found: %ld %g\n", closest_node, closest_sq_dist);
 
     if (closest_node < 0) {
-        MPI_Abort(comm, -1);
+        SFEM_ERROR("closest_node < 0");
     }
 
     idx_t *selected_nodes = (idx_t *)malloc((mesh.nnodes + 1) * sizeof(idx_t));

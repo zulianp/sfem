@@ -69,7 +69,7 @@ int test_ssgmg_poisson_cube() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_BASE_RESOLUTION = 8;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
@@ -116,11 +116,16 @@ int test_ssgmg_linear_elasticity_cube() {
     const char *SFEM_FINE_OP_TYPE   = "MF";
     const char *SFEM_COARSE_OP_TYPE = "MF";
 
+    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
+    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_BASE_RESOLUTION = 8;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+
 
     geom_t Lx = 1;
     auto   m  = sfem::Mesh::create_hex8_cube(

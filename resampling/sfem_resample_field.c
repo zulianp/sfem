@@ -778,7 +778,7 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
 #define real_type real_t
 
 int tet4_resample_field_local_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         float** const SFEM_RESTRICT xyz,
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
@@ -788,7 +788,7 @@ int tet4_resample_field_local_CUDA(  // Mesh
         real_type* const SFEM_RESTRICT weighted_field);
 
 int tet4_resample_field_local_reduce_CUDA(  // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         float** const SFEM_RESTRICT xyz,
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
@@ -799,7 +799,7 @@ int tet4_resample_field_local_reduce_CUDA(  // Mesh
 
 int tet4_resample_field_local_V8(
         // Mesh
-        const ptrdiff_t nelements, const ptrdiff_t nnodes, int** const SFEM_RESTRICT elems,
+        const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t** const SFEM_RESTRICT elems,
         float** const SFEM_RESTRICT xyz,
         // SDF
         const ptrdiff_t* const SFEM_RESTRICT n, const ptrdiff_t* const SFEM_RESTRICT stride,
@@ -910,10 +910,8 @@ int resample_field_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, weighted_field);
 
         default: {
-            assert(0);
-            fprintf(stderr, "Unknown element type %d\n", st);
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            return EXIT_FAILURE;
+            SFEM_ERROR("Unknown element type %d\n", st);
+            return SFEM_FAILURE;
         }
     }
 
@@ -1129,11 +1127,7 @@ int field_view_ensure_margin(MPI_Comm comm, const ptrdiff_t nnodes,
     MPI_Comm_size(comm, &size);
 
     if (size == 1) {
-        if (!rank) {
-            fprintf(stderr, "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
-        }
-
-        MPI_Abort(comm, -1);
+       SFEM_ERROR( "[%d] resample_grid_view cannot be used in serial runs!\n", rank);
         return 1;
     }
 

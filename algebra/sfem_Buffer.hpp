@@ -9,6 +9,9 @@
 
 #include "sfem_base.h"
 
+#include "sfem_MPIType.hpp"
+#include "matrixio_array.h"
+
 namespace sfem {
 
     enum ExecutionSpace { EXECUTION_SPACE_HOST = 0, EXECUTION_SPACE_DEVICE = 1, EXECUTION_SPACE_INVALID = -1 };
@@ -244,6 +247,39 @@ namespace sfem {
                 MEMORY_SPACE_HOST);
         return ret;
     }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T>> view(const std::shared_ptr<Buffer<T>> &buffer, const ptrdiff_t begin, const ptrdiff_t end) {
+        return std::make_shared<Buffer<T>>(
+                end - begin, &buffer->data()[begin], [keep_alive = buffer](void *) { (void)keep_alive; }, buffer->mem_space());
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T *>> view(const std::shared_ptr<Buffer<T *>> &buffer,
+                                      const ptrdiff_t                     begin0,
+                                      const ptrdiff_t                     end0,
+                                      const ptrdiff_t                     begin1,
+                                      const ptrdiff_t                     end1) {
+        const ptrdiff_t extent0 = end0 - begin0;
+        const ptrdiff_t extent1 = end1 - begin1;
+
+        T **new_buffer = (T **)malloc(extent0 * sizeof(T *));
+        for (ptrdiff_t i0 = 0; i0 < extent0; i0++) {
+            new_buffer[i0] = &(buffer->data()[begin0 + i0][begin1]);
+        }
+
+        return std::make_shared<Buffer<T *>>(
+                extent0, extent1, new_buffer, [keep_alive = buffer](int, void *buff) { free(buff); }, buffer->mem_space());
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T>> create_buffer_from_file(MPI_Comm comm, const char *path) {
+        T        *data{nullptr};
+        ptrdiff_t local_size{0}, global_size{0};
+        array_create_from_file(comm, path, sfem::MPIType<T>::value(), (void **)&data, &local_size, &global_size);
+        return manage_host_buffer<T>(local_size, data);
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP

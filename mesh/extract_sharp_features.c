@@ -93,7 +93,7 @@ int extract_sharp_edges(const enum ElemType element_type,
                 const count_t extent = rowptr[node_from + 1] - rowptr[node_from];
                 const idx_t *cols = &colidx[rowptr[node_from]];
 
-                ptrdiff_t edge_id = -1;
+                ptrdiff_t edge_id = SFEM_PTRDIFF_INVALID;
                 for (count_t k = 0; k < extent; k++) {
                     if (cols[k] == node_to) {
                         edge_id = rowptr[node_from] + k;
@@ -101,7 +101,7 @@ int extract_sharp_edges(const enum ElemType element_type,
                     }
                 }
 
-                assert(edge_id >= 0);
+                assert(edge_id != SFEM_PTRDIFF_INVALID);
                 for (int d = 0; d < 3; d++) {
                     normal[d][edge_id] = n[d];
                 }

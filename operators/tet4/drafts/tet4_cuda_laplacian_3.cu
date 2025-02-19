@@ -53,8 +53,8 @@ static inline __device__ void laplacian(const real_t *SFEM_RESTRICT fff,
     element_matrix[15 * stride] = fff[5 * stride];
 }
 
-static inline __device__ __host__ int linear_search(const idx_t target, const idx_t *const arr, const int size) {
-    int i;
+static inline __device__ __host__ idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
+    idx_t i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
         if (arr[i + 1] == target) return i + 1;
@@ -64,10 +64,10 @@ static inline __device__ __host__ int linear_search(const idx_t target, const id
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static inline __device__ __host__ int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static inline __device__ __host__ idx_t find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     // if (lenrow <= 32)
     // {
     return linear_search(key, row, lenrow);

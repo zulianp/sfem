@@ -27,7 +27,7 @@ SFEM_INLINE static int real_type_size(enum RealType type) {
             return sizeof(real_t);
         default: {
             assert(0);
-            return -1;
+            return SFEM_FAILURE;
         }
     }
 }

@@ -10,6 +10,7 @@ extern "C" {
 
 void sort_idx(idx_t *arr, idx_t size);
 idx_t sortreduce(idx_t *arr, idx_t size);
+idx_t psortreduce(idx_t *arr, idx_t size);
 idx_t find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size);
 idx_t safe_find_idx_binary_search(const idx_t key, const idx_t *arr, idx_t size);
 

@@ -38,6 +38,20 @@ int ssquad4_prolongate(const ptrdiff_t                   nelements,
                        const real_t *const SFEM_RESTRICT from,
                        real_t *const SFEM_RESTRICT       to);
 
+int ssquad4_prolongation_crs_nnz(const int                    level,
+                                 const ptrdiff_t              nelements,
+                                 idx_t **const SFEM_RESTRICT  elements,
+                                 const ptrdiff_t              to_nnodes,
+                                 count_t *const SFEM_RESTRICT rowptr);
+
+int ssquad4_prolongation_crs_fill(const int                    level,
+                                  const ptrdiff_t              nelements,
+                                  idx_t **const SFEM_RESTRICT  elements,
+                                  const ptrdiff_t              to_nnodes,
+                                  count_t *const SFEM_RESTRICT rowptr,
+                                  idx_t *const SFEM_RESTRICT   colidx,
+                                  real_t *const SFEM_RESTRICT  values);
+
 #ifdef __cplusplus
 }
 #endif

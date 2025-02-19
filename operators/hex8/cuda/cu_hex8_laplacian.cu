@@ -380,7 +380,7 @@ __global__ void cu_affine_hex8_laplacian_crs_sym_kernel(
             const idx_t *cols = &colidx[rowptr[ev[edof_i]]];
             // Find the columns associated with the current row and mask what is not found with
             // -1
-            int ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+            idx_t ks[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
             for (int i = 0; i < lenrow; i++) {
                 for (int k = 0; k < 8; k++) {
                     if (cols[i] == ev[k]) {
@@ -392,7 +392,7 @@ __global__ void cu_affine_hex8_laplacian_crs_sym_kernel(
 
             for (int edof_j = 0; edof_j < 8; edof_j++) {
                 if (ev[edof_j] > ev[edof_i]) {
-                    assert(ks[edof_j] != -1);
+                    assert(ks[edof_j] != SFEM_IDX_INVALID);
                     atomicAdd(&offdiag[rowptr[ev[edof_i]] + ks[edof_j]],
                               element_matrix[edof_i * 8 + edof_j]);
                 }

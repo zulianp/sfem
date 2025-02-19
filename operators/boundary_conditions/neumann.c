@@ -417,8 +417,7 @@ void surface_forcing_function(const int element_type,
             break;
         }
         default: {
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            assert(0 && "Implement me!");
+            SFEM_ERROR("Implement me!");
             break;
         }
     }

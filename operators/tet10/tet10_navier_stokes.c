@@ -1542,7 +1542,7 @@ static SFEM_INLINE void tet10_add_diffusion_rhs_kernel(const real_t px0,
 //                                                      real_t *const SFEM_RESTRICT element_vector)
 //                                                      {}
 
-static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr, const int size) {
+static SFEM_INLINE idx_t linear_search(const idx_t target, const idx_t *const arr, const int size) {
     int i;
     for (i = 0; i < size - 4; i += 4) {
         if (arr[i] == target) return i;
@@ -1553,10 +1553,10 @@ static SFEM_INLINE int linear_search(const idx_t target, const idx_t *const arr,
     for (; i < size; i++) {
         if (arr[i] == target) return i;
     }
-    return -1;
+    return SFEM_IDX_INVALID;
 }
 
-static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const int lenrow) {
+static SFEM_INLINE idx_t find_col(const idx_t key, const idx_t *const row, const int lenrow) {
     if (lenrow <= 32) {
         return linear_search(key, row, lenrow);
 
@@ -1575,7 +1575,7 @@ static SFEM_INLINE int find_col(const idx_t key, const idx_t *const row, const i
 static SFEM_INLINE void find_cols10(const idx_t *targets,
                                     const idx_t *const row,
                                     const int lenrow,
-                                    int *ks) {
+                                    idx_t *ks) {
     if (lenrow > 32) {
         for (int d = 0; d < 10; ++d) {
             ks[d] = find_col(targets[d], row, lenrow);

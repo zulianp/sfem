@@ -28,7 +28,7 @@ namespace sfem {
         // x[i] += r[i] / d[i];
         std::function<void(const std::size_t, const T* const, T* const)> smooth_;
 
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
 
         int iterations() const override {
             return iterations_;
@@ -83,7 +83,7 @@ namespace sfem {
 
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
-                return -1;
+                return SFEM_FAILURE;
             }
 
             T* r = blas.allocate(n);
@@ -99,7 +99,7 @@ namespace sfem {
                 return 0;
             }
 
-            int info = -1;
+            int info = SFEM_FAILURE;
             for (iterations_ = 1; iterations_ < max_it; iterations_++) {
                 smooth_(n, b, x);
 
@@ -112,6 +112,7 @@ namespace sfem {
 
                     if (norm_r < tol || norm_r != norm_r) {
                         assert(norm_r == norm_r);
+                        info = SFEM_SUCCESS;
                         break;
                     }
                 }
