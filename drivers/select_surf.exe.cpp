@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
     // Find approximately closest elemenent
     ///////////////////////////////////////////////////////////////////////////////
 
-    idx_t closest_element = -1;
+    idx_t closest_element = SFEM_IDX_INVALID;
     real_t closest_sq_dist = 1000000;
 
     for (ptrdiff_t e = 0; e < mesh.nelements; ++e) {
@@ -131,9 +131,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (closest_element < 0) {
-        fprintf(stderr, "Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh.nelements, mesh.nnodes);
-        MPI_Abort(comm, -1);
+    if (closest_element == SFEM_IDX_INVALID) {
+        SFEM_ERROR("Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh.nelements, mesh.nnodes);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -162,7 +161,7 @@ int main(int argc, char *argv[]) {
 
     elem_queue[0] = closest_element;
     for (ptrdiff_t e = 1; e < size_queue; ++e) {
-        elem_queue[e] = -1;
+        elem_queue[e] = SFEM_PTRDIFF_INVALID;
     }
 
     // Next slot
@@ -233,7 +232,7 @@ int main(int argc, char *argv[]) {
             }
 
             selected[e] = 1;
-            elem_queue[q] = -1;
+            elem_queue[q] = SFEM_PTRDIFF_INVALID;
         }
     } else {
         for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
@@ -294,7 +293,7 @@ int main(int argc, char *argv[]) {
             }
 
             selected[e] = 1;
-            elem_queue[q] = -1;
+            elem_queue[q] = SFEM_PTRDIFF_INVALID;
         }
     }
 

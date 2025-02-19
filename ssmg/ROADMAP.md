@@ -105,13 +105,13 @@ MS := Milestone
    - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
    - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
    - [x] Basic tracing facilities for timing different parts of the code (CPU only)
-   - [ ] GMG: Hierarchical indexing for no redundancy multilevel discretization
-   - [ ] SSHEX8-Mesh online generation from HEX8
-   - [ ] Multilevel GMG on CPU
-   - [ ] Contact stresses post-processor for SSHEX8
+   - [x] GMG: Hierarchical indexing for no redundancy multilevel discretization
+   - [x] SSHEX8-Mesh online generation from HEX8
+   - [x] Multilevel GMG on CPU
+   - [x] Contact stresses post-processor for SSHEX8
    - [ ] Provide boundary surface mask for adaptive coarsening
-   - [ ] Boundary mass-matrix
-   - [ ] MG with Support non-axis aligned normal fields for contact
+   - [x] Boundary mass-matrix
+   - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
    - [ ] Export facilities for Paper 1
    - [ ] Nonlinear obstacle contact loop (Optional)
@@ -138,6 +138,7 @@ MS := Milestone
 
 **MS 1: ()**
    - [x] MatLab implementation of SPGMG in 2D (scalar problem)
+   - [ ] Update strategy of Lagrange multiplier
    - [ ] MatLab implementations for Paper 1 (P1)
    - [ ] Drafting P1
 
@@ -171,6 +172,19 @@ MS := Milestone
 - [ ] Examples in 2D and 3D including constrained Poisson problem, linear elasticity
 - [ ] Matlab Implementation
 - [ ] Convergence of the method on toy problems (no Perf)
+- [ ] Experiements  
+   - [ ] Elasticity 1) 2D Axis-aligned contact Matlab
+   - [x] Elasticity 2) SDF cube vs half-sphere (s) (stresses), correct stress verification
+   - [x] Elasticity 3) Complex showcase (displacement)
+- [ ] Solver convergence: number of iterations, residuals
+   - [x] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
+   - [x] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
+
+
+
+- [ ] Post-processor 
+   - [ ] Cauchy  stress for HEX8/SSHEX8
+   - [ ] Contact stress for HEX8/SSHEX8 (lambda = M^-1 (b - A x))
 
 If rejected content goes to **P2**
 

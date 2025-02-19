@@ -35,7 +35,7 @@ namespace sfem {
         T              atol{1e-16};
         int            max_it{10000};
         int            check_each{100};
-        ptrdiff_t      n_dofs{-1};
+        ptrdiff_t      n_dofs{SFEM_PTRDIFF_INVALID};
         int            iterations_{0};
         bool           verbose{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
@@ -150,7 +150,7 @@ namespace sfem {
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
                 assert(0);
-                return -1;
+                return SFEM_FAILURE;
             }
 
             T* r = blas.allocate(n);
@@ -166,7 +166,7 @@ namespace sfem {
             T rtr = rtr0;
 
             if (rtr0 == 0) {
-                return 0;
+                return SFEM_SUCCESS;
             }
 
             T* p  = blas.allocate(n);
@@ -174,7 +174,7 @@ namespace sfem {
 
             blas.copy(n, r, p);
 
-            int info = -1;
+            int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, Ap);
                 apply_op->apply(p, Ap);
@@ -196,7 +196,7 @@ namespace sfem {
 
                 monitor(iterations_ + 1, r_norm, r_norm / r_norm0);
                 if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
-                    info = 0;
+                    info = SFEM_SUCCESS;
                     break;
                 }
             }
@@ -210,7 +210,7 @@ namespace sfem {
 
         int aux_apply_precond(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
-                return -1;
+                return SFEM_FAILURE;
             }
 
             T* r = blas.allocate(n);
@@ -242,6 +242,10 @@ namespace sfem {
             const T rtz0 = blas.dot(n, r, z);
             T       rtz  = rtz0;
 
+            if(rtz == 0) {
+                return SFEM_SUCCESS;
+            }
+
             monitor(0, sqrt(rtz), 1);
 
             {
@@ -254,7 +258,7 @@ namespace sfem {
                 blas.axpby(n, -alpha, Ap, 1, r);
             }
 
-            int info = -1;
+            int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 blas.zeros(n, z);
                 preconditioner_op->apply(r, z);
@@ -281,7 +285,7 @@ namespace sfem {
 
                 monitor(iterations_ + 1, anorm, rnorm);
                 if (anorm < atol || rnorm < rtol) {
-                    info = 0;
+                    info = SFEM_SUCCESS;
                     break;
                 }
             }

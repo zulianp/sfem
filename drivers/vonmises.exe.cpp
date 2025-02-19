@@ -97,8 +97,7 @@ int main(int argc, char *argv[]) {
     // if(strcmp(material, "neohookean") == 0) { }
 
     if (is_AoS) {
-        fprintf(stderr, "AoS not supported yet!\n");
-        MPI_Abort(comm, -1);
+        SFEM_ERROR("AoS not supported yet!\n");
         // real_t *u;
         // ptrdiff_t u_n_local, u_n_global;
         // array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);

@@ -47,7 +47,7 @@ case $CASE in
 		then
 			echo "Reusing mesh"
 		else
-			export SFEM_REFINE=1
+			export SFEM_REFINE=4
 			$SCRIPTPATH/../../data/vtk/joint-hex.sh $SFEM_ELEMENT_REFINE_LEVEL
 		fi
 		sinlet=$mesh/surface/sidesets_aos/base.raw

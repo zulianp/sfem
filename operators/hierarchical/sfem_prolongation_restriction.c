@@ -289,7 +289,7 @@ int build_p1_to_p2_edge_map(const ptrdiff_t nnodes,
                 // } else if (i == j) {
                 //     verts[k] = i;
             } else {
-                verts[k] = INVALID_IDX;
+                verts[k] = SFEM_IDX_INVALID;
             }
         }
     }

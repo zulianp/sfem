@@ -38,7 +38,7 @@ namespace sfem {
         T eig_max{0};
         T scale_eig_max{1};
         T scale_eig_min{0.06};
-        ptrdiff_t n_dofs{-1};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool is_initial_guess_zero{false};
         bool verbose{true};
 
@@ -148,7 +148,7 @@ namespace sfem {
                           // work-buffers
                           T* const p, T* const temp) {
             if (!good()) {
-                return -1;
+                return SFEM_FAILURE;
             }
 
             const ptrdiff_t n = this->rows();

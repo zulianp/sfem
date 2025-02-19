@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 
-source ../../sfem_config.sh
-
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+if [[ -z $SFEM_DIR ]]
+then
+	echo "SFEM_DIR must be defined with the installation prefix of sfem"
+	exit 1
+fi
 
-PATH=$SCRIPTPATH/..:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../../:$PATH
-PATH=$SCRIPTPATH/../../../python:$PATH
-PATH=$SCRIPTPATH/../../../python/mesh:$PATH
-PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+export PATH=$SCRIPTPATH:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SFEM_DIR/bin:$PATH
+export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
+export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
+source $SFEM_DIR/workflows/sfem_config.sh
+export PATH=$SCRIPTPATH/../../../data/benchmarks/meshes:$PATH
 
 export DYLD_LIBRARY_PATH=$METIS_DIR/lib
 
@@ -23,18 +27,24 @@ matrix=system
 output=decomp.raw
 test_output=decomp.txt
 
-sphere.py $mesh_db --refinements=1
-db_to_raw.py $mesh_db $mesh
+# sphere.py $mesh_db --refinements=5
+# db_to_raw.py $mesh_db $mesh --select_elem_type=tetra
+# refine $mesh refined
 
-mkdir -p $matrix
 
-SFEM_HANDLE_NEUMANN=0 \
-SFEM_HANDLE_RHS=0 \
-SFEM_HANDLE_DIRICHLET=0 \
-assemble $mesh $matrix
+export OMP_NUM_THREAD=1
+export OMP_PROC_BIND=true
+time mpiexec -np 8 partition refined partitioned
 
-partition_mesh_based_on_operator $mesh $matrix $num_procs $output
-fp_convert.py $output proc-float32.raw int32 float32
-raw_to_db.py $mesh decomp-vis.vtk --cell_data="proc-float32.raw" --cell_data_type="float32"
+# mkdir -p $matrix
 
-raw2text.py $output int32 $test_output
+# SFEM_HANDLE_NEUMANN=0 \
+# SFEM_HANDLE_RHS=0 \
+# SFEM_HANDLE_DIRICHLET=0 \
+# assemble $mesh $matrix
+
+# partition_mesh_based_on_operator $mesh $matrix $num_procs $output
+# fp_convert.py $output proc-float32.raw int32 float32
+# raw_to_db.py $mesh decomp-vis.vtk --cell_data="proc-float32.raw" --cell_data_type="float32"
+
+# raw2text.py $output int32 $test_output

@@ -28,6 +28,16 @@ def assign_matrix(name, mat):
 			expr.append(ast.Assignment(var, mat[i, j]))
 	return expr
 
+def assign_add_matrix(name, mat):
+	rows, cols = mat.shape
+	expr = []
+	for i in range(0, rows):
+		for j in range(0, cols):
+			var = sp.symbols(f'{name}[{i*cols + j}]')
+			expr.append(ast.AddAugmentedAssignment(var, mat[i, j]))
+	return expr
+
+
 class GPULinearElasticityOp:
 	SoA_IO = True
 	# use_taylor = True
@@ -164,6 +174,8 @@ class GPULinearElasticityOp:
 		self.de = P
 		self.mu = mu
 		self.lmbda = lmbda
+		self.disp = disp
+
 
 		###################################################################
 
@@ -236,6 +248,49 @@ class GPULinearElasticityOp:
 		P = self.P 
 		expr = assign_matrix('P', P)
 		return expr
+
+	def cauchy_stress(self):
+		dims = self.fe.manifold_dim()
+		# It is linear so it is ok to  `F * P.T / J = Id * P / 1`
+		P = self.P 
+		if dims == 2:
+			CauchyStress = sp.Matrix(3, 1, [P[0, 0], P[0, 1], P[1, 1]])
+		elif dims == 3:
+			CauchyStress = sp.Matrix(6, 1, [P[0, 0], P[0, 1], P[0, 2], P[1, 1], P[1, 2], P[2, 2] ])
+		return assign_matrix("cauchy_stress", CauchyStress)
+
+	def strain(self):
+		fe = self.fe
+		disp = self.disp
+		dims = fe.manifold_dim()
+		q = fe.quadrature_point()
+		shape_grad = fe.physical_tgrad(q)
+		eval_strain = sp.zeros(3, 3)
+
+		for i in range(0, dims * fe.n_nodes()):
+			eval_strain += disp[i] * (shape_grad[i] + shape_grad[i].T) / 2
+ 		
+		if dims == 2:
+			ret = sp.Matrix(3, 1, [eval_strain[0, 0], eval_strain[0, 1], eval_strain[1, 1]])
+		elif dims == 3:
+			ret = sp.Matrix(6, 1, [eval_strain[0, 0], eval_strain[0, 1], eval_strain[0, 2], eval_strain[1, 1], eval_strain[1, 2], eval_strain[2, 2] ])
+		
+		return assign_matrix("strain", ret)
+
+	def l2_project(self):
+		v = sp.symbols('v')
+		fe = self.fe
+		q = fe.quadrature_point()
+		f = fe.fun(q)
+		dV = self.fe.symbol_jacobian_determinant() * self.fe.reference_measure()
+		nfuns = len(f)
+
+		vals = sp.zeros(nfuns, 1)
+		for i in range(0, nfuns):
+			integr = f[i] * v * dV 
+			vals[i] = integr
+		return assign_add_matrix("values", vals)
+
 
 	def loperand(self):
 		P = self.P 
@@ -598,6 +653,21 @@ def main():
 	# 	c_code(op.jacobian())
 	# 	c_code(op.geometry())
 
+	c_log("//--------------------------")
+	c_log("// CauchyStress")	
+	c_log("//--------------------------")
+	c_code(op.cauchy_stress())
+
+
+	c_log("//--------------------------")
+	c_log("// Strain")	
+	c_log("//--------------------------")
+	c_code(op.strain())
+
+	c_log("//--------------------------")
+	c_log("// L2-project")	
+	c_log("//--------------------------")
+	c_code(op.l2_project())
 
 	c_log("//--------------------------")
 	c_log("// displacement_gradient")	

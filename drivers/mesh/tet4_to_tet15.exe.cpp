@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
 
 #ifndef NDEBUG
         for (ptrdiff_t e = 0; e < n_elements * 4; e++) {
-            si[e] = -1;
+            si[e] = SFEM_IDX_INVALID;
         }
 #endif
 
@@ -49,17 +49,17 @@ int main(int argc, char *argv[]) {
             for (int s = 0; s < nsxe; s++) {
                 const ptrdiff_t     offset = e * nsxe + s;
                 const element_idx_t neigh  = st[offset];
-                if (neigh == -1 || e < neigh) {
+                if (neigh == SFEM_IDX_INVALID || e < neigh) {
                     // Create new id
                     si[offset] = id_offset + n_unique_sides;
                     n_unique_sides++;
-                } else if (neigh != -1 && e > neigh) {
+                } else if (neigh != SFEM_IDX_INVALID && e > neigh) {
                     // Search id in neighbor
                     bool found = false;
                     for (int sneigh = 0; sneigh < nsxe; sneigh++) {
                         const ptrdiff_t offset_neigh = neigh * nsxe + sneigh;
                         if (st[offset_neigh] == e) {
-                            assert(si[offset_neigh] != -1);
+                            assert(si[offset_neigh] != SFEM_IDX_INVALID);
                             si[offset] = si[offset_neigh];
                             found      = true;
                             break;

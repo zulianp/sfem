@@ -1,6 +1,8 @@
 #ifndef SFEM_ShiftedPenalty_IMPL_HPP
 #define SFEM_ShiftedPenalty_IMPL_HPP
 
+#include "sfem_Tracer.hpp" 
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -122,6 +124,8 @@ namespace sfem {
                                               const T* const lagr_lb,
                                               const T* const lagr_ub,
                                               T* result) {
+                SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_r_pen");
+
                 // Ramp negative and positive parts
                 if (lb) ramp_m(n, penalty_param, x, lb, lagr_lb, result);
                 if (ub) ramp_p(n, penalty_param, x, ub, lagr_ub, result);
@@ -135,6 +139,8 @@ namespace sfem {
                                 const T* const lagr_lb,
                                 const T* const lagr_ub,
                                 T* const result) {
+                SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_J_pen");
+
                 if (lb) {
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {

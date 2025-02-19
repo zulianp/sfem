@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
 
     for (int d = 0; d < nxe; d++) {
         for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-            elements[d][i] = -1;
+            elements[d][i] = SFEM_IDX_INVALID;
         }
     }
 
