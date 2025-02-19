@@ -50,6 +50,9 @@ namespace sfem {
 
 #include "sfem_glob.hpp"
 
+// C++
+#include "sfem_CRSGraph.hpp"
+
 namespace sfem {
 
     template <typename T>
