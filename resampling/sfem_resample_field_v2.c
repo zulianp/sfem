@@ -18,6 +18,37 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+/**
+ * @brief Transform a quadrature point from reference to physical coordinates.
+ *
+ * Given the vertices of a tetrahedron (first vertex plus differences),
+ * compute the transformed coordinates ([out_x, out_y, out_z]) at the given
+ * quadrature point ([qx, qy, qz]). The mapping is defined by:
+ *
+ *   [out_x; out_y; out_z] = [px0; py0; pz0] +
+ *    [px1 - px0, px2 - px0, px3 - px0;
+ *     py1 - py0, py2 - py0, py3 - py0;
+ *     pz1 - pz0, pz2 - pz0, pz3 - pz0] * [qx; qy; qz]
+ *
+ * @param px0 X-coordinate of vertex 0.
+ * @param px1 X-coordinate of vertex 1.
+ * @param px2 X-coordinate of vertex 2.
+ * @param px3 X-coordinate of vertex 3.
+ * @param py0 Y-coordinate of vertex 0.
+ * @param py1 Y-coordinate of vertex 1.
+ * @param py2 Y-coordinate of vertex 2.
+ * @param py3 Y-coordinate of vertex 3.
+ * @param pz0 Z-coordinate of vertex 0.
+ * @param pz1 Z-coordinate of vertex 1.
+ * @param pz2 Z-coordinate of vertex 2.
+ * @param pz3 Z-coordinate of vertex 3.
+ * @param qx  Quadrature point coordinate along x in the reference tetrahedron.
+ * @param qy  Quadrature point coordinate along y.
+ * @param qz  Quadrature point coordinate along z.
+ * @param out_x Pointer to store the resulting x-coordinate.
+ * @param out_y Pointer to store the resulting y-coordinate.
+ * @param out_z Pointer to store the resulting z-coordinate.
+ */
 SFEM_INLINE static void                                    //
 tet4_transform_v2(const real_type                px0,      // X-coordinate
                   const real_type                px1,      //
@@ -108,17 +139,37 @@ tet4_measure_v2(
     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
 }
 
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-// hex_aa_8_collect_coeffs ////////////////////////////////
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-SFEM_INLINE static void  //
-hex_aa_8_eval_fun_V(const real_t x, const real_t y, const real_t z,
-                    // Output
-                    real_t* const SFEM_RESTRICT f0, real_t* const SFEM_RESTRICT f1, real_t* const SFEM_RESTRICT f2,
-                    real_t* const SFEM_RESTRICT f3, real_t* const SFEM_RESTRICT f4, real_t* const SFEM_RESTRICT f5,
-                    real_t* const SFEM_RESTRICT f6, real_t* const SFEM_RESTRICT f7) {
+/**
+ * @brief Evaluate the shape functions for an 8-node hexahedral element.
+ *
+ * Computes the value of the eight standard basis (hat) functions associated
+ * with a hexahedral (cubic) element evaluated at the local coordinate (x, y, z). This
+ * is typically used for interpolation in grid-based methods.
+ *
+ * @param[in] x Local x-coordinate in the unit cube.
+ * @param[in] y Local y-coordinate in the unit cube.
+ * @param[in] z Local z-coordinate in the unit cube.
+ * @param[out] f0 Pointer to the value of the shape function associated with node 0.
+ * @param[out] f1 Pointer to the value of the shape function associated with node 1.
+ * @param[out] f2 Pointer to the value of the shape function associated with node 2.
+ * @param[out] f3 Pointer to the value of the shape function associated with node 3.
+ * @param[out] f4 Pointer to the value of the shape function associated with node 4.
+ * @param[out] f5 Pointer to the value of the shape function associated with node 5.
+ * @param[out] f6 Pointer to the value of the shape function associated with node 6.
+ * @param[out] f7 Pointer to the value of the shape function associated with node 7.
+ */
+SFEM_INLINE static void                                //
+hex_aa_8_eval_fun_V(const real_t                x,     // Local coordinates (in the unit cube)
+                    const real_t                y,     //
+                    const real_t                z,     //
+                    real_t* const SFEM_RESTRICT f0,    // Output
+                    real_t* const SFEM_RESTRICT f1,    //
+                    real_t* const SFEM_RESTRICT f2,    //
+                    real_t* const SFEM_RESTRICT f3,    //
+                    real_t* const SFEM_RESTRICT f4,    //
+                    real_t* const SFEM_RESTRICT f5,    //
+                    real_t* const SFEM_RESTRICT f6,    //
+                    real_t* const SFEM_RESTRICT f7) {  //
     // Quadrature point (local coordinates)
     // With respect to the hat functions of a cube element
     // In a local coordinate system
@@ -133,11 +184,40 @@ hex_aa_8_eval_fun_V(const real_t x, const real_t y, const real_t z,
     *f7 = (1.0 - x) * y * z;
 }
 
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-// hex_aa_8_collect_coeffs ////////////////////////////////
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
+/**
+ * @brief Collect coefficients for an 8-node hexahedral element.
+ *
+ * This function extracts eight coefficient values from a flattened input array
+ * using the given multidimensional indices and stride information. The coefficients
+ * represent the geometric data transformed into the solver's data layout. The
+ * extraction is performed by computing a unique index for each node from the grid
+ * position defined by (i, j, k) and the given stride, then reading the corresponding
+ * value from the input array.
+ *
+ * The indices for the eight nodes are computed as follows:
+ *  - i0 = i * stride[0] + j * stride[1] + k * stride[2]
+ *  - i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2]
+ *  - i2 = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2]
+ *  - i3 = i * stride[0] + (j + 1) * stride[1] + k * stride[2]
+ *  - i4 = i * stride[0] + j * stride[1] + (k + 1) * stride[2]
+ *  - i5 = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2]
+ *  - i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2]
+ *  - i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2]
+ *
+ * @param[in]  stride  Pointer to an array of stride values for each dimension.
+ * @param[in]  i       The index along the first dimension of the element.
+ * @param[in]  j       The index along the second dimension of the element.
+ * @param[in]  k       The index along the third dimension of the element.
+ * @param[in]  data    Pointer to the flattened input data array.
+ * @param[out] out0    Pointer to store the coefficient at node 0.
+ * @param[out] out1    Pointer to store the coefficient at node 1.
+ * @param[out] out2    Pointer to store the coefficient at node 2.
+ * @param[out] out3    Pointer to store the coefficient at node 3.
+ * @param[out] out4    Pointer to store the coefficient at node 4.
+ * @param[out] out5    Pointer to store the coefficient at node 5.
+ * @param[out] out6    Pointer to store the coefficient at node 6.
+ * @param[out] out7    Pointer to store the coefficient at node 7.
+ */
 void                                                                    //
 hex_aa_8_collect_coeffs_V(const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
                           const ptrdiff_t                      i,       // Indices of the element
@@ -277,6 +357,8 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 
             real_type g_qx, g_qy, g_qz;
 
+            // Transform quadrature point to physical space
+            // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
             tet4_transform_v2(x0,
                               x1,
                               x2,
@@ -318,6 +400,9 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
                 const real_type f2 = tet4_qy[quad_i];
                 const real_type f3 = tet4_qz[quad_i];
 
+                // Values of the shape functions at the quadrature point
+                // In the local coordinate system of the tetrahedral element
+                // For each vertex of the tetrahedral element
                 tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
                 tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
                 tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
@@ -337,7 +422,7 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
             // printf("j = %ld grid_y = %g\n", j, grid_y);
             // printf("k = %ld grid_z = %g\n", k, grid_z);
 
-            // If outside
+            // If outside the domain of the grid (i.e., the grid is not large enough)
             if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                 fprintf(stderr,
                         "WARNING: (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
@@ -355,6 +440,7 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
             }
 
             // Get the reminder [0, 1]
+            // The local coordinates of the quadrature point in the unit cube
             real_type l_x = (grid_x - (double)i);
             real_type l_y = (grid_y - (double)j);
             real_type l_z = (grid_z - (double)k);
@@ -368,18 +454,44 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
             assert(l_z <= 1 + 1e-8);
 
             // Critical point
-            hex_aa_8_eval_fun_V(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
+            // Compute the shape functions of the hexahedral (cubic) element
+            // at the quadrature point
+            hex_aa_8_eval_fun_V(l_x,        // Local coordinates
+                                l_y,        //
+                                l_z,        //
+                                &hex8_f0,   // Output shape functions
+                                &hex8_f1,   //
+                                &hex8_f2,   //
+                                &hex8_f3,   //
+                                &hex8_f4,   //
+                                &hex8_f5,   //
+                                &hex8_f6,   //
+                                &hex8_f7);  //
 
-            hex_aa_8_collect_coeffs_V(
-                    stride, i, j, k, data, &coeffs0, &coeffs1, &coeffs2, &coeffs3, &coeffs4, &coeffs5, &coeffs6, &coeffs7);
+            // Collect coefficients for the hexahedral element
+            // The data at the vertices of the hexahedral element (in the structured grid)
+            // are stored in the variables coeffs0, ..., coeffs7
+            hex_aa_8_collect_coeffs_V(stride,     // Stride
+                                      i,          // Indices of the element (in the grid)
+                                      j,          //
+                                      k,          //
+                                      data,       // Input
+                                      &coeffs0,   // Output
+                                      &coeffs1,   //
+                                      &coeffs2,   //
+                                      &coeffs3,   //
+                                      &coeffs4,   //
+                                      &coeffs5,   //
+                                      &coeffs6,   //
+                                      &coeffs7);  //
 
             // Integrate gap function
             {
                 real_type eval_field = 0.0;
-                // UNROLL_ZERO
-                // for (int edof_j = 0; edof_j < 8; edof_j++) {
-                //     eval_field += hex8_f[edof_j] * coeffs[edof_j];
-                // }
+
+                // Value of the field at the quadrature point
+                // Is a linear combination of the coefficients and the shape functions
+                // of the hexahedral element
                 eval_field += hex8_f0 * coeffs0;
                 eval_field += hex8_f1 * coeffs1;
                 eval_field += hex8_f2 * coeffs2;
@@ -394,9 +506,11 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
                 //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
                 // }  // end edof_i loop
 
-                real_type dV = theta_volume * tet4_qw[quad_i];
-                // dV = 1.0;
+                // Update the field at the vertices of the tetrahedral element
+                // with the contribution of the quadrature point
+                const real_type dV = theta_volume * tet4_qw[quad_i];
 
+                //
                 element_field0 += eval_field * tet4_f0 * dV;
                 element_field1 += eval_field * tet4_f1 * dV;
                 element_field2 += eval_field * tet4_f2 * dV;
@@ -411,6 +525,9 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 
         //      weighted_field[ev[v]] += element_field[v];
         // }  // end vertex loop
+
+        // Update the field at the vertices of the tetrahedral element
+        // with the contribution of the quadrature points of the element (sum over quadrature points)
         weighted_field[ev[0]] += element_field0;
         weighted_field[ev[1]] += element_field1;
         weighted_field[ev[2]] += element_field2;
