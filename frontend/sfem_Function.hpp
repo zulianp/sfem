@@ -341,6 +341,7 @@ namespace sfem {
 
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);
+        void clear_constraints();
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 
         std::shared_ptr<CRSGraph> crs_graph() const;

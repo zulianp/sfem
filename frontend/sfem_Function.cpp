@@ -1125,6 +1125,8 @@ namespace sfem {
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
+    void Function::clear_constraints() { impl_->constraints.clear(); }
+
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
     int Function::constaints_mask(mask_t *mask) {
