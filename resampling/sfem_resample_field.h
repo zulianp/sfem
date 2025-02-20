@@ -201,8 +201,8 @@ int                                                                             
 tet4_resample_field_local_v2(const ptrdiff_t                      start_element,  // Mesh
                              const ptrdiff_t                      end_element,    // Mesh
                              const ptrdiff_t                      nnodes,         // Mesh
-                             idx_t** const SFEM_RESTRICT          elems,          // Mesh
-                             geom_t** const SFEM_RESTRICT         xyz,            // Mesh
+                             const idx_t** const SFEM_RESTRICT          elems,          // Mesh
+                             const geom_t** const SFEM_RESTRICT         xyz,            // Mesh
                              const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
                              const ptrdiff_t* const SFEM_RESTRICT stride,         // SDF
                              const geom_t* const SFEM_RESTRICT    origin,         // SDF

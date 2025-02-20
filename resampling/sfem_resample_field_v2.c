@@ -104,11 +104,42 @@ tet4_transform_v2(const real_type                px0,      // X-coordinate
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
 }
 
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-// tet4_resample_field_local /////////////////////////////
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
+/**
+ * @brief Compute the scaled volume measure of a tetrahedral element.
+ *
+ * This function computes the volume of a tetrahedron using the determinant of the
+ * 4x4 matrix defined by the tetrahedron's vertex coordinates augmented with a unit column.
+ * In particular, the volume is obtained by
+ *
+ *   V = (1/6) * det(M)
+ *
+ * where M is defined by:
+ *
+ *   M = [ px0, py0, pz0, 1 ]
+ *       [ px1, py1, pz1, 1 ]
+ *       [ px2, py2, pz2, 1 ]
+ *       [ px3, py3, pz3, 1 ]
+ *
+ * Instead of computing the full 4x4 determinant directly, the function uses a set of
+ * intermediate expressions (x0 to x8) that encapsulate the required differences and
+ * scaling factors. This approach avoids forming the full 4x4 matrix and directly yields
+ * the scaled determinant equivalent to the tetrahedron's volume.
+ *
+ * @param[in] px0 X-coordinate of vertex 0.
+ * @param[in] px1 X-coordinate of vertex 1.
+ * @param[in] px2 X-coordinate of vertex 2.
+ * @param[in] px3 X-coordinate of vertex 3.
+ * @param[in] py0 Y-coordinate of vertex 0.
+ * @param[in] py1 Y-coordinate of vertex 1.
+ * @param[in] py2 Y-coordinate of vertex 2.
+ * @param[in] py3 Y-coordinate of vertex 3.
+ * @param[in] pz0 Z-coordinate of vertex 0.
+ * @param[in] pz1 Z-coordinate of vertex 1.
+ * @param[in] pz2 Z-coordinate of vertex 2.
+ * @param[in] pz3 Z-coordinate of vertex 3.
+ *
+ * @return The volume measure of the tetrahedron (V = (1/6) * det(M)).
+ */
 SFEM_INLINE static real_type  //
 tet4_measure_v2(
         // X-coordinates
@@ -262,8 +293,8 @@ int                                                                             
 tet4_resample_field_local_v2(const ptrdiff_t                      start_element,  // Mesh
                              const ptrdiff_t                      end_element,    //
                              const ptrdiff_t                      nnodes,         //
-                             idx_t** const SFEM_RESTRICT          elems,          //
-                             geom_t** const SFEM_RESTRICT         xyz,            //
+                             const idx_t** const SFEM_RESTRICT    elems,          //
+                             const geom_t** const SFEM_RESTRICT   xyz,            //
                              const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
                              const ptrdiff_t* const SFEM_RESTRICT stride,         //
                              const geom_t* const SFEM_RESTRICT    origin,         //

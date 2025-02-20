@@ -491,23 +491,33 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
             vec_real l_z = (grid_z - __builtin_convertvector(k, vec_real));
 
             // Critical point
-            hex_aa_8_eval_fun_V(l_x, l_y, l_z, &hex8_f0, &hex8_f1, &hex8_f2, &hex8_f3, &hex8_f4, &hex8_f5, &hex8_f6, &hex8_f7);
+            hex_aa_8_eval_fun_V(l_x,        //
+                                l_y,        //
+                                l_z,        //
+                                &hex8_f0,   //
+                                &hex8_f1,   //
+                                &hex8_f2,   //
+                                &hex8_f3,   //
+                                &hex8_f4,   //
+                                &hex8_f5,   //
+                                &hex8_f6,   //
+                                &hex8_f7);  //
 
-            hex_aa_8_collect_coeffs_V(stride0,
-                                      stride1,
-                                      stride2,
-                                      i,
-                                      j,
-                                      k,
-                                      data,
-                                      &coeffs0,
-                                      &coeffs1,
-                                      &coeffs2,
-                                      &coeffs3,
-                                      &coeffs4,
-                                      &coeffs5,
-                                      &coeffs6,
-                                      &coeffs7);
+            hex_aa_8_collect_coeffs_V(stride0,    //
+                                      stride1,    //
+                                      stride2,    //
+                                      i,          //
+                                      j,          //
+                                      k,          //
+                                      data,       //
+                                      &coeffs0,   //
+                                      &coeffs1,   //
+                                      &coeffs2,   //
+                                      &coeffs3,   //
+                                      &coeffs4,   //
+                                      &coeffs5,   //
+                                      &coeffs6,   //
+                                      &coeffs7);  //
 
             // Integrate gap function
             {
@@ -576,7 +586,6 @@ int tet4_resample_field_local_V(const ptrdiff_t                      nelements, 
                                 real_t* const SFEM_RESTRICT          weighted_field) {    // Output
     //
     PRINT_CURRENT_FUNCTION;
-    
 
     const ptrdiff_t nelements_aligned = nelements - (nelements % _VL_);
     const ptrdiff_t nelements_tail    = nelements % _VL_;
