@@ -4,6 +4,7 @@
 namespace sfem {
     class Function;
     class Mesh;
+    class SemiStructuredMesh;
     class FunctionSpace;
     class Op;
     class CRSGraph;
