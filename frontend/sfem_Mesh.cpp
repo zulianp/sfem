@@ -8,9 +8,8 @@
 #include "sfem_mesh_write.h"
 
 // C++ includes
-#include "sfem_Tracer.hpp"
 #include "sfem_CRSGraph.hpp"
-
+#include "sfem_Tracer.hpp"
 
 // FIXME
 #include "sfem_prolongation_restriction.h"
@@ -60,7 +59,18 @@ namespace sfem {
                                                  const geom_t zmax) {
         auto ret = std::make_shared<Mesh>(comm);
         mesh_create_hex8_cube(&ret->impl_->mesh, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+        return ret;
+    }
 
+    std::shared_ptr<Mesh> Mesh::create_tri3_square(MPI_Comm     comm,
+                                                   const int    nx,
+                                                   const int    ny,
+                                                   const geom_t xmin,
+                                                   const geom_t ymin,
+                                                   const geom_t xmax,
+                                                   const geom_t ymax) {
+        auto ret = std::make_shared<Mesh>(comm);
+        mesh_create_tri3_square(&ret->impl_->mesh, nx, ny, xmin, ymin, xmax, ymax);
         return ret;
     }
 
