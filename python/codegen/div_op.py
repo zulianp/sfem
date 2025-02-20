@@ -4,6 +4,7 @@ from sfem_codegen import *
 from fields import *
 from tet4 import *
 from tet10 import *
+from tri3 import *
 
 class DivOp:
 	def __init__(self, vector_field, fe_test, q):
@@ -102,13 +103,20 @@ class DivOp:
 
 
 def main():
-	fe = Tet10()
+	
+	# fe = Tet10()
 	# fe = Tet4()
 
-	u = [ coeffs('ux', fe.n_nodes()), coeffs('uy', fe.n_nodes()), coeffs('uz', fe.n_nodes()) ]
+	# u = [ coeffs('ux', fe.n_nodes()), coeffs('uy', fe.n_nodes()), coeffs('uz', fe.n_nodes()) ]
+	# q = vec3(qx, qy, qz)
+
+	fe = Tri3()
+	u = [ coeffs('ux', fe.n_nodes()), coeffs('uy', fe.n_nodes()) ]
+	q = fe.quadrature_point()
+	
 	field = VectorField(fe, u)
 
-	q = vec3(qx, qy, qz)
+	
 	op = DivOp(field, fe, q)
 
 
