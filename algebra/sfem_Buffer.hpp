@@ -9,8 +9,8 @@
 
 #include "sfem_base.h"
 
-#include "sfem_MPIType.hpp"
 #include "matrixio_array.h"
+#include "sfem_MPIType.hpp"
 
 namespace sfem {
 
@@ -270,6 +270,12 @@ namespace sfem {
 
         return std::make_shared<Buffer<T *>>(
                 extent0, extent1, new_buffer, [keep_alive = buffer](int, void *buff) { free(buff); }, buffer->mem_space());
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T>> sub(const std::shared_ptr<Buffer<T *>> &buffer, const ptrdiff_t i0) {
+        return std::make_shared<Buffer<T>>(
+                buffer->extent(1), buffer->data()[i0], [keep_alive = buffer](void *) {}, buffer->mem_space());
     }
 
     template <typename T>

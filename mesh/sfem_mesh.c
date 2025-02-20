@@ -171,6 +171,71 @@ void mesh_create_hex8_cube(mesh_t      *mesh,
     }
 }
 
+void mesh_create_tri3_square(mesh_t      *mesh,
+                             const int    nx,
+                             const int    ny,
+                             const geom_t xmin,
+                             const geom_t ymin,
+                             const geom_t xmax,
+                             const geom_t ymax) {
+    const ptrdiff_t  nelements = 2 * nx * ny;
+    const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
+
+    mesh_init(mesh);
+    mesh->comm         = MPI_COMM_SELF;
+    mesh->spatial_dim  = 2;
+    mesh->element_type = TRI3;
+    mesh->nelements    = nelements;
+    mesh->elements     = malloc(3 * sizeof(idx_t *));
+    mesh->nnodes       = nnodes;
+    mesh->points       = malloc(2 * sizeof(geom_t *));
+
+    for (int i = 0; i < 3; i++) {
+        mesh->elements[i]    = malloc(nelements * sizeof(idx_t));
+        mesh->elements[i][0] = i;
+    }
+
+    for (int d = 0; d < 2; d++) {
+        mesh->points[d] = malloc(nnodes * sizeof(geom_t));
+    }
+
+    const ptrdiff_t ldy = nx + 1;
+    const ptrdiff_t ldx = 1;
+
+    const double hx = (xmax - xmin) * 1. / nx;
+    const double hy = (ymax - ymin) * 1. / ny;
+
+    assert(hx > 0);
+    assert(hy > 0);
+
+    for (ptrdiff_t yi = 0; yi < ny; yi++) {
+        for (ptrdiff_t xi = 0; xi < nx; xi++) {
+            const ptrdiff_t e = 2 * (yi * nx + xi);
+
+            const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy;
+            const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy;
+            const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy;
+            const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy;
+
+            mesh->elements[0][e] = i0;
+            mesh->elements[1][e] = i1;
+            mesh->elements[2][e] = i3;
+
+            mesh->elements[0][e + 1] = i1;
+            mesh->elements[1][e + 1] = i2;
+            mesh->elements[2][e + 1] = i3;
+        }
+    }
+
+    for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+        for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+            ptrdiff_t node        = xi * ldx + yi * ldy;
+            mesh->points[0][node] = (double)xmin + xi * hx;
+            mesh->points[1][node] = (double)ymin + yi * hy;
+        }
+    }
+}
+
 void mesh_create_serial(mesh_t       *mesh,
                         int           spatial_dim,
                         enum ElemType element_type,
