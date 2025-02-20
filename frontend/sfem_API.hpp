@@ -52,6 +52,7 @@ namespace sfem {
 
 // C++
 #include "sfem_CRSGraph.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
 
 namespace sfem {
 
