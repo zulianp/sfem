@@ -285,89 +285,90 @@ namespace sfem {
         return sqrt(d[0] * d[0] + d[1] * d[1]);
     }
 
-    static SFEM_INLINE geom_t point_triangle_distance_3d(const geom_t *const p,  // Point coordinates
-                                                         const geom_t        x[3][3])   // Triangle vertex coordinates
-    {
-        // Triangle vectors
-        geom_t v0[3], v1[3], v2[3];
-        for (int d = 0; d < 3; d++) {
-            v0[d] = x[d][1] - x[d][0];  // edge 0
-            v1[d] = x[d][2] - x[d][0];  // edge 1
-            v2[d] = p[d] - x[d][0];     // point to vertex
-        }
+    // static SFEM_INLINE geom_t point_triangle_distance_3d(const geom_t *const p,  // Point coordinates
+    //                                                      const geom_t        x[3][3])   // Triangle vertex coordinates
+    // {
+    //     // Triangle vectors
+    //     geom_t v0[3], v1[3], v2[3];
+    //     for (int d = 0; d < 3; d++) {
+    //         v0[d] = x[d][1] - x[d][0];  // edge 0
+    //         v1[d] = x[d][2] - x[d][0];  // edge 1
+    //         v2[d] = p[d] - x[d][0];     // point to vertex
+    //     }
 
-        // Compute dot products
-        const geom_t dot00 = v0[0] * v0[0] + v0[1] * v0[1] + v0[2] * v0[2];
-        const geom_t dot01 = v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
-        const geom_t dot02 = v0[0] * v2[0] + v0[1] * v2[1] + v0[2] * v2[2];
-        const geom_t dot11 = v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2];
-        const geom_t dot12 = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+    //     // Compute dot products
+    //     const geom_t dot00 = v0[0] * v0[0] + v0[1] * v0[1] + v0[2] * v0[2];
+    //     const geom_t dot01 = v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
+    //     const geom_t dot02 = v0[0] * v2[0] + v0[1] * v2[1] + v0[2] * v2[2];
+    //     const geom_t dot11 = v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2];
+    //     const geom_t dot12 = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
 
-        // Compute barycentric coordinates
-        const geom_t denom = dot00 * dot11 - dot01 * dot01;
-        const geom_t s     = (dot11 * dot02 - dot01 * dot12) / denom;
-        const geom_t t     = (dot00 * dot12 - dot01 * dot02) / denom;
+    //     // Compute barycentric coordinates
+    //     const geom_t denom = dot00 * dot11 - dot01 * dot01;
+    //     const geom_t s     = (dot11 * dot02 - dot01 * dot12) / denom;
+    //     const geom_t t     = (dot00 * dot12 - dot01 * dot02) / denom;
 
-        if (s >= 0 && t >= 0 && s + t <= 1) {
-            // Inside triangle - compute distance to plane
-            geom_t closest[3];
-            for (int d = 0; d < 3; d++) {
-                closest[d] = x[d][0] + s * v0[d] + t * v1[d];
-            }
-            geom_t dist_sq = 0;
-            for (int d = 0; d < 3; d++) {
-                const geom_t diff = p[d] - closest[d];
-                dist_sq += diff * diff;
-            }
-            return sqrt(dist_sq);
-        }
+    //     if (s >= 0 && t >= 0 && s + t <= 1) {
+    //         // Inside triangle - compute distance to plane
+    //         geom_t closest[3];
+    //         for (int d = 0; d < 3; d++) {
+    //             closest[d] = x[d][0] + s * v0[d] + t * v1[d];
+    //         }
+    //         geom_t dist_sq = 0;
+    //         for (int d = 0; d < 3; d++) {
+    //             const geom_t diff = p[d] - closest[d];
+    //             dist_sq += diff * diff;
+    //         }
+    //         return sqrt(dist_sq);
+    //     }
 
-        // Outside triangle - find closest point on edges/vertices
-        geom_t min_dist = INFINITY;
+    //     // Outside triangle - find closest point on edges/vertices
+    //     geom_t min_dist = INFINITY;
 
-        // Check vertices
-        for (int i = 0; i < 3; i++) {
-            geom_t dist_sq = 0;
-            for (int d = 0; d < 3; d++) {
-                const geom_t diff = p[d] - x[d][i];
-                dist_sq += diff * diff;
-            }
-            min_dist = MIN(min_dist, sqrt(dist_sq));
-        }
+    //     // Check vertices
+    //     for (int i = 0; i < 3; i++) {
+    //         geom_t dist_sq = 0;
+    //         for (int d = 0; d < 3; d++) {
+    //             const geom_t diff = p[d] - x[d][i];
+    //             dist_sq += diff * diff;
+    //         }
+    //         min_dist = MIN(min_dist, sqrt(dist_sq));
+    //     }
 
-        // Check edges
-        const int edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
-        for (int e = 0; e < 3; e++) {
-            const int i0 = edges[e][0];
-            const int i1 = edges[e][1];
+    //     // Check edges
+    //     const int edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
+    //     for (int e = 0; e < 3; e++) {
+    //         const int i0 = edges[e][0];
+    //         const int i1 = edges[e][1];
 
-            geom_t edge[3], diff[3];
-            for (int d = 0; d < 3; d++) {
-                edge[d] = x[d][i1] - x[d][i0];
-                diff[d] = p[d] - x[d][i0];
-            }
+    //         geom_t edge[3], diff[3];
+    //         for (int d = 0; d < 3; d++) {
+    //             edge[d] = x[d][i1] - x[d][i0];
+    //             diff[d] = p[d] - x[d][i0];
+    //         }
 
-            const geom_t len_sq = edge[0] * edge[0] + edge[1] * edge[1] + edge[2] * edge[2];
-            geom_t       t      = (edge[0] * diff[0] + edge[1] * diff[1] + edge[2] * diff[2]) / len_sq;
-            t                   = MAX(0, MIN(1, t));
+    //         const geom_t len_sq = edge[0] * edge[0] + edge[1] * edge[1] + edge[2] * edge[2];
+    //         geom_t       t      = (edge[0] * diff[0] + edge[1] * diff[1] + edge[2] * diff[2]) / len_sq;
+    //         t                   = MAX(0, MIN(1, t));
 
-            geom_t dist_sq = 0;
-            for (int d = 0; d < 3; d++) {
-                const geom_t proj = x[d][i0] + t * edge[d];
-                const geom_t d    = p[d] - proj;
-                dist_sq += d * d;
-            }
-            min_dist = MIN(min_dist, sqrt(dist_sq));
-        }
+    //         geom_t dist_sq = 0;
+    //         for (int d = 0; d < 3; d++) {
+    //             const geom_t proj = x[d][i0] + t * edge[d];
+    //             const geom_t d    = p[d] - proj;
+    //             dist_sq += d * d;
+    //         }
+    //         min_dist = MIN(min_dist, sqrt(dist_sq));
+    //     }
 
-        return min_dist;
-    }
+    //     return min_dist;
+    // }
 
-    void init_sdf(const std::shared_ptr<Mesh>           &mesh,
-                  const std::shared_ptr<CellList>       &cell_list,
-                  const std::shared_ptr<Mesh>           &surface,
-                  const real_t                           margin,
-                  const std::shared_ptr<Buffer<real_t>> &distance) {
+    void init_sdf(const std::shared_ptr<Mesh>             &mesh,
+                  const std::shared_ptr<CellList>         &cell_list,
+                  const std::shared_ptr<Mesh>             &surface,
+                  const real_t                             margin,
+                  const std::shared_ptr<Buffer<real_t>>   &distance,
+                  const std::shared_ptr<Buffer<real_t *>> &normals) {
         const ptrdiff_t ne_surf  = surface->n_elements();
         const ptrdiff_t ne_mesh  = mesh->n_elements();
         const int       dim      = mesh->spatial_dimension();
@@ -392,8 +393,8 @@ namespace sfem {
             geom_t xx_surf[3][3];
 
             for (int d = 0; d < dim; d++) {
-                for (int v_surf = 0; v_surf < nxe; v_surf++) {
-                    xx_surf[d][v_surf] = p_surf[d][e_surf[v_surf][i_surf]]
+                for (int v_surf = 0; v_surf < nxe_surf; v_surf++) {
+                    xx_surf[d][v_surf] = p_surf[d][e_surf[v_surf][i_surf]];
                 }
             }
 
@@ -445,10 +446,10 @@ namespace sfem {
                                 }
                             } else if (dim == 3) {
                                 assert(false);
-                                geom_t p[3];
+                                // geom_t p[3];
 
-                                geom_t dd = point_triangle_distance_3d(p, xx_surf);
-                                dist[node] = MIN(dist[node], dd);
+                                // geom_t dd  = point_triangle_distance_3d(p, xx_surf);
+                                // dist[node] = MIN(dist[node], dd);
                             }
                         }
                     }
@@ -461,6 +462,7 @@ namespace sfem {
 
 void compute_pseudo_normals(enum ElemType                element_type,
                             const ptrdiff_t              n_elements,
+                            const ptrdiff_t              n_nodes,
                             idx_t **const SFEM_RESTRICT  elements,
                             geom_t **const SFEM_RESTRICT points,
                             real_t **const SFEM_RESTRICT normals) {
@@ -477,16 +479,30 @@ void compute_pseudo_normals(enum ElemType                element_type,
         const geom_t len = sqrt(ux * ux + uy * uy);
         assert(len != 0);
 
-        const geom_t nx = uy / len;
-        const geom_t ny = -ux / len;
+        const geom_t nx = uy;
+        const geom_t ny = -ux;
 
-        normals[0][i0] = -nx;
-        normals[1][i0] = -ny;
+        normals[0][i0] += -nx;
+        normals[1][i0] += -ny;
 
-        normals[0][i1] = -nx;
-        normals[1][i1] = -ny;
+        normals[0][i1] += -nx;
+        normals[1][i1] += -ny;
 
         assert(nx * nx + ny * ny > 0);
+    }
+
+    for (ptrdiff_t i = 0; i < n_nodes; i++) {
+        geom_t nx  = normals[0][i];
+        geom_t ny  = normals[1][i];
+        geom_t len = sqrt(nx * nx + ny * ny);
+
+        if (len > 0) {
+            nx /= len;
+            ny /= len;
+        }
+
+        normals[0][i] = nx;
+        normals[1][i] = ny;
     }
 }
 
@@ -595,13 +611,17 @@ int main(int argc, char *argv[]) {
     // auto        mesh          = sfem::Mesh::create_from_file(comm, argv[2]);
     // const char *output_folder = argv[3];
 
-    int SFEM_ENABLE_ORACLE = 0;
-    SFEM_READ_ENV(SFEM_ENABLE_ORACLE, atoi);
+    // int SFEM_ENABLE_ORACLE = 0;
+    // SFEM_READ_ENV(SFEM_ENABLE_ORACLE, atoi);
 
+    auto es   = sfem::EXECUTION_SPACE_HOST;
+    auto blas = sfem::blas<real_t>(es);
+
+    int         demo          = argc == 1 || strcmp(argv[1], "demo") == 0;
     std::string output_folder = "test_approxsdf";
     sfem::create_directory(output_folder.c_str());
 
-    auto mesh = sfem::Mesh::create_tri3_square(comm, 9, 9, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(comm, 80, 80, 0, 0, 1, 1);
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 40, 40, 40, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -614,70 +634,65 @@ int main(int argc, char *argv[]) {
 
     auto p = points->data();
 
-    auto distance = sfem::create_host_buffer<real_t>(nnodes);
-    auto normals  = sfem::create_host_buffer<real_t>(dim, nnodes);
-    auto allnodes = sfem::create_host_buffer<idx_t>(nnodes);
+    auto                distance = sfem::create_host_buffer<real_t>(nnodes);
+    auto                normals  = sfem::create_host_buffer<real_t>(dim, nnodes);
+    static const real_t infty    = 1000000000;
+    blas->values(distance->size(), infty, distance->data());
 
     auto oracle = sfem::create_host_buffer<real_t>(nnodes);
 
     auto d = distance->data();
     auto n = normals->data();
 
-    ptrdiff_t nconstraints = 0;
-    auto      idx          = allnodes->data();
-
     // Include mesh surface
-    if (!SFEM_ENABLE_ORACLE) {
-        ptrdiff_t      n_surf_elements = 0;
-        element_idx_t *parent          = 0;
-        int16_t       *side_idx        = 0;
 
-        if (extract_skin_sideset(mesh->n_elements(),
-                                 mesh->n_nodes(),
-                                 mesh->element_type(),
-                                 mesh->elements()->data(),
-                                 &n_surf_elements,
-                                 &parent,
-                                 &side_idx) != SFEM_SUCCESS) {
-            SFEM_ERROR("Failed to extract skin!\n");
-        }
+    ptrdiff_t      n_surf_elements = 0;
+    element_idx_t *parent          = 0;
+    int16_t       *side_idx        = 0;
 
-        auto sideset = std::make_shared<sfem::Sideset>(
-                comm, sfem::manage_host_buffer(n_surf_elements, parent), sfem::manage_host_buffer(n_surf_elements, side_idx));
+    if (extract_skin_sideset(mesh->n_elements(),
+                             mesh->n_nodes(),
+                             mesh->element_type(),
+                             mesh->elements()->data(),
+                             &n_surf_elements,
+                             &parent,
+                             &side_idx) != SFEM_SUCCESS) {
+        SFEM_ERROR("Failed to extract skin!\n");
+    }
 
-        const auto st    = side_type(mesh->element_type());
-        const int  nnxs  = elem_num_nodes(st);
-        auto       sides = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
+    auto sideset = std::make_shared<sfem::Sideset>(
+            comm, sfem::manage_host_buffer(n_surf_elements, parent), sfem::manage_host_buffer(n_surf_elements, side_idx));
 
-        if (extract_surface_from_sideset(fs->element_type(),
-                                         mesh->elements()->data(),
-                                         sideset->parent()->size(),
-                                         sideset->parent()->data(),
-                                         sideset->lfi()->data(),
-                                         sides->data()) != SFEM_SUCCESS) {
-            SFEM_ERROR("Unable to extract surface from sideset!\n");
-        }
+    const auto st    = side_type(mesh->element_type());
+    const int  nnxs  = elem_num_nodes(st);
+    auto       sides = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
 
-        compute_pseudo_normals(st, sides->extent(1), sides->data(), p, normals->data());
+    if (extract_surface_from_sideset(fs->element_type(),
+                                     mesh->elements()->data(),
+                                     sideset->parent()->size(),
+                                     sideset->parent()->data(),
+                                     sideset->lfi()->data(),
+                                     sides->data()) != SFEM_SUCCESS) {
+        SFEM_ERROR("Unable to extract surface from sideset!\n");
+    }
 
-        auto            boundary_nodes = create_nodeset_from_sideset(fs, sideset);
-        auto            bn             = boundary_nodes->data();
-        const ptrdiff_t nbnodes        = boundary_nodes->size();
+    compute_pseudo_normals(st, sides->extent(1), nnodes, sides->data(), p, n);
 
-        for (ptrdiff_t i = 0; i < nbnodes; i++) {
-            idx[i + nconstraints] = bn[i];
-            d[i + nconstraints]   = 0;
-        }
+    auto            boundary_nodes = create_nodeset_from_sideset(fs, sideset);
+    auto            bn             = boundary_nodes->data();
+    const ptrdiff_t nbnodes        = boundary_nodes->size();
 
-        nconstraints += boundary_nodes->size();
+    for (ptrdiff_t i = 0; i < nbnodes; i++) {
+        d[bn[i]] = 0;
     }
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
     const geom_t radius = 0.3333;
 
-    {
+    if (demo) {
+        printf("Demo!!\n");
         // Toy setup to be replaced with mesh
-        const geom_t dist_tol = 0.1;
+        const geom_t dist_tol = 0.05;
         for (ptrdiff_t i = 0; i < nnodes; i++) {
             geom_t pdist = 0;
             geom_t vec[3];
@@ -693,7 +708,7 @@ int main(int argc, char *argv[]) {
             oracle->data()[i] = pdist;
 
             // Avoid square-root
-            if (fabs(pdist) < dist_tol) {
+            if (fabs(pdist) < dist_tol && fabs(d[i]) > fabs(pdist)) {
                 d[i] = pdist;
 
                 auto neg = signbit(pdist);
@@ -704,24 +719,42 @@ int main(int argc, char *argv[]) {
                     norm_vec += dx * dx;
                 }
 
+                assert(norm_vec != 0);
+
                 norm_vec = sqrt(norm_vec);
-                norm_vec = neg ? -norm_vec : norm_vec;
+                // norm_vec = neg ? -norm_vec : norm_vec;
                 for (int d = 0; d < dim; d++) {
                     n[d][i] = vec[d] / norm_vec;
                 }
-
-                idx[nconstraints++] = i;
             }
+        }
+    } else {
+        // auto surface   = sfem::Mesh::create_from_file(comm, argv[1]);
+        // auto cell_list = sfem::create_cell_list_from_nodes(mesh);
+        // sfem::init_sdf(mesh, cell_list, surface, 0, distance, normals);
+    }
+
+    ptrdiff_t nconstraints = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        nconstraints += (d[i] != infty);
+    }
+
+    auto      nodeset = sfem::create_host_buffer<idx_t>(nconstraints);
+    ptrdiff_t offset  = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        if (d[i] != infty) {
+            nodeset->data()[offset++] = i;
+        } else {
+            d[i] = 0;
         }
     }
 
-    auto cell_list = create_cell_list_from_nodes(mesh);
+    // nodeset->print(std::cout);
+    // distance->print(std::cout);
+    // normals->print(std::cout);
 
     distance->to_file((output_folder + "/input_distance.raw").c_str());
     normals->to_files((output_folder + "/input_normals.%d.raw").c_str());
-
-    auto es      = sfem::EXECUTION_SPACE_HOST;
-    auto nodeset = sfem::view(allnodes, 0, nconstraints);
 
     auto op = sfem::create_op(fs, "Laplacian", es);
     op->initialize();
@@ -735,8 +768,6 @@ int main(int argc, char *argv[]) {
 
     auto linear_op     = sfem::create_linear_operator("CRS", f, nullptr, es);
     auto linear_solver = sfem::create_cg<real_t>(linear_op, es);
-
-    auto blas = sfem::blas<real_t>(es);
 
     auto rhs        = sfem::create_host_buffer<real_t>(fs->n_dofs());
     auto correction = sfem::create_host_buffer<real_t>(fs->n_dofs());
@@ -802,12 +833,12 @@ int main(int argc, char *argv[]) {
 
     correction->to_file((output_folder + "/divergence.raw").c_str());
 
-    if (SFEM_ENABLE_ORACLE) {
-        oracle->to_file((output_folder + "/oracle.raw").c_str());
+    // if (SFEM_ENABLE_ORACLE) {
+    //     oracle->to_file((output_folder + "/oracle.raw").c_str());
 
-        blas->axpy(oracle->size(), -1, oracle->data(), distance->data());
-        distance->to_file((output_folder + "/difference.raw").c_str());
-    }
+    //     blas->axpy(oracle->size(), -1, oracle->data(), distance->data());
+    //     distance->to_file((output_folder + "/difference.raw").c_str());
+    // }
 
     return MPI_Finalize();
 }
