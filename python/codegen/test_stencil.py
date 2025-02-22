@@ -27,8 +27,8 @@ def assign_tensor3(name, mat):
 	return expr
 
 if __name__ == '__main__':
-	fe = Quad4(True)
-	# fe = Hex8(False)
+	# fe = Quad4(True)
+	fe = Hex8(False)
 	dim = fe.spatial_dim()
 
 	op = LaplaceOp(fe, True)
@@ -37,8 +37,8 @@ if __name__ == '__main__':
 
 	# L = op.sym_matrix()
 	
-	# L = matrix_coeff('A', fe.n_nodes(), fe.n_nodes())
-	L = sym_matrix_coeff('A', fe.n_nodes(), fe.n_nodes())
+	L = matrix_coeff('A', fe.n_nodes(), fe.n_nodes())
+	# L = sym_matrix_coeff('A', fe.n_nodes(), fe.n_nodes())
 	S = fe.to_stencil(L)
  	# S = fe.to_masked_stencil(L)
 	# print(S.shape)

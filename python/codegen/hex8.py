@@ -127,7 +127,9 @@ class Hex8(FE):
 
 		ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
 		stencil = G[ii_center, :]
-		return stencil
+		return {
+		"stencil111": stencil
+		}
 
 	def to_masked_stencil(self, M):
 		xi, yi, zi, level = sp.symbols('xi yi zi level', integer=True)
