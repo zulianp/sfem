@@ -37,17 +37,18 @@ static void slice_stencil_3x3x3(const ptrdiff_t                   xc,
 }
 
 static void par_slice_stencil_3x3x3(const ptrdiff_t                   xc,
-                                const ptrdiff_t                   yc,
-                                const ptrdiff_t                   zc,
-                                const real_t *const SFEM_RESTRICT s,
-                                const ptrdiff_t                   in_ystride,
-                                const ptrdiff_t                   in_zstride,
-                                const real_t *const SFEM_RESTRICT in,
-                                const ptrdiff_t                   out_ystride,
-                                const ptrdiff_t                   out_zstride,
-                                real_t *const SFEM_RESTRICT       out) {
+                                    const ptrdiff_t                   yc,
+                                    const ptrdiff_t                   zc,
+                                    const real_t *const SFEM_RESTRICT s,
+                                    const ptrdiff_t                   in_ystride,
+                                    const ptrdiff_t                   in_zstride,
+                                    const real_t *const SFEM_RESTRICT in,
+                                    const ptrdiff_t                   out_ystride,
+                                    const ptrdiff_t                   out_zstride,
+                                    real_t *const SFEM_RESTRICT       out) {
     // TODO tiling
-  #pragma omp parallel for proc_bind(spread) collapse(2)
+
+#pragma omp parallel for proc_bind(spread)  // collapse(2)
     for (ptrdiff_t zi = 0; zi < zc; zi++) {
         for (int d = 0; d < 3; d++) {
             slice_stencil_3x3(xc,

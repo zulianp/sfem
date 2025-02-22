@@ -30,7 +30,7 @@ static void sfem_print_test_info() {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    if(!rank) {
+    if (!rank) {
         printf("MPI_Comm_size=%d\n", size);
     }
 
@@ -82,9 +82,29 @@ static inline int sfem_test_assert(const int expr, const char *expr_string, cons
 
     return 0;
 }
+
+static inline int sfem_test_assert_approxeq(double      a,
+                                            double      b,
+                                            double      tol,
+                                            const char *file,
+                                            const int   line) {
+    if (fabs(a - b) > tol) {
+        fprintf(stderr, "\nAssertion failure: %g != %g (diff %g > %g) \nAt %s:%d\n\n", a, b, fabs(a - b), tol, file, line);
+        assert(0);
+        return SFEM_TEST_FAILURE;
+    }
+
+    return 0;
+}
+
 #define SFEM_TEST_ASSERT(expr)                                                    \
     if (sfem_test_assert(expr, #expr, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
         return SFEM_TEST_FAILURE;                                                 \
+    }
+
+#define SFEM_TEST_APPROXEQ(a, b, tol)                                           \
+    if (sfem_test_assert_approxeq(a, b, tol, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
+        return SFEM_TEST_FAILURE;                                               \
     }
 
 #ifdef __cplusplus
