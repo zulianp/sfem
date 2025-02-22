@@ -405,6 +405,21 @@ def matrix_coeff(name, rows, cols):
     ret = sp.Matrix(rows, cols, list_coeffs)
     return ret
 
+def sym_matrix_coeff(name, rows, cols):
+    ret = sp.zeros(rows, cols)
+    
+    idx = 0
+    for i in range(0, rows):
+        ui = sp.symbols(f'{name}[{idx}]', real=True)
+        idx += 1
+        ret[i, i] = ui
+        for j in range(i+1, cols):
+            ui = sp.symbols(f'{name}[{idx}]', real=True)
+            idx += 1
+            ret[i, j] = ui
+            ret[j, i] = ui
+    return ret
+
 def strided_matrix_coeff(name, rows, cols, stride):
     list_coeffs = []
 
