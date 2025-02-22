@@ -255,7 +255,10 @@ namespace sfem {
         return ret;
     }
 
-    static SFEM_INLINE geom_t point_line_distance_2d(const geom_t *const p, const geom_t line[3][3]) {
+    static SFEM_INLINE geom_t closest_distance_and_normal(const geom_t *const SFEM_RESTRICT p,
+                                                          const geom_t                      line[3][3],
+                                                          const geom_t                      line_normal[3][3],
+                                                          geom_t *const SFEM_RESTRICT       point_normal) {
         // Line segment endpoints
         const geom_t p0[2] = {line[0][0], line[1][0]};
         const geom_t p1[2] = {line[0][1], line[1][1]};
@@ -280,6 +283,15 @@ namespace sfem {
 
         // Distance vector
         const geom_t d[2] = {p[0] - closest[0], p[1] - closest[1]};
+
+        point_normal[0] = line_normal[0][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
+        point_normal[1] = line_normal[1][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
+
+        const geom_t len_normal = sqrt(point_normal[0] * point_normal[0] + point_normal[1] * point_normal[1]);
+        assert(len_normal != 0);
+
+        point_normal[0] /= len_normal;
+        point_normal[1] /= len_normal;
 
         // Return distance
         return sqrt(d[0] * d[0] + d[1] * d[1]);
@@ -366,6 +378,7 @@ namespace sfem {
     void init_sdf(const std::shared_ptr<Mesh>             &mesh,
                   const std::shared_ptr<CellList>         &cell_list,
                   const std::shared_ptr<Mesh>             &surface,
+                  const std::shared_ptr<Buffer<real_t *>> &surface_normals,
                   const real_t                             margin,
                   const std::shared_ptr<Buffer<real_t>>   &distance,
                   const std::shared_ptr<Buffer<real_t *>> &normals) {
@@ -376,6 +389,7 @@ namespace sfem {
 
         auto e_surf = surface->elements()->data();
         auto p_surf = surface->points()->data();
+        auto n_surf = surface_normals->data();
 
         auto p_mesh = mesh->points()->data();
 
@@ -391,10 +405,12 @@ namespace sfem {
         for (ptrdiff_t i_surf = 0; i_surf < ne_surf; i_surf++) {
             geom_t box_min[3], box_max[3];
             geom_t xx_surf[3][3];
+            geom_t nn_surf[3][3];
 
             for (int d = 0; d < dim; d++) {
                 for (int v_surf = 0; v_surf < nxe_surf; v_surf++) {
                     xx_surf[d][v_surf] = p_surf[d][e_surf[v_surf][i_surf]];
+                    nn_surf[d][v_surf] = n_surf[d][e_surf[v_surf][i_surf]];
                 }
             }
 
@@ -440,10 +456,16 @@ namespace sfem {
                             }
 
                             if (dim == 2) {
-                                for (int d = 0; d < dim; d++) {
-                                    geom_t dd  = point_line_distance_2d(p, xx_surf);
-                                    dist[node] = MIN(dist[node], dd);
+                                geom_t point_normal[2] = {0, 0};    
+                                geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, point_normal);
+
+                                if (fabs(dd) < fabs(dist[node])) {
+                                    dist[node] = dd;
+                                    for (int d = 0; d < dim; d++) {
+                                        normals->data()[node][d] = point_normal[d];
+                                    }
                                 }
+
                             } else if (dim == 3) {
                                 assert(false);
                                 // geom_t p[3];
@@ -729,9 +751,19 @@ int main(int argc, char *argv[]) {
             }
         }
     } else {
-        // auto surface   = sfem::Mesh::create_from_file(comm, argv[1]);
-        // auto cell_list = sfem::create_cell_list_from_nodes(mesh);
-        // sfem::init_sdf(mesh, cell_list, surface, 0, distance, normals);
+        auto surface   = sfem::Mesh::create_from_file(comm, argv[1]);
+        auto cell_list = sfem::create_cell_list_from_nodes(mesh);
+        
+
+        auto surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
+        compute_pseudo_normals(surface->element_type(),
+                               surface->n_elements(),
+                               surface->n_nodes(),
+                               surface->elements()->data(),
+                               surface->points()->data(),
+                               surface_normals->data());
+
+        sfem::init_sdf(mesh, cell_list, surface, surface_normals, 0, distance, normals);
     }
 
     ptrdiff_t nconstraints = 0;
