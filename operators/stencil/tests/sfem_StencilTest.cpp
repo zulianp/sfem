@@ -15,8 +15,8 @@ int test_stencil2() {
 
     real_t s[3 * 3] = {0, -1, 0, -1, 4, -1, 0, -1, 0};
 
-    ptrdiff_t yc = 1000;
-    ptrdiff_t xc = 1000;
+    ptrdiff_t yc = 9;
+    ptrdiff_t xc = 10;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc);
     blas->values(in->size(), 1, in->data());
@@ -69,7 +69,7 @@ int test_stencil3() {
                            0, -1, 0, -1, 6,  -1, 0, -1, 0,  //
                            0, 0,  0, 0,  -1, 0,  0, 0,  0};
 
-#if 1
+#if 0
     if (sizeof(real_t) == 8) {
         scalar_t fff[6] = {1, 0, 0, 1, 0, 1};
         scalar_t A[8 * 8];
@@ -115,9 +115,13 @@ int test_stencil3() {
     }
 #endif
 
-    ptrdiff_t zc = 129;
-    ptrdiff_t yc = 129;
-    ptrdiff_t xc = 129;
+    // ptrdiff_t zc = 1025;
+    // ptrdiff_t yc = 2049;
+    // ptrdiff_t xc = 2*513;
+
+    ptrdiff_t zc = 5;
+    ptrdiff_t yc = 5;
+    ptrdiff_t xc = 6;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
     blas->values(in->size(), 1, in->data());
@@ -125,7 +129,9 @@ int test_stencil3() {
     for (ptrdiff_t zi = 0; zi < zc; zi++) {
         for (ptrdiff_t yi = 0; yi < yc; yi++) {
             for (ptrdiff_t xi = 0; xi < xc; xi++) {
-                in->data()[zi * yc * xc + yi * xc + xi] = (xi * xi + yi * yi + zi * zi);
+                const ptrdiff_t zstride = yc * xc;
+                const ptrdiff_t ystride = xc;
+                in->data()[zi * zstride + yi * ystride + xi] = (xi * xi + yi * yi + zi * zi);
             }
         }
     }
@@ -141,12 +147,12 @@ int test_stencil3() {
              yc - 2,
              zc - 2,
              s,  //
-             xc,
+             xc,    
              xc * yc,
              in->data(),
              //
-             yc - 2,
-             (xc - 2) * (xc - 2),
+             (xc - 2),
+             (xc - 2) * (yc - 2),
              o);
 
     double tock    = MPI_Wtime();
@@ -154,10 +160,16 @@ int test_stencil3() {
 
     if (verbose) printf("#nodes %ld, TTS: %g [s] TP: %g [MDOF/s]\n", xc * yc * zc, elapsed, 1e-6 * (xc * yc * zc) / elapsed);
 
+
+    // out->print(std::cout);
+
     for (ptrdiff_t zi = 0; zi < zc - 2; zi++) {
         for (ptrdiff_t yi = 0; yi < yc - 2; yi++) {
             for (ptrdiff_t xi = 0; xi < xc - 2; xi++) {
-                real_t val = o[zi * (yc - 2) * (xc - 2) + yi * (xc - 2) + xi];
+                const ptrdiff_t zstride = (xc - 2) * (yc - 2);
+                const ptrdiff_t ystride = (xc - 2);
+                const real_t    val     = o[zi * zstride + yi * ystride + xi];
+
                 SFEM_TEST_APPROXEQ(-6, val, sizeof(real_t) == 4 ? 1e-6 : 1e-8);
             }
         }
