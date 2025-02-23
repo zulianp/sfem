@@ -15,8 +15,8 @@ int test_stencil2() {
 
     real_t s[3 * 3] = {0, -1, 0, -1, 4, -1, 0, -1, 0};
 
-    ptrdiff_t yc = 9;
-    ptrdiff_t xc = 10;
+    ptrdiff_t yc = 33;
+    ptrdiff_t xc = 65;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc);
     blas->values(in->size(), 1, in->data());
@@ -69,7 +69,7 @@ int test_stencil3() {
                            0, -1, 0, -1, 6,  -1, 0, -1, 0,  //
                            0, 0,  0, 0,  -1, 0,  0, 0,  0};
 
-#if 0
+#if 1
     if (sizeof(real_t) == 8) {
         scalar_t fff[6] = {1, 0, 0, 1, 0, 1};
         scalar_t A[8 * 8];
@@ -119,9 +119,18 @@ int test_stencil3() {
     // ptrdiff_t yc = 2049;
     // ptrdiff_t xc = 2*513;
 
-    ptrdiff_t zc = 5;
-    ptrdiff_t yc = 5;
-    ptrdiff_t xc = 6;
+    // ptrdiff_t zc = 129;
+    // ptrdiff_t yc = 129;
+    // ptrdiff_t xc = 129;
+
+    // ptrdiff_t zc = 257;
+    // ptrdiff_t yc = 257;
+    // ptrdiff_t xc = 257;
+
+
+    ptrdiff_t zc = 513;
+    ptrdiff_t yc = 513;
+    ptrdiff_t xc = 513;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
     blas->values(in->size(), 1, in->data());
