@@ -5,8 +5,9 @@
 #include "sfem_API.hpp"
 
 #include "stencil3.h"
-
+#include "sshex8_skeleton_stencil.h"
 #include "hex8_laplacian_inline_cpu.h"
+
 
 bool verbose{true};
 
@@ -15,8 +16,8 @@ int test_stencil2() {
 
     real_t s[3 * 3] = {0, -1, 0, -1, 4, -1, 0, -1, 0};
 
-    ptrdiff_t yc = 33;
-    ptrdiff_t xc = 65;
+    ptrdiff_t yc = 2 * 33;
+    ptrdiff_t xc = 2 * 65;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc);
     blas->values(in->size(), 1, in->data());
@@ -62,75 +63,25 @@ int test_stencil2() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_stencil3() {
+int test_stencil3_against_original() {
     auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
-    real_t s[3 * 3 * 3] = {0, 0,  0, 0,  -1, 0,  0, 0,  0,  //
-                           0, -1, 0, -1, 6,  -1, 0, -1, 0,  //
-                           0, 0,  0, 0,  -1, 0,  0, 0,  0};
+    scalar_t x[8] = {0, 1, 1.5, 0, 0, 1, 1.5, 0};
+    scalar_t y[8] = {0, 0, 1, 1,  0, 0, 2, 1};
+    scalar_t z[8] = {0, 0, 0, 0,  1, 1, 1, 2};
+    scalar_t fff[6] = {0, 0, 0, 0, 0, 0};
 
-#if 1
-    if (sizeof(real_t) == 8) {
-        scalar_t fff[6] = {1, 0, 0, 1, 0, 1};
-        scalar_t A[8 * 8];
-        hex8_laplacian_matrix_fff_integral(fff, A);
+    hex8_fff(x, y, z, 0.5, 0.5, 0.5, fff);
+    scalar_t element_matrix[8 * 8];
+    hex8_laplacian_matrix_fff_integral(fff, element_matrix);
 
-        // Elemental matrix to stencil
-        const scalar_t x0 = A[13] + A[7];
-        const scalar_t x1 = A[24] + A[5];
-        const scalar_t x2 = A[12] + A[19] + A[25] + A[4];
-        const scalar_t x3 = A[11] + A[20];
-        const scalar_t x4 = A[18] + A[22];
-        const scalar_t x5 = A[28] + A[2];
-        const scalar_t x6 = A[29] + A[31] + A[3] + A[9];
-        const scalar_t x7 = A[10] + A[32];
-        const scalar_t x8 = A[16] + A[1] + A[27] + A[34];
-        s[0]              = A[48];
-        s[1]              = A[49] + A[56];
-        s[2]              = A[57];
-        s[3]              = A[40] + A[51];
-        s[4]              = A[32] + A[41] + A[50] + A[59];
-        s[5]              = A[33] + A[58];
-        s[6]              = A[43];
-        s[7]              = A[35] + A[42];
-        s[8]              = A[34];
-        s[9]              = A[16] + A[52];
-        s[10]             = A[17] + A[24] + A[53] + A[60];
-        s[11]             = A[25] + A[61];
-        s[12]             = A[19] + A[44] + A[55] + A[8];
-        s[13]             = A[0] + A[18] + A[27] + A[36] + A[45] + A[54] + A[63] + A[9];
-        s[14]             = A[1] + A[26] + A[37] + A[62];
-        s[15]             = A[11] + A[47];
-        s[16]             = A[10] + A[39] + A[3] + A[46];
-        s[17]             = A[2] + A[38];
-        s[18]             = A[20];
-        s[19]             = A[21] + A[28];
-        s[20]             = A[29];
-        s[21]             = A[12] + A[23];
-        s[22]             = A[13] + A[22] + A[31] + A[4];
-        s[23]             = A[30] + A[5];
-        s[24]             = A[15];
-        s[25]             = A[14] + A[7];
-        s[26]             = A[6];
-    }
-#endif
+    real_t stencil[3 * 3 * 3];
+    hex8_matrix_to_stencil(element_matrix, stencil);
 
-    // ptrdiff_t zc = 1025;
-    // ptrdiff_t yc = 2049;
-    // ptrdiff_t xc = 2*513;
-
-    // ptrdiff_t zc = 129;
-    // ptrdiff_t yc = 129;
-    // ptrdiff_t xc = 129;
-
-    // ptrdiff_t zc = 257;
-    // ptrdiff_t yc = 257;
-    // ptrdiff_t xc = 257;
-
-
-    ptrdiff_t zc = 513;
-    ptrdiff_t yc = 513;
-    ptrdiff_t xc = 513;
+    ptrdiff_t level = 8;
+    ptrdiff_t zc    = level + 1;
+    ptrdiff_t yc    = level + 1;
+    ptrdiff_t xc    = level + 1;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
     blas->values(in->size(), 1, in->data());
@@ -138,48 +89,107 @@ int test_stencil3() {
     for (ptrdiff_t zi = 0; zi < zc; zi++) {
         for (ptrdiff_t yi = 0; yi < yc; yi++) {
             for (ptrdiff_t xi = 0; xi < xc; xi++) {
-                const ptrdiff_t zstride = yc * xc;
+                const ptrdiff_t zstride                      = yc * xc;
+                const ptrdiff_t ystride                      = xc;
+                in->data()[zi * zstride + yi * ystride + xi] = xc * xc * xc + 2 * yc * yc * yc + 3 * zc * zc * zc;
+            }
+        }
+    }
+
+    auto out          = sfem::create_host_buffer<real_t>(xc * yc * zc);
+    auto out_original = sfem::create_host_buffer<real_t>(xc * yc * zc);
+
+    sshex8_stencil(xc, yc, zc, stencil, in->data(), out->data());
+    sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
+    sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
+
+    auto o  = out->data();
+    auto oo = out_original->data();
+    for (ptrdiff_t zi = 0; zi < zc; zi++) {
+        for (ptrdiff_t yi = 0; yi < yc; yi++) {
+            for (ptrdiff_t xi = 0; xi < xc; xi++) {
+                const ptrdiff_t zstride = xc * yc;
                 const ptrdiff_t ystride = xc;
+
+                const real_t actual   = o[zi * zstride + yi * ystride + xi];
+                const real_t expected = oo[zi * zstride + yi * ystride + xi];
+                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-6 : 1e-12);
+            }
+        }
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_stencil3() {
+    auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+
+    real_t stencil[3 * 3 * 3] = {0, 0,  0, 0,  -1, 0,  0, 0,  0,  //
+                                 0, -1, 0, -1, 6,  -1, 0, -1, 0,  //
+                                 0, 0,  0, 0,  -1, 0,  0, 0,  0};
+
+#if 1
+    scalar_t fff[6] = {1, 0, 0, 1, 0, 1};
+    scalar_t element_matrix[8 * 8];
+    hex8_laplacian_matrix_fff_integral(fff, element_matrix);
+
+    if (sizeof(real_t) == 8) {
+        hex8_matrix_to_stencil(element_matrix, stencil);
+    }
+#endif
+
+    // ptrdiff_t zc = 65;
+    // ptrdiff_t yc = 65;
+    // ptrdiff_t xc = 65;
+
+    ptrdiff_t zc = 255;
+    ptrdiff_t yc = 255;
+    ptrdiff_t xc = 255;
+
+    auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
+    blas->values(in->size(), 1, in->data());
+
+    for (ptrdiff_t zi = 0; zi < zc; zi++) {
+        for (ptrdiff_t yi = 0; yi < yc; yi++) {
+            for (ptrdiff_t xi = 0; xi < xc; xi++) {
+                const ptrdiff_t zstride                      = yc * xc;
+                const ptrdiff_t ystride                      = xc;
                 in->data()[zi * zstride + yi * ystride + xi] = (xi * xi + yi * yi + zi * zi);
             }
         }
     }
 
-    auto out = sfem::create_host_buffer<real_t>((xc - 2) * (yc - 2) * (zc - 2));
-    auto o   = out->data();
+    auto out = sfem::create_host_buffer<real_t>(xc * yc * zc);
 
     double tick = MPI_Wtime();
 
-    par_slice_stencil_3x3x3
-            // slice_stencil_3x3x3
-            (xc - 2,
-             yc - 2,
-             zc - 2,
-             s,  //
-             xc,    
-             xc * yc,
-             in->data(),
-             //
-             (xc - 2),
-             (xc - 2) * (yc - 2),
-             o);
+    int repeat = MAX(1, 100000 / (xc * yc * zc));
+
+    for (int r = 0; r < repeat; r++) {
+        sshex8_stencil(xc, yc, zc, stencil, in->data(), out->data());
+        sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
+    }
 
     double tock    = MPI_Wtime();
-    double elapsed = tock - tick;
+    double elapsed = (tock - tick) / repeat;
 
-    if (verbose) printf("#nodes %ld, TTS: %g [s] TP: %g [MDOF/s]\n", xc * yc * zc, elapsed, 1e-6 * (xc * yc * zc) / elapsed);
+    if (verbose) {
+        printf("#nodes %ld, TTS: %g [s] TP: %g [MDOF/s] (repeat=%d)\n",
+               xc * yc * zc,
+               elapsed,
+               1e-6 * (xc * yc * zc) / elapsed,
+               repeat);
+    }
 
+    auto o = out->data();
+    for (ptrdiff_t zi = 1; zi < zc - 1; zi++) {
+        for (ptrdiff_t yi = 1; yi < yc - 1; yi++) {
+            for (ptrdiff_t xi = 1; xi < xc - 1; xi++) {
+                const ptrdiff_t zstride = xc * yc;
+                const ptrdiff_t ystride = xc;
 
-    // out->print(std::cout);
-
-    for (ptrdiff_t zi = 0; zi < zc - 2; zi++) {
-        for (ptrdiff_t yi = 0; yi < yc - 2; yi++) {
-            for (ptrdiff_t xi = 0; xi < xc - 2; xi++) {
-                const ptrdiff_t zstride = (xc - 2) * (yc - 2);
-                const ptrdiff_t ystride = (xc - 2);
-                const real_t    val     = o[zi * zstride + yi * ystride + xi];
-
-                SFEM_TEST_APPROXEQ(-6, val, sizeof(real_t) == 4 ? 1e-6 : 1e-8);
+                const real_t val = o[zi * zstride + yi * ystride + xi];
+                SFEM_TEST_APPROXEQ(-6 * repeat, val, sizeof(real_t) == 4 ? 1e-6 : 1e-8);
             }
         }
     }
@@ -191,6 +201,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_stencil2);
     SFEM_RUN_TEST(test_stencil3);
+    SFEM_RUN_TEST(test_stencil3_against_original);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
