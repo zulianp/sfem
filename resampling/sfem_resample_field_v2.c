@@ -390,28 +390,25 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 
             // Transform quadrature point to physical space
             // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
-            tet4_transform_v2(x0,
-                              x1,
-                              x2,
-                              x3,
-
-                              y0,
-                              y1,
-                              y2,
-                              y3,
-
-                              z0,
-                              z1,
-                              z2,
-                              z3,
-
-                              tet4_qx[quad_i],
-                              tet4_qy[quad_i],
-                              tet4_qz[quad_i],
-
-                              &g_qx,
-                              &g_qy,
-                              &g_qz);
+            // of the tetrahedral element
+            tet4_transform_v2(x0,               // x-coordinates of the vertices
+                              x1,               //
+                              x2,               //
+                              x3,               //
+                              y0,               // y-coordinates of the vertices
+                              y1,               //
+                              y2,               //
+                              y3,               //
+                              z0,               // z-coordinates of the vertices
+                              z1,               //
+                              z2,               //
+                              z3,               //
+                              tet4_qx[quad_i],  // Quadrature point
+                              tet4_qy[quad_i],  //
+                              tet4_qz[quad_i],  //
+                              &g_qx,            // Output coordinates
+                              &g_qy,            //
+                              &g_qz);           //
 
 #ifndef SFEM_RESAMPLE_GAP_DUAL
             // Standard basis function
