@@ -162,8 +162,8 @@ int test_stencil3() {
     int repeat = MAX(1, 100000 / (xc * yc * zc));
 
     for (int r = 0; r < repeat; r++) {
-        sshex8_stencil
-        // par_sshex8_stencil
+        // sshex8_stencil // (uncomment to see serial performance)
+        par_sshex8_stencil
         (xc, yc, zc, stencil, in->data(), out->data());
         sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
     }
