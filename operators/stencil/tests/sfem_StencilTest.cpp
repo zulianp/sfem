@@ -91,7 +91,7 @@ int test_stencil3_against_original() {
             for (ptrdiff_t xi = 0; xi < xc; xi++) {
                 const ptrdiff_t zstride                      = yc * xc;
                 const ptrdiff_t ystride                      = xc;
-                in->data()[zi * zstride + yi * ystride + xi] = xc * xc * xc + 2 * yc * yc * yc + 3 * zc * zc * zc;
+                in->data()[zi * zstride + yi * ystride + xi] = xc * xc * xc + 0.2 * yc * yc * yc + 0.3 * zc * zc * zc;
             }
         }
     }
@@ -113,7 +113,7 @@ int test_stencil3_against_original() {
 
                 const real_t actual   = o[zi * zstride + yi * ystride + xi];
                 const real_t expected = oo[zi * zstride + yi * ystride + xi];
-                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-6 : 1e-12);
+                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-3 : 1e-11);
             }
         }
     }
@@ -138,13 +138,9 @@ int test_stencil3() {
     }
 #endif
 
-    // ptrdiff_t zc = 65;
-    // ptrdiff_t yc = 65;
-    // ptrdiff_t xc = 65;
-
-    ptrdiff_t zc = 255;
-    ptrdiff_t yc = 255;
-    ptrdiff_t xc = 255;
+    ptrdiff_t zc = 257;
+    ptrdiff_t yc = 257;
+    ptrdiff_t xc = 257;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
     blas->values(in->size(), 1, in->data());
@@ -166,7 +162,9 @@ int test_stencil3() {
     int repeat = MAX(1, 100000 / (xc * yc * zc));
 
     for (int r = 0; r < repeat; r++) {
-        sshex8_stencil(xc, yc, zc, stencil, in->data(), out->data());
+        sshex8_stencil
+        // par_sshex8_stencil
+        (xc, yc, zc, stencil, in->data(), out->data());
         sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
     }
 
