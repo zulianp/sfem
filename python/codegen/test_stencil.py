@@ -46,11 +46,83 @@ if __name__ == '__main__':
 	# Su = S * coeffs('u', S.shape[1])
 	# print('//DIFF = ', matrix_sum(S) - matrix_sum(L))
 	# expr = []
+
+	paramlist = "(\nconst ptrdiff_t xc,\nconst ptrdiff_t yc,\nconst ptrdiff_t zc,\n"
+	paramlist += f"const ptrdiff_t xstride,\nconst ptrdiff_t ystride,\nconst ptrdiff_t zstride,\n"
+	paramlist += f"const scalar_t * const SFEM_RESTRICT A,\n"
+	paramlist += f"const scalar_t * const SFEM_RESTRICT input,\n"
+	paramlist += f"scalar_t * const SFEM_RESTRICT output\n)\n"
+
+	xstride, ystride, zstride = sp.symbols('xstride ystride zstride')
+	stride = ['xstride']
 	for k,v in S.items():
-		print(f'===============\n{k})\n===============')
-		expr = assign_matrix(k, v)
+		print(f'//===============\n//{k})\n//===============')
+		# print(v)
+
+		size = v['size']
+		inoffset = v['inoffset']
+		outoffset = v['outoffset']
+		extent = v['extent']
+
+		expr = assign_matrix(k, v["stencil"])
 		# expr = assign_tensor3("S", S)
 		# expr = assign_matrix("Su", Su)
-		c_code(expr)
+		m2s = c_gen(expr)
+		code = f"static void sshex8_apply_{k}" 
+		code += paramlist
+
+		code += "{\n"
+		code += f"scalar_t {k}[{size[0] * size[1] * size[2]}];"
+		code += m2s
+		code += "\n"
+		code += "// buffs\n"
+
+		for zi in range(0, size[2]):
+			for yi in range(0, size[1]):
+				for xi in range(0, size[0]):
+					code += f"const scalar_t *const in{xi + yi * size[0] + zi * size[1] * size[0]} = &input[{(inoffset[0] + xi) * xstride + (inoffset[1] + yi) * ystride + (inoffset[2] + zi) * zstride}];\n"
+
+		code += f"scalar_t * const out = &output[{outoffset[0] * xstride + outoffset[1] * ystride + outoffset[2] * zstride}];\n"
+		code += f"for(ptrdiff_t zi = 0; zi < ({extent[2]}); zi++)\n"
+		code += "{\n"
+		code += f"for(ptrdiff_t yi = 0; yi < ({extent[1]}); yi++)\n"
+		code += "{\n"
+		code += f"for(ptrdiff_t xi = 0; xi < ({extent[0]}); xi++)\n"
+		code += "{\n"
+		code += f"const ptrdiff_t idx = xi * {xstride} + yi * {ystride} + zi * {zstride};\n"
+		
+		
+		for zi in range(0, size[2]):
+			for yi in range(0, size[1]):
+				for xi in range(0, size[0]):
+					ii = xi + yi * size[0] + zi * size[1] * size[0]
+					code += f"out[idx] += "
+					code += f"in{ii}[idx] * {k}[{ii}]"
+					code += ";\n"
+
+
+
+		code += "}\n"
+		code += "}\n"
+		code += "}\n"
+		code += "}\n"
+		print(code)
+
+
+	code = "static void sshex8_surface_stencil"
+	
+	code += paramlist 
+	code += "{\n"
+	
+
+
+	for k,v in S.items():
+		if k == "stencil111":
+			code += "// "
+
+		code += f"sshex8_apply_{k}"
+		code += "(xc, yc, zc, xstride, ystride, zstride, A, input, output);\n"
+	code += "}\n"
+	print(code)
 
 	# c_code(op.hessian())
