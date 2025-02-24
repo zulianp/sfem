@@ -10,7 +10,6 @@
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
 
-
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
 
@@ -49,10 +48,10 @@
 #include "sfem_prolongation_restriction.h"
 
 // C++ includes
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -1794,9 +1793,7 @@ namespace sfem {
                                                                   &values[5]);
         }
 
-        int gradient(const real_t *const x, real_t *const out) override {
-            return apply(nullptr, x, out);
-        }
+        int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::apply");
@@ -1996,6 +1993,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
         bool                           use_affine_approximation{true};
+        bool                           use_stencil{true};
 
         long   calls{0};
         double total_time{0};
@@ -2005,7 +2003,7 @@ namespace sfem {
                 printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
-                       use_affine_approximation ? "affine" : "isoparametric",
+                       use_affine_approximation ? (use_stencil? "stencil" : "affine") : "isoparametric",
                        calls,
                        total_time,
                        total_time / calls,
@@ -2033,6 +2031,10 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
             ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
 
+            int SFEM_ENABLE_HEX8_STENCIL = ret->use_stencil;
+            SFEM_READ_ENV(SFEM_ENABLE_HEX8_STENCIL, atoi);
+            ret->use_stencil = SFEM_ENABLE_HEX8_STENCIL;
+
             return ret;
         }
 
@@ -2050,6 +2052,7 @@ namespace sfem {
                 auto ret                      = std::make_shared<SemiStructuredLaplacian>(space);
                 ret->element_type             = element_type;
                 ret->use_affine_approximation = use_affine_approximation;
+                ret->use_stencil = use_stencil;
                 return ret;
             } else {
                 auto ret          = std::make_shared<Laplacian>(space);
@@ -2096,7 +2099,10 @@ namespace sfem {
             double tick = MPI_Wtime();
 
             int err = 0;
-            if (use_affine_approximation) {
+            if (use_stencil) {
+                err = affine_sshex8_laplacian_stencil_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+            } else if (use_affine_approximation) {
                 err = affine_sshex8_laplacian_apply(
                         ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
 
