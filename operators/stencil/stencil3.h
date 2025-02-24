@@ -183,6 +183,25 @@ static void sshex8_stencil(const ptrdiff_t                     xc,
                         &output[1 + 1 * xc + 1 * xc * yc]);
 }
 
+static void par_sshex8_stencil(const ptrdiff_t                     xc,
+                           const ptrdiff_t                     yc,
+                           const ptrdiff_t                     zc,
+                           const scalar_t *const SFEM_RESTRICT stencil,
+                           const scalar_t *const SFEM_RESTRICT input,
+                           scalar_t *const                     output) {
+    par_slice_stencil_3x3x3(xc - 2,
+                        yc - 2,
+                        zc - 2,
+                        stencil,  //
+                        xc,
+                        xc * yc,
+                        input,
+                        //
+                        xc,
+                        xc * yc,
+                        &output[1 + 1 * xc + 1 * xc * yc]);
+}
+
 static void hex8_matrix_to_stencil(const scalar_t *const SFEM_RESTRICT A, scalar_t *const SFEM_RESTRICT s) {
     s[0]  = A[48];
     s[1]  = A[49] + A[56];
