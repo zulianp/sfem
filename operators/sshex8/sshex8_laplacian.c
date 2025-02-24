@@ -4,8 +4,8 @@
 #include "hex8_laplacian_inline_cpu.h"
 
 #include "hex8_quadrature.h"
-#include "stencil3.h"
 #include "sshex8_skeleton_stencil.h"
+#include "stencil3.h"
 #include "tet4_inline_cpu.h"
 
 #include <math.h>
@@ -511,9 +511,7 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
             hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
             sshex8_stencil(level + 1, level + 1, level + 1, laplacian_stencil, eu, v);
             sshex8_surface_stencil(
-                level + 1, level + 1, level + 1, 
-                1, level + 1, (level + 1) * (level + 1), 
-                laplacian_matrix, eu, v);
+                    level + 1, level + 1, level + 1, 1, level + 1, (level + 1) * (level + 1), laplacian_matrix, eu, v);
 
 #ifndef NDEBUG
             {

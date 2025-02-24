@@ -1689,6 +1689,7 @@ static void sshex8_surface_stencil(const ptrdiff_t                     xc,
                                    const scalar_t *const SFEM_RESTRICT A,
                                    const scalar_t *const SFEM_RESTRICT input,
                                    scalar_t *const SFEM_RESTRICT       output) {
+    assert(xstride == 1);
     sshex8_apply_stencil000(xc, yc, zc, xstride, ystride, zstride, A, input, output);
     sshex8_apply_stencil100(xc, yc, zc, xstride, ystride, zstride, A, input, output);
     sshex8_apply_stencil200(xc, yc, zc, xstride, ystride, zstride, A, input, output);
