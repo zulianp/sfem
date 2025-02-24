@@ -592,3 +592,44 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
 
     return SFEM_SUCCESS;
 }
+
+int sshex8_laplacian_element_matrix(int                           level,
+                                    const ptrdiff_t               nelements,
+                                    const ptrdiff_t               nnodes,
+                                    idx_t **const SFEM_RESTRICT   elements,
+                                    geom_t **const SFEM_RESTRICT  points,
+                                    scalar_t *const SFEM_RESTRICT values) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+    const scalar_t h = 1. / level;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t m_fff[6];
+        scalar_t fff[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, m_fff);
+        hex8_sub_fff_0(m_fff, h, fff);
+
+        accumulator_t element_matrix[8 * 8];
+        hex8_laplacian_matrix_fff_integral(fff, &values[i * 64]);
+    }
+
+    return SFEM_SUCCESS;
+}

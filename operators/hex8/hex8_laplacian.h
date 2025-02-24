@@ -32,11 +32,12 @@ int hex8_laplacian_crs(const ptrdiff_t                    nelements,
                        const idx_t *const SFEM_RESTRICT   colidx,
                        real_t *const SFEM_RESTRICT        values);
 
-int hex8_laplacian_diag(const ptrdiff_t nelements,
-                        const ptrdiff_t nnodes,
-                        idx_t **const SFEM_RESTRICT elements,
+
+int hex8_laplacian_diag(const ptrdiff_t              nelements,
+                        const ptrdiff_t              nnodes,
+                        idx_t **const SFEM_RESTRICT  elements,
                         geom_t **const SFEM_RESTRICT points,
-                        real_t *const SFEM_RESTRICT diag);
+                        real_t *const SFEM_RESTRICT  diag);
 
 #ifdef __cplusplus
 }
