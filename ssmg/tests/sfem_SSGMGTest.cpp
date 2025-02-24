@@ -63,6 +63,7 @@ int test_ssgmg_poisson_cube() {
     }
 
     const char *SFEM_OPERATOR       = "Laplacian";
+    // const char *SFEM_OPERATOR       = "em:Laplacian";
     const char *SFEM_FINE_OP_TYPE   = "MF";
     const char *SFEM_COARSE_OP_TYPE = "MF";
 
@@ -120,10 +121,10 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     int SFEM_BASE_RESOLUTION = 4;
-    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+    // SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
 
 
