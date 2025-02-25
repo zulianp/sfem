@@ -125,7 +125,7 @@ class SFEMCodePrinter(sp.printing.c.C99CodePrinter):
         else:
             return super()._print_Pow(expr)
 
-def c_gen(expr, dump=False):
+def c_gen(expr, dump=False, optimizations='basic'):
 
     if verbose_gen:
         console.print("--------------------------")
@@ -133,7 +133,8 @@ def c_gen(expr, dump=False):
 
     start = perf_counter()
 
-    sub_expr, simpl_expr = sp.cse(expr)
+    print(f'// optimizations={optimizations}')
+    sub_expr, simpl_expr = sp.cse(expr, optimizations=optimizations)
 
     # sub_ops = sp.count_ops(sub_expr, visual=True)
     # result_ops = sp.count_ops(simpl_expr, visual=True)
@@ -164,8 +165,8 @@ def c_gen(expr, dump=False):
 
     return code_string
 
-def c_code(expr):
-    code_string = c_gen(expr)
+def c_code(expr, optimizations='basic'):
+    code_string = c_gen(expr, optimizations=optimizations)
     console.print(code_string)
 
 def inner(l, r):

@@ -67,7 +67,7 @@ if __name__ == '__main__':
 		expr = assign_matrix(k, v["stencil"])
 		# expr = assign_tensor3("S", S)
 		# expr = assign_matrix("Su", Su)
-		m2s = c_gen(expr)
+		m2s = c_gen(expr, optimizations="basic")
 		code = f"static void sshex8_apply_{k}" 
 		code += paramlist
 
@@ -100,22 +100,16 @@ if __name__ == '__main__':
 					code += f"in{ii}[idx] * {k}[{ii}]"
 					code += ";\n"
 
-
-
 		code += "}\n"
 		code += "}\n"
 		code += "}\n"
 		code += "}\n"
 		print(code)
 
-
 	code = "static void sshex8_surface_stencil"
-	
 	code += paramlist 
 	code += "{\n"
 	
-
-
 	for k,v in S.items():
 		if k == "stencil111":
 			code += "// "
