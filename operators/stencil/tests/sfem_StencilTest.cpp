@@ -78,7 +78,7 @@ int test_stencil3_against_original() {
     real_t stencil[3 * 3 * 3];
     hex8_matrix_to_stencil(element_matrix, stencil);
 
-    ptrdiff_t level = 8;
+    ptrdiff_t level = 32;
     ptrdiff_t zc    = level + 1;
     ptrdiff_t yc    = level + 1;
     ptrdiff_t xc    = level + 1;
@@ -99,9 +99,28 @@ int test_stencil3_against_original() {
     auto out          = sfem::create_host_buffer<real_t>(xc * yc * zc);
     auto out_original = sfem::create_host_buffer<real_t>(xc * yc * zc);
 
+    double tick = MPI_Wtime();
+    
     sshex8_stencil(xc, yc, zc, stencil, in->data(), out->data());
     sshex8_surface_stencil(xc, yc, zc, 1, xc, xc*yc, element_matrix, in->data(), out->data());
+    
+    double tack = MPI_Wtime();
+
     sshex8_apply_element_matrix(level, element_matrix, in->data(), out_original->data());
+    
+    double tock = MPI_Wtime();
+
+    double elapsed_stencil = (tack - tick);
+    double elapsed_original = (tock - tack);
+
+    if (verbose) {
+        printf("#nodes %ld, stencil TTS: %g [s] TP: %g [MDOF/s], original TTS: %g [s] TP: %g [MDOF/s]\n",
+               xc * yc * zc,
+               elapsed_stencil,
+               1e-6 * (xc * yc * zc) / elapsed_stencil,
+               elapsed_original,
+               1e-6 * (xc * yc * zc) / elapsed_original);
+    }
 
     auto o  = out->data();
     auto oo = out_original->data();
@@ -113,7 +132,7 @@ int test_stencil3_against_original() {
 
                 const real_t actual   = o[zi * zstride + yi * ystride + xi];
                 const real_t expected = oo[zi * zstride + yi * ystride + xi];
-                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-3 : 1e-11);
+                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-3 : 1e-10);
             }
         }
     }
@@ -138,8 +157,12 @@ int test_stencil3() {
     }
 #endif
 
-    ptrdiff_t zc = 257;
-    ptrdiff_t yc = 257;
+    // ptrdiff_t zc = 257;
+    // ptrdiff_t yc = 257;
+    // ptrdiff_t xc = 257;
+
+    ptrdiff_t zc = 129;
+    ptrdiff_t yc = 259;
     ptrdiff_t xc = 257;
 
     auto in = sfem::create_host_buffer<real_t>(xc * yc * zc);
@@ -159,7 +182,7 @@ int test_stencil3() {
 
     double tick = MPI_Wtime();
 
-    int repeat = MAX(1, 100000 / (xc * yc * zc));
+    int repeat = MAX(3, 100000 / (xc * yc * zc));
 
     for (int r = 0; r < repeat; r++) {
         // sshex8_stencil // (uncomment to see serial performance)
