@@ -1087,7 +1087,7 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
         // exchange ghost nodes and add contribution
         if (mpi_size > 1) {
-            perform_exchange_operations(mesh, mass_vector, g);
+            perform_exchange_operations((mesh_t*)mesh, mass_vector, g);
         }  // end if mpi_size > 1
 
         // divide by the mass vector
@@ -1102,6 +1102,168 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 
     free(mass_vector);
     mass_vector = NULL;
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_field_adjoint //////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+int                                                                         //
+resample_field_adjoint_tet4(const int                            mpi_size,  // MPI size
+                            const int                            mpi_rank,  // MPI rank
+                            const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                            const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                            const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                            const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                            const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                            const real_t* const SFEM_RESTRICT    g,         // Weighted field
+                            real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
+                            sfem_resample_field_info*            info) {               // Info struct with options and flags
+    //
+    PRINT_CURRENT_FUNCTION;
+    int ret = 0;
+
+    real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
+
+    {  // Apply the mass matrix to the adjoint field
+
+        {
+            enum ElemType st = shell_type(mesh->element_type);  // The only possible outcome for TET4 is INVALID
+            st               = (st == INVALID) ? mesh->element_type : st;
+            assemble_lumped_mass(st,               //
+                                 mesh->nelements,  //
+                                 mesh->nnodes,     //
+                                 mesh->elements,   //
+                                 mesh->points,     //
+                                 mass_vector);     //
+        }
+
+        {
+            //// TODO In CPU must be called.
+            //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
+            //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
+
+            // exchange ghost nodes and add contribution
+            if (mpi_size > 1) {
+                perform_exchange_operations((mesh_t*)mesh, mass_vector, g);
+            }  // end if mpi_size > 1
+
+            // divide by the mass vector
+            for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
+                if (mass_vector[i] == 0)
+                    fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh->n_owned_nodes, mesh->nnodes);
+
+                assert(mass_vector[i] != 0);
+                // g[i] /= mass_vector[i];
+                mass_vector[i] = g[i] / mass_vector[i];
+                // printf("mass_vector[%ld] = %g\n", i, mass_vector[i]);
+                // mass_vector[i] = g[i] ; // DEBUG - to be removed
+            }  // end for i < mesh.n_owned_nodes
+        }
+
+    }  // end Apply the mass matrix to the adjoint field
+
+    ret = tet4_resample_field_local_adjoint(0,                              //
+                                            mesh->nelements,                //
+                                            mesh->nnodes,                   //
+                                            (const idx_t**)mesh->elements,  //
+                                            (const geom_t**)mesh->points,   //
+                                            n,                              //
+                                            stride,                         //
+                                            origin,                         //
+                                            delta,                          //
+                                            mass_vector,                    //
+                                            data);                          //
+
+    free(mass_vector);
+    mass_vector = NULL;
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_field_TEST_adjoint_tet4 ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+int                                                                              //
+resample_field_TEST_adjoint_tet4(const int                            mpi_size,  // MPI size
+                                 const int                            mpi_rank,  // MPI rank
+                                 const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                                 const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                                 const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                                 const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                                 const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                                 const real_t* const SFEM_RESTRICT    in_data,   // Weighted field
+                                 real_t* const SFEM_RESTRICT          out_data,  // SDF: data (output)
+                                 real_t* const SFEM_RESTRICT          g,         // Weighted field (output)
+                                 sfem_resample_field_info*            info) {               // Info struct with options and flags
+
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    ret = tet4_resample_field_local_V(mesh->nelements,  //
+                                      mesh->nnodes,     //
+                                      mesh->elements,   //
+                                      mesh->points,     //
+                                      n,                //
+                                      stride,           //
+                                      origin,           //
+                                      delta,            //
+                                      in_data,          //
+                                      g);               //
+
+    real_t* mass_vector = calloc(mesh->nnodes, sizeof(real_t));
+
+    {
+        enum ElemType st = shell_type(mesh->element_type);  // The only possible outcome for TET4 is INVALID
+        st               = (st == INVALID) ? mesh->element_type : st;
+        assemble_lumped_mass(st,               //
+                             mesh->nelements,  //
+                             mesh->nnodes,     //
+                             mesh->elements,   //
+                             mesh->points,     //
+                             mass_vector);     //
+    }
+
+    {
+        //// TODO In CPU must be called.
+        //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
+        //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
+
+        // exchange ghost nodes and add contribution
+        if (mpi_size > 1) {
+            perform_exchange_operations((mesh_t*)mesh, mass_vector, g);
+        }  // end if mpi_size > 1
+
+        // divide by the mass vector
+        for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
+            if (mass_vector[i] == 0)
+                fprintf(stderr, "Found 0 mass at %ld, info (%ld, %ld)\n", i, mesh->n_owned_nodes, mesh->nnodes);
+
+            assert(mass_vector[i] != 0);
+            g[i] /= mass_vector[i];
+        }  // end for i < mesh.n_owned_nodes
+    }
+
+    free(mass_vector);
+    mass_vector = NULL;
+
+    ret = tet4_resample_field_local_adjoint(0,                              //
+                                            mesh->nelements,                //
+                                            mesh->nnodes,                   //
+                                            (const idx_t**)mesh->elements,  //
+                                            (const geom_t**)mesh->points,   //
+                                            n,                              //
+                                            stride,                         //
+                                            origin,                         //
+                                            delta,                          //
+                                            g,                              //
+                                            out_data);                      //
 
     RETURN_FROM_FUNCTION(ret);
 }

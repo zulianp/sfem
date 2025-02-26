@@ -115,20 +115,34 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
                           sfem_resample_field_info*            info);                // info
 
 /**
- * @brief
+ * @brief Resamples a field from a tetrahedral mesh to a structured grid using MPI.
  *
- * @param mpi_size
- * @param mpi_rank
- * @param mesh
- * @param n
- * @param stride
- * @param origin
- * @param delta
- * @param data
- * @param field
- * @param g
- * @param info
- * @return int
+ * This function resamples a field defined on a tetrahedral mesh onto a structured grid,
+ * utilizing MPI for parallel processing. It's designed to distribute the computational
+ * load across multiple processes for efficiency.
+ *
+ * @param[in] mpi_size The total number of MPI processes.
+ * @param[in] mpi_rank The rank of the current MPI process (0 to mpi_size - 1).
+ * @param[in] mesh A pointer to the mesh_t struct, containing the tetrahedral mesh data.
+ * @param[in] n Number of grid points in each dimension of the structured grid (nx, ny, nz).
+ * @param[in] stride Stride values for the structured grid, defining memory offsets
+ *                   between grid points in each dimension.
+ * @param[in] origin Origin of the structured grid (coordinates of the grid's corner).
+ * @param[in] delta Grid spacing (dx, dy, dz) in each dimension of the structured grid.
+ * @param[in] data Input field defined on the structured grid.
+ * @param[out] g Output field, where the resampled values from the tetrahedral mesh
+ *               will be accumulated.
+ * @param[in,out] info A pointer to the sfem_resample_field_info struct, containing
+ *                   information about the resampling process (e.g., quadrature nodes count).
+ *
+ * @details
+ * This function distributes the tetrahedral mesh elements across MPI processes. Each process
+ * then performs a local resampling operation, integrating field values at quadrature points
+ * within its assigned elements and updating the corresponding locations on the structured grid.
+ * MPI is used to manage the parallel execution and potentially gather results (though the
+ * specific details of result aggregation would depend on the broader context of how 'g' is used).
+ *
+ * @return 0 if the operation is successful.
  */
 int                                                                      //
 resample_field_mesh_tet4(const int                            mpi_size,  // MPI size
@@ -141,6 +155,70 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
                          const real_t* const SFEM_RESTRICT    data,      // SDF: data
                          real_t* const SFEM_RESTRICT          g,         // Output
                          sfem_resample_field_info*            info);                //
+
+/**
+ * @brief Resamples a field from a tetrahedral mesh to a structured grid (adjoint version).
+ *
+ * This function performs an adjoint (reverse) resampling operation using MPI, transferring a
+ * field from a tetrahedral mesh to a structured grid. It distributes the values from the
+ * tetrahedral mesh to the structured grid, acting as the transpose of a forward resampling.
+ *
+ * @param[in] mpi_size  The total number of MPI processes.
+ * @param[in] mpi_rank  The rank of the current MPI process (0 to mpi_size - 1).
+ * @param[in] mesh      A pointer to the mesh_t struct, containing the tetrahedral mesh data.
+ * @param[in] n         Number of grid points in each dimension of the structured grid (nx, ny, nz).
+ * @param[in] stride    Stride values for the structured grid, defining memory offsets between grid points in each dimension.
+ * @param[in] origin    Origin of the structured grid (coordinates of the grid's corner).
+ * @param[in] delta     Grid spacing (dx, dy, dz) in each dimension of the structured grid.
+ * @param[in] g         Input field (weighted field) defined on the tetrahedral mesh.
+ * @param[out] data     Output array representing the structured grid, where the resampled field values will be stored.
+ * @param[in,out] info  A pointer to the sfem_resample_field_info struct, containing information about the resampling process.
+ *
+ * @details
+ * This function distributes the tetrahedral mesh elements across MPI processes. Each process then performs a
+ * local adjoint resampling operation, transferring values from its assigned elements to the structured grid.
+ * The "adjoint" nature means that it distributes values from the tetrahedral mesh to the structured grid,
+ * rather than interpolating values from the structured grid to the tetrahedral mesh.
+ *
+ * @return 0 if the operation is successful.
+ */
+int                                                                         //
+resample_field_adjoint_tet4(const int                            mpi_size,  // MPI size
+                            const int                            mpi_rank,  // MPI rank
+                            const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                            const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                            const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                            const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                            const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                            const real_t* const SFEM_RESTRICT    g,         // Weighted field
+                            real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
+                            sfem_resample_field_info*            info);                // Info struct with options and flags
+
+/// @brief  DEBUG code for testing the adjoint resampling operation
+/// @param mpi_size
+/// @param mpi_rank
+/// @param mesh
+/// @param n
+/// @param stride
+/// @param origin
+/// @param delta
+/// @param in_data
+/// @param out_data
+/// @param g
+/// @param info
+/// @return
+int                                                                              //
+resample_field_TEST_adjoint_tet4(const int                            mpi_size,  // MPI size
+                                 const int                            mpi_rank,  // MPI rank
+                                 const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                                 const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                                 const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                                 const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                                 const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                                 const real_t* const SFEM_RESTRICT    in_data,   // Weighted field
+                                 real_t* const SFEM_RESTRICT          out_data,  // SDF: data (output)
+                                 real_t* const SFEM_RESTRICT          g,         // Weighted field (output)
+                                 sfem_resample_field_info*            info);
 
 int                                                             //
 interpolate_field(const ptrdiff_t                      nnodes,  //

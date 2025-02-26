@@ -638,15 +638,11 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                   const geom_t* const SFEM_RESTRICT    delta,           //
                                   const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                                   real_t* const SFEM_RESTRICT          data) {                   // Output
+                                                                                        //
+    PRINT_CURRENT_FUNCTION;
 
     int ret = 0;
-    //
-#if SFEM_LOG_LEVEL >= 5
-    printf("============================================================\n");
-    printf("Start: tet4_resample_field_local_adjoint [%s:%d] \n", __FILE__, __LINE__);
-    printf("============================================================\n");
-#endif
-    //
+
     const real_type ox = (real_type)origin[0];
     const real_type oy = (real_type)origin[1];
     const real_type oz = (real_type)origin[2];

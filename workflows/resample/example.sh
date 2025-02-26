@@ -69,7 +69,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=4
+n_procs=1
 # n_procs=2
 # n_procs=8
 
@@ -94,7 +94,20 @@ GRID_TO_MESH="grid_to_mesh"
 # export OMP_PROC_BIND=true
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
+export SFEM_INTERPOLATE=0
+export SFEM_READ_FP32=1
+export SFEM_ADJOINT=1
+
+if [[ SFEM_ADJOINT -eq 1 ]]
+then
+	echo Starting adjoint run with $n_procs processes ++++++++++++++++
+fi
+
+time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
+
+head -11 metadata_sdf.float32.yml > metadata_test_field.yml
+echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
+raw_to_xdmf.py test_field.raw
 

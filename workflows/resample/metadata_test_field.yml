@@ -1,0 +1,12 @@
+nx: 100
+ny: 100
+nz: 100
+block_size: 1
+type: float
+ox: -0.88
+oy: -0.88
+oz: -0.88
+dx: 0.017777777777777778
+dy: 0.017777777777777778
+dz: 0.017777777777777778
+path: /home/sriva/git/sfem/workflows/resample/test_field.raw
