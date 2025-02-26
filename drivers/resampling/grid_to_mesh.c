@@ -224,6 +224,9 @@ int main(int argc, char* argv[]) {
     int SFEM_INTERPOLATE = 1;
     SFEM_READ_ENV(SFEM_INTERPOLATE, atoi);
 
+    int SFEM_ADJOINT = 0;
+    SFEM_READ_ENV(SFEM_ADJOINT, atoi);
+
     double tick = MPI_Wtime();
 
     ptrdiff_t   nglobal[3]  = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
@@ -406,6 +409,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    real_t* test_field = calloc(nlocal[0] * nlocal[1] * nlocal[2], sizeof(real_t));  /// DEBUG
+
     if (mpi_size > 1) {
         real_t* pfield;
         field_view(comm,
@@ -427,7 +432,8 @@ int main(int argc, char* argv[]) {
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
 
-    {
+    {  // begin resample_field_mesh
+        /////////////////////////////////
         MPI_Barrier(MPI_COMM_WORLD);
         double resample_tick = MPI_Wtime();
 
@@ -441,7 +447,7 @@ int main(int argc, char* argv[]) {
                               delta,               //
                               field,               //
                               g);                  // Output
-        } else {
+        } else if (SFEM_ADJOINT == 0) {
             int ret_resample = 1;
 
             switch (info.element_type) {                         //
@@ -474,7 +480,7 @@ int main(int argc, char* argv[]) {
 
                     break;
                 default:
-                    fprintf(stderr, "Error: Invalid element type\n");
+                    fprintf(stderr, "Error: Invalid element type: %s:%d\n", __FILE__, __LINE__);
                     exit(EXIT_FAILURE);
                     break;
             }
@@ -484,7 +490,69 @@ int main(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
-        }  // end if SFEM_INTERPOLATE
+        } else if (SFEM_ADJOINT == 1) {
+            int ret_resample_adjoint = 1;
+
+            // DEBUG: fill g with ones
+            // for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            //     g[i] = 1.0;
+            // }
+
+            switch (info.element_type) {
+                case TET10:
+                    /* code */
+                    break;
+
+                case TET4:
+
+                    ret_resample_adjoint =                                //
+                            resample_field_TEST_adjoint_tet4(mpi_size,    //
+                                                             mpi_rank,    //
+                                                             &mesh,       //
+                                                             nlocal,      //
+                                                             stride,      //
+                                                             origin,      //
+                                                             delta,       //
+                                                             field,       //
+                                                             test_field,  //
+                                                             g,           //
+                                                             &info);      //
+
+                    ndarray_write(MPI_COMM_WORLD,
+                                  "/home/sriva/git/sfem/workflows/resample/test_field.raw",
+                                  MPI_FLOAT,
+                                  3,
+                                  test_field,
+                                  nlocal,
+                                  nglobal);
+
+                    // ret_resample_adjoint =                         //
+                    //         resample_field_adjoint_tet4(mpi_size,  //
+                    //                                     mpi_rank,  //
+                    //                                     &mesh,     //
+                    //                                     nlocal,    //
+                    //                                     stride,    //
+                    //                                     origin,    //
+                    //                                     delta,     //
+                    //                                     g,         //
+                    //                                     field,     //
+                    //                                     &info);    //
+
+                    break;
+
+                default:
+                    fprintf(stderr, "Error: Invalid element type: %s:%d\n", __FILE__, __LINE__);
+                    exit(EXIT_FAILURE);
+                    break;
+            }
+
+            if (ret_resample_adjoint) {
+                fprintf(stderr, "Error: resample_field_mesh_adjoint failed %s:%d\n", __FILE__, __LINE__);
+                return EXIT_FAILURE;
+            }
+        }
+
+        // end if SFEM_INTERPOLATE
         /////////////////////////////////
         // END resample_field_mesh
         /////////////////////////////////
@@ -546,121 +614,8 @@ int main(int argc, char* argv[]) {
                                              info.quad_nodes_cnt,            //
                                              &mesh,                          //
                                              1);                             //
-        // if (mpi_rank == 0) {
-            //
 
-            // const int nelements    = tot_nelements;
-            // const int nnodes       = tot_nnodes;
-            // const int npoint_struc = nglobal[0] * nglobal[1] * nglobal[2];
-
-            // const double elements_second    = (double)tot_nelements / (double)(resample_tock - resample_tick);
-            // const double nodes_second       = (double)(tot_nnodes) / (double)(resample_tock - resample_tick);
-            // const double nodes_struc_second = (double)npoint_struc / (double)(resample_tock - resample_tick);
-            // const double quadrature_points_second =
-            //         (double)(tot_nelements * TET_QUAD_NQP) / (double)(resample_tock - resample_tick);
-            // const int real_t_bits    = sizeof(real_t) * 8;
-            // const int ptrdiff_t_bits = sizeof(ptrdiff_t) * 8;
-
-            // int std_out = 1;
-
-            // if (check_string_in_args(argc, (const char**)argv, "write", 0)) {
-            //     std_out = 0;
-            // }
-
-            // FILE* output_file = NULL;
-
-            // if (std_out == 1) {
-            //     output_file = stdout;
-            // } else {
-            //     output_file = fopen("output_Throughput.log", "w");
-            // }
-
-            // if (output_file == NULL) {
-            //     fprintf(stderr, "Error opening file for writing\n");
-            //     return EXIT_FAILURE;
-            // }
-
-            // fprintf(output_file, "\n");
-            // fprintf(output_file, "===========================================\n");
-            // fprintf(output_file, "Rank: [%d]  file: %s:%d\n", mpi_rank, __FILE__, __LINE__);
-            // fprintf(output_file,
-            //         "Rank: [%d]  real_t bits    %d\n",  //
-            //         mpi_rank,                           //
-            //         real_t_bits);                       //
-            // fprintf(output_file,
-            //         "Rank: [%d]  ptrdiff_t bits %d\n",  //
-            //         mpi_rank,                           //
-            //         ptrdiff_t_bits);                    //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Nr of elements  %d\n",  //
-            //         mpi_rank,                            //
-            //         tot_nelements);                      //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Nr of nodes     %d\n",  //
-            //         mpi_rank,                            //
-            //         tot_nnodes);                         //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Nr of point_struc %d\n",  //
-            //         mpi_rank,                              //
-            //         npoint_struc);                         //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Resample        %g (seconds)\n",  //
-            //         mpi_rank,                                      //
-            //         resample_tock - resample_tick);                //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Throughput      %e (elements/second)\n",  //
-            //         mpi_rank,                                              //
-            //         elements_second);                                      //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Throughput      %e (nodes/second)\n",  //
-            //         mpi_rank,                                           //
-            //         nodes_second);                                      //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Throughput      %e (point_struc/second)\n",  //
-            //         mpi_rank,                                                 //
-            //         nodes_struc_second);                                      //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  Throughput      %e (quadrature points/second)\n",  //
-            //         mpi_rank,                                                       //
-            //         quadrature_points_second);                                      //
-
-            // fprintf(output_file,
-            //         "Rank: [%d]  FLOPS           %e (FLOP/S)\n",  //
-            //         mpi_rank,                                     //
-            //         tot_flops);                                   //
-
-            // fprintf(output_file,
-            //         "<BenchH> mpi_rank, mpi_size, tot_nelements, tot_nnodes, npoint_struc, clock, elements_second, "
-            //         "nodes_second, nodes_struc_second, quadrature_points_second\n");
-            // fprintf(output_file,
-            //         "<BenchR> %d,   %d,   %d,   %d,   %d,   %g,   %g,   %g,   %g,  %g\n",  //
-            //         mpi_rank,                                                              //
-            //         mpi_size,                                                              //
-            //         tot_nelements,                                                         //
-            //         tot_nnodes,                                                            //
-            //         npoint_struc,                                                          //
-            //         (resample_tock - resample_tick),                                       //
-            //         elements_second,                                                       //
-            //         nodes_second,                                                          //
-            //         nodes_struc_second,                                                    //
-            //         quadrature_points_second);
-            // fprintf(output_file, "===========================================\n");
-
-            // fprintf(output_file, "\n");
-
-            // if (std_out == 0) {
-            //     fclose(output_file);
-            // }
-        // }  // end if mpi_rank == 0
-    }      // end resample_field_mesh
+    }  // end resample_field_mesh
 
     // Write result to disk
     {
@@ -726,6 +681,9 @@ int main(int argc, char* argv[]) {
                nglobal[2]);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
+
+    free(test_field);   /// DEBUG
+    test_field = NULL;  /// DEBUG
 
     const int return_value = MPI_Finalize();
     RETURN_FROM_FUNCTION(return_value);
