@@ -127,7 +127,117 @@ class Hex8(FE):
 
 		ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
 		stencil = G[ii_center, :]
-		return stencil
+
+		ret = {
+			# "stencil111": stencil
+		}
+
+		xi, yi, zi = sp.symbols('xi yi zi')
+		xc, yc, zc = sp.symbols('xc yc zc')
+		allc = [xc, yc, zc]
+
+
+		for k in range(left, right + 1):
+			for j in range(left, right + 1):
+				for i in range(left, right + 1):
+					idx =  (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+
+					si = max(i - 1, 0)
+					sj = max(j - 1, 0)
+					sk = max(k - 1, 0)
+
+					ei = min(i + 2, 3)
+					ej = min(j + 2, 3)
+					ek = min(k + 2, 3)
+
+					key = f"stencil{i}{j}{k}"
+
+					# print("------------------")
+					# print(f"{i}, {j}, {k})")
+					
+
+					sacc = [i, j, k]
+					ssize = [ei - si, ej - sj, ek - sk]
+					sinoffset = [si, sj, sk]
+					soutoffset = [i - si, j - sj, k - sk]
+					sextent = [1, 1, 1]
+					
+					for l in range(0, 3):
+						if ssize[l] > 2:
+							sextent[l] = allc[l] - 2
+
+						if sacc[l] == 2:
+							sinoffset[l] = allc[l] - sextent[l] - 1
+							soutoffset[l] = allc[l] - sextent[l]
+
+					
+
+
+ 	
+					# print(f'acc = {sacc[0]}, {sacc[1]}, {sacc[2]}')
+					# print(f'size = {ssize[0]}, {ssize[1]}, {ssize[2]}')
+					# print(f'begin = {sinoffset[0]}, {sinoffset[1]}, {sinoffset[2]}')
+					# print(f'sextent = {sextent[0]}, {sextent[1]}, {sextent[2]}')
+
+
+					ss = []
+
+					for lk in range(sk, ek):
+						for lj in range(sj, ej):
+							for li in range(si, ei):
+								lidx =  (li + 0) * ld[0] + (lj + 0) * ld[1] + (lk + 0) * ld[2]
+
+								# print(f'({xi + li - i}, {yi + lj - j}, {zi + lk - k})', end=' ')
+								# print(G[idx, lidx], end=' ')
+								ss.append(G[idx, lidx])
+							# print(' ')
+						# print('\n')
+					# print("------------------")
+
+					loop = {
+						"acc" : sacc,
+						"size" : ssize,
+						"inoffset" : sinoffset,
+						"outoffset" : soutoffset,
+						"extent" : sextent,
+						"stencil" : sp.Matrix(len(ss), 1, ss)
+					}
+
+					ret[key] = loop
+
+		return ret
+
+	# def to_stencil(self, M):
+	# 	G = sp.zeros(27, 27)
+	# 	ld = [1, 3, 9]
+	# 	ii = [-1] * 8
+
+	# 	left = 0
+	# 	right = 2
+	# 	for k in range(left, right):
+	# 		for j in range(left, right):
+	# 			for i in range(left, right):
+					
+	# 				ii[0] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+	# 				ii[1] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 0) * ld[2]
+	# 				ii[2] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+	# 				ii[3] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 0) * ld[2]
+	# 				ii[4] = (i + 0) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+	# 				ii[5] = (i + 1) * ld[0] + (j + 0) * ld[1] + (k + 1) * ld[2]
+	# 				ii[6] = (i + 1) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+	# 				ii[7] = (i + 0) * ld[0] + (j + 1) * ld[1] + (k + 1) * ld[2]
+
+	# 				for l in range(0, 8):
+	# 					for s in range(0, 8):
+	# 						ll = ii[l]
+	# 						ss = ii[s]
+	# 						G[ll, ss] += M[l, s]
+
+	# 	ii_center = 1 * ld[0] + 1 * ld[1] + 1 * ld[2]
+	# 	stencil = G[ii_center, :]
+	# 	return {
+	# 	"stencil111": stencil
+	# 	}
 
 	def to_masked_stencil(self, M):
 		xi, yi, zi, level = sp.symbols('xi yi zi level', integer=True)

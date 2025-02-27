@@ -8,6 +8,115 @@ class Quad4(FE):
 	def __init__(self, isoparam=False):
 		super().__init__()
 		self.isoparam = isoparam
+  
+
+	def to_stencil(self, M):
+		G = sp.zeros(9, 9)
+		ld = [1, 3]
+		ii = [-1] * 4
+
+		left = 0
+		right = 2
+
+		for j in range(left, right):
+			for i in range(left, right):
+				ii[0] = (i + 0) * ld[0] + (j + 0) * ld[1]
+				ii[1] = (i + 1) * ld[0] + (j + 0) * ld[1]
+				ii[2] = (i + 1) * ld[0] + (j + 1) * ld[1]
+				ii[3] = (i + 0) * ld[0] + (j + 1) * ld[1]
+				for l in range(0, 4):
+					for s in range(0, 4):
+						ll = ii[l]
+						ss = ii[s]
+						G[ll, ss] += M[l, s]
+
+  
+		ii = 0 * ld[0] + 0 * ld[1]
+		stencil_00 = sp.Matrix(4, 1, [ 
+                                G[ii, 0 * ld[0] + 0 * ld[1]], 
+                                G[ii, 1 * ld[0] + 0 * ld[1]], 
+                                G[ii, 0 * ld[0] + 1 * ld[1]],
+                                G[ii, 1 * ld[0] + 1 * ld[1]]
+                                ])
+  
+		ii = 1 * ld[0] + 0 * ld[1]
+		stencil_10 = sp.Matrix(6, 1, [ 
+                                G[ii, 0 * ld[0] + 0 * ld[1]], 
+                                G[ii, 1 * ld[0] + 0 * ld[1]], 
+                                G[ii, 2 * ld[0] + 0 * ld[1]], 
+                                G[ii, 0 * ld[0] + 1 * ld[1]],
+                                G[ii, 1 * ld[0] + 1 * ld[1]],
+                                G[ii, 2 * ld[0] + 1 * ld[1]] 
+                                ])
+  
+		ii = 2 * ld[0] + 0 * ld[1]
+		stencil_20 = sp.Matrix(4, 1, [ 
+							G[ii, 1 * ld[0] + 0 * ld[1]], 
+							G[ii, 2 * ld[0] + 0 * ld[1]], 
+							G[ii, 1 * ld[0] + 1 * ld[1]],
+							G[ii, 2 * ld[0] + 1 * ld[1]]
+							])
+  
+		ii = 0 * ld[0] + 1 * ld[1]
+		stencil_01 = sp.Matrix(6, 1, [ 
+                                G[ii, 0 * ld[0] + 0 * ld[1]], 
+                                G[ii, 1 * ld[0] + 0 * ld[1]], 
+                                G[ii, 0 * ld[0] + 1 * ld[1]],
+                                G[ii, 1 * ld[0] + 1 * ld[1]],
+                                G[ii, 0 * ld[0] + 2 * ld[1]],
+                                G[ii, 1 * ld[0] + 2 * ld[1]]
+                                ])
+
+		ii_center = 1 * ld[0] + 1 * ld[1]
+		stencil_11 = G[ii_center, :]
+  
+		ii = 2 * ld[0] + 1 * ld[1]
+		stencil_21 = sp.Matrix(6, 1, [ 
+                                G[ii, 1 * ld[0] + 0 * ld[1]], 
+                                G[ii, 2 * ld[0] + 0 * ld[1]], 
+                                G[ii, 1 * ld[0] + 1 * ld[1]],
+                                G[ii, 2 * ld[0] + 1 * ld[1]],
+                                G[ii, 1 * ld[0] + 2 * ld[1]],
+                                G[ii, 2 * ld[0] + 2 * ld[1]]
+                                ])
+  
+		ii = 0 * ld[0] + 2 * ld[1]
+		stencil_02 = sp.Matrix(4, 1, [ 
+                                G[ii, 0 * ld[0] + 1 * ld[1]], 
+                                G[ii, 1 * ld[0] + 1 * ld[1]], 
+                                G[ii, 0 * ld[0] + 2 * ld[1]],
+                                G[ii, 1 * ld[0] + 2 * ld[1]],
+                                ])
+
+		ii = 1 * ld[0] + 2 * ld[1]
+		stencil_12 = sp.Matrix(6, 1, [ 
+                                G[ii, 0 * ld[0] + 1 * ld[1]], 
+                                G[ii, 1 * ld[0] + 1 * ld[1]], 
+                                G[ii, 2 * ld[0] + 1 * ld[1]], 
+                                G[ii, 0 * ld[0] + 2 * ld[1]],
+                                G[ii, 1 * ld[0] + 2 * ld[1]],
+                                G[ii, 2 * ld[0] + 2 * ld[1]] 
+                                ])
+  
+		ii = 2 * ld[0] + 2 * ld[1]
+		stencil_22 = sp.Matrix(4, 1, [ 
+							G[ii, 1 * ld[0] + 1 * ld[1]], 
+							G[ii, 1 * ld[0] + 2 * ld[1]], 
+							G[ii, 1 * ld[0] + 2 * ld[1]],
+							G[ii, 2 * ld[0] + 2 * ld[1]]
+							])
+
+		return { 
+          "stencil_00" : stencil_00,
+          "stencil_10" : stencil_10,
+          "stencil_20" : stencil_20,
+          "stencil_01" : stencil_01,
+          "stencil_11" : stencil_11,
+          "stencil_21" : stencil_21,
+          "stencil_02" : stencil_02,
+          "stencil_12" : stencil_12,
+          "stencil_22" : stencil_22
+		}
 
 	def is_isoparametric(self):
 		return self.isoparam
@@ -135,6 +244,8 @@ class QuadShell4(Quad4):
 
 	def measure(self, q):
 		return self.jacobian_determinant(q)
+
+	
 
 class AxisAlignedQuad4(FE):
 	def __init__(self):
