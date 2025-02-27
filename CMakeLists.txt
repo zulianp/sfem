@@ -65,6 +65,7 @@ set(SFEM_MODULES
     operators/hex8
     operators/ssquad4
     operators/boundary_conditions
+    operators/stencil
     ssmg
 )
 
@@ -233,7 +234,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -298,6 +299,7 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND SFEM_UNIT_TESTS
         operators/ssquad4/tests
         operators/sshex8/tests
+        operators/stencil/tests
         mesh/tests
         frontend/tests
         ssmg/tests
