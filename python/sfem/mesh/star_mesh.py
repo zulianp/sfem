@@ -2,12 +2,17 @@
 
 import os
 import numpy as np
+import sys
+
 
 # Parameters for the star
 num_points = 5  # Number of points in the star
 outer_radius = 0.5  # Outer radius
-inner_radius = 0.25  # Inner radius
+inner_radius = 0.15  # Inner radius
 center = np.array([0.5, 0.5])  # Center of the star
+
+if len(sys.argv) > 1:
+     num_points = int(sys.argv[1])
 
 
 # Generate angles for all points (outer and inner vertices)

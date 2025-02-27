@@ -224,6 +224,10 @@ namespace sfem {
 
         auto ret = std::make_shared<CellList>();
 
+        geom_t max_radius = 0;
+        for(int d = 0; d < dim; d++) {
+         }
+
         ptrdiff_t ncells = 1;
         for (int d = 0; d < dim; d++) {
             geom_t extent = (max[d] - min[d]);
@@ -717,6 +721,8 @@ int tri3_div_apply(const ptrdiff_t     nelements,
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
+    SFEM_TRACE_SCOPE("approxsdf.main");
+
     MPI_Comm comm = MPI_COMM_WORLD;
 
     int rank, size;
@@ -748,7 +754,7 @@ int main(int argc, char *argv[]) {
     sfem::create_directory(output_folder.c_str());
 
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
-    auto mesh = sfem::Mesh::create_tri3_square(comm, 20, 20, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(comm, 500, 500, 0, 0, 1, 1);
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -824,6 +830,9 @@ int main(int argc, char *argv[]) {
     boundary_surface->write((output_folder + "/surface").c_str());
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
 
+    // 
+    auto cell_list = sfem::create_cell_list_from_nodes(mesh);
+
     sfem::init_sdf_brute_force(boundary_surface, normals, mesh, distance, normals);
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
@@ -881,11 +890,13 @@ int main(int argc, char *argv[]) {
 
         sfem::init_sdf_brute_force(surface, surface_normals, mesh, distance, normals);
 
-        auto cell_list_structure = sfem::create_cell_list_from_nodes(surface);
-        cell_list_structure->print(std::cout);
+        
 
-        auto cell_list_boundary = sfem::create_cell_list_from_nodes(boundary_surface);
-        cell_list_boundary->print(std::cout);
+        // auto cell_list_structure = sfem::create_cell_list_from_nodes(surface);
+        // cell_list_structure->print(std::cout);
+
+        // auto cell_list_boundary = sfem::create_cell_list_from_nodes(boundary_surface);
+        // cell_list_boundary->print(std::cout);
         // sfem::init_sdf(
         //     surface, surface_normals, cell_list, mesh, 0, distance, normals);
     }
@@ -904,10 +915,6 @@ int main(int argc, char *argv[]) {
             d[i] = 0;
         }
     }
-
-    // nodeset->print(std::cout);
-    // distance->print(std::cout);
-    // normals->print(std::cout);
 
     distance->to_file((output_folder + "/input_distance.raw").c_str());
     normals->to_files((output_folder + "/input_normals.%d.raw").c_str());
