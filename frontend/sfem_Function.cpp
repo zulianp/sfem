@@ -6,11 +6,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "read_mesh.h"
 #include "sfem_defs.h"
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
-#include "sfem_mesh_write.h"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -33,12 +31,14 @@
 // Ops
 
 #include "cvfem_operators.h"
+#include "hex8_laplacian.h"
 #include "laplacian.h"
 #include "linear_elasticity.h"
 #include "mass.h"
 #include "neohookean_ogden.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
+#include "sshex8_stencil_element_matrix_apply.h"
 
 // Mesh
 #include "adj_table.h"
@@ -49,6 +49,9 @@
 // Multigrid
 #include "sfem_prolongation_restriction.h"
 
+// C++ includes
+#include "sfem_CRSGraph.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -74,258 +77,6 @@
 #include <map>
 
 namespace sfem {
-
-    class CRSGraph::Impl {
-    public:
-        std::shared_ptr<Buffer<count_t>> rowptr;
-        std::shared_ptr<Buffer<idx_t>>   colidx;
-        ~Impl() {}
-    };
-
-    CRSGraph::CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr, const std::shared_ptr<Buffer<idx_t>> &colidx)
-        : impl_(std::make_unique<Impl>()) {
-        impl_->rowptr = rowptr;
-        impl_->colidx = colidx;
-    }
-
-    void CRSGraph::print(std::ostream &os) const {
-        auto            rowptr = this->rowptr()->data();
-        auto            colidx = this->colidx()->data();
-        const ptrdiff_t nnodes = this->n_nodes();
-        const ptrdiff_t nnz    = this->nnz();
-
-        os << "CRSGraph (" << nnodes << " nodes, " << nnz << " nnz)\n";
-        for (ptrdiff_t i = 0; i < nnodes; i++) {
-            os << i << " (" << (rowptr[i + 1] - rowptr[i]) << "): ";
-            for (int j = rowptr[i]; j < rowptr[i + 1]; j++) {
-                assert(j < nnz);
-                os << colidx[j] << " ";
-            }
-            os << "\n";
-        }
-    }
-
-    CRSGraph::CRSGraph() : impl_(std::make_unique<Impl>()) {}
-    CRSGraph::~CRSGraph() = default;
-
-    ptrdiff_t CRSGraph::n_nodes() const { return rowptr()->size() - 1; }
-    ptrdiff_t CRSGraph::nnz() const { return colidx()->size(); }
-
-    std::shared_ptr<Buffer<count_t>> CRSGraph::rowptr() const { return impl_->rowptr; }
-    std::shared_ptr<Buffer<idx_t>>   CRSGraph::colidx() const { return impl_->colidx; }
-
-    std::shared_ptr<CRSGraph> CRSGraph::block_to_scalar(const int block_size) {
-        auto rowptr = create_host_buffer<count_t>(this->n_nodes() * block_size + 1);
-        auto colidx = create_host_buffer<idx_t>(this->nnz() * block_size * block_size);
-
-        crs_graph_block_to_scalar(
-                this->n_nodes(), block_size, this->rowptr()->data(), this->colidx()->data(), rowptr->data(), colidx->data());
-
-        return std::make_shared<CRSGraph>(rowptr, colidx);
-    }
-
-    class Mesh::Impl {
-    public:
-        MPI_Comm comm;
-        mesh_t   mesh;
-
-        std::shared_ptr<CRSGraph>   crs_graph;
-        std::shared_ptr<CRSGraph>   crs_graph_upper_triangular;
-        std::function<void(void *)> destroy;
-
-        ~Impl() { destroy(&mesh); }
-    };
-
-    MPI_Comm Mesh::comm() const { return impl_->comm; }
-
-    Mesh::Mesh(int                         spatial_dim,
-               enum ElemType               element_type,
-               ptrdiff_t                   nelements,
-               idx_t                     **elements,
-               ptrdiff_t                   nnodes,
-               geom_t                    **points,
-               std::function<void(void *)> destroy)
-        : impl_(std::make_unique<Impl>()) {
-        if (!destroy) {
-            impl_->destroy = [](void *m) { mesh_destroy((mesh_t *)m); };
-        } else {
-            impl_->destroy = destroy;
-        }
-
-        mesh_create_serial(&impl_->mesh, spatial_dim, element_type, nelements, elements, nnodes, points);
-    }
-
-    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm     comm,
-                                                 const int    nx,
-                                                 const int    ny,
-                                                 const int    nz,
-                                                 const geom_t xmin,
-                                                 const geom_t ymin,
-                                                 const geom_t zmin,
-                                                 const geom_t xmax,
-                                                 const geom_t ymax,
-                                                 const geom_t zmax) {
-        auto ret = std::make_shared<Mesh>(comm);
-        mesh_create_hex8_cube(&ret->impl_->mesh, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
-
-        return ret;
-    }
-
-    int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
-    int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
-
-    ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
-    ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
-
-    enum ElemType Mesh::element_type() const { return impl_->mesh.element_type; }
-
-    std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
-        return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
-    }
-
-    std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
-        return Buffer<idx_t *>::wrap(n_nodes_per_elem(), n_elements(), impl_->mesh.elements);
-    }
-
-    Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
-        impl_->comm = MPI_COMM_WORLD;
-        mesh_init(&impl_->mesh);
-        impl_->destroy = [](void *m) { mesh_destroy((mesh_t *)m); };
-    }
-
-    Mesh::Mesh(MPI_Comm comm) : impl_(std::make_unique<Impl>()) {
-        impl_->comm = comm;
-        mesh_init(&impl_->mesh);
-        impl_->destroy = [](void *m) { mesh_destroy((mesh_t *)m); };
-    }
-
-    Mesh::~Mesh() = default;
-
-    int Mesh::read(const char *path) {
-        SFEM_TRACE_SCOPE("Mesh::read");
-
-        if (mesh_read(impl_->comm, path, &impl_->mesh)) {
-            return SFEM_FAILURE;
-        }
-
-        int SFEM_USE_MACRO = 0;
-        SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
-
-        if (SFEM_USE_MACRO) {
-            impl_->mesh.element_type = macro_type_variant((enum ElemType)impl_->mesh.element_type);
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int Mesh::write(const char *path) const {
-        SFEM_TRACE_SCOPE("Mesh::write");
-
-        if (mesh_write(path, &impl_->mesh) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    const geom_t *const Mesh::points(const int coord) const {
-        assert(coord < spatial_dimension());
-        assert(coord >= 0);
-        return impl_->mesh.points[coord];
-    }
-
-    const idx_t *const Mesh::idx(const int node_num) const {
-        assert(node_num < n_nodes_per_elem());
-        assert(node_num >= 0);
-        return impl_->mesh.elements[node_num];
-    }
-
-    std::shared_ptr<CRSGraph> Mesh::node_to_node_graph() {
-        initialize_node_to_node_graph();
-        return impl_->crs_graph;
-    }
-
-    std::shared_ptr<Buffer<element_idx_t>> Mesh::half_face_table() {
-        // FIXME it should be allocated outisde
-        element_idx_t *table{nullptr};
-        create_element_adj_table(n_elements(), n_nodes(), element_type(), elements()->data(), &table);
-
-        int nsxe = elem_num_sides(element_type());
-        return manage_host_buffer<element_idx_t>(n_elements() * nsxe, table);
-    }
-
-    std::shared_ptr<CRSGraph> Mesh::create_node_to_node_graph(const enum ElemType element_type) {
-        auto mesh = &impl_->mesh;
-        if (mesh->element_type == element_type) {
-            return node_to_node_graph();
-        }
-
-        const ptrdiff_t n_nodes = max_node_id(element_type, mesh->nelements, mesh->elements) + 1;
-
-        count_t *rowptr{nullptr};
-        idx_t   *colidx{nullptr};
-        build_crs_graph_for_elem_type(element_type, mesh->nelements, n_nodes, mesh->elements, &rowptr, &colidx);
-
-        auto crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(n_nodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                                                    Buffer<idx_t>::own(rowptr[n_nodes], colidx, free, MEMORY_SPACE_HOST));
-
-        return crs_graph;
-    }
-
-    int Mesh::initialize_node_to_node_graph() {
-        if (impl_->crs_graph) {
-            return SFEM_SUCCESS;
-        }
-
-        SFEM_TRACE_SCOPE("Mesh::initialize_node_to_node_graph");
-
-        impl_->crs_graph = std::make_shared<CRSGraph>();
-
-        auto mesh = &impl_->mesh;
-
-        count_t *rowptr{nullptr};
-        idx_t   *colidx{nullptr};
-        build_crs_graph_for_elem_type(mesh->element_type, mesh->nelements, mesh->nnodes, mesh->elements, &rowptr, &colidx);
-
-        impl_->crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                                                      Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
-
-        return SFEM_SUCCESS;
-    }
-
-    std::shared_ptr<CRSGraph> Mesh::node_to_node_graph_upper_triangular() {
-        if (impl_->crs_graph_upper_triangular) return impl_->crs_graph_upper_triangular;
-        SFEM_TRACE_SCOPE("Mesh::node_to_node_graph_upper_triangular");
-
-        auto mesh = &impl_->mesh;
-
-        count_t *rowptr{nullptr};
-        idx_t   *colidx{nullptr};
-        build_crs_graph_upper_triangular_from_element(mesh->nelements,
-                                                      mesh->nnodes,
-                                                      elem_num_nodes((enum ElemType)mesh->element_type),
-                                                      mesh->elements,
-                                                      &rowptr,
-                                                      &colidx);
-
-        impl_->crs_graph_upper_triangular =
-                std::make_shared<CRSGraph>(Buffer<count_t>::own(mesh->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
-                                           Buffer<idx_t>::own(rowptr[mesh->nnodes], colidx, free, MEMORY_SPACE_HOST));
-
-        // impl_->crs_graph_upper_triangular->print(std::cout);
-
-        return impl_->crs_graph_upper_triangular;
-    }
-
-    int Mesh::convert_to_macro_element_mesh() {
-        impl_->mesh.element_type = macro_type_variant((enum ElemType)impl_->mesh.element_type);
-        return SFEM_SUCCESS;
-    }
-
-    void *Mesh::impl_mesh() { return (void *)&impl_->mesh; }
-
-    std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
-    std::shared_ptr<Buffer<idx_t>>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
     class Sideset::Impl final {
     public:
@@ -447,300 +198,6 @@ namespace sfem {
     std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
     std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
 
-    class SemiStructuredMesh::Impl {
-    public:
-        std::shared_ptr<Mesh> macro_mesh;
-        int                   level;
-
-        std::shared_ptr<Buffer<idx_t *>> elements;
-        ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
-        std::shared_ptr<CRSGraph>        node_to_node_graph;
-
-        std::shared_ptr<Buffer<geom_t *>> points;
-
-        void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
-            SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
-
-            this->macro_mesh = macro_mesh;
-            this->level      = level;
-
-            const int nxe      = sshex8_nxe(level);
-            auto      elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            for (int d = 0; d < nxe; d++) {
-                elements[d] = (idx_t *)malloc(macro_mesh->n_elements() * sizeof(idx_t));
-            }
-
-#ifndef NDEBUG
-            for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < macro_mesh->n_elements(); i++) {
-                    elements[d][i] = SFEM_IDX_INVALID;
-                }
-            }
-#endif
-            auto c_mesh = (mesh_t *)macro_mesh->impl_mesh();
-            sshex8_generate_elements(level,
-                                     c_mesh->nelements,
-                                     c_mesh->nnodes,
-                                     c_mesh->elements,
-                                     elements,
-                                     &this->n_unique_nodes,
-                                     &this->interior_start);
-
-            this->elements = std::make_shared<Buffer<idx_t *>>(
-                    nxe,
-                    macro_mesh->n_elements(),
-                    elements,
-                    [](int n, void **data) {
-                        for (int i = 0; i < n; i++) {
-                            free(data[i]);
-                        }
-
-                        free(data);
-                    },
-                    MEMORY_SPACE_HOST);
-        }
-
-        Impl() {}
-        ~Impl() {}
-    };
-
-    std::shared_ptr<Mesh> SemiStructuredMesh::macro_mesh() { return impl_->macro_mesh; }
-
-    std::vector<int> SemiStructuredMesh::derefinement_levels() {
-        const int        L       = level();
-        const int        nlevels = sshex8_hierarchical_n_levels(L);
-        std::vector<int> levels(nlevels);
-        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
-        return levels;
-    }
-
-    std::shared_ptr<SemiStructuredMesh> SemiStructuredMesh::derefine(const int to_level) {
-        const int from_level  = this->level();
-        const int step_factor = from_level / to_level;
-        const int nxe         = (to_level + 1) * (to_level + 1) * (to_level + 1);
-
-        auto elements = this->impl_->elements;
-
-        auto view = std::make_shared<Buffer<idx_t *>>(
-                nxe,
-                n_elements(),
-                (idx_t **)malloc(nxe * sizeof(idx_t *)),
-                [keep_alive = elements](int, void **v) {
-                    (void)keep_alive;
-                    free(v);
-                },
-                elements->mem_space());
-
-        for (int zi = 0; zi <= to_level; zi++) {
-            for (int yi = 0; yi <= to_level; yi++) {
-                for (int xi = 0; xi <= to_level; xi++) {
-                    const int from_lidx   = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
-                    const int to_lidx     = sshex8_lidx(to_level, xi, yi, zi);
-                    view->data()[to_lidx] = elements->data()[from_lidx];
-                }
-            }
-        }
-
-        ptrdiff_t n_unique_nodes{-1};
-        {
-            auto            vv        = view->data();
-            const ptrdiff_t nelements = this->n_elements();
-            for (int v = 0; v < view->extent(0); v++) {
-                for (ptrdiff_t e = 0; e < nelements; e++) {
-                    n_unique_nodes = MAX(vv[v][e], n_unique_nodes);
-                }
-            }
-
-            n_unique_nodes += 1;
-        }
-
-        auto ret                   = std::make_shared<SemiStructuredMesh>();
-        ret->impl_->macro_mesh     = this->impl_->macro_mesh;
-        ret->impl_->level          = to_level;
-        ret->impl_->elements       = view;
-        ret->impl_->n_unique_nodes = n_unique_nodes;
-        ret->impl_->interior_start = this->impl_->interior_start;
-
-        if (this->impl_->points) {
-            int sdim           = this->impl_->macro_mesh->spatial_dimension();
-            ret->impl_->points = sfem::view(this->impl_->points, 0, sdim, 0, n_unique_nodes);
-        }
-
-        return ret;
-    }
-
-    int SemiStructuredMesh::apply_hierarchical_renumbering() {
-        const int L = level();
-
-        const int nlevels = sshex8_hierarchical_n_levels(L);
-
-        std::vector<int> levels(nlevels);
-
-        // FiXME harcoded for sshex8
-        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
-
-        return sshex8_hierarchical_renumbering(
-                L, nlevels, levels.data(), this->n_elements(), this->impl_->n_unique_nodes, this->impl_->elements->data());
-    }
-
-    std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
-        if (!impl_->points) {
-            auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
-            auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
-
-            SFEM_TRACE_SCOPE("sshex8_fill_points");
-            sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
-            impl_->points = p;
-        }
-
-        return impl_->points;
-    }
-
-    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements() { return impl_->elements; }
-
-    std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
-        // printf("SemiStructuredMesh::node_to_node_graph\n");
-        if (impl_->node_to_node_graph) {
-            return impl_->node_to_node_graph;
-        }
-
-        SFEM_TRACE_SCOPE("SemiStructuredMesh::node_to_node_graph");
-
-        count_t *rowptr{nullptr};
-        idx_t   *colidx{nullptr};
-
-        sshex8_crs_graph(impl_->level, this->n_elements(), this->n_nodes(), this->element_data(), &rowptr, &colidx);
-
-        impl_->node_to_node_graph =
-                std::make_shared<CRSGraph>(Buffer<count_t>::own(this->n_nodes() + 1, rowptr, free, MEMORY_SPACE_HOST),
-                                           Buffer<idx_t>::own(rowptr[this->n_nodes()], colidx, free, MEMORY_SPACE_HOST));
-
-        return impl_->node_to_node_graph;
-    }
-
-    int SemiStructuredMesh::n_nodes_per_element() const { return sshex8_nxe(impl_->level); }
-
-    idx_t   **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
-    geom_t  **SemiStructuredMesh::point_data() { return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points; }
-    ptrdiff_t SemiStructuredMesh::interior_start() const { return impl_->interior_start; }
-
-    SemiStructuredMesh::SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)
-        : impl_(std::make_unique<Impl>()) {
-        impl_->init(macro_mesh, level);
-    }
-
-    SemiStructuredMesh::SemiStructuredMesh() : impl_(std::make_unique<Impl>()) {}
-
-    SemiStructuredMesh::~SemiStructuredMesh() {}
-
-    ptrdiff_t SemiStructuredMesh::n_nodes() const { return impl_->n_unique_nodes; }
-    int       SemiStructuredMesh::level() const { return impl_->level; }
-    ptrdiff_t SemiStructuredMesh::n_elements() const { return impl_->macro_mesh->n_elements(); }
-
-    int SemiStructuredMesh::export_as_standard(const char *path) {
-        SFEM_TRACE_SCOPE("SemiStructuredMesh::export_as_standard");
-
-        sfem::create_directory(path);
-
-        std::string folder   = path;
-        auto        elements = impl_->elements;
-        auto        points   = this->points();
-
-        const int txe              = sshex8_txe(this->level());
-        ptrdiff_t n_micro_elements = this->n_elements() * txe;
-        auto      hex8_elements    = create_host_buffer<idx_t>(8, n_micro_elements);
-
-        sshex8_to_standard_hex8_mesh(level(), n_elements(), elements->data(), hex8_elements->data());
-
-        // hex8_elements->print(std::cout);
-        // points->print(std::cout);
-
-        std::string points_path = folder + "/x%d.raw";
-        points->to_files(points_path.c_str());
-
-        std::string elements_path = folder + "/i%d.raw";
-        hex8_elements->to_files(elements_path.c_str());
-
-        std::stringstream ss;
-        ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::export_as_standard)\n";
-        ss << "n_elements: " << hex8_elements->extent(1) << "\n";
-        ss << "n_nodes: " << points->extent(1) << "\n";
-        ss << "spatial_dimension: 3\n";
-        ss << "elem_num_nodes: 8\n";
-        ss << "element_type: HEX8\n";
-        ss << "points:\n";
-        ss << "- x: x0.raw\n";
-        ss << "- y: x1.raw\n";
-        ss << "- z: x2.raw\n";
-        ss << "rpath: true\n";
-
-        const double mem_hex8_mesh   = hex8_elements->extent(0) * hex8_elements->extent(1) * sizeof(idx_t) * 1e-9;
-        const double mem_sshex8_mesh = elements->extent(0) * elements->extent(1) * sizeof(idx_t) * 1e-9;
-        const double mem_points      = points->extent(0) * points->extent(1) * sizeof(geom_t) * 1e-9;
-        const double mem_macro_points =
-                impl_->macro_mesh->points()->extent(0) * impl_->macro_mesh->points()->extent(1) * sizeof(geom_t) * 1e-9;
-
-        ss << "mem_hex8_mesh:    " << mem_hex8_mesh << " [GB]\n";
-        ss << "mem_sshex8_mesh:  " << mem_sshex8_mesh << " [GB]\n";
-        ss << "mem_points:       " << mem_points << " [GB]\n";
-        ss << "mem_macro_points: " << mem_macro_points << " [GB]\n";
-        ss << "mem_disc_ss:      " << (mem_points + mem_macro_points) << " [GB]\n";
-        ss << "mem_disc_std:     " << (mem_hex8_mesh + mem_sshex8_mesh) << " [GB]\n";
-        ss << "n_macro_elements: " << elements->extent(1) << "\n";
-
-        std::string   meta_path = folder + "/meta.yaml";
-        std::ofstream os(meta_path.c_str());
-
-        if (!os.good()) {
-            return SFEM_FAILURE;
-        }
-
-        os << ss.str();
-        os.close();
-
-        return SFEM_SUCCESS;
-    }
-
-    int SemiStructuredMesh::write(const char *path) {
-        SFEM_TRACE_SCOPE("SemiStructuredMesh::write");
-        sfem::create_directory(path);
-
-        std::string folder   = path;
-        auto        elements = impl_->elements;
-        auto        points   = this->points();
-
-        std::string points_path = folder + "/x%d.raw";
-        points->to_files(points_path.c_str());
-
-        std::string elements_path = folder + "/i%d.raw";
-        elements->to_files(elements_path.c_str());
-
-        std::stringstream ss;
-        ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::write)\n";
-        ss << "level: " << this->level() << "\n";
-        ss << "n_elements: " << elements->extent(1) << "\n";
-        ss << "n_nodes: " << points->extent(1) << "\n";
-        ss << "spatial_dimension: 3\n";
-        ss << "elem_num_nodes: " << ((level() - 1) * (level() - 1) * (level() - 1)) << "\n";
-        ss << "element_type: SSHEX8\n";
-        ss << "points:\n";
-        ss << "- x: x0.raw\n";
-        ss << "- y: x1.raw\n";
-        ss << "- z: x2.raw\n";
-        ss << "rpath: true\n";
-
-        std::string   meta_path = folder + "/meta.yaml";
-        std::ofstream os(meta_path.c_str());
-
-        if (!os.good()) {
-            return SFEM_FAILURE;
-        }
-
-        os << ss.str();
-        os.close();
-        return SFEM_SUCCESS;
-    }
-
     class FunctionSpace::Impl {
     public:
         std::shared_ptr<Mesh> mesh;
@@ -839,23 +296,18 @@ namespace sfem {
         assert(block_size > 0);
 
         if (element_type == INVALID) {
-            impl_->element_type = (enum ElemType)mesh->impl_->mesh.element_type;
+            impl_->element_type = mesh->element_type();
         } else {
             impl_->element_type = element_type;
         }
 
-        auto c_mesh = &mesh->impl_->mesh;
-        if (impl_->element_type == c_mesh->element_type) {
-            impl_->nlocal  = c_mesh->nnodes * block_size;
-            impl_->nglobal = c_mesh->nnodes * block_size;
+        if (impl_->element_type == mesh->element_type()) {
+            impl_->nlocal  = mesh->n_nodes() * block_size;
+            impl_->nglobal = mesh->n_nodes() * block_size;
         } else {
             // FIXME in parallel it will not work
-            impl_->nlocal  = (max_node_id(impl_->element_type, c_mesh->nelements, c_mesh->elements) + 1) * block_size;
+            impl_->nlocal  = (max_node_id(impl_->element_type, mesh->n_elements(), mesh->elements()->data()) + 1) * block_size;
             impl_->nglobal = impl_->nlocal;
-
-            // MPI_CATCH_ERROR(
-            //     MPI_Allreduce(MPI_IN_PLACE, &impl_->nglobal, 1, MPI_LONG, MPI_SUM,
-            //     c_mesh->comm));
         }
     }
 
@@ -1674,6 +1126,8 @@ namespace sfem {
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
+    void Function::clear_constraints() { impl_->constraints.clear(); }
+
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
     int Function::constaints_mask(mask_t *mask) {
@@ -2341,9 +1795,7 @@ namespace sfem {
                                                                   &values[5]);
         }
 
-        int gradient(const real_t *const x, real_t *const out) override {
-            return apply(nullptr, x, out);
-        }
+        int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::apply");
@@ -2543,6 +1995,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
         bool                           use_affine_approximation{true};
+        bool                           use_stencil{true};
 
         long   calls{0};
         double total_time{0};
@@ -2552,7 +2005,7 @@ namespace sfem {
                 printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
-                       use_affine_approximation ? "affine" : "isoparametric",
+                       use_affine_approximation ? (use_stencil ? "stencil" : "affine") : "isoparametric",
                        calls,
                        total_time,
                        total_time / calls,
@@ -2580,6 +2033,10 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
             ret->use_affine_approximation = SFEM_HEX8_ASSUME_AFFINE;
 
+            int SFEM_ENABLE_HEX8_STENCIL = ret->use_stencil;
+            SFEM_READ_ENV(SFEM_ENABLE_HEX8_STENCIL, atoi);
+            ret->use_stencil = SFEM_ENABLE_HEX8_STENCIL;
+
             return ret;
         }
 
@@ -2597,6 +2054,7 @@ namespace sfem {
                 auto ret                      = std::make_shared<SemiStructuredLaplacian>(space);
                 ret->element_type             = element_type;
                 ret->use_affine_approximation = use_affine_approximation;
+                ret->use_stencil              = use_stencil;
                 return ret;
             } else {
                 auto ret          = std::make_shared<Laplacian>(space);
@@ -2643,7 +2101,10 @@ namespace sfem {
             double tick = MPI_Wtime();
 
             int err = 0;
-            if (use_affine_approximation) {
+            if (use_stencil) {
+                err = affine_sshex8_laplacian_stencil_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+            } else if (use_affine_approximation) {
                 err = affine_sshex8_laplacian_apply(
                         ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
 
@@ -2660,6 +2121,135 @@ namespace sfem {
 
         int value(const real_t *x, real_t *const out) override {
             SFEM_ERROR("[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
+    class SemiStructuredEMLaplacian : public Op {
+    public:
+        std::shared_ptr<FunctionSpace>    space;
+        enum ElemType                     element_type { INVALID };
+        std::shared_ptr<Buffer<scalar_t>> element_matrix;
+
+        long   calls{0};
+        double total_time{0};
+
+        ~SemiStructuredEMLaplacian() {
+            if (calls) {
+                printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       space->semi_structured_mesh().level(),
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::create");
+
+            assert(space->has_semi_structured_mesh());
+            if (!space->has_semi_structured_mesh()) {
+                fprintf(stderr,
+                        "[Error] SemiStructuredEMLaplacian::create requires space with "
+                        "semi_structured_mesh!\n");
+                return nullptr;
+            }
+
+            assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+            auto ret          = std::make_unique<SemiStructuredEMLaplacian>(space);
+            ret->element_type = (enum ElemType)space->element_type();
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            fprintf(stderr, "[Error] SemiStructuredEMLaplacian::lor_op NOT IMPLEMENTED!\n");
+            assert(false);
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::derefine_op");
+
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
+            if (space->has_semi_structured_mesh()) {
+                auto ret            = std::make_shared<SemiStructuredEMLaplacian>(space);
+                ret->element_type   = element_type;
+                // FIXME every level stores a variatin of it with different scaling 
+                // It woud be usefull to revisit
+                // ret->element_matrix = element_matrix;
+                ret->initialize();
+                return ret;
+            } else {
+                auto ret          = std::make_shared<Laplacian>(space);
+                ret->element_type = macro_base_elem(element_type);
+                return ret;
+            }
+        }
+
+        const char *name() const override { return "ss:em:Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override {
+            auto &ssm      = space->semi_structured_mesh();
+            auto  mesh     = space->mesh_ptr();
+            element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+            return sshex8_laplacian_element_matrix(ssm.level(),
+                                                   mesh->n_elements(),
+                                                   mesh->n_nodes(),
+                                                   mesh->elements()->data(),
+                                                   mesh->points()->data(),
+                                                   element_matrix->data());
+
+            element_matrix->print(std::cout);
+        }
+
+        SemiStructuredEMLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_ERROR("[Error] ss:em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
+
+            auto &ssm = space->semi_structured_mesh();
+            return affine_sshex8_laplacian_diag(
+                    ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), out);
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_ERROR("[Error] ss:em:Laplacian::gradient NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::apply");
+
+            assert(element_type == SSHEX8);  // REMOVEME once generalized approach
+
+            auto &ssm = space->semi_structured_mesh();
+
+            double tick = MPI_Wtime();
+
+            int err = sshex8_stencil_element_matrix_apply(
+                    ssm.level(), ssm.n_elements(), ssm.element_data(), element_matrix->data(), h, out);
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+            return err;
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_ERROR("[Error] ss:em:Laplacian::value NOT IMPLEMENTED!\n");
             return SFEM_FAILURE;
         }
 
@@ -3256,6 +2846,7 @@ namespace sfem {
             instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
+            instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
