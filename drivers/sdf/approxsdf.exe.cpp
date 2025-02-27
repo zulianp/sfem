@@ -16,12 +16,12 @@ namespace sfem {
         ptrdiff_t stride[3];
         geom_t    o[3];
         geom_t    delta[3];
+        geom_t    radius;
 
         std::shared_ptr<Buffer<ptrdiff_t>> cell_ptr;
         std::shared_ptr<Buffer<ptrdiff_t>> cell_idx;
 
         void print(std::ostream &os) const {
-
             os << "----------------------------\n";
             os << n[0] << " x " << n[1] << " x " << n[2] << "\n";
             os << stride[0] << " x " << stride[1] << " x " << stride[2] << "\n";
@@ -185,7 +185,7 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<CellList> create_cell_list_from_nodes(const std::shared_ptr<sfem::Mesh> &mesh) {
+    std::shared_ptr<CellList> create_cell_list_from_nodes(const std::shared_ptr<sfem::Mesh> &mesh, const geom_t radius_factor = 1) {
         const ptrdiff_t nnodes = mesh->n_nodes();
         auto            points = mesh->points();
 
@@ -224,14 +224,19 @@ namespace sfem {
 
         auto ret = std::make_shared<CellList>();
 
-        geom_t max_radius = 0;
-        for(int d = 0; d < dim; d++) {
-         }
+        geom_t max_radius = radius[0];
+        for (int d = 1; d < dim; d++) {
+            max_radius = MAX(radius[d], max_radius);
+        }
+
+        max_radius *= radius_factor;
+
+        ret->radius = max_radius;
 
         ptrdiff_t ncells = 1;
         for (int d = 0; d < dim; d++) {
             geom_t extent = (max[d] - min[d]);
-            ret->n[d]     = extent / (2 * radius[d]);
+            ret->n[d]     = extent / (2 * max_radius);
             ret->delta[d] = extent / ret->n[d];
             ret->o[d]     = min[d];
 
@@ -292,34 +297,53 @@ namespace sfem {
     static SFEM_INLINE geom_t closest_distance_and_normal(const geom_t *const SFEM_RESTRICT p,
                                                           const geom_t                      line[3][3],
                                                           const geom_t                      line_normal[3][3],
+                                                          const geom_t                      orientation,
                                                           geom_t *const SFEM_RESTRICT       point_normal) {
         // Line segment endpoints
-        const geom_t p0[2] = {line[0][0], line[1][0]};
-        const geom_t p1[2] = {line[0][1], line[1][1]};
+        const geom_t l0x = line[0][0];
+        const geom_t l0y = line[1][0];
+        const geom_t l1x = line[0][1];
+        const geom_t l1y = line[1][1];
 
         // Line direction vector
-        const geom_t v[2] = {p1[0] - p0[0], p1[1] - p0[1]};
+        const geom_t vx = l1x - l0x;
+        const geom_t vy = l1y - l0y;
 
         // Vector from line start to point
-        const geom_t w[2] = {p[0] - p0[0], p[1] - p0[1]};
+        const geom_t wx = p[0] - l0x;
+        const geom_t wy = p[1] - l0y;
 
         // Line segment length squared
-        const geom_t len_sq = v[0] * v[0] + v[1] * v[1];
+        const geom_t len_sq = vx * vx + vy * vy;
 
         // Project point onto line using dot product
-        const geom_t t = (len_sq != 0) ? (w[0] * v[0] + w[1] * v[1]) / len_sq : 0;
+        const geom_t t = (len_sq != 0) ? (wx * vx + wy * vy) / len_sq : 0;
 
         // Clamp projection to segment
         const geom_t t_clamped = t < 0 ? 0 : (t > 1 ? 1 : t);
 
         // Closest point on line
-        const geom_t closest[2] = {p0[0] + t_clamped * v[0], p0[1] + t_clamped * v[1]};
+
+        const geom_t cx = l0x + t_clamped * vx;
+        const geom_t cy = l0y + t_clamped * vy;
 
         // Distance vector
-        const geom_t d[2] = {p[0] - closest[0], p[1] - closest[1]};
+        const geom_t dx = p[0] - cx;
+        const geom_t dy = p[1] - cy;
 
-        point_normal[0] = line_normal[0][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
-        point_normal[1] = line_normal[1][0] * (1 - t_clamped) + line_normal[1][1] * t_clamped;
+        const geom_t pnx = line_normal[0][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
+        const geom_t pny = line_normal[1][0] * (1 - t_clamped) + line_normal[1][1] * t_clamped;
+
+        if (t_clamped == 1 || t_clamped == 0) {
+            point_normal[0] = pnx;
+            point_normal[1] = pny;
+        } else {
+            point_normal[0] = vy;
+            point_normal[1] = -vx;
+        }
+
+        point_normal[0] *= orientation;
+        point_normal[1] *= orientation;
 
         const geom_t len_normal = sqrt(point_normal[0] * point_normal[0] + point_normal[1] * point_normal[1]);
         assert(len_normal != 0);
@@ -327,10 +351,10 @@ namespace sfem {
         point_normal[0] /= len_normal;
         point_normal[1] /= len_normal;
 
-        const geom_t sign = (point_normal[0] * (p[0] - closest[0]) + point_normal[1] * (p[1] - closest[1])) < 0 ? -1 : 1;
+        const geom_t sign = orientation * (pnx * (p[0] - cx) + pny * (p[1] - cy)) < 0 ? -1 : 1;
 
         // Return distance
-        return sign * sqrt(d[0] * d[0] + d[1] * d[1]);
+        return sign * sqrt(dx * dx + dy * dy);
     }
 
     // static SFEM_INLINE geom_t point_triangle_distance_3d(const geom_t *const p,  // Point coordinates
@@ -413,6 +437,7 @@ namespace sfem {
 
     void init_sdf_brute_force(const std::shared_ptr<Mesh>             &surface,
                               const std::shared_ptr<Buffer<real_t *>> &surface_normals,
+                              const geom_t                             orientation,
                               const std::shared_ptr<Mesh>             &mesh,
                               const std::shared_ptr<Buffer<real_t>>   &distance,
                               const std::shared_ptr<Buffer<real_t *>> &normals) {
@@ -449,7 +474,7 @@ namespace sfem {
 
                 if (dim == 2) {
                     geom_t point_normal[2] = {0, 0};
-                    geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, point_normal);
+                    geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, orientation, point_normal);
 
                     if (fabs(dd) < fabs(dist[node])) {
                         dist[node] = dd;
@@ -466,9 +491,9 @@ namespace sfem {
 
     void init_sdf(const std::shared_ptr<Mesh>             &surface,
                   const std::shared_ptr<Buffer<real_t *>> &surface_normals,
+                  const geom_t                             orientation,
                   const std::shared_ptr<CellList>         &cell_list,
                   const std::shared_ptr<Mesh>             &mesh,
-                  const real_t                             margin,
                   const std::shared_ptr<Buffer<real_t>>   &distance,
                   const std::shared_ptr<Buffer<real_t *>> &normals) {
         const ptrdiff_t ne_surf  = surface->n_elements();
@@ -491,6 +516,8 @@ namespace sfem {
         auto cell_ptr = cell_list->cell_ptr->data();
         auto cell_idx = cell_list->cell_idx->data();
 
+        auto radius = cell_list->radius;
+
         for (ptrdiff_t i_surf = 0; i_surf < ne_surf; i_surf++) {
             geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0};
             geom_t xx_surf[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
@@ -498,14 +525,15 @@ namespace sfem {
 
             for (int d = 0; d < dim; d++) {
                 for (int v_surf = 0; v_surf < nxe_surf; v_surf++) {
-                    xx_surf[d][v_surf] = p_surf[d][e_surf[v_surf][i_surf]];
-                    nn_surf[d][v_surf] = n_surf[d][e_surf[v_surf][i_surf]];
+                    idx_t node_surf    = e_surf[v_surf][i_surf];
+                    xx_surf[d][v_surf] = p_surf[d][node_surf];
+                    nn_surf[d][v_surf] = n_surf[d][node_surf];
                 }
             }
 
             for (int d = 0; d < dim; d++) {
-                box_min[d] = p_surf[d][0];
-                box_max[d] = p_surf[d][0];
+                box_min[d] = xx_surf[d][0];
+                box_max[d] = xx_surf[d][0];
             }
 
             for (int v_surf = 1; v_surf < nxe_surf; v_surf++) {
@@ -515,13 +543,6 @@ namespace sfem {
                 }
             }
 
-            for (int d = 0; d < dim; d++) {
-                box_min[d] -= margin;
-                box_max[d] += margin;
-
-                assert(box_min[d] <= box_max[d]);
-            }
-
             ptrdiff_t start_coord[3] = {1, 1, 0};
             ptrdiff_t end_coord[3]   = {1, 1, 1};
 
@@ -529,25 +550,25 @@ namespace sfem {
             cell_list_coords(dim, n, o, delta, box_max, end_coord);
 
             for (int d = 0; d < dim; d++) {
-                // start_coord[d] = MAX(start_coord[d] - 1, 0);
-                end_coord[d] = MIN(end_coord[d] + 1, n[d]);
+                start_coord[d] = MAX(start_coord[d] - 1, 0);
+                end_coord[d]   = MIN(end_coord[d] + 1, n[d]);
 
                 assert(start_coord[d] <= end_coord[d]);
             }
 
-            printf("-----------------------\n");
+            // printf("-----------------------\n");
 
-            printf("%g %g -- %g %g\n", box_min[0], box_min[1], box_max[0], box_max[1]);
+            // printf("%g %g -- %g %g\n", box_min[0], box_min[1], box_max[0], box_max[1]);
 
-            printf("%ld %ld %ld -- %ld %ld %ld\n",
-                   start_coord[0],
-                   start_coord[1],
-                   start_coord[2],
-                   end_coord[0],
-                   end_coord[1],
-                   end_coord[2]);
+            // printf("%ld %ld %ld -- %ld %ld %ld\n",
+            //        start_coord[0],
+            //        start_coord[1],
+            //        start_coord[2],
+            //        end_coord[0],
+            //        end_coord[1],
+            //        end_coord[2]);
 
-            printf("-----------------------\n");
+            // printf("-----------------------\n");
 
             for (int zi = start_coord[2]; zi < end_coord[2]; zi++) {
                 for (int yi = start_coord[1]; yi < end_coord[1]; yi++) {
@@ -564,9 +585,9 @@ namespace sfem {
 
                             if (dim == 2) {
                                 geom_t point_normal[2] = {0, 0};
-                                geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, point_normal);
+                                geom_t dd = closest_distance_and_normal(p, xx_surf, nn_surf, orientation, point_normal);
 
-                                if (fabs(dd) < fabs(dist[node])) {
+                                if (fabs(dd) < fabs(dist[node]) && fabs(dd) < radius) {
                                     dist[node] = dd;
                                     for (int d = 0; d < dim; d++) {
                                         normals->data()[d][node] = point_normal[d];
@@ -594,7 +615,6 @@ void compute_pseudo_normals(enum ElemType                element_type,
                             const ptrdiff_t              n_nodes,
                             idx_t **const SFEM_RESTRICT  elements,
                             geom_t **const SFEM_RESTRICT points,
-                            const geom_t                 sign,
                             real_t **const SFEM_RESTRICT normals) {
     // TODO: pseudo normal computation using surface
     assert(element_type == EDGE2 && "IMPLEMENT OTHER CASES");
@@ -612,11 +632,11 @@ void compute_pseudo_normals(enum ElemType                element_type,
         const geom_t nx = uy;
         const geom_t ny = -ux;
 
-        normals[0][i0] += sign * nx;
-        normals[1][i0] += sign * ny;
+        normals[0][i0] += nx;
+        normals[1][i0] += ny;
 
-        normals[0][i1] += sign * nx;
-        normals[1][i1] += sign * ny;
+        normals[0][i1] += nx;
+        normals[1][i1] += ny;
 
         assert(nx * nx + ny * ny > 0);
     }
@@ -754,7 +774,7 @@ int main(int argc, char *argv[]) {
     sfem::create_directory(output_folder.c_str());
 
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
-    auto mesh = sfem::Mesh::create_tri3_square(comm, 500, 500, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(comm, 200, 200, 0, 0, 1, 1);
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -809,7 +829,7 @@ int main(int argc, char *argv[]) {
         SFEM_ERROR("Unable to extract surface from sideset!\n");
     }
 
-    compute_pseudo_normals(st, sides->extent(1), nnodes, sides->data(), p, 1, n);
+    compute_pseudo_normals(st, sides->extent(1), nnodes, sides->data(), p, n);
 
     auto            boundary_nodes = create_nodeset_from_sideset(fs, sideset);
     auto            bn             = boundary_nodes->data();
@@ -830,10 +850,11 @@ int main(int argc, char *argv[]) {
     boundary_surface->write((output_folder + "/surface").c_str());
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
 
-    // 
-    auto cell_list = sfem::create_cell_list_from_nodes(mesh);
+    //
+    auto cell_list = sfem::create_cell_list_from_nodes(mesh, 4);
 
-    sfem::init_sdf_brute_force(boundary_surface, normals, mesh, distance, normals);
+    // sfem::init_sdf_brute_force(boundary_surface, normals, 1, mesh, distance, normals);
+    sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh,  distance, normals);
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
     const geom_t radius = 0.3333;
@@ -878,19 +899,20 @@ int main(int argc, char *argv[]) {
             }
         }
     } else {
-        auto surface         = sfem::Mesh::create_from_file(comm, argv[1]);
-        auto surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
+        const std::string surface_path    = argv[1];
+        auto              surface         = sfem::Mesh::create_from_file(comm, surface_path.c_str());
+        auto              surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
         compute_pseudo_normals(surface->element_type(),
                                surface->n_elements(),
                                surface->n_nodes(),
                                surface->elements()->data(),
                                surface->points()->data(),
-                               -1,
                                surface_normals->data());
 
-        sfem::init_sdf_brute_force(surface, surface_normals, mesh, distance, normals);
+        surface_normals->to_files((surface_path + "/normals.%d.raw").c_str());
 
-        
+        // sfem::init_sdf_brute_force(surface, surface_normals, -1, mesh, distance, normals);
+        sfem::init_sdf(surface, surface_normals, -1, cell_list, mesh, distance, normals);
 
         // auto cell_list_structure = sfem::create_cell_list_from_nodes(surface);
         // cell_list_structure->print(std::cout);
@@ -971,7 +993,7 @@ int main(int argc, char *argv[]) {
     // solve potential for the distance
     blas->zeros(rhs->size(), rhs->data());
     linear_op->apply(distance->data(), rhs->data());
-    blas->axpy(rhs->size(), -1, div->data(), rhs->data());
+    blas->axpy(rhs->size(), 1, div->data(), rhs->data());
 
     f->apply_constraints(rhs->data());
 
