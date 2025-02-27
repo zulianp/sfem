@@ -32,16 +32,16 @@ namespace sfem {
             auto      cp = cell_ptr->data();
             auto      ci = cell_idx->data();
 
-            os << "cells:\n";
+            // os << "cells:\n";
 
-            for (ptrdiff_t i = 0; i < n; i++) {
-                os << i << ") ";
-                for (ptrdiff_t k = cp[i]; k < cp[i + 1]; k++) {
-                    os << ci[k] << " ";
-                }
+            // for (ptrdiff_t i = 0; i < n; i++) {
+            //     os << i << ") ";
+            //     for (ptrdiff_t k = cp[i]; k < cp[i + 1]; k++) {
+            //         os << ci[k] << " ";
+            //     }
 
-                os << "\n";
-            }
+            //     os << "\n";
+            // }
 
             os << "----------------------------\n";
         }
@@ -551,7 +551,7 @@ namespace sfem {
 
             for (int d = 0; d < dim; d++) {
                 start_coord[d] = MAX(start_coord[d] - 1, 0);
-                end_coord[d]   = MIN(end_coord[d] + 1, n[d]);
+                end_coord[d]   = MIN(end_coord[d] + 2, n[d]);
 
                 assert(start_coord[d] <= end_coord[d]);
             }
@@ -773,8 +773,9 @@ int main(int argc, char *argv[]) {
     std::string output_folder = "test_approxsdf";
     sfem::create_directory(output_folder.c_str());
 
+    ptrdiff_t nx = 1000;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
-    auto mesh = sfem::Mesh::create_tri3_square(comm, 200, 200, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -851,10 +852,17 @@ int main(int argc, char *argv[]) {
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
 
     //
-    auto cell_list = sfem::create_cell_list_from_nodes(mesh, 4);
+    auto cell_list = sfem::create_cell_list_from_nodes(mesh, MAX(2, 0.03*nx));
+    cell_list->print(std::cout);
 
     // sfem::init_sdf_brute_force(boundary_surface, normals, 1, mesh, distance, normals);
-    sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh,  distance, normals);
+
+    {
+
+        SFEM_TRACE_SCOPE("sfem::init_sdf(boundary)");
+        sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh,  distance, normals);
+
+    }
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
     const geom_t radius = 0.3333;
