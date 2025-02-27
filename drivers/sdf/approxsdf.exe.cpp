@@ -22,7 +22,7 @@ namespace sfem {
     };
 
     static SFEM_INLINE void cell_list_coords(const int                            dim,
-                                             const ptrdiff_t *const SFEM_RESTRICT stride,
+                                             const ptrdiff_t *const SFEM_RESTRICT n,
                                              const geom_t *const SFEM_RESTRICT    o,
                                              const geom_t *const SFEM_RESTRICT    delta,
                                              const geom_t *const SFEM_RESTRICT    p,
@@ -30,7 +30,8 @@ namespace sfem {
         for (int d = 0; d < dim; d++) {
             geom_t val = p[d] - o[d];
             val /= delta[d];
-            coords[d] = floor(val) * stride[d];
+            coords[d] = floor(val);
+            assert(coords[d] < n[d]);
         }
     }
 
@@ -152,7 +153,7 @@ namespace sfem {
             ci[cp[idx] + bk[idx]++] = i;
         }
 
-        cell_idx->print(std::cout);
+        // cell_idx->print(std::cout);
         ret->cell_idx = cell_idx;
         ret->cell_ptr = cell_ptr;
         return ret;
@@ -179,6 +180,9 @@ namespace sfem {
                 min[d] = MIN(min[d], p[d][i]);
                 max[d] = MAX(max[d], p[d][i]);
             }
+
+            min[d] -= 1e-6;
+            max[d] += 1e-6;
         }
 
         for (int d = 0; d < dim; d++) {
@@ -249,7 +253,7 @@ namespace sfem {
             ci[cp[idx] + bk[idx]++] = i;
         }
 
-        cell_idx->print(std::cout);
+        // cell_idx->print(std::cout);
         ret->cell_idx = cell_idx;
         ret->cell_ptr = cell_ptr;
         return ret;
@@ -285,7 +289,7 @@ namespace sfem {
         const geom_t d[2] = {p[0] - closest[0], p[1] - closest[1]};
 
         point_normal[0] = line_normal[0][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
-        point_normal[1] = line_normal[1][0] * (1 - t_clamped) + line_normal[0][1] * t_clamped;
+        point_normal[1] = line_normal[1][0] * (1 - t_clamped) + line_normal[1][1] * t_clamped;
 
         const geom_t len_normal = sqrt(point_normal[0] * point_normal[0] + point_normal[1] * point_normal[1]);
         assert(len_normal != 0);
@@ -293,8 +297,10 @@ namespace sfem {
         point_normal[0] /= len_normal;
         point_normal[1] /= len_normal;
 
+        const geom_t sign = (point_normal[0] * (p[0] - closest[0]) + point_normal[1] * (p[1] - closest[1])) < 0 ? - 1 : 1;
+
         // Return distance
-        return sqrt(d[0] * d[0] + d[1] * d[1]);
+        return sign * sqrt(d[0] * d[0] + d[1] * d[1]);
     }
 
     // static SFEM_INLINE geom_t point_triangle_distance_3d(const geom_t *const p,  // Point coordinates
@@ -375,10 +381,63 @@ namespace sfem {
     //     return min_dist;
     // }
 
-    void init_sdf(const std::shared_ptr<Mesh>             &mesh,
-                  const std::shared_ptr<CellList>         &cell_list,
-                  const std::shared_ptr<Mesh>             &surface,
+    void init_sdf_brute_force(const std::shared_ptr<Mesh>             &surface,
+                              const std::shared_ptr<Buffer<real_t *>> &surface_normals,
+                              const std::shared_ptr<Mesh>             &mesh,
+                              const std::shared_ptr<Buffer<real_t>>   &distance,
+                              const std::shared_ptr<Buffer<real_t *>> &normals) {
+        auto            e_surf   = surface->elements()->data();
+        auto            p_surf   = surface->points()->data();
+        auto            n_surf   = surface_normals->data();
+        const ptrdiff_t ne_surf  = surface->n_elements();
+        const int       nxe_surf = elem_num_nodes(surface->element_type());
+
+        auto            p_mesh = mesh->points()->data();
+        auto            n_mesh = normals->data();
+        auto            dist   = distance->data();
+        const ptrdiff_t nnodes = mesh->n_nodes();
+        const int       dim    = mesh->spatial_dimension();
+
+        for (ptrdiff_t node = 0; node < nnodes; node++) {
+            geom_t p[3] = {0, 0, 0};
+
+            for (int d = 0; d < dim; d++) {
+                p[d] = p_mesh[d][node];
+            }
+
+            for (ptrdiff_t i_surf = 0; i_surf < ne_surf; i_surf++) {
+                geom_t xx_surf[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+                geom_t nn_surf[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+
+                for (int d = 0; d < dim; d++) {
+                    for (int v_surf = 0; v_surf < nxe_surf; v_surf++) {
+                        idx_t node_surf = e_surf[v_surf][i_surf];
+                        xx_surf[d][v_surf] = p_surf[d][node_surf];
+                        nn_surf[d][v_surf] = n_surf[d][node_surf];
+                    }
+                }
+
+                if (dim == 2) {
+                    geom_t point_normal[2] = {0, 0};
+                    geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, point_normal);
+
+                    if (fabs(dd) < fabs(dist[node])) {
+                        dist[node] = dd;
+                        for (int d = 0; d < dim; d++) {
+                            n_mesh[d][node] = point_normal[d];
+                        }
+                    }
+                } else {
+                    SFEM_ERROR("NOT IMPLEMENTED!\n");
+                }
+            }
+        }
+    }
+
+    void init_sdf(const std::shared_ptr<Mesh>             &surface,
                   const std::shared_ptr<Buffer<real_t *>> &surface_normals,
+                  const std::shared_ptr<CellList>         &cell_list,
+                  const std::shared_ptr<Mesh>             &mesh,
                   const real_t                             margin,
                   const std::shared_ptr<Buffer<real_t>>   &distance,
                   const std::shared_ptr<Buffer<real_t *>> &normals) {
@@ -403,9 +462,9 @@ namespace sfem {
         auto cell_idx = cell_list->cell_idx->data();
 
         for (ptrdiff_t i_surf = 0; i_surf < ne_surf; i_surf++) {
-            geom_t box_min[3], box_max[3];
-            geom_t xx_surf[3][3];
-            geom_t nn_surf[3][3];
+            geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0};
+            geom_t xx_surf[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+            geom_t nn_surf[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
             for (int d = 0; d < dim; d++) {
                 for (int v_surf = 0; v_surf < nxe_surf; v_surf++) {
@@ -429,18 +488,36 @@ namespace sfem {
             for (int d = 0; d < dim; d++) {
                 box_min[d] -= margin;
                 box_max[d] += margin;
+
+                assert(box_min[d] <= box_max[d]);
             }
 
-            ptrdiff_t start_coord[3] = {1, 1, 1};
+            ptrdiff_t start_coord[3] = {1, 1, 0};
             ptrdiff_t end_coord[3]   = {1, 1, 1};
 
-            cell_list_coords(dim, stride, o, delta, box_min, start_coord);
-            cell_list_coords(dim, stride, o, delta, box_max, end_coord);
+            cell_list_coords(dim, n, o, delta, box_min, start_coord);
+            cell_list_coords(dim, n, o, delta, box_max, end_coord);
 
             for (int d = 0; d < dim; d++) {
                 // start_coord[d] = MAX(start_coord[d] - 1, 0);
                 end_coord[d] = MIN(end_coord[d] + 1, n[d]);
+
+                assert(start_coord[d] <= end_coord[d]);
             }
+
+            printf("-----------------------\n");
+
+            printf("%g %g -- %g %g\n", box_min[0], box_min[1], box_max[0], box_max[1]);
+
+            printf("%ld %ld %ld -- %ld %ld %ld\n",
+                   start_coord[0],
+                   start_coord[1],
+                   start_coord[2],
+                   end_coord[0],
+                   end_coord[1],
+                   end_coord[2]);
+
+            printf("-----------------------\n");
 
             for (int zi = start_coord[2]; zi < end_coord[2]; zi++) {
                 for (int yi = start_coord[1]; yi < end_coord[1]; yi++) {
@@ -456,13 +533,13 @@ namespace sfem {
                             }
 
                             if (dim == 2) {
-                                geom_t point_normal[2] = {0, 0};    
+                                geom_t point_normal[2] = {0, 0};
                                 geom_t dd              = closest_distance_and_normal(p, xx_surf, nn_surf, point_normal);
 
                                 if (fabs(dd) < fabs(dist[node])) {
                                     dist[node] = dd;
                                     for (int d = 0; d < dim; d++) {
-                                        normals->data()[node][d] = point_normal[d];
+                                        normals->data()[d][node] = point_normal[d];
                                     }
                                 }
 
@@ -487,6 +564,7 @@ void compute_pseudo_normals(enum ElemType                element_type,
                             const ptrdiff_t              n_nodes,
                             idx_t **const SFEM_RESTRICT  elements,
                             geom_t **const SFEM_RESTRICT points,
+                            const geom_t sign,
                             real_t **const SFEM_RESTRICT normals) {
     // TODO: pseudo normal computation using surface
     assert(element_type == EDGE2 && "IMPLEMENT OTHER CASES");
@@ -504,11 +582,11 @@ void compute_pseudo_normals(enum ElemType                element_type,
         const geom_t nx = uy;
         const geom_t ny = -ux;
 
-        normals[0][i0] += -nx;
-        normals[1][i0] += -ny;
+        normals[0][i0] += sign * nx;
+        normals[1][i0] += sign * ny;
 
-        normals[0][i1] += -nx;
-        normals[1][i1] += -ny;
+        normals[0][i1] += sign * nx;
+        normals[1][i1] += sign * ny;
 
         assert(nx * nx + ny * ny > 0);
     }
@@ -643,8 +721,9 @@ int main(int argc, char *argv[]) {
     std::string output_folder = "test_approxsdf";
     sfem::create_directory(output_folder.c_str());
 
-    auto mesh = sfem::Mesh::create_tri3_square(comm, 80, 80, 0, 0, 1, 1);
-    // auto mesh = sfem::Mesh::create_hex8_cube(comm, 40, 40, 40, 0, 0, 0, 1, 1, 1);
+    // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(comm, 20, 20, 0, 0, 1, 1);
+    // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
 
@@ -698,7 +777,7 @@ int main(int argc, char *argv[]) {
         SFEM_ERROR("Unable to extract surface from sideset!\n");
     }
 
-    compute_pseudo_normals(st, sides->extent(1), nnodes, sides->data(), p, n);
+    compute_pseudo_normals(st, sides->extent(1), nnodes, sides->data(), p, 1, n);
 
     auto            boundary_nodes = create_nodeset_from_sideset(fs, sideset);
     auto            bn             = boundary_nodes->data();
@@ -707,6 +786,19 @@ int main(int argc, char *argv[]) {
     for (ptrdiff_t i = 0; i < nbnodes; i++) {
         d[bn[i]] = 0;
     }
+
+    auto boundary_surface = std::make_shared<sfem::Mesh>(mesh->spatial_dimension(),
+                                                         st,
+                                                         sides->extent(1),
+                                                         sides->data(),
+                                                         mesh->n_nodes(),
+                                                         mesh->points()->data(),
+                                                         [mesh, sides](void *) {});
+
+    boundary_surface->write((output_folder + "/surface").c_str());
+    normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
+
+    sfem::init_sdf_brute_force(boundary_surface, normals, mesh, distance, normals);
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
     const geom_t radius = 0.3333;
@@ -751,19 +843,21 @@ int main(int argc, char *argv[]) {
             }
         }
     } else {
-        auto surface   = sfem::Mesh::create_from_file(comm, argv[1]);
-        auto cell_list = sfem::create_cell_list_from_nodes(mesh);
-        
-
+        auto surface         = sfem::Mesh::create_from_file(comm, argv[1]);
         auto surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
         compute_pseudo_normals(surface->element_type(),
                                surface->n_elements(),
                                surface->n_nodes(),
                                surface->elements()->data(),
                                surface->points()->data(),
+                               -1,
                                surface_normals->data());
 
-        sfem::init_sdf(mesh, cell_list, surface, surface_normals, 0, distance, normals);
+        sfem::init_sdf_brute_force(surface, surface_normals, mesh, distance, normals);
+
+        // auto cell_list = sfem::create_cell_list_from_nodes(surface);
+        // sfem::init_sdf(
+        //     surface, surface_normals, cell_list, mesh, 0, distance, normals);
     }
 
     ptrdiff_t nconstraints = 0;
