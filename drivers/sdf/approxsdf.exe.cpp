@@ -185,7 +185,8 @@ namespace sfem {
         return ret;
     }
 
-    std::shared_ptr<CellList> create_cell_list_from_nodes(const std::shared_ptr<sfem::Mesh> &mesh, const geom_t radius_factor = 1) {
+    std::shared_ptr<CellList> create_cell_list_from_nodes(const std::shared_ptr<sfem::Mesh> &mesh,
+                                                          const geom_t                       radius_factor = 1) {
         const ptrdiff_t nnodes = mesh->n_nodes();
         auto            points = mesh->points();
 
@@ -667,7 +668,7 @@ int main(int argc, char *argv[]) {
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
     auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
 
-    // FIXME implement 3D 
+    // FIXME implement 3D
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -744,14 +745,14 @@ int main(int argc, char *argv[]) {
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
 
     //
-    auto cell_list = sfem::create_cell_list_from_nodes(mesh, MAX(2, 0.03*nx));
+    auto cell_list = sfem::create_cell_list_from_nodes(mesh, MAX(2, 0.03 * nx));
     cell_list->print(std::cout);
 
     // sfem::init_sdf_brute_force(boundary_surface, normals, 1, mesh, distance, normals);
 
     {
         SFEM_TRACE_SCOPE("sfem::init_sdf(boundary)");
-        sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh,  distance, normals);
+        sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh, distance, normals);
     }
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
@@ -792,7 +793,7 @@ int main(int argc, char *argv[]) {
                 norm_vec = sqrt(norm_vec);
                 // norm_vec = neg ? -norm_vec : norm_vec;
                 for (int d = 0; d < dim; d++) {
-                    n[d][i] = vec[d] / norm_vec;
+                    n[d][i] = -vec[d] / norm_vec;
                 }
             }
         }
