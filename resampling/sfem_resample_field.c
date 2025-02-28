@@ -19,6 +19,60 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// main ////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+int                                                                  //
+apply_fun_to_mesh(const ptrdiff_t                    start_element,  // Mesh
+                  const ptrdiff_t                    end_element,    // Mesh
+                  const ptrdiff_t                    nnodes,         // Mesh
+                  const idx_t** const SFEM_RESTRICT  elems,          // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,            // Mesh
+                  const function_XYZ_t               fun,            // Function
+                  real_t* const SFEM_RESTRICT        weighted_field) {      //   Output (weighted field)
+    PRINT_CURRENT_FUNCTION;
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // Vertices coordinates of the tetrahedron
+
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // Read the coordinates of the vertices of the tetrahedron
+        const real_t x0 = xyz[0][ev[0]];
+        const real_t x1 = xyz[0][ev[1]];
+        const real_t x2 = xyz[0][ev[2]];
+        const real_t x3 = xyz[0][ev[3]];
+
+        const real_t y0 = xyz[1][ev[0]];
+        const real_t y1 = xyz[1][ev[1]];
+        const real_t y2 = xyz[1][ev[2]];
+        const real_t y3 = xyz[1][ev[3]];
+
+        const real_t z0 = xyz[2][ev[0]];
+        const real_t z1 = xyz[2][ev[1]];
+        const real_t z2 = xyz[2][ev[2]];
+        const real_t z3 = xyz[2][ev[3]];
+
+        const real_t v1 = fun(x0, y0, z0);
+        const real_t v2 = fun(x1, y1, z1);
+        const real_t v3 = fun(x2, y2, z2);
+        const real_t v4 = fun(x3, y3, z3);
+
+        weighted_field[ev[0]] = v1;
+        weighted_field[ev[1]] = v2;
+        weighted_field[ev[2]] = v3;
+        weighted_field[ev[3]] = v4;
+    }
+
+    RETURN_FROM_FUNCTION(0);
+}
+
 #define SFEM_RESAMPLE_GAP_DUAL
 
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
