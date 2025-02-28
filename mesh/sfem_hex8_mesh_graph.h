@@ -33,6 +33,13 @@ int sshex8_crs_graph(const int       L,
                      count_t       **out_rowptr,
                      idx_t         **out_colidx);
 
+int sshex8_skeleton_crs_graph(const int       L,
+                              const ptrdiff_t nelements,
+                              const ptrdiff_t nnodes,
+                              idx_t **const   elements,
+                              count_t       **out_rowptr,
+                              idx_t         **out_colidx);
+
 int sshex8_hierarchical_renumbering(const int       L,
                                     const int       nlevels,
                                     int *const      levels,
@@ -71,8 +78,8 @@ int ssquad4_hierarchical_remapping(const int                   L,
                                    const ptrdiff_t             nelements,
                                    const ptrdiff_t             nnodes,
                                    idx_t **const SFEM_RESTRICT elements,
-                                   idx_t ** SFEM_RESTRICT  node_mapping_out,
-                                   ptrdiff_t *count_out);
+                                   idx_t **SFEM_RESTRICT       node_mapping_out,
+                                   ptrdiff_t                  *count_out);
 
 #ifdef __cplusplus
 }
