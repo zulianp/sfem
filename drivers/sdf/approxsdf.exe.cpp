@@ -600,7 +600,6 @@ int tri3_div_apply(const ptrdiff_t     nelements,
     real_t element_uy[3];
 
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-#pragma unroll(3)
         for (int v = 0; v < 3; ++v) {
             ev[v] = elems[v][i];
         }
