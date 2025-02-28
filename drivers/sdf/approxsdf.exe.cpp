@@ -357,84 +357,6 @@ namespace sfem {
         return sign * sqrt(dx * dx + dy * dy);
     }
 
-    // static SFEM_INLINE geom_t point_triangle_distance_3d(const geom_t *const p,  // Point coordinates
-    //                                                      const geom_t        x[3][3])   // Triangle vertex coordinates
-    // {
-    //     // Triangle vectors
-    //     geom_t v0[3], v1[3], v2[3];
-    //     for (int d = 0; d < 3; d++) {
-    //         v0[d] = x[d][1] - x[d][0];  // edge 0
-    //         v1[d] = x[d][2] - x[d][0];  // edge 1
-    //         v2[d] = p[d] - x[d][0];     // point to vertex
-    //     }
-
-    //     // Compute dot products
-    //     const geom_t dot00 = v0[0] * v0[0] + v0[1] * v0[1] + v0[2] * v0[2];
-    //     const geom_t dot01 = v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
-    //     const geom_t dot02 = v0[0] * v2[0] + v0[1] * v2[1] + v0[2] * v2[2];
-    //     const geom_t dot11 = v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2];
-    //     const geom_t dot12 = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-
-    //     // Compute barycentric coordinates
-    //     const geom_t denom = dot00 * dot11 - dot01 * dot01;
-    //     const geom_t s     = (dot11 * dot02 - dot01 * dot12) / denom;
-    //     const geom_t t     = (dot00 * dot12 - dot01 * dot02) / denom;
-
-    //     if (s >= 0 && t >= 0 && s + t <= 1) {
-    //         // Inside triangle - compute distance to plane
-    //         geom_t closest[3];
-    //         for (int d = 0; d < 3; d++) {
-    //             closest[d] = x[d][0] + s * v0[d] + t * v1[d];
-    //         }
-    //         geom_t dist_sq = 0;
-    //         for (int d = 0; d < 3; d++) {
-    //             const geom_t diff = p[d] - closest[d];
-    //             dist_sq += diff * diff;
-    //         }
-    //         return sqrt(dist_sq);
-    //     }
-
-    //     // Outside triangle - find closest point on edges/vertices
-    //     geom_t min_dist = INFINITY;
-
-    //     // Check vertices
-    //     for (int i = 0; i < 3; i++) {
-    //         geom_t dist_sq = 0;
-    //         for (int d = 0; d < 3; d++) {
-    //             const geom_t diff = p[d] - x[d][i];
-    //             dist_sq += diff * diff;
-    //         }
-    //         min_dist = MIN(min_dist, sqrt(dist_sq));
-    //     }
-
-    //     // Check edges
-    //     const int edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
-    //     for (int e = 0; e < 3; e++) {
-    //         const int i0 = edges[e][0];
-    //         const int i1 = edges[e][1];
-
-    //         geom_t edge[3], diff[3];
-    //         for (int d = 0; d < 3; d++) {
-    //             edge[d] = x[d][i1] - x[d][i0];
-    //             diff[d] = p[d] - x[d][i0];
-    //         }
-
-    //         const geom_t len_sq = edge[0] * edge[0] + edge[1] * edge[1] + edge[2] * edge[2];
-    //         geom_t       t      = (edge[0] * diff[0] + edge[1] * diff[1] + edge[2] * diff[2]) / len_sq;
-    //         t                   = MAX(0, MIN(1, t));
-
-    //         geom_t dist_sq = 0;
-    //         for (int d = 0; d < 3; d++) {
-    //             const geom_t proj = x[d][i0] + t * edge[d];
-    //             const geom_t d    = p[d] - proj;
-    //             dist_sq += d * d;
-    //         }
-    //         min_dist = MIN(min_dist, sqrt(dist_sq));
-    //     }
-
-    //     return min_dist;
-    // }
-
     void init_sdf_brute_force(const std::shared_ptr<Mesh>             &surface,
                               const std::shared_ptr<Buffer<real_t *>> &surface_normals,
                               const geom_t                             orientation,
@@ -556,20 +478,6 @@ namespace sfem {
                 assert(start_coord[d] <= end_coord[d]);
             }
 
-            // printf("-----------------------\n");
-
-            // printf("%g %g -- %g %g\n", box_min[0], box_min[1], box_max[0], box_max[1]);
-
-            // printf("%ld %ld %ld -- %ld %ld %ld\n",
-            //        start_coord[0],
-            //        start_coord[1],
-            //        start_coord[2],
-            //        end_coord[0],
-            //        end_coord[1],
-            //        end_coord[2]);
-
-            // printf("-----------------------\n");
-
             for (int zi = start_coord[2]; zi < end_coord[2]; zi++) {
                 for (int yi = start_coord[1]; yi < end_coord[1]; yi++) {
                     for (int xi = start_coord[0]; xi < end_coord[0]; xi++) {
@@ -595,11 +503,7 @@ namespace sfem {
                                 }
 
                             } else if (dim == 3) {
-                                assert(false);
-                                // geom_t p[3];
-
-                                // geom_t dd  = point_triangle_distance_3d(p, xx_surf);
-                                // dist[node] = MIN(dist[node], dd);
+                                SFEM_ERROR("IMEPLEMENT ME!");
                             }
                         }
                     }
@@ -749,22 +653,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    // if (argc != 4) {
-    //     if (!rank) {
-    //         fprintf(stderr, "usage: %s <trisurf> <mesh> <output_folder>\n", argv[0]);
-    //     }
-
-    //     return EXIT_FAILURE;
-    // }
-
-    // auto surf = argv[1];
-
-    // // auto        trisurf       = sfem::Mesh::create_from_file(comm, argv[1]);
-    // auto        mesh          = sfem::Mesh::create_from_file(comm, argv[2]);
-    // const char *output_folder = argv[3];
-
-    // int SFEM_ENABLE_ORACLE = 0;
-    // SFEM_READ_ENV(SFEM_ENABLE_ORACLE, atoi);
+    if (size > 1) {
+        SFEM_ERROR("Only serial runs!");
+    }
 
     auto es   = sfem::EXECUTION_SPACE_HOST;
     auto blas = sfem::blas<real_t>(es);
@@ -776,6 +667,8 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nx = 100;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
     auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
+
+    // FIXME implement 3D 
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
 
     mesh->write((output_folder + "/mesh").c_str());
@@ -858,10 +751,8 @@ int main(int argc, char *argv[]) {
     // sfem::init_sdf_brute_force(boundary_surface, normals, 1, mesh, distance, normals);
 
     {
-
         SFEM_TRACE_SCOPE("sfem::init_sdf(boundary)");
         sfem::init_sdf(boundary_surface, normals, 1, cell_list, mesh,  distance, normals);
-
     }
 
     const geom_t c[3]   = {0.5, 0.5, 0.5};
@@ -918,17 +809,7 @@ int main(int argc, char *argv[]) {
                                surface_normals->data());
 
         surface_normals->to_files((surface_path + "/normals.%d.raw").c_str());
-
-        // sfem::init_sdf_brute_force(surface, surface_normals, -1, mesh, distance, normals);
         sfem::init_sdf(surface, surface_normals, -1, cell_list, mesh, distance, normals);
-
-        // auto cell_list_structure = sfem::create_cell_list_from_nodes(surface);
-        // cell_list_structure->print(std::cout);
-
-        // auto cell_list_boundary = sfem::create_cell_list_from_nodes(boundary_surface);
-        // cell_list_boundary->print(std::cout);
-        // sfem::init_sdf(
-        //     surface, surface_normals, cell_list, mesh, 0, distance, normals);
     }
 
     ptrdiff_t nconstraints = 0;
@@ -1009,8 +890,6 @@ int main(int argc, char *argv[]) {
     linear_solver->apply(rhs->data(), correction->data());
     blas->axpy(correction->size(), -1, correction->data(), distance->data());
 
-    // TODO: visualize divergence
-    // ...
     distance->to_file((output_folder + "/distance.raw").c_str());
     normals->to_files((output_folder + "/normals.%d.raw").c_str());
 
@@ -1025,13 +904,5 @@ int main(int argc, char *argv[]) {
                           correction->data());
 
     correction->to_file((output_folder + "/divergence.raw").c_str());
-
-    // if (SFEM_ENABLE_ORACLE) {
-    //     oracle->to_file((output_folder + "/oracle.raw").c_str());
-
-    //     blas->axpy(oracle->size(), -1, oracle->data(), distance->data());
-    //     distance->to_file((output_folder + "/difference.raw").c_str());
-    // }
-
     return MPI_Finalize();
 }
