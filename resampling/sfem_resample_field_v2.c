@@ -651,6 +651,15 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
     const real_type dy = (real_type)delta[1];
     const real_type dz = (real_type)delta[2];
 
+    const real_type hexahedron_volume = dx * dy * dz;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("Start: tet4_resample_field_local_adjoint  v2: %s:%d \n", __FILE__, __LINE__);
+    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
     // shape functions of the hexahedral element
     real_type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0,  //
             hex8_f4 = 0.0, hex8_f5 = 0.0, hex8_f6 = 0.0, hex8_f7 = 0.0;

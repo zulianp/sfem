@@ -16,7 +16,7 @@ print(f'sdf_test.py: Writing field to {output_path}')
 
 sdf_t = np.float32
 
-D = 900
+D = 200
 dims = (D, D, D)
 
 print(
@@ -90,7 +90,7 @@ def normalize_field(field):
 # 3: np.ones_like(X)
 
 
-option = 1
+option = 5
 
 ########## Normalize field in an interval [-1, 1] ##########
 
@@ -113,6 +113,11 @@ elif option == 2:
 elif option == 3:
     print("sdf_test.py: Using field: np.ones_like(X)")
     field = np.ones_like(X)
+    
+else:
+    print("sdf_test.py: Zero field")
+    field = np.zeros_like(X)
+    normalize = False
 
 
 if normalize and not option == 3:

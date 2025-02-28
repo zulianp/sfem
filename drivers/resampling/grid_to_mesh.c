@@ -273,6 +273,17 @@ int check_string_in_args(const int argc, const char* argv[], const char* target,
     return 0;
 }
 
+real_t mesh_fun_a(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
+
+real_t mesh_fun_b(real_t x, real_t y, real_t z) { return 2.0 * (sin(3 * x) + sin(3 * y) + sin(3 * z)); }
+
+real_t mesh_fun_c(real_t x, real_t y, real_t z) { return 1.0; }
+
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+// main ////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]) {
     // printf("========================================\n");
     // printf("Starting grid_to_mesh\n");
@@ -499,7 +510,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    real_t* test_field = calloc(nlocal[0] * nlocal[1] * nlocal[2], sizeof(real_t));  /// DEBUG
+    // real_t* test_field = calloc(nlocal[0] * nlocal[1] * nlocal[2], sizeof(real_t));  /// DEBUG
 
     if (mpi_size > 1) {
         real_t* pfield;
@@ -588,6 +599,8 @@ int main(int argc, char* argv[]) {
             //     g[i] = 1.0;
             // }
 
+            apply_fun_to_mesh(0, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_fun_c, g);
+
             switch (info.element_type) {
                 case TET10:
                     /* code */
@@ -595,36 +608,36 @@ int main(int argc, char* argv[]) {
 
                 case TET4:
 
-                    ret_resample_adjoint =                                //
-                            resample_field_TEST_adjoint_tet4(mpi_size,    //
-                                                             mpi_rank,    //
-                                                             &mesh,       //
-                                                             nlocal,      //
-                                                             stride,      //
-                                                             origin,      //
-                                                             delta,       //
-                                                             field,       //
-                                                             test_field,  //
-                                                             g,           //
-                                                             &info);      //
+                    // ret_resample_adjoint =                                //
+                    //         resample_field_TEST_adjoint_tet4(mpi_size,    //
+                    //                                          mpi_rank,    //
+                    //                                          &mesh,       //
+                    //                                          nlocal,      //
+                    //                                          stride,      //
+                    //                                          origin,      //
+                    //                                          delta,       //
+                    //                                          field,       //
+                    //                                          test_field,  //
+                    //                                          g,           //
+                    //                                          &info);      //
 
-                    // ret_resample_adjoint =                         //
-                    //         resample_field_adjoint_tet4(mpi_size,  //
-                    //                                     mpi_rank,  //
-                    //                                     &mesh,     //
-                    //                                     nlocal,    //
-                    //                                     stride,    //
-                    //                                     origin,    //
-                    //                                     delta,     //
-                    //                                     g,         //
-                    //                                     field,     //
-                    //                                     &info);    //
+                    ret_resample_adjoint =                         //
+                            resample_field_adjoint_tet4(mpi_size,  //
+                                                        mpi_rank,  //
+                                                        &mesh,     //
+                                                        nlocal,    //
+                                                        stride,    //
+                                                        origin,    //
+                                                        delta,     //
+                                                        g,         //
+                                                        field,     //
+                                                        &info);    //
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field.raw",
                                   MPI_FLOAT,
                                   3,
-                                  test_field,
+                                  field,
                                   nlocal,
                                   nglobal);
 
@@ -772,8 +785,8 @@ int main(int argc, char* argv[]) {
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    free(test_field);   /// DEBUG
-    test_field = NULL;  /// DEBUG
+    // free(test_field);   /// DEBUG
+    // test_field = NULL;  /// DEBUG
 
     const int return_value = MPI_Finalize();
     RETURN_FROM_FUNCTION(return_value);
