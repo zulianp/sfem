@@ -773,7 +773,7 @@ int main(int argc, char *argv[]) {
     std::string output_folder = "test_approxsdf";
     sfem::create_directory(output_folder.c_str());
 
-    ptrdiff_t nx = 1000;
+    ptrdiff_t nx = 100;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
     auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
