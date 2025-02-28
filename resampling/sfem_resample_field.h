@@ -352,7 +352,31 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                   const geom_t* const SFEM_RESTRICT    origin,          //
                                   const geom_t* const SFEM_RESTRICT    delta,           //
                                   const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                  real_t* const SFEM_RESTRICT          data);
+                                  real_t* const SFEM_RESTRICT          data);                    // Output
+
+typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
+
+/**
+ * @brief Apply a function to a mesh
+ *
+ * This function applies a given function to a mesh within the specified range of elements.
+ *
+ * @param start_element [in] The starting element index of the mesh to apply the function to.
+ * @param end_element [in] The ending element index of the mesh to apply the function to.
+ * @param nnodes [in] Number of nodes in the mesh.
+ * @param elems [in] Pointer to the array of element indices in the mesh.
+ * @param xyz [in] Pointer to the array of geometric coordinates of the nodes in the mesh.
+ * @param fun [in] The function to be applied to the mesh.
+ * @param weighted_field [out] Pointer to the output array where the weighted field will be stored.
+ */
+int                                                                  //
+apply_fun_to_mesh(const ptrdiff_t                    start_element,  // Mesh
+                  const ptrdiff_t                    end_element,    // Mesh
+                  const ptrdiff_t                    nnodes,         // Mesh
+                  const idx_t** const SFEM_RESTRICT  elems,          // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,            // Mesh
+                  const function_XYZ_t               fun,            // Function
+                  real_t* const SFEM_RESTRICT        weighted_field);       //   Output (weighted field)
 
 #ifdef __cplusplus
 }

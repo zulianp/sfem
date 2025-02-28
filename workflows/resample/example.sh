@@ -107,7 +107,10 @@ time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
 
-head -11 metadata_sdf.float32.yml > metadata_test_field.yml
-echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
-raw_to_xdmf.py test_field.raw
+if [[ $SFEM_ADJOINT -eq 1 ]]
+then
+    head -11 metadata_sdf.float32.yml > metadata_test_field.yml
+    echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
+    raw_to_xdmf.py test_field.raw
+fi
 
