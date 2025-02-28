@@ -1142,10 +1142,6 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
         }
 
         {
-            //// TODO In CPU must be called.
-            //// TODO In GPU should be calculated in the kernel calls in case of unified and Managed memory
-            //// TODO In GPU is calculated here in case of host memory and more than one MPI rank (at the moment)
-
             // exchange ghost nodes and add contribution
             if (mpi_size > 1) {
                 perform_exchange_operations((mesh_t*)mesh, mass_vector, g);

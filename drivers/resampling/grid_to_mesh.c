@@ -20,6 +20,96 @@
 #include "quadratures_rule.h"
 #include "tet10_resample_field.h"
 
+#define RED_TEXT "\x1b[31m"
+#define GREEN_TEXT "\x1b[32m"
+#define RESET_TEXT "\x1b[0m"
+
+/**
+ * @brief Get the option argument
+ * @note This function is used to get the argument and its unique option from the command line
+ *
+ * @param argc
+ * @param argv
+ * @param option
+ * @param arg
+ * @param arg_size
+ * @return int
+ */
+int                                      //
+get_option_argument(int         argc,    //
+                    char*       argv[],  //
+                    const char* option,  //
+                    char**      arg,     //
+                    size_t*     arg_size) {  //
+
+    // check if option start with "--"
+    if (strncmp(option, "--", 2) != 0) {
+        fprintf(stderr, RED_TEXT "Error: option must start with '--'\n" RESET_TEXT);
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 1; i < argc; i++) {
+        if (strncmp(argv[i], option, strlen(option)) == 0) {
+            if (i + 1 < argc) {
+                *arg      = argv[i + 1];
+                *arg_size = strlen(argv[i + 1]);
+                return 0;  // Success
+            } else {
+                *arg      = NULL;
+                *arg_size = 0;
+                return -1;  // Option found but no argument
+            }
+        }
+    }
+    *arg      = NULL;
+    *arg_size = 0;
+    return -2;  // Option not found
+}
+
+/**
+ * @brief Handle the option result object
+ *
+ * @param result
+ * @param option
+ * @param arg
+ * @param arg_size
+ * @param mandatory
+ */
+void  //
+handle_option_result(const int result, const char* option, const char* arg, const size_t arg_size, const int mandatory,
+                     const int print_result) {
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+
+    if (mpi_rank == 0) {
+        if (result == 0) {
+            if (print_result) printf("Option: %s: %s\n", option, arg);
+        } else if (result == -1) {
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
+            if (mandatory) {
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
+            if (mandatory) {
+                exit(EXIT_FAILURE);
+            }
+        }
+    } else if (result != 0 && mpi_rank == 0) {
+        if (result == -1) {
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s found but no argument provided\n\x1b[0m", option);
+            if (mandatory) {
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if (print_result) fprintf(stderr, "\x1b[31mOption: %s not found\n\x1b[0m", option);
+            if (mandatory) {
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
 void                                                                      //
 print_performance_metrics_cpu(sfem_resample_field_info* info,             //
                               FILE*                     output_file,      //
@@ -518,14 +608,6 @@ int main(int argc, char* argv[]) {
                                                              g,           //
                                                              &info);      //
 
-                    ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/test_field.raw",
-                                  MPI_FLOAT,
-                                  3,
-                                  test_field,
-                                  nlocal,
-                                  nglobal);
-
                     // ret_resample_adjoint =                         //
                     //         resample_field_adjoint_tet4(mpi_size,  //
                     //                                     mpi_rank,  //
@@ -537,6 +619,14 @@ int main(int argc, char* argv[]) {
                     //                                     g,         //
                     //                                     field,     //
                     //                                     &info);    //
+
+                    ndarray_write(MPI_COMM_WORLD,
+                                  "/home/sriva/git/sfem/workflows/resample/test_field.raw",
+                                  MPI_FLOAT,
+                                  3,
+                                  test_field,
+                                  nlocal,
+                                  nglobal);
 
                     break;
 
