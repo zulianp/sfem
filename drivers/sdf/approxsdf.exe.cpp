@@ -237,7 +237,7 @@ namespace sfem {
         ptrdiff_t ncells = 1;
         for (int d = 0; d < dim; d++) {
             geom_t extent = (max[d] - min[d]);
-            ret->n[d]     = extent / (2 * max_radius);
+            ret->n[d]     = extent /  max_radius;
             ret->delta[d] = extent / ret->n[d];
             ret->o[d]     = min[d];
 
@@ -664,7 +664,7 @@ int main(int argc, char *argv[]) {
     std::string output_folder = "test_approxsdf";
     sfem::create_directory(output_folder.c_str());
 
-    ptrdiff_t nx = 100;
+    ptrdiff_t nx = 2000;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
     auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
 
