@@ -20,7 +20,7 @@ else
 fi
 
 $CC   -mcmodel=large -Ofast -fno-math-errno -mcpu=apple-m1 -DNDEBUG -Xclang -fopenmp -L/opt/homebrew/lib/ -lomp 		\
-      -DSTREAM_ARRAY_SIZE=87200000 -DNTIMES=400  	\
+      -DSTREAM_ARRAY_SIZE=80000000 -DNTIMES=50  	\
       -o stream_openmp.exe stream.c
 
 
