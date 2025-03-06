@@ -275,7 +275,7 @@ int check_string_in_args(const int argc, const char* argv[], const char* target,
 
 real_t mesh_fun_a(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
 
-real_t mesh_fun_b(real_t x, real_t y, real_t z) { return 2.0 * (sin(3 * x) + sin(3 * y) + sin(3 * z)); }
+real_t mesh_fun_b(real_t x, real_t y, real_t z) { return 2.0 * (sin(3.0 * x) + cos(3.0 * y) + sin(3.0 * z)); }
 
 real_t mesh_fun_c(real_t x, real_t y, real_t z) { return 1.0; }
 
@@ -599,7 +599,7 @@ int main(int argc, char* argv[]) {
             //     g[i] = 1.0;
             // }
 
-            apply_fun_to_mesh(0, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_fun_c, g);
+            apply_fun_to_mesh(0, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_fun_b, g);
 
             switch (info.element_type) {
                 case TET10:

@@ -1210,7 +1210,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                 // g[i] /= mass_vector[i];
                 mass_vector[i] = g[i] / mass_vector[i];
                 // printf("mass_vector[%ld] = %g\n", i, mass_vector[i]);
-                // mass_vector[i] = g[i] ; // DEBUG - to be removed
+                mass_vector[i] = g[i] ; // DEBUG - to be removed
             }  // end for i < mesh.n_owned_nodes
         }
 

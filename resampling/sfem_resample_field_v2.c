@@ -171,6 +171,52 @@ tet4_measure_v2(
 }
 
 /**
+ * @brief Compute the barycenter (centroid) of a tetrahedral element.
+ *
+ * This function calculates the coordinates of the barycenter of a tetrahedron by taking
+ * the arithmetic mean of its four vertices' coordinates. The barycenter is the point where
+ * the four medians of the tetrahedron intersect, and represents the center of mass assuming
+ * uniform density.
+ *
+ * @param[in] px0 X-coordinate of vertex 0.
+ * @param[in] px1 X-coordinate of vertex 1.
+ * @param[in] px2 X-coordinate of vertex 2.
+ * @param[in] px3 X-coordinate of vertex 3.
+ * @param[in] py0 Y-coordinate of vertex 0.
+ * @param[in] py1 Y-coordinate of vertex 1.
+ * @param[in] py2 Y-coordinate of vertex 2.
+ * @param[in] py3 Y-coordinate of vertex 3.
+ * @param[in] pz0 Z-coordinate of vertex 0.
+ * @param[in] pz1 Z-coordinate of vertex 1.
+ * @param[in] pz2 Z-coordinate of vertex 2.
+ * @param[in] pz3 Z-coordinate of vertex 3.
+ * @param[out] bx Pointer to store the x-coordinate of the barycenter.
+ * @param[out] by Pointer to store the y-coordinate of the barycenter.
+ * @param[out] bz Pointer to store the z-coordinate of the barycenter.
+ */
+SFEM_INLINE static void                                  //
+tet4_barycenter_v2(const real_type                px0,   // X-coordinate
+                   const real_type                px1,   //
+                   const real_type                px2,   //
+                   const real_type                px3,   //
+                   const real_type                py0,   // Y-coordinate
+                   const real_type                py1,   //
+                   const real_type                py2,   //
+                   const real_type                py3,   //
+                   const real_type                pz0,   // Z-coordinate
+                   const real_type                pz1,   //
+                   const real_type                pz2,   //
+                   const real_type                pz3,   //
+                   real_type* const SFEM_RESTRICT bx,    // Output
+                   real_type* const SFEM_RESTRICT by,    //
+                   real_type* const SFEM_RESTRICT bz) {  //
+                                                         //
+    *bx = (px0 + px1 + px2 + px3) / 4.0;
+    *by = (py0 + py1 + py2 + py3) / 4.0;
+    *bz = (pz0 + pz1 + pz2 + pz3) / 4.0;
+}
+
+/**
  * @brief Evaluate the shape functions for an 8-node hexahedral element.
  *
  * Computes the value of the eight standard basis (hat) functions associated
@@ -626,6 +672,197 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 // tet4_resample_field_local_adjoint /////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+int                                                                                         //
+tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,            // Tetrahedron vertices X-coordinates
+                                        const real_type                      x1,            //
+                                        const real_type                      x2,            //
+                                        const real_type                      x3,            //
+                                        const real_type                      y0,            // Tetrahedron vertices Y-coordinates
+                                        const real_type                      y1,            //
+                                        const real_type                      y2,            //
+                                        const real_type                      y3,            //
+                                        const real_type                      z0,            // Tetrahedron vertices Z-coordinates
+                                        const real_type                      z1,            //
+                                        const real_type                      z2,            //
+                                        const real_type                      z3,            //
+                                        const real_type                      theta_volume,  // Volume of the tetrahedron
+                                        const real_type                      wf0,           // Weighted field at the vertices
+                                        const real_type                      wf1,           //
+                                        const real_type                      wf2,           //
+                                        const real_type                      wf3,           //
+                                        const real_type                      ox,            // Origin of the grid
+                                        const real_type                      oy,            //
+                                        const real_type                      oz,            //
+                                        const real_type                      dx,            // Spacing of the grid
+                                        const real_type                      dy,            //
+                                        const real_type                      dz,            //
+                                        const ptrdiff_t* const SFEM_RESTRICT stride,        // Stride
+                                        const ptrdiff_t* const SFEM_RESTRICT n,             // Size of the grid
+                                        real_type* const SFEM_RESTRICT       data) {              // Output
+
+    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+
+        real_type g_qx, g_qy, g_qz;
+
+        // Transform quadrature point to physical space
+        // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
+        // of the tetrahedral element
+        tet4_transform_v2(x0,               // x-coordinates of the vertices
+                          x1,               //
+                          x2,               //
+                          x3,               //
+                          y0,               // y-coordinates of the vertices
+                          y1,               //
+                          y2,               //
+                          y3,               //
+                          z0,               // z-coordinates of the vertices
+                          z1,               //
+                          z2,               //
+                          z3,               //
+                          tet4_qx[quad_i],  // Quadrature point
+                          tet4_qy[quad_i],  //
+                          tet4_qz[quad_i],  //
+                          &g_qx,            // Output coordinates
+                          &g_qy,            //
+                          &g_qz);           //
+
+#ifndef SFEM_RESAMPLE_GAP_DUAL
+        // Standard basis function
+        {
+            tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
+            tet4_f[1] = tet4_qx[q];
+            tet4_f[2] = tet4_qy[q];
+            tet4_f[2] = tet4_qz[q];
+        }
+#else
+
+        real_type tet4_f0, tet4_f1, tet4_f2, tet4_f3;
+        {
+            // DUAL basis function (Shape functions for tetrahedral elements)
+            // at the quadrature point
+            const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
+            const real_type f1 = tet4_qx[quad_i];
+            const real_type f2 = tet4_qy[quad_i];
+            const real_type f3 = tet4_qz[quad_i];
+
+            // Values of the shape functions at the quadrature point
+            // In the local coordinate system of the tetrahedral element
+            // For each vertex of the tetrahedral element
+            tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
+            tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
+            tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
+            tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+        }
+#endif
+
+        const real_type grid_x = (g_qx - ox) / dx;
+        const real_type grid_y = (g_qy - oy) / dy;
+        const real_type grid_z = (g_qz - oz) / dz;
+
+        const ptrdiff_t i = floor(grid_x);
+        const ptrdiff_t j = floor(grid_y);
+        const ptrdiff_t k = floor(grid_z);
+
+        // printf("i = %ld grid_x = %g\n", i, grid_x);
+        // printf("j = %ld grid_y = %g\n", j, grid_y);
+        // printf("k = %ld grid_z = %g\n", k, grid_z);
+
+        // If outside the domain of the grid (i.e., the grid is not large enough)
+        if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
+            fprintf(stderr,
+                    "WARNING: (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
+                    "%ld)!\n",
+                    g_qx,
+                    g_qy,
+                    g_qz,
+                    i,
+                    j,
+                    k,
+                    n[0],
+                    n[1],
+                    n[2]);
+            exit(1);
+        }
+
+        // Get the reminder [0, 1]
+        // The local coordinates of the quadrature point in the unit cube
+        real_type l_x = (grid_x - (double)i);
+        real_type l_y = (grid_y - (double)j);
+        real_type l_z = (grid_z - (double)k);
+
+        assert(l_x >= -1e-8);
+        assert(l_y >= -1e-8);
+        assert(l_z >= -1e-8);
+
+        assert(l_x <= 1 + 1e-8);
+        assert(l_y <= 1 + 1e-8);
+        assert(l_z <= 1 + 1e-8);
+
+        // Critical point
+        // Compute the shape functions of the hexahedral (cubic) element
+        // at the quadrature point
+
+        real_type hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
+
+        hex_aa_8_eval_fun_V(l_x,        // Local coordinates
+                            l_y,        //
+                            l_z,        //
+                            &hex8_f0,   // Output shape functions
+                            &hex8_f1,   //
+                            &hex8_f2,   //
+                            &hex8_f3,   //
+                            &hex8_f4,   //
+                            &hex8_f5,   //
+                            &hex8_f6,   //
+                            &hex8_f7);  //
+
+        // Indices of the vertices of the hexahedral element
+        ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7;
+        hex_aa_8_collect_coeffs_indices_V(stride,  // Stride
+                                          i,       // Indices of the element
+                                          j,       //
+                                          k,       //
+                                          &i0,     // Output indices
+                                          &i1,     //
+                                          &i2,     //
+                                          &i3,     //
+                                          &i4,     //
+                                          &i5,     //
+                                          &i6,     //
+                                          &i7);    //
+
+        // Integrate the values of the field at the vertices of the tetrahedral element
+        const real_type dV = theta_volume * tet4_qw[quad_i];
+        const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
+
+        const real_type d0 = It * hex8_f0;
+        const real_type d1 = It * hex8_f1;
+        const real_type d2 = It * hex8_f2;
+        const real_type d3 = It * hex8_f3;
+        const real_type d4 = It * hex8_f4;
+        const real_type d5 = It * hex8_f5;
+        const real_type d6 = It * hex8_f6;
+        const real_type d7 = It * hex8_f7;
+
+        // Update the data
+        data[i0] += d0;
+        data[i1] += d1;
+        data[i2] += d2;
+        data[i3] += d3;
+        data[i4] += d4;
+        data[i5] += d5;
+        data[i6] += d6;
+        data[i7] += d7;
+    }
+
+    return 0;
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_adjoint /////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 int                                                                                     //
 tet4_resample_field_local_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                   const ptrdiff_t                      end_element,     //
@@ -715,158 +952,41 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
         const real_type wf2 = weighted_field[ev[2]];
         const real_type wf3 = weighted_field[ev[3]];
 
-        /////////////////////////////////////////////
-        // loop over the quadrature points
-        for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+        const real_type sampled_volume = hexahedron_volume * (double)(TET_QUAD_NQP);
 
-            real_type g_qx, g_qy, g_qz;
+        tet4_resample_tetrahedron_local_adjoint(x0,            // Tetrahedron vertices X-coordinates
+                                                x1,            //
+                                                x2,            //
+                                                x3,            //
+                                                y0,            // Tetrahedron vertices Y-coordinates
+                                                y1,            //
+                                                y2,            //
+                                                y3,            //
+                                                z0,            // Tetrahedron vertices Z-coordinates
+                                                z1,            //
+                                                z2,            //
+                                                z3,            //
+                                                theta_volume,  // Volume of the tetrahedron
+                                                wf0,           // Weighted field at the vertices
+                                                wf1,           //
+                                                wf2,           //
+                                                wf3,           //
+                                                ox,            // Origin of the grid
+                                                oy,            //
+                                                oz,            //
+                                                dx,            // Spacing of the grid
+                                                dy,            //
+                                                dz,            //
+                                                stride,        // Stride
+                                                n,             // Size of the grid
+                                                data);         // Output
 
-            // Transform quadrature point to physical space
-            // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
-            // of the tetrahedral element
-            tet4_transform_v2(x0,               // x-coordinates of the vertices
-                              x1,               //
-                              x2,               //
-                              x3,               //
-                              y0,               // y-coordinates of the vertices
-                              y1,               //
-                              y2,               //
-                              y3,               //
-                              z0,               // z-coordinates of the vertices
-                              z1,               //
-                              z2,               //
-                              z3,               //
-                              tet4_qx[quad_i],  // Quadrature point
-                              tet4_qy[quad_i],  //
-                              tet4_qz[quad_i],  //
-                              &g_qx,            // Output coordinates
-                              &g_qy,            //
-                              &g_qz);           //
+        // if (sampled_volume < 8.0 * theta_volume) {
+        //     fprintf(stderr, "WARNING: sampled_volume < 8 * theta_volume: %g < %g\n", sampled_volume, 8.0 *
+        // theta_volume);
+        // }
 
-#ifndef SFEM_RESAMPLE_GAP_DUAL
-            // Standard basis function
-            {
-                tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-                tet4_f[1] = tet4_qx[q];
-                tet4_f[2] = tet4_qy[q];
-                tet4_f[2] = tet4_qz[q];
-            }
-#else
-            {
-                // DUAL basis function (Shape functions for tetrahedral elements)
-                // at the quadrature point
-                const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
-                const real_type f1 = tet4_qx[quad_i];
-                const real_type f2 = tet4_qy[quad_i];
-                const real_type f3 = tet4_qz[quad_i];
-
-                // Values of the shape functions at the quadrature point
-                // In the local coordinate system of the tetrahedral element
-                // For each vertex of the tetrahedral element
-                tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-                tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-                tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-                tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
-            }
-#endif
-
-            const real_type grid_x = (g_qx - ox) / dx;
-            const real_type grid_y = (g_qy - oy) / dy;
-            const real_type grid_z = (g_qz - oz) / dz;
-
-            const ptrdiff_t i = floor(grid_x);
-            const ptrdiff_t j = floor(grid_y);
-            const ptrdiff_t k = floor(grid_z);
-
-            // printf("i = %ld grid_x = %g\n", i, grid_x);
-            // printf("j = %ld grid_y = %g\n", j, grid_y);
-            // printf("k = %ld grid_z = %g\n", k, grid_z);
-
-            // If outside the domain of the grid (i.e., the grid is not large enough)
-            if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                fprintf(stderr,
-                        "WARNING: (%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                        "%ld)!\n",
-                        g_qx,
-                        g_qy,
-                        g_qz,
-                        i,
-                        j,
-                        k,
-                        n[0],
-                        n[1],
-                        n[2]);
-                exit(1);
-            }
-
-            // Get the reminder [0, 1]
-            // The local coordinates of the quadrature point in the unit cube
-            real_type l_x = (grid_x - (double)i);
-            real_type l_y = (grid_y - (double)j);
-            real_type l_z = (grid_z - (double)k);
-
-            assert(l_x >= -1e-8);
-            assert(l_y >= -1e-8);
-            assert(l_z >= -1e-8);
-
-            assert(l_x <= 1 + 1e-8);
-            assert(l_y <= 1 + 1e-8);
-            assert(l_z <= 1 + 1e-8);
-
-            // Critical point
-            // Compute the shape functions of the hexahedral (cubic) element
-            // at the quadrature point
-            hex_aa_8_eval_fun_V(l_x,        // Local coordinates
-                                l_y,        //
-                                l_z,        //
-                                &hex8_f0,   // Output shape functions
-                                &hex8_f1,   //
-                                &hex8_f2,   //
-                                &hex8_f3,   //
-                                &hex8_f4,   //
-                                &hex8_f5,   //
-                                &hex8_f6,   //
-                                &hex8_f7);  //
-
-            // Indices of the vertices of the hexahedral element
-            hex_aa_8_collect_coeffs_indices_V(stride,  // Stride
-                                              i,       // Indices of the element
-                                              j,       //
-                                              k,       //
-                                              &i0,     // Output indices
-                                              &i1,     //
-                                              &i2,     //
-                                              &i3,     //
-                                              &i4,     //
-                                              &i5,     //
-                                              &i6,     //
-                                              &i7);    //
-
-            // Integrate the values of the field at the vertices of the tetrahedral element
-            const real_type dV = theta_volume * tet4_qw[quad_i];
-            const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
-
-            const real_type d0 = It * hex8_f0;
-            const real_type d1 = It * hex8_f1;
-            const real_type d2 = It * hex8_f2;
-            const real_type d3 = It * hex8_f3;
-            const real_type d4 = It * hex8_f4;
-            const real_type d5 = It * hex8_f5;
-            const real_type d6 = It * hex8_f6;
-            const real_type d7 = It * hex8_f7;
-
-            // Update the data
-            data[i0] += d0;
-            data[i1] += d1;
-            data[i2] += d2;
-            data[i3] += d3;
-            data[i4] += d4;
-            data[i5] += d5;
-            data[i6] += d6;
-            data[i7] += d7;
-
-        }  // end for quad_i over quadrature points
-    }      // end for i over elements
+    }  // end for i over elements
 
     return ret;
 }  // end tet4_resample_field_local_adjoint
