@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <limits.h>
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
@@ -389,13 +390,15 @@ int main(int argc, char* argv[]) {
     }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t*   field = NULL;
-    ptrdiff_t nlocal[3];
+    real_t*       field     = NULL;
+    unsigned int* field_cnt = NULL;
+    ptrdiff_t     nlocal[3];
 
     int SFEM_READ_FP32 = 1;
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
 
     printf("SFEM_READ_FP32 = %d, %s:%d\n", SFEM_READ_FP32, __FILE__, __LINE__);
+    ptrdiff_t n_zyx = 0;
 
     {
         double ndarray_read_tick = MPI_Wtime();
@@ -430,8 +433,9 @@ int main(int argc, char* argv[]) {
             // double max_temp = temp[0];
             // double min_temp = temp[0];
 
-            ptrdiff_t n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
-            field           = malloc(n_zyx * sizeof(real_t));
+            n_zyx     = nlocal[0] * nlocal[1] * nlocal[2];
+            field     = malloc(n_zyx * sizeof(real_t));
+            field_cnt = calloc(n_zyx, sizeof(unsigned int));
 
             // if (field == NULL) {
             //     fprintf(stderr, "Error: malloc failed\n");
@@ -621,17 +625,30 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    ret_resample_adjoint =                         //
-                            resample_field_adjoint_tet4(mpi_size,  //
-                                                        mpi_rank,  //
-                                                        &mesh,     //
-                                                        nlocal,    //
-                                                        stride,    //
-                                                        origin,    //
-                                                        delta,     //
-                                                        g,         //
-                                                        field,     //
-                                                        &info);    //
+                    ret_resample_adjoint =                          //
+                            resample_field_adjoint_tet4(mpi_size,   //
+                                                        mpi_rank,   //
+                                                        &mesh,      //
+                                                        nlocal,     //
+                                                        stride,     //
+                                                        origin,     //
+                                                        delta,      //
+                                                        g,          //
+                                                        field,      //
+                                                        field_cnt,  //
+                                                        &info);     //
+
+                    unsigned int max_field_cnt          = 0;
+                    unsigned int min_non_zero_field_cnt = UINT_MAX;
+                    for (ptrdiff_t i = 0; i < n_zyx; i++) {
+                        max_field_cnt = fmax(max_field_cnt, field_cnt[i]);
+                        if (field_cnt[i] != 0) {
+                            min_non_zero_field_cnt = fmin(min_non_zero_field_cnt, field_cnt[i]);
+                        }
+                    }
+
+                    printf("max_field_cnt = %u\n", max_field_cnt);
+                    printf("min_non_zero_field_cnt = %u\n", min_non_zero_field_cnt);
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field.raw",

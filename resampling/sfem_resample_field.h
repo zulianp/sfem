@@ -4,6 +4,7 @@
 #include <mpi.h>
 #include <stddef.h>
 
+#include "bit_array.h"
 #include "sfem_base.h"
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
@@ -157,6 +158,49 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
                          sfem_resample_field_info*            info);                //
 
 /**
+ * @brief Determines which points in a structured grid are inside a tetrahedral mesh.
+ *
+ * This function creates a binary mask (bit array) indicating which points in a structured grid
+ * are located inside a tetrahedral (TET4) mesh. The determination is done in parallel using MPI,
+ * with the computational load distributed across multiple processes.
+ *
+ * @param[in] mpi_size  The total number of MPI processes.
+ * @param[in] mpi_rank  The rank of the current MPI process (0 to mpi_size - 1).
+ * @param[in] mesh      A pointer to the mesh_t struct, containing the tetrahedral mesh data.
+ * @param[in] n         Number of grid points in each dimension of the structured grid (nx, ny, nz).
+ * @param[in] stride    Stride values for the structured grid, defining memory offsets
+ *                      between grid points in each dimension.
+ * @param[in] origin    Origin of the structured grid (coordinates of the grid's corner).
+ * @param[in] delta     Grid spacing (dx, dy, dz) in each dimension of the structured grid.
+ * @param[out] bit_array Output bit array where each bit indicates whether the corresponding grid point
+ *                      is inside the mesh (1) or outside the mesh (0).
+ * @param[in,out] info  A pointer to the sfem_resample_field_info struct, containing information
+ *                      about the process configuration (e.g., use of accelerators).
+ *
+ * @details
+ * The function distributes the structured grid across MPI processes. Each process determines
+ * whether its assigned grid points are inside or outside the tetrahedral mesh. This information
+ * is encoded in the bit_array, where a set bit (1) indicates that the corresponding grid point
+ * is inside the mesh, and a cleared bit (0) indicates that it's outside.
+ *
+ * This inside/outside determination is useful for subsequent operations that need to know which
+ * grid points should be processed (e.g., for level set computations, domain masking, or
+ * selective field resampling).
+ *
+ * @return 0 if the operation is successful.
+ */
+int                                                           //
+inn_out_tet4(const int                            mpi_size,   // MPI size
+             const int                            mpi_rank,   // MPI rank
+             const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
+             const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
+             const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
+             const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
+             const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
+             BitArray                             bit_array,  // Output
+             sfem_resample_field_info*            info);                 //
+
+/**
  * @brief Resamples a field from a tetrahedral mesh to a structured grid (adjoint version).
  *
  * This function performs an adjoint (reverse) resampling operation using MPI, transferring a
@@ -192,6 +236,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
+                            unsigned int*                        data_cnt,  // SDF: data count (output)
                             sfem_resample_field_info*            info);                // Info struct with options and flags
 
 /// @brief  DEBUG code for testing the adjoint resampling operation
@@ -354,6 +399,51 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                   const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                                   real_t* const SFEM_RESTRICT          data);                    // Output
 
+/**
+ * @brief Count how many tetrahedral elements contribute to each grid point during adjoint resampling.
+ *
+ * This function traverses tetrahedral elements and counts how many times each point in the
+ * structured grid is updated during the adjoint resampling process. This information can be
+ * used for proper normalization of accumulated field values.
+ *
+ * @param[in] start_element Index of the first tetrahedral element to process.
+ * @param[in] end_element   Index of the last tetrahedral element to process.
+ * @param[in] nnodes        Total number of nodes in the tetrahedral mesh.
+ * @param[in] elems         Array of element connectivity: `elems[v][element_i]` is the global
+ *                          index of the v-th vertex of the element_i-th tetrahedron.
+ * @param[in] xyz           Array of vertex coordinates: `xyz[d][i]` is the d-th coordinate
+ *                          (d=0 for x, d=1 for y, d=2 for z) of the i-th vertex.
+ * @param[in] n             Number of grid points in each dimension of the structured grid (nx, ny, nz).
+ * @param[in] stride        Stride values for the structured grid, defining memory offsets
+ *                          between grid points in each dimension.
+ * @param[in] origin        Origin of the structured grid (coordinates of the grid's corner).
+ * @param[in] delta         Grid spacing (dx, dy, dz) in each dimension of the structured grid.
+ * @param[in] weighted_field Input field defined on the tetrahedral mesh (used only for quadrature logic).
+ * @param[out] data_cnt     Output array that counts how many times each grid point is updated
+ *                          during the adjoint resampling operation.
+ *
+ * @details
+ * This function mimics the traversal pattern of the adjoint resampling operation but instead
+ * of accumulating field values, it increments a counter for each grid point that would be
+ * updated. The resulting count map can be used to normalize field values in cases where
+ * multiple tetrahedral elements contribute to the same grid point.
+ *
+ * @return 0 if the operation is successful.
+ */
+int                                                                         //
+tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                      const ptrdiff_t                      end_element,     //
+                      const ptrdiff_t                      nnodes,          //
+                      const idx_t** const SFEM_RESTRICT    elems,           //
+                      const geom_t** const SFEM_RESTRICT   xyz,             //
+                      const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                      const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                      const geom_t* const SFEM_RESTRICT    origin,          //
+                      const geom_t* const SFEM_RESTRICT    delta,           //
+                      const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                      unsigned int* const SFEM_RESTRICT    data_cnt);          // Output
+
+/** @brief Function pointer type for a function of three variables. */
 typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
 
 /**

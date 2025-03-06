@@ -16,7 +16,7 @@ print(f'sdf_test.py: Writing field to {output_path}')
 
 sdf_t = np.float32
 
-D = 300
+D = 900
 dims = (D, D, D)
 
 print(

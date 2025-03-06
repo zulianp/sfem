@@ -897,15 +897,6 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
     printf("============================================================\n");
 #endif
 
-    // shape functions of the hexahedral element
-    real_type hex8_f0 = 0.0, hex8_f1 = 0.0, hex8_f2 = 0.0, hex8_f3 = 0.0,  //
-            hex8_f4 = 0.0, hex8_f5 = 0.0, hex8_f6 = 0.0, hex8_f7 = 0.0;
-
-    ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7;
-
-    // real_type tet4_f[4];
-    real_type tet4_f0 = 0.0, tet4_f1 = 0.0, tet4_f2 = 0.0, tet4_f3 = 0.0;
-
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // Vertices coordinates of the tetrahedron
 
@@ -988,5 +979,204 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
 
     }  // end for i over elements
 
-    return ret;
+    RETURN_FROM_FUNCTION(ret);
 }  // end tet4_resample_field_local_adjoint
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_adjoint /////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                          //
+tet4_update_cnt_local_adjoint(const real_type                      x0,       // Tetrahedron vertices X-coordinates
+                              const real_type                      x1,       //
+                              const real_type                      x2,       //
+                              const real_type                      x3,       //
+                              const real_type                      y0,       // Tetrahedron vertices Y-coordinates
+                              const real_type                      y1,       //
+                              const real_type                      y2,       //
+                              const real_type                      y3,       //
+                              const real_type                      z0,       // Tetrahedron vertices Z-coordinates
+                              const real_type                      z1,       //
+                              const real_type                      z2,       //
+                              const real_type                      z3,       //
+                              const real_type                      ox,       // Origin of the grid
+                              const real_type                      oy,       //
+                              const real_type                      oz,       //
+                              const real_type                      dx,       // Spacing of the grid
+                              const real_type                      dy,       //
+                              const real_type                      dz,       //
+                              const ptrdiff_t* const SFEM_RESTRICT stride,   // Stride
+                              const ptrdiff_t* const SFEM_RESTRICT n,        // Size of the grid
+                              unsigned int* const SFEM_RESTRICT    data_cnt) {  // Output
+
+    // Volume of the tetrahedron
+    const real_type theta_volume = tet4_measure_v2(x0,
+                                                   x1,
+                                                   x2,
+                                                   x3,
+                                                   //
+                                                   y0,
+                                                   y1,
+                                                   y2,
+                                                   y3,
+                                                   //
+                                                   z0,
+                                                   z1,
+                                                   z2,
+                                                   z3);
+
+    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+
+        real_type g_qx, g_qy, g_qz;
+
+        // Transform quadrature point to physical space
+        // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
+        // of the tetrahedral element
+        tet4_transform_v2(x0,               // x-coordinates of the vertices
+                          x1,               //
+                          x2,               //
+                          x3,               //
+                          y0,               // y-coordinates of the vertices
+                          y1,               //
+                          y2,               //
+                          y3,               //
+                          z0,               // z-coordinates of the vertices
+                          z1,               //
+                          z2,               //
+                          z3,               //
+                          tet4_qx[quad_i],  // Quadrature point
+                          tet4_qy[quad_i],  //
+                          tet4_qz[quad_i],  //
+                          &g_qx,            // Output coordinates
+                          &g_qy,            //
+                          &g_qz);           //
+
+        const real_type grid_x = (g_qx - ox) / dx;
+        const real_type grid_y = (g_qy - oy) / dy;
+        const real_type grid_z = (g_qz - oz) / dz;
+
+        const ptrdiff_t i = floor(grid_x);
+        const ptrdiff_t j = floor(grid_y);
+        const ptrdiff_t k = floor(grid_z);
+
+        // Indices of the vertices of the hexahedral element
+        ptrdiff_t i0, i1, i2, i3, i4, i5, i6, i7;
+        hex_aa_8_collect_coeffs_indices_V(stride,  // Stride
+                                          i,       // Indices of the element
+                                          j,       //
+                                          k,       //
+                                          &i0,     // Output indices
+                                          &i1,     //
+                                          &i2,     //
+                                          &i3,     //
+                                          &i4,     //
+                                          &i5,     //
+                                          &i6,     //
+                                          &i7);    //
+
+        // Update the data cnt
+        data_cnt[i0] += 1;
+        data_cnt[i1] += 1;
+        data_cnt[i2] += 1;
+        data_cnt[i3] += 1;
+        data_cnt[i4] += 1;
+        data_cnt[i5] += 1;
+        data_cnt[i6] += 1;
+        data_cnt[i7] += 1;
+    }
+
+    return 0;
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_in_out_mesh_adjoint //////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                         //
+tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                      const ptrdiff_t                      end_element,     //
+                      const ptrdiff_t                      nnodes,          //
+                      const idx_t** const SFEM_RESTRICT    elems,           //
+                      const geom_t** const SFEM_RESTRICT   xyz,             //
+                      const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                      const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                      const geom_t* const SFEM_RESTRICT    origin,          //
+                      const geom_t* const SFEM_RESTRICT    delta,           //
+                      const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                      unsigned int* const SFEM_RESTRICT    data_cnt) {         // Output
+                                                                            //
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_type ox = (real_type)origin[0];
+    const real_type oy = (real_type)origin[1];
+    const real_type oz = (real_type)origin[2];
+
+    const real_type dx = (real_type)delta[0];
+    const real_type dy = (real_type)delta[1];
+    const real_type dz = (real_type)delta[2];
+
+    const real_type hexahedron_volume = dx * dy * dz;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("Start: tet4_resample_field_local_adjoint  v2: %s:%d \n", __FILE__, __LINE__);
+    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // Vertices coordinates of the tetrahedron
+
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // Read the coordinates of the vertices of the tetrahedron
+        const real_type x0 = xyz[0][ev[0]];
+        const real_type x1 = xyz[0][ev[1]];
+        const real_type x2 = xyz[0][ev[2]];
+        const real_type x3 = xyz[0][ev[3]];
+
+        const real_type y0 = xyz[1][ev[0]];
+        const real_type y1 = xyz[1][ev[1]];
+        const real_type y2 = xyz[1][ev[2]];
+        const real_type y3 = xyz[1][ev[3]];
+
+        const real_type z0 = xyz[2][ev[0]];
+        const real_type z1 = xyz[2][ev[1]];
+        const real_type z2 = xyz[2][ev[2]];
+        const real_type z3 = xyz[2][ev[3]];
+
+        // Update the data cnt
+        ret = tet4_update_cnt_local_adjoint(x0,         // Tetrahedron vertices X-coordinates
+                                            x1,         //
+                                            x2,         //
+                                            x3,         //
+                                            y0,         // Tetrahedron vertices Y-coordinates
+                                            y1,         //
+                                            y2,         //
+                                            y3,         //
+                                            z0,         // Tetrahedron vertices Z-coordinates
+                                            z1,         //
+                                            z2,         //
+                                            z3,         //
+                                            ox,         // Origin of the grid
+                                            oy,         //
+                                            oz,         //
+                                            dx,         // Spacing of the grid
+                                            dy,         //
+                                            dz,         //
+                                            stride,     // Stride
+                                            n,          // Size of the grid
+                                            data_cnt);  // Output
+
+    }  // end for i over elements
+
+    RETURN_FROM_FUNCTION(ret);
+}

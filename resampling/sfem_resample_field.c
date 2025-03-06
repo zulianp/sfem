@@ -1175,6 +1175,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
+                            unsigned int*                        data_cnt,  // SDF: data count (output)
                             sfem_resample_field_info*            info) {               // Info struct with options and flags
     //
     PRINT_CURRENT_FUNCTION;
@@ -1210,8 +1211,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                 // g[i] /= mass_vector[i];
                 mass_vector[i] = g[i] / mass_vector[i];
                 // printf("mass_vector[%ld] = %g\n", i, mass_vector[i]);
-                mass_vector[i] = g[i] ; // DEBUG - to be removed
-            }  // end for i < mesh.n_owned_nodes
+                mass_vector[i] = g[i];  // DEBUG - to be removed
+            }                           // end for i < mesh.n_owned_nodes
         }
 
     }  // end Apply the mass matrix to the adjoint field
@@ -1227,6 +1228,18 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                             delta,                          //
                                             mass_vector,                    //
                                             data);                          //
+
+    ret = tet4_cnt_mesh_adjoint(0,                              //
+                                mesh->nelements,                //
+                                mesh->nnodes,                   //
+                                (const idx_t**)mesh->elements,  //
+                                (const geom_t**)mesh->points,   //
+                                n,                              //
+                                stride,                         //
+                                origin,                         //
+                                delta,                          //
+                                mass_vector,                    //
+                                data_cnt);                      //
 
     free(mass_vector);
     mass_vector = NULL;
