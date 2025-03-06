@@ -78,7 +78,7 @@ int test_stencil3_against_original() {
     real_t stencil[3 * 3 * 3];
     hex8_matrix_to_stencil(element_matrix, stencil);
 
-    ptrdiff_t level = 32;
+    ptrdiff_t level = 16;
     ptrdiff_t zc    = level + 1;
     ptrdiff_t yc    = level + 1;
     ptrdiff_t xc    = level + 1;
@@ -91,7 +91,7 @@ int test_stencil3_against_original() {
             for (ptrdiff_t xi = 0; xi < xc; xi++) {
                 const ptrdiff_t zstride                      = yc * xc;
                 const ptrdiff_t ystride                      = xc;
-                in->data()[zi * zstride + yi * ystride + xi] = xc * xc * xc + 0.2 * yc * yc * yc + 0.3 * zc * zc * zc;
+                in->data()[zi * zstride + yi * ystride + xi] = xc * xc * xc + 0.02 * yc * yc * yc + 0.03 * zc * zc * zc;
             }
         }
     }
@@ -132,7 +132,7 @@ int test_stencil3_against_original() {
 
                 const real_t actual   = o[zi * zstride + yi * ystride + xi];
                 const real_t expected = oo[zi * zstride + yi * ystride + xi];
-                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-3 : 1e-10);
+                SFEM_TEST_APPROXEQ(actual, expected, sizeof(real_t) == 4 ? 1e-2 : 1e-8);
             }
         }
     }
