@@ -46,6 +46,8 @@ TC8   3958 TFLOPS 3341 TFLOPS (Int and float)
 Mem     80 GB 		94 GB
 GPU Mem Bandwidth 3.35TB/s 3.9TB/s
 
+https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/
+https://developer.nvidia.com/blog/accelerating-inference-with-sparsity-using-ampere-and-tensorrt/
 
 # H200
 
