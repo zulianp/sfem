@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <exception>
+#include <math.h>
 
 #include "sfem_Tracer.hpp"
 #include "sfem_base.h"
