@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <limits.h>
 #include <math.h>
 #include <mpi.h>
 #include <stddef.h>
@@ -6,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <limits.h>
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
@@ -603,6 +603,7 @@ int main(int argc, char* argv[]) {
             //     g[i] = 1.0;
             // }
 
+            // TESTING: apply mesh_fun_b to g
             apply_fun_to_mesh(0, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_fun_b, g);
 
             switch (info.element_type) {
@@ -638,17 +639,40 @@ int main(int argc, char* argv[]) {
                                                         field_cnt,  //
                                                         &info);     //
 
-                    unsigned int max_field_cnt          = 0;
+                    BitArray bit_array = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
+
+                    ret_resample_adjoint = in_out_field_mesh_tet4(mpi_size,    //
+                                                                  mpi_rank,    //
+                                                                  &mesh,       //
+                                                                  nlocal,      //
+                                                                  stride,      //
+                                                                  origin,      //
+                                                                  delta,       //
+                                                                  &bit_array,  //
+                                                                  &info);      //
+
+                    unsigned int max_field_cnt = 0;
+                    unsigned int max_in_out    = 0;
+
                     unsigned int min_non_zero_field_cnt = UINT_MAX;
+                    unsigned int min_non_zero_in_out    = 0;
+
                     for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                        max_field_cnt = fmax(max_field_cnt, field_cnt[i]);
-                        if (field_cnt[i] != 0) {
-                            min_non_zero_field_cnt = fmin(min_non_zero_field_cnt, field_cnt[i]);
+                        if (field_cnt[i] > max_field_cnt) {
+                            max_field_cnt = field_cnt[i];
+                            max_in_out    = get_bit(bit_array, i);
+                        }
+
+                        if (field_cnt[i] > 0 && field_cnt[i] < min_non_zero_field_cnt) {
+                            min_non_zero_field_cnt = field_cnt[i];
+                            min_non_zero_in_out    = get_bit(bit_array, i);
                         }
                     }
 
-                    printf("max_field_cnt = %u\n", max_field_cnt);
-                    printf("min_non_zero_field_cnt = %u\n", min_non_zero_field_cnt);
+                    printf("\n");
+                    printf("max_field_cnt = %u, in_out = %u\n", max_field_cnt, max_in_out);
+                    printf("min_non_zero_field_cnt = %u, in_out = %u\n", min_non_zero_field_cnt, min_non_zero_in_out);
+                    printf("\n");
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field.raw",

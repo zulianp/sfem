@@ -532,3 +532,209 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
 
     RETURN_FROM_FUNCTION(ret);
 }
+
+// Function to determine if a point is on the same side of the plane as the opposite vertex
+int                        //
+is_same_side(double px,    // Point X-coordinates
+             double py,    //       Y-coordinates
+             double pz,    //       Z-coordinates
+             double ax,    // Tet vertex a:  X-coordinates
+             double ay,    //                Y-coordinates
+             double az,    //                Z-coordinates
+             double bx,    // Tet vertex b:  X-coordinates
+             double by,    //                Y-coordinates
+             double bz,    //                Z-coordinates
+             double cx,    // Tet vertex c:  X-coordinates
+             double cy,    //                Y-coordinates
+             double cz,    //                Z-coordinates
+             double dx,    // Tet vertex d:  X-coordinates
+             double dy,    //                Y-coordinates
+             double dz) {  //                Z-coordinates
+
+    // Compute vectors for the plane ABC
+    double abx = bx - ax;
+    double aby = by - ay;
+    double abz = bz - az;
+    double acx = cx - ax;
+    double acy = cy - ay;
+    double acz = cz - az;
+
+    // Calculate cross product (normal vector of the plane)
+    double nx = aby * acz - abz * acy;
+    double ny = abz * acx - abx * acz;
+    double nz = abx * acy - aby * acx;
+
+    // Vector from A to D (opposite vertex)
+    double adx = dx - ax;
+    double ady = dy - ay;
+    double adz = dz - az;
+
+    // Dot product of normal with AD (direction from plane to D)
+    double dotD = nx * adx + ny * ady + nz * adz;
+
+    // Vector from A to P
+    double apx = px - ax;
+    double apy = py - ay;
+    double apz = pz - az;
+
+    // Dot product of normal with AP (direction from plane to P)
+    double dotP = nx * apx + ny * apy + nz * apz;
+
+    // Check if both dot products have the same sign (or zero)
+    return (dotD * dotP >= 0.0);
+}
+
+// Function to check if a point is inside or on the boundary of a tetrahedron
+int                                        //
+is_point_inside_tetrahedron(double px,     //
+                            double py,     //
+                            double pz,     //
+                            double v1x,    //
+                            double v1y,    //
+                            double v1z,    //
+                            double v2x,    //
+                            double v2y,    //
+                            double v2z,    //
+                            double v3x,    //
+                            double v3y,    //
+                            double v3z,    //
+                            double v4x,    //
+                            double v4y,    //
+                            double v4z) {  //
+
+    // Check against all four faces
+    if (!is_same_side(px, py, pz, v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z, v4x, v4y, v4z)) return 0;
+    if (!is_same_side(px, py, pz, v1x, v1y, v1z, v2x, v2y, v2z, v4x, v4y, v4z, v3x, v3y, v3z)) return 0;
+    if (!is_same_side(px, py, pz, v1x, v1y, v1z, v3x, v3y, v3z, v4x, v4y, v4z, v2x, v2y, v2z)) return 0;
+    if (!is_same_side(px, py, pz, v2x, v2y, v2z, v3x, v3y, v3z, v4x, v4y, v4z, v1x, v1y, v1z)) return 0;
+
+    return 1;
+}
+
+int                                                                         //
+tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // Mesh
+                       const ptrdiff_t                      end_element,    //
+                       const ptrdiff_t                      nnodes,         //
+                       const idx_t** const SFEM_RESTRICT    elems,          //
+                       const geom_t** const SFEM_RESTRICT   xyz,            //
+                       const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                       const ptrdiff_t* const SFEM_RESTRICT stride,         //
+                       const geom_t* const SFEM_RESTRICT    origin,         //
+                       const geom_t* const SFEM_RESTRICT    delta,          //
+                       BitArray*                            bit_array) {                               // Output
+
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_type ox = (real_type)origin[0];
+    const real_type oy = (real_type)origin[1];
+    const real_type oz = (real_type)origin[2];
+
+    const real_type dx = (real_type)delta[0];
+    const real_type dy = (real_type)delta[1];
+    const real_type dz = (real_type)delta[2];
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        //
+        const real_type x0 = xyz[0][ev[0]];
+        const real_type x1 = xyz[0][ev[1]];
+        const real_type x2 = xyz[0][ev[2]];
+        const real_type x3 = xyz[0][ev[3]];
+
+        const real_type y0 = xyz[1][ev[0]];
+        const real_type y1 = xyz[1][ev[1]];
+        const real_type y2 = xyz[1][ev[2]];
+        const real_type y3 = xyz[1][ev[3]];
+
+        const real_type z0 = xyz[2][ev[0]];
+        const real_type z1 = xyz[2][ev[1]];
+        const real_type z2 = xyz[2][ev[2]];
+        const real_type z3 = xyz[2][ev[3]];
+
+        // Define the bounding box of the tetrahedron
+        const real_type xb_min = fmin(fmin(x0, x1), fmin(x2, x3));
+        const real_type xb_max = fmax(fmax(x0, x1), fmax(x2, x3));
+
+        const real_type yb_min = fmin(fmin(y0, y1), fmin(y2, y3));
+        const real_type yb_max = fmax(fmax(y0, y1), fmax(y2, y3));
+
+        const real_type zb_min = fmin(fmin(z0, z1), fmin(z2, z3));
+        const real_type zb_max = fmax(fmax(z0, z1), fmax(z2, z3));
+
+        const real_type grid_x_min = (xb_min - ox) / dx;
+        const real_type grid_y_min = (yb_min - oy) / dy;
+        const real_type grid_z_min = (zb_min - oz) / dz;
+
+        const ptrdiff_t i_min = floor(grid_x_min);
+        const ptrdiff_t j_min = floor(grid_y_min);
+        const ptrdiff_t k_min = floor(grid_z_min);
+
+        const real_type grid_x_max = (xb_max - ox) / dx;
+        const real_type grid_y_max = (yb_max - oy) / dy;
+        const real_type grid_z_max = (zb_max - oz) / dz;
+
+        const ptrdiff_t i_max = floor(grid_x_max);
+        const ptrdiff_t j_max = floor(grid_y_max);
+        const ptrdiff_t k_max = floor(grid_z_max);
+
+        for (ptrdiff_t i = i_min; i <= i_max; i++) {
+            for (ptrdiff_t j = j_min; j <= j_max; j++) {
+                for (ptrdiff_t k = k_min; k <= k_max; k++) {
+                    real_type x = ox + i * dx;
+                    real_type y = oy + j * dy;
+                    real_type z = oz + k * dz;
+
+                    // Check if the point is inside the tetrahedron
+                    if (is_point_inside_tetrahedron(x, y, z, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3)) {
+                        size_t index = i * stride[0] + j * stride[1] + k * stride[2];
+                        set_bit(bit_array, index);
+                    }  // end if
+
+                }  // end for k
+            }      // end for j
+        }          // end for i
+
+        //
+
+    }  // end for i over elements
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+int                                                                     //
+in_out_field_mesh_tet4(const int                            mpi_size,   // MPI size
+                       const int                            mpi_rank,   // MPI rank
+                       const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
+                       const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
+                       const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
+                       const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
+                       const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
+                       BitArray*                            bit_array,  // Output
+                       sfem_resample_field_info*            info) {                // info
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    // set to zero the bit array
+    to_zero(bit_array);
+
+    tet4_field_in_out_mesh(0,                // Mesh
+                           mesh->nelements,  //
+                           mesh->nnodes,     //
+                           mesh->elements,   //
+                           mesh->points,     //
+                           n,                // SDF
+                           stride,           //
+                           origin,           //
+                           delta,            //
+                           bit_array);       // Output
+
+    RETURN_FROM_FUNCTION(ret);
+}
