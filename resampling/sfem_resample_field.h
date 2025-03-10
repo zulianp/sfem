@@ -265,6 +265,49 @@ resample_field_TEST_adjoint_tet4(const int                            mpi_size, 
                                  real_t* const SFEM_RESTRICT          g,         // Weighted field (output)
                                  sfem_resample_field_info*            info);
 
+/**
+ * @brief Determines which points in a structured grid are inside a tetrahedral mesh using field values.
+ *
+ * This function creates a binary mask (bit array) indicating which points in a structured grid
+ * are located inside a tetrahedral (TET4) mesh, potentially using field values to assist in the
+ * determination. The operation is performed in parallel using MPI.
+ *
+ * @param[in] mpi_size  The total number of MPI processes.
+ * @param[in] mpi_rank  The rank of the current MPI process (0 to mpi_size - 1).
+ * @param[in] mesh      A pointer to the mesh_t struct, containing the tetrahedral mesh data.
+ * @param[in] n         Number of grid points in each dimension of the structured grid (nx, ny, nz).
+ * @param[in] stride    Stride values for the structured grid, defining memory offsets
+ *                      between grid points in each dimension.
+ * @param[in] origin    Origin of the structured grid (coordinates of the grid's corner).
+ * @param[in] delta     Grid spacing (dx, dy, dz) in each dimension of the structured grid.
+ * @param[out] bit_array Pointer to output bit array where each bit indicates whether the corresponding
+ *                      grid point is inside the mesh (1) or outside the mesh (0).
+ * @param[in,out] info  A pointer to the sfem_resample_field_info struct, containing information
+ *                      about the process configuration.
+ *
+ * @details
+ * The function distributes the structured grid across MPI processes. Each process determines
+ * whether its assigned grid points are inside or outside the tetrahedral mesh using field values
+ * and geometric properties. This information is encoded in the bit_array, where a set bit (1)
+ * indicates that the corresponding grid point is inside the mesh, and a cleared bit (0) indicates
+ * that it's outside.
+ *
+ * Unlike the standard in_out_tet4 function, this version takes a pointer to a BitArray rather
+ * than a BitArray value directly, allowing for more flexible memory management.
+ *
+ * @return 0 if the operation is successful.
+ */
+int                                                                     //
+in_out_field_mesh_tet4(const int                            mpi_size,   // MPI size
+                       const int                            mpi_rank,   // MPI rank
+                       const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
+                       const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
+                       const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
+                       const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
+                       const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
+                       BitArray*                            bit_array,  // Output
+                       sfem_resample_field_info*            info);                 //
+
 int                                                             //
 interpolate_field(const ptrdiff_t                      nnodes,  //
                   geom_t** const SFEM_RESTRICT         xyz,     //

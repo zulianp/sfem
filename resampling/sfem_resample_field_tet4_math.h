@@ -236,6 +236,49 @@ tet4_measure_v2(const real_type px0,   // X-coordinate 1st vertex
                 const real_type pz2,   //              3rd vertex
                 const real_type pz3);  //              4th vertex
 
+/**
+ * @brief Check if a point lies inside a tetrahedron or on its boundary.
+ *
+ * This function determines whether a point is inside a tetrahedron or on its boundary
+ * by checking if the point is on the same side of all four faces as the opposite vertex.
+ * The algorithm works by examining the point's position relative to each of the four
+ * triangular faces that make up the tetrahedron.
+ *
+ * @param[in] px X-coordinate of the point to test.
+ * @param[in] py Y-coordinate of the point to test.
+ * @param[in] pz Z-coordinate of the point to test.
+ * @param[in] v1x X-coordinate of the first tetrahedron vertex.
+ * @param[in] v1y Y-coordinate of the first tetrahedron vertex.
+ * @param[in] v1z Z-coordinate of the first tetrahedron vertex.
+ * @param[in] v2x X-coordinate of the second tetrahedron vertex.
+ * @param[in] v2y Y-coordinate of the second tetrahedron vertex.
+ * @param[in] v2z Z-coordinate of the second tetrahedron vertex.
+ * @param[in] v3x X-coordinate of the third tetrahedron vertex.
+ * @param[in] v3y Y-coordinate of the third tetrahedron vertex.
+ * @param[in] v3z Z-coordinate of the third tetrahedron vertex.
+ * @param[in] v4x X-coordinate of the fourth tetrahedron vertex.
+ * @param[in] v4y Y-coordinate of the fourth tetrahedron vertex.
+ * @param[in] v4z Z-coordinate of the fourth tetrahedron vertex.
+ *
+ * @return 1 if the point is inside the tetrahedron or on its boundary, 0 otherwise.
+ */
+int                                       //
+is_point_inside_tetrahedron(double px,    //
+                            double py,    //
+                            double pz,    //
+                            double v1x,   //
+                            double v1y,   //
+                            double v1z,   //
+                            double v2x,   //
+                            double v2y,   //
+                            double v2z,   //
+                            double v3x,   //
+                            double v3y,   //
+                            double v3z,   //
+                            double v4x,   //
+                            double v4y,   //
+                            double v4z);  //
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
