@@ -189,16 +189,16 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
  *
  * @return 0 if the operation is successful.
  */
-int                                                           //
-inn_out_tet4(const int                            mpi_size,   // MPI size
-             const int                            mpi_rank,   // MPI rank
-             const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
-             const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
-             const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
-             const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
-             const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
-             BitArray                             bit_array,  // Output
-             sfem_resample_field_info*            info);                 //
+int                                                          //
+in_out_tet4(const int                            mpi_size,   // MPI size
+            const int                            mpi_rank,   // MPI rank
+            const mesh_t* const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
+            const ptrdiff_t* const SFEM_RESTRICT n,          // SDF: n[3]
+            const ptrdiff_t* const SFEM_RESTRICT stride,     // SDF: stride[3]
+            const geom_t* const SFEM_RESTRICT    origin,     // SDF: origin[3]
+            const geom_t* const SFEM_RESTRICT    delta,      // SDF: delta[3]
+            BitArray                             bit_array,  // Output
+            sfem_resample_field_info*            info);                 //
 
 /**
  * @brief Resamples a field from a tetrahedral mesh to a structured grid (adjoint version).
