@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bit_array.h"
+#include "sfem_config.h"
 
 /**
  * @brief Number of bits in an unsigned int
@@ -63,6 +64,15 @@ int get_bit(BitArray bit_array, size_t index) {
         return -1;
     }
     return (bit_array.array[index / BITS_PER_INT] >> (index % BITS_PER_INT)) & 1;
+}
+
+// Function to convert a bit array to a real array
+real_t *to_real_array(BitArray bit_array) {
+    real_t *real_array = (real_t *)malloc(bit_array.size * sizeof(real_t));
+    for (size_t i = 0; i < bit_array.size; i++) {
+        real_array[i] = get_bit(bit_array, i);
+    }
+    return real_array;
 }
 
 // int main() {

@@ -12,6 +12,8 @@
 
 #include <stddef.h>
 
+#include "sfem_config.h"
+
 /**
  * @brief Structure representing a bit array
  *
@@ -78,5 +80,13 @@ void toggle_bit(BitArray *bit_array, size_t index);
  * @return int The bit value (0 or 1), or -1 if index is out of bounds
  */
 int get_bit(BitArray bit_array, size_t index);
+
+/**
+ * @brief Converts a bit array to a real_t array
+ *
+ * @param bit_array The bit array to convert
+ * @return real_t* A newly allocated real_t array
+ */
+real_t *to_real_array(BitArray bit_array);
 
 #endif /* BIT_ARRAY_H */
