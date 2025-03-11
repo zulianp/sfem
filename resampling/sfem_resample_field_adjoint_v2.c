@@ -533,7 +533,11 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
     RETURN_FROM_FUNCTION(ret);
 }
 
-// Function to determine if a point is on the same side of the plane as the opposite vertex
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_in_out_mesh_adjoint //////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 int                        //
 is_same_side(double px,    // Point X-coordinates
              double py,    //       Y-coordinates
@@ -611,6 +615,11 @@ is_point_inside_tetrahedron(double px,     //
     return 1;
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_field_in_out_mesh ////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 int                                                                         //
 tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // Mesh
                        const ptrdiff_t                      end_element,    //
@@ -680,9 +689,9 @@ tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // M
         const real_type grid_y_max = (yb_max - oy) / dy;
         const real_type grid_z_max = (zb_max - oz) / dz;
 
-        const ptrdiff_t i_max = floor(grid_x_max);
-        const ptrdiff_t j_max = floor(grid_y_max);
-        const ptrdiff_t k_max = floor(grid_z_max);
+        const ptrdiff_t i_max = ceil(grid_x_max);
+        const ptrdiff_t j_max = ceil(grid_y_max);
+        const ptrdiff_t k_max = ceil(grid_z_max);
 
         for (ptrdiff_t i = i_min; i <= i_max; i++) {
             for (ptrdiff_t j = j_min; j <= j_max; j++) {
@@ -708,6 +717,11 @@ tet4_field_in_out_mesh(const ptrdiff_t                      start_element,  // M
     RETURN_FROM_FUNCTION(ret);
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// in_out_field_mesh_tet4 ////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 int                                                                     //
 in_out_field_mesh_tet4(const int                            mpi_size,   // MPI size
                        const int                            mpi_rank,   // MPI rank
@@ -725,16 +739,16 @@ in_out_field_mesh_tet4(const int                            mpi_size,   // MPI s
     // set to zero the bit array
     to_zero(bit_array);
 
-    tet4_field_in_out_mesh(0,                // Mesh
-                           mesh->nelements,  //
-                           mesh->nnodes,     //
-                           mesh->elements,   //
-                           mesh->points,     //
-                           n,                // SDF
-                           stride,           //
-                           origin,           //
-                           delta,            //
-                           bit_array);       // Output
+    ret = tet4_field_in_out_mesh(0,                // Mesh
+                                 mesh->nelements,  //
+                                 mesh->nnodes,     //
+                                 mesh->elements,   //
+                                 mesh->points,     //
+                                 n,                // SDF
+                                 stride,           //
+                                 origin,           //
+                                 delta,            //
+                                 bit_array);       // Output
 
     RETURN_FROM_FUNCTION(ret);
 }

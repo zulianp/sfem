@@ -16,7 +16,19 @@ print(f'sdf_test.py: Writing field to {output_path}')
 
 sdf_t = np.float32
 
-D = 900
+
+# Default grid dimension
+D = 300
+
+# Check if a second argument exists and if it's a number to use as grid dimension
+if len(sys.argv) > 2:
+    try:
+        grid_size = int(sys.argv[2])
+        D = grid_size
+        print(f'sdf_test.py: Using grid size D = {D} from command line argument')
+    except ValueError:
+        print(f'sdf_test.py: Warning - second argument is not a valid integer, using default D = {D}')
+
 dims = (D, D, D)
 
 print(
