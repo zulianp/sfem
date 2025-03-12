@@ -295,7 +295,7 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
         const real_type wf2 = weighted_field[ev[2]];
         const real_type wf3 = weighted_field[ev[3]];
 
-        const real_type sampled_volume = hexahedron_volume * (double)(TET_QUAD_NQP);
+        // const real_type sampled_volume = hexahedron_volume * (double)(TET_QUAD_NQP);
 
         tet4_resample_tetrahedron_local_adjoint(x0,            // Tetrahedron vertices X-coordinates
                                                 x1,            //

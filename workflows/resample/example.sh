@@ -59,7 +59,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 1400
+sdf_test.py $sdf 50
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
@@ -105,7 +105,7 @@ fi
 
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
+raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
 
 if [[ $SFEM_ADJOINT -eq 1 ]]
 then

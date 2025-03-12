@@ -248,10 +248,18 @@ SFEM_INLINE static void hex_aa_8_eval_fun(
     f[7] = (1.0 - x) * y * z;
 }
 
-SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_RESTRICT stride,              //
-                                                const ptrdiff_t i, const ptrdiff_t j, const ptrdiff_t k,  //
-                                                // Attention this is geometric data transformed to solver data! //
-                                                const real_t* const SFEM_RESTRICT data, real_t* const SFEM_RESTRICT out) {  //
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_collect_coeffs
+////////////////////////////////////////////////////////////////////////
+SFEM_INLINE static void                                               //
+hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                        const ptrdiff_t                      i,       //
+                        const ptrdiff_t                      j,       //
+                        const ptrdiff_t                      k,       //
+                        const real_t* const SFEM_RESTRICT    data,    //
+                        real_t* const SFEM_RESTRICT          out) {            //
+
+    // Attention this is geometric data transformed to solver data! //
     //
     const ptrdiff_t i0 = i * stride[0] + j * stride[1] + k * stride[2];
     const ptrdiff_t i1 = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
@@ -262,31 +270,6 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_REST
     const ptrdiff_t i6 = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
     const ptrdiff_t i7 = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
 
-    // if (i0 >= nSizes_global)
-    //     printf("ERROR i0 = %ld > %ld, i %ld, j %ld, k %ld, stride %ld %ld %ld\n",
-    //            i0,
-    //            nSizes_global,
-    //            i,
-    //            j,
-    //            k,
-    //            stride[0],
-    //            stride[1],
-    //            stride[2]);
-    // if (i1 >= nSizes_global) printf("ERROR i1 = %ld > %ld, i+1 %ld, j %ld, k %ld, stride %ld %ld
-    // %ld\n", i1, nSizes_global, i + 1, j, k, stride[0], stride[1], stride[2]); if (i2 >=
-    // nSizes_global) printf("ERROR i2 = %ld > %ld, i+1 %ld, j+1 %ld, k %ld, stride %ld %ld %ld\n",
-    // i2, nSizes_global, i + 1, j + 1, k, stride[0], stride[1], stride[2]); if (i3 >=
-    // nSizes_global) printf("ERROR i3 = %ld > %ld, i %ld, j+1 %ld, k %ld, stride %ld %ld %ld\n",
-    // i3, nSizes_global, i, j + 1, k, stride[0], stride[1], stride[2]); if (i4 >= nSizes_global)
-    // printf("ERROR i4 = %ld > %ld, i %ld, j %ld, k+1 %ld, stride %ld %ld %ld\n", i4,
-    // nSizes_global, i, j, k + 1, stride[0], stride[1], stride[2]); if (i5 >= nSizes_global)
-    // printf("ERROR i5 = %ld > %ld, i+1 %ld, j %ld, k+1 %ld, stride %ld %ld %ld\n", i5,
-    // nSizes_global, i + 1, j, k + 1, stride[0], stride[1], stride[2]); if (i6 >= nSizes_global)
-    // printf("ERROR i6 = %ld > %ld, i+1 %ld, j+1 %ld, k+1 %ld, stride %ld %ld %ld\n", i6,
-    // nSizes_global, i + 1, j + 1, k + 1, stride[0], stride[1], stride[2]); if (i7 >=
-    // nSizes_global) printf("ERROR i7 = %ld > %ld, i %ld, j+1 %ld, k+1 %ld, stride %ld %ld %ld\n",
-    // i7, nSizes_global, i, j + 1, k + 1, stride[0], stride[1], stride[2]);
-
     out[0] = data[i0];
     out[1] = data[i1];
     out[2] = data[i2];
@@ -295,6 +278,26 @@ SFEM_INLINE static void hex_aa_8_collect_coeffs(const ptrdiff_t* const SFEM_REST
     out[5] = data[i5];
     out[6] = data[i6];
     out[7] = data[i7];
+}
+
+////////////////////////////////////////////////////////////////////////
+// hex_aa_8_collect_indices
+////////////////////////////////////////////////////////////////////////
+void                                                                   //
+hex_aa_8_collect_indices(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                         const ptrdiff_t                      i,       //
+                         const ptrdiff_t                      j,       //
+                         const ptrdiff_t                      k,       //
+                         ptrdiff_t* const SFEM_RESTRICT       indices) {     //
+
+    indices[0] = i * stride[0] + j * stride[1] + k * stride[2];
+    indices[1] = (i + 1) * stride[0] + j * stride[1] + k * stride[2];
+    indices[2] = (i + 1) * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    indices[3] = i * stride[0] + (j + 1) * stride[1] + k * stride[2];
+    indices[4] = i * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    indices[5] = (i + 1) * stride[0] + j * stride[1] + (k + 1) * stride[2];
+    indices[6] = (i + 1) * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
+    indices[7] = i * stride[0] + (j + 1) * stride[1] + (k + 1) * stride[2];
 }
 
 /**
@@ -1238,6 +1241,156 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 
     RETURN_FROM_FUNCTION(0);
     // return 0;
+}
+
+///////////////////////////////////////////////////////////////////////
+// hex8_to_isoparametric_tet10_resample_field_local_adjoint
+///////////////////////////////////////////////////////////////////////
+int                                                                                                           //
+hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,  // Mesh
+                                                         const ptrdiff_t                      end_element,    //
+                                                         const ptrdiff_t                      nnodes,         //
+                                                         const idx_t** const SFEM_RESTRICT    elems,          //
+                                                         const geom_t** const SFEM_RESTRICT   xyz,            //
+                                                         const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                                                         const ptrdiff_t* const SFEM_RESTRICT stride,         //
+                                                         const geom_t* const SFEM_RESTRICT    origin,         //
+                                                         const geom_t* const SFEM_RESTRICT    delta,          //
+                                                         const real_t* const SFEM_RESTRICT
+                                                                                     weighted_field,  // Input weighted field
+                                                         real_t* const SFEM_RESTRICT data) {          // Output SDF
+
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const real_t hexahedron_volume = dx * dy * dz;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("Start: %s  v2: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        idx_t ev[10];
+
+        // ISOPARAMETRIC
+        real_t x[10], y[10], z[10];
+
+        real_t hex8_f[8];
+        real_t coeffs[8];
+
+        real_t tet10_f[10];
+        real_t element_field[10];
+
+        // loop over the 4 vertices of the tetrahedron
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // ISOPARAMETRIC
+        for (int v = 0; v < 10; ++v) {
+            x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
+            y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
+            z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
+        }
+
+        // memset(element_field, 0, 10 * sizeof(real_t));
+
+        // set to zero the element field
+        memset(element_field, 0, 10 * sizeof(real_t));
+
+        const real_t wf_tet10[10] = {weighted_field[ev[0]],
+                                     weighted_field[ev[1]],
+                                     weighted_field[ev[2]],
+                                     weighted_field[ev[3]],
+                                     weighted_field[ev[4]],
+                                     weighted_field[ev[5]],
+                                     weighted_field[ev[6]],
+                                     weighted_field[ev[7]],
+                                     weighted_field[ev[8]],
+                                     weighted_field[ev[9]]};
+
+        ptrdiff_t indices[10];
+
+        for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
+
+            real_t g_qx;
+            real_t g_qy;
+            real_t g_qz;
+
+            tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
+            tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+
+            const real_t grid_x = (g_qx - ox) / dx;
+            const real_t grid_y = (g_qy - oy) / dy;
+            const real_t grid_z = (g_qz - oz) / dz;
+
+            const ptrdiff_t i = floor(grid_x);
+            const ptrdiff_t j = floor(grid_y);
+            const ptrdiff_t k = floor(grid_z);
+
+            // Get the reminder [0, 1]
+            real_t l_x = (grid_x - i);
+            real_t l_y = (grid_y - j);
+            real_t l_z = (grid_z - k);
+
+            assert(l_x >= -1e-8);
+            assert(l_y >= -1e-8);
+            assert(l_z >= -1e-8);
+
+            assert(l_x <= 1 + 1e-8);
+            assert(l_y <= 1 + 1e-8);
+            assert(l_z <= 1 + 1e-8);
+
+            hex_aa_8_collect_indices(stride, i, j, k, indices);
+            hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+
+            const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
+            const real_t dV      = measure * tet4_qw[q];
+
+            const real_t It = dV * (tet10_f[0] * wf_tet10[0] +  //
+                                    tet10_f[1] * wf_tet10[1] +  //
+                                    tet10_f[2] * wf_tet10[2] +  //
+                                    tet10_f[3] * wf_tet10[3] +  //
+                                    tet10_f[4] * wf_tet10[4] +  //
+                                    tet10_f[5] * wf_tet10[5] +  //
+                                    tet10_f[6] * wf_tet10[6] +  //
+                                    tet10_f[7] * wf_tet10[7] +  //
+                                    tet10_f[8] * wf_tet10[8] +  //
+                                    tet10_f[9] * wf_tet10[9]);  //
+
+            const real_t d0 = It * hex8_f[0];
+            const real_t d1 = It * hex8_f[1];
+            const real_t d2 = It * hex8_f[2];
+            const real_t d3 = It * hex8_f[3];
+            const real_t d4 = It * hex8_f[4];
+            const real_t d5 = It * hex8_f[5];
+            const real_t d6 = It * hex8_f[6];
+            const real_t d7 = It * hex8_f[7];
+
+            data[indices[0]] += d0;
+            data[indices[1]] += d1;
+            data[indices[2]] += d2;
+            data[indices[3]] += d3;
+            data[indices[4]] += d4;
+            data[indices[5]] += d5;
+            data[indices[6]] += d6;
+            data[indices[7]] += d7;
+        }
+    }
+
+    RETURN_FROM_FUNCTION(ret);
 }
 
 ///////////////////////////////////////////////////////////////////////

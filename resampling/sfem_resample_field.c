@@ -1333,6 +1333,83 @@ resample_field_TEST_adjoint_tet4(const int                            mpi_size, 
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+// resample_field_adjoint_tet10 ////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+int                                                                               //
+resample_field_mesh_adjoint_tet10(const int                            mpi_size,  // MPI size
+                                  const int                            mpi_rank,  // MPI rank
+                                  const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
+                                  const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
+                                  const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
+                                  const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
+                                  const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
+                                  const real_t* const SFEM_RESTRICT    g,         // Weighted field
+                                  real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
+                                  unsigned int*                        data_cnt,  // SDF: data count (output)
+                                  sfem_resample_field_info*            info) {               // Info struct with options and flags
+
+    PRINT_CURRENT_FUNCTION;
+    int ret = 0;
+
+    enum ElemType st             = shell_type(mesh->element_type);
+    real_t*       mass_vector    = calloc(mesh->nnodes, sizeof(real_t));
+    real_t*       weighted_field = malloc(mesh->nnodes * sizeof(real_t));
+    memcpy(weighted_field, g, mesh->nnodes * sizeof(real_t));
+
+    if (st == INVALID) {
+        tet10_assemble_dual_mass_vector(mesh->nelements,  //
+                                        mesh->nnodes,     //
+                                        mesh->elements,   //
+                                        mesh->points,     //
+                                        mass_vector);     //
+
+        // exchange ghost nodes and add contribution
+        if (mpi_size > 1) {                                                     //
+            printf("perform_exchange_operations %s:%d\n", __FILE__, __LINE__);  //
+            perform_exchange_operations(mesh,                                   //
+                                        mass_vector,                            //
+                                        weighted_field);                        //
+        }
+
+        for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {               //
+            assert(mass_vector[i] != 0);                             //
+            weighted_field[i] = weighted_field[i] / mass_vector[i];  //
+        }                                                            // end for (i) loop
+
+    } else {
+        apply_inv_lumped_mass(st,               //
+                              mesh->nelements,  //
+                              mesh->nnodes,     //
+                              mesh->elements,   //
+                              mesh->points,     //
+                              weighted_field,   //
+                              g);               //
+    }                                           // end if (INVALID == st)
+
+    free(mass_vector);
+    mass_vector = NULL;
+
+    hex8_to_isoparametric_tet10_resample_field_local_adjoint(0,                //
+                                                             mesh->nelements,  //
+                                                             mesh->nnodes,     //
+                                                             mesh->elements,   //
+                                                             mesh->points,     //
+                                                             n,                //
+                                                             stride,           //
+                                                             origin,           //
+                                                             delta,            //
+                                                             weighted_field,   //
+                                                             data);            //
+
+    free(weighted_field);
+    weighted_field = NULL;
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 // resample_field_mesh_tet10 ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -1453,7 +1530,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-// interpolate_field //////////////////////////////////////////////////////
+// interpolate_field ///////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 int                                                             //

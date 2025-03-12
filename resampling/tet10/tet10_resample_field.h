@@ -151,6 +151,36 @@ int hex8_to_tet10_resample_field_local_CUDA_Managed(
         // Output //
         real_t* const SFEM_RESTRICT g_host);
 
+/**
+ * @brief Resample a field from a structured grid to a quadratic (10-node) tetrahedral mesh using subparametric mapping.
+ *
+ * @param start_element
+ * @param end_element
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param weighted_field
+ * @param data
+ * @return int
+ */
+int                                                                                                           //
+hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,  // Mesh
+                                                         const ptrdiff_t                      end_element,    //
+                                                         const ptrdiff_t                      nnodes,         //
+                                                         const idx_t** const SFEM_RESTRICT    elems,          //
+                                                         const geom_t** const SFEM_RESTRICT   xyz,            //
+                                                         const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
+                                                         const ptrdiff_t* const SFEM_RESTRICT stride,         //
+                                                         const geom_t* const SFEM_RESTRICT    origin,         //
+                                                         const geom_t* const SFEM_RESTRICT    delta,          //
+                                                         const real_t* const SFEM_RESTRICT
+                                                                                     weighted_field,  // Input weighted field
+                                                         real_t* const SFEM_RESTRICT data);           // Output
+
 #ifdef __cplusplus
 }
 #endif

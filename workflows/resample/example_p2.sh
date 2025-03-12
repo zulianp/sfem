@@ -140,7 +140,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf
+sdf_test.py $sdf 200
 # raw_to_xdmf.py $sdf
 
 sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
@@ -201,13 +201,25 @@ fi
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
+export SFEM_INTERPOLATE=0
+export SFEM_READ_FP32=1
+export SFEM_ADJOINT=1
+
+set -x
+time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
 
 if [[ "$FLOAT_64" == "1" ]]
 then
 	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64
 else
 	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+fi
+
+if [[ $SFEM_ADJOINT -eq 1 ]]
+then
+    head -11 metadata_sdf.float32.yml > metadata_test_field_t10.yml
+    echo "path: $PWD/test_field_t10.raw" >> metadata_test_field_t10.yml 
+    raw_to_xdmf.py test_field_t10.raw
 fi
 
 # raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64
