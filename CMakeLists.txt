@@ -61,6 +61,7 @@ set(SFEM_MODULES
     operators/macro_tet4
     operators/sstet4
     operators/sshex8
+    operators/spectral_hex
     operators/hierarchical
     operators/hex8
     operators/ssquad4
