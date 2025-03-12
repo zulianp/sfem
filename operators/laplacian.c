@@ -8,6 +8,7 @@
 #include "macro_tri3_laplacian.h"
 
 #include "hex8_laplacian.h"
+#include "spectral_hex_laplacian.h"
 
 #include "sfem_defs.h"
 

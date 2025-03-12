@@ -141,9 +141,9 @@ void spectral_hex_mass_apply(const T jacobian_determinant,
                              T* const SFEM_RESTRICT out) {
     spectral_hex_interpolate<N, Q, T>(S, u, out);
 
-    for (int qk = 0;qk < Q; qk++) {
-        for (int qj = 0;qj < Q; qj++) {
-            for (int qi = 0;qi < Q; qi++) {
+    for (int qk = 0; qk < Q; qk++) {
+        for (int qj = 0; qj < Q; qj++) {
+            for (int qi = 0; qi < Q; qi++) {
                 out[qk * Q * Q + qj * Q + qi] *= jacobian_determinant;
             }
         }
@@ -152,8 +152,41 @@ void spectral_hex_mass_apply(const T jacobian_determinant,
     spectral_hex_integrate<N, Q, T>(S, qw, out, out);
 }
 
-template void spectral_hex_mass_apply<2, 2, scalar_t>(const scalar_t,
+// template void spectral_hex_mass_apply<2, 2, scalar_t>(const scalar_t,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       scalar_t* const       SFEM_RESTRICT);
+
+// template void spectral_hex_mass_apply<3, 3, scalar_t>(const scalar_t,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       scalar_t* const       SFEM_RESTRICT);
+
+// template void spectral_hex_mass_apply<5, 5, scalar_t>(const scalar_t,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       const scalar_t* const SFEM_RESTRICT,
+//                                                       scalar_t* const       SFEM_RESTRICT);
+
+template void spectral_hex_mass_apply<9, 9, scalar_t>(const scalar_t,
                                                       const scalar_t* const SFEM_RESTRICT,
                                                       const scalar_t* const SFEM_RESTRICT,
                                                       const scalar_t* const SFEM_RESTRICT,
                                                       scalar_t* const       SFEM_RESTRICT);
+
+// template void spectral_hex_mass_apply<9, 9, vec_t>(const vec_t,
+//                                                    const vec_t* const SFEM_RESTRICT,
+//                                                    const vec_t* const SFEM_RESTRICT,
+//                                                    const vec_t* const SFEM_RESTRICT,
+//                                                    vec_t* const       SFEM_RESTRICT);
+
+// extern "C" void spectral_hex_mass_apply(const scalar_t jacobian_determinant,
+//                              // Shape functions per quad point Q x S
+//                              const scalar_t* const SFEM_RESTRICT S,
+//                              const scalar_t* const SFEM_RESTRICT qw,
+//                              // Coefficients S x S x S
+//                              const scalar_t* const SFEM_RESTRICT u,
+//                              // Evaluation Q x Q x Q
+//                              scalar_t* const SFEM_RESTRICT out)
