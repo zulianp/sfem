@@ -590,13 +590,10 @@ typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
  * @param fun [in] The function to be applied to the mesh.
  * @param weighted_field [out] Pointer to the output array where the weighted field will be stored.
  */
-int                                                                  //
-apply_fun_to_mesh(const ptrdiff_t                    start_element,  // Mesh
-                  const ptrdiff_t                    end_element,    // Mesh
-                  const ptrdiff_t                    nnodes,         // Mesh
-                  const idx_t** const SFEM_RESTRICT  elems,          // Mesh
-                  const geom_t** const SFEM_RESTRICT xyz,            // Mesh
-                  const function_XYZ_t               fun,            // Function
+int                                                              //
+apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,        // Mesh
+                  const function_XYZ_t               fun,        // Function
                   real_t* const SFEM_RESTRICT        weighted_field);       //   Output (weighted field)
 
 #ifdef __cplusplus

@@ -124,7 +124,7 @@ else
 	SFEM_ORDER_WITH_COORDINATE=2 sfc temp_mesh $mesh_sorted
 	
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
-	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
+	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=0 mesh_p1_to_p2 $mesh_sorted $p2_mesh
 
 	raw_to_db.py $p2_mesh test_mapping.vtk 
 fi
@@ -140,12 +140,12 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf 200
+sdf_test.py $sdf 100
 # raw_to_xdmf.py $sdf
 
-sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
-origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
-scaling=`head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
+sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
+origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
+scaling=$(head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
 
 echo $sizes
 echo $origins
@@ -222,4 +222,3 @@ then
     raw_to_xdmf.py test_field_t10.raw
 fi
 
-# raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64

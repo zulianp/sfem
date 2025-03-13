@@ -87,9 +87,64 @@ SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx, const real_t qy, 
  * @param qy
  * @param qz
  * @param f
+ */
+void                                                                                        //
+tet10_Lagrange_basis(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {  //
+    const real_t x0 = qx + qy + qz - 1;
+    const real_t x1 = 2 * qy;
+    const real_t x2 = 2 * qz;
+    const real_t x3 = 2 * qx - 1;
+    const real_t x4 = 4 * qx;
+    const real_t x5 = 4 * x0;
+
+    f[0] = x0 * (x1 + x2 + x3);
+    f[1] = qx * x3;
+    f[2] = qy * (x1 - 1);
+    f[3] = qz * (x2 - 1);
+    f[4] = -x0 * x4;
+    f[5] = qy * x4;
+    f[6] = -qy * x5;
+    f[7] = -qz * x5;
+    f[8] = qz * x4;
+    f[9] = 4 * qy * qz;
+}
+
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
  * @return SFEM_INLINE
  */
-SFEM_INLINE static void tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
+SFEM_INLINE static void  //
+tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
+    assert(qx >= 0);
+    assert(qy >= 0);
+    assert(qz >= 0);
+    assert(qx + qy + qz <= 1 + 1e-8);
+
+    // const real_t x0 = qx + qy + qz - 1;
+    // const real_t x1 = 2 * qy;
+    // const real_t x2 = 2 * qz;
+    // const real_t x3 = 2 * qx - 1;
+    // const real_t x4 = 4 * qx;
+    // const real_t x5 = 4 * x0;
+
+    // f[0] = x0 * (x1 + x2 + x3);
+    // f[1] = qx * x3;
+    // f[2] = qy * (x1 - 1);
+    // f[3] = qz * (x2 - 1);
+    // f[4] = -x0 * x4;
+    // f[5] = qy * x4;
+    // f[6] = -qy * x5;
+    // f[7] = -qz * x5;
+    // f[8] = qz * x4;
+    // f[9] = 4 * qy * qz;
+
+    // return;
+
     const real_t x0  = 2 * qy;
     const real_t x1  = 2 * qz;
     const real_t x2  = 2 * qx - 1;
@@ -1246,19 +1301,18 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_local_adjoint
 ///////////////////////////////////////////////////////////////////////
-int                                                                                                           //
-hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,  // Mesh
-                                                         const ptrdiff_t                      end_element,    //
-                                                         const ptrdiff_t                      nnodes,         //
-                                                         const idx_t** const SFEM_RESTRICT    elems,          //
-                                                         const geom_t** const SFEM_RESTRICT   xyz,            //
-                                                         const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
-                                                         const ptrdiff_t* const SFEM_RESTRICT stride,         //
-                                                         const geom_t* const SFEM_RESTRICT    origin,         //
-                                                         const geom_t* const SFEM_RESTRICT    delta,          //
-                                                         const real_t* const SFEM_RESTRICT
-                                                                                     weighted_field,  // Input weighted field
-                                                         real_t* const SFEM_RESTRICT data) {          // Output SDF
+int                                                                                                            //
+hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                         const ptrdiff_t                      end_element,     //
+                                                         const ptrdiff_t                      nnodes,          //
+                                                         const idx_t** const SFEM_RESTRICT    elems,           //
+                                                         const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                         const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                         const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                         const geom_t* const SFEM_RESTRICT    origin,          //
+                                                         const geom_t* const SFEM_RESTRICT    delta,           //
+                                                         const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                         real_t* const SFEM_RESTRICT          data) {                   // Output SDF
 
     PRINT_CURRENT_FUNCTION;
 
@@ -1291,7 +1345,7 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
         real_t coeffs[8];
 
         real_t tet10_f[10];
-        real_t element_field[10];
+        // real_t element_field[10];
 
         // loop over the 4 vertices of the tetrahedron
         for (int v = 0; v < 10; ++v) {
@@ -1308,7 +1362,7 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
         // memset(element_field, 0, 10 * sizeof(real_t));
 
         // set to zero the element field
-        memset(element_field, 0, 10 * sizeof(real_t));
+        // memset(element_field, 0, 10 * sizeof(real_t));
 
         const real_t wf_tet10[10] = {weighted_field[ev[0]],
                                      weighted_field[ev[1]],
@@ -1321,7 +1375,9 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
                                      weighted_field[ev[8]],
                                      weighted_field[ev[9]]};
 
-        ptrdiff_t indices[10];
+        // for ( int v = 0; v < 10; ++v) {
+        //     printf("wf_tet10[%d] = %f\n", v, wf_tet10[v]);
+        // }
 
         for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
 
@@ -1353,31 +1409,48 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
             assert(l_y <= 1 + 1e-8);
             assert(l_z <= 1 + 1e-8);
 
+            ptrdiff_t indices[10];
             hex_aa_8_collect_indices(stride, i, j, k, indices);
+
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
 
             const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
             const real_t dV      = measure * tet4_qw[q];
 
-            const real_t It = dV * (tet10_f[0] * wf_tet10[0] +  //
-                                    tet10_f[1] * wf_tet10[1] +  //
-                                    tet10_f[2] * wf_tet10[2] +  //
-                                    tet10_f[3] * wf_tet10[3] +  //
-                                    tet10_f[4] * wf_tet10[4] +  //
-                                    tet10_f[5] * wf_tet10[5] +  //
-                                    tet10_f[6] * wf_tet10[6] +  //
-                                    tet10_f[7] * wf_tet10[7] +  //
-                                    tet10_f[8] * wf_tet10[8] +  //
-                                    tet10_f[9] * wf_tet10[9]);  //
+            // if (dV < 0) {
+            //     fprintf(stderr, "warning: negative volume %g!\n", dV);
+            //     continue;
+            // }
 
-            const real_t d0 = It * hex8_f[0];
-            const real_t d1 = It * hex8_f[1];
-            const real_t d2 = It * hex8_f[2];
-            const real_t d3 = It * hex8_f[3];
-            const real_t d4 = It * hex8_f[4];
-            const real_t d5 = It * hex8_f[5];
-            const real_t d6 = It * hex8_f[6];
-            const real_t d7 = It * hex8_f[7];
+            // if(wf_tet10[0] <  0) {
+            //     fprintf(stderr, "warning: negative wf_tet10[0] %g!\n", wf_tet10[0]);
+            //     continue;
+            // }
+
+            const real_t It = (tet10_f[0] * wf_tet10[0] +  //
+                               tet10_f[1] * wf_tet10[1] +  //
+                               tet10_f[2] * wf_tet10[2] +  //
+                               tet10_f[3] * wf_tet10[3] +  //
+                               tet10_f[4] * wf_tet10[4] +  //
+                               tet10_f[5] * wf_tet10[5] +  //
+                               tet10_f[6] * wf_tet10[6] +  //
+                               tet10_f[7] * wf_tet10[7] +  //
+                               tet10_f[8] * wf_tet10[8] +  //
+                               tet10_f[9] * wf_tet10[9]);  //
+
+            // if (It < -1e-9) {
+            //     fprintf(stderr, "warning: negative integral %g!\n", It);
+            //     continue;
+            // }
+
+            const real_t d0 = It * hex8_f[0] * dV;
+            const real_t d1 = It * hex8_f[1] * dV;
+            const real_t d2 = It * hex8_f[2] * dV;
+            const real_t d3 = It * hex8_f[3] * dV;
+            const real_t d4 = It * hex8_f[4] * dV;
+            const real_t d5 = It * hex8_f[5] * dV;
+            const real_t d6 = It * hex8_f[6] * dV;
+            const real_t d7 = It * hex8_f[7] * dV;
 
             data[indices[0]] += d0;
             data[indices[1]] += d1;
@@ -1387,6 +1460,15 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
             data[indices[5]] += d5;
             data[indices[6]] += d6;
             data[indices[7]] += d7;
+
+            // data[indices[0]]=1.0;
+            // data[indices[1]]=1.0;
+            // data[indices[2]]=1.0;
+            // data[indices[3]]=1.0;
+            // data[indices[4]]=1.0;
+            // data[indices[5]]=1.0;
+            // data[indices[6]]=1.0;
+            // data[indices[7]]=1.0;
         }
     }
 
