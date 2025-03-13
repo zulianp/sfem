@@ -604,7 +604,7 @@ int main(int argc, char* argv[]) {
             // }
 
             // TESTING: apply mesh_fun_b to g
-            apply_fun_to_mesh(0, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mesh_fun_c, g);
+            apply_fun_to_mesh(mesh.nnodes, mesh.points, mesh_fun_c, g);
 
             switch (info.element_type) {
                 case TET10:
@@ -650,6 +650,7 @@ int main(int argc, char* argv[]) {
                     break;
 
                 case TET4:
+                    ///////////////////////////////////// Case TEt4 /////////////////////////////////////
 
                     // ret_resample_adjoint =                                //
                     //         resample_field_TEST_adjoint_tet4(mpi_size,    //
