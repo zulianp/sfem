@@ -256,34 +256,6 @@ void spectral_hex_laplacian_apply(  // Shape functions per quad point Q x S
 #endif
 }
 
-// template void spectral_hex_laplacian_apply<2, 2, scalar_t>(const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            scalar_t* const       SFEM_RESTRICT);
-
-// template void spectral_hex_laplacian_apply<9, 9, scalar_t>(const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            const scalar_t* const SFEM_RESTRICT,
-//                                                            scalar_t* const       SFEM_RESTRICT);
-
-// template void spectral_hex_laplacian_apply<2, 2, vec_t>(const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         vec_t* const       SFEM_RESTRICT);
-
-// template void spectral_hex_laplacian_apply<9, 9, vec_t>(const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         const vec_t* const SFEM_RESTRICT,
-//                                                         vec_t* const       SFEM_RESTRICT);
-
 template <int order>
 int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements,
                                      const ptrdiff_t                   nnodes,
@@ -381,12 +353,9 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
             ev[v] = elements[v][i];
         }
 
-        // printf("==========================\n");
         for (int v = 0; v < N3; ++v) {
             element_u[v] = u[ev[v]];
-            // printf("%g ", element_u[v]);
         }
-        // printf("\n");
 
         for (int d = 0; d < 8; d++) {
             lx[d] = x[ev[hex8_corners[d]]];
@@ -400,12 +369,9 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
 
         for (int v = 0; v < N3; v++) {
             assert(!isnan(element_vector[v]));
-            // printf("%g ", element_vector[v]);
 #pragma omp atomic update
             values[ev[v]] += element_vector[v];
         }
-        // printf("\n");
-        // printf("==========================\n");
     }
 
     return SFEM_SUCCESS;
