@@ -12,13 +12,13 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
-    cg->set_max_it(1000);
+    cg->set_max_it(20000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-8);
+    cg->set_rtol(1e-14);
 
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    f->hessian_diag(nullptr, diag->data());
-    cg->set_preconditioner_op(create_shiftable_jacobi(diag, es));
+    // f->hessian_diag(nullptr, diag->data());
+    // cg->set_preconditioner_op(create_shiftable_jacobi(diag, es));
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -116,6 +116,9 @@ int test_poisson_and_boundary_selector() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
+    const char *SFEM_OPERATOR = "Laplacian";
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
@@ -143,7 +146,7 @@ int test_poisson_and_boundary_selector() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
 
-    auto op = sfem::create_op(fs, "Laplacian", es);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
     return test_linear_function(f, "test_poisson_and_boundary_selector");
