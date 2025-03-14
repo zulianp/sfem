@@ -11,9 +11,15 @@ static const scalar_t line_q2_w[line_q2_n] = {1. / 2, 1. / 2};
 static const scalar_t line_q3_x[line_q3_n] = {0.1127016654, 1. / 2, 0.8872983346};
 static const scalar_t line_q3_w[line_q3_n] = {0.2777777778, 0.4444444444, 0.2777777778};
 
+// Gauss-Legendre
 #define line_q5_n 5
 static const scalar_t line_q5_x[line_q5_n] = {0.04691007703, 0.2307653449, 1/2, 0.7692346551, 0.9530899230};
 static const scalar_t line_q5_w[line_q5_n] = {0.1184634425, 0.2393143352, 0.2844444444, 0.2393143352, 0.1184634425};
+
+// Gauss-Lobatto
+// #define line_q5_n 5
+// static const scalar_t line_q5_x[line_q5_n] = {0.0, 0.1726731646, 1/2, 0.8273268354, 1.0};
+// static const scalar_t line_q5_w[line_q5_n] = {0.05000000000, 0.2722222222, 0.3555555556, 0.2722222222, 0.05000000000};
 
 #define line_q6_n 6
 static const scalar_t line_q6_x[line_q6_n] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
