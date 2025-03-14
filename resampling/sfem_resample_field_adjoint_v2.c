@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define real_t double
+// #define real_t real_type
 
 #include "quadratures_rule.h"
 
@@ -59,24 +59,24 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
         // Transform quadrature point to physical space
         // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
         // of the tetrahedral element
-        tet4_transform_v2(x0,               // x-coordinates of the vertices
-                          x1,               //
-                          x2,               //
-                          x3,               //
-                          y0,               // y-coordinates of the vertices
-                          y1,               //
-                          y2,               //
-                          y3,               //
-                          z0,               // z-coordinates of the vertices
-                          z1,               //
-                          z2,               //
-                          z3,               //
+        tet4_transform_v2(x0,              // x-coordinates of the vertices
+                          x1,              //
+                          x2,              //
+                          x3,              //
+                          y0,              // y-coordinates of the vertices
+                          y1,              //
+                          y2,              //
+                          y3,              //
+                          z0,              // z-coordinates of the vertices
+                          z1,              //
+                          z2,              //
+                          z3,              //
                           tet_qx[quad_i],  // Quadrature point
                           tet_qy[quad_i],  //
                           tet_qz[quad_i],  //
-                          &g_qx,            // Output coordinates
-                          &g_qy,            //
-                          &g_qz);           //
+                          &g_qx,           // Output coordinates
+                          &g_qy,           //
+                          &g_qz);          //
 
 #ifndef SFEM_RESAMPLE_GAP_DUAL
         // Standard basis function
@@ -138,9 +138,9 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
 
         // Get the reminder [0, 1]
         // The local coordinates of the quadrature point in the unit cube
-        real_type l_x = (grid_x - (double)i);
-        real_type l_y = (grid_y - (double)j);
-        real_type l_z = (grid_z - (double)k);
+        real_type l_x = (grid_x - (real_type)i);
+        real_type l_y = (grid_y - (real_type)j);
+        real_type l_z = (grid_z - (real_type)k);
 
         assert(l_x >= -1e-8);
         assert(l_y >= -1e-8);
@@ -292,14 +292,14 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
 
         const real_type ratio_Vth = theta_volume / hexahedron_volume;
 
-        // printf("ratio_Vth: Volume of the tetrahedron / Volume of the hexahedron = %g\n", ratio_Vth); 
+        // printf("ratio_Vth: Volume of the tetrahedron / Volume of the hexahedron = %g\n", ratio_Vth);
 
         const real_type wf0 = weighted_field[ev[0]];
         const real_type wf1 = weighted_field[ev[1]];
         const real_type wf2 = weighted_field[ev[2]];
         const real_type wf3 = weighted_field[ev[3]];
 
-        // const real_type sampled_volume = hexahedron_volume * (double)(TET_QUAD_NQP);
+        // const real_type sampled_volume = hexahedron_volume * (real_type)(TET_QUAD_NQP);
 
         tet4_resample_tetrahedron_local_adjoint(x0,            // Tetrahedron vertices X-coordinates
                                                 x1,            //
@@ -389,24 +389,24 @@ tet4_update_cnt_local_adjoint(const real_type                      x0,       // 
         // Transform quadrature point to physical space
         // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
         // of the tetrahedral element
-        tet4_transform_v2(x0,               // x-coordinates of the vertices
-                          x1,               //
-                          x2,               //
-                          x3,               //
-                          y0,               // y-coordinates of the vertices
-                          y1,               //
-                          y2,               //
-                          y3,               //
-                          z0,               // z-coordinates of the vertices
-                          z1,               //
-                          z2,               //
-                          z3,               //
+        tet4_transform_v2(x0,              // x-coordinates of the vertices
+                          x1,              //
+                          x2,              //
+                          x3,              //
+                          y0,              // y-coordinates of the vertices
+                          y1,              //
+                          y2,              //
+                          y3,              //
+                          z0,              // z-coordinates of the vertices
+                          z1,              //
+                          z2,              //
+                          z3,              //
                           tet_qx[quad_i],  // Quadrature point
                           tet_qy[quad_i],  //
                           tet_qz[quad_i],  //
-                          &g_qx,            // Output coordinates
-                          &g_qy,            //
-                          &g_qz);           //
+                          &g_qx,           // Output coordinates
+                          &g_qy,           //
+                          &g_qz);          //
 
         const real_type grid_x = (g_qx - ox) / dx;
         const real_type grid_y = (g_qy - oy) / dy;
@@ -542,73 +542,73 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
 // tet4_in_out_mesh_adjoint //////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int                        //
-is_same_side(double px,    // Point X-coordinates
-             double py,    //       Y-coordinates
-             double pz,    //       Z-coordinates
-             double ax,    // Tet vertex a:  X-coordinates
-             double ay,    //                Y-coordinates
-             double az,    //                Z-coordinates
-             double bx,    // Tet vertex b:  X-coordinates
-             double by,    //                Y-coordinates
-             double bz,    //                Z-coordinates
-             double cx,    // Tet vertex c:  X-coordinates
-             double cy,    //                Y-coordinates
-             double cz,    //                Z-coordinates
-             double dx,    // Tet vertex d:  X-coordinates
-             double dy,    //                Y-coordinates
-             double dz) {  //                Z-coordinates
+int                                 //
+is_same_side(const real_type px,    // Point X-coordinates
+             const real_type py,    //       Y-coordinates
+             const real_type pz,    //       Z-coordinates
+             const real_type ax,    // Tet vertex a:  X-coordinates
+             const real_type ay,    //                Y-coordinates
+             const real_type az,    //                Z-coordinates
+             const real_type bx,    // Tet vertex b:  X-coordinates
+             const real_type by,    //                Y-coordinates
+             const real_type bz,    //                Z-coordinates
+             const real_type cx,    // Tet vertex c:  X-coordinates
+             const real_type cy,    //                Y-coordinates
+             const real_type cz,    //                Z-coordinates
+             const real_type dx,    // Tet vertex d:  X-coordinates
+             const real_type dy,    //                Y-coordinates
+             const real_type dz) {  //                Z-coordinates
 
     // Compute vectors for the plane ABC
-    double abx = bx - ax;
-    double aby = by - ay;
-    double abz = bz - az;
-    double acx = cx - ax;
-    double acy = cy - ay;
-    double acz = cz - az;
+    real_type abx = bx - ax;
+    real_type aby = by - ay;
+    real_type abz = bz - az;
+    real_type acx = cx - ax;
+    real_type acy = cy - ay;
+    real_type acz = cz - az;
 
     // Calculate cross product (normal vector of the plane)
-    double nx = aby * acz - abz * acy;
-    double ny = abz * acx - abx * acz;
-    double nz = abx * acy - aby * acx;
+    real_type nx = aby * acz - abz * acy;
+    real_type ny = abz * acx - abx * acz;
+    real_type nz = abx * acy - aby * acx;
 
     // Vector from A to D (opposite vertex)
-    double adx = dx - ax;
-    double ady = dy - ay;
-    double adz = dz - az;
+    real_type adx = dx - ax;
+    real_type ady = dy - ay;
+    real_type adz = dz - az;
 
     // Dot product of normal with AD (direction from plane to D)
-    double dotD = nx * adx + ny * ady + nz * adz;
+    real_type dotD = nx * adx + ny * ady + nz * adz;
 
     // Vector from A to P
-    double apx = px - ax;
-    double apy = py - ay;
-    double apz = pz - az;
+    real_type apx = px - ax;
+    real_type apy = py - ay;
+    real_type apz = pz - az;
 
     // Dot product of normal with AP (direction from plane to P)
-    double dotP = nx * apx + ny * apy + nz * apz;
+    real_type dotP = nx * apx + ny * apy + nz * apz;
 
     // Check if both dot products have the same sign (or zero)
     return (dotD * dotP >= 0.0);
 }
 
 // Function to check if a point is inside or on the boundary of a tetrahedron
-int                                        //
-is_point_inside_tetrahedron(double px,     //
-                            double py,     //
-                            double pz,     //
-                            double v1x,    //
-                            double v1y,    //
-                            double v1z,    //
-                            double v2x,    //
-                            double v2y,    //
-                            double v2z,    //
-                            double v3x,    //
-                            double v3y,    //
-                            double v3z,    //
-                            double v4x,    //
-                            double v4y,    //
-                            double v4z) {  //
+int                                                 //
+is_point_inside_tetrahedron(const real_type px,     //
+                            const real_type py,     //
+                            const real_type pz,     //
+                            const real_type v1x,    //
+                            const real_type v1y,    //
+                            const real_type v1z,    //
+                            const real_type v2x,    //
+                            const real_type v2y,    //
+                            const real_type v2z,    //
+                            const real_type v3x,    //
+                            const real_type v3y,    //
+                            const real_type v3z,    //
+                            const real_type v4x,    //
+                            const real_type v4y,    //
+                            const real_type v4z) {  //
 
     // Check against all four faces
     if (!is_same_side(px, py, pz, v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z, v4x, v4y, v4z)) return 0;
@@ -755,4 +755,233 @@ in_out_field_mesh_tet4(const int                            mpi_size,   // MPI s
                                  bit_array);       // Output
 
     RETURN_FROM_FUNCTION(ret);
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// in_out_field_mesh_tet4 ////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                         //
+tet_uniform_refinement(const real_t               v1x,      //
+                       const real_t               v1y,      //
+                       const real_t               v1z,      //
+                       const real_t               v2x,      //
+                       const real_t               v2y,      //
+                       const real_t               v2z,      //
+                       const real_t               v3x,      //
+                       const real_t               v3y,      //
+                       const real_t               v3z,      //
+                       const real_t               v4x,      //
+                       const real_t               v4y,      //
+                       const real_t               v4z,      //
+                       struct tet_vertices* const rTets) {  //
+
+    PRINT_CURRENT_FUNCTION;
+    int ret = 0;
+
+    // Using the method from the paper:
+    // "Uniform Refinement of a Tetrahedron"
+    //                     Elizabeth G. Ong
+    //                         January 1991
+    //                     CAM Report 91-01
+
+    const real_t v5x = 0.5 * (v1x + v2x);
+    const real_t v5y = 0.5 * (v1y + v2y);
+    const real_t v5z = 0.5 * (v1z + v2z);
+
+    const real_t v6x = 0.5 * (v2x + v4x);
+    const real_t v6y = 0.5 * (v2y + v4y);
+    const real_t v6z = 0.5 * (v2z + v4z);
+
+    const real_t v7x = 0.5 * (v2x + v3x);
+    const real_t v7y = 0.5 * (v2y + v3y);
+    const real_t v7z = 0.5 * (v2z + v3z);
+
+    const real_t v8x = 0.5 * (v1x + v4x);
+    const real_t v8y = 0.5 * (v1y + v4y);
+    const real_t v8z = 0.5 * (v1z + v4z);
+
+    const real_t v9x = 0.5 * (v3x + v4x);
+    const real_t v9y = 0.5 * (v3y + v4y);
+    const real_t v9z = 0.5 * (v3z + v4z);
+
+    const real_t v10x = 0.5 * (v1x + v3x);
+    const real_t v10y = 0.5 * (v1y + v3y);
+    const real_t v10z = 0.5 * (v1z + v3z);
+
+    // First tetrahedron (v2, v5, v6, v7)
+    rTets[0].x0 = v2x;
+    rTets[0].y0 = v2y;
+    rTets[0].z0 = v2z;
+
+    rTets[0].x1 = v5x;
+    rTets[0].y1 = v5y;
+    rTets[0].z1 = v5z;
+
+    rTets[0].x2 = v6x;
+    rTets[0].y2 = v6y;
+    rTets[0].z2 = v6z;
+
+    rTets[0].x3 = v7x;
+    rTets[0].y3 = v7y;
+    rTets[0].z3 = v7z;
+
+    // Second tetrahedron (v1, v5, v8, v10)
+    rTets[1].x0 = v1x;
+    rTets[1].y0 = v1y;
+    rTets[1].z0 = v1z;
+
+    rTets[1].x1 = v5x;
+    rTets[1].y1 = v5y;
+    rTets[1].z1 = v5z;
+
+    rTets[1].x2 = v8x;
+    rTets[1].y2 = v8y;
+    rTets[1].z2 = v8z;
+
+    rTets[1].x3 = v10x;
+    rTets[1].y3 = v10y;
+    rTets[1].z3 = v10z;
+
+    // Third tetrahedron (v4, v6, v8, v9)
+    rTets[2].x0 = v4x;
+    rTets[2].y0 = v4y;
+    rTets[2].z0 = v4z;
+
+    rTets[2].x1 = v6x;
+    rTets[2].y1 = v6y;
+    rTets[2].z1 = v6z;
+
+    rTets[2].x2 = v8x;
+    rTets[2].y2 = v8y;
+    rTets[2].z2 = v8z;
+
+    rTets[2].x3 = v9x;
+    rTets[2].y3 = v9y;
+    rTets[2].z3 = v9z;
+
+    // Fourth tetrahedron (v3, v7, v9, v10)
+    rTets[3].x0 = v3x;
+    rTets[3].y0 = v3y;
+    rTets[3].z0 = v3z;
+
+    rTets[3].x1 = v7x;
+    rTets[3].y1 = v7y;
+    rTets[3].z1 = v7z;
+
+    rTets[3].x2 = v9x;
+    rTets[3].y2 = v9y;
+    rTets[3].z2 = v9z;
+
+    rTets[3].x3 = v10x;
+    rTets[3].y3 = v10y;
+    rTets[3].z3 = v10z;
+
+    // Fifth tetrahedron (v5, v6, v8, v9)
+    rTets[4].x0 = v5x;
+    rTets[4].y0 = v5y;
+    rTets[4].z0 = v5z;
+
+    rTets[4].x1 = v6x;
+    rTets[4].y1 = v6y;
+    rTets[4].z1 = v6z;
+
+    rTets[4].x2 = v8x;
+    rTets[4].y2 = v8y;
+    rTets[4].z2 = v8z;
+
+    rTets[4].x3 = v9x;
+    rTets[4].y3 = v9y;
+    rTets[4].z3 = v9z;
+
+    // Sixth tetrahedron (v5, v6, v7, v9)
+    rTets[5].x0 = v5x;
+    rTets[5].y0 = v5y;
+    rTets[5].z0 = v5z;
+
+    rTets[5].x1 = v6x;
+    rTets[5].y1 = v6y;
+    rTets[5].z1 = v6z;
+
+    rTets[5].x2 = v7x;
+    rTets[5].y2 = v7y;
+    rTets[5].z2 = v7z;
+
+    rTets[5].x3 = v9x;
+    rTets[5].y3 = v9y;
+    rTets[5].z3 = v9z;
+
+    // Seventh tetrahedron (v5, v7, v9, v10)
+    rTets[6].x0 = v5x;
+    rTets[6].y0 = v5y;
+    rTets[6].z0 = v5z;
+
+    rTets[6].x1 = v7x;
+    rTets[6].y1 = v7y;
+    rTets[6].z1 = v7z;
+
+    rTets[6].x2 = v9x;
+    rTets[6].y2 = v9y;
+    rTets[6].z2 = v9z;
+
+    rTets[6].x3 = v10x;
+    rTets[6].y3 = v10y;
+    rTets[6].z3 = v10z;
+
+    // Eighth tetrahedron (v5, v7, v9, v10)
+    rTets[7].x0 = v5x;
+    rTets[7].y0 = v5y;
+    rTets[7].z0 = v5z;
+
+    rTets[7].x1 = v7x;
+    rTets[7].y1 = v7y;
+    rTets[7].z1 = v7z;
+
+    rTets[7].x2 = v9x;
+    rTets[7].y2 = v9y;
+    rTets[7].z2 = v9z;
+
+    rTets[7].x3 = v10x;
+    rTets[7].y3 = v10y;
+    rTets[7].z3 = v10z;
+
+    RETURN_FROM_FUNCTION(ret);
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// volume_tet_array //////////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+real_t                                                   //
+volume_tet_array(const struct tet_vertices* const tets,  // Array of tetrahedra
+                 const int                        n,     // Number of tetrahedra
+                 real_t* const                    V) {                      // Output
+
+    PRINT_CURRENT_FUNCTION;
+
+    real_t tot_volume = 0.0;
+
+    for (int tet_i = 0; tet_i < n; tet_i++) {
+        const real_t volume = tet4_measure_v2(tets[tet_i].x0,
+                                              tets[tet_i].x1,
+                                              tets[tet_i].x2,
+                                              tets[tet_i].x3,
+                                              //
+                                              tets[tet_i].y0,
+                                              tets[tet_i].y1,
+                                              tets[tet_i].y2,
+                                              tets[tet_i].y3,
+                                              //
+                                              tets[tet_i].z0,
+                                              tets[tet_i].z1,
+                                              tets[tet_i].z2,
+                                              tets[tet_i].z3);
+
+        tot_volume += volume;
+        V[tet_i] = volume;
+    }
+
+    RETURN_FROM_FUNCTION(tot_volume);
 }
