@@ -561,3 +561,12 @@ def compress_nnz(names, mat):
                 vals.append(mat[i, j])
                 check.add(name)
     return sp.Matrix(len(vals), 1, vals)
+
+def assign_matrix(name, mat):
+    rows, cols = mat.shape
+    expr = []
+    for i in range(0, rows):
+        for j in range(0, cols):
+            var = sp.symbols(f'{name}[{i*cols + j}]')
+            expr.append(ast.Assignment(var, mat[i, j]))
+    return expr
