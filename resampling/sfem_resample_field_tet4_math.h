@@ -262,22 +262,101 @@ tet4_measure_v2(const real_type px0,   // X-coordinate 1st vertex
  *
  * @return 1 if the point is inside the tetrahedron or on its boundary, 0 otherwise.
  */
-int                                       //
-is_point_inside_tetrahedron(double px,    //
-                            double py,    //
-                            double pz,    //
-                            double v1x,   //
-                            double v1y,   //
-                            double v1z,   //
-                            double v2x,   //
-                            double v2y,   //
-                            double v2z,   //
-                            double v3x,   //
-                            double v3y,   //
-                            double v3z,   //
-                            double v4x,   //
-                            double v4y,   //
-                            double v4z);  //
+int                                                //
+is_point_inside_tetrahedron(const real_type px,    //
+                            const real_type py,    //
+                            const real_type pz,    //
+                            const real_type v1x,   //
+                            const real_type v1y,   //
+                            const real_type v1z,   //
+                            const real_type v2x,   //
+                            const real_type v2y,   //
+                            const real_type v2z,   //
+                            const real_type v3x,   //
+                            const real_type v3y,   //
+                            const real_type v3z,   //
+                            const real_type v4x,   //
+                            const real_type v4y,   //
+                            const real_type v4z);  //
+
+/**
+ * @brief Structure representing the 4 vertices of a tetrahedron
+ *
+ * This structure stores the coordinates of the four vertices that define a tetrahedron.
+ * Each vertex is represented by its x, y, and z coordinates.
+ */
+struct tet_vertices {
+    real_type x0, y0, z0;  // Vertex 0 coordinates
+    real_type x1, y1, z1;  // Vertex 1 coordinates
+    real_type x2, y2, z2;  // Vertex 2 coordinates
+    real_type x3, y3, z3;  // Vertex 3 coordinates
+};
+
+/**
+ * @brief Performs uniform refinement of a tetrahedron into 8 smaller tetrahedra
+ *
+ * This function subdivides a tetrahedron into 8 smaller tetrahedra by introducing
+ * new vertices at the midpoints of the original edges. The refinement is uniform,
+ * meaning all resulting tetrahedra have the same volume (1/8 of the original).
+ *
+ * @param[in] v1x X-coordinate of the first vertex of the original tetrahedron
+ * @param[in] v1y Y-coordinate of the first vertex of the original tetrahedron
+ * @param[in] v1z Z-coordinate of the first vertex of the original tetrahedron
+ * @param[in] v2x X-coordinate of the second vertex of the original tetrahedron
+ * @param[in] v2y Y-coordinate of the second vertex of the original tetrahedron
+ * @param[in] v2z Z-coordinate of the second vertex of the original tetrahedron
+ * @param[in] v3x X-coordinate of the third vertex of the original tetrahedron
+ * @param[in] v3y Y-coordinate of the third vertex of the original tetrahedron
+ * @param[in] v3z Z-coordinate of the third vertex of the original tetrahedron
+ * @param[in] v4x X-coordinate of the fourth vertex of the original tetrahedron
+ * @param[in] v4y Y-coordinate of the fourth vertex of the original tetrahedron
+ * @param[in] v4z Z-coordinate of the fourth vertex of the original tetrahedron
+ * @param[out] rTets Pointer to an array of 8 tet_vertices structures that will
+ *                  store the coordinates of the vertices for the refined tetrahedra
+ *
+ * @details
+ * The refinement is achieved by computing midpoints of the edges of the original
+ * tetrahedron and using these points, along with the original vertices, to define
+ * 8 new tetrahedra that completely fill the volume of the original tetrahedron.
+ * This is a common operation in adaptive mesh refinement procedures for finite element
+ * methods.
+ * Using the method from the paper:
+ *   Uniform Refinement of a Tetrahedron
+ *   Elizabeth G. Ong, January 1991, CAM Report 91-01
+ *
+ * @return Number of created tetrahedra (8 for a successful refinement), or a negative
+ *         value if an error occurred
+ */
+int                                                        //
+tet_uniform_refinement(const real_t               v1x,     //
+                       const real_t               v1y,     //
+                       const real_t               v1z,     //
+                       const real_t               v2x,     //
+                       const real_t               v2y,     //
+                       const real_t               v2z,     //
+                       const real_t               v3x,     //
+                       const real_t               v3y,     //
+                       const real_t               v3z,     //
+                       const real_t               v4x,     //
+                       const real_t               v4y,     //
+                       const real_t               v4z,     //
+                       struct tet_vertices* const rTets);  // Output tetrahedra
+
+/**
+ * @brief Compute the volume of an array of tetrahedra.
+ * return the total volume of the tetrahedra in the array.
+ * The volume of each tetrahedron is computed using the determinant of the 4x4 matrix
+ * Returns the total volume of the tetrahedra in the array.
+ *
+ * @param[in] tets Array of tetrahedra
+ * @param[in] n Number of tetrahedra
+ * @param[out] V Pointer to store the total volume
+ * @return real_t Total volume of the tetrahedra
+ */
+real_t                                                   //
+volume_tet_array(const struct tet_vertices* const tets,  // Array of tetrahedra
+                 const int                        n,     // Number of tetrahedra
+                 real_t* const                    V);                       // Output
 
 #ifdef __cplusplus
 }  // extern "C"
