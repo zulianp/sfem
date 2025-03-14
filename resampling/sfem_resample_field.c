@@ -389,9 +389,9 @@ tet4_resample_field_local(const ptrdiff_t                      nelements,  // Me
                                z[2],
                                z[3],
                                //
-                               tet4_qx[q],
-                               tet4_qy[q],
-                               tet4_qz[q],
+                               tet_qx[q],
+                               tet_qy[q],
+                               tet_qz[q],
                                //
                                &g_qx,
                                &g_qy,
@@ -400,18 +400,18 @@ tet4_resample_field_local(const ptrdiff_t                      nelements,  // Me
 #ifndef SFEM_RESAMPLE_GAP_DUAL
                 // Standard basis function
                 {
-                    tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-                    tet4_f[1] = tet4_qx[q];
-                    tet4_f[2] = tet4_qy[q];
-                    tet4_f[2] = tet4_qz[q];
+                    tet4_f[0] = 1 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+                    tet4_f[1] = tet_qx[q];
+                    tet4_f[2] = tet_qy[q];
+                    tet4_f[2] = tet_qz[q];
                 }
 #else
                 // DUAL basis function
                 {
-                    const real_t f0 = 1.0 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-                    const real_t f1 = tet4_qx[q];
-                    const real_t f2 = tet4_qy[q];
-                    const real_t f3 = tet4_qz[q];
+                    const real_t f0 = 1.0 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+                    const real_t f1 = tet_qx[q];
+                    const real_t f2 = tet_qy[q];
+                    const real_t f3 = tet_qz[q];
 
                     tet4_f[0] = 4 * f0 - f1 - f2 - f3;
                     tet4_f[1] = -f0 + 4 * f1 - f2 - f3;
@@ -419,8 +419,8 @@ tet4_resample_field_local(const ptrdiff_t                      nelements,  // Me
                     tet4_f[3] = -f0 - f1 - f2 + 4 * f3;
                 }
 #endif
-                // const real_t dV = measure * tet4_qw[q];
-                const real_t dV = tet4_qw[q];
+                // const real_t dV = measure * tet_qw[q];
+                const real_t dV = tet_qw[q];
 
                 const real_t grid_x = (g_qx - ox) / dx;
                 const real_t grid_y = (g_qy - oy) / dy;

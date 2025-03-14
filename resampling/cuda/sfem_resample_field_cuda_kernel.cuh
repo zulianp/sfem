@@ -339,9 +339,9 @@ tet4_resample_field_local_kernel(const ptrdiff_t MY_RESTRICT         start_eleme
                           z2,
                           z3,
 
-                          tet4_qx[quad_i],
-                          tet4_qy[quad_i],
-                          tet4_qz[quad_i],
+                          tet_qx[quad_i],
+                          tet_qy[quad_i],
+                          tet_qz[quad_i],
 
                           &g_qx,
                           &g_qy,
@@ -350,18 +350,18 @@ tet4_resample_field_local_kernel(const ptrdiff_t MY_RESTRICT         start_eleme
 #ifdef SFEM_RESAMPLE_GAP_DUAL
         // Standard basis function
         {
-            tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-            tet4_f[1] = tet4_qx[q];
-            tet4_f[2] = tet4_qy[q];
-            tet4_f[2] = tet4_qz[q];
+            tet4_f[0] = 1 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+            tet4_f[1] = tet_qx[q];
+            tet4_f[2] = tet_qy[q];
+            tet4_f[2] = tet_qz[q];
         }
 #else
         // DUAL basis function
         {
-            const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
-            const real_type f1 = tet4_qx[quad_i];
-            const real_type f2 = tet4_qy[quad_i];
-            const real_type f3 = tet4_qz[quad_i];
+            const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
+            const real_type f1 = tet_qx[quad_i];
+            const real_type f2 = tet_qy[quad_i];
+            const real_type f3 = tet_qz[quad_i];
 
             const real_type r4 = 4.0;
 
@@ -426,7 +426,7 @@ tet4_resample_field_local_kernel(const ptrdiff_t MY_RESTRICT         start_eleme
             //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
             // }  // end edof_i loop
 
-            const real_type dV = theta_volume * tet4_qw[quad_i];
+            const real_type dV = theta_volume * tet_qw[quad_i];
             // dV = 1.0;
 
             element_field0 += eval_field * tet4_f0 * dV;
@@ -458,10 +458,10 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 __device__ inline void                                              //
-quadrature_node(const real_type                    tet4_qx_v,       //
-                const real_type                    tet4_qy_v,       //
-                const real_type                    tet4_qz_v,       //
-                const real_type                    tet4_qw_v,       //
+quadrature_node(const real_type                    tet_qx_v,       //
+                const real_type                    tet_qy_v,       //
+                const real_type                    tet_qz_v,       //
+                const real_type                    tet_qw_v,       //
                 const real_type                    theta_volume,    //
                 const real_type                    x0,              //
                 const real_type                    x1,              //
@@ -523,9 +523,9 @@ quadrature_node(const real_type                    tet4_qx_v,       //
                       z2,
                       z3,
 
-                      tet4_qx_v,
-                      tet4_qy_v,
-                      tet4_qz_v,
+                      tet_qx_v,
+                      tet_qy_v,
+                      tet_qz_v,
 
                       &g_qx,
                       &g_qy,
@@ -536,10 +536,10 @@ quadrature_node(const real_type                    tet4_qx_v,       //
         const real_type r4 = 4.0;
         const real_type r1 = 1.0;
 
-        const real_type f0 = r1 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
-        const real_type f1 = tet4_qx_v;
-        const real_type f2 = tet4_qy_v;
-        const real_type f3 = tet4_qz_v;
+        const real_type f0 = r1 - tet_qx_v - tet_qy_v - tet_qz_v;
+        const real_type f1 = tet_qx_v;
+        const real_type f2 = tet_qy_v;
+        const real_type f3 = tet_qz_v;
 
         tet4_f0 = r4 * f0 - f1 - f2 - f3;
         tet4_f1 = -f0 + r4 * f1 - f2 - f3;
@@ -601,7 +601,7 @@ quadrature_node(const real_type                    tet4_qx_v,       //
         //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
         // }  // end edof_i loop
 
-        const real_type dV = theta_volume * tet4_qw_v;
+        const real_type dV = theta_volume * tet_qw_v;
         // dV = 1.0;
 
         element_field0 = fma_real_t(eval_field * tet4_f0, dV, element_field0);
@@ -759,15 +759,15 @@ tet4_resample_field_reduce_local_kernel(const ptrdiff_t MY_RESTRICT         star
         // real_type element_field2 = 0.0;
         // real_type element_field3 = 0.0;
 
-        const real_type tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-        const real_type tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-        const real_type tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-        const real_type tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
+        const real_type tet_qx_v = (q_i < TET_QUAD_NQP) ? tet_qx[q_i] : tet_qx[0];
+        const real_type tet_qy_v = (q_i < TET_QUAD_NQP) ? tet_qy[q_i] : tet_qy[0];
+        const real_type tet_qz_v = (q_i < TET_QUAD_NQP) ? tet_qz[q_i] : tet_qz[0];
+        const real_type tet_qw_v = (q_i < TET_QUAD_NQP) ? tet_qw[q_i] : real_t(0.0);
 
-        quadrature_node(tet4_qx_v,
-                        tet4_qy_v,
-                        tet4_qz_v,
-                        tet4_qw_v,
+        quadrature_node(tet_qx_v,
+                        tet_qy_v,
+                        tet_qz_v,
+                        tet_qw_v,
                         theta_volume,
                         x0,
                         x1,
@@ -960,15 +960,15 @@ tet4_resample_field_reduce_local_kernel_v2(const ptrdiff_t MY_RESTRICT         s
             // real_type element_field2 = 0.0;
             // real_type element_field3 = 0.0;
 
-            const real_type tet4_qx_v = (q_i < TET_QUAD_NQP) ? tet4_qx[q_i] : tet4_qx[0];
-            const real_type tet4_qy_v = (q_i < TET_QUAD_NQP) ? tet4_qy[q_i] : tet4_qy[0];
-            const real_type tet4_qz_v = (q_i < TET_QUAD_NQP) ? tet4_qz[q_i] : tet4_qz[0];
-            const real_type tet4_qw_v = (q_i < TET_QUAD_NQP) ? tet4_qw[q_i] : real_t(0.0);
+            const real_type tet_qx_v = (q_i < TET_QUAD_NQP) ? tet_qx[q_i] : tet_qx[0];
+            const real_type tet_qy_v = (q_i < TET_QUAD_NQP) ? tet_qy[q_i] : tet_qy[0];
+            const real_type tet_qz_v = (q_i < TET_QUAD_NQP) ? tet_qz[q_i] : tet_qz[0];
+            const real_type tet_qw_v = (q_i < TET_QUAD_NQP) ? tet_qw[q_i] : real_t(0.0);
 
-            quadrature_node(tet4_qx_v,
-                            tet4_qy_v,
-                            tet4_qz_v,
-                            tet4_qw_v,
+            quadrature_node(tet_qx_v,
+                            tet_qy_v,
+                            tet_qz_v,
+                            tet_qw_v,
                             theta_volume,
                             x0,
                             x1,

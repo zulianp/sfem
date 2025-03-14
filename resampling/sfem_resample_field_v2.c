@@ -455,9 +455,9 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
                               z1,               //
                               z2,               //
                               z3,               //
-                              tet4_qx[quad_i],  // Quadrature point
-                              tet4_qy[quad_i],  //
-                              tet4_qz[quad_i],  //
+                              tet_qx[quad_i],  // Quadrature point
+                              tet_qy[quad_i],  //
+                              tet_qz[quad_i],  //
                               &g_qx,            // Output coordinates
                               &g_qy,            //
                               &g_qz);           //
@@ -465,20 +465,20 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 #ifndef SFEM_RESAMPLE_GAP_DUAL
             // Standard basis function
             {
-                tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-                tet4_f[1] = tet4_qx[q];
-                tet4_f[2] = tet4_qy[q];
-                tet4_f[2] = tet4_qz[q];
+                tet4_f[0] = 1 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+                tet4_f[1] = tet_qx[q];
+                tet4_f[2] = tet_qy[q];
+                tet4_f[2] = tet_qz[q];
             }
 #else
 
             {
                 // DUAL basis function (Shape functions for tetrahedral elements)
                 // at the quadrature point
-                const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
-                const real_type f1 = tet4_qx[quad_i];
-                const real_type f2 = tet4_qy[quad_i];
-                const real_type f3 = tet4_qz[quad_i];
+                const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
+                const real_type f1 = tet_qx[quad_i];
+                const real_type f2 = tet_qy[quad_i];
+                const real_type f3 = tet_qz[quad_i];
 
                 // Values of the shape functions at the quadrature point
                 // In the local coordinate system of the tetrahedral element
@@ -588,7 +588,7 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
 
                 // Update the field at the vertices of the tetrahedral element
                 // with the contribution of the quadrature point
-                const real_type dV = theta_volume * tet4_qw[quad_i];
+                const real_type dV = theta_volume * tet_qw[quad_i];
 
                 //
                 element_field0 += eval_field * tet4_f0 * dV;

@@ -427,9 +427,9 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
             //
             vec_real g_qx, g_qy, g_qz;
 
-            vec_real tet4_qx_v = CONST_VEC(tet4_qx[quad_i]);
-            vec_real tet4_qy_v = CONST_VEC(tet4_qy[quad_i]);
-            vec_real tet4_qz_v = CONST_VEC(tet4_qz[quad_i]);
+            vec_real tet_qx_v = CONST_VEC(tet_qx[quad_i]);
+            vec_real tet_qy_v = CONST_VEC(tet_qy[quad_i]);
+            vec_real tet_qz_v = CONST_VEC(tet_qz[quad_i]);
 
             tet4_transform_V(x0,
                              x1,
@@ -446,9 +446,9 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
                              z2,
                              z3,
                              //
-                             tet4_qx_v,
-                             tet4_qy_v,
-                             tet4_qz_v,
+                             tet_qx_v,
+                             tet_qy_v,
+                             tet_qz_v,
                              //
                              &g_qx,
                              &g_qy,
@@ -457,18 +457,18 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
 #ifndef SFEM_RESAMPLE_GAP_DUAL
             // Standard basis function
             {
-                // tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-                // tet4_f[1] = tet4_qx[q];
-                // tet4_f[2] = tet4_qy[q];
-                // tet4_f[2] = tet4_qz[q];
+                // tet4_f[0] = 1 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+                // tet4_f[1] = tet_qx[q];
+                // tet4_f[2] = tet_qy[q];
+                // tet4_f[2] = tet_qz[q];
             }
 #else
             // DUAL basis function
             {
-                const vec_real f0 = 1.0 - tet4_qx_v - tet4_qy_v - tet4_qz_v;
-                const vec_real f1 = tet4_qx_v;
-                const vec_real f2 = tet4_qy_v;
-                const vec_real f3 = tet4_qz_v;
+                const vec_real f0 = 1.0 - tet_qx_v - tet_qy_v - tet_qz_v;
+                const vec_real f1 = tet_qx_v;
+                const vec_real f2 = tet_qy_v;
+                const vec_real f3 = tet_qz_v;
 
                 tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
                 tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
@@ -542,7 +542,7 @@ tet4_resample_field_local_V_aligned(const ptrdiff_t                      start_n
                 //     element_field[edof_i] += eval_field * tet4_f[edof_i] * dV;
                 // }  // end edof_i loop
 
-                vec_real dV = theta_volume * tet4_qw[quad_i];
+                vec_real dV = theta_volume * tet_qw[quad_i];
                 // dV = (vec8_t){1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
                 element_field0 += eval_field * tet4_f0 * dV;
