@@ -290,6 +290,10 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                                        z2,
                                                        z3);
 
+        const real_type ratio_Vth = theta_volume / hexahedron_volume;
+
+        // printf("ratio_Vth: Volume of the tetrahedron / Volume of the hexahedron = %g\n", ratio_Vth); 
+
         const real_type wf0 = weighted_field[ev[0]];
         const real_type wf1 = weighted_field[ev[1]];
         const real_type wf2 = weighted_field[ev[2]];

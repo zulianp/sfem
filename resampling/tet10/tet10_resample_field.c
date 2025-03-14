@@ -17,7 +17,16 @@
 
 ptrdiff_t nSizes_global = 0;
 
-SFEM_INLINE static void tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
+ */
+SFEM_INLINE static void  //
+tet10_dual_basis_popp(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
     const real_t x0  = -qx - qy - qz + 1;
     const real_t x1  = 2 * qy;
     const real_t x2  = 2 * qz;
@@ -210,7 +219,16 @@ tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* 
     f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
 }
 
-SFEM_INLINE static real_t tet4_measure(
+/**
+ * @brief Compute the dual basis of the tet10 element
+ *
+ * @param qx
+ * @param qy
+ * @param qz
+ * @param f
+ */
+SFEM_INLINE static real_t  //
+tet4_measure(
         // X-coordinates
         const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
