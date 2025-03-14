@@ -4,8 +4,16 @@ import sys
 from sympy.integrals.quadrature import gauss_lobatto, gauss_legendre
 
 order = int(sys.argv[1])
+qp_type = "gauss_legendre"
 
-x, w = gauss_legendre(order, 10)
+if len(sys.argv) > 2:
+	qp_type = sys.argv[2]
+
+if qp_type == "gauss_legendre":
+	x, w = gauss_legendre(order, 10)
+else:
+	x, w = gauss_lobatto(order, 10)
+	
 n = len(w)
 
 print("// ------------------------------")
