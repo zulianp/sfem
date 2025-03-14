@@ -71,9 +71,9 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
                           z1,               //
                           z2,               //
                           z3,               //
-                          tet4_qx[quad_i],  // Quadrature point
-                          tet4_qy[quad_i],  //
-                          tet4_qz[quad_i],  //
+                          tet_qx[quad_i],  // Quadrature point
+                          tet_qy[quad_i],  //
+                          tet_qz[quad_i],  //
                           &g_qx,            // Output coordinates
                           &g_qy,            //
                           &g_qz);           //
@@ -81,10 +81,10 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
 #ifndef SFEM_RESAMPLE_GAP_DUAL
         // Standard basis function
         {
-            tet4_f[0] = 1 - tet4_qx[q] - tet4_qy[q] - tet4_qz[q];
-            tet4_f[1] = tet4_qx[q];
-            tet4_f[2] = tet4_qy[q];
-            tet4_f[2] = tet4_qz[q];
+            tet4_f[0] = 1 - tet_qx[q] - tet_qy[q] - tet_qz[q];
+            tet4_f[1] = tet_qx[q];
+            tet4_f[2] = tet_qy[q];
+            tet4_f[2] = tet_qz[q];
         }
 #else
 
@@ -92,10 +92,10 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
         {
             // DUAL basis function (Shape functions for tetrahedral elements)
             // at the quadrature point
-            const real_type f0 = 1.0 - tet4_qx[quad_i] - tet4_qy[quad_i] - tet4_qz[quad_i];
-            const real_type f1 = tet4_qx[quad_i];
-            const real_type f2 = tet4_qy[quad_i];
-            const real_type f3 = tet4_qz[quad_i];
+            const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
+            const real_type f1 = tet_qx[quad_i];
+            const real_type f2 = tet_qy[quad_i];
+            const real_type f3 = tet_qz[quad_i];
 
             // Values of the shape functions at the quadrature point
             // In the local coordinate system of the tetrahedral element
@@ -184,7 +184,7 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
                                           &i7);    //
 
         // Integrate the values of the field at the vertices of the tetrahedral element
-        const real_type dV = theta_volume * tet4_qw[quad_i];
+        const real_type dV = theta_volume * tet_qw[quad_i];
         const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
 
         const real_type d0 = It * hex8_f0;
@@ -401,9 +401,9 @@ tet4_update_cnt_local_adjoint(const real_type                      x0,       // 
                           z1,               //
                           z2,               //
                           z3,               //
-                          tet4_qx[quad_i],  // Quadrature point
-                          tet4_qy[quad_i],  //
-                          tet4_qz[quad_i],  //
+                          tet_qx[quad_i],  // Quadrature point
+                          tet_qy[quad_i],  //
+                          tet_qz[quad_i],  //
                           &g_qx,            // Output coordinates
                           &g_qy,            //
                           &g_qz);           //

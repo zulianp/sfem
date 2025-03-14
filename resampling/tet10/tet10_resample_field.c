@@ -818,9 +818,9 @@ int hex8_to_subparametric_tet10_resample_field_local(
                                z[2],
                                z[3],
                                //
-                               tet4_qx[q],
-                               tet4_qy[q],
-                               tet4_qz[q],
+                               tet_qx[q],
+                               tet_qy[q],
+                               tet_qz[q],
                                //
                                &g_qx,
                                &g_qy,
@@ -828,10 +828,10 @@ int hex8_to_subparametric_tet10_resample_field_local(
 
                 // No standard basis function (tet10 cannot lump as for tet4, needs special
                 // treatment)
-                // tet10_dual_basis_popp(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
-                tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+                // tet10_dual_basis_popp(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
+                tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
 
-                const real_t dV = measure * tet4_qw[q];
+                const real_t dV = measure * tet_qw[q];
 
                 const real_t grid_x = (g_qx - ox) / dx;
                 const real_t grid_y = (g_qy - oy) / dy;
@@ -1214,18 +1214,18 @@ int hex8_to_isoparametric_tet10_resample_field_local(
                 //     break;
                 // }
 
-                const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
+                const real_t measure = tet10_measure(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]);
 
                 assert(measure > 0);
-                const real_t dV = measure * tet4_qw[q];
+                const real_t dV = measure * tet_qw[q];
                 // printf("dV[%d]: %e\n", q, dV);
 
                 real_t g_qx, g_qy, g_qz;
                 // Transform quadrature point to physical space
                 // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical
                 // space
-                tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
-                tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+                tet10_transform(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx, &g_qy, &g_qz);
+                tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
 
                 ///// ======================================================
 
@@ -1403,8 +1403,8 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
             real_t g_qy;
             real_t g_qz;
 
-            tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx, &g_qy, &g_qz);
-            tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+            tet10_transform(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx, &g_qy, &g_qz);
+            tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
 
             const real_t grid_x = (g_qx - ox) / dx;
             const real_t grid_y = (g_qy - oy) / dy;
@@ -1432,8 +1432,8 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
 
             hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
 
-            const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]);
-            const real_t dV      = measure * tet4_qw[q];
+            const real_t measure = tet10_measure(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]);
+            const real_t dV      = measure * tet_qw[q];
 
             // if (dV < 0) {
             //     fprintf(stderr, "warning: negative volume %g!\n", dV);
@@ -1619,21 +1619,21 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 //     break;
                 // }
 
-                // const real_t measure = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q],
-                // tet4_qz[q]);
+                // const real_t measure = tet10_measure(x, y, z, tet_qx[q], tet_qy[q],
+                // tet_qz[q]);
 
                 // measure with respect to the unitary spacing
                 const real_t measure = tet10_measure(x_unit,
                                                      y_unit,
                                                      z_unit,  //
-                                                     tet4_qx[q],
-                                                     tet4_qy[q],
-                                                     tet4_qz[q]);
+                                                     tet_qx[q],
+                                                     tet_qy[q],
+                                                     tet_qz[q]);
 
                 assert(measure > 0);
 
-                // const real_t dV = measure * tet4_qw[q];
-                const real_t dV = measure * tet4_qw[q] * cVolume;
+                // const real_t dV = measure * tet_qw[q];
+                const real_t dV = measure * tet_qw[q] * cVolume;
 
                 // printf("dV[%d]: %e\n", q, dV);
 
@@ -1641,15 +1641,15 @@ int hex8_to_isoparametric_tet10_resample_field_local_cube1(
                 // g_qx_glob, g_qy_glob, g_qz_glob are the coordinates of the quadrature point in
                 // the global space
                 real_t g_qx_glob, g_qy_glob, g_qz_glob;
-                tet10_transform(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx_glob, &g_qy_glob, &g_qz_glob);
+                tet10_transform(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx_glob, &g_qy_glob, &g_qz_glob);
 
-                tet10_dual_basis_hrt(tet4_qx[q], tet4_qy[q], tet4_qz[q], tet10_f);
+                tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
 
                 // Transform quadrature point to unitary space
                 // g_qx_unit, g_qy_unit, g_qz_unit are the coordinates of the quadrature point in
                 // the unitary space
                 real_t g_qx_unit, g_qy_unit, g_qz_unit;
-                tet10_transform(x_unit, y_unit, z_unit, tet4_qx[q], tet4_qy[q], tet4_qz[q], &g_qx_unit, &g_qy_unit, &g_qz_unit);
+                tet10_transform(x_unit, y_unit, z_unit, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx_unit, &g_qy_unit, &g_qz_unit);
 
                 ///// ======================================================
 
@@ -1835,12 +1835,12 @@ int isoparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
 
         // We do this numerical integration due to the det J
         for (int q = 0; q < TET_QUAD_NQP; q++) {  // loop over the quadrature points
-            real_t dV = tet10_measure(x, y, z, tet4_qx[q], tet4_qy[q], tet4_qz[q]) * tet4_qw[q];
+            real_t dV = tet10_measure(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]) * tet_qw[q];
             isoparametric_lumped_mass_kernel_hrt(dV,
                                                  // Quadrature
-                                                 tet4_qx[q],
-                                                 tet4_qy[q],
-                                                 tet4_qz[q],
+                                                 tet_qx[q],
+                                                 tet_qy[q],
+                                                 tet_qz[q],
                                                  element_diag);
         }
 
