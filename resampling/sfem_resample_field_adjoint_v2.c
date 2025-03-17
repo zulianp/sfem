@@ -463,62 +463,92 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
         const real_type alpha_tet = max_edges_length / dx;
         //////////////////////////////////////////////
 
-        // Volume of the tetrahedron
-        const real_type theta_volume = tet4_measure_v2(x0,
-                                                       x1,
-                                                       x2,
-                                                       x3,
-                                                       //
-                                                       y0,
-                                                       y1,
-                                                       y2,
-                                                       y3,
-                                                       //
-                                                       z0,
-                                                       z1,
-                                                       z2,
-                                                       z3);
+        struct tet_vertices tets[8];
+        int                 n_tets = 0;
 
-        const real_type wf0 = weighted_field[ev[0]];
-        const real_type wf1 = weighted_field[ev[1]];
-        const real_type wf2 = weighted_field[ev[2]];
-        const real_type wf3 = weighted_field[ev[3]];
+        if (alpha_tet < alpha_th) {
+            n_tets     = 1;
+            tets[0].x0 = x0;
+            tets[0].x1 = x1;
+            tets[0].x2 = x2;
+            tets[0].x3 = x3;
+            tets[0].y0 = y0;
+            tets[0].y1 = y1;
+            tets[0].y2 = y2;
+            tets[0].y3 = y3;
+            tets[0].z0 = z0;
+            tets[0].z1 = z1;
+            tets[0].z2 = z2;
+            tets[0].z3 = z3;
 
-        // const real_type sampled_volume = hexahedron_volume * (real_type)(TET_QUAD_NQP);
+            tets[0].w0 = weighted_field[ev[0]];
+            tets[0].w1 = weighted_field[ev[1]];
+            tets[0].w2 = weighted_field[ev[2]];
+            tets[0].w3 = weighted_field[ev[3]];
 
-        tet4_resample_tetrahedron_local_adjoint(x0,            // Tetrahedron vertices X-coordinates
-                                                x1,            //
-                                                x2,            //
-                                                x3,            //
-                                                y0,            // Tetrahedron vertices Y-coordinates
-                                                y1,            //
-                                                y2,            //
-                                                y3,            //
-                                                z0,            // Tetrahedron vertices Z-coordinates
-                                                z1,            //
-                                                z2,            //
-                                                z3,            //
-                                                theta_volume,  // Volume of the tetrahedron
-                                                wf0,           // Weighted field at the vertices
-                                                wf1,           //
-                                                wf2,           //
-                                                wf3,           //
-                                                ox,            // Origin of the grid
-                                                oy,            //
-                                                oz,            //
-                                                dx,            // Spacing of the grid
-                                                dy,            //
-                                                dz,            //
-                                                stride,        // Stride
-                                                n,             // Size of the grid
-                                                data);         // Output
+        } else {
+        }
 
-        // if (sampled_volume < 8.0 * theta_volume) {
-        //     fprintf(stderr, "WARNING: sampled_volume < 8 * theta_volume: %g < %g\n", sampled_volume, 8.0 *
-        // theta_volume);
-        // }
+        for (int ref_i = 0; ref_i < n_tets; ref_i++) {
+            // Loop over the refined tetrahedra
 
-    }  // end for i over elements
+            // Volume of the tetrahedron
+            const real_type theta_volume = tet4_measure_v2(tets[ref_i].x0,
+                                                           tets[ref_i].x1,
+                                                           tets[ref_i].x2,
+                                                           tets[ref_i].x3,
+                                                           //
+                                                           tets[ref_i].y0,
+                                                           tets[ref_i].y1,
+                                                           tets[ref_i].y2,
+                                                           tets[ref_i].y3,
+                                                           //
+                                                           tets[ref_i].z0,
+                                                           tets[ref_i].z1,
+                                                           tets[ref_i].z2,
+                                                           tets[ref_i].z3);
+
+            const real_type wf0 = tets[ref_i].w0;
+            const real_type wf1 = tets[ref_i].w1;
+            const real_type wf2 = tets[ref_i].w2;
+            const real_type wf3 = tets[ref_i].w3;
+
+            // const real_type sampled_volume = hexahedron_volume * (real_type)(TET_QUAD_NQP);
+
+            tet4_resample_tetrahedron_local_adjoint(tets[ref_i].x0,
+                                                    tets[ref_i].x1,
+                                                    tets[ref_i].x2,
+                                                    tets[ref_i].x3,
+                                                    //
+                                                    tets[ref_i].y0,
+                                                    tets[ref_i].y1,
+                                                    tets[ref_i].y2,
+                                                    tets[ref_i].y3,
+                                                    //
+                                                    tets[ref_i].z0,
+                                                    tets[ref_i].z1,
+                                                    tets[ref_i].z2,
+                                                    tets[ref_i].z3 theta_volume,  // Volume of the tetrahedron
+                                                    wf0,                          // Weighted field at the vertices
+                                                    wf1,                          //
+                                                    wf2,                          //
+                                                    wf3,                          //
+                                                    ox,                           // Origin of the grid
+                                                    oy,                           //
+                                                    oz,                           //
+                                                    dx,                           // Spacing of the grid
+                                                    dy,                           //
+                                                    dz,                           //
+                                                    stride,                       // Stride
+                                                    n,                            // Size of the grid
+                                                    data);                        // Output
+
+            // if (sampled_volume < 8.0 * theta_volume) {
+            //     fprintf(stderr, "WARNING: sampled_volume < 8 * theta_volume: %g < %g\n", sampled_volume, 8.0 *
+            // theta_volume);
+            // }
+        }  // end for ref_i over refined tetrahedra
+    }      // end for i over elements
 
     RETURN_FROM_FUNCTION(ret);
 }  // end tet4_resample_field_local_refine_adjoint
