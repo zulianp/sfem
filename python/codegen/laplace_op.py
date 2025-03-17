@@ -3,6 +3,7 @@
 import sys
 from aahex8 import *
 from hex8 import *
+from hex27  import *
 from quad4 import *
 from sfem_codegen import *
 from tet10 import *
@@ -326,6 +327,7 @@ def main():
 	"TET10": Tet10(),
 	"TET20": Tet20(),
 	"HEX8": Hex8(),
+	"HEX27": Hex27(),
 	"AAHEX8": AAHex8(),
 	"AAQUAD4": AxisAlignedQuad4()
 	}

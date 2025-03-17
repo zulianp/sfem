@@ -16,7 +16,7 @@ class Hex8(FE):
 		return 1
 
 	def subparam_n_nodes(self):
-		return 4
+		return 2
 
 	def barycenter(self):
 		return vec3(sp.Rational(1, 2), sp.Rational(1, 2), sp.Rational(1, 2))
@@ -28,13 +28,13 @@ class Hex8(FE):
 		z = xyz[2]
 
 		return [
-			[x[0], x[1], x[3], x[4]],
-			[y[0], y[1], y[3], y[4]],
-			[z[0], z[1], z[3], z[4]]
+			[x[0], x[6]],
+			[y[0], y[6]],
+			[z[0], z[6]]
 		]
 
 	def coords(self):
-		return  [coeffs('x', 10), coeffs('y', 10), coeffs('z', 10) ]
+		return  [coeffs('x', 8), coeffs('y', 8), coeffs('z', 8) ]
 
 
 	def fun(self, p):
