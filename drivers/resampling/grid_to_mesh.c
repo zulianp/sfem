@@ -390,8 +390,9 @@ int main(int argc, char* argv[]) {
     }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t*       field     = NULL;
-    unsigned int* field_cnt = NULL;
+    real_t*       field       = NULL;
+    unsigned int* field_cnt   = NULL;  // TESTING used to count the number of times a field is updated
+    real_t*       field_alpha = NULL;  // TESTING used to store the alpha field
     ptrdiff_t     nlocal[3];
 
     int SFEM_READ_FP32 = 1;
@@ -433,9 +434,10 @@ int main(int argc, char* argv[]) {
             // double max_temp = temp[0];
             // double min_temp = temp[0];
 
-            n_zyx     = nlocal[0] * nlocal[1] * nlocal[2];
-            field     = malloc(n_zyx * sizeof(real_t));
-            field_cnt = calloc(n_zyx, sizeof(unsigned int));
+            n_zyx       = nlocal[0] * nlocal[1] * nlocal[2];
+            field       = malloc(n_zyx * sizeof(real_t));
+            field_cnt   = calloc(n_zyx, sizeof(unsigned int));
+            field_alpha = calloc(n_zyx, sizeof(real_t));
 
             // if (field == NULL) {
             //     fprintf(stderr, "Error: malloc failed\n");
@@ -596,6 +598,8 @@ int main(int argc, char* argv[]) {
             }
 
         } else if (SFEM_ADJOINT == 1) {
+            /// Adjoint case /////////////////////////////////////////////////
+
             int ret_resample_adjoint = 1;
 
             // DEBUG: fill g with ones
@@ -665,18 +669,19 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    ret_resample_adjoint =                          //
-                            resample_field_adjoint_tet4(mpi_size,   //
-                                                        mpi_rank,   //
-                                                        &mesh,      //
-                                                        nlocal,     //
-                                                        stride,     //
-                                                        origin,     //
-                                                        delta,      //
-                                                        g,          //
-                                                        field,      //
-                                                        field_cnt,  //
-                                                        &info);     //
+                    ret_resample_adjoint =                            //
+                            resample_field_adjoint_tet4(mpi_size,     //
+                                                        mpi_rank,     //
+                                                        &mesh,        //
+                                                        nlocal,       //
+                                                        stride,       //
+                                                        origin,       //
+                                                        delta,        //
+                                                        g,            //
+                                                        field,        //
+                                                        field_cnt,    //
+                                                        field_alpha,  //
+                                                        &info);       //
 
                     BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
 
@@ -764,6 +769,14 @@ int main(int argc, char* argv[]) {
                                   MPI_FLOAT,
                                   3,
                                   field_cnt_real,
+                                  nlocal,
+                                  nglobal);
+
+                    ndarray_write(MPI_COMM_WORLD,
+                                  "/home/sriva/git/sfem/workflows/resample/test_field_alpha.raw",
+                                  MPI_FLOAT,
+                                  3,
+                                  field_alpha,
                                   nlocal,
                                   nglobal);
 
@@ -903,6 +916,16 @@ int main(int argc, char* argv[]) {
         free(field);
         free(g);
         mesh_destroy(&mesh);
+    }
+
+    if (field_cnt != NULL) {
+        free(field_cnt);
+        field_cnt = NULL;
+    }
+
+    if (field_alpha) {
+        free(field_alpha);
+        field_alpha = NULL;
     }
 
     double tock = MPI_Wtime();

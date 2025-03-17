@@ -1478,15 +1478,6 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
             data[indices[5]] += d5;
             data[indices[6]] += d6;
             data[indices[7]] += d7;
-
-            // data[indices[0]]=1.0;
-            // data[indices[1]]=1.0;
-            // data[indices[2]]=1.0;
-            // data[indices[3]]=1.0;
-            // data[indices[4]]=1.0;
-            // data[indices[5]]=1.0;
-            // data[indices[6]]=1.0;
-            // data[indices[7]]=1.0;
         }
     }
 
