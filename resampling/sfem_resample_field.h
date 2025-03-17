@@ -304,6 +304,11 @@ in_out_tet4(const int                            mpi_size,   // MPI size
  * @param[in] delta     Grid spacing (dx, dy, dz) in each dimension of the structured grid.
  * @param[in] g         Input field (weighted field) defined on the tetrahedral mesh.
  * @param[out] data     Output array representing the structured grid, where the resampled field values will be stored.
+ * @param[out] data_cnt Output array that counts how many times each grid point is updated during
+ *                      the adjoint resampling operation, useful for normalization.
+ * @param[in] alpha     Optional weighting factor array for the structured grid points. If not NULL,
+ *                      these values are used to weight the contribution of each tetrahedral element
+ *                      to the structured grid.
  * @param[in,out] info  A pointer to the sfem_resample_field_info struct, containing information about the resampling process.
  *
  * @details
@@ -311,6 +316,12 @@ in_out_tet4(const int                            mpi_size,   // MPI size
  * local adjoint resampling operation, transferring values from its assigned elements to the structured grid.
  * The "adjoint" nature means that it distributes values from the tetrahedral mesh to the structured grid,
  * rather than interpolating values from the structured grid to the tetrahedral mesh.
+ *
+ * The data_cnt array is populated with counts of how many tetrahedral elements contribute to each
+ * grid point, which can be used for proper normalization of the output field values.
+ *
+ * If the alpha parameter is provided (not NULL), it's used as a weighting factor when distributing
+ * values from the tetrahedral mesh to the structured grid, allowing for spatially-varying influence.
  *
  * @return 0 if the operation is successful.
  */
@@ -325,6 +336,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
                             unsigned int*                        data_cnt,  // SDF: data count (output)
+                            real_t const*                        alpha,     // SDF: alpha
                             sfem_resample_field_info*            info);                // Info struct with options and flags
 
 /// @brief  DEBUG code for testing the adjoint resampling operation
@@ -531,6 +543,37 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                   real_t* const SFEM_RESTRICT          data);                    // Output
 
 /**
+ * @brief
+ *
+ * @param start_element
+ * @param end_element
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param weighted_field
+ * @param alpha_th
+ * @param data
+ * @return int
+ */
+int                                                                                            //
+tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                         const ptrdiff_t                      end_element,     //
+                                         const ptrdiff_t                      nnodes,          //
+                                         const idx_t** const SFEM_RESTRICT    elems,           //
+                                         const geom_t** const SFEM_RESTRICT   xyz,             //
+                                         const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                         const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                         const geom_t* const SFEM_RESTRICT    origin,          //
+                                         const geom_t* const SFEM_RESTRICT    delta,           //
+                                         const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                         const real_t                         alpha_th,        // Threshold for alpha
+                                         real_t* const SFEM_RESTRICT          data);
+
+/**
  * @brief Count how many tetrahedral elements contribute to each grid point during adjoint resampling.
  *
  * This function traverses tetrahedral elements and counts how many times each point in the
@@ -574,6 +617,19 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
                       const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                       unsigned int* const SFEM_RESTRICT    data_cnt);          // Output
 
+int                                                                           //
+tet4_alpha_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                        const ptrdiff_t                      end_element,     //
+                        const ptrdiff_t                      nnodes,          //
+                        const idx_t** const SFEM_RESTRICT    elems,           //
+                        const geom_t** const SFEM_RESTRICT   xyz,             //
+                        const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                        const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                        const geom_t* const SFEM_RESTRICT    origin,          //
+                        const geom_t* const SFEM_RESTRICT    delta,           //
+                        const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                        real_t* const SFEM_RESTRICT          alpha);                   // Output
+
 /** @brief Function pointer type for a function of three variables. */
 typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
 
@@ -590,11 +646,11 @@ typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
  * @param fun [in] The function to be applied to the mesh.
  * @param weighted_field [out] Pointer to the output array where the weighted field will be stored.
  */
-int                                                              //
-apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
-                  const geom_t** const SFEM_RESTRICT xyz,        // Mesh
-                  const function_XYZ_t               fun,        // Function
-                  real_t* const SFEM_RESTRICT        weighted_field);       //   Output (weighted field)
+int                                                             //
+apply_fun_to_mesh(const ptrdiff_t                    nnodes,    // Mesh
+                  const geom_t** const SFEM_RESTRICT xyz,       // Mesh
+                  const function_XYZ_t               fun,       // Function
+                  real_t* const SFEM_RESTRICT        weighted_field);  //   Output (weighted field)
 
 #ifdef __cplusplus
 }

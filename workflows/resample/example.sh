@@ -59,7 +59,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 300
+sdf_test.py $sdf 400
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
@@ -107,25 +107,50 @@ time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field
 
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
 
-if [[ $SFEM_ADJOINT -eq 1 ]]
-then
-    head -11 metadata_sdf.float32.yml > metadata_test_field.yml
-    echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
-    raw_to_xdmf.py test_field.raw
-fi
 
-if [[ $SFEM_ADJOINT -eq 1 && -f bit_array.raw ]]
-then
-    head -11 metadata_sdf.float32.yml > metadata_bit_array.yml
-    echo "path: $PWD/bit_array.raw" >> metadata_bit_array.yml 
-    raw_to_xdmf.py bit_array.raw
-fi
+# Function to create metadata and convert raw files to XDMF format
+# Usage: process_raw_file filename
+# Example: process_raw_file field_cnt
+function process_raw_file() {
+    local file_base=$1
+    local raw_file="${file_base}.raw"
+    local metadata_file="metadata_${file_base}.yml"
+    
+    if [[ $SFEM_ADJOINT -eq 1 && -f $raw_file ]]; then
+        echo "Processing $raw_file..."
+        head -11 metadata_sdf.float32.yml > $metadata_file
+        echo "path: $PWD/$raw_file" >> $metadata_file
+        raw_to_xdmf.py $raw_file
+    fi
+}
 
-if [[ $SFEM_ADJOINT -eq 1 && -f field_cnt.raw ]]
-then
-	head -11 metadata_sdf.float32.yml > metadata_field_cnt.yml
-	echo "path: $PWD/field_cnt.raw" >> metadata_field_cnt.yml 
-	raw_to_xdmf.py field_cnt.raw
-fi
+process_raw_file field_cnt
+process_raw_file bit_array
+process_raw_file test_field
+process_raw_file test_field_alpha
+
+
+# if [[ $SFEM_ADJOINT -eq 1 ]]
+# then
+#     head -11 metadata_sdf.float32.yml > metadata_test_field.yml
+#     echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
+#     raw_to_xdmf.py test_field.raw
+# fi
+
+# if [[ $SFEM_ADJOINT -eq 1 && -f bit_array.raw ]]
+# then
+#     head -11 metadata_sdf.float32.yml > metadata_bit_array.yml
+#     echo "path: $PWD/bit_array.raw" >> metadata_bit_array.yml 
+#     raw_to_xdmf.py bit_array.raw
+# fi
+
+# if [[ $SFEM_ADJOINT -eq 1 && -f field_cnt.raw ]]
+# then
+# 	head -11 metadata_sdf.float32.yml > metadata_field_cnt.yml
+# 	echo "path: $PWD/field_cnt.raw" >> metadata_field_cnt.yml 
+# 	raw_to_xdmf.py field_cnt.raw
+# fi
+
+
 
 

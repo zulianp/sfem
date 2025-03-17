@@ -1147,6 +1147,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
                             unsigned int*                        data_cnt,  // SDF: data count (output)
+                            real_t const*                        alpha,     // SDF: alpha
                             sfem_resample_field_info*            info) {               // Info struct with options and flags
     //
     PRINT_CURRENT_FUNCTION;
@@ -1202,7 +1203,22 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                             mass_vector,                    //
                                             data);                          //
 
-    ret = tet4_cnt_mesh_adjoint(0,                              //
+    if (data_cnt != NULL) {
+        ret = tet4_cnt_mesh_adjoint(0,                              //
+                                    mesh->nelements,                //
+                                    mesh->nnodes,                   //
+                                    (const idx_t**)mesh->elements,  //
+                                    (const geom_t**)mesh->points,   //
+                                    n,                              //
+                                    stride,                         //
+                                    origin,                         //
+                                    delta,                          //
+                                    mass_vector,                    //
+                                    data_cnt);                      //
+    }
+
+    if (alpha != NULL) {
+        tet4_alpha_mesh_adjoint(0,                              //
                                 mesh->nelements,                //
                                 mesh->nnodes,                   //
                                 (const idx_t**)mesh->elements,  //
@@ -1212,7 +1228,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                 origin,                         //
                                 delta,                          //
                                 mass_vector,                    //
-                                data_cnt);                      //
+                                alpha);                         //
+    }
 
     free(mass_vector);
     mass_vector = NULL;

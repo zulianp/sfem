@@ -286,10 +286,11 @@ is_point_inside_tetrahedron(const real_type px,    //
  * Each vertex is represented by its x, y, and z coordinates.
  */
 struct tet_vertices {
-    real_type x0, y0, z0;  // Vertex 0 coordinates
-    real_type x1, y1, z1;  // Vertex 1 coordinates
-    real_type x2, y2, z2;  // Vertex 2 coordinates
-    real_type x3, y3, z3;  // Vertex 3 coordinates
+    real_type x0, y0, z0;      // Vertex 0 coordinates
+    real_type x1, y1, z1;      // Vertex 1 coordinates
+    real_type x2, y2, z2;      // Vertex 2 coordinates
+    real_type x3, y3, z3;      // Vertex 3 coordinates
+    real_type w0, w1, w2, w3;  // Weights for the vertices
 };
 
 /**
@@ -299,36 +300,44 @@ struct tet_vertices {
  * new vertices at the midpoints of the original edges. The refinement is uniform,
  * meaning all resulting tetrahedra have the same volume (1/8 of the original).
  *
- * @param[in] v1x X-coordinate of the first vertex of the original tetrahedron
- * @param[in] v1y Y-coordinate of the first vertex of the original tetrahedron
- * @param[in] v1z Z-coordinate of the first vertex of the original tetrahedron
- * @param[in] v2x X-coordinate of the second vertex of the original tetrahedron
- * @param[in] v2y Y-coordinate of the second vertex of the original tetrahedron
- * @param[in] v2z Z-coordinate of the second vertex of the original tetrahedron
- * @param[in] v3x X-coordinate of the third vertex of the original tetrahedron
- * @param[in] v3y Y-coordinate of the third vertex of the original tetrahedron
- * @param[in] v3z Z-coordinate of the third vertex of the original tetrahedron
- * @param[in] v4x X-coordinate of the fourth vertex of the original tetrahedron
- * @param[in] v4y Y-coordinate of the fourth vertex of the original tetrahedron
- * @param[in] v4z Z-coordinate of the fourth vertex of the original tetrahedron
+ * @param[in] v0x X-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v0y Y-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v0z Z-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v1x X-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v1y Y-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v1z Z-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v2x X-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v2y Y-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v2z Z-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v3x X-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] v3y Y-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] v3z Z-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] w0 Weight associated with vertex 0, used for field interpolation
+ * @param[in] w1 Weight associated with vertex 1, used for field interpolation
+ * @param[in] w2 Weight associated with vertex 2, used for field interpolation
+ * @param[in] w3 Weight associated with vertex 3, used for field interpolation
  * @param[out] rTets Pointer to an array of 8 tet_vertices structures that will
- *                  store the coordinates of the vertices for the refined tetrahedra
+ *                  store the coordinates and interpolated weights for the refined tetrahedra
  *
  * @details
  * The refinement is achieved by computing midpoints of the edges of the original
  * tetrahedron and using these points, along with the original vertices, to define
  * 8 new tetrahedra that completely fill the volume of the original tetrahedron.
+ * Additionally, the function interpolates field values (weights) at the new vertices
+ * based on the weights at the original vertices.
+ *
  * This is a common operation in adaptive mesh refinement procedures for finite element
- * methods.
- * Using the method from the paper:
+ * methods. The implementation uses the method from the paper:
  *   Uniform Refinement of a Tetrahedron
  *   Elizabeth G. Ong, January 1991, CAM Report 91-01
  *
- * @return Number of created tetrahedra (8 for a successful refinement), or a negative
- *         value if an error occurred
+ * @return 0 if the operation was successful, 1 otherwise
  */
 int                                                        //
-tet_uniform_refinement(const real_t               v1x,     //
+tet_uniform_refinement(const real_t               v0x,     //
+                       const real_t               v0y,     //
+                       const real_t               v0z,     //
+                       const real_t               v1x,     //
                        const real_t               v1y,     //
                        const real_t               v1z,     //
                        const real_t               v2x,     //
@@ -337,9 +346,10 @@ tet_uniform_refinement(const real_t               v1x,     //
                        const real_t               v3x,     //
                        const real_t               v3y,     //
                        const real_t               v3z,     //
-                       const real_t               v4x,     //
-                       const real_t               v4y,     //
-                       const real_t               v4z,     //
+                       const real_t               w0,      //
+                       const real_t               w1,      //
+                       const real_t               w2,      //
+                       const real_t               w3,      //
                        struct tet_vertices* const rTets);  // Output tetrahedra
 
 /**
@@ -357,6 +367,55 @@ real_t                                                   //
 volume_tet_array(const struct tet_vertices* const tets,  // Array of tetrahedra
                  const int                        n,     // Number of tetrahedra
                  real_t* const                    V);                       // Output
+
+/**
+ * @brief Calculate the lengths of all edges in a tetrahedron
+ *
+ * This function computes the lengths of all six edges of a tetrahedron defined by four vertices.
+ * The edge lengths are calculated as the Euclidean distances between pairs of vertices:
+ *
+ * - edge_length[0]: Distance between vertices v0 and v1
+ * - edge_length[1]: Distance between vertices v0 and v2
+ * - edge_length[2]: Distance between vertices v0 and v3
+ * - edge_length[3]: Distance between vertices v1 and v2
+ * - edge_length[4]: Distance between vertices v1 and v3
+ * - edge_length[5]: Distance between vertices v2 and v3
+ *
+ * @param[in] v0x X-coordinate of the first vertex (vertex 0)
+ * @param[in] v0y Y-coordinate of the first vertex (vertex 0)
+ * @param[in] v0z Z-coordinate of the first vertex (vertex 0)
+ * @param[in] v1x X-coordinate of the second vertex (vertex 1)
+ * @param[in] v1y Y-coordinate of the second vertex (vertex 1)
+ * @param[in] v1z Z-coordinate of the second vertex (vertex 1)
+ * @param[in] v2x X-coordinate of the third vertex (vertex 2)
+ * @param[in] v2y Y-coordinate of the third vertex (vertex 2)
+ * @param[in] v2z Z-coordinate of the third vertex (vertex 2)
+ * @param[in] v3x X-coordinate of the fourth vertex (vertex 3)
+ * @param[in] v3y Y-coordinate of the fourth vertex (vertex 3)
+ * @param[in] v3z Z-coordinate of the fourth vertex (vertex 3)
+ * @param[out] edge_length Pointer to an array of at least 6 elements to store the calculated edge lengths
+ *
+ * @details
+ * This function is useful for mesh quality assessment, refinement criteria, and various
+ * finite element computations where the edge lengths of tetrahedra are needed. The array
+ * edge_length must be pre-allocated with sufficient space to store all 6 edge lengths.
+ *
+ * @return 0 if the operation was successful, a non-zero error code otherwise
+ */
+int                                          //
+tet_edge_length(const real_t  v0x,           //
+                const real_t  v0y,           //
+                const real_t  v0z,           //
+                const real_t  v1x,           //
+                const real_t  v1y,           //
+                const real_t  v1z,           //
+                const real_t  v2x,           //
+                const real_t  v2y,           //
+                const real_t  v2z,           //
+                const real_t  v3x,           //
+                const real_t  v3y,           //
+                const real_t  v3z,           //
+                real_t* const edge_length);  //
 
 #ifdef __cplusplus
 }  // extern "C"
