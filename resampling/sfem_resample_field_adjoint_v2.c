@@ -487,6 +487,69 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
             tets[0].w3 = weighted_field[ev[3]];
 
         } else {
+            // printf("Refining the tetrahedron: alpha = %g\n", alpha_tet);
+
+            n_tets = 8;                 // The uniform refinement produces 8 tetrahedra
+            tet_uniform_refinement(x0,  // Coordinates of the 1st vertex
+                                   y0,
+                                   z0,
+                                   x1,
+                                   y1,  // Coordinates of the 2nd vertex
+                                   z1,
+                                   x2,
+                                   y2,
+                                   z2,  // Coordinates of the 3rd vertex
+                                   x3,
+                                   y3,
+                                   z3,
+                                   weighted_field[ev[0]],  // Weighted field at the vertices
+                                   weighted_field[ev[1]],
+                                   weighted_field[ev[2]],
+                                   weighted_field[ev[3]],
+                                   tets);  // Output
+
+            // real_t Vt[8];
+            // real_t array_vol = volume_tet_array(tets, n_tets, Vt);
+
+            // printf("Array Volume of the tetrahedra: %g: %g %g %g %g %g %g %g %g\n",
+            //        array_vol,
+            //        Vt[0],
+            //        Vt[1],
+            //        Vt[2],
+            //        Vt[3],
+            //        Vt[4],
+            //        Vt[5],
+            //        Vt[6],
+            //        Vt[7]);
+
+            // const real_type theta_volume = tet4_measure_v2(x0,
+            //                                                x1,
+            //                                                x2,
+            //                                                x3,
+            //                                                //
+            //                                                y0,
+            //                                                y1,
+            //                                                y2,
+            //                                                y3,
+            //                                                //
+            //                                                z0,
+            //                                                z1,
+            //                                                z2,
+            //                                                z3);
+
+            // printf("theta_volume = %g\n", theta_volume);
+
+            // real_t p0d = sqrt(x0 * x0 + y0 * y0 + z0 * z0);
+            // real_t p1d = sqrt(x1 * x1 + y1 * y1 + z1 * z1);
+            // real_t p2d = sqrt(x2 * x2 + y2 * y2 + z2 * z2);
+            // real_t p3d = sqrt(x3 * x3 + y3 * y3 + z3 * z3);
+
+            // printf("Tetrahedron vertices:\n");
+            // printf("  Vertex 0: (%g, %g, %g)\n", x0, y0, z0);
+            // printf("  Vertex 1: (%g, %g, %g)\n", x1, y1, z1);
+            // printf("  Vertex 2: (%g, %g, %g)\n", x2, y2, z2);
+            // printf("  Vertex 3: (%g, %g, %g)\n", x3, y3, z3);
+            // printf("tet d = %g %g %g %g\n\n", p0d, p1d, p2d, p3d);
         }
 
         for (int ref_i = 0; ref_i < n_tets; ref_i++) {
@@ -508,6 +571,8 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
                                                            tets[ref_i].z2,
                                                            tets[ref_i].z3);
 
+            // printf("theta_volume = %g\n", theta_volume);
+
             const real_type wf0 = tets[ref_i].w0;
             const real_type wf1 = tets[ref_i].w1;
             const real_type wf2 = tets[ref_i].w2;
@@ -528,20 +593,21 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
                                                     tets[ref_i].z0,
                                                     tets[ref_i].z1,
                                                     tets[ref_i].z2,
-                                                    tets[ref_i].z3 theta_volume,  // Volume of the tetrahedron
-                                                    wf0,                          // Weighted field at the vertices
-                                                    wf1,                          //
-                                                    wf2,                          //
-                                                    wf3,                          //
-                                                    ox,                           // Origin of the grid
-                                                    oy,                           //
-                                                    oz,                           //
-                                                    dx,                           // Spacing of the grid
-                                                    dy,                           //
-                                                    dz,                           //
-                                                    stride,                       // Stride
-                                                    n,                            // Size of the grid
-                                                    data);                        // Output
+                                                    tets[ref_i].z3,
+                                                    theta_volume,  // Volume of the tetrahedron
+                                                    wf0,           // Weighted field at the vertices
+                                                    wf1,           //
+                                                    wf2,           //
+                                                    wf3,           //
+                                                    ox,            // Origin of the grid
+                                                    oy,            //
+                                                    oz,            //
+                                                    dx,            // Spacing of the grid
+                                                    dy,            //
+                                                    dz,            //
+                                                    stride,        // Stride
+                                                    n,             // Size of the grid
+                                                    data);         // Output
 
             // if (sampled_volume < 8.0 * theta_volume) {
             //     fprintf(stderr, "WARNING: sampled_volume < 8 * theta_volume: %g < %g\n", sampled_volume, 8.0 *
@@ -1151,31 +1217,37 @@ tet_uniform_refinement(const real_t               v1x,      //
     //                         January 1991
     //                     CAM Report 91-01
 
+    // v5 is the midpoint of edge v1-v2
     const real_t v5x = 0.5 * (v1x + v2x);
     const real_t v5y = 0.5 * (v1y + v2y);
     const real_t v5z = 0.5 * (v1z + v2z);
     const real_t v5w = 0.5 * (w1 + w2);
 
+    // v6 is the midpoint of edge v2-v4
     const real_t v6x = 0.5 * (v2x + v4x);
     const real_t v6y = 0.5 * (v2y + v4y);
     const real_t v6z = 0.5 * (v2z + v4z);
     const real_t v6w = 0.5 * (w2 + w4);
 
+    // v7 is the midpoint of edge v2-v3
     const real_t v7x = 0.5 * (v2x + v3x);
     const real_t v7y = 0.5 * (v2y + v3y);
     const real_t v7z = 0.5 * (v2z + v3z);
     const real_t v7w = 0.5 * (w2 + w3);
 
+    // v8 is the midpoint of edge v3-v4
     const real_t v8x = 0.5 * (v1x + v4x);
     const real_t v8y = 0.5 * (v1y + v4y);
     const real_t v8z = 0.5 * (v1z + v4z);
     const real_t v8w = 0.5 * (w1 + w4);
 
+    // v9 is the midpoint of edge v3-v4
     const real_t v9x = 0.5 * (v3x + v4x);
     const real_t v9y = 0.5 * (v3y + v4y);
     const real_t v9z = 0.5 * (v3z + v4z);
     const real_t v9w = 0.5 * (w3 + w4);
 
+    // v10 is the midpoint of edge v1-v3
     const real_t v10x = 0.5 * (v1x + v3x);
     const real_t v10y = 0.5 * (v1y + v3y);
     const real_t v10z = 0.5 * (v1z + v3z);
@@ -1203,15 +1275,15 @@ tet_uniform_refinement(const real_t               v1x,      //
     rTets[0].w3 = v7w;
 
     // Second tetrahedron (v1, v5, v8, v10)
-    rTets[1].x0 = v1x;
-    rTets[1].y0 = v1y;
-    rTets[1].z0 = v1z;
-    rTets[1].w0 = w1;
+    rTets[1].x0 = v5x;
+    rTets[1].y0 = v5y;
+    rTets[1].z0 = v5z;
+    rTets[1].w0 = v5w;
 
-    rTets[1].x1 = v5x;
-    rTets[1].y1 = v5y;
-    rTets[1].z1 = v5z;
-    rTets[1].w1 = v5w;
+    rTets[1].x1 = v1x;
+    rTets[1].y1 = v1y;
+    rTets[1].z1 = v1z;
+    rTets[1].w1 = w1;
 
     rTets[1].x2 = v8x;
     rTets[1].y2 = v8y;
@@ -1223,26 +1295,26 @@ tet_uniform_refinement(const real_t               v1x,      //
     rTets[1].z3 = v10z;
     rTets[1].w3 = v10w;
 
-    // Third tetrahedron (v4, v6, v8, v9)
-    rTets[2].x0 = v4x;
-    rTets[2].y0 = v4y;
-    rTets[2].z0 = v4z;
-    rTets[2].w0 = w4;
+    // Third tetrahedron (v6, v8, v4, v9)
+    rTets[2].x0 = v8x;
+    rTets[2].y0 = v8y;
+    rTets[2].z0 = v8z;
+    rTets[2].w0 = v8w;
 
     rTets[2].x1 = v6x;
     rTets[2].y1 = v6y;
     rTets[2].z1 = v6z;
     rTets[2].w1 = v6w;
 
-    rTets[2].x2 = v8x;
-    rTets[2].y2 = v8y;
-    rTets[2].z2 = v8z;
-    rTets[2].w2 = v8w;
+    rTets[2].x3 = v4x;
+    rTets[2].y3 = v4y;
+    rTets[2].z3 = v4z;
+    rTets[2].w3 = w4;
 
-    rTets[2].x3 = v9x;
-    rTets[2].y3 = v9y;
-    rTets[2].z3 = v9z;
-    rTets[2].w3 = v9w;
+    rTets[2].x2 = v9x;
+    rTets[2].y2 = v9y;
+    rTets[2].z2 = v9z;
+    rTets[2].w2 = v9w;
 
     // Fourth tetrahedron (v3, v7, v9, v10)
     rTets[3].x0 = v3x;
@@ -1266,15 +1338,15 @@ tet_uniform_refinement(const real_t               v1x,      //
     rTets[3].w3 = v10w;
 
     // Fifth tetrahedron (v5, v6, v8, v9)
-    rTets[4].x0 = v5x;
-    rTets[4].y0 = v5y;
-    rTets[4].z0 = v5z;
-    rTets[4].w0 = v5w;
+    rTets[4].x0 = v6x;
+    rTets[4].y0 = v6y;
+    rTets[4].z0 = v6z;
+    rTets[4].w0 = v6w;
 
-    rTets[4].x1 = v6x;
-    rTets[4].y1 = v6y;
-    rTets[4].z1 = v6z;
-    rTets[4].w1 = v6w;
+    rTets[4].x1 = v5x;
+    rTets[4].y1 = v5y;
+    rTets[4].z1 = v5z;
+    rTets[4].w1 = v5w;
 
     rTets[4].x2 = v8x;
     rTets[4].y2 = v8y;
@@ -1307,16 +1379,16 @@ tet_uniform_refinement(const real_t               v1x,      //
     rTets[5].z3 = v9z;
     rTets[5].w3 = v9w;
 
-    // Seventh tetrahedron (v5, v7, v9, v10)
+    // Seventh tetrahedron (v5, v8, v9, v10)
     rTets[6].x0 = v5x;
     rTets[6].y0 = v5y;
     rTets[6].z0 = v5z;
     rTets[6].w0 = v5w;
 
-    rTets[6].x1 = v7x;
-    rTets[6].y1 = v7y;
-    rTets[6].z1 = v7z;
-    rTets[6].w1 = v7w;
+    rTets[6].x1 = v8x;
+    rTets[6].y1 = v8y;
+    rTets[6].z1 = v8z;
+    rTets[6].w1 = v8w;
 
     rTets[6].x2 = v9x;
     rTets[6].y2 = v9y;
@@ -1329,15 +1401,15 @@ tet_uniform_refinement(const real_t               v1x,      //
     rTets[6].w3 = v10w;
 
     // Eighth tetrahedron (v5, v7, v9, v10)
-    rTets[7].x0 = v5x;
-    rTets[7].y0 = v5y;
-    rTets[7].z0 = v5z;
-    rTets[7].w0 = v5w;
+    rTets[7].x0 = v7x;
+    rTets[7].y0 = v7y;
+    rTets[7].z0 = v7z;
+    rTets[7].w0 = v7w;
 
-    rTets[7].x1 = v7x;
-    rTets[7].y1 = v7y;
-    rTets[7].z1 = v7z;
-    rTets[7].w1 = v7w;
+    rTets[7].x1 = v5x;
+    rTets[7].y1 = v5y;
+    rTets[7].z1 = v5z;
+    rTets[7].w1 = v5w;
 
     rTets[7].x2 = v9x;
     rTets[7].y2 = v9y;
