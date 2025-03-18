@@ -1191,17 +1191,18 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
     }  // end Apply the mass matrix to the adjoint field
 
-    ret = tet4_resample_field_local_adjoint(0,                              //
-                                            mesh->nelements,                //
-                                            mesh->nnodes,                   //
-                                            (const idx_t**)mesh->elements,  //
-                                            (const geom_t**)mesh->points,   //
-                                            n,                              //
-                                            stride,                         //
-                                            origin,                         //
-                                            delta,                          //
-                                            mass_vector,                    //
-                                            data);                          //
+    ret = tet4_resample_field_local_refine_adjoint(0,                              //
+                                                   mesh->nelements,                //
+                                                   mesh->nnodes,                   //
+                                                   (const idx_t**)mesh->elements,  //
+                                                   (const geom_t**)mesh->points,   //
+                                                   n,                              //
+                                                   stride,                         //
+                                                   origin,                         //
+                                                   delta,                          //
+                                                   mass_vector,                    //
+                                                   2.5,
+                                                   data);  //
 
     if (data_cnt != NULL) {
         ret = tet4_cnt_mesh_adjoint(0,                              //
