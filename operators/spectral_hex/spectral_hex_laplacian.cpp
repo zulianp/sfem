@@ -735,8 +735,8 @@ int spectral_hex_laplacian_apply_GLL_tpl(const ptrdiff_t                   nelem
         }
     }
 
-    lagrange_eval<scalar_t>(order, Q, qx, S);
-    lagrange_diff_eval<scalar_t>(order, Q, qx, D);
+    lagrange_GLL_eval<scalar_t>(order, Q, qx, S);
+    lagrange_GLL_diff_eval<scalar_t>(order, Q, qx, D);
 
     const int nxe = sshex8_nxe(order);
     const int txe = sshex8_txe(order);
@@ -802,9 +802,10 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
                                             real_t* const SFEM_RESTRICT       values) {
     SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
 
-    // bool use_GLL = true;
-    bool use_GLL = false;
-    if (use_GLL) {
+    int SFEM_USE_GLL = 0;
+    SFEM_READ_ENV(SFEM_USE_GLL, atoi);
+
+    if (SFEM_USE_GLL) {
         switch (order) {
             case 2: {
                 return spectral_hex_laplacian_apply_GLL_tpl<2>(nelements, nnodes, elements, points, u, values);
@@ -815,9 +816,9 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
             case 8: {
                 return spectral_hex_laplacian_apply_GLL_tpl<8>(nelements, nnodes, elements, points, u, values);
             }
-            // case 16: {
-            //     return spectral_hex_laplacian_apply_GLL_tpl<16>(nelements, nnodes, elements, points, u, values);
-            // }
+            case 16: {
+                return spectral_hex_laplacian_apply_GLL_tpl<16>(nelements, nnodes, elements, points, u, values);
+            }
             default: {
                 SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
             }
