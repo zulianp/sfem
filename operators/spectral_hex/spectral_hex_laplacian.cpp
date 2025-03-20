@@ -10,6 +10,8 @@
 #include "sfem_Tracer.hpp"
 #include "sshex8.h"
 #include "tet4_inline_cpu.h"
+#include "lagrange_legendre_gauss_lobatto.hpp"
+#include "line_quadrature_gauss_lobatto.h"
 
 #include <cstdio>
 
@@ -560,7 +562,7 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
 
     static const int N  = order + 1;
     static const int N3 = N * N * N;
-    static const int Q  = 2 * (N + N + N - 1);
+    static const int Q  = MAX(0, 3 * order);
 
     scalar_t S[Q * N] = {0};
     scalar_t D[Q * N] = {0};
@@ -570,41 +572,41 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
     const scalar_t* qw{nullptr};
 
     switch (order) {
-        // case 1: {
-        //     n_qp = line_q2_n;
-        //     qx   = line_q2_x;
-        //     qw   = line_q2_w;
-        //     assert(n_qp == Q);
-        //     break;
-        // }
+        case 1: {
+            n_qp = line_q3_n;
+            qx   = line_q3_x;
+            qw   = line_q3_w;
+            assert(n_qp == Q);
+            break;
+        }
         case 2: {
-            n_qp = line_q10_n;
-            qx   = line_q10_x;
-            qw   = line_q10_w;
+            n_qp = line_q6_n;
+            qx   = line_q6_x;
+            qw   = line_q6_w;
             assert(n_qp == Q);
             break;
         }
         case 4: {
-            n_qp = line_q22_n;
-            qx   = line_q22_x;
-            qw   = line_q22_w;
+            n_qp = line_q12_n;
+            qx   = line_q12_x;
+            qw   = line_q12_w;
             assert(n_qp == Q);
             break;
         }
-        // case 8: {
-        //     n_qp = line_q9_n;
-        //     qx   = line_q9_x;
-        //     qw   = line_q9_w;
-        //     assert(n_qp == Q);
-        //     break;
-        // }
-        // case 16: {
-        //     n_qp = line_q17_n;
-        //     qx   = line_q17_x;
-        //     qw   = line_q17_w;
-        //     assert(n_qp == Q);
-        //     break;
-        // }
+        case 8: {
+            n_qp = line_q24_n;
+            qx   = line_q24_x;
+            qw   = line_q24_w;
+            assert(n_qp == Q);
+            break;
+        }
+        case 16: {
+            n_qp = line_q48_n;
+            qx   = line_q48_x;
+            qw   = line_q48_w;
+            assert(n_qp == Q);
+            break;
+        }
         default: {
             SFEM_ERROR("spectral_hex_laplacian_apply_tpl: Unsupported element order!\n");
             break;
@@ -658,8 +660,128 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
         // Assume affine here!
         hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
         spectral_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
-        // reference_lapl<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
-        // classical_lapl(fff, line_q8_n, line_q8_x, line_q8_w, element_u, element_vector);
+
+        for (int v = 0; v < N3; v++) {
+            assert(!isnan(element_vector[v]));
+#pragma omp atomic update
+            values[ev[v]] += element_vector[v];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+template <int order>
+int spectral_hex_laplacian_apply_GLL_tpl(const ptrdiff_t                   nelements,
+                                         const ptrdiff_t                   nnodes,
+                                         idx_t** const SFEM_RESTRICT       elements,
+                                         geom_t** const SFEM_RESTRICT      points,
+                                         const real_t* const SFEM_RESTRICT u,
+                                         real_t* const SFEM_RESTRICT       values) {
+    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
+
+    SFEM_UNUSED(nnodes);
+
+    static const int N  = order + 1;
+    static const int N3 = N * N * N;
+    static const int Q  = N;
+
+    scalar_t S[Q * N] = {0};
+    scalar_t D[Q * N] = {0};
+
+    int             n_qp{0};
+    const scalar_t* qx{nullptr};
+    const scalar_t* qw{nullptr};
+
+    switch (order) {
+        case 1: {
+            n_qp = line_GL_q2_n;
+            qx   = line_GL_q2_x;
+            qw   = line_GL_q2_w;
+            assert(n_qp == Q);
+            break;
+        }
+        case 2: {
+            n_qp = line_GL_q3_n;
+            qx   = line_GL_q3_x;
+            qw   = line_GL_q3_w;
+            assert(n_qp == Q);
+            break;
+        }
+        case 4: {
+            n_qp = line_GL_q5_n;
+            qx   = line_GL_q5_x;
+            qw   = line_GL_q5_w;
+            assert(n_qp == Q);
+            break;
+        }
+        case 8: {
+            n_qp = line_GL_q9_n;
+            qx   = line_GL_q9_x;
+            qw   = line_GL_q9_w;
+            assert(n_qp == Q);
+            break;
+        }
+        case 16: {
+            n_qp = line_GL_q17_n;
+            qx   = line_GL_q17_x;
+            qw   = line_GL_q17_w;
+            assert(n_qp == Q);
+            break;
+        }
+        default: {
+            SFEM_ERROR("spectral_hex_laplacian_apply_tpl: Unsupported element order!\n");
+            break;
+        }
+    }
+
+    lagrange_eval<scalar_t>(order, Q, qx, S);
+    lagrange_diff_eval<scalar_t>(order, Q, qx, D);
+
+    const int nxe = sshex8_nxe(order);
+    const int txe = sshex8_txe(order);
+
+    const int hex8_corners[8] = {// Bottom
+                                 sshex8_lidx(order, 0, 0, 0),
+                                 sshex8_lidx(order, order, 0, 0),
+                                 sshex8_lidx(order, order, order, 0),
+                                 sshex8_lidx(order, 0, order, 0),
+
+                                 // Top
+                                 sshex8_lidx(order, 0, 0, order),
+                                 sshex8_lidx(order, order, 0, order),
+                                 sshex8_lidx(order, order, order, order),
+                                 sshex8_lidx(order, 0, order, order)};
+
+    const geom_t* const x = points[0];
+    const geom_t* const y = points[1];
+    const geom_t* const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t         ev[N3];
+        accumulator_t element_vector[N3] = {0};
+        scalar_t      element_u[N3];
+        scalar_t      fff[6];
+        scalar_t      lx[8], ly[8], lz[8];
+
+        for (int v = 0; v < N3; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < N3; ++v) {
+            element_u[v] = u[ev[v]];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[hex8_corners[v]]];
+            ly[v] = y[ev[hex8_corners[v]]];
+            lz[v] = z[ev[hex8_corners[v]]];
+        }
+
+        // Assume affine here!
+        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
+        spectral_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
             assert(!isnan(element_vector[v]));
@@ -680,21 +802,44 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
                                             real_t* const SFEM_RESTRICT       values) {
     SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
 
-    switch (order) {
-        case 2: {
-            return spectral_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
+    // bool use_GLL = true;
+    bool use_GLL = false;
+    if (use_GLL) {
+        switch (order) {
+            case 2: {
+                return spectral_hex_laplacian_apply_GLL_tpl<2>(nelements, nnodes, elements, points, u, values);
+            }
+            case 4: {
+                return spectral_hex_laplacian_apply_GLL_tpl<4>(nelements, nnodes, elements, points, u, values);
+            }
+            case 8: {
+                return spectral_hex_laplacian_apply_GLL_tpl<8>(nelements, nnodes, elements, points, u, values);
+            }
+            // case 16: {
+            //     return spectral_hex_laplacian_apply_GLL_tpl<16>(nelements, nnodes, elements, points, u, values);
+            // }
+            default: {
+                SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
+            }
         }
-        case 4: {
-            return spectral_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
-        }
-        case 8: {
-            return spectral_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
-        }
-        // case 16: {
-        //     return spectral_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
-        // }
-        default: {
-            SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
+
+    } else {
+        switch (order) {
+            case 2: {
+                return spectral_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
+            }
+            case 4: {
+                return spectral_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
+            }
+            case 8: {
+                return spectral_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
+            }
+            // case 16: {
+            //     return spectral_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
+            // }
+            default: {
+                SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
+            }
         }
     }
 
