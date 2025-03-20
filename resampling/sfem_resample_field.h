@@ -336,7 +336,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
                             unsigned int*                        data_cnt,  // SDF: data count (output)
-                            real_t const*                        alpha,     // SDF: alpha
+                            real_t const*                        alpha,     // SDF: tet alpha
+                            real_t const*                        volume,    // SDF: tet volume
                             sfem_resample_field_info*            info);                // Info struct with options and flags
 
 /// @brief  DEBUG code for testing the adjoint resampling operation
@@ -617,18 +618,19 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
                       const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                       unsigned int* const SFEM_RESTRICT    data_cnt);          // Output
 
-int                                                                           //
-tet4_alpha_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                        const ptrdiff_t                      end_element,     //
-                        const ptrdiff_t                      nnodes,          //
-                        const idx_t** const SFEM_RESTRICT    elems,           //
-                        const geom_t** const SFEM_RESTRICT   xyz,             //
-                        const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                        const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                        const geom_t* const SFEM_RESTRICT    origin,          //
-                        const geom_t* const SFEM_RESTRICT    delta,           //
-                        const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                        real_t* const SFEM_RESTRICT          alpha);                   // Output
+int                                                                                  //
+tet4_alpha_volume_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                               const ptrdiff_t                      end_element,     //
+                               const ptrdiff_t                      nnodes,          //
+                               const idx_t** const SFEM_RESTRICT    elems,           //
+                               const geom_t** const SFEM_RESTRICT   xyz,             //
+                               const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                               const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                               const geom_t* const SFEM_RESTRICT    origin,          //
+                               const geom_t* const SFEM_RESTRICT    delta,           //
+                               const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                               real_t* const SFEM_RESTRICT          alpha,           // Output alpha
+                               real_t* const SFEM_RESTRICT          tet_volume);              // Output tetrahedral volume
 
 /** @brief Function pointer type for a function of three variables. */
 typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);

@@ -390,10 +390,12 @@ int main(int argc, char* argv[]) {
     }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t*       field       = NULL;
-    unsigned int* field_cnt   = NULL;  // TESTING used to count the number of times a field is updated
-    real_t*       field_alpha = NULL;  // TESTING used to store the alpha field
-    ptrdiff_t     nlocal[3];
+    real_t*       field        = NULL;
+    unsigned int* field_cnt    = NULL;  // TESTING used to count the number of times a field is updated
+    real_t*       field_alpha  = NULL;  // TESTING used to store the alpha field
+    real_t*       filed_volume = NULL;  // TESTING used to store the volume field
+
+    ptrdiff_t nlocal[3];
 
     int SFEM_READ_FP32 = 1;
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
@@ -434,10 +436,11 @@ int main(int argc, char* argv[]) {
             // double max_temp = temp[0];
             // double min_temp = temp[0];
 
-            n_zyx       = nlocal[0] * nlocal[1] * nlocal[2];
-            field       = malloc(n_zyx * sizeof(real_t));
-            field_cnt   = calloc(n_zyx, sizeof(unsigned int));
-            field_alpha = calloc(n_zyx, sizeof(real_t));
+            n_zyx        = nlocal[0] * nlocal[1] * nlocal[2];
+            field        = malloc(n_zyx * sizeof(real_t));
+            field_cnt    = calloc(n_zyx, sizeof(unsigned int));
+            field_alpha  = calloc(n_zyx, sizeof(real_t));
+            filed_volume = calloc(n_zyx, sizeof(real_t));
 
             // if (field == NULL) {
             //     fprintf(stderr, "Error: malloc failed\n");
@@ -669,19 +672,20 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    ret_resample_adjoint =                            //
-                            resample_field_adjoint_tet4(mpi_size,     //
-                                                        mpi_rank,     //
-                                                        &mesh,        //
-                                                        nlocal,       //
-                                                        stride,       //
-                                                        origin,       //
-                                                        delta,        //
-                                                        g,            //
-                                                        field,        //
-                                                        field_cnt,    //
-                                                        field_alpha,  //
-                                                        &info);       //
+                    ret_resample_adjoint =                             //
+                            resample_field_adjoint_tet4(mpi_size,      //
+                                                        mpi_rank,      //
+                                                        &mesh,         //
+                                                        nlocal,        //
+                                                        stride,        //
+                                                        origin,        //
+                                                        delta,         //
+                                                        g,             //
+                                                        field,         //
+                                                        field_cnt,     //
+                                                        field_alpha,   //
+                                                        filed_volume,  //
+                                                        &info);        //
 
                     BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
 
@@ -777,6 +781,14 @@ int main(int argc, char* argv[]) {
                                   MPI_FLOAT,
                                   3,
                                   field_alpha,
+                                  nlocal,
+                                  nglobal);
+
+                    ndarray_write(MPI_COMM_WORLD,
+                                  "/home/sriva/git/sfem/workflows/resample/test_field_volume.raw",
+                                  MPI_FLOAT,
+                                  3,
+                                  filed_volume,
                                   nlocal,
                                   nglobal);
 
@@ -927,6 +939,13 @@ int main(int argc, char* argv[]) {
         free(field_alpha);
         field_alpha = NULL;
     }
+
+    if (filed_volume) {
+        free(filed_volume);
+        filed_volume = NULL;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     double tock = MPI_Wtime();
 

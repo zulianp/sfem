@@ -511,45 +511,13 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
             // real_t Vt[8];
             // real_t array_vol = volume_tet_array(tets, n_tets, Vt);
 
-            // printf("Array Volume of the tetrahedra: %g: %g %g %g %g %g %g %g %g\n",
-            //        array_vol,
-            //        Vt[0],
-            //        Vt[1],
-            //        Vt[2],
-            //        Vt[3],
-            //        Vt[4],
-            //        Vt[5],
-            //        Vt[6],
-            //        Vt[7]);
-
-            // const real_type theta_volume = tet4_measure_v2(x0,
-            //                                                x1,
-            //                                                x2,
-            //                                                x3,
-            //                                                //
-            //                                                y0,
-            //                                                y1,
-            //                                                y2,
-            //                                                y3,
-            //                                                //
-            //                                                z0,
-            //                                                z1,
-            //                                                z2,
-            //                                                z3);
-
-            // printf("theta_volume = %g\n", theta_volume);
-
-            // real_t p0d = sqrt(x0 * x0 + y0 * y0 + z0 * z0);
-            // real_t p1d = sqrt(x1 * x1 + y1 * y1 + z1 * z1);
-            // real_t p2d = sqrt(x2 * x2 + y2 * y2 + z2 * z2);
-            // real_t p3d = sqrt(x3 * x3 + y3 * y3 + z3 * z3);
-
-            // printf("Tetrahedron vertices:\n");
-            // printf("  Vertex 0: (%g, %g, %g)\n", x0, y0, z0);
-            // printf("  Vertex 1: (%g, %g, %g)\n", x1, y1, z1);
-            // printf("  Vertex 2: (%g, %g, %g)\n", x2, y2, z2);
-            // printf("  Vertex 3: (%g, %g, %g)\n", x3, y3, z3);
-            // printf("tet d = %g %g %g %g\n\n", p0d, p1d, p2d, p3d);
+            // // check if the volumes in Vt are positive
+            // for (int i = 0; i < 8; i++) {
+            //     if (Vt[i] < 0) {
+            //         fprintf(stderr, "WARNING: Volume of the tetrahedron is negative: %g\n", Vt[i]);
+            //         exit(1);
+            //     }
+            // }
         }
 
         for (int ref_i = 0; ref_i < n_tets; ref_i++) {
@@ -818,18 +786,20 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
     RETURN_FROM_FUNCTION(ret);
 }
 
-int                                                                           //
-tet4_alpha_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                        const ptrdiff_t                      end_element,     //
-                        const ptrdiff_t                      nnodes,          //
-                        const idx_t** const SFEM_RESTRICT    elems,           //
-                        const geom_t** const SFEM_RESTRICT   xyz,             //
-                        const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                        const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                        const geom_t* const SFEM_RESTRICT    origin,          //
-                        const geom_t* const SFEM_RESTRICT    delta,           //
-                        const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                        real_t* const SFEM_RESTRICT          alpha) {                  // Output
+int                                                                                  //
+tet4_alpha_volume_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                               const ptrdiff_t                      end_element,     //
+                               const ptrdiff_t                      nnodes,          //
+                               const idx_t** const SFEM_RESTRICT    elems,           //
+                               const geom_t** const SFEM_RESTRICT   xyz,             //
+                               const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                               const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                               const geom_t* const SFEM_RESTRICT    origin,          //
+                               const geom_t* const SFEM_RESTRICT    delta,           //
+                               const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                               real_t* const SFEM_RESTRICT          alpha,           // Output alpha
+                               real_t* const SFEM_RESTRICT          volume) {                 // Output volume
+
     PRINT_CURRENT_FUNCTION;
 
     int ret = 0;
@@ -903,6 +873,21 @@ tet4_alpha_mesh_adjoint(const ptrdiff_t                      start_element,   //
 
         for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
+            real_t tet_volume = tet4_measure_v2(x0,
+                                                x1,
+                                                x2,
+                                                x3,
+                                                //
+                                                y0,
+                                                y1,
+                                                y2,
+                                                y3,
+                                                //
+                                                z0,
+                                                z1,
+                                                z2,
+                                                z3);
+
             real_type g_qx, g_qy, g_qz;
 
             // Transform quadrature point to physical space
@@ -959,11 +944,20 @@ tet4_alpha_mesh_adjoint(const ptrdiff_t                      start_element,   //
             alpha[i5] = alpha[i5] > alpha_loc ? alpha[i5] : alpha_loc;
             alpha[i6] = alpha[i6] > alpha_loc ? alpha[i6] : alpha_loc;
             alpha[i7] = alpha[i7] > alpha_loc ? alpha[i7] : alpha_loc;
+
+            volume[i0] = volume[i0] > tet_volume ? volume[i0] : tet_volume;
+            volume[i1] = volume[i1] > tet_volume ? volume[i1] : tet_volume;
+            volume[i2] = volume[i2] > tet_volume ? volume[i2] : tet_volume;
+            volume[i3] = volume[i3] > tet_volume ? volume[i3] : tet_volume;
+            volume[i4] = volume[i4] > tet_volume ? volume[i4] : tet_volume;
+            volume[i5] = volume[i5] > tet_volume ? volume[i5] : tet_volume;
+            volume[i6] = volume[i6] > tet_volume ? volume[i6] : tet_volume;
+            volume[i7] = volume[i7] > tet_volume ? volume[i7] : tet_volume;
         }
     }  // end for i over elements
 
     RETURN_FROM_FUNCTION(ret);
-}  // end tet4_alpha_mesh_adjoint
+}  // end tet4_alpha_volume_mesh_adjoint
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -1216,6 +1210,9 @@ tet_uniform_refinement(const real_t               v1x,      //
     //                     Elizabeth G. Ong
     //                         January 1991
     //                     CAM Report 91-01
+    // Attention: the ordering of the vertices is arranged such that
+    // The operation 1/6 det(J) is positive in any tetrahedron
+    // Given that the main tetrahedron have this property.
 
     // v5 is the midpoint of edge v1-v2
     const real_t v5x = 0.5 * (v1x + v2x);
@@ -1459,12 +1456,17 @@ volume_tet_array(const struct tet_vertices* const tets,  // Array of tetrahedra
     return tot_volume;
 }
 
-real_t point_distance(const real_t x0,    //
-                      const real_t y0,    //
-                      const real_t z0,    //
-                      const real_t x1,    //
-                      const real_t y1,    //
-                      const real_t z1) {  //
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// points_distance ////////////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+real_t points_distance(const real_t x0,    //
+                       const real_t y0,    //
+                       const real_t z0,    //
+                       const real_t x1,    //
+                       const real_t y1,    //
+                       const real_t z1) {  //
     const real_t dx = x1 - x0;
     const real_t dy = y1 - y0;
     const real_t dz = z1 - z0;
@@ -1493,22 +1495,39 @@ tet_edge_length(const real_t  v0x,            //
                 real_t* const edge_length) {  // Output
 
     // Edge 0 (v0, v1)
-    edge_length[0] = point_distance(v0x, v0y, v0z, v1x, v1y, v1z);
+    edge_length[0] = points_distance(v0x, v0y, v0z, v1x, v1y, v1z);
 
     // Edge 1 (v0, v2)
-    edge_length[1] = point_distance(v0x, v0y, v0z, v2x, v2y, v2z);
+    edge_length[1] = points_distance(v0x, v0y, v0z, v2x, v2y, v2z);
 
     // Edge 2 (v0, v3)
-    edge_length[2] = point_distance(v0x, v0y, v0z, v3x, v3y, v3z);
+    edge_length[2] = points_distance(v0x, v0y, v0z, v3x, v3y, v3z);
 
     // Edge 3 (v1, v2)
-    edge_length[3] = point_distance(v1x, v1y, v1z, v2x, v2y, v2z);
+    edge_length[3] = points_distance(v1x, v1y, v1z, v2x, v2y, v2z);
 
     // Edge 4 (v1, v3)
-    edge_length[4] = point_distance(v1x, v1y, v1z, v3x, v3y, v3z);
+    edge_length[4] = points_distance(v1x, v1y, v1z, v3x, v3y, v3z);
 
     // Edge 5 (v2, v3)
-    edge_length[5] = point_distance(v2x, v2y, v2z, v3x, v3y, v3z);
+    edge_length[5] = points_distance(v2x, v2y, v2z, v3x, v3y, v3z);
 
     return 0;
+}
+
+struct field_analytic  //
+field_analytic_create(const int n) {
+    struct field_analytic field;
+    field.n      = n;
+    field.alpha  = (real_t*)calloc(n, sizeof(real_t));
+    field.volume = (real_t*)calloc(n, sizeof(real_t));
+}
+
+void  //
+field_analytic_destroy(struct field_analytic* field) {
+    free(field->alpha);
+    free(field->volume);
+
+    field->alpha  = NULL;
+    field->volume = NULL;
 }

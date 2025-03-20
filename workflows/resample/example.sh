@@ -59,7 +59,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 400
+sdf_test.py $sdf 300
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
@@ -128,28 +128,8 @@ process_raw_file field_cnt
 process_raw_file bit_array
 process_raw_file test_field
 process_raw_file test_field_alpha
+process_raw_file test_field_volume
 
-
-# if [[ $SFEM_ADJOINT -eq 1 ]]
-# then
-#     head -11 metadata_sdf.float32.yml > metadata_test_field.yml
-#     echo "path: $PWD/test_field.raw" >> metadata_test_field.yml 
-#     raw_to_xdmf.py test_field.raw
-# fi
-
-# if [[ $SFEM_ADJOINT -eq 1 && -f bit_array.raw ]]
-# then
-#     head -11 metadata_sdf.float32.yml > metadata_bit_array.yml
-#     echo "path: $PWD/bit_array.raw" >> metadata_bit_array.yml 
-#     raw_to_xdmf.py bit_array.raw
-# fi
-
-# if [[ $SFEM_ADJOINT -eq 1 && -f field_cnt.raw ]]
-# then
-# 	head -11 metadata_sdf.float32.yml > metadata_field_cnt.yml
-# 	echo "path: $PWD/field_cnt.raw" >> metadata_field_cnt.yml 
-# 	raw_to_xdmf.py field_cnt.raw
-# fi
 
 
 

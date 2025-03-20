@@ -1147,7 +1147,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                             const real_t* const SFEM_RESTRICT    g,         // Weighted field
                             real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
                             unsigned int*                        data_cnt,  // SDF: data count (output)
-                            real_t const*                        alpha,     // SDF: alpha
+                            real_t const*                        alpha,     // SDF: tet alpha
+                            real_t const*                        volume,    // SDF: tet volume
                             sfem_resample_field_info*            info) {               // Info struct with options and flags
     //
     PRINT_CURRENT_FUNCTION;
@@ -1191,6 +1192,25 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
     }  // end Apply the mass matrix to the adjoint field
 
+#define REFINE_ADJOINT 1
+#if REFINE_ADJOINT == 0
+
+    ret = tet4_resample_field_local_adjoint(0,                              //
+                                            mesh->nelements,                //
+                                            mesh->nnodes,                   //
+                                            (const idx_t**)mesh->elements,  //
+                                            (const geom_t**)mesh->points,   //
+                                            n,                              //
+                                            stride,                         //
+                                            origin,                         //
+                                            delta,                          //
+                                            mass_vector,                    //
+                                            data);                          //
+
+#else
+
+    const real_t alpha_th = 2.5;
+
     ret = tet4_resample_field_local_refine_adjoint(0,                              //
                                                    mesh->nelements,                //
                                                    mesh->nnodes,                   //
@@ -1201,8 +1221,10 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                    origin,                         //
                                                    delta,                          //
                                                    mass_vector,                    //
-                                                   2.5,
-                                                   data);  //
+                                                   alpha_th,                       //
+                                                   data);                          //
+
+#endif  // end if REFINE_ADJOINT == 0
 
     if (data_cnt != NULL) {
         ret = tet4_cnt_mesh_adjoint(0,                              //
@@ -1219,17 +1241,18 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
     }
 
     if (alpha != NULL) {
-        tet4_alpha_mesh_adjoint(0,                              //
-                                mesh->nelements,                //
-                                mesh->nnodes,                   //
-                                (const idx_t**)mesh->elements,  //
-                                (const geom_t**)mesh->points,   //
-                                n,                              //
-                                stride,                         //
-                                origin,                         //
-                                delta,                          //
-                                mass_vector,                    //
-                                alpha);                         //
+        tet4_alpha_volume_mesh_adjoint(0,                              //
+                                       mesh->nelements,                //
+                                       mesh->nnodes,                   //
+                                       (const idx_t**)mesh->elements,  //
+                                       (const geom_t**)mesh->points,   //
+                                       n,                              //
+                                       stride,                         //
+                                       origin,                         //
+                                       delta,                          //
+                                       mass_vector,                    //
+                                       alpha,                          //
+                                       volume);                        //
     }
 
     free(mass_vector);
