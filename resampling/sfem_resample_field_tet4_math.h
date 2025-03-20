@@ -417,6 +417,21 @@ tet_edge_length(const real_t  v0x,           //
                 const real_t  v3z,           //
                 real_t* const edge_length);  //
 
+/**
+ * @brief structure to store the analytic field
+ */
+struct field_analytic {
+    unsigned int n;
+    real_t*      alpha;
+    real_t*      volume;
+};
+
+struct field_analytic                //
+field_analytic_create(const int n);  //
+
+void  //
+field_analytic_destroy(struct field_analytic* field);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
