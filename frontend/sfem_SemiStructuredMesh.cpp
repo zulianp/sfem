@@ -1,6 +1,7 @@
 #include "sfem_SemiStructuredMesh.hpp"
 
 // C Includes
+#include "line_quadrature_gauss_lobatto.h"
 #include "sfem_macros.h"
 
 // Mesh
@@ -11,9 +12,9 @@
 
 // C++ Includes
 #include "sfem_CRSGraph.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 // STL
 #include <fstream>
@@ -163,7 +164,41 @@ namespace sfem {
             auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
 
             SFEM_TRACE_SCOPE("sshex8_fill_points");
-            sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
+            // bool use_GL = level() == 2 || level() == 4 || level() == 8 || level() == 16;
+            bool use_GL = false;
+            if (use_GL) {
+                const scalar_t *qx{nullptr};
+                switch (level()) {
+                    case 1: {
+                        qx = line_GL_q2_x;
+                        break;
+                    }
+                    case 2: {
+                        qx = line_GL_q3_x;
+                        break;
+                    }
+                    case 4: {
+                        qx = line_GL_q5_x;
+                        break;
+                    }
+                    case 8: {
+                        qx = line_GL_q9_x;
+                        break;
+                    }
+                    case 16: {
+                        qx = line_GL_q17_x;
+                        break;
+                    }
+                    default: {
+                        SFEM_ERROR("Unsupported order %d!", level());
+                    }
+                }
+
+                sshex8_fill_points_1D_map(level(), n_elements(), element_data(), macro_p, qx, p->data());
+            } else {
+                sshex8_fill_points(level(), n_elements(), element_data(), macro_p, p->data());
+            }
+
             impl_->points = p;
         }
 

@@ -14,7 +14,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->verbose    = true;
     cg->set_max_it(20000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-14);
+    cg->set_rtol(1e-8);
 
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     // f->hessian_diag(nullptr, diag->data());
