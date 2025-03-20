@@ -164,9 +164,11 @@ namespace sfem {
             auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
 
             SFEM_TRACE_SCOPE("sshex8_fill_points");
-            // bool use_GL = level() == 2 || level() == 4 || level() == 8 || level() == 16;
-            bool use_GL = false;
-            if (use_GL) {
+
+            int SFEM_USE_GLL = 0;
+            SFEM_READ_ENV(SFEM_USE_GLL, atoi);
+
+            if (SFEM_USE_GLL) {
                 const scalar_t *qx{nullptr};
                 switch (level()) {
                     case 1: {
