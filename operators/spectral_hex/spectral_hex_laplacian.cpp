@@ -6,19 +6,19 @@
 #include "hex8_laplacian_inline_cpu.h"
 #include "hex8_quadrature.h"
 #include "lagrange.hpp"
+#include "lagrange_legendre_gauss_lobatto.hpp"
 #include "line_quadrature.h"
+#include "line_quadrature_gauss_lobatto.h"
 #include "sfem_Tracer.hpp"
 #include "sshex8.h"
 #include "tet4_inline_cpu.h"
-#include "lagrange_legendre_gauss_lobatto.hpp"
-#include "line_quadrature_gauss_lobatto.h"
 
 #include <cstdio>
 
 // 2*3*MAX(N, Q)^4
 
 template <int N, int Q, typename T>
-SFEM_INLINE static void spectral_hex_triad_interpolate(
+SFEM_INLINE static void lagrange_hex_triad_interpolate(
         // Shape functions per quad point Q x S
         const T* const SFEM_RESTRICT B0,
         // Shape functions per quad point Q x S
@@ -443,7 +443,7 @@ void classical_lapl(const scalar_t* const               fff,
 // #define DEBUG_SUMFACT
 
 template <int N, int Q, typename T>
-void spectral_hex_laplacian_apply(  // Shape functions per quad point Q x S
+void lagrange_hex_laplacian_apply(  // Shape functions per quad point Q x S
         const T* const SFEM_RESTRICT S,
         // Shape functions per quad point Q x S
         const T* const SFEM_RESTRICT D,
@@ -458,13 +458,13 @@ void spectral_hex_laplacian_apply(  // Shape functions per quad point Q x S
     // Interpolate gradient
 
     T gx[Q * Q * Q];
-    spectral_hex_triad_interpolate<N, Q, T>(D, S, S, u, gx);
+    lagrange_hex_triad_interpolate<N, Q, T>(D, S, S, u, gx);
 
     T gy[Q * Q * Q];
-    spectral_hex_triad_interpolate<N, Q, T>(S, D, S, u, gy);
+    lagrange_hex_triad_interpolate<N, Q, T>(S, D, S, u, gy);
 
     T gz[Q * Q * Q];
-    spectral_hex_triad_interpolate<N, Q, T>(S, S, D, u, gz);
+    lagrange_hex_triad_interpolate<N, Q, T>(S, S, D, u, gz);
 
     for (int q = 0; q < Q * Q * Q; q++) {
         const T gxq = FFF[0] * gx[q] + FFF[1] * gy[q] + FFF[2] * gz[q];
@@ -550,13 +550,13 @@ void spectral_hex_laplacian_apply(  // Shape functions per quad point Q x S
 }
 
 template <int order>
-int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements,
+int lagrange_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements,
                                      const ptrdiff_t                   nnodes,
                                      idx_t** const SFEM_RESTRICT       elements,
                                      geom_t** const SFEM_RESTRICT      points,
                                      const real_t* const SFEM_RESTRICT u,
                                      real_t* const SFEM_RESTRICT       values) {
-    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
+    SFEM_TRACE_SCOPE("lagrange_hex_laplacian_apply_tpl");
 
     SFEM_UNUSED(nnodes);
 
@@ -608,7 +608,7 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
             break;
         }
         default: {
-            SFEM_ERROR("spectral_hex_laplacian_apply_tpl: Unsupported element order!\n");
+            SFEM_ERROR("lagrange_hex_laplacian_apply_tpl: Unsupported element order!\n");
             break;
         }
     }
@@ -659,7 +659,7 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
 
         // Assume affine here!
         hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
-        spectral_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
+        lagrange_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
             assert(!isnan(element_vector[v]));
@@ -672,13 +672,13 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
 }
 
 template <int order>
-int spectral_hex_laplacian_apply_GLL_tpl(const ptrdiff_t                   nelements,
-                                         const ptrdiff_t                   nnodes,
-                                         idx_t** const SFEM_RESTRICT       elements,
-                                         geom_t** const SFEM_RESTRICT      points,
-                                         const real_t* const SFEM_RESTRICT u,
-                                         real_t* const SFEM_RESTRICT       values) {
-    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
+int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements,
+                                     const ptrdiff_t                   nnodes,
+                                     idx_t** const SFEM_RESTRICT       elements,
+                                     geom_t** const SFEM_RESTRICT      points,
+                                     const real_t* const SFEM_RESTRICT u,
+                                     real_t* const SFEM_RESTRICT       values) {
+    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply_tpl");
 
     SFEM_UNUSED(nnodes);
 
@@ -730,7 +730,7 @@ int spectral_hex_laplacian_apply_GLL_tpl(const ptrdiff_t                   nelem
             break;
         }
         default: {
-            SFEM_ERROR("spectral_hex_laplacian_apply_tpl: Unsupported element order!\n");
+            SFEM_ERROR("lagrange_hex_laplacian_apply_tpl: Unsupported element order!\n");
             break;
         }
     }
@@ -781,7 +781,7 @@ int spectral_hex_laplacian_apply_GLL_tpl(const ptrdiff_t                   nelem
 
         // Assume affine here!
         hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
-        spectral_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
+        lagrange_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
             assert(!isnan(element_vector[v]));
@@ -808,16 +808,16 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
     if (SFEM_USE_GLL) {
         switch (order) {
             case 2: {
-                return spectral_hex_laplacian_apply_GLL_tpl<2>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
             }
             case 4: {
-                return spectral_hex_laplacian_apply_GLL_tpl<4>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
             }
             case 8: {
-                return spectral_hex_laplacian_apply_GLL_tpl<8>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
             }
             case 16: {
-                return spectral_hex_laplacian_apply_GLL_tpl<16>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
             }
             default: {
                 SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
@@ -827,16 +827,16 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
     } else {
         switch (order) {
             case 2: {
-                return spectral_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
             }
             case 4: {
-                return spectral_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
             }
             case 8: {
-                return spectral_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
             }
             // case 16: {
-            //     return spectral_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
+            //     return lagrange_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
             // }
             default: {
                 SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
