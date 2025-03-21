@@ -49,7 +49,7 @@ tet4_measure_V(const vec_real px0,    // X-coordinate
     //
     // V = (1/6) * det(M)
 
-    const real_t   ref_vol = 1. / 6;
+    const real_t   ref_vol = 1.0 / 6.0;
     const vec_real x0      = -pz0 + pz3;
     const vec_real x1      = -py0 + py2;
     const vec_real x2      = -ref_vol * px0 + ref_vol * px1;

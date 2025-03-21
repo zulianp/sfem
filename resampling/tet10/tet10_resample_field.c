@@ -1038,10 +1038,14 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
 ///////////////////////////////////////////////////////////////////////
 // tet10_measure
 ///////////////////////////////////////////////////////////////////////
-SFEM_INLINE static real_t tet10_measure(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RESTRICT y,
-                                        const geom_t* const SFEM_RESTRICT z,
-                                        // Quadrature point
-                                        const real_t qx, const real_t qy, const real_t qz) {
+SFEM_INLINE static real_t                            //
+tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
+              const geom_t* const SFEM_RESTRICT y,   //
+              const geom_t* const SFEM_RESTRICT z,   //
+              const real_t                      qx,  // Quadrature point
+              const real_t                      qy,  //
+              const real_t                      qz) {                     //
+
     const real_t x0  = 4 * qz;
     const real_t x1  = x0 - 1;
     const real_t x2  = 4 * qy;
