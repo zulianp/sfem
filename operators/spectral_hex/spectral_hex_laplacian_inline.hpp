@@ -130,7 +130,7 @@ void spectral_hex_laplacian_apply(
                 for (int n = 1; n < N; n++) {
                     const int nidx = n * N;
                     acc[0] += D0[nidx] * g0[n];
-                    acc[1] += D1[nidx] * g1[n * N];
+                    acc[1] += D1[nidx] * g1[nidx];
                     acc[2] += D2[nidx] * g2[n * N2];
                 }
 
