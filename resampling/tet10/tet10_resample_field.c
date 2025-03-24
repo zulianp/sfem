@@ -1321,20 +1321,20 @@ int hex8_to_isoparametric_tet10_resample_field_local(
 }
 
 ///////////////////////////////////////////////////////////////////////
-// hex8_to_isoparametric_tet10_resample_field_local_adjoint
+// hex8_to_isoparametric_tet10_resample_field_adjoint
 ///////////////////////////////////////////////////////////////////////
-int                                                                                                            //
-hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                                                         const ptrdiff_t                      end_element,     //
-                                                         const ptrdiff_t                      nnodes,          //
-                                                         const idx_t** const SFEM_RESTRICT    elems,           //
-                                                         const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                         const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                                                         const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                                                         const geom_t* const SFEM_RESTRICT    origin,          //
-                                                         const geom_t* const SFEM_RESTRICT    delta,           //
-                                                         const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
-                                                         real_t* const SFEM_RESTRICT          data) {                   // Output SDF
+int                                                                                                      //
+hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                   const ptrdiff_t                      end_element,     //
+                                                   const ptrdiff_t                      nnodes,          //
+                                                   const idx_t** const SFEM_RESTRICT    elems,           //
+                                                   const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                   const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                   const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                   const geom_t* const SFEM_RESTRICT    origin,          //
+                                                   const geom_t* const SFEM_RESTRICT    delta,           //
+                                                   const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                   real_t* const SFEM_RESTRICT          data) {                   // Output SDF
 
     PRINT_CURRENT_FUNCTION;
 
@@ -1486,6 +1486,135 @@ hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t        
     }
 
     RETURN_FROM_FUNCTION(ret);
+}
+
+int                                                                                                             //
+hex8_to_isoparametric_tet10_resample_field_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                          const ptrdiff_t                      end_element,     //
+                                                          const ptrdiff_t                      nnodes,          //
+                                                          const idx_t** const SFEM_RESTRICT    elems,           //
+                                                          const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                          const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                          const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                          const geom_t* const SFEM_RESTRICT    origin,          //
+                                                          const geom_t* const SFEM_RESTRICT    delta,           //
+                                                          const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                          const real_t                         alpha_th,  // Threshold for alpha
+                                                          real_t* const SFEM_RESTRICT          data) {             // Output SDF
+
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const real_t hexahedron_volume = dx * dy * dz;
+}
+
+///////////////////////////////////////////////////////////////////////
+// tet10_uniform_refinement
+///////////////////////////////////////////////////////////////////////
+int                                                             //
+tet10_uniform_refinement(const real_t* const          x,        //
+                         const real_t* const          y,        //
+                         const real_t* const          z,        //
+                         const real_t* const          w,        //
+                         struct tet10_vertices* const rTets) {  //
+
+    const int refine_pattern[8][4] = {// Corner tests
+                                      {0, 4, 6, 7},
+                                      {4, 1, 5, 8},
+                                      {6, 5, 2, 9},
+                                      {7, 8, 9, 3},
+                                      // Octahedron tets
+                                      {4, 5, 6, 8},
+                                      {7, 4, 6, 8},
+                                      {6, 5, 9, 8},
+                                      {7, 6, 9, 8}};
+
+    for (int ni = 0; ni < 8; ni++) {
+        const int v_indices[4] = {refine_pattern[ni][0],   //
+                                  refine_pattern[ni][1],   //
+                                  refine_pattern[ni][2],   //
+                                  refine_pattern[ni][3]};  //
+
+        for (int j = 0; j < 4; j++) {
+            // Assign the vertices coordinates of the refined tetrahedron
+            rTets[ni].x[j] = x[v_indices[j]];
+            rTets[ni].y[j] = y[v_indices[j]];
+            rTets[ni].z[j] = z[v_indices[j]];
+            rTets[ni].w[j] = w[v_indices[j]];
+        }
+    }
+
+    // Add the mid-edge vertices and weights of the refined tetrahedron
+    for (int ni = 0; ni < 8; ni++) {
+        rTets[ni].x[4] = 0.5 * (rTets[ni].x[0] + rTets[ni].x[1]);
+        rTets[ni].y[4] = 0.5 * (rTets[ni].y[0] + rTets[ni].y[1]);
+        rTets[ni].z[4] = 0.5 * (rTets[ni].z[0] + rTets[ni].z[1]);
+        rTets[ni].w[4] = 0.5 * (rTets[ni].w[0] + rTets[ni].w[1]);
+
+        rTets[ni].x[5] = 0.5 * (rTets[ni].x[1] + rTets[ni].x[2]);
+        rTets[ni].y[5] = 0.5 * (rTets[ni].y[1] + rTets[ni].y[2]);
+        rTets[ni].z[5] = 0.5 * (rTets[ni].z[1] + rTets[ni].z[2]);
+        rTets[ni].w[5] = 0.5 * (rTets[ni].w[1] + rTets[ni].w[2]);
+
+        rTets[ni].x[6] = 0.5 * (rTets[ni].x[0] + rTets[ni].x[2]);
+        rTets[ni].y[6] = 0.5 * (rTets[ni].y[0] + rTets[ni].y[2]);
+        rTets[ni].z[6] = 0.5 * (rTets[ni].z[0] + rTets[ni].z[2]);
+        rTets[ni].w[6] = 0.5 * (rTets[ni].w[0] + rTets[ni].w[2]);
+
+        rTets[ni].x[7] = 0.5 * (rTets[ni].x[0] + rTets[ni].x[3]);
+        rTets[ni].y[7] = 0.5 * (rTets[ni].y[0] + rTets[ni].y[3]);
+        rTets[ni].z[7] = 0.5 * (rTets[ni].z[0] + rTets[ni].z[3]);
+        rTets[ni].w[7] = 0.5 * (rTets[ni].w[0] + rTets[ni].w[3]);
+
+        rTets[ni].x[8] = 0.5 * (rTets[ni].x[1] + rTets[ni].x[3]);
+        rTets[ni].y[8] = 0.5 * (rTets[ni].y[1] + rTets[ni].y[3]);
+        rTets[ni].z[8] = 0.5 * (rTets[ni].z[1] + rTets[ni].z[3]);
+        rTets[ni].w[8] = 0.5 * (rTets[ni].w[1] + rTets[ni].w[3]);
+
+        rTets[ni].x[9] = 0.5 * (rTets[ni].x[2] + rTets[ni].x[3]);
+        rTets[ni].y[9] = 0.5 * (rTets[ni].y[2] + rTets[ni].y[3]);
+        rTets[ni].z[9] = 0.5 * (rTets[ni].z[2] + rTets[ni].z[3]);
+        rTets[ni].w[9] = 0.5 * (rTets[ni].w[2] + rTets[ni].w[3]);
+    }
+
+    return 0;
+}
+
+real_t                                                   //
+tet10_volumes(const struct tet10_vertices* const rTets,  //
+              const int                          N,      //
+              real_t* const                      V) {                         //
+
+    real_t volume = 0.0;
+
+    for (int ni = 0; ni < N; ni++) {
+        const real_t volume_loc = tet4_measure(rTets[ni].x[0],  // x-coordinates
+                                               rTets[ni].x[1],
+                                               rTets[ni].x[2],
+                                               rTets[ni].x[3],
+                                               rTets[ni].y[0],  // y-coordinates
+                                               rTets[ni].y[1],
+                                               rTets[ni].y[2],
+                                               rTets[ni].y[3],
+                                               rTets[ni].z[0],  // z-coordinates
+                                               rTets[ni].z[1],
+                                               rTets[ni].z[2],
+                                               rTets[ni].z[3]);  //
+
+        volume += volume_loc * V[ni];
+        V[ni] = volume_loc;
+    }
+
+    return volume;
 }
 
 ///////////////////////////////////////////////////////////////////////
