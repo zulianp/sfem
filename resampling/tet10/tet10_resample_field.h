@@ -167,19 +167,91 @@ int hex8_to_tet10_resample_field_local_CUDA_Managed(
  * @param data
  * @return int
  */
-int                                                                                                           //
-hex8_to_isoparametric_tet10_resample_field_local_adjoint(const ptrdiff_t                      start_element,  // Mesh
-                                                         const ptrdiff_t                      end_element,    //
-                                                         const ptrdiff_t                      nnodes,         //
-                                                         const idx_t** const SFEM_RESTRICT    elems,          //
-                                                         const geom_t** const SFEM_RESTRICT   xyz,            //
-                                                         const ptrdiff_t* const SFEM_RESTRICT n,              // SDF
-                                                         const ptrdiff_t* const SFEM_RESTRICT stride,         //
-                                                         const geom_t* const SFEM_RESTRICT    origin,         //
-                                                         const geom_t* const SFEM_RESTRICT    delta,          //
-                                                         const real_t* const SFEM_RESTRICT
-                                                                                     weighted_field,  // Input weighted field
-                                                         real_t* const SFEM_RESTRICT data);           // Output
+int                                                                                                      //
+hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                   const ptrdiff_t                      end_element,     //
+                                                   const ptrdiff_t                      nnodes,          //
+                                                   const idx_t** const SFEM_RESTRICT    elems,           //
+                                                   const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                   const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                   const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                   const geom_t* const SFEM_RESTRICT    origin,          //
+                                                   const geom_t* const SFEM_RESTRICT    delta,           //
+                                                   const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                   real_t* const SFEM_RESTRICT          data);                    // Output
+
+int                                                                                                             //
+hex8_to_isoparametric_tet10_resample_field_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                          const ptrdiff_t                      end_element,     //
+                                                          const ptrdiff_t                      nnodes,          //
+                                                          const idx_t** const SFEM_RESTRICT    elems,           //
+                                                          const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                          const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                          const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                          const geom_t* const SFEM_RESTRICT    origin,          //
+                                                          const geom_t* const SFEM_RESTRICT    delta,           //
+                                                          const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                          const real_t                         alpha_th,  // Threshold for alpha
+                                                          real_t* const SFEM_RESTRICT          data);              // Output
+
+/**
+ * @struct tet10_vertices
+ * @brief Holds the coordinates and weight for a 10-node tetrahedral element.
+ *
+ * This structure provides separate arrays for x, y, z, and w values, each
+ * containing data for the 10 nodes of a second-order tetrahedron.
+ *
+ * @var tet10_vertices::x
+ *     The x-coordinates of the 10 nodes.
+ * @var tet10_vertices::y
+ *     The y-coordinates of the 10 nodes.
+ * @var tet10_vertices::z
+ *     The z-coordinates of the 10 nodes.
+ * @var tet10_vertices::w
+ *     Additional weighting or field data for the 10 nodes.
+ */
+struct tet10_vertices {
+    real_t x[10];
+    real_t y[10];
+    real_t z[10];
+    real_t w[10];
+};
+
+/**
+ * @brief Uniformly refine a tetrahedral 2nd order mesh.
+ *
+ * Refines the provided 10-node tetrahedron by updating coordinates and weights.
+ * @note The ordering of the vertices are the one form User Manual for EXODUS II Mesh Converter.
+ * at page 14 Figure 8 TETRA 10-NODED ELEMENT (no central node).
+ *
+ * @param x     Input array of x-coordinates (size: 10).
+ * @param y     Input array of y-coordinates (size: 10).
+ * @param z     Input array of z-coordinates (size: 10).
+ * @param w     Input array of weights or field data (size: 10).
+ * @param rTets Output struct containing refined element data.
+ *
+ * @return 0 on success, non-zero otherwise.
+ */
+int                                                            //
+tet10_uniform_refinement(const real_t* const          x,       //
+                         const real_t* const          y,       //
+                         const real_t* const          z,       //
+                         const real_t* const          w,       //
+                         struct tet10_vertices* const rTets);  //
+
+/**
+ * @brief Compute the volumes of the 10-node tetrahedra in the array rTets.
+ *
+ * @param rTets
+ * @param N
+ * @param V
+ * @param M
+ * @return the total volume of the tetrahedra.
+ */
+real_t                                                   //
+tet10_volumes(const struct tet10_vertices* const rTets,  //
+              const int                          N,      //
+              real_t* const                      V);                          //
 
 #ifdef __cplusplus
 }

@@ -1208,6 +1208,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                             data);                          //
 
 #else
+#pragma message("Using REFINE_ADJOINT for TET4")
 
     const real_t alpha_th = 2.5;
 
@@ -1410,7 +1411,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
     free(mass_vector);
     mass_vector = NULL;
 
-    hex8_to_isoparametric_tet10_resample_field_local_adjoint(0,                //
+    hex8_to_isoparametric_tet10_resample_field_adjoint(0,                //
                                                              mesh->nelements,  //
                                                              mesh->nnodes,     //
                                                              mesh->elements,   //
