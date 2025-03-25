@@ -1,6 +1,8 @@
 #ifndef __SFEM_RESAMPLE_FIELD_TET4_MATH_H__
 #define __SFEM_RESAMPLE_FIELD_TET4_MATH_H__
 
+#include <stddef.h>  // Add this for ptrdiff_t type
+#include "sfem_base.h"
 #include "sfem_config.h"
 
 #define real_type real_t
@@ -416,6 +418,31 @@ tet_edge_length(const real_t  v0x,           //
                 const real_t  v3y,           //
                 const real_t  v3z,           //
                 real_t* const edge_length);  //
+
+/**
+ * @brief Compute the volume of a tetrahedron.
+ *
+ * @param px0
+ * @param px1
+ * @param px2
+ * @param px3
+ * @param py0
+ * @param py1
+ * @param py2
+ * @param py3
+ * @param pz0
+ * @param pz1
+ * @param pz2
+ * @param pz3
+ * @return real_t
+ */
+real_t tet4_measure(
+        // X-coordinates
+        const real_t px0, const real_t px1, const real_t px2, const real_t px3,
+        // Y-coordinates
+        const real_t py0, const real_t py1, const real_t py2, const real_t py3,
+        // Z-coordinates
+        const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3);
 
 /**
  * @brief structure to store the analytic field

@@ -122,7 +122,7 @@ SFEM_INLINE static void beam2_transform(
     *out_z = pz0 + x * (-pz0 + pz1);
 }
 
-SFEM_INLINE static real_t tet4_measure(
+real_t tet4_measure(
         // X-coordinates
         const real_t px0, const real_t px1, const real_t px2, const real_t px3,
         // Y-coordinates
@@ -1412,16 +1412,16 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
     mass_vector = NULL;
 
     hex8_to_isoparametric_tet10_resample_field_adjoint(0,                //
-                                                             mesh->nelements,  //
-                                                             mesh->nnodes,     //
-                                                             mesh->elements,   //
-                                                             mesh->points,     //
-                                                             n,                //
-                                                             stride,           //
-                                                             origin,           //
-                                                             delta,            //
-                                                             weighted_field,   //
-                                                             data);            //
+                                                       mesh->nelements,  //
+                                                       mesh->nnodes,     //
+                                                       mesh->elements,   //
+                                                       mesh->points,     //
+                                                       n,                //
+                                                       stride,           //
+                                                       origin,           //
+                                                       delta,            //
+                                                       weighted_field,   //
+                                                       data);            //
 
     free(weighted_field);
     weighted_field = NULL;
