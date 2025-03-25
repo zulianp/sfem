@@ -268,6 +268,40 @@ tet10_edge_lengths(const real_t* x,              //
                    const real_t* z,              //
                    real_t* const edge_lengths);  //
 
+void  //
+tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RESTRICT y, const geom_t* const SFEM_RESTRICT z,
+                // Quadrature point
+                const real_t qx, const real_t qy, const real_t qz,
+                // Output
+                real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z);
+
+void  //
+tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f);
+
+void                                                                   //
+hex_aa_8_collect_indices(const ptrdiff_t* const SFEM_RESTRICT stride,  //
+                         const ptrdiff_t                      i,       //
+                         const ptrdiff_t                      j,       //
+                         const ptrdiff_t                      k,       //
+                         ptrdiff_t* const SFEM_RESTRICT       indices);
+
+void  //
+hex_aa_8_eval_fun(
+        // Quadrature point (local coordinates)
+        // With respect to the hat functions of a cube element
+        // In a local coordinate system
+        const real_t x, const real_t y, const real_t z,
+        // Output
+        real_t* const SFEM_RESTRICT f);
+
+real_t                                               //
+tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
+              const geom_t* const SFEM_RESTRICT y,   //
+              const geom_t* const SFEM_RESTRICT z,   //
+              const real_t                      qx,  // Quadrature point
+              const real_t                      qy,  //
+              const real_t                      qz);
+
 #ifdef __cplusplus
 }
 #endif

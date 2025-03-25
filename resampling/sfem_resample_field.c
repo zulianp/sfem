@@ -204,7 +204,7 @@ qz
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
 }
 
-SFEM_INLINE static void hex_aa_8_eval_fun(
+void hex_aa_8_eval_fun(
         // Quadrature point (local coordinates)
         // With respect to the hat functions of a cube element
         // In a local coordinate system

@@ -128,7 +128,7 @@ tet10_Lagrange_basis(const real_t qx, const real_t qy, const real_t qz, real_t* 
  * @param f
  * @return SFEM_INLINE
  */
-SFEM_INLINE static void  //
+void  //
 tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f) {
     assert(qx >= 0);
     assert(qy >= 0);
@@ -220,14 +220,14 @@ tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* 
     f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
 }
 
-/**
- * @brief Compute the dual basis of the tet10 element
- *
- * @param qx
- * @param qy
- * @param qz
- * @param f
- */
+// /**
+//  * @brief Compute the dual basis of the tet10 element
+//  *
+//  * @param qx
+//  * @param qy
+//  * @param qz
+//  * @param f
+//  */
 // real_t  //
 // tet4_measure(
 //         // X-coordinates
@@ -304,23 +304,23 @@ SFEM_INLINE static void tet4_transform(
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
 }
 
-SFEM_INLINE static void hex_aa_8_eval_fun(
-        // Quadrature point (local coordinates)
-        // With respect to the hat functions of a cube element
-        // In a local coordinate system
-        const real_t x, const real_t y, const real_t z,
-        // Output
-        real_t* const SFEM_RESTRICT f) {
-    //
-    f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f[1] = x * (1.0 - y) * (1.0 - z);
-    f[2] = x * y * (1.0 - z);
-    f[3] = (1.0 - x) * y * (1.0 - z);
-    f[4] = (1.0 - x) * (1.0 - y) * z;
-    f[5] = x * (1.0 - y) * z;
-    f[6] = x * y * z;
-    f[7] = (1.0 - x) * y * z;
-}
+// void hex_aa_8_eval_fun(
+//         // Quadrature point (local coordinates)
+//         // With respect to the hat functions of a cube element
+//         // In a local coordinate system
+//         const real_t x, const real_t y, const real_t z,
+//         // Output
+//         real_t* const SFEM_RESTRICT f) {
+//     //
+//     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
+//     f[1] = x * (1.0 - y) * (1.0 - z);
+//     f[2] = x * y * (1.0 - z);
+//     f[3] = (1.0 - x) * y * (1.0 - z);
+//     f[4] = (1.0 - x) * (1.0 - y) * z;
+//     f[5] = x * (1.0 - y) * z;
+//     f[6] = x * y * z;
+//     f[7] = (1.0 - x) * y * z;
+// }
 
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_collect_coeffs
@@ -1039,7 +1039,7 @@ int subparametric_tet10_assemble_dual_mass_vector(const ptrdiff_t nelements, con
 ///////////////////////////////////////////////////////////////////////
 // tet10_measure
 ///////////////////////////////////////////////////////////////////////
-SFEM_INLINE static real_t                            //
+real_t                                               //
 tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
               const geom_t* const SFEM_RESTRICT y,   //
               const geom_t* const SFEM_RESTRICT z,   //
@@ -1090,13 +1090,12 @@ tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
 ///////////////////////////////////////////////////////////////////////
 // tet10_transform
 ///////////////////////////////////////////////////////////////////////
-SFEM_INLINE static void tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RESTRICT y,
-                                        const geom_t* const SFEM_RESTRICT z,
-                                        // Quadrature point
-                                        const real_t qx, const real_t qy, const real_t qz,
-                                        // Output
-                                        real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y,
-                                        real_t* const SFEM_RESTRICT out_z) {
+void  //
+tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RESTRICT y, const geom_t* const SFEM_RESTRICT z,
+                // Quadrature point
+                const real_t qx, const real_t qy, const real_t qz,
+                // Output
+                real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z) {
     //
     const real_t x0  = 4 * qx;
     const real_t x1  = qy * x0;
