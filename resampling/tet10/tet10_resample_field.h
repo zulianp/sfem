@@ -253,6 +253,21 @@ tet10_volumes(const struct tet10_vertices* const rTets,  //
               const int                          N,      //
               real_t* const                      V);                          //
 
+/**
+ * @brief Calculate the lengths of all edges in a tetrahedron defined by the 10 nodes of a tet10.
+ *
+ * @param x Array of x-coordinates for the 10 nodes.
+ * @param y Array of y-coordinates for the 10 nodes.
+ * @param z Array of z-coordinates for the 10 nodes.
+ * @param array of edge lengths for the 6 edges.
+ * @return real_t Maximum edge length.
+ */
+real_t                                           //
+tet10_edge_lengths(const real_t* x,              //
+                   const real_t* y,              //
+                   const real_t* z,              //
+                   real_t* const edge_lengths);  //
+
 #ifdef __cplusplus
 }
 #endif
