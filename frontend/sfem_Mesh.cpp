@@ -74,6 +74,19 @@ namespace sfem {
         return ret;
     }
 
+
+    std::shared_ptr<Mesh> Mesh::create_quad4_square(MPI_Comm     comm,
+                                                   const int    nx,
+                                                   const int    ny,
+                                                   const geom_t xmin,
+                                                   const geom_t ymin,
+                                                   const geom_t xmax,
+                                                   const geom_t ymax) {
+        auto ret = std::make_shared<Mesh>(comm);
+        mesh_create_quad4_square(&ret->impl_->mesh, nx, ny, xmin, ymin, xmax, ymax);
+        return ret;
+    }
+
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
     int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
 

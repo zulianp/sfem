@@ -6,6 +6,7 @@
 #include "sfem_base.h"
 #include "sfem_mask.h"
 #include "sfem_mesh.h"
+#include "adj_table.h"
 
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
@@ -1095,6 +1096,28 @@ namespace sfem {
         }
 
         return max_node_id;
+    }
+
+    static std::shared_ptr<sfem::Sideset> create_skin_sideset(const std::shared_ptr<sfem::Mesh> &mesh)
+    {
+        ptrdiff_t      n_surf_elements = 0;
+        element_idx_t *parent          = 0;
+        int16_t       *side_idx        = 0;
+
+        if (extract_skin_sideset(mesh->n_elements(),
+                                 mesh->n_nodes(),
+                                 mesh->element_type(),
+                                 mesh->elements()->data(),
+                                 &n_surf_elements,
+                                 &parent,
+                                 &side_idx) != SFEM_SUCCESS) {
+            SFEM_ERROR("Failed to extract skin!\n");
+        }
+
+        auto sideset = std::make_shared<sfem::Sideset>(
+                mesh->comm(), sfem::manage_host_buffer(n_surf_elements, parent), sfem::manage_host_buffer(n_surf_elements, side_idx));
+
+        return sideset;
     }
 
 }  // namespace sfem

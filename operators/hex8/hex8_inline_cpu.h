@@ -149,6 +149,65 @@ static SFEM_INLINE void hex8_adjugate_and_det(const scalar_t *const SFEM_RESTRIC
                             jacobian[6] * x3 - jacobian[6] * x4;
 }
 
+static SFEM_INLINE void hex8_adjugate(const scalar_t *const SFEM_RESTRICT x,
+                                      const scalar_t *const SFEM_RESTRICT y,
+                                      const scalar_t *const SFEM_RESTRICT z,
+                                      const scalar_t                      qx,
+                                      const scalar_t                      qy,
+                                      const scalar_t                      qz,
+                                      scalar_t *const SFEM_RESTRICT       adjugate) {
+    scalar_t jacobian[9];
+    {
+        const scalar_t x0  = qy * qz;
+        const scalar_t x1  = 1 - qz;
+        const scalar_t x2  = qy * x1;
+        const scalar_t x3  = 1 - qy;
+        const scalar_t x4  = qz * x3;
+        const scalar_t x5  = x1 * x3;
+        const scalar_t x6  = qx * qz;
+        const scalar_t x7  = qx * x1;
+        const scalar_t x8  = 1 - qx;
+        const scalar_t x9  = qz * x8;
+        const scalar_t x10 = x1 * x8;
+        const scalar_t x11 = qx * qy;
+        const scalar_t x12 = qx * x3;
+        const scalar_t x13 = qy * x8;
+        const scalar_t x14 = x3 * x8;
+
+        jacobian[0] = x0 * x[6] - x0 * x[7] + x2 * x[2] - x2 * x[3] - x4 * x[4] + x4 * x[5] - x5 * x[0] + x5 * x[1];
+        jacobian[1] = qx * qz * x[6] + qx * x1 * x[2] + qz * x8 * x[7] + x1 * x8 * x[3] - x10 * x[0] - x6 * x[5] - x7 * x[1] -
+                      x9 * x[4];
+        jacobian[2] = qx * qy * x[6] + qx * x3 * x[5] + qy * x8 * x[7] - x11 * x[2] - x12 * x[1] - x13 * x[3] - x14 * x[0] +
+                      x3 * x8 * x[4];
+        jacobian[3] = x0 * y[6] - x0 * y[7] + x2 * y[2] - x2 * y[3] - x4 * y[4] + x4 * y[5] - x5 * y[0] + x5 * y[1];
+        jacobian[4] = qx * qz * y[6] + qx * x1 * y[2] + qz * x8 * y[7] + x1 * x8 * y[3] - x10 * y[0] - x6 * y[5] - x7 * y[1] -
+                      x9 * y[4];
+        jacobian[5] = qx * qy * y[6] + qx * x3 * y[5] + qy * x8 * y[7] - x11 * y[2] - x12 * y[1] - x13 * y[3] - x14 * y[0] +
+                      x3 * x8 * y[4];
+        jacobian[6] = x0 * z[6] - x0 * z[7] + x2 * z[2] - x2 * z[3] - x4 * z[4] + x4 * z[5] - x5 * z[0] + x5 * z[1];
+        jacobian[7] = qx * qz * z[6] + qx * x1 * z[2] + qz * x8 * z[7] + x1 * x8 * z[3] - x10 * z[0] - x6 * z[5] - x7 * z[1] -
+                      x9 * z[4];
+        jacobian[8] = qx * qy * z[6] + qx * x3 * z[5] + qy * x8 * z[7] - x11 * z[2] - x12 * z[1] - x13 * z[3] - x14 * z[0] +
+                      x3 * x8 * z[4];
+    }
+
+    const scalar_t x0 = jacobian[4] * jacobian[8];
+    const scalar_t x1 = jacobian[5] * jacobian[7];
+    const scalar_t x2 = jacobian[1] * jacobian[8];
+    const scalar_t x3 = jacobian[1] * jacobian[5];
+    const scalar_t x4 = jacobian[2] * jacobian[4];
+
+    adjugate[0] = x0 - x1;
+    adjugate[1] = jacobian[2] * jacobian[7] - x2;
+    adjugate[2] = x3 - x4;
+    adjugate[3] = -jacobian[3] * jacobian[8] + jacobian[5] * jacobian[6];
+    adjugate[4] = jacobian[0] * jacobian[8] - jacobian[2] * jacobian[6];
+    adjugate[5] = -jacobian[0] * jacobian[5] + jacobian[2] * jacobian[3];
+    adjugate[6] = jacobian[3] * jacobian[7] - jacobian[4] * jacobian[6];
+    adjugate[7] = -jacobian[0] * jacobian[7] + jacobian[1] * jacobian[6];
+    adjugate[8] = jacobian[0] * jacobian[4] - jacobian[1] * jacobian[3];
+}
+
 static SFEM_INLINE idx_t hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {
     idx_t i;
     for (i = 0; i < size - 4; i += 4) {
@@ -359,12 +418,12 @@ static const scalar_t hex8_H_0[8][3] = {{1.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0},
 
 static const scalar_t hex8_diff3_0[8] = {-1, 1, -1, 1, 1, -1, 1, -1};
 
-static SFEM_INLINE void hex8_l2_project(const scalar_t                jacobian_determinant,
-                                        const scalar_t                qx,
-                                        const scalar_t                qy,
-                                        const scalar_t                qz,
-                                        const scalar_t                qw,
-                                        const scalar_t                v,
+static SFEM_INLINE void hex8_l2_project(const scalar_t                     jacobian_determinant,
+                                        const scalar_t                     qx,
+                                        const scalar_t                     qy,
+                                        const scalar_t                     qz,
+                                        const scalar_t                     qw,
+                                        const scalar_t                     v,
                                         accumulator_t *const SFEM_RESTRICT values) {
     const scalar_t x0 = 1 - qx;
     const scalar_t x1 = 1 - qy;

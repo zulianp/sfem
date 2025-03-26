@@ -82,6 +82,14 @@ void mesh_create_tri3_square(mesh_t      *mesh,
                              const geom_t xmax,
                              const geom_t ymax);
 
+void mesh_create_quad4_square(mesh_t      *mesh,
+                              const int    nx,
+                              const int    ny,
+                              const geom_t xmin,
+                              const geom_t ymin,
+                              const geom_t xmax,
+                              const geom_t ymax);
+
 /**
  * @brief Create mesh in serial mode
  *
