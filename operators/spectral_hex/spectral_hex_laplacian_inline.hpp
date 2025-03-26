@@ -115,9 +115,9 @@ void spectral_hex_laplacian_apply(
 
     for (int k = 0; k < N; k++) {
         for (int j = 0; j < N; j++) {
+            T*const out_kj = &out[k * N2 + j * N];
+            
             for (int i = 0; i < N; i++) {
-                const int idx = k * N2 + j * N + i;
-
                 const T* const D0 = &D[i];
                 const T* const D1 = &D[j];
                 const T* const D2 = &D[k];
@@ -134,7 +134,7 @@ void spectral_hex_laplacian_apply(
                     acc[2] += D2[nidx] * g2[n * N2];
                 }
 
-                out[idx] += acc[0] + acc[1] + acc[2];
+                out_kj[i] += acc[0] + acc[1] + acc[2];
             }
         }
     }

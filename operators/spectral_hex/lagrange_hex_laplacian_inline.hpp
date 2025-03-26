@@ -4,6 +4,8 @@
 #include "sfem_base.h"
 #include <cstdio>
 
+
+#include "sfem_Tracer.hpp"
 // #define DEBUG_SUMFACT
 
 template <int N, int Q, typename T>
