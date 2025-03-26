@@ -109,7 +109,7 @@ tet10_volumes(const struct tet10_vertices* const rTets,  //
                                                rTets[ni].z[2],
                                                rTets[ni].z[3]);  //
 
-        volume += volume_loc * V[ni];
+        volume += volume_loc;
         V[ni] = volume_loc;
     }
 
@@ -179,7 +179,9 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
         real_t g_qz;
 
         tet10_transform(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx, &g_qy, &g_qz);
-        tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
+
+        // tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
+        tet10_Lagrange_basis(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
 
         const real_t grid_x = (g_qx - ox) / dx;
         const real_t grid_y = (g_qy - oy) / dy;
@@ -290,6 +292,10 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
 
     struct tet10_vertices rTets[8];
 
+    real_t alpha_max       = 0.0;
+    real_t alpha_mim       = 1e9;
+    int    refinements_cnt = 0;
+
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         idx_t ev[10];
 
@@ -329,11 +335,46 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
         const real_t max_edge_len = tet10_edge_lengths(x, y, z, edges_length);
         const real_t alpha        = max_edge_len / dx;
 
+        alpha_max = alpha > alpha_max ? alpha : alpha_max;
+        alpha_mim = alpha < alpha_mim ? alpha : alpha_mim;
+
         int n_tet = 0;
 
         if (alpha > alpha_th) {
             tet10_uniform_refinement(x, y, z, wf_tet10, rTets);
             n_tet = 8;
+            refinements_cnt++;
+
+            // //  Test refinement quality
+            // real_t V[8];
+            //
+            // const real_t tot_volume = tet10_volumes(rTets, 8, V);
+            // const real_t ref_volume = tet4_measure(x[0],  // x-coordinates
+            //                                        x[1],
+            //                                        x[2],
+            //                                        x[3],
+            //                                        y[0],  // y-coordinates
+            //                                        y[1],
+            //                                        y[2],
+            //                                        y[3],
+            //                                        z[0],  // z-coordinates
+            //                                        z[1],
+            //                                        z[2],
+            //                                        z[3]);  //
+            //
+            // printf("ref_volume: %g <<<<<<<<<<<<<<<<<<<<<<<< \n", ref_volume);
+            // printf("tot_volume: %g <<<<<<<<<<<<<<<<<<<<<<<< \n", tot_volume);
+            // printf("V: %e + %e + %e + %e + %e + %e + %e + %e = %e < \n\n",
+            //        V[0],
+            //        V[1],
+            //        V[2],
+            //        V[3],
+            //        V[4],
+            //        V[5],
+            //        V[6],
+            //        V[7],
+            //        (V[0] + V[1] + V[2] + V[3] + V[4] + V[5] + V[6] + V[7]));
+
         } else {
             n_tet = 1;
             for (int v = 0; v < 10; ++v) {
@@ -355,6 +396,13 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
                                                              data);        //
         }
     }
+
+    printf("============================================================\n");
+    printf("alpha_max:       %g  \n", alpha_max);
+    printf("alpha_mim:       %g  \n", alpha_mim);
+    printf("refinements_cnt: %d  \n", refinements_cnt);
+    printf("Total elements:  %ld \n", (end_element - start_element));
+    printf("Refinement ratio %g  \n", (real_t)refinements_cnt / (real_t)(end_element - start_element));
 
     RETURN_FROM_FUNCTION(ret);
 }
