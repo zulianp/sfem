@@ -1411,6 +1411,9 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
     free(mass_vector);
     mass_vector = NULL;
 
+#define TEST_REFINE_ADJOINT 1
+#if TEST_REFINE_ADJOINT == 0
+
     hex8_to_isoparametric_tet10_resample_field_adjoint(0,                //
                                                        mesh->nelements,  //
                                                        mesh->nnodes,     //
@@ -1422,6 +1425,33 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                                                        delta,            //
                                                        weighted_field,   //
                                                        data);            //
+
+#else
+
+#pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
+
+    const real_t alpha_th = 2.0;
+
+    hex8_to_isoparametric_tet10_resample_field_refine_adjoint(0,                //
+                                                              mesh->nelements,  //
+                                                              mesh->nnodes,     //
+                                                              mesh->elements,   //
+                                                              mesh->points,     //
+                                                              n,                //
+                                                              stride,           //
+                                                              origin,           //
+                                                              delta,            //
+                                                              weighted_field,   //
+                                                              alpha_th,         //
+                                                              data);            //
+
+    const real_t    volume_hex = delta[0] * delta[1] * delta[2];
+    const ptrdiff_t data_size  = n[0] * n[1] * n[2];
+    for (ptrdiff_t i = 0; i < data_size; i++) {
+        data[i] /= volume_hex;
+    }
+
+#endif
 
     free(weighted_field);
     weighted_field = NULL;

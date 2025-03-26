@@ -278,6 +278,9 @@ tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RE
 void  //
 tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f);
 
+void  //
+tet10_Lagrange_basis(const real_t qx, const real_t qy, const real_t qz, real_t* const f);
+
 void                                                                   //
 hex_aa_8_collect_indices(const ptrdiff_t* const SFEM_RESTRICT stride,  //
                          const ptrdiff_t                      i,       //

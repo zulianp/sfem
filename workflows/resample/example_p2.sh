@@ -140,7 +140,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf 100
+sdf_test.py $sdf 350
 # raw_to_xdmf.py $sdf
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
@@ -215,10 +215,22 @@ else
 	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
 fi
 
-if [[ $SFEM_ADJOINT -eq 1 ]]
-then
-    head -11 metadata_sdf.float32.yml > metadata_test_field_t10.yml
-    echo "path: $PWD/test_field_t10.raw" >> metadata_test_field_t10.yml 
-    raw_to_xdmf.py test_field_t10.raw
-fi
+# Function to create metadata and convert raw files to XDMF format
+# Usage: process_raw_file filename
+# Example: process_raw_file field_cnt
+function process_raw_file() {
+    local file_base=$1
+    local raw_file="${file_base}.raw"
+    local metadata_file="metadata_${file_base}.yml"
+    
+    if [[ $SFEM_ADJOINT -eq 1 && -f $raw_file ]]; then
+        echo "Processing $raw_file..."
+        head -11 metadata_sdf.float32.yml > $metadata_file
+        echo "path: $PWD/$raw_file" >> $metadata_file
+        raw_to_xdmf.py $raw_file
+    fi
+}
+
+process_raw_file test_field_t10
+
 

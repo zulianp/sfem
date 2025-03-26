@@ -611,8 +611,10 @@ int main(int argc, char* argv[]) {
             // }
 
             // TESTING: apply mesh_fun_b to g
-            apply_fun_to_mesh(mesh.nnodes, mesh.points, mesh_fun_c, g);
 
+            apply_fun_to_mesh(mesh.nnodes, mesh.points, mesh_fun_c, g);
+            const real_t alpha_th_tet10 = 2.5;
+            
             switch (info.element_type) {
                 case TET10:
 
