@@ -39,7 +39,8 @@ static SFEM_INLINE void lagrange_hex_advection_apply(
     T cuz[Q * Q * Q];
 
     // Use cux as temp for cq
-    lagrange_hex_triad_interpolate<N, Q, T>(S, S, S, c, cux);
+    lagrange_hex_interpolate<N, Q, T>(S, c, cux);
+    // lagrange_hex_triad_interpolate<N, Q, T>(S, S, S, c, cux);
 
     for (int q = 0; q < Q * Q * Q; q++) {
         const T cq = cux[q];
