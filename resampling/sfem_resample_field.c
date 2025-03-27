@@ -1208,7 +1208,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                             data);                          //
 
 #else
-#pragma message("Using REFINE_ADJOINT for TET4")
+#pragma message "Using REFINE_ADJOINT for TET4"
 
     const real_t alpha_th = 2.5;
 

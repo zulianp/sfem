@@ -413,6 +413,8 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
     printf("============================================================\n");
 #endif
 
+    int degenerated_tetrahedra_cnt = 0;
+
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
         idx_t ev[4];
@@ -439,32 +441,76 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
         // Compute the alpha_tet to decide if the tetrahedron is refined
         // Sides of the tetrahedron
         real_type edges_length[6];
-        tet_edge_length(x0,  // Coordinates of the 1st vertex
-                        y0,
-                        z0,
-                        x1,
-                        y1,  // Coordinates of the 2nd vertex
-                        z1,
-                        x2,
-                        y2,
-                        z2,  // Coordinates of the 3rd vertex
-                        x3,
-                        y3,
-                        z3,
-                        edges_length);  // Output
 
-        real_type max_edges_length = edges_length[0];
-        for (int i = 1; i < 6; i++) {
-            if (edges_length[i] > max_edges_length) {
-                max_edges_length = edges_length[i];
-            }
+        int vertex_a = 0;
+        int vertex_b = 0;
+
+        const real_type max_edges_length =  //
+                tet_edge_max_length(x0,
+                                    y0,
+                                    z0,  //
+                                    x1,
+                                    y1,
+                                    z1,  //
+                                    x2,
+                                    y2,
+                                    z2,  //
+                                    x3,
+                                    y3,
+                                    z3,             //
+                                    &vertex_a,      // Output
+                                    &vertex_b,      // Output
+                                    edges_length);  // Output
+
+        const real_t alpha_tet           = max_edges_length / dx;
+        const real_t max_min_edges_ratio = ratio_abs_max_min(edges_length, 6);
+
+        int degenerated_tet = 0;
+
+        if (max_min_edges_ratio > 2.0 && alpha_tet > alpha_th) {
+            degenerated_tetrahedra_cnt++;
+            degenerated_tet = 1;
         }
 
-        const real_type alpha_tet = max_edges_length / dx;
         //////////////////////////////////////////////
 
         struct tet_vertices tets[8];
         int                 n_tets = 0;
+
+        if (degenerated_tet) { // TODO fix this
+            tet_refine_two_edge_vertex(x0,  // Coordinates of the 1st vertex
+                                       y0,
+                                       z0,
+                                       x1,
+                                       y1,  // Coordinates of the 2nd vertex
+                                       z1,
+                                       x2,
+                                       y2,
+                                       z2,  // Coordinates of the 3rd vertex
+                                       x3,
+                                       y3,
+                                       z3,
+                                       weighted_field[ev[0]],  // Weighted field at the vertices
+                                       weighted_field[ev[1]],
+                                       weighted_field[ev[2]],
+                                       weighted_field[ev[3]],
+                                       vertex_a,  // The two vertices to refine
+                                       vertex_b,
+                                       tets);  // Output
+
+            real_t Vt[8];
+            real_t array_vol = volume_tet_array(tets, 2, Vt);
+
+            printf("Vt[0] = %g, Vt[1] = %g\n", Vt[0], Vt[1]);
+
+            // check if the volumes in Vt are positive
+            // for (int i = 0; i < 2; i++) {
+            //     if (Vt[i] < 0) {
+            //         fprintf(stderr, "WARNING: Volume of the tetrahedron is negative: %g\n", Vt[i]);
+            //         exit(1);
+            //     }
+            // }
+        }
 
         if (alpha_tet < alpha_th) {
             n_tets     = 1;
@@ -583,6 +629,10 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
             // }
         }  // end for ref_i over refined tetrahedra
     }      // end for i over elements
+
+    printf("degenerated_tetrahedra          = %d\n", degenerated_tetrahedra_cnt);
+    printf("Total number of tetrahedra      = %ld\n", end_element - start_element);
+    printf("Ratio of degenerated tetrahedra = %g\n", (real_t)degenerated_tetrahedra_cnt / (real_t)(end_element - start_element));
 
     RETURN_FROM_FUNCTION(ret);
 }  // end tet4_resample_field_local_refine_adjoint
@@ -1181,6 +1231,109 @@ in_out_field_mesh_tet4(const int                            mpi_size,   // MPI s
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+// tet_refine_two_edge_vertex ////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                              //
+tet_refine_two_edge_vertex(const real_t               v0x,       //
+                           const real_t               v0y,       //
+                           const real_t               v0z,       //
+                           const real_t               v1x,       //
+                           const real_t               v1y,       //
+                           const real_t               v1z,       //
+                           const real_t               v2x,       //
+                           const real_t               v2y,       //
+                           const real_t               v2z,       //
+                           const real_t               v3x,       //
+                           const real_t               v3y,       //
+                           const real_t               v3z,       //
+                           const real_t               w1,        //
+                           const real_t               w2,        //
+                           const real_t               w3,        //
+                           const real_t               w4,        //
+                           const int                  vertex_a,  //
+                           const int                  vertex_b,  //
+                           struct tet_vertices* const rTets) {   //
+
+    if (vertex_a == vertex_b) return 0;
+    if (vertex_a < 0 || vertex_a > 3) return 0;
+    if (vertex_b < 0 || vertex_b > 3) return 0;
+
+    const real_t vx[4] = {v0x, v1x, v2x, v3x};
+    const real_t vy[4] = {v0y, v1y, v2y, v3y};
+    const real_t vz[4] = {v0z, v1z, v2z, v3z};
+    const real_t vw[4] = {w1, w2, w3, w4};
+
+    real_t vn1x[4]  = {vx[0], vx[1], vx[2], vx[3]},  //
+            vn1y[4] = {vy[0], vy[1], vy[2], vy[3]},  //
+            vn1z[4] = {vz[0], vz[1], vz[2], vz[3]},  //
+            vn1w[4] = {vw[0], vw[1], vw[2], vw[3]};  //
+
+    real_t vn2x[4]  = {vx[0], vx[1], vx[2], vx[3]},  //
+            vn2y[4] = {vy[0], vy[1], vy[2], vy[3]},  //
+            vn2z[4] = {vz[0], vz[1], vz[2], vz[3]},  //
+            vn2w[4] = {vw[0], vw[1], vw[2], vw[3]};  //
+
+    const real_t vrx = (vx[vertex_a] + vx[vertex_b]) * 0.5;
+    const real_t vry = (vy[vertex_a] + vy[vertex_b]) * 0.5;
+    const real_t vrz = (vz[vertex_a] + vz[vertex_b]) * 0.5;
+    const real_t vrw = (vw[vertex_a] + vw[vertex_b]) * 0.5;
+
+    vn1x[vertex_a] = vrx;
+    vn1y[vertex_a] = vry;
+    vn1z[vertex_a] = vrz;
+    vn1w[vertex_a] = vrw;
+
+    vn2x[vertex_b] = vrx;
+    vn2y[vertex_b] = vry;
+    vn2z[vertex_b] = vrz;
+    vn2w[vertex_b] = vrw;
+
+    // First tetrahedron (v0, v1, v2, vrx)
+    rTets[0].x0 = vn1x[0];
+    rTets[0].y0 = vn1y[0];
+    rTets[0].z0 = vn1z[0];
+    rTets[0].w0 = vn1w[0];
+
+    rTets[0].x1 = vn1x[1];
+    rTets[0].y1 = vn1y[1];
+    rTets[0].z1 = vn1z[1];
+    rTets[0].w1 = vn1w[1];
+
+    rTets[0].x2 = vn1x[2];
+    rTets[0].y2 = vn1y[2];
+    rTets[0].z2 = vn1z[2];
+    rTets[0].w2 = vn1w[2];
+
+    rTets[0].x3 = vn1x[3];
+    rTets[0].y3 = vn1y[3];
+    rTets[0].z3 = vn1z[3];
+    rTets[0].w3 = vn1w[3];
+
+    // Second tetrahedron (v1, v2, v3, vrx)
+    rTets[1].x0 = vn2x[1];
+    rTets[1].y0 = vn2y[1];
+    rTets[1].z0 = vn2z[1];
+    rTets[1].w0 = vn2w[1];
+
+    rTets[1].x0 = vn2x[1];
+    rTets[1].y0 = vn2y[1];
+    rTets[1].z0 = vn2z[1];
+    rTets[1].w0 = vn2w[1];
+
+    rTets[1].x1 = vn2x[2];
+    rTets[1].y1 = vn2y[2];
+    rTets[1].z1 = vn2z[2];
+    rTets[1].w1 = vn2w[2];
+
+    rTets[1].x2 = vn2x[3];
+    rTets[1].y2 = vn2y[3];
+    rTets[1].z2 = vn2z[3];
+    rTets[1].w2 = vn2w[3];
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 // in_out_field_mesh_tet4 ////////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -1513,6 +1666,100 @@ tet_edge_length(const real_t  v0x,            //
     edge_length[5] = points_distance(v2x, v2y, v2z, v3x, v3y, v3z);
 
     return 0;
+}
+
+real_t                                            //
+tet_edge_max_length(const real_t  v0x,            //
+                    const real_t  v0y,            //
+                    const real_t  v0z,            //
+                    const real_t  v1x,            //
+                    const real_t  v1y,            //
+                    const real_t  v1z,            //
+                    const real_t  v2x,            //
+                    const real_t  v2y,            //
+                    const real_t  v2z,            //
+                    const real_t  v3x,            //
+                    const real_t  v3y,            //
+                    const real_t  v3z,            //
+                    int*          vertex_a,       //
+                    int*          vertex_b,       //
+                    real_t* const edge_length) {  //
+
+    real_t max_length = 0.0;
+
+    // Edge 0 (v0, v1)
+    edge_length[0] = points_distance(v0x, v0y, v0z, v1x, v1y, v1z);
+    if (edge_length[0] > max_length) {
+        max_length = edge_length[0];
+        *vertex_a  = 0;
+        *vertex_b  = 1;
+    }
+
+    // Edge 1 (v0, v2)
+    edge_length[1] = points_distance(v0x, v0y, v0z, v2x, v2y, v2z);
+    if (edge_length[1] > max_length) {
+        max_length = edge_length[1];
+        *vertex_a  = 0;
+        *vertex_b  = 2;
+    }
+
+    // Edge 2 (v0, v3)
+    edge_length[2] = points_distance(v0x, v0y, v0z, v3x, v3y, v3z);
+    if (edge_length[2] > max_length) {
+        max_length = edge_length[2];
+        *vertex_a  = 0;
+        *vertex_b  = 3;
+    }
+
+    // Edge 3 (v1, v2)
+    edge_length[3] = points_distance(v1x, v1y, v1z, v2x, v2y, v2z);
+    if (edge_length[3] > max_length) {
+        max_length = edge_length[3];
+        *vertex_a  = 1;
+        *vertex_b  = 2;
+    }
+
+    // Edge 4 (v1, v3)
+    edge_length[4] = points_distance(v1x, v1y, v1z, v3x, v3y, v3z);
+    if (edge_length[4] > max_length) {
+        max_length = edge_length[4];
+        *vertex_a  = 1;
+        *vertex_b  = 3;
+    }
+
+    // Edge 5 (v2, v3)
+    edge_length[5] = points_distance(v2x, v2y, v2z, v3x, v3y, v3z);
+    if (edge_length[5] > max_length) {
+        max_length = edge_length[5];
+        *vertex_a  = 2;
+        *vertex_b  = 3;
+    }
+
+    return max_length;
+}
+
+//////////////////////////////////////////////////////////
+
+#define MY_ABS_MM(x) ((x) > 0 ? (x) : -(x))
+
+real_t                                        //
+ratio_abs_max_min(const real_t* const array,  //
+                  const int           n) {              //
+
+    real_t max = MY_ABS_MM(array[0]);
+    real_t min = MY_ABS_MM(array[0]);
+
+    for (int i = 1; i < n; i++) {
+        if (MY_ABS_MM(array[i]) > max) {
+            max = MY_ABS_MM(array[i]);
+        }
+
+        if (MY_ABS_MM(array[i]) < min) {
+            min = MY_ABS_MM(array[i]);
+        }
+    }
+
+    return max / min;
 }
 
 struct field_analytic  //
