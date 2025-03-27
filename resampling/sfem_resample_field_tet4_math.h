@@ -355,6 +355,67 @@ tet_uniform_refinement(const real_t               v0x,     //
                        struct tet_vertices* const rTets);  // Output tetrahedra
 
 /**
+ * @brief Refines a tetrahedron by creating a new vertex along the edge between two specified vertices
+ *
+ * This function performs a non-uniform refinement of a tetrahedron by inserting a new vertex
+ * along the edge connecting two of the tetrahedron's vertices (specified by vertex_a and vertex_b).
+ * The original tetrahedron is then divided into a set of smaller tetrahedra that share this
+ * new edge vertex.
+ *
+ * @param[in] v0x X-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v0y Y-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v0z Z-coordinate of the first vertex (vertex 0) of the original tetrahedron
+ * @param[in] v1x X-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v1y Y-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v1z Z-coordinate of the second vertex (vertex 1) of the original tetrahedron
+ * @param[in] v2x X-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v2y Y-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v2z Z-coordinate of the third vertex (vertex 2) of the original tetrahedron
+ * @param[in] v3x X-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] v3y Y-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] v3z Z-coordinate of the fourth vertex (vertex 3) of the original tetrahedron
+ * @param[in] w1 Weight associated with vertex 0, used for field interpolation
+ * @param[in] w2 Weight associated with vertex 1, used for field interpolation
+ * @param[in] w3 Weight associated with vertex 2, used for field interpolation
+ * @param[in] w4 Weight associated with vertex 3, used for field interpolation
+ * @param[in] vertex_a Index of the first vertex defining the edge to be refined (0-3)
+ * @param[in] vertex_b Index of the second vertex defining the edge to be refined (0-3)
+ * @param[out] rTets Pointer to an array of tet_vertices structures that will
+ *                   store the coordinates and interpolated weights for the refined tetrahedra
+ *
+ * @details
+ * This function enables selective refinement of a tetrahedron along a single edge,
+ * which is useful for adaptive mesh refinement strategies where only specific regions
+ * of the mesh need higher resolution. The field values (weights) at the new vertex
+ * are interpolated from the values at the original vertices.
+ *
+ * The number of output tetrahedra depends on the specific implementation and the
+ * chosen refinement strategy for a single edge.
+ *
+ * @return 0 if the operation was successful, non-zero error code otherwise
+ */
+int                                                              //
+tet_refine_two_edge_vertex(const real_t               v0x,       //
+                           const real_t               v0y,       //
+                           const real_t               v0z,       //
+                           const real_t               v1x,       //
+                           const real_t               v1y,       //
+                           const real_t               v1z,       //
+                           const real_t               v2x,       //
+                           const real_t               v2y,       //
+                           const real_t               v2z,       //
+                           const real_t               v3x,       //
+                           const real_t               v3y,       //
+                           const real_t               v3z,       //
+                           const real_t               w1,        //
+                           const real_t               w2,        //
+                           const real_t               w3,        //
+                           const real_t               w4,        //
+                           const int                  vertex_a,  //
+                           const int                  vertex_b,  //
+                           struct tet_vertices* const rTets);
+
+/**
  * @brief Compute the volume of an array of tetrahedra.
  * return the total volume of the tetrahedra in the array.
  * The volume of each tetrahedron is computed using the determinant of the 4x4 matrix
@@ -418,6 +479,54 @@ tet_edge_length(const real_t  v0x,           //
                 const real_t  v3y,           //
                 const real_t  v3z,           //
                 real_t* const edge_length);  //
+
+/**
+ * @brief
+ *
+ * @param v0x
+ * @param v0y
+ * @param v0z
+ * @param v1x
+ * @param v1y
+ * @param v1z
+ * @param v2x
+ * @param v2y
+ * @param v2z
+ * @param v3x
+ * @param v3y
+ * @param v3z
+ * @param vertex_a
+ * @param vertex_b
+ * @param edge_length
+ * @return real_t
+ */
+real_t                                           //
+tet_edge_max_length(const real_t  v0x,           //
+                    const real_t  v0y,           //
+                    const real_t  v0z,           //
+                    const real_t  v1x,           //
+                    const real_t  v1y,           //
+                    const real_t  v1z,           //
+                    const real_t  v2x,           //
+                    const real_t  v2y,           //
+                    const real_t  v2z,           //
+                    const real_t  v3x,           //
+                    const real_t  v3y,           //
+                    const real_t  v3z,           //
+                    int*          vertex_a,      //
+                    int*          vertex_b,      //
+                    real_t* const edge_length);  //
+
+/**
+ * @brief Compute the ratio of the absolute maximum and minimum values in an array
+ *
+ * @param array
+ * @param n
+ * @return real_t
+ */
+real_t                                        //
+ratio_abs_max_min(const real_t* const array,  //
+                  const int           n);               //
 
 /**
  * @brief Compute the volume of a tetrahedron.
