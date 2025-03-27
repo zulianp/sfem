@@ -221,6 +221,7 @@ int spectral_hex_advection_apply_tpl(const ptrdiff_t                   nelements
                                      const real_t* const SFEM_RESTRICT vz,
                                      const real_t* const SFEM_RESTRICT c,
                                      real_t* const SFEM_RESTRICT       values) {
+    SFEM_ERROR("IMPLEMENT ME!\n");
     return SFEM_SUCCESS;
 }
 
@@ -242,16 +243,16 @@ extern "C" int spectral_hex_advection_apply(const int                         or
     if (SFEM_USE_GLL) {
         switch (order) {
             case 2: {
-                return lagrange_hex_advection_apply_tpl<2>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
+                return spectral_hex_advection_apply_tpl<2>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
             }
             case 4: {
-                return lagrange_hex_advection_apply_tpl<4>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
+                return spectral_hex_advection_apply_tpl<4>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
             }
             case 8: {
-                return lagrange_hex_advection_apply_tpl<8>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
+                return spectral_hex_advection_apply_tpl<8>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
             }
             case 16: {
-                return lagrange_hex_advection_apply_tpl<16>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
+                return spectral_hex_advection_apply_tpl<16>(nelements, nnodes, elements, points, vx, vy, vz, c, values);
             }
             default: {
                 SFEM_ERROR("spectral_hex_advection_apply: Unsupported order!");
