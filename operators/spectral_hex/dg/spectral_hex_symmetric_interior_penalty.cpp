@@ -30,8 +30,8 @@ static SFEM_INLINE void lagrange_hex_interpolate_face(
     static const int N3   = N2 * N;
     static const int SIZE = MAX(Qx * Qy * Qz, N3);
 
-    T temp1[SIZE];
-    T temp2[SIZE];
+    T temp1[Qx * N * N];
+    T temp2[Qy * Qx * N];
 
     for (int qi = 0; qi < Qx; qi++) {
         for (int k = 0; k < N; k++) {
@@ -217,10 +217,21 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         // - <grad v, [[u]]/2>         (Adjoint consistency term)
         // + <v n, tau [[u]]>          (Penalty term tau=alpha*order^2/h, 2 <= alpha <= 10)
 
-        // Only - part
+        // 7) 
+        // We compute only the "-" part
         // - < v n^-, grad u^->/2
         // - <grad v, n^- * u^->/2   
         // + <v n^-, tau n^- u^->   
+        // 8) Accumulate owner
+        // 9) Transpose (using side_code) and sign change
+        // 10) Accumulate neighbor
+        // Pros: less computation, less loads, Cons: atomics required
+
+
+        // Alternative):
+        /// Gather neighbor, interpolate u^+ and grad u^+ ..., transpose
+        // Pros: no atomics required, Cons: large number of loads
+
 
         // Face 0
         // Normal = (0, -1, 0)
@@ -309,16 +320,8 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
 
         // TODO
 
-        // Alternative 1):
-        // We compute only the "-" part
-        // Accumulate owner
-        // Transpose and sign change
-        // Accumulate neighbor
-        // Pros: less computation, less loads, Cons: atomics required
-
-        // Alternative 2):
-        /// Gather neighbor, interpolate u^+ and grad u^+ ..., transpose
-        // Pros: no atomics required, Cons: large number of loads
+   
+      
     }
 
     return SFEM_SUCCESS;
