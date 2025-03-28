@@ -414,6 +414,7 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
 #endif
 
     int degenerated_tetrahedra_cnt = 0;
+    int uniform_refine_cnt         = 0;
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
@@ -442,21 +443,21 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
         // Sides of the tetrahedron
         real_type edges_length[6];
 
-        int vertex_a = 0;
-        int vertex_b = 0;
+        int vertex_a = -1;
+        int vertex_b = -1;
 
-        const real_type max_edges_length =  //
-                tet_edge_max_length(x0,
-                                    y0,
-                                    z0,  //
-                                    x1,
-                                    y1,
-                                    z1,  //
-                                    x2,
-                                    y2,
-                                    z2,  //
-                                    x3,
-                                    y3,
+        const real_type max_edges_length =          //
+                tet_edge_max_length(x0,             //
+                                    y0,             //
+                                    z0,             //
+                                    x1,             //
+                                    y1,             //
+                                    z1,             //
+                                    x2,             //
+                                    y2,             //
+                                    z2,             //
+                                    x3,             //
+                                    y3,             //
                                     z3,             //
                                     &vertex_a,      // Output
                                     &vertex_b,      // Output
@@ -477,40 +478,40 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
         struct tet_vertices tets[8];
         int                 n_tets = 0;
 
-        if (degenerated_tet) { // TODO fix this
-            tet_refine_two_edge_vertex(x0,  // Coordinates of the 1st vertex
-                                       y0,
-                                       z0,
-                                       x1,
-                                       y1,  // Coordinates of the 2nd vertex
-                                       z1,
-                                       x2,
-                                       y2,
-                                       z2,  // Coordinates of the 3rd vertex
-                                       x3,
-                                       y3,
-                                       z3,
-                                       weighted_field[ev[0]],  // Weighted field at the vertices
-                                       weighted_field[ev[1]],
-                                       weighted_field[ev[2]],
-                                       weighted_field[ev[3]],
-                                       vertex_a,  // The two vertices to refine
-                                       vertex_b,
-                                       tets);  // Output
+        // if (degenerated_tet) {
+        //     tet_refine_two_edge_vertex(x0,  // Coordinates of the 1st vertex
+        //                                y0,
+        //                                z0,
+        //                                x1,
+        //                                y1,  // Coordinates of the 2nd vertex
+        //                                z1,
+        //                                x2,
+        //                                y2,
+        //                                z2,  // Coordinates of the 3rd vertex
+        //                                x3,
+        //                                y3,
+        //                                z3,
+        //                                weighted_field[ev[0]],  // Weighted field at the vertices
+        //                                weighted_field[ev[1]],
+        //                                weighted_field[ev[2]],
+        //                                weighted_field[ev[3]],
+        //                                vertex_a,  // The two vertices to refine
+        //                                vertex_b,
+        //                                tets);  // Output
 
-            real_t Vt[8];
-            real_t array_vol = volume_tet_array(tets, 2, Vt);
+        //     real_t Vt[8];
+        //     real_t array_vol = volume_tet_array(tets, 2, Vt);
 
-            printf("Vt[0] = %g, Vt[1] = %g\n", Vt[0], Vt[1]);
+        //     printf("Vt[0] = %g, Vt[1] = %g  Vbase volume = %g, sum = %g\n", Vt[0], Vt[1], theta_volume, (Vt[0] + Vt[1]));
 
-            // check if the volumes in Vt are positive
-            // for (int i = 0; i < 2; i++) {
-            //     if (Vt[i] < 0) {
-            //         fprintf(stderr, "WARNING: Volume of the tetrahedron is negative: %g\n", Vt[i]);
-            //         exit(1);
-            //     }
-            // }
-        }
+        //     // check if the volumes in Vt are positive
+        //     // for (int i = 0; i < 2; i++) {
+        //     //     if (Vt[i] < 0) {
+        //     //         fprintf(stderr, "WARNING: Volume of the tetrahedron is negative: %g\n", Vt[i]);
+        //     //         exit(1);
+        //     //     }
+        //     // }
+        // }
 
         if (alpha_tet < alpha_th) {
             n_tets     = 1;
@@ -532,8 +533,32 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
             tets[0].w2 = weighted_field[ev[2]];
             tets[0].w3 = weighted_field[ev[3]];
 
+        } else if (degenerated_tet) {
+            n_tets = 2;
+
+            tet_refine_two_edge_vertex(x0,  // Coordinates of the 1st vertex
+                                       y0,
+                                       z0,
+                                       x1,
+                                       y1,  // Coordinates of the 2nd vertex
+                                       z1,
+                                       x2,
+                                       y2,
+                                       z2,  // Coordinates of the 3rd vertex
+                                       x3,
+                                       y3,
+                                       z3,
+                                       weighted_field[ev[0]],  // Weighted field at the vertices
+                                       weighted_field[ev[1]],
+                                       weighted_field[ev[2]],
+                                       weighted_field[ev[3]],
+                                       vertex_a,  // The two vertices to refine
+                                       vertex_b,
+                                       tets);  // Output
         } else {
             // printf("Refining the tetrahedron: alpha = %g\n", alpha_tet);
+
+            uniform_refine_cnt++;
 
             n_tets = 8;                 // The uniform refinement produces 8 tetrahedra
             tet_uniform_refinement(x0,  // Coordinates of the 1st vertex
@@ -633,6 +658,10 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
     printf("degenerated_tetrahedra          = %d\n", degenerated_tetrahedra_cnt);
     printf("Total number of tetrahedra      = %ld\n", end_element - start_element);
     printf("Ratio of degenerated tetrahedra = %g\n", (real_t)degenerated_tetrahedra_cnt / (real_t)(end_element - start_element));
+    printf("uniform_refine_cnt             = %d\n", uniform_refine_cnt);
+    printf("Ratio of uniform refinement     = %g\n", (real_t)uniform_refine_cnt / (real_t)(end_element - start_element));
+    printf("Ratio unifrm refinement / degenerated tetrahedra = %g\n",
+           (real_t)uniform_refine_cnt / (real_t)degenerated_tetrahedra_cnt);
 
     RETURN_FROM_FUNCTION(ret);
 }  // end tet4_resample_field_local_refine_adjoint
@@ -1255,9 +1284,9 @@ tet_refine_two_edge_vertex(const real_t               v0x,       //
                            const int                  vertex_b,  //
                            struct tet_vertices* const rTets) {   //
 
-    if (vertex_a == vertex_b) return 0;
-    if (vertex_a < 0 || vertex_a > 3) return 0;
-    if (vertex_b < 0 || vertex_b > 3) return 0;
+    if (vertex_a == vertex_b) return 1;
+    if (vertex_a < 0 || vertex_a > 3) return 1;
+    if (vertex_b < 0 || vertex_b > 3) return 1;
 
     const real_t vx[4] = {v0x, v1x, v2x, v3x};
     const real_t vy[4] = {v0y, v1y, v2y, v3y};
@@ -1311,25 +1340,27 @@ tet_refine_two_edge_vertex(const real_t               v0x,       //
     rTets[0].w3 = vn1w[3];
 
     // Second tetrahedron (v1, v2, v3, vrx)
-    rTets[1].x0 = vn2x[1];
-    rTets[1].y0 = vn2y[1];
-    rTets[1].z0 = vn2z[1];
-    rTets[1].w0 = vn2w[1];
+    rTets[1].x0 = vn2x[0];
+    rTets[1].y0 = vn2y[0];
+    rTets[1].z0 = vn2z[0];
+    rTets[1].w0 = vn2w[0];
 
-    rTets[1].x0 = vn2x[1];
-    rTets[1].y0 = vn2y[1];
-    rTets[1].z0 = vn2z[1];
-    rTets[1].w0 = vn2w[1];
+    rTets[1].x1 = vn2x[1];
+    rTets[1].y1 = vn2y[1];
+    rTets[1].z1 = vn2z[1];
+    rTets[1].w1 = vn2w[1];
 
-    rTets[1].x1 = vn2x[2];
-    rTets[1].y1 = vn2y[2];
-    rTets[1].z1 = vn2z[2];
-    rTets[1].w1 = vn2w[2];
+    rTets[1].x2 = vn2x[2];
+    rTets[1].y2 = vn2y[2];
+    rTets[1].z2 = vn2z[2];
+    rTets[1].w2 = vn2w[2];
 
-    rTets[1].x2 = vn2x[3];
-    rTets[1].y2 = vn2y[3];
-    rTets[1].z2 = vn2z[3];
-    rTets[1].w2 = vn2w[3];
+    rTets[1].x3 = vn2x[3];
+    rTets[1].y3 = vn2y[3];
+    rTets[1].z3 = vn2z[3];
+    rTets[1].w3 = vn2w[3];
+
+    return 0;
 }
 
 //////////////////////////////////////////////////////////
@@ -1668,6 +1699,11 @@ tet_edge_length(const real_t  v0x,            //
     return 0;
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet_edge_max_length ///////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 real_t                                            //
 tet_edge_max_length(const real_t  v0x,            //
                     const real_t  v0y,            //
