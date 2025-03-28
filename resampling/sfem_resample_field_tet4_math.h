@@ -481,24 +481,44 @@ tet_edge_length(const real_t  v0x,           //
                 real_t* const edge_length);  //
 
 /**
- * @brief
+ * @brief Find the maximum edge length of a tetrahedron and identify the vertices forming this edge
  *
- * @param v0x
- * @param v0y
- * @param v0z
- * @param v1x
- * @param v1y
- * @param v1z
- * @param v2x
- * @param v2y
- * @param v2z
- * @param v3x
- * @param v3y
- * @param v3z
- * @param vertex_a
- * @param vertex_b
- * @param edge_length
- * @return real_t
+ * This function computes the lengths of all six edges of a tetrahedron and determines
+ * which edge has the maximum length. It returns the maximum edge length value and
+ * identifies the two vertices that define this edge through the output parameters.
+ *
+ * The function calculates the length of each edge as the Euclidean distance between
+ * pairs of vertices, following this mapping:
+ * - edge 0: between vertices 0 and 1
+ * - edge 1: between vertices 0 and 2
+ * - edge 2: between vertices 0 and 3
+ * - edge 3: between vertices 1 and 2
+ * - edge 4: between vertices 1 and 3
+ * - edge 5: between vertices 2 and 3
+ *
+ * @param[in] v0x X-coordinate of the first vertex (vertex 0)
+ * @param[in] v0y Y-coordinate of the first vertex (vertex 0)
+ * @param[in] v0z Z-coordinate of the first vertex (vertex 0)
+ * @param[in] v1x X-coordinate of the second vertex (vertex 1)
+ * @param[in] v1y Y-coordinate of the second vertex (vertex 1)
+ * @param[in] v1z Z-coordinate of the second vertex (vertex 1)
+ * @param[in] v2x X-coordinate of the third vertex (vertex 2)
+ * @param[in] v2y Y-coordinate of the third vertex (vertex 2)
+ * @param[in] v2z Z-coordinate of the third vertex (vertex 2)
+ * @param[in] v3x X-coordinate of the fourth vertex (vertex 3)
+ * @param[in] v3y Y-coordinate of the fourth vertex (vertex 3)
+ * @param[in] v3z Z-coordinate of the fourth vertex (vertex 3)
+ * @param[out] vertex_a Pointer to store the index (0-3) of the first vertex of the maximum length edge
+ * @param[out] vertex_b Pointer to store the index (0-3) of the second vertex of the maximum length edge
+ * @param[out] edge_length Pointer to an array of at least 6 elements where all calculated edge lengths will be stored
+ *
+ * @return The maximum edge length of the tetrahedron
+ *
+ * @details
+ * This function is useful for adaptive mesh refinement algorithms where the longest edge
+ * is often targeted for bisection or other refinement strategies. It can also be used
+ * for mesh quality assessment where the ratio of maximum to minimum edge length is
+ * an important quality metric.
  */
 real_t                                           //
 tet_edge_max_length(const real_t  v0x,           //
