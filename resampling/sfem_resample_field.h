@@ -544,6 +544,56 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
                                   real_t* const SFEM_RESTRICT          data);                    // Output
 
 /**
+ * @brief Adjoint resampling with adaptive refinement based on alpha threshold
+ *
+ * This function performs an adjoint (reverse) resampling operation with refinement
+ * capabilities, transferring a field from a tetrahedral mesh to a structured grid.
+ * It uses an alpha threshold to selectively refine the sampling process in regions
+ * of interest or importance.
+ *
+ * @param[in] start_element Index of the first tetrahedral element to process
+ * @param[in] end_element   Index of the last tetrahedral element to process
+ * @param[in] nnodes        Total number of nodes in the tetrahedral mesh
+ * @param[in] elems         Array of element connectivity: `elems[v][element_i]` is the global
+ *                          index of the v-th vertex of the element_i-th tetrahedron
+ * @param[in] xyz           Array of vertex coordinates: `xyz[d][i]` is the d-th coordinate
+ *                          (d=0 for x, d=1 for y, d=2 for z) of the i-th vertex
+ * @param[in] n             Number of grid points in each dimension of the structured grid (nx, ny, nz)
+ * @param[in] stride        Stride values for the structured grid, defining memory offsets
+ *                          between grid points in each dimension
+ * @param[in] origin        Origin of the structured grid (coordinates of the grid's corner)
+ * @param[in] delta         Grid spacing (dx, dy, dz) in each dimension of the structured grid
+ * @param[in] weighted_field Input field defined on the tetrahedral mesh
+ * @param[in] alpha_th      Threshold value for alpha parameter that controls the refinement
+ *                          process - elements with alpha values above this threshold receive
+ *                          additional refinement
+ * @param[out] data         Output array representing the structured grid, where the
+ *                          resampled field values will be stored
+ *
+ * @details
+ * This function extends the standard adjoint resampling by incorporating a one-step adaptive
+ * refinement strategy based on the alpha threshold. For regions where the alpha value
+ * exceeds the alpha threshold.
+ * The function is not strictly adaptive but simply refine the tetrahedral elements that shows
+ * high alpha values.
+ *
+ * @return 0 if the operation is successful
+ */
+int                                                                                            //
+tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                         const ptrdiff_t                      end_element,     //
+                                         const ptrdiff_t                      nnodes,          //
+                                         const idx_t** const SFEM_RESTRICT    elems,           //
+                                         const geom_t** const SFEM_RESTRICT   xyz,             //
+                                         const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                         const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                         const geom_t* const SFEM_RESTRICT    origin,          //
+                                         const geom_t* const SFEM_RESTRICT    delta,           //
+                                         const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                         const real_t                         alpha_th,        // Threshold for alpha
+                                         real_t* const SFEM_RESTRICT          data);
+
+/**
  * @brief
  *
  * @param start_element
@@ -560,19 +610,19 @@ tet4_resample_field_local_adjoint(const ptrdiff_t                      start_ele
  * @param data
  * @return int
  */
-int                                                                                            //
-tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                                         const ptrdiff_t                      end_element,     //
-                                         const ptrdiff_t                      nnodes,          //
-                                         const idx_t** const SFEM_RESTRICT    elems,           //
-                                         const geom_t** const SFEM_RESTRICT   xyz,             //
-                                         const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                                         const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                                         const geom_t* const SFEM_RESTRICT    origin,          //
-                                         const geom_t* const SFEM_RESTRICT    delta,           //
-                                         const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                         const real_t                         alpha_th,        // Threshold for alpha
-                                         real_t* const SFEM_RESTRICT          data);
+int                                                                                                   //
+tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                const ptrdiff_t                      end_element,     //
+                                                const ptrdiff_t                      nnodes,          //
+                                                const idx_t** const SFEM_RESTRICT    elems,           //
+                                                const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                const geom_t* const SFEM_RESTRICT    origin,          //
+                                                const geom_t* const SFEM_RESTRICT    delta,           //
+                                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                const real_t                         alpha_th,        // Threshold for alpha
+                                                real_t* const SFEM_RESTRICT          data);
 
 /**
  * @brief Count how many tetrahedral elements contribute to each grid point during adjoint resampling.

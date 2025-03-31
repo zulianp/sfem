@@ -1,5 +1,6 @@
 #include "sfem_resample_field.h"
 #include "sfem_resample_field_tet4_math.h"
+#include "sfem_stack.h"
 
 #include "mass.h"
 // #include "read_mesh.h"
@@ -665,6 +666,260 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
 
     RETURN_FROM_FUNCTION(ret);
 }  // end tet4_resample_field_local_refine_adjoint
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_iterative_refinement /////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                        //
+tet4_iterative_refinement(const real_type       x0,        // Tetrahedron vertices X-coordinates
+                          const real_type       x1,        //
+                          const real_type       x2,        //
+                          const real_type       x3,        //
+                          const real_type       y0,        // Tetrahedron vertices Y-coordinates
+                          const real_type       y1,        //
+                          const real_type       y2,        //
+                          const real_type       y3,        //
+                          const real_type       z0,        // Tetrahedron vertices Z-coordinates
+                          const real_type       z1,        //
+                          const real_type       z2,        //
+                          const real_type       z3,        //
+                          const real_type       dx,        // Spacing of the grid
+                          const real_type       dy,        //
+                          const real_type       dz,        //
+                          const real_type       wf0,       // Weighted field at the vertices
+                          const real_type       wf1,       //
+                          const real_type       wf2,       //
+                          const real_type       wf3,       //
+                          const real_type       alpha_th,  // Threshold for alpha
+                          const int             max_iter,  // Maximum number of iterations
+                          struct tet_vertices** tets) {    // Output
+
+    // Compute the alpha_tet to decide if the tetrahedron is refined
+    // Sides of the tetrahedron
+
+    // tet_vertices is automatically freed by the function
+
+    int tet_vertices_size = 0;
+
+    if (&tets != NULL) {
+        free(*tets);
+        *tets = NULL;
+    }
+
+    int flag   = 1;
+    int n_tets = 0;
+
+    struct tet_vertices* tets_ref                   = malloc(sizeof(struct tet_vertices) * 8);
+    int                  degenerated_tetrahedra_cnt = 0;
+
+    struct sfem_stack* stack = sfem_stack_create(100);
+
+    struct tet_vertices* first_tet = malloc(sizeof(struct tet_vertices));
+    first_tet->x0                  = x0;
+    first_tet->x1                  = x1;
+    first_tet->x2                  = x2;
+    first_tet->x3                  = x3;
+    first_tet->y0                  = y0;
+    first_tet->y1                  = y1;
+    first_tet->y2                  = y2;
+    first_tet->y3                  = y3;
+    first_tet->z0                  = z0;
+    first_tet->z1                  = z1;
+    first_tet->z2                  = z2;
+    first_tet->z3                  = z3;
+    first_tet->w0                  = wf0;
+    first_tet->w1                  = wf1;
+    first_tet->w2                  = wf2;
+    first_tet->w3                  = wf3;
+
+    // Push the first tetrahedron on the stack
+    if (sfem_stack_push(stack, first_tet) != first_tet) {
+        fprintf(stderr, "ERROR: sfem_stack_push failed\n");
+        exit(1);
+    }
+
+    while (sfem_stack_size(stack) > 0) {
+        // Pop the tetrahedron from the stack
+        struct tet_vertices* tet = (struct tet_vertices*)sfem_stack_pop(stack);
+        if (tet == NULL) {
+            fprintf(stderr, "ERROR: sfem_stack_pop failed\n");
+            exit(1);
+        }
+
+        real_type edges_length[6];
+
+        int vertex_a = -1;
+        int vertex_b = -1;
+
+        const real_type max_edges_length =          //
+                tet_edge_max_length(tet->x0,        //
+                                    tet->y0,        //
+                                    tet->z0,        //
+                                    tet->x1,        //
+                                    tet->y1,        //
+                                    tet->z1,        //
+                                    tet->x2,        //
+                                    tet->y2,        //
+                                    tet->z2,        //
+                                    tet->x3,        //
+                                    tet->y3,        //
+                                    tet->z3,        //
+                                    &vertex_a,      // Output
+                                    &vertex_b,      // Output
+                                    edges_length);  // Output
+
+        const real_t alpha_tet           = max_edges_length / dx;
+        const real_t max_min_edges_ratio = ratio_abs_max_min(edges_length, 6);
+
+        int degenerated_tet = 0;
+
+        if (max_min_edges_ratio > 2.0 && alpha_tet > alpha_th) {
+            degenerated_tetrahedra_cnt++;
+            degenerated_tet = 1;
+        }
+
+        if (alpha_tet < alpha_th) {
+            // n_tets     = 1;
+            // tets[0].x0 = x0;
+            // tets[0].x1 = x1;
+            // tets[0].x2 = x2;
+            // tets[0].x3 = x3;
+            // tets[0].y0 = y0;
+            // tets[0].y1 = y1;
+            // tets[0].y2 = y2;
+            // tets[0].y3 = y3;
+            // tets[0].z0 = z0;
+            // tets[0].z1 = z1;
+            // tets[0].z2 = z2;
+            // tets[0].z3 = z3;
+
+            // tets[0].w0 = weighted_field[ev[0]];
+            // tets[0].w1 = weighted_field[ev[1]];
+            // tets[0].w2 = weighted_field[ev[2]];
+            // tets[0].w3 = weighted_field[ev[3]];
+        }
+
+        //////////////////////////////////////////////
+    }
+
+    free(stack);
+    stack = NULL;
+
+    free(tets_ref);
+    tets_ref = NULL;
+
+    return n_tets;
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_ref_iterative_adjoint ///////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                                   //
+tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                const ptrdiff_t                      end_element,     //
+                                                const ptrdiff_t                      nnodes,          //
+                                                const idx_t** const SFEM_RESTRICT    elems,           //
+                                                const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                const geom_t* const SFEM_RESTRICT    origin,          //
+                                                const geom_t* const SFEM_RESTRICT    delta,           //
+                                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                const real_t                         alpha_th,        // Threshold for alpha
+                                                real_t* const SFEM_RESTRICT          data) {                   // Output
+                                                                                                      //
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_type ox = (real_type)origin[0];
+    const real_type oy = (real_type)origin[1];
+    const real_type oz = (real_type)origin[2];
+
+    const real_type dx = (real_type)delta[0];
+    const real_type dy = (real_type)delta[1];
+    const real_type dz = (real_type)delta[2];
+
+    const real_type hexahedron_volume = dx * dy * dz;
+
+    int degenerated_tetrahedra_cnt = 0;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("Start: %s: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // Read the coordinates of the vertices of the tetrahedron
+        const real_type x0 = xyz[0][ev[0]];
+        const real_type x1 = xyz[0][ev[1]];
+        const real_type x2 = xyz[0][ev[2]];
+        const real_type x3 = xyz[0][ev[3]];
+
+        const real_type y0 = xyz[1][ev[0]];
+        const real_type y1 = xyz[1][ev[1]];
+        const real_type y2 = xyz[1][ev[2]];
+        const real_type y3 = xyz[1][ev[3]];
+
+        const real_type z0 = xyz[2][ev[0]];
+        const real_type z1 = xyz[2][ev[1]];
+        const real_type z2 = xyz[2][ev[2]];
+        const real_type z3 = xyz[2][ev[3]];
+
+        // Compute the alpha_tet to decide if the tetrahedron is refined
+        // Sides of the tetrahedron
+        real_type edges_length[6];
+
+        int vertex_a = -1;
+        int vertex_b = -1;
+
+        const real_type max_edges_length =          //
+                tet_edge_max_length(x0,             //
+                                    y0,             //
+                                    z0,             //
+                                    x1,             //
+                                    y1,             //
+                                    z1,             //
+                                    x2,             //
+                                    y2,             //
+                                    z2,             //
+                                    x3,             //
+                                    y3,             //
+                                    z3,             //
+                                    &vertex_a,      // Output
+                                    &vertex_b,      // Output
+                                    edges_length);  // Output
+
+        const real_t alpha_tet           = max_edges_length / dx;
+        const real_t max_min_edges_ratio = ratio_abs_max_min(edges_length, 6);
+
+        int degenerated_tet = 0;
+
+        if (max_min_edges_ratio > 2.0 && alpha_tet > alpha_th) {
+            degenerated_tetrahedra_cnt++;
+            degenerated_tet = 1;
+        }
+
+        //////////////////////////////////////////////
+
+        struct tet_vertices tets[8];
+        int                 n_tets = 0;
+    }
+
+    RETURN_FROM_FUNCTION(ret);
+}
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
