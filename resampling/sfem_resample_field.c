@@ -1212,18 +1212,21 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
     const real_t alpha_th = 2.5;
 
-    ret = tet4_resample_field_local_refine_adjoint(0,                              //
-                                                   mesh->nelements,                //
-                                                   mesh->nnodes,                   //
-                                                   (const idx_t**)mesh->elements,  //
-                                                   (const geom_t**)mesh->points,   //
-                                                   n,                              //
-                                                   stride,                         //
-                                                   origin,                         //
-                                                   delta,                          //
-                                                   mass_vector,                    //
-                                                   alpha_th,                       //
-                                                   data);                          //
+    // ret = tet4_resample_field_local_refine_adjoint
+            // ret = tet4_resample_field_local_adjoint
+            ret = tet4_resample_field_local_ref_iterative_adjoint
+            (0,                              //
+             mesh->nelements,                //
+             mesh->nnodes,                   //
+             (const idx_t**)mesh->elements,  //
+             (const geom_t**)mesh->points,   //
+             n,                              //
+             stride,                         //
+             origin,                         //
+             delta,                          //
+             mass_vector,                    //
+             alpha_th,                       //
+             data);                          //
 
 #endif  // end if REFINE_ADJOINT == 0
 
