@@ -668,6 +668,29 @@ tet4_cnt_mesh_adjoint(const ptrdiff_t                      start_element,   // M
                       const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                       unsigned int* const SFEM_RESTRICT    data_cnt);          // Output
 
+int                                                                         //
+tet4_update_cnt_local_adjoint(const real_t                         x0,      // Tetrahedron vertices X-coordinates
+                              const real_t                         x1,      //
+                              const real_t                         x2,      //
+                              const real_t                         x3,      //
+                              const real_t                         y0,      // Tetrahedron vertices Y-coordinates
+                              const real_t                         y1,      //
+                              const real_t                         y2,      //
+                              const real_t                         y3,      //
+                              const real_t                         z0,      // Tetrahedron vertices Z-coordinates
+                              const real_t                         z1,      //
+                              const real_t                         z2,      //
+                              const real_t                         z3,      //
+                              const real_t                         ox,      // Origin of the grid
+                              const real_t                         oy,      //
+                              const real_t                         oz,      //
+                              const real_t                         dx,      // Spacing of the grid
+                              const real_t                         dy,      //
+                              const real_t                         dz,      //
+                              const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
+                              const ptrdiff_t* const SFEM_RESTRICT n,       // Size of the grid
+                              unsigned int* const SFEM_RESTRICT    data_cnt);  //
+
 int                                                                                  //
 tet4_alpha_volume_mesh_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                const ptrdiff_t                      end_element,     //
