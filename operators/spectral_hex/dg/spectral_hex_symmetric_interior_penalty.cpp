@@ -10,6 +10,7 @@
 #include "lagrange_hex_interpolate_inline.hpp"
 #include "lagrange_hex_laplacian_inline.hpp"
 #include "sfem_Tracer.hpp"
+#include "sshex_side_code.h"
 
 #include <cassert>
 #include <cstdio>
@@ -77,6 +78,24 @@ static SFEM_INLINE void lagrange_hex_interpolate_face(
 }
 
 template <int order>
+static void dg_hex_add_to_neighbor(const uint8_t* const SFEM_RESTRICT  begin,
+                                   const uint8_t* const SFEM_RESTRICT  end,
+                                   const scalar_t* const SFEM_RESTRICT side_buffer,
+                                   real_t* const SFEM_RESTRICT         neigh_buffer) {
+    static const int N  = order + 1;
+    static const int N2 = N * N;
+
+    int offset = 0;
+    for (int zi = begin[2] * N; zi < end[2] * N; zi += (end[2] - begin[2])) {
+        for (int yi = begin[1] * N; yi < end[1] * N; yi += (end[1] - begin[1])) {
+            for (int xi = begin[0] * N; xi < end[0] * N; xi += (end[0] - begin[0])) {
+                neigh_buffer[zi * N2 + yi * N + xi] = side_buffer[offset++];
+            }
+        }
+    }
+}
+
+template <int order>
 int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t                          nelements,
                                                       const ptrdiff_t                          nnodes,
                                                       idx_t** const SFEM_RESTRICT              elements,
@@ -106,6 +125,7 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
     const geom_t* const z = points[2];
 
     static const int N  = order + 1;
+    static const int N2  = N * N;
     static const int N3 = N * N * N;
     static const int Q  = MAX(0, 3 * order);
     static const int Q3 = Q * Q * Q;
@@ -176,8 +196,7 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t    ev[N3];
-        scalar_t element_u[N3];
+        idx_t ev[8];
 
         scalar_t side_u[Q * Q];
 
@@ -185,18 +204,20 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         scalar_t side_gy[Q * Q];
         scalar_t side_gz[Q * Q];
 
+        scalar_t      element_u[N3];
         accumulator_t element_vector[N3] = {0};
 
         scalar_t adjugate[9];
         scalar_t determinant;
         scalar_t lx[8], ly[8], lz[8];
 
-        for (int v = 0; v < N3; ++v) {
+        for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v][i];
         }
 
+        // Copy element block
         for (int v = 0; v < N3; ++v) {
-            element_u[v] = u[ev[v]];
+            element_u[v] = u[i * N3 + v];
         }
 
         for (int v = 0; v < 8; v++) {
@@ -206,7 +227,7 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         }
 
         // Loop over non-boundary faces
-        // For each face 
+        // For each face
         // 1) interpolate u^- and grad u^- (transform using Adj(J)^T/det(J))
         // 2) Compute normal using Adj(J)^T
         // 3) Compute v n
@@ -217,21 +238,19 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         // - <grad v, [[u]]/2>         (Adjoint consistency term)
         // + <v n, tau [[u]]>          (Penalty term tau=alpha*order^2/h, 2 <= alpha <= 10)
 
-        // 7) 
+        // 7)
         // We compute only the "-" part
         // - < v n^-, grad u^->/2
-        // - <grad v, n^- * u^->/2   
-        // + <v n^-, tau n^- u^->   
+        // - <grad v, n^- * u^->/2
+        // + <v n^-, tau n^- u^->
         // 8) Accumulate owner
         // 9) Transpose (using side_code) and sign change
         // 10) Accumulate neighbor
         // Pros: less computation, less loads, Cons: atomics required
 
-
         // Alternative):
         /// Gather neighbor, interpolate u^+ and grad u^+ ..., transpose
         // Pros: no atomics required, Cons: large number of loads
-
 
         // Face 0
         // Normal = (0, -1, 0)
@@ -239,11 +258,31 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         // Dli * Sf0j * Snk
         // Sli * Df0j * Snk
         // Sli * Sf0j * Dnk
-        lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Sf, S, element_u, side_u);
 
-        lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(D, Sf, S, element_u, side_gx);
-        lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Df, S, element_u, side_gy);
-        lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Sf, D, element_u, side_gz);
+        element_idx_t neigh = adj_table[i * 6 + 0];
+        if (neigh != SFEM_ELEMENT_IDX_INVALID) {
+            lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Sf, S, element_u, side_u);
+
+            lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(D, Sf, S, element_u, side_gx);
+            lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Df, S, element_u, side_gy);
+            lagrange_hex_interpolate_face<N, Q, 1, Q, scalar_t>(S, Sf, D, element_u, side_gz);
+
+            
+            scalar_t sip[N2];
+
+            // TODO: Assemble flux 
+
+            // Transposition flux from xz to xy not necessary
+
+
+            uint8_t begin[3], end[3];
+            sshex_coords_from_side_code(side_code[i], 0, begin, end);
+
+            dg_hex_add_to_neighbor<order>(begin, end, sip, &values[neigh * N3]);
+
+        } else {
+            // BC?
+        }
 
         // TODO
 
@@ -319,9 +358,6 @@ int lagrange_hex_symmetric_interior_penalty_apply_tpl(const ptrdiff_t           
         lagrange_hex_interpolate_face<N, Q, Q, 1, scalar_t>(S, S, &Df[1], element_u, side_gz);
 
         // TODO
-
-   
-      
     }
 
     return SFEM_SUCCESS;
