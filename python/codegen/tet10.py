@@ -209,7 +209,12 @@ def DualTet10():
 
 
 
-if __name__ == '__main__':
-	Tet10().generate_c_code()
+# if __name__ == '__main__':
+	# Tet10().generate_c_code()
+	# Tet10().generate_qp_based_code()
+	# fe = Tet10()
+	# q = fe.quadrature_point()
+	# f = fe.f0(0.51, 0.0, 0.0)
+	# print(f)
 	# DualTet10().generate_qp_based_code();
 	

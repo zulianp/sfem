@@ -113,6 +113,41 @@ def adjugate(mat):
     else:
         return adjugate3(mat)
 
+
+import sympy as sy
+import numpy as np
+import sys
+# Function to count different operation types
+def opcount(expr):
+    basic_ops = div_ops = sqrt_ops = 0
+    
+    def traverse(e):
+        nonlocal basic_ops, div_ops, sqrt_ops
+        
+        if isinstance(e, sy.Pow):
+            if e.exp == -1:  # Division is represented as power(-1)
+                div_ops += 1
+            elif isinstance(e.exp, sy.Number) and float(e.exp) == 0.5:  # Square root as power(0.5)
+                sqrt_ops += 1
+            else:
+                basic_ops += 1
+        elif isinstance(e, sy.Function):
+            if e.func == sy.sqrt:  # Changed from isinstance to checking func attribute
+                sqrt_ops += 1
+        elif isinstance(e, (sy.Add, sy.Mul)):
+            if len(e.args) > 0:
+                basic_ops += len(e.args) - 1  # n operands = n-1 operations
+        
+        for arg in e.args:
+            traverse(arg)
+    
+    traverse(expr)
+    return basic_ops, div_ops, sqrt_ops
+
+def flopcount(opcounts):
+    return opcounts[0] + 8 * opcounts[1] + 12 * opcounts[2]
+
+
 # Optimization for CUDA can be added here
 class SFEMCodePrinter(sp.printing.c.C99CodePrinter):
     def _print_Pow(self, expr):
@@ -131,6 +166,8 @@ def c_gen(expr, dump=False, optimizations='basic'):
         console.print("--------------------------")
         console.print(f'Running cse')
 
+    opcounts = np.array([0,0,0])
+
     start = perf_counter()
 
     print(f'// optimizations={optimizations}')
@@ -145,9 +182,11 @@ def c_gen(expr, dump=False, optimizations='basic'):
 
     for var,expr in sub_expr:
         lines.append(f'const {real_t} {var} = {printer.doprint(expr)};')
+        opcounts += opcount(expr)
 
     for v in simpl_expr:
         lines.append(printer.doprint(v))
+        opcounts += opcount(v)
 
     code_string=f'\n'.join(lines)
 
@@ -161,13 +200,18 @@ def c_gen(expr, dump=False, optimizations='basic'):
     # code_string = f'//TODO COST\n' + code_string
 
     if dump:
+        console.print(
+"""
+// mundane ops: %d divs: %d sqrts: %d 
+// total ops: %d
+""" % (tuple(opcounts) + (flopcount(opcounts),)))
+
         console.print(code_string)
 
     return code_string
 
 def c_code(expr, optimizations='basic'):
-    code_string = c_gen(expr, optimizations=optimizations)
-    console.print(code_string)
+    code_string = c_gen(expr, True, optimizations=optimizations)
 
 def inner(l, r):
     rows, cols = l.shape
@@ -517,3 +561,12 @@ def compress_nnz(names, mat):
                 vals.append(mat[i, j])
                 check.add(name)
     return sp.Matrix(len(vals), 1, vals)
+
+def assign_matrix(name, mat):
+    rows, cols = mat.shape
+    expr = []
+    for i in range(0, rows):
+        for j in range(0, cols):
+            var = sp.symbols(f'{name}[{i*cols + j}]')
+            expr.append(ast.Assignment(var, mat[i, j]))
+    return expr
