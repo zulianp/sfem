@@ -2,12 +2,20 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+if [[ -z $SFEM_DIR ]]
+then
+	echo "SFEM_DIR must be defined with the installation prefix of sfem"
+	exit 1
+fi
 
-PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../../..:$PATH
-PATH=$SCRIPTPATH/../../../python:$PATH
-PATH=$SCRIPTPATH/../../../python/sfem/mesh:$PATH
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+export PATH=$SCRIPTPATH:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+export PATH=$SFEM_DIR/bin:$PATH
+export PATH=$SFEM_DIR/scripts/sfem/mesh:$PATH
+export PYTHONPATH=$SFEM_DIR/lib:$SFEM_DIR/scripts:$PYTHONPATH
+source $SFEM_DIR/workflows/sfem_config.sh
+
 
 if (($# != 8))
 then
