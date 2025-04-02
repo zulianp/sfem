@@ -1033,7 +1033,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
         // real_t  vol_iter = volume_tet_array(tets_iter, n_tets, V);
         // free(V);
         // V = NULL;
-        // printf("tet4_iterative_refinement: vol_base = %g, vol_iter = %g\n", vol_base, vol_iter);
+        // printf("tet4_iterative_refinement: vol_base = %g, vol_iter = %g, n_tets: %d\n", vol_base, vol_iter, n_tets);
 
         for (int tet_id = 0; tet_id < n_tets; tet_id++) {
             // Volume of the tetrahedron
