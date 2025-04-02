@@ -88,6 +88,14 @@ namespace sfem {
                                                         const geom_t xmax = 1,
                                                         const geom_t ymax = 1);
 
+        static std::shared_ptr<Mesh> create_quad4_square(MPI_Comm     comm,
+                                                         const int    nx   = 1,
+                                                         const int    ny   = 1,
+                                                         const geom_t xmin = 0,
+                                                         const geom_t ymin = 0,
+                                                         const geom_t xmax = 1,
+                                                         const geom_t ymax = 1);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

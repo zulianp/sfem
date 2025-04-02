@@ -61,6 +61,8 @@ set(SFEM_MODULES
     operators/macro_tet4
     operators/sstet4
     operators/sshex8
+    operators/spectral_hex
+    operators/spectral_hex/dg
     operators/hierarchical
     operators/hex8
     operators/ssquad4
@@ -234,7 +236,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
