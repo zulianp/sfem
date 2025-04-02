@@ -19,10 +19,12 @@ extern "C" {
 // } element_type;
 
 typedef struct {
-    ptrdiff_t        quad_nodes_cnt;   // Number of quadrature points
-    ptrdiff_t        nelements;        // Number of elements
-    enum ElemType    element_type;     // Element type
-    AcceleratorsType use_accelerator;  // Use accelerator such as CUDA
+    ptrdiff_t         quad_nodes_cnt;       // Number of quadrature points
+    ptrdiff_t         nelements;            // Number of elements
+    enum ElemType     element_type;         // Element type
+    AcceleratorsType  use_accelerator;      // Use accelerator such as CUDA
+    AdjointRefineType adjoint_refine_type;  // Adjoint refine type
+    real_t            alpha_th;             // Threshold for adjoint refinement
 } sfem_resample_field_info;
 
 /**
