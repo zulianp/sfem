@@ -85,6 +85,23 @@ tet10_uniform_refinement(const real_t* const          x,        //
     return 0;
 }
 
+/////////////////////////////////////////////////////////////////
+// tet10_refine_two_edge_vertex
+/////////////////////////////////////////////////////////////////
+int                                                                  //
+tet10_refine_two_edge_vertex(const real_t* const          x,         //
+                             const real_t* const          y,         //
+                             const real_t* const          z,         //
+                             const real_t* const          w,         //
+                             const int                    vertex_a,  //
+                             const int                    vertex_b,  //
+                             struct tet10_vertices* const rTets) {   //
+
+    if (vertex_b <= vertex_a) return 1;
+    if (vertex_a < 0 || vertex_a > 3) return 1;
+    if (vertex_b < 0 || vertex_b > 3) return 1;
+}
+
 ///////////////////////////////////////////////////////////////////////
 // tet10_volumes
 ///////////////////////////////////////////////////////////////////////

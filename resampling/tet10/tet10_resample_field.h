@@ -240,6 +240,27 @@ tet10_uniform_refinement(const real_t* const          x,       //
                          struct tet10_vertices* const rTets);  //
 
 /**
+ * @brief
+ *
+ * @param x
+ * @param y
+ * @param z
+ * @param w
+ * @param vertex_a
+ * @param vertex_b
+ * @param rTets
+ * @return int
+ */
+int                                                                  //
+tet10_refine_two_edge_vertex(const real_t* const          x,         //
+                             const real_t* const          y,         //
+                             const real_t* const          z,         //
+                             const real_t* const          w,         //
+                             const int                    vertex_a,  //
+                             const int                    vertex_b,  //
+                             struct tet10_vertices* const rTets);    //
+
+/**
  * @brief Compute the volumes of the 10-node tetrahedra in the array rTets.
  *
  * @param rTets

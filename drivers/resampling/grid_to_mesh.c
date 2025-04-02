@@ -436,8 +436,10 @@ int main(int argc, char* argv[]) {
             // double max_temp = temp[0];
             // double min_temp = temp[0];
 
-            n_zyx        = nlocal[0] * nlocal[1] * nlocal[2];
-            field        = malloc(n_zyx * sizeof(real_t));
+            n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+            field = malloc(n_zyx * sizeof(real_t));
+
+            // TODO: are data to analyze the results
             field_cnt    = calloc(n_zyx, sizeof(unsigned int));
             field_alpha  = calloc(n_zyx, sizeof(real_t));
             filed_volume = calloc(n_zyx, sizeof(real_t));
@@ -614,7 +616,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes, mesh.points, mesh_fun_c, g);
             const real_t alpha_th_tet10 = 2.5;
-            
+
             switch (info.element_type) {
                 case TET10:
 
@@ -673,6 +675,9 @@ int main(int argc, char* argv[]) {
                     //                                          test_field,  //
                     //                                          g,           //
                     //                                          &info);      //
+
+                    info.alpha_th            = 2.5;
+                    info.adjoint_refine_type = ADJOINT_REFINE_ONE_STEP;
 
                     ret_resample_adjoint =                             //
                             resample_field_adjoint_tet4(mpi_size,      //

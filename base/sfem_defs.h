@@ -19,7 +19,13 @@ typedef enum {
     SFEM_ACCELERATOR_TYPE_OPENCL  = 2,  // OpenCL Not supported
     SFEM_ACCELERATOR_TYPE_OPENACC = 3,  // OpenACC Not supported
     SFEM_ACCELERATOR_TYPE_HIP     = 4   // HIP Not supported
-} AcceleratorsType;
+} AcceleratorsType;                     //
+
+typedef enum {
+    ADJOINT_BASE             = 0,  //
+    ADJOINT_REFINE_ONE_STEP  = 1,  //
+    ADJOINT_REFINE_ITERATIVE = 2   //
+} AdjointRefineType;               //
 
 static void* SFEM_DEFAULT_STREAM = 0;
 
