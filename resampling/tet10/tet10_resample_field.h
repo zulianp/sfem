@@ -287,6 +287,8 @@ real_t                                           //
 tet10_edge_lengths(const real_t* x,              //
                    const real_t* y,              //
                    const real_t* z,              //
+                   int*          vertex_a,       //
+                   int*          vertex_b,       //
                    real_t* const edge_lengths);  //
 
 void  //

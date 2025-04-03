@@ -85,6 +85,23 @@ tet10_uniform_refinement(const real_t* const          x,        //
     return 0;
 }
 
+///////////////////////////////////////////////////////////////////////
+// tet10_get_intermediate_index
+///////////////////////////////////////////////////////////////////////
+int                                                 //
+tet10_get_intermediate_index(const int vertex_a,    //
+                             const int vertex_b) {  //
+                                                    //
+    if (vertex_a == 0 && vertex_b == 1) return 4;
+    if (vertex_a == 1 && vertex_b == 2) return 5;
+    if (vertex_a == 0 && vertex_b == 2) return 6;
+    if (vertex_a == 0 && vertex_b == 3) return 7;
+    if (vertex_a == 1 && vertex_b == 3) return 8;
+    if (vertex_a == 2 && vertex_b == 3) return 9;
+
+    return -1;
+}
+
 /////////////////////////////////////////////////////////////////
 // tet10_refine_two_edge_vertex
 /////////////////////////////////////////////////////////////////
@@ -97,12 +114,141 @@ tet10_refine_two_edge_vertex(const real_t* const          x,         //
                              const int                    vertex_b,  //
                              struct tet10_vertices* const rTets) {   //
 
+    // Return the number of the new and refined tetrahedra
+    // if 2 is OK
+    // otherwise return 1
+
     if (vertex_b <= vertex_a) return 1;
     if (vertex_a < 0 || vertex_a > 3) return 1;
     if (vertex_b < 0 || vertex_b > 3) return 1;
+
+    const int vertex_N = tet10_get_intermediate_index(vertex_a, vertex_b);
+
+    const real_t N1_x = 0.5 * (x[1] + x[vertex_N]);
+    const real_t N1_y = 0.5 * (y[1] + y[vertex_N]);
+    const real_t N1_z = 0.5 * (z[1] + z[vertex_N]);
+
+    const real_t N2_x = 0.5 * (x[2] + x[vertex_N]);
+    const real_t N2_y = 0.5 * (y[2] + y[vertex_N]);
+    const real_t N2_z = 0.5 * (z[2] + z[vertex_N]);
+
+    const real_t N3_x = 0.5 * (x[3] + x[vertex_N]);
+    const real_t N3_y = 0.5 * (y[3] + y[vertex_N]);
+    const real_t N3_z = 0.5 * (z[3] + z[vertex_N]);
+
+    const real_t N4_x = 0.5 * (x[0] + x[vertex_N]);
+    const real_t N4_y = 0.5 * (y[0] + y[vertex_N]);
+    const real_t N4_z = 0.5 * (z[0] + z[vertex_N]);
+
+    real_t xn_1[10] = {x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9]};
+    real_t yn_1[10] = {y[0], y[1], y[2], y[3], y[4], y[5], y[6], y[7], y[8], y[9]};
+    real_t zn_1[10] = {z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7], z[8], z[9]};
+    real_t wn_1[10] = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9]};
+
+    real_t xn_2[10] = {x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9]};
+    real_t yn_2[10] = {y[0], y[1], y[2], y[3], y[4], y[5], y[6], y[7], y[8], y[9]};
+    real_t zn_2[10] = {z[0], z[1], z[2], z[3], z[4], z[5], z[6], z[7], z[8], z[9]};
+    real_t wn_2[10] = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9]};
+
+    xn_1[vertex_a] = x[vertex_N];
+    yn_1[vertex_a] = y[vertex_N];
+    zn_1[vertex_a] = z[vertex_N];
+
+    xn_2[vertex_b] = x[vertex_N];
+    yn_2[vertex_b] = y[vertex_N];
+    zn_2[vertex_b] = z[vertex_N];
+
+    // xn_1[vertex_N] = N1_x;
+    // yn_1[vertex_N] = N1_y;
+    // zn_1[vertex_N] = N1_z;
+
+    // xn_2[vertex_N] = N4_x;
+    // yn_2[vertex_N] = N4_y;
+    // zn_2[vertex_N] = N4_z;
+
+    xn_1[4] = 0.5 * (x[0] + x[1]);
+    yn_1[4] = 0.5 * (y[0] + y[1]);
+    zn_1[4] = 0.5 * (z[0] + z[1]);
+
+    xn_1[5] = 0.5 * (x[1] + x[2]);
+    yn_1[5] = 0.5 * (y[1] + y[2]);
+    zn_1[5] = 0.5 * (z[1] + z[2]);
+
+    xn_1[6] = 0.5 * (x[0] + x[2]);
+    yn_1[6] = 0.5 * (y[0] + y[2]);
+    zn_1[6] = 0.5 * (z[0] + z[2]);
+
+    xn_1[7] = 0.5 * (x[0] + x[3]);
+    yn_1[7] = 0.5 * (y[0] + y[3]);
+    zn_1[7] = 0.5 * (z[0] + z[3]);
+
+    xn_1[8] = 0.5 * (x[1] + x[3]);
+    yn_1[8] = 0.5 * (y[1] + y[3]);
+    zn_1[8] = 0.5 * (z[1] + z[3]);
+
+    xn_1[9] = 0.5 * (x[2] + x[3]);
+    yn_1[9] = 0.5 * (y[2] + y[3]);
+    zn_1[9] = 0.5 * (z[2] + z[3]);
+
+    wn_1[vertex_a] = 0.5 * (w[vertex_a] + w[vertex_b]);
+    wn_1[4]        = 0.5 * (wn_1[0] + wn_1[1]);
+    wn_1[5]        = 0.5 * (wn_1[1] + wn_1[2]);
+    wn_1[6]        = 0.5 * (wn_1[0] + wn_1[2]);
+    wn_1[7]        = 0.5 * (wn_1[0] + wn_1[3]);
+    wn_1[8]        = 0.5 * (wn_1[1] + wn_1[3]);
+    wn_1[9]        = 0.5 * (wn_1[2] + wn_1[3]);
+
+    ///////
+
+    xn_2[4] = 0.5 * (x[0] + x[1]);
+    yn_2[4] = 0.5 * (y[0] + y[1]);
+    zn_2[4] = 0.5 * (z[0] + z[1]);
+
+    xn_2[5] = 0.5 * (x[1] + x[2]);
+    yn_2[5] = 0.5 * (y[1] + y[2]);
+    zn_2[5] = 0.5 * (z[1] + z[2]);
+
+    xn_2[6] = 0.5 * (x[0] + x[2]);
+    yn_2[6] = 0.5 * (y[0] + y[2]);
+    zn_2[6] = 0.5 * (z[0] + z[2]);
+
+    xn_2[7] = 0.5 * (x[0] + x[3]);
+    yn_2[7] = 0.5 * (y[0] + y[3]);
+    zn_2[7] = 0.5 * (z[0] + z[3]);
+
+    xn_2[8] = 0.5 * (x[1] + x[3]);
+    yn_2[8] = 0.5 * (y[1] + y[3]);
+    zn_2[8] = 0.5 * (z[1] + z[3]);
+
+    xn_2[9] = 0.5 * (x[2] + x[3]);
+    yn_2[9] = 0.5 * (y[2] + y[3]);
+    zn_2[9] = 0.5 * (z[2] + z[3]);
+
+    wn_2[vertex_b] = 0.5 * (w[vertex_a] + w[vertex_b]);
+    wn_2[4]        = 0.5 * (wn_2[0] + wn_2[1]);
+    wn_2[5]        = 0.5 * (wn_2[1] + wn_2[2]);
+    wn_2[6]        = 0.5 * (wn_2[0] + wn_2[2]);
+    wn_2[7]        = 0.5 * (wn_2[0] + wn_2[3]);
+    wn_2[8]        = 0.5 * (wn_2[1] + wn_2[3]);
+    wn_2[9]        = 0.5 * (wn_2[2] + wn_2[3]);
+
+    for (int i = 0; i < 10; i++) {
+        rTets[0].x[i] = xn_1[i];
+        rTets[0].y[i] = yn_1[i];
+        rTets[0].z[i] = zn_1[i];
+        rTets[0].w[i] = wn_1[i];
+
+        rTets[1].x[i] = xn_2[i];
+        rTets[1].y[i] = yn_2[i];
+        rTets[1].z[i] = zn_2[i];
+        rTets[1].w[i] = wn_2[i];
+    }
+
+    return 2;
 }
 
-///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////
+////////////////////
 // tet10_volumes
 ///////////////////////////////////////////////////////////////////////
 real_t                                                   //
@@ -140,7 +286,12 @@ real_t                                            //
 tet10_edge_lengths(const real_t* x,               //
                    const real_t* y,               //
                    const real_t* z,               //
+                   int*          vertex_a,        //
+                   int*          vertex_b,        //
                    real_t* const edge_lengths) {  //
+
+    *vertex_a = -1;
+    *vertex_b = -1;
 
     real_t    max_length          = 0.0;
     const int edges_pattern[6][2] = {{0, 1},   //
@@ -159,7 +310,18 @@ tet10_edge_lengths(const real_t* x,               //
                                 (z[i0] - z[i1]) * (z[i0] - z[i1]));  //
 
         edge_lengths[i] = len;
-        max_length      = len > max_length ? len : max_length;
+
+        if (len > max_length) {
+            *vertex_a  = i0;
+            *vertex_b  = i1;
+            max_length = len;
+        }
+    }
+
+    if (*vertex_a > *vertex_b) {
+        const int tmp = *vertex_a;
+        *vertex_a     = *vertex_b;
+        *vertex_b     = tmp;
     }
 
     return max_length;
@@ -295,6 +457,8 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
 
     PRINT_CURRENT_FUNCTION;
 
+    const real_t degenerated_tet_ratio = 2.5;  // TODO: make it a parameter
+
     int ret = 0;
 
     const real_t ox = (real_t)origin[0];
@@ -348,16 +512,77 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
                                      weighted_field[ev[8]],
                                      weighted_field[ev[9]]};
 
-        real_t       edges_length[6];
-        const real_t max_edge_len = tet10_edge_lengths(x, y, z, edges_length);
-        const real_t alpha        = max_edge_len / dx;
+        real_t edges_length[6];
+        int    vertex_a, vertex_b;
+
+        const real_t max_edge_len = tet10_edge_lengths(x, y, z, &vertex_a, &vertex_b, edges_length);
+
+        const real_t alpha = max_edge_len / dx;
 
         alpha_max = alpha > alpha_max ? alpha : alpha_max;
         alpha_mim = alpha < alpha_mim ? alpha : alpha_mim;
 
         int n_tet = 0;
 
-        if (alpha > alpha_th) {
+        real_t min_edge_length = edges_length[0];
+        for (int i = 1; i < 6; i++) {
+            min_edge_length = edges_length[i] < min_edge_length ? edges_length[i] : min_edge_length;
+        }
+
+        const real_t ratio_max_min   = max_edge_len / min_edge_length;
+        const int    degenerated_tet = ratio_max_min > degenerated_tet_ratio ? 1 : 0;
+
+        // if (ratio_max_min > 2.5) {
+        //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, vertex_a, vertex_b, rTets);
+        //     n_tet = 2;
+
+        //     real_t tot_volume = 0.0;
+        //     real_t V[2];
+
+        //     for (int ni = 0; ni < n_tet; ni++) {
+        //         const real_t volume_loc = tet4_measure(rTets[ni].x[0],  // x-coordinates
+        //                                                rTets[ni].x[1],
+        //                                                rTets[ni].x[2],
+        //                                                rTets[ni].x[3],
+        //                                                rTets[ni].y[0],  // y-coordinates
+        //                                                rTets[ni].y[1],
+        //                                                rTets[ni].y[2],
+        //                                                rTets[ni].y[3],
+        //                                                rTets[ni].z[0],  // z-coordinates
+        //                                                rTets[ni].z[1],
+        //                                                rTets[ni].z[2],
+        //                                                rTets[ni].z[3]);  //
+
+        //         V[ni] = volume_loc;
+        //         tot_volume += volume_loc;
+        //     }
+        //     const real_t ref_volume = tet4_measure(x[0],  // x-coordinates
+        //                                            x[1],
+        //                                            x[2],
+        //                                            x[3],
+        //                                            y[0],  // y-coordinates
+        //                                            y[1],
+        //                                            y[2],
+        //                                            y[3],
+        //                                            z[0],  // z-coordinates
+        //                                            z[1],
+        //                                            z[2],
+        //                                            z[3]);  //
+
+        //     real_t rel_err = fabs(tot_volume - ref_volume) / ref_volume;
+
+        //     if (rel_err > 1e-6) {
+        //         printf("V[0] %e, V[1] %e, ", V[0], V[1]);
+        //         printf(" volume: %e, ref_volume: %e, rel err %e ", tot_volume, ref_volume, rel_err);
+        //         printf("va, vb: %d, %d \n", vertex_a, vertex_b);
+        //     }
+        //     // { // test refine edge
+        //     //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, 0, 1, rTets);
+
+        //     // }
+        // }
+
+        if (alpha > alpha_th || degenerated_tet == 0) {
             tet10_uniform_refinement(x, y, z, wf_tet10, rTets);
             n_tet = 8;
             refinements_cnt++;
@@ -391,6 +616,13 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
             //        V[6],
             //        V[7],
             //        (V[0] + V[1] + V[2] + V[3] + V[4] + V[5] + V[6] + V[7]));
+
+        // } 
+        
+        // else if (alpha > alpha_th && degenerated_tet == 1) {
+        //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, vertex_a, vertex_b, rTets);
+        //     n_tet = 2;
+        //     refinements_cnt++;
 
         } else {
             n_tet = 1;
