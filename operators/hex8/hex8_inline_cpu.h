@@ -444,4 +444,119 @@ static SFEM_INLINE void hex8_l2_project(const scalar_t                     jacob
     values[7] += x0 * x8;
 }
 
+static SFEM_INLINE void hex8_surface_element_0(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[1] - qx * y[5] - x0 * y[0] + x0 * y[4];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[4] - qy * z[5] - x2 * z[0] + x2 * z[1];
+    const scalar_t x4  = qx * z[1] - qx * z[5] - x0 * z[0] + x0 * z[4];
+    const scalar_t x5  = qy * y[4] - qy * y[5] - x2 * y[0] + x2 * y[1];
+    const scalar_t x6  = qx * x[1] - qx * x[5] - x0 * x[0] + x0 * x[4];
+    const scalar_t x7  = qy * x[4] - qy * x[5] - x2 * x[0] + x2 * x[1];
+    surface_element[0] = -x1 * x3 + x4 * x5;
+    surface_element[1] = x3 * x6 - x4 * x7;
+    surface_element[2] = x1 * x7 - x5 * x6;
+}
+
+static SFEM_INLINE void hex8_surface_element_1(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[2] - qx * y[6] - x0 * y[1] + x0 * y[5];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[5] - qy * z[6] - x2 * z[1] + x2 * z[2];
+    const scalar_t x4  = qx * z[2] - qx * z[6] - x0 * z[1] + x0 * z[5];
+    const scalar_t x5  = qy * y[5] - qy * y[6] - x2 * y[1] + x2 * y[2];
+    const scalar_t x6  = qx * x[2] - qx * x[6] - x0 * x[1] + x0 * x[5];
+    const scalar_t x7  = qy * x[5] - qy * x[6] - x2 * x[1] + x2 * x[2];
+    surface_element[0] = -x1 * x3 + x4 * x5;
+    surface_element[1] = x3 * x6 - x4 * x7;
+    surface_element[2] = x1 * x7 - x5 * x6;
+}
+
+static SFEM_INLINE void hex8_surface_element_2(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[3] - qx * y[7] - x0 * y[2] + x0 * y[6];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[6] - qy * z[7] - x2 * z[2] + x2 * z[3];
+    const scalar_t x4  = qx * z[3] - qx * z[7] - x0 * z[2] + x0 * z[6];
+    const scalar_t x5  = qy * y[6] - qy * y[7] - x2 * y[2] + x2 * y[3];
+    const scalar_t x6  = qx * x[3] - qx * x[7] - x0 * x[2] + x0 * x[6];
+    const scalar_t x7  = qy * x[6] - qy * x[7] - x2 * x[2] + x2 * x[3];
+    surface_element[0] = -x1 * x3 + x4 * x5;
+    surface_element[1] = x3 * x6 - x4 * x7;
+    surface_element[2] = x1 * x7 - x5 * x6;
+}
+
+static SFEM_INLINE void hex8_surface_element_3(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[0] - qx * y[4] - x0 * y[3] + x0 * y[7];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[4] - qy * z[7] - x2 * z[0] + x2 * z[3];
+    const scalar_t x4  = qx * z[0] - qx * z[4] - x0 * z[3] + x0 * z[7];
+    const scalar_t x5  = qy * y[4] - qy * y[7] - x2 * y[0] + x2 * y[3];
+    const scalar_t x6  = qx * x[0] - qx * x[4] - x0 * x[3] + x0 * x[7];
+    const scalar_t x7  = qy * x[4] - qy * x[7] - x2 * x[0] + x2 * x[3];
+    surface_element[0] = x1 * x3 - x4 * x5;
+    surface_element[1] = -x3 * x6 + x4 * x7;
+    surface_element[2] = -x1 * x7 + x5 * x6;
+}
+
+// optimizations=basi4)
+static SFEM_INLINE void hex8_surface_element_4(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[1] - qx * y[2] - x0 * y[0] + x0 * y[3];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[0] - qy * z[1] + x2 * z[2] - x2 * z[3];
+    const scalar_t x4  = qx * z[1] - qx * z[2] - x0 * z[0] + x0 * z[3];
+    const scalar_t x5  = qy * y[0] - qy * y[1] + x2 * y[2] - x2 * y[3];
+    const scalar_t x6  = qx * x[1] - qx * x[2] - x0 * x[0] + x0 * x[3];
+    const scalar_t x7  = qy * x[0] - qy * x[1] + x2 * x[2] - x2 * x[3];
+    surface_element[0] = x1 * x3 - x4 * x5;
+    surface_element[1] = -x3 * x6 + x4 * x7;
+    surface_element[2] = -x1 * x7 + x5 * x6;
+}
+
+static SFEM_INLINE void hex8_surface_element_5(const scalar_t                qx,
+                                               const scalar_t                qy,
+                                               const scalar_t *const         x,
+                                               const scalar_t *const         y,
+                                               const scalar_t *const         z,
+                                               scalar_t *const SFEM_RESTRICT surface_element) {
+    const scalar_t x0  = qx - 1;
+    const scalar_t x1  = qx * y[5] - qx * y[6] - x0 * y[4] + x0 * y[7];
+    const scalar_t x2  = qy - 1;
+    const scalar_t x3  = qy * z[6] - qy * z[7] + x2 * z[4] - x2 * z[5];
+    const scalar_t x4  = qx * z[5] - qx * z[6] - x0 * z[4] + x0 * z[7];
+    const scalar_t x5  = qy * y[6] - qy * y[7] + x2 * y[4] - x2 * y[5];
+    const scalar_t x6  = qx * x[5] - qx * x[6] - x0 * x[4] + x0 * x[7];
+    const scalar_t x7  = qy * x[6] - qy * x[7] + x2 * x[4] - x2 * x[5];
+    surface_element[0] = x1 * x3 - x4 * x5;
+    surface_element[1] = -x3 * x6 + x4 * x7;
+    surface_element[2] = -x1 * x7 + x5 * x6;
+}
+
 #endif  // HEX8_INLINE_CPU_H
