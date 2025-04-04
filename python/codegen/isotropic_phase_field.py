@@ -41,8 +41,8 @@
 # gradc = sp.Matrix(3, 1, [dcdx, dcdy, dcdz])
 
 # gradu = sp.Matrix(3, 3, [
-# 	du0dx, du0dy, du0dz, 
-# 	du1dx, du1dy, du1dz, 
+# 	du0dx, du0dy, du0dz,
+# 	du1dx, du1dy, du1dz,
 # 	du2dx, du2dy, du2dz]
 # )
 
@@ -75,8 +75,8 @@
 
 # #############################################
 
-# evalgradu = sp.Matrix(3, 3, 
-# 	[0, 0, 0, 
+# evalgradu = sp.Matrix(3, 3,
+# 	[0, 0, 0,
 # 	 0, 0, 0,
 # 	 0, 0, 0])
 
@@ -133,14 +133,14 @@
 
 # 	integr = subsmat3x3(integr, gradu, evalgradu)
 # 	integr = subsvec3(integr, gradc, evalgradc)
-	
+
 # 	# integr = integr * dV
 
 # 	if simplify_expr:
 # 		integr = sp.simplify(integr)
 
 # 	form = sp.symbols(f'element_energy')
-# 	energy_expr = (ast.Assignment(form, integr))	
+# 	energy_expr = (ast.Assignment(form, integr))
 # 	return energy_expr
 
 # # energy_expr = makeenergy()
@@ -152,8 +152,8 @@
 
 # # Displacement variable
 
-# dedu = sp.Matrix(3, 3, 
-# 	[0, 0, 0, 
+# dedu = sp.Matrix(3, 3,
+# 	[0, 0, 0,
 # 	 0, 0, 0,
 # 	 0, 0, 0])
 
@@ -170,7 +170,7 @@
 # # Phase-field variable
 
 # # Derivative w.r.t to grad(c)
-# dedgradc = sp.Matrix(3, 1, 
+# dedgradc = sp.Matrix(3, 1,
 # 	[0, 0, 0])
 
 # for d1 in range(0, 3):
@@ -186,7 +186,7 @@
 
 # 	for d1 in range(0, 3):
 # 		integr += dedgradc[d1] * sp.diff(f[i], q[d1])
-	
+
 # 	grade_wrt_c[i] = integr + (dedc * rf[i])
 
 # ####################################
@@ -200,7 +200,7 @@
 
 # 	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
 # 	integr = integr * dV
-	
+
 # 	if simplify_expr:
 # 		integr = sp.simplify(integr)
 
@@ -208,7 +208,7 @@
 # 	expr = ast.Assignment(lform, integr)
 
 # 	q.put(expr)
-	
+
 # def makegradc(i, q):
 # 	assert(i < 4)
 # 	integr =  grade_wrt_c[i]
@@ -220,7 +220,7 @@
 
 # 	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets
 # 	integr = integr * dV
-	
+
 # 	if simplify_expr:
 # 		integr = sp.simplify(integr)
 
@@ -245,8 +245,8 @@
 # def makehessian(i, q):
 # 	tuples = []
 
-# 	# He = sp.Matrix(3, 3, 
-# 	# 	[0, 0, 0, 
+# 	# He = sp.Matrix(3, 3,
+# 	# 	[0, 0, 0,
 # 	# 	 0, 0, 0,
 # 	# 	 0, 0, 0])
 
@@ -256,7 +256,7 @@
 
 # 	# for j in range(i, (4*3)):
 # 	# 	# Bilinear form
-# 	# 	integr = inner(He, shapegrad[j]) 
+# 	# 	integr = inner(He, shapegrad[j])
 # 	# 	integr = subsmat3x3(integr, gradu, evalgradu)
 
 # 	# 	# integr = sp.integrate(integr * det3(A), (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1)) # No need for this in linear tets

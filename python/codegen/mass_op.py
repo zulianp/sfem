@@ -24,245 +24,249 @@ from fields import *
 
 import sys
 
+
 def simplify(expr):
-	# return sp.simplify(expr)
-	return expr
+    # return sp.simplify(expr)
+    return expr
+
 
 class MassOp:
-	def __init__(self, field, fe_test, symbolic_integration):
-		# Ref element dims
-		dims = fe_test.manifold_dim()
+    def __init__(self, field, fe_test, symbolic_integration):
+        # Ref element dims
+        dims = fe_test.manifold_dim()
 
-		# Quadrature point
-		q = fe_test.quadrature_point()
+        # Quadrature point
+        q = fe_test.quadrature_point()
 
-		self.field = field
-		self.fe_trial = field.fe
-		self.fe_test = fe_test
-		self.q = q
-		self.qw = fe_test.quadrature_weight()
-		self.symbolic_integration = symbolic_integration
+        self.field = field
+        self.fe_trial = field.fe
+        self.fe_test = fe_test
+        self.q = q
+        self.qw = fe_test.quadrature_weight()
+        self.symbolic_integration = symbolic_integration
 
-	def sym_matrix(self):
-		fe_trial = self.fe_trial
-		fe_test = self.fe_test
-		q = self.q
+    def sym_matrix(self):
+        fe_trial = self.fe_trial
+        fe_test = self.fe_test
+        q = self.q
 
-		fun_trial = fe_trial.fun(q)
-		fun_test  = fe_test.fun(q)
+        fun_trial = fe_trial.fun(q)
+        fun_test = fe_test.fun(q)
 
-		if fe_test.is_isoparametric():
-			dV = fe_test.jacobian_determinant(q)
-		else:
-			dV = fe_test.symbol_jacobian_determinant()
+        if fe_test.is_isoparametric():
+            dV = fe_test.jacobian_determinant(q)
+        else:
+            dV = fe_test.symbol_jacobian_determinant()
 
-		if not self.symbolic_integration:
-			dV *= fe_test.reference_measure() * self.qw
+        if not self.symbolic_integration:
+            dV *= fe_test.reference_measure() * self.qw
 
-		M = sp.zeros(fe_test.n_nodes(), fe_trial.n_nodes())
-		for i in range(0, fe_test.n_nodes()):
-			for j in range(0, fe_trial.n_nodes()):
-				if not self.symbolic_integration:
-					integr = fun_test[i] * fun_trial[j] * dV
-				else:
-					if fe_test.is_isoparametric():
-						integr = fe_test.integrate(q, fun_test[i] * fun_trial[j] * dV) 
-					else:
-						integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
-				M[i, j] = integr
+        M = sp.zeros(fe_test.n_nodes(), fe_trial.n_nodes())
+        for i in range(0, fe_test.n_nodes()):
+            for j in range(0, fe_trial.n_nodes()):
+                if not self.symbolic_integration:
+                    integr = fun_test[i] * fun_trial[j] * dV
+                else:
+                    if fe_test.is_isoparametric():
+                        integr = fe_test.integrate(q, fun_test[i] * fun_trial[j] * dV)
+                    else:
+                        integr = fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
+                M[i, j] = integr
 
-		return M
+        return M
 
-	def matrix(self):
-		M = self.sym_matrix()
-		rows, cols = M.shape
+    def matrix(self):
+        M = self.sym_matrix()
+        rows, cols = M.shape
 
-		expr = []
-		for i in range(0, rows):
-			for j in range(0, cols):
-				var = sp.symbols(f'element_matrix[{i*cols+j}]')
-				expr.append(self.assign_op(var, M[i, j]))
+        expr = []
+        for i in range(0, rows):
+            for j in range(0, cols):
+                var = sp.symbols(f"element_matrix[{i*cols+j}]")
+                expr.append(self.assign_op(var, M[i, j]))
 
-		return expr
+        return expr
 
-	# [3]
-	def hrz_diagonal_scaling_lumped_matrix(self):
-		fe_trial = self.fe_trial
-		fe_test = self.fe_test
-		q = self.q
+    # [3]
+    def hrz_diagonal_scaling_lumped_matrix(self):
+        fe_trial = self.fe_trial
+        fe_test = self.fe_test
+        q = self.q
 
-		fun_trial = fe_trial.fun(q)
-		fun_test  = fe_test.fun(q)
-		dV = fe_test.jacobian_determinant(q)
+        fun_trial = fe_trial.fun(q)
+        fun_test = fe_test.fun(q)
+        dV = fe_test.jacobian_determinant(q)
 
-		expr = []
+        expr = []
 
-		d = sp.zeros(fe_test.n_nodes(), 1)
+        d = sp.zeros(fe_test.n_nodes(), 1)
 
-		approx_measure = 0
-		for i in range(0, fe_test.n_nodes()):
-			integr = fe_test.integrate(q, fun_test[i] * fun_trial[i]) * dV
-			integr = simplify(integr)
-			d[i] = integr
-			approx_measure += integr
+        approx_measure = 0
+        for i in range(0, fe_test.n_nodes()):
+            integr = fe_test.integrate(q, fun_test[i] * fun_trial[i]) * dV
+            integr = simplify(integr)
+            d[i] = integr
+            approx_measure += integr
 
-		measure = fe_test.measure(q)
-		rescale = measure / approx_measure
-		d = d * rescale
-		
-		for i in range(0, fe_test.n_nodes()):
-			var = sp.symbols(f'element_matrix_diag[{i}]')
-			expr.append(ast.Assignment(var, d[i]))
-		return expr
+        measure = fe_test.measure(q)
+        rescale = measure / approx_measure
+        d = d * rescale
 
-	def lumped_matrix(self):
-		fe_trial = self.fe_trial
-		fe_test = self.fe_test
-		q = self.q
+        for i in range(0, fe_test.n_nodes()):
+            var = sp.symbols(f"element_matrix_diag[{i}]")
+            expr.append(ast.Assignment(var, d[i]))
+        return expr
 
-		fun_trial = fe_trial.fun(q)
-		fun_test  = fe_test.fun(q)
-		dV = fe_test.jacobian_determinant(q)
+    def lumped_matrix(self):
+        fe_trial = self.fe_trial
+        fe_test = self.fe_test
+        q = self.q
 
-		if not self.symbolic_integration:
-			dV *= fe_test.reference_measure() * self.qw
+        fun_trial = fe_trial.fun(q)
+        fun_test = fe_test.fun(q)
+        dV = fe_test.jacobian_determinant(q)
 
-		expr = []
-		for i in range(0, fe_test.n_nodes()):
-			integr = 0
-			for j in range(0, fe_trial.n_nodes()):
-				if not self.symbolic_integration:
-					integr += fun_test[i] * fun_trial[j] * dV
-				else:
-					if fe_test.is_isoparametric():
-						integrand = fun_test[i] * fun_trial[j] * dV
-						integrand = simplify(integrand)
-						integr += fe_test.integrate(q, integrand) 
-					else:
-						integr += fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
+        if not self.symbolic_integration:
+            dV *= fe_test.reference_measure() * self.qw
 
-			var = sp.symbols(f'element_matrix_diag[{i}]')
-			expr.append(self.assign_op(var, integr))
+        expr = []
+        for i in range(0, fe_test.n_nodes()):
+            integr = 0
+            for j in range(0, fe_trial.n_nodes()):
+                if not self.symbolic_integration:
+                    integr += fun_test[i] * fun_trial[j] * dV
+                else:
+                    if fe_test.is_isoparametric():
+                        integrand = fun_test[i] * fun_trial[j] * dV
+                        integrand = simplify(integrand)
+                        integr += fe_test.integrate(q, integrand)
+                    else:
+                        integr += fe_test.integrate(q, fun_test[i] * fun_trial[j]) * dV
 
-		return expr
+            var = sp.symbols(f"element_matrix_diag[{i}]")
+            expr.append(self.assign_op(var, integr))
 
-	def apply(self):
-		field = self.field
-		fe_trial = self.fe_trial
-		fe_test = self.fe_test
-		q = self.q
+        return expr
 
-		fun_trial = field.eval(q)
-		fun_test  = fe_test.fun(q)
-		dV = fe_test.jacobian_determinant(q)
+    def apply(self):
+        field = self.field
+        fe_trial = self.fe_trial
+        fe_test = self.fe_test
+        q = self.q
 
-		if not self.symbolic_integration:
-			dV *= fe_test.reference_measure() * self.qw
+        fun_trial = field.eval(q)
+        fun_test = fe_test.fun(q)
+        dV = fe_test.jacobian_determinant(q)
 
-		expr = []
-		for i in range(0, fe_test.n_nodes()):
-			if not self.symbolic_integration:
-				integr = fun_test[i] * fun_trial  * dV
-			else:
-				if fe_test.is_isoparametric():
-					integr = fe_test.integrate(q, fun_test[i] * fun_trial  * dV)
-				else:
-					integr = fe_test.integrate(q, fun_test[i] * fun_trial) * dV
+        if not self.symbolic_integration:
+            dV *= fe_test.reference_measure() * self.qw
 
-			var = sp.symbols(f'element_vector[{i}]')
-			expr.append(self.assign_op(var, integr))
-		return expr
+        expr = []
+        for i in range(0, fe_test.n_nodes()):
+            if not self.symbolic_integration:
+                integr = fun_test[i] * fun_trial * dV
+            else:
+                if fe_test.is_isoparametric():
+                    integr = fe_test.integrate(q, fun_test[i] * fun_trial * dV)
+                else:
+                    integr = fe_test.integrate(q, fun_test[i] * fun_trial) * dV
 
-	def assign_op(self, var, expr):
-		if self.symbolic_integration:
-			return ast.Assignment(var, simplify(expr))
-		else:
-			return ast.AddAugmentedAssignment(var, simplify(expr))
+            var = sp.symbols(f"element_vector[{i}]")
+            expr.append(self.assign_op(var, integr))
+        return expr
 
-	def apply_to_constant(self):
-		field = self.field
-		fe_test = self.fe_test
-		q = self.q
+    def assign_op(self, var, expr):
+        if self.symbolic_integration:
+            return ast.Assignment(var, simplify(expr))
+        else:
+            return ast.AddAugmentedAssignment(var, simplify(expr))
 
-		fun_test = fe_test.fun(q)
-		dV = fe_test.jacobian_determinant(q)
-		val = sp.symbols('val')
+    def apply_to_constant(self):
+        field = self.field
+        fe_test = self.fe_test
+        q = self.q
 
-		if not self.symbolic_integration:
-			dV *= fe_test.reference_measure() * self.qw
+        fun_test = fe_test.fun(q)
+        dV = fe_test.jacobian_determinant(q)
+        val = sp.symbols("val")
 
-		expr = []
-		for i in range(0, fe_test.n_nodes()):
-			if not self.symbolic_integration:
-				integr = fun_test[i] * val * dV
-			else:
-				if fe_test.is_isoparametric():
-					integrand = fun_test[i] * val * dV
-					integrand = simplify(integrand)
-					integr = fe_test.integrate(q, integrand)
-				else:
-					integr = fe_test.integrate(q, fun_test[i] * val) * dV
+        if not self.symbolic_integration:
+            dV *= fe_test.reference_measure() * self.qw
 
-			var = sp.symbols(f'element_vector[{i}]')
-			expr.append(self.assign_op(var, integr))
-		return expr
+        expr = []
+        for i in range(0, fe_test.n_nodes()):
+            if not self.symbolic_integration:
+                integr = fun_test[i] * val * dV
+            else:
+                if fe_test.is_isoparametric():
+                    integrand = fun_test[i] * val * dV
+                    integrand = simplify(integrand)
+                    integr = fe_test.integrate(q, integrand)
+                else:
+                    integr = fe_test.integrate(q, fun_test[i] * val) * dV
+
+            var = sp.symbols(f"element_vector[{i}]")
+            expr.append(self.assign_op(var, integr))
+        return expr
+
 
 def main():
-	fes = {
-		"TRI6": Tri6(),
-		"TRI3": Tri3(),
-		"TRISHELL3": TriShell3(),
-		"TET4": Tet4(),
-		"TET10": Tet10(),
-		"TET20": Tet20(),
-		"HEX8": Hex8(),
-		"AAHEX8": AAHex8(),
-		"AAQUAD4": AxisAlignedQuad4(),
-		"QUAD4": Quad4(),
-		"QUADSHELL4": QuadShell4()
-	}
+    fes = {
+        "TRI6": Tri6(),
+        "TRI3": Tri3(),
+        "TRISHELL3": TriShell3(),
+        "TET4": Tet4(),
+        "TET10": Tet10(),
+        "TET20": Tet20(),
+        "HEX8": Hex8(),
+        "AAHEX8": AAHex8(),
+        "AAQUAD4": AxisAlignedQuad4(),
+        "QUAD4": Quad4(),
+        "QUADSHELL4": QuadShell4(),
+    }
 
-	symbolic_integration = False
+    symbolic_integration = False
 
-	if len(sys.argv) >= 2:
-		fe = fes[sys.argv[1]]
-	else:
-		print("Fallback with TET10")
-		fe = Tet10()
+    if len(sys.argv) >= 2:
+        fe = fes[sys.argv[1]]
+    else:
+        print("Fallback with TET10")
+        fe = Tet10()
 
-	fe_field = fe
-	if len(sys.argv) >= 3:
-		fe_field = fes[sys.argv[2]]
+    fe_field = fe
+    if len(sys.argv) >= 3:
+        fe_field = fes[sys.argv[2]]
 
-	if len(sys.argv) >= 4:
-		symbolic_integration = int(sys.argv[3])
+    if len(sys.argv) >= 4:
+        symbolic_integration = int(sys.argv[3])
 
-	f = Field(fe_field, coeffs('u', fe_field.n_nodes()))
-	op = MassOp(f, fe, symbolic_integration)
+    f = Field(fe_field, coeffs("u", fe_field.n_nodes()))
+    op = MassOp(f, fe, symbolic_integration)
 
-	print("----------------------------")
-	print("apply_to_constant")
-	print("----------------------------")
-	c_code(op.apply_to_constant())
-	print("----------------------------")	
+    print("----------------------------")
+    print("apply_to_constant")
+    print("----------------------------")
+    c_code(op.apply_to_constant())
+    print("----------------------------")
 
-	print("----------------------------")
-	print("lumped_matrix")
-	print("----------------------------")
-	c_code(op.lumped_matrix())
-	print("----------------------------")	
+    print("----------------------------")
+    print("lumped_matrix")
+    print("----------------------------")
+    c_code(op.lumped_matrix())
+    print("----------------------------")
 
-	print("----------------------------")
-	print("matrix")
-	print("----------------------------")
-	c_code(op.matrix())
-	print("----------------------------")	
+    print("----------------------------")
+    print("matrix")
+    print("----------------------------")
+    c_code(op.matrix())
+    print("----------------------------")
 
-	print("----------------------------")
-	print("apply")
-	print("----------------------------")
-	c_code(op.apply())
-	print("----------------------------")	
+    print("----------------------------")
+    print("apply")
+    print("----------------------------")
+    c_code(op.apply())
+    print("----------------------------")
 
-if __name__ == '__main__':
-	main()
+
+if __name__ == "__main__":
+    main()
