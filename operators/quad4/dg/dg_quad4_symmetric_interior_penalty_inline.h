@@ -1,6 +1,11 @@
 #ifndef DG_HEX8_SYMMETRIC_INTERIOR_PENALTY_INLINE_H
 #define DG_HEX8_SYMMETRIC_INTERIOR_PENALTY_INLINE_H
 
+#include "sfem_base.h"
+#include "sfem_macros.h"
+
+#include <math.h>
+
 static void SFEM_INLINE dg_quad4_sip_0(const scalar_t* const SFEM_RESTRICT x,
                                        const scalar_t* const SFEM_RESTRICT y,
                                        const scalar_t* const SFEM_RESTRICT jacobian_inverse,
