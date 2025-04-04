@@ -123,22 +123,30 @@ tet10_refine_two_edge_vertex(const real_t* const          x,         //
     if (vertex_b < 0 || vertex_b > 3) return 1;
 
     const int vertex_N = tet10_get_intermediate_index(vertex_a, vertex_b);
+    if (vertex_N < 0) {
+        printf("Error: vertex_N < 0\n");
+        exit(1);
+    }
 
-    const real_t N1_x = 0.5 * (x[1] + x[vertex_N]);
-    const real_t N1_y = 0.5 * (y[1] + y[vertex_N]);
-    const real_t N1_z = 0.5 * (z[1] + z[vertex_N]);
+    // if (vertex_a == 0 && vertex_b == 1) {
+    //     printf("vertex_a = %d, vertex_b = %d, vertex_N = %d\n", vertex_a, vertex_b, vertex_N);
+    // }
 
-    const real_t N2_x = 0.5 * (x[2] + x[vertex_N]);
-    const real_t N2_y = 0.5 * (y[2] + y[vertex_N]);
-    const real_t N2_z = 0.5 * (z[2] + z[vertex_N]);
+    // const real_t N1_x = 0.5 * (x[1] + x[vertex_N]);
+    // const real_t N1_y = 0.5 * (y[1] + y[vertex_N]);
+    // const real_t N1_z = 0.5 * (z[1] + z[vertex_N]);
 
-    const real_t N3_x = 0.5 * (x[3] + x[vertex_N]);
-    const real_t N3_y = 0.5 * (y[3] + y[vertex_N]);
-    const real_t N3_z = 0.5 * (z[3] + z[vertex_N]);
+    // const real_t N2_x = 0.5 * (x[2] + x[vertex_N]);
+    // const real_t N2_y = 0.5 * (y[2] + y[vertex_N]);
+    // const real_t N2_z = 0.5 * (z[2] + z[vertex_N]);
 
-    const real_t N4_x = 0.5 * (x[0] + x[vertex_N]);
-    const real_t N4_y = 0.5 * (y[0] + y[vertex_N]);
-    const real_t N4_z = 0.5 * (z[0] + z[vertex_N]);
+    // const real_t N3_x = 0.5 * (x[3] + x[vertex_N]);
+    // const real_t N3_y = 0.5 * (y[3] + y[vertex_N]);
+    // const real_t N3_z = 0.5 * (z[3] + z[vertex_N]);
+
+    // const real_t N4_x = 0.5 * (x[0] + x[vertex_N]);
+    // const real_t N4_y = 0.5 * (y[0] + y[vertex_N]);
+    // const real_t N4_z = 0.5 * (z[0] + z[vertex_N]);
 
     real_t xn_1[10] = {x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9]};
     real_t yn_1[10] = {y[0], y[1], y[2], y[3], y[4], y[5], y[6], y[7], y[8], y[9]};
@@ -166,31 +174,31 @@ tet10_refine_two_edge_vertex(const real_t* const          x,         //
     // yn_2[vertex_N] = N4_y;
     // zn_2[vertex_N] = N4_z;
 
-    xn_1[4] = 0.5 * (x[0] + x[1]);
-    yn_1[4] = 0.5 * (y[0] + y[1]);
-    zn_1[4] = 0.5 * (z[0] + z[1]);
+    xn_1[4] = 0.5 * (xn_1[0] + xn_1[1]);
+    yn_1[4] = 0.5 * (yn_1[0] + yn_1[1]);
+    zn_1[4] = 0.5 * (zn_1[0] + zn_1[1]);
 
-    xn_1[5] = 0.5 * (x[1] + x[2]);
-    yn_1[5] = 0.5 * (y[1] + y[2]);
-    zn_1[5] = 0.5 * (z[1] + z[2]);
+    xn_1[5] = 0.5 * (xn_1[1] + xn_1[2]);
+    yn_1[5] = 0.5 * (yn_1[1] + yn_1[2]);
+    zn_1[5] = 0.5 * (zn_1[1] + zn_1[2]);
 
-    xn_1[6] = 0.5 * (x[0] + x[2]);
-    yn_1[6] = 0.5 * (y[0] + y[2]);
-    zn_1[6] = 0.5 * (z[0] + z[2]);
+    xn_1[6] = 0.5 * (xn_1[0] + xn_1[2]);
+    yn_1[6] = 0.5 * (yn_1[0] + yn_1[2]);
+    zn_1[6] = 0.5 * (zn_1[0] + zn_1[2]);
 
-    xn_1[7] = 0.5 * (x[0] + x[3]);
-    yn_1[7] = 0.5 * (y[0] + y[3]);
-    zn_1[7] = 0.5 * (z[0] + z[3]);
+    xn_1[7] = 0.5 * (xn_1[0] + xn_1[3]);
+    yn_1[7] = 0.5 * (yn_1[0] + yn_1[3]);
+    zn_1[7] = 0.5 * (zn_1[0] + zn_1[3]);
 
-    xn_1[8] = 0.5 * (x[1] + x[3]);
-    yn_1[8] = 0.5 * (y[1] + y[3]);
-    zn_1[8] = 0.5 * (z[1] + z[3]);
+    xn_1[8] = 0.5 * (xn_1[1] + xn_1[3]);
+    yn_1[8] = 0.5 * (yn_1[1] + yn_1[3]);
+    zn_1[8] = 0.5 * (zn_1[1] + zn_1[3]);
 
-    xn_1[9] = 0.5 * (x[2] + x[3]);
-    yn_1[9] = 0.5 * (y[2] + y[3]);
-    zn_1[9] = 0.5 * (z[2] + z[3]);
+    xn_1[9] = 0.5 * (xn_1[2] + xn_1[3]);
+    yn_1[9] = 0.5 * (yn_1[2] + yn_1[3]);
+    zn_1[9] = 0.5 * (zn_1[2] + zn_1[3]);
 
-    wn_1[vertex_a] = 0.5 * (w[vertex_a] + w[vertex_b]);
+    wn_1[vertex_a] = w[vertex_N];
     wn_1[4]        = 0.5 * (wn_1[0] + wn_1[1]);
     wn_1[5]        = 0.5 * (wn_1[1] + wn_1[2]);
     wn_1[6]        = 0.5 * (wn_1[0] + wn_1[2]);
@@ -200,31 +208,31 @@ tet10_refine_two_edge_vertex(const real_t* const          x,         //
 
     ///////
 
-    xn_2[4] = 0.5 * (x[0] + x[1]);
-    yn_2[4] = 0.5 * (y[0] + y[1]);
-    zn_2[4] = 0.5 * (z[0] + z[1]);
+    xn_2[4] = 0.5 * (xn_2[0] + xn_2[1]);
+    yn_2[4] = 0.5 * (yn_2[0] + yn_2[1]);
+    zn_2[4] = 0.5 * (zn_2[0] + zn_2[1]);
 
-    xn_2[5] = 0.5 * (x[1] + x[2]);
-    yn_2[5] = 0.5 * (y[1] + y[2]);
-    zn_2[5] = 0.5 * (z[1] + z[2]);
+    xn_2[5] = 0.5 * (xn_2[1] + xn_2[2]);
+    yn_2[5] = 0.5 * (yn_2[1] + yn_2[2]);
+    zn_2[5] = 0.5 * (zn_2[1] + zn_2[2]);
 
-    xn_2[6] = 0.5 * (x[0] + x[2]);
-    yn_2[6] = 0.5 * (y[0] + y[2]);
-    zn_2[6] = 0.5 * (z[0] + z[2]);
+    xn_2[6] = 0.5 * (xn_2[0] + xn_2[2]);
+    yn_2[6] = 0.5 * (yn_2[0] + yn_2[2]);
+    zn_2[6] = 0.5 * (zn_2[0] + zn_2[2]);
 
-    xn_2[7] = 0.5 * (x[0] + x[3]);
-    yn_2[7] = 0.5 * (y[0] + y[3]);
-    zn_2[7] = 0.5 * (z[0] + z[3]);
+    xn_2[7] = 0.5 * (xn_2[0] + xn_2[3]);
+    yn_2[7] = 0.5 * (yn_2[0] + yn_2[3]);
+    zn_2[7] = 0.5 * (zn_2[0] + zn_2[3]);
 
-    xn_2[8] = 0.5 * (x[1] + x[3]);
-    yn_2[8] = 0.5 * (y[1] + y[3]);
-    zn_2[8] = 0.5 * (z[1] + z[3]);
+    xn_2[8] = 0.5 * (xn_2[1] + xn_2[3]);
+    yn_2[8] = 0.5 * (yn_2[1] + yn_2[3]);
+    zn_2[8] = 0.5 * (zn_2[1] + zn_2[3]);
 
-    xn_2[9] = 0.5 * (x[2] + x[3]);
-    yn_2[9] = 0.5 * (y[2] + y[3]);
-    zn_2[9] = 0.5 * (z[2] + z[3]);
+    xn_2[9] = 0.5 * (xn_2[2] + xn_2[3]);
+    yn_2[9] = 0.5 * (yn_2[2] + yn_2[3]);
+    zn_2[9] = 0.5 * (zn_2[2] + zn_2[3]);
 
-    wn_2[vertex_b] = 0.5 * (w[vertex_a] + w[vertex_b]);
+    wn_2[vertex_b] = w[vertex_N];
     wn_2[4]        = 0.5 * (wn_2[0] + wn_2[1]);
     wn_2[5]        = 0.5 * (wn_2[1] + wn_2[2]);
     wn_2[6]        = 0.5 * (wn_2[0] + wn_2[2]);
@@ -532,97 +540,19 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
         const real_t ratio_max_min   = max_edge_len / min_edge_length;
         const int    degenerated_tet = ratio_max_min > degenerated_tet_ratio ? 1 : 0;
 
-        // if (ratio_max_min > 2.5) {
-        //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, vertex_a, vertex_b, rTets);
-        //     n_tet = 2;
-
-        //     real_t tot_volume = 0.0;
-        //     real_t V[2];
-
-        //     for (int ni = 0; ni < n_tet; ni++) {
-        //         const real_t volume_loc = tet4_measure(rTets[ni].x[0],  // x-coordinates
-        //                                                rTets[ni].x[1],
-        //                                                rTets[ni].x[2],
-        //                                                rTets[ni].x[3],
-        //                                                rTets[ni].y[0],  // y-coordinates
-        //                                                rTets[ni].y[1],
-        //                                                rTets[ni].y[2],
-        //                                                rTets[ni].y[3],
-        //                                                rTets[ni].z[0],  // z-coordinates
-        //                                                rTets[ni].z[1],
-        //                                                rTets[ni].z[2],
-        //                                                rTets[ni].z[3]);  //
-
-        //         V[ni] = volume_loc;
-        //         tot_volume += volume_loc;
-        //     }
-        //     const real_t ref_volume = tet4_measure(x[0],  // x-coordinates
-        //                                            x[1],
-        //                                            x[2],
-        //                                            x[3],
-        //                                            y[0],  // y-coordinates
-        //                                            y[1],
-        //                                            y[2],
-        //                                            y[3],
-        //                                            z[0],  // z-coordinates
-        //                                            z[1],
-        //                                            z[2],
-        //                                            z[3]);  //
-
-        //     real_t rel_err = fabs(tot_volume - ref_volume) / ref_volume;
-
-        //     if (rel_err > 1e-6) {
-        //         printf("V[0] %e, V[1] %e, ", V[0], V[1]);
-        //         printf(" volume: %e, ref_volume: %e, rel err %e ", tot_volume, ref_volume, rel_err);
-        //         printf("va, vb: %d, %d \n", vertex_a, vertex_b);
-        //     }
-        //     // { // test refine edge
-        //     //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, 0, 1, rTets);
-
-        //     // }
-        // }
-
-        if (alpha > alpha_th || degenerated_tet == 0) {
+        if (alpha > alpha_th && degenerated_tet == 0) {
             tet10_uniform_refinement(x, y, z, wf_tet10, rTets);
             n_tet = 8;
             refinements_cnt++;
 
-            // //  Test refinement quality
-            // real_t V[8];
-            //
-            // const real_t tot_volume = tet10_volumes(rTets, 8, V);
-            // const real_t ref_volume = tet4_measure(x[0],  // x-coordinates
-            //                                        x[1],
-            //                                        x[2],
-            //                                        x[3],
-            //                                        y[0],  // y-coordinates
-            //                                        y[1],
-            //                                        y[2],
-            //                                        y[3],
-            //                                        z[0],  // z-coordinates
-            //                                        z[1],
-            //                                        z[2],
-            //                                        z[3]);  //
-            //
-            // printf("ref_volume: %g <<<<<<<<<<<<<<<<<<<<<<<< \n", ref_volume);
-            // printf("tot_volume: %g <<<<<<<<<<<<<<<<<<<<<<<< \n", tot_volume);
-            // printf("V: %e + %e + %e + %e + %e + %e + %e + %e = %e < \n\n",
-            //        V[0],
-            //        V[1],
-            //        V[2],
-            //        V[3],
-            //        V[4],
-            //        V[5],
-            //        V[6],
-            //        V[7],
-            //        (V[0] + V[1] + V[2] + V[3] + V[4] + V[5] + V[6] + V[7]));
-
-        // } 
-        
-        // else if (alpha > alpha_th && degenerated_tet == 1) {
-        //     tet10_refine_two_edge_vertex(x, y, z, wf_tet10, vertex_a, vertex_b, rTets);
-        //     n_tet = 2;
-        //     refinements_cnt++;
+        } else if (alpha > alpha_th && degenerated_tet == 1) {
+            const int nt = tet10_refine_two_edge_vertex(x, y, z, wf_tet10, vertex_a, vertex_b, rTets);
+            if (nt != 2) {
+                fprintf(stderr, "tet10_refine_two_edge_vertex: %d != 2\n", nt);
+                return -1;
+            }
+            n_tet = 2;
+            refinements_cnt++;
 
         } else {
             n_tet = 1;
@@ -632,7 +562,7 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
                 rTets[0].z[v] = z[v];
                 rTets[0].w[v] = wf_tet10[v];
             }
-        }
+        }  // end if to select the refinement schema
 
         for (int ni = 0; ni < n_tet; ni++) {
             hex8_to_isoparametric_tet10_resample_tet_adjoint(rTets[ni].x,  //
@@ -646,12 +576,95 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
         }
     }
 
+#if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
     printf("alpha_max:       %g  \n", alpha_max);
     printf("alpha_mim:       %g  \n", alpha_mim);
     printf("refinements_cnt: %d  \n", refinements_cnt);
     printf("Total elements:  %ld \n", (end_element - start_element));
     printf("Refinement ratio %g  \n", (real_t)refinements_cnt / (real_t)(end_element - start_element));
+    printf("============================================================\n");
+#endif
 
     RETURN_FROM_FUNCTION(ret);
+}
+
+///////////////////////////////////////////////////////////////////////
+// hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint
+///////////////////////////////////////////////////////////////////////
+int                                                                                                                    //
+hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                                 const ptrdiff_t                      end_element,     //
+                                                                 const ptrdiff_t                      nnodes,          //
+                                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                                 const real_t                alpha_th,  // Threshold for alpha
+                                                                 real_t* const SFEM_RESTRICT data) {    //
+
+    PRINT_CURRENT_FUNCTION;
+
+    const real_t degenerated_tet_ratio = 2.5;  // TODO: make it a parameter
+
+    int ret = 0;
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const real_t hexahedron_volume = dx * dy * dz;
+
+    struct tet10_vertices* rTets = NULL;
+
+    real_t alpha_max       = 0.0;
+    real_t alpha_mim       = 1e9;
+    int    refinements_cnt = 0;
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        idx_t ev[10];
+
+        // ISOPARAMETRIC
+        real_t x[10], y[10], z[10];
+
+        real_t hex8_f[8];
+        real_t coeffs[8];
+
+        real_t tet10_f[10];
+        // real_t element_field[10];
+
+        // loop over the 4 vertices of the tetrahedron
+        for (int v = 0; v < 10; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // ISOPARAMETRIC
+        for (int v = 0; v < 10; ++v) {
+            x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
+            y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
+            z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
+        }
+
+        const real_t wf_tet10[10] = {weighted_field[ev[0]],
+                                     weighted_field[ev[1]],
+                                     weighted_field[ev[2]],
+                                     weighted_field[ev[3]],
+                                     weighted_field[ev[4]],
+                                     weighted_field[ev[5]],
+                                     weighted_field[ev[6]],
+                                     weighted_field[ev[7]],
+                                     weighted_field[ev[8]],
+                                     weighted_field[ev[9]]};
+
+        // generate iterative refinement
+
+        // perform the adjoint on the refined mesh
+    }
 }

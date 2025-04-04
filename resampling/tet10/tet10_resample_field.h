@@ -180,6 +180,31 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
                                                    const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
                                                    real_t* const SFEM_RESTRICT          data);                    // Output
 
+/**
+ * @brief Resamples a field from a 10-node tetrahedral mesh back to a structured hexahedral grid with adaptive refinement.
+ *
+ * This function performs the adjoint operation of resampling, transferring data from a second-order
+ * (quadratic) tetrahedral mesh to a structured hexahedral grid. Unlike the standard adjoint version,
+ * this function includes an adaptive refinement strategy controlled by the alpha_th parameter.
+ *
+ * The alpha threshold is used to determine which elements should be refined based on the ratio of
+ * the edges of the tetrahedral mesh compared  to the edge of the hexahedral mesh.
+ *
+ * @param start_element First element index to process (for parallelization)
+ * @param end_element Last element index to process (exclusive)
+ * @param nnodes Total number of nodes in the tetrahedral mesh
+ * @param elems Element connectivity array for the tetrahedral mesh (10 indices per element)
+ * @param xyz Nodal coordinates array for the tetrahedral mesh
+ * @param n Number of nodes in each direction of the structured grid
+ * @param stride Stride values for navigating the structured grid
+ * @param origin Origin coordinates of the structured grid
+ * @param delta Grid spacing of the structured grid
+ * @param weighted_field Input field values from the tetrahedral mesh (already weighted)
+ * @param alpha_th Threshold for refinement - elements with gradients exceeding this value will be refined
+ * @param data Output field values resampled to the structured grid
+ *
+ * @return 0 on success, non-zero on failure
+ */
 int                                                                                                             //
 hex8_to_isoparametric_tet10_resample_field_refine_adjoint(const ptrdiff_t                      start_element,   // Mesh
                                                           const ptrdiff_t                      end_element,     //
@@ -193,6 +218,37 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(const ptrdiff_t       
                                                           const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
                                                           const real_t                         alpha_th,  // Threshold for alpha
                                                           real_t* const SFEM_RESTRICT          data);              // Output
+
+/**
+ * @brief
+ *
+ * @param start_element
+ * @param end_element
+ * @param nnodes
+ * @param elems
+ * @param xyz
+ * @param n
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param weighted_field
+ * @param alpha_th
+ * @param data
+ * @return int
+ */
+int                                                                                                                    //
+hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                                 const ptrdiff_t                      end_element,     //
+                                                                 const ptrdiff_t                      nnodes,          //
+                                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                                 const real_t                alpha_th,  // Threshold for alpha
+                                                                 real_t* const SFEM_RESTRICT data);     // Output
 
 /**
  * @struct tet10_vertices
