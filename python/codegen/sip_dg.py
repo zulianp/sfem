@@ -11,6 +11,8 @@ from tet20 import *
 from tet4 import *
 from tri3 import *
 from tri6 import *
+from quad4 import *
+
 
 from sympy import pprint
 
@@ -21,8 +23,8 @@ def simplify(x):
 
 
 class SIPDG:
-    def __init__(self, fe, symbolic_integration=False):
-        self.symbolic_integration = symbolic_integration
+
+    def __init__(self, fe):
         self.fe = fe
         self.tau = sp.symbols("tau")
         self.qw = sp.symbols("qw")
@@ -53,7 +55,7 @@ class SIPDG:
 
         gv = fe.grad(v_qp_sym)
 
-        integrals = {}
+        integrals = []
         for si in range(0, ns):
             side = sides[si]
             coords = fe.select_coords(side)
@@ -67,8 +69,7 @@ class SIPDG:
             if dim == 3:
                 dS = cross(g[:, 0], g[:, 1])
             else:
-                # IMPLEMENT ME
-                assert False
+                dS = perp(g)
 
             norm_dS = norm2(dS)
             v_qp = fe.map_to_side(si, s_qp)
@@ -84,50 +85,96 @@ class SIPDG:
 
             v = side_fe.fun(s_qp)
             for j in range(0, n_side_nodes):
+                s_gv = subsmat(gv[j], v_qp_sym, v_qp)
                 primal_consistency_term[j] = v[j] * inner(dS / 2, guh_sym)
-                adjoint_consistency_term[j] = uh_sym * inner(dS / 2, gv[j])
+                adjoint_consistency_term[j] = uh_sym * inner(dS / 2, s_gv)
                 penalty_term[j] = v[j] * uh_sym * norm_dS * tau
 
-                if self.symbolic_integration:
-                    primal_consistency_term[j] = side_fe.integrate(
-                        s_qp, primal_consistency_term[j]
-                    )
-                    adjoint_consistency_term[j] = side_fe.integrate(
-                        s_qp, adjoint_consistency_term[j]
-                    )
-                    penalty_term[j] = side_fe.integrate(s_qp, penalty_term[j])
-                else:
-                    primal_consistency_term[j] = simplify(
-                        primal_consistency_term[j] * qw
-                    )
-                    adjoint_consistency_term[j] = simplify(
-                        adjoint_consistency_term[j] * qw
-                    )
-                    penalty_term[j] = simplify(penalty_term[j] * qw)
+                primal_consistency_term[j] = simplify(primal_consistency_term[j] * qw)
+
+                adjoint_consistency_term[j] = simplify(adjoint_consistency_term[j] * qw)
+
+                penalty_term[j] = simplify(penalty_term[j] * qw)
+
+            blocks = {}
+            blocks["INTERP"] = assign_value("uh", s_uh)
+            blocks["INTERP"].extend(assign_matrix("guh", s_guh))
 
             # split_ops = True
             split_ops = False
-
-            integrals[f"uh_sym_{si}"] = assign_value("uh", uh)
-            integrals[f"guh_sym_{si}"] = assign_matrix("guh", guh)
-
             if split_ops:
-                integrals[f"primal_consistency_term_{si}"] = assign_matrix(
+                blocks[f"PRIMAL_CONSISTENCY_TERM"] = add_assign_matrix(
                     "element_vector", primal_consistency_term
                 )
-                integrals[f"adjoint_consistency_term_{si}"] = assign_matrix(
+                blocks[f"ADJOINT_CONSISTENCY_TERM"] = add_assign_matrix(
                     "element_vector", adjoint_consistency_term
                 )
-                integrals[f"penalty_term_{si}"] = assign_matrix(
+                blocks[f"PENALTY_TERM"] = add_assign_matrix(
                     "element_vector", penalty_term
                 )
             else:
                 lform = (
                     primal_consistency_term + adjoint_consistency_term + penalty_term
                 )
-                integrals[si] = assign_matrix("element_vector", lform)
+                blocks[f"FORM"] = add_assign_matrix("element_vector", lform)
+
+            integrals.append(blocks)
 
         return integrals
+
+    def apply_code(self):
+        tpl = """
+static void SFEM_INLINE dg_{NAME}_sip_{FACE}(
+    {COORDS}
+    const scalar_t * const SFEM_RESTRICT jacobian_inverse,
+    {QUAD_POINTS}
+    const scalar_t qw,
+    const scalar_t tau,
+    const scalar_t * const SFEM_RESTRICT u,
+    scalar_t * const SFEM_RESTRICT element_vector)
+{{  
+    scalar_t uh;
+    scalar_t guh[{DIM}];
+    {{
+        {INTERP}
+    }}
+
+    {FORM}
+}}
+""" 
+
+        coordnames = ["x", "y", "z"]
+        arg_coords = ""
+            
+        dim = self.fe.spatial_dim()
+        for i in range(0, dim):
+            arg_coords += f"const scalar_t * const SFEM_RESTRICT {coordnames[i]},"
+            if i < dim -1:
+                arg_coords += "\n"
+
+
+        arg_quad_points = ""
+        for i in range(0, dim-1):
+            arg_quad_points += f"const scalar_t q{coordnames[i]},"
+
+            if i < dim - 2:
+                arg_coords += "\n"
+
+        blocks = self.apply()
+        for b in range(0, len(blocks)):
+            block = blocks[b]
+
+            code = tpl.format(
+                NAME=self.fe.name().lower(),
+                COORDS=arg_coords,
+                QUAD_POINTS=arg_quad_points,
+                FACE=b,
+                DIM=dim,
+                INTERP=c_gen(block["INTERP"]),
+                FORM=c_gen(block["FORM"]),
+            )
+
+            print(code)
 
 
 def main():
@@ -139,6 +186,7 @@ def main():
         # "TET10": Tet10(),
         # "TET20": Tet20(),
         "HEX8": Hex8(),
+        "QUAD4": Quad4(),
         # "HEX27": Hex27(),
         # "AAHEX8": AAHex8(),
         # "AAQUAD4": AxisAlignedQuad4()
@@ -147,20 +195,11 @@ def main():
     if len(sys.argv) >= 2:
         fe = fes[sys.argv[1]]
     else:
-        print("Fallback with Hex8")
+        print("// Fallback with Hex8")
         fe = Hex8()
 
-    symbolic_integration = False
-    if len(sys.argv) >= 3:
-        symbolic_integration = int(sys.argv[2])
-
-    op = SIPDG(fe, symbolic_integration)
-
-    for k, v in op.apply().items():
-        print("-----------------------------------")
-        print(f"{k})")
-        c_code(v)
-        print("-----------------------------------")
+    op = SIPDG(fe)
+    op.apply_code()
 
 
 if __name__ == "__main__":

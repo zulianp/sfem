@@ -40,34 +40,37 @@ endif()
 
 set(SFEM_MODULES
     algebra base matrix 
+    algebra/openmp
     mesh 
     mesh/sshex8
-    pizzastack solver
-    algebra/openmp
     operators 
     operators/beam2 
+    operators/boundary_conditions
     operators/cvfem 
+    operators/cvfem_quad4
+    operators/cvfem_tet4
+    operators/cvfem_tri3
+    operators/hex8
+    operators/hex8/dg
+    operators/hierarchical
+    operators/macro_tet4
+    operators/macro_tri3
     operators/navier_stokes
+    operators/quad4
+    operators/quad4/dg
+    operators/quadshell4
+    operators/spectral_hex
+    operators/spectral_hex/dg
+    operators/sshex8
+    operators/ssquad4
+    operators/sstet4
+    operators/stencil
     operators/tet10
     operators/tet4
     operators/tri3
     operators/tri6
     operators/trishell3
-    operators/quadshell4
-    operators/cvfem_tri3
-    operators/cvfem_tet4
-    operators/cvfem_quad4
-    operators/macro_tri3
-    operators/macro_tet4
-    operators/sstet4
-    operators/sshex8
-    operators/spectral_hex
-    operators/spectral_hex/dg
-    operators/hierarchical
-    operators/hex8
-    operators/ssquad4
-    operators/boundary_conditions
-    operators/stencil
+    pizzastack solver
     ssmg
 )
 

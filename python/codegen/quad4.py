@@ -3,6 +3,7 @@
 from fe import FE
 import sympy as sp
 from sfem_codegen import *
+from edge2 import EdgeShell2
 
 
 class Quad4(FE):
@@ -149,6 +150,33 @@ class Quad4(FE):
             "stencil_22": stencil_22,
         }
 
+    def trace_element(self):
+        return EdgeShell2()
+
+    def sides(self):
+        return [[0, 1], [1, 2], [2, 3], [3, 0]]
+
+    def select_coords(self, selection):
+        xy = self.coords()
+        return [
+            [xy[0][j] for j in selection],
+            [xy[1][j] for j in selection]
+        ]
+
+    def map_to_side(self, side_idx, p):
+        x = p[0]
+        match side_idx:
+            case 0:
+                return sp.Matrix(2, 1, [x, 0])
+            case 1:
+                return sp.Matrix(2, 1, [1, x])
+            case 2:
+                return sp.Matrix(2, 1, [-x, 1])
+            case 3:
+                return sp.Matrix(2, 1, [0, -x])
+            case _:
+                assert False
+
     def is_isoparametric(self):
         return self.isoparam
 
@@ -162,7 +190,7 @@ class Quad4(FE):
         return [[x0, x2], [y0, y2]]
 
     def coords(self):
-        return [coeffs("px", 4), coeffs("py", 4), coeffs("pz", 4)]
+        return [coeffs("x", 4), coeffs("y", 4), coeffs("z", 4)]
 
     def name(self):
         return "Quad4"
