@@ -36,10 +36,10 @@
 #include "linear_elasticity.h"
 #include "mass.h"
 #include "neohookean_ogden.h"
+#include "spectral_hex_laplacian.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
 #include "sshex8_stencil_element_matrix_apply.h"
-#include "spectral_hex_laplacian.h"
 
 // Mesh
 #include "adj_table.h"
@@ -1069,14 +1069,43 @@ namespace sfem {
     int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        sfem::create_directory(impl_->output_dir.c_str());
+        auto      mesh       = (mesh_t *)impl_->space->mesh().impl_mesh();
+        const int block_size = impl_->space->block_size();
 
         char path[2048];
-        sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
 
-        if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
-            return SFEM_FAILURE;
+        if (impl_->AoS_to_SoA && block_size > 1) {
+            ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
+
+            auto buff = create_host_buffer<real_t>(n_blocks);
+            auto bb   = buff->data();
+
+            for (int b = 0; b < block_size; b++) {
+                for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                    bb[i] = x[i * block_size + b];
+                }
+
+                char b_name[1024];
+                sprintf(b_name, "%s.%d", name, b);
+                sprintf(path,
+                        impl_->time_dependent_file_format.c_str(),
+                        impl_->output_dir.c_str(),
+                        b_name,
+                        impl_->export_counter++);
+
+                if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                    return SFEM_FAILURE;
+                }
+            }
+
+        } else {
+            sfem::create_directory(impl_->output_dir.c_str());
+
+            sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
+
+            if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
+                return SFEM_FAILURE;
+            }
         }
 
         if (log_is_empty(&impl_->time_logger)) {
