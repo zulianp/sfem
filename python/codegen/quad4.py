@@ -158,10 +158,7 @@ class Quad4(FE):
 
     def select_coords(self, selection):
         xy = self.coords()
-        return [
-            [xy[0][j] for j in selection],
-            [xy[1][j] for j in selection]
-        ]
+        return [[xy[0][j] for j in selection], [xy[1][j] for j in selection]]
 
     def map_to_side(self, side_idx, p):
         x = p[0]
