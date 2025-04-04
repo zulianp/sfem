@@ -13,11 +13,11 @@ i3 = np.array([3], dtype=np.int32)
 
 path = "./mesh"
 
-x.tofile(f'{path}/x.raw')
-y.tofile(f'{path}/y.raw')
-z.tofile(f'{path}/z.raw')
+x.tofile(f"{path}/x.raw")
+y.tofile(f"{path}/y.raw")
+z.tofile(f"{path}/z.raw")
 
-i0.tofile(f'{path}/i0.raw')
-i1.tofile(f'{path}/i1.raw')
-i2.tofile(f'{path}/i2.raw')
-i3.tofile(f'{path}/i3.raw')
+i0.tofile(f"{path}/i0.raw")
+i1.tofile(f"{path}/i1.raw")
+i2.tofile(f"{path}/i2.raw")
+i3.tofile(f"{path}/i3.raw")
