@@ -13,7 +13,6 @@ from tri3 import *
 from tri6 import *
 from quad4 import *
 
-
 from sympy import pprint
 
 
@@ -141,20 +140,19 @@ static void SFEM_INLINE dg_{NAME}_sip_{FACE}(
 
     {FORM}
 }}
-""" 
+"""
 
         coordnames = ["x", "y", "z"]
         arg_coords = ""
-            
+
         dim = self.fe.spatial_dim()
         for i in range(0, dim):
             arg_coords += f"const scalar_t * const SFEM_RESTRICT {coordnames[i]},"
-            if i < dim -1:
+            if i < dim - 1:
                 arg_coords += "\n"
 
-
         arg_quad_points = ""
-        for i in range(0, dim-1):
+        for i in range(0, dim - 1):
             arg_quad_points += f"const scalar_t q{coordnames[i]},"
 
             if i < dim - 2:
