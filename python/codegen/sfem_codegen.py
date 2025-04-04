@@ -23,6 +23,10 @@ def c_log(expr):
 # from sympy.physics.matrices import msigma
 
 
+def perp(e):
+    return sp.Matrix(2, 1, [-e[1], e[0]])
+
+
 def det2(mat):
     return mat[0, 0] * mat[1, 1] - mat[1, 0] * mat[0, 1]
 
@@ -629,4 +633,14 @@ def assign_matrix(name, mat):
         for j in range(0, cols):
             var = sp.symbols(f"{name}[{i*cols + j}]")
             expr.append(ast.Assignment(var, mat[i, j]))
+    return expr
+
+
+def add_assign_matrix(name, mat):
+    rows, cols = mat.shape
+    expr = []
+    for i in range(0, rows):
+        for j in range(0, cols):
+            var = sp.symbols(f"{name}[{i*cols + j}]")
+            expr.append(ast.AddAugmentedAssignment(var, mat[i, j]))
     return expr
