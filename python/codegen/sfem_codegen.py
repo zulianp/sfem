@@ -194,7 +194,9 @@ def c_gen(expr, dump=False, optimizations="basic"):
 
     start = perf_counter()
 
-    print(f"// optimizations={optimizations}")
+    if verbose_gen:
+        print(f"// optimizations={optimizations}")
+
     sub_expr, simpl_expr = sp.cse(expr, optimizations=optimizations)
 
     # sub_ops = sp.count_ops(sub_expr, visual=True)
@@ -613,6 +615,11 @@ def compress_nnz(names, mat):
                 vals.append(mat[i, j])
                 check.add(name)
     return sp.Matrix(len(vals), 1, vals)
+
+
+def assign_value(name, value):
+    var = sp.symbols(f"{name}")
+    return [ast.Assignment(var, value)]
 
 
 def assign_matrix(name, mat):

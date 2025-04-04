@@ -5,305 +5,307 @@ import numpy as np
 import sys
 import os
 import getopt
+
 # import pdb
 
-try: geom_t
-except NameError: 
-    print('exodusII_to_raw: self contained mode')
+try:
+    geom_t
+except NameError:
+    print("exodusII_to_raw: self contained mode")
     geom_t = np.float32
     idx_t = np.int32
     element_idx_t = np.int32
 
+
 def exodusII_to_raw(input_mesh, output_folder):
-	def mkdir(path):
-		if not os.path.exists(path):
-			os.makedirs(path)
-
-	mkdir(output_folder)
-	mkdir(f'{output_folder}/blocks')
-
-	nc = netCDF4.Dataset(input_mesh)
-
-	if 'coord' in nc.variables:
-		coords = nc.variables['coord']
-	else:
-		coords = []
-		if 'coordx' in nc.variables:
-			coordx = nc.variables['coordx']
-			coords.append(coordx)
-		if 'coordy' in nc.variables:
-			coordy = nc.variables['coordy']
-			coords.append(coordy)
-		if 'coordz' in nc.variables:
-			coordz = nc.variables['coordz']
-			coords.append(coordz)
-
-		coords = np.array(coords)
-
-	dims, nnodes = coords.shape
-
-	coordnames = ['x', 'y', 'z', 't' ]
-
-	for i in range(0, dims):
-		x = np.array(coords[i, :]).astype(geom_t)
-		x.tofile(f'{output_folder}/{coordnames[i]}.raw')
-
-	n_time_steps = 1
-	if 'time_whole' in nc.variables:
-		time_whole = nc.variables['time_whole']
-		n_time_steps = time_whole.shape[0]
-		t = np.array(time_whole[:]).astype(np.float32)
-		t.tofile(f'{output_folder}/time_whole.raw')
-
-	print(f'n_time_steps = {n_time_steps}')
-
-	if 'name_nod_var' in nc.variables:
-		name_nod_var = nc.variables['name_nod_var']
-		nvars, __ = name_nod_var.shape
-		print(f'Point data, nvars = {nvars}')
-
-		point_data_dir = f'{output_folder}/point_data'
-		mkdir(point_data_dir)
-
-		nodal_prefix = 'vals_nod_var'
-		for i in range(0, nvars):
-			var_key = f'{nodal_prefix}{i+1}'
-			var = nc.variables[var_key]
-
-			var_name = netCDF4.chartostring(name_nod_var[i, :])
-			print(f' - {var_name}, dtype {var.dtype}')
-
-			var_path_prefix = f'{point_data_dir}/{var_name}'
-
-			if(n_time_steps <= 1):
-				path = f'{var_path_prefix}.raw'
-
-				data =  np.array(var[:])
-				data.tofile(path)
-			else:
-				size_padding = int(np.ceil(np.log10(n_time_steps)))
-
-				format_string = f"%s.%0.{size_padding}d.raw"
-
-				for t in range(0, n_time_steps):
-					data = np.array(var[t,:])
-
-					path = format_string % (var_path_prefix, t)
-					data.tofile(path)
-			
-	def s2n_quad4():
-		return [
-			[0, 1],
-			[1, 2],
-			[2, 3],
-			[3, 0],
-		]
-
-	def s2n_hex8():
-		return [
-			[0, 1, 5, 4],
-			[1, 2, 6, 5],
-			[2, 3, 7, 6],
-			[3, 0, 4, 7],
-			[0, 1, 2, 3],
-			[4, 5, 6, 7],
-		]
-
-	def s2n_tet4():
-		return [
-			[0, 1, 3],
-			[1, 2, 3],
-			[0, 3, 2],
-			[0, 1, 2],
-		]
-
-	def s2n_tri3():
-		return [
-			[0, 1],
-			[1, 2],
-			[2, 0],
-		]
+    def mkdir(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    mkdir(output_folder)
+    mkdir(f"{output_folder}/blocks")
+
+    nc = netCDF4.Dataset(input_mesh)
+
+    if "coord" in nc.variables:
+        coords = nc.variables["coord"]
+    else:
+        coords = []
+        if "coordx" in nc.variables:
+            coordx = nc.variables["coordx"]
+            coords.append(coordx)
+        if "coordy" in nc.variables:
+            coordy = nc.variables["coordy"]
+            coords.append(coordy)
+        if "coordz" in nc.variables:
+            coordz = nc.variables["coordz"]
+            coords.append(coordz)
+
+        coords = np.array(coords)
+
+    dims, nnodes = coords.shape
+
+    coordnames = ["x", "y", "z", "t"]
+
+    for i in range(0, dims):
+        x = np.array(coords[i, :]).astype(geom_t)
+        x.tofile(f"{output_folder}/{coordnames[i]}.raw")
+
+    n_time_steps = 1
+    if "time_whole" in nc.variables:
+        time_whole = nc.variables["time_whole"]
+        n_time_steps = time_whole.shape[0]
+        t = np.array(time_whole[:]).astype(np.float32)
+        t.tofile(f"{output_folder}/time_whole.raw")
+
+    print(f"n_time_steps = {n_time_steps}")
+
+    if "name_nod_var" in nc.variables:
+        name_nod_var = nc.variables["name_nod_var"]
+        nvars, __ = name_nod_var.shape
+        print(f"Point data, nvars = {nvars}")
+
+        point_data_dir = f"{output_folder}/point_data"
+        mkdir(point_data_dir)
+
+        nodal_prefix = "vals_nod_var"
+        for i in range(0, nvars):
+            var_key = f"{nodal_prefix}{i+1}"
+            var = nc.variables[var_key]
+
+            var_name = netCDF4.chartostring(name_nod_var[i, :])
+            print(f" - {var_name}, dtype {var.dtype}")
+
+            var_path_prefix = f"{point_data_dir}/{var_name}"
+
+            if n_time_steps <= 1:
+                path = f"{var_path_prefix}.raw"
+
+                data = np.array(var[:])
+                data.tofile(path)
+            else:
+                size_padding = int(np.ceil(np.log10(n_time_steps)))
+
+                format_string = f"%s.%0.{size_padding}d.raw"
+
+                for t in range(0, n_time_steps):
+                    data = np.array(var[t, :])
+
+                    path = format_string % (var_path_prefix, t)
+                    data.tofile(path)
+
+    def s2n_quad4():
+        return [
+            [0, 1],
+            [1, 2],
+            [2, 3],
+            [3, 0],
+        ]
+
+    def s2n_hex8():
+        return [
+            [0, 1, 5, 4],
+            [1, 2, 6, 5],
+            [2, 3, 7, 6],
+            [3, 0, 4, 7],
+            [0, 1, 2, 3],
+            [4, 5, 6, 7],
+        ]
+
+    def s2n_tet4():
+        return [
+            [0, 1, 3],
+            [1, 2, 3],
+            [0, 3, 2],
+            [0, 1, 2],
+        ]
+
+    def s2n_tri3():
+        return [
+            [0, 1],
+            [1, 2],
+            [2, 0],
+        ]
+
+    ss_to_nodelist = {}
+    ss_to_nodelist["QUAD4"] = s2n_quad4()
+    ss_to_nodelist["HEX8"] = s2n_hex8()
+    ss_to_nodelist["TET4"] = s2n_tet4()
+    ss_to_nodelist["TETRA"] = s2n_tet4()
+    ss_to_nodelist["tetra"] = s2n_tet4()
+    ss_to_nodelist["tetra4"] = s2n_tet4()
+    ss_to_nodelist["TRI3"] = s2n_tri3()
+
+    #########################################
+    # Elements
+    #########################################
 
-	ss_to_nodelist = {}
-	ss_to_nodelist['QUAD4'] = s2n_quad4()
-	ss_to_nodelist['HEX8'] = s2n_hex8()
-	ss_to_nodelist['TET4'] = s2n_tet4()
-	ss_to_nodelist['TETRA'] = s2n_tet4()
-	ss_to_nodelist['tetra'] = s2n_tet4()
-	ss_to_nodelist['tetra4'] = s2n_tet4()
-	ss_to_nodelist['TRI3'] = s2n_tri3()
+    num_elem = nc.dimensions["num_elem"].size
+    print(f"num_elem = {num_elem}")
 
-	#########################################
-	# Elements
-	#########################################
+    num_el_blk = nc.dimensions["num_el_blk"].size
+    print(f"num_el_blk = {num_el_blk}")
 
+    if num_el_blk == 1:
+        connect = nc.variables["connect1"]
+        elem_type = connect.elem_type
+        print(f"elem_type = {elem_type}")
 
-	num_elem = nc.dimensions['num_elem'].size
-	print(f'num_elem = {num_elem}')
+        nelements, nnodesxelem = connect.shape
 
-	num_el_blk = nc.dimensions['num_el_blk'].size
-	print(f'num_el_blk = {num_el_blk}')
+        for i in range(0, nnodesxelem):
+            ii = np.array(connect[:, i]).astype(idx_t) - 1
+            ii.tofile(f"{output_folder}/i{i}.raw")
 
-	if num_el_blk == 1:
-		connect = nc.variables['connect1']
-		elem_type = connect.elem_type
-		print(f'elem_type = {elem_type}')
+    else:
+        num_nod_per_el_ref = 0
+        for b in range(0, num_el_blk):
+            var_name = f"num_nod_per_el{b+1}"
+            num_nod_per_el = nc.dimensions[var_name].size
+            print(f"{var_name} = {num_nod_per_el}")
 
-		nelements, nnodesxelem = connect.shape
+            if num_nod_per_el_ref == 0:
+                num_nod_per_el_ref = num_nod_per_el
+            else:
+                assert num_nod_per_el_ref == num_nod_per_el
 
-		for i in range(0, nnodesxelem):
-			ii = np.array(connect[:,i]).astype(idx_t) - 1
-			ii.tofile(f'{output_folder}/i{i}.raw')
+        connect = np.zeros((num_elem, num_nod_per_el_ref), dtype=idx_t)
 
-	else:
-		num_nod_per_el_ref = 0
-		for b in range(0, num_el_blk):
-			var_name = f'num_nod_per_el{b+1}'
-			num_nod_per_el = nc.dimensions[var_name].size
-			print(f'{var_name} = {num_nod_per_el}')
+        offset = 0
+        for b in range(0, num_el_blk):
+            connect_b = nc.variables[f"connect{b+1}"]
+            elem_type = connect_b.elem_type
+            print(f"elem_type = {elem_type}")
 
-			if num_nod_per_el_ref == 0:
-				num_nod_per_el_ref = num_nod_per_el
-			else:
-				assert num_nod_per_el_ref == num_nod_per_el
+            name = None
 
-		connect = np.zeros((num_elem, num_nod_per_el_ref), dtype=idx_t)
+            try:
+                eb_prop_b = nc.variables[f"eb_prop{b+2}"]
+                if eb_prop_b != None:
+                    name = eb_prop_b.__dict__["name"]
+                    name = name.lower()
+            except:
+                eb_prop_b = None
 
-		offset = 0
-		for b in range(0, num_el_blk):
-			connect_b = nc.variables[f'connect{b+1}']
-			elem_type = connect_b.elem_type
-			print(f'elem_type = {elem_type}')
+            # if name != None:
+            # if name in exclude:
+            # 	print(f'Skipping block: {name}')
+            # 	continue
+            # print(f'name = {name}')
 
-			name = None
+            nelements, nnodesxelem = connect_b.shape
 
-			try:
-				eb_prop_b = nc.variables[f'eb_prop{b+2}']
-				if eb_prop_b != None:
-					name = eb_prop_b.__dict__['name']
-					name = name.lower()
-			except:
-				eb_prop_b = None
+            block_begin = offset
+            block_end = offset + nelements
 
-			# if name != None:
-				# if name in exclude:
-				# 	print(f'Skipping block: {name}')
-				# 	continue
-				# print(f'name = {name}')
+            if name != None:
+                np.array([block_begin, block_end], dtype=np.int64).tofile(
+                    f"{output_folder}/blocks/{name}.int64.raw"
+                )
 
-			nelements, nnodesxelem = connect_b.shape
+            connect[block_begin:block_end, :] = connect_b[:].astype(idx_t)
+            offset += nelements
 
-			block_begin = offset
-			block_end = (offset + nelements)
+        for i in range(0, nnodesxelem):
+            ii = np.array(connect[:, i]).astype(idx_t) - 1
+            ii.tofile(f"{output_folder}/i{i}.raw")
 
-			if name != None:
-				np.array([block_begin, block_end], dtype=np.int64).tofile(f'{output_folder}/blocks/{name}.int64.raw')
+    #########################################
+    # Sidesets
+    #########################################
 
-			connect[block_begin:block_end,:] = connect_b[:].astype(idx_t)
-			offset += nelements
+    num_sidesets = nc.dimensions["num_side_sets"].size
+    print(f"num_sidesets={num_sidesets}")
 
-		for i in range(0, nnodesxelem):
-			ii = np.array(connect[:,i]).astype(idx_t) - 1
-			ii.tofile(f'{output_folder}/i{i}.raw')
+    s2n_map = ss_to_nodelist[elem_type]
+    nnodesxside = len(s2n_map[0])
 
-	#########################################
-	# Sidesets
-	#########################################
+    ss_names = nc.variables["ss_names"]
 
-	num_sidesets = nc.dimensions['num_side_sets'].size
-	print(f'num_sidesets={num_sidesets}')
+    sideset_dir = f"{output_folder}/sidesets"
+    if num_sidesets > 0:
+        mkdir(sideset_dir)
 
-	s2n_map = ss_to_nodelist[elem_type]
-	nnodesxside = len(s2n_map[0])
+    for i in range(0, num_sidesets):
+        ssidx = i + 1
 
-	ss_names = nc.variables['ss_names']
+        name = netCDF4.chartostring(ss_names[i])
 
-	sideset_dir = f'{output_folder}/sidesets'
-	if num_sidesets > 0:
-		mkdir(sideset_dir)
+        if name == "":
+            name = f"sideset{ssidx}"
 
-	for i in range(0, num_sidesets):
-		ssidx = i + 1
+        print(f"sideset = {name}")
 
-		name = netCDF4.chartostring(ss_names[i])
+        key = f"elem_ss{ssidx}"
+        e_ss = nc.variables[key]
 
-		if name == "":
-			name = f"sideset{ssidx}"
+        key = f"side_ss{ssidx}"
+        s_ss = nc.variables[key]
 
-		print(f'sideset = {name}')
+        this_sideset_dir = f"{sideset_dir}/{name}"
+        mkdir(this_sideset_dir)
 
-		key = f'elem_ss{ssidx}'
-		e_ss = nc.variables[key]
+        idx = [None] * nnodesxside
+        for d in range(0, nnodesxside):
+            idx[d] = []
 
-		key = f'side_ss{ssidx}'
-		s_ss = nc.variables[key]
+        parent = np.zeros(len(e_ss[:]), dtype=element_idx_t)
+        local_face_idx = np.zeros(len(e_ss[:]), dtype=np.int16)
 
-		this_sideset_dir = f'{sideset_dir}/{name}'
-		mkdir(this_sideset_dir)
+        for n in range(0, len(e_ss[:])):
+            e = e_ss[n] - 1
+            s = s_ss[n] - 1
 
-		idx = [None] * nnodesxside
-		for d in range(0, nnodesxside):
-			idx[d] = []
+            parent[n] = e
+            local_face_idx[n] = s
 
+            lnodes = s2n_map[s]
 
-		parent = np.zeros(len(e_ss[:]), dtype=element_idx_t)
-		local_face_idx = np.zeros(len(e_ss[:]), dtype=np.int16)
+            for d in range(0, nnodesxside):
+                ln = lnodes[d]
+                node = connect[e, ln] - 1
 
-		for n in range(0, len(e_ss[:])):
-			e = e_ss[n] - 1
-			s = s_ss[n] - 1
+                # if(node == 162):
+                # 	pdb.set_trace()
 
-			parent[n] = e
-			local_face_idx[n] = s
+                idx[d].append(node)
 
-			lnodes = s2n_map[s]
+        local_face_idx.tofile(f"{this_sideset_dir}/lfi.int16.raw")
+        parent.tofile(f"{this_sideset_dir}/parent.{str(element_idx_t.__name__)}.raw")
 
-			for d in range(0, nnodesxside):
-				ln = lnodes[d]
-				node = connect[e, ln] - 1
+        for d in range(0, nnodesxside):
+            path = f"{this_sideset_dir}/{name}.{d}.raw"
+            ii = np.array(idx[d]).astype(idx_t)
+            ii.tofile(path)
 
-				# if(node == 162):
-				# 	pdb.set_trace()
 
-				idx[d].append(node)
+if __name__ == "__main__":
 
-		local_face_idx.tofile(f'{this_sideset_dir}/lfi.int16.raw')
-		parent.tofile(f'{this_sideset_dir}/parent.{str(element_idx_t.__name__)}.raw')
+    usage = f"usage: {sys.argv[0]} <input_mesh> <output_folder>"
 
-		for d in range(0, nnodesxside):
-			path = f'{this_sideset_dir}/{name}.{d}.raw'
-			ii = np.array(idx[d]).astype(idx_t)
-			ii.tofile(path)
+    if len(sys.argv) < 3:
+        print(usage)
+        exit()
 
-if __name__ == '__main__':
+    input_mesh = sys.argv[1]
+    output_folder = sys.argv[2]
 
-	usage = f'usage: {sys.argv[0]} <input_mesh> <output_folder>'
+    try:
+        opts, args = getopt.getopt(sys.argv[3:], "h", ["help"])
 
-	if len(sys.argv) < 3:
-		print(usage)
-		exit()
+    except getopt.GetoptError as err:
+        print(err)
+        print(usage)
+        sys.exit(1)
 
-	input_mesh = sys.argv[1]
-	output_folder = sys.argv[2]
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            print(usage)
+            sys.exit()
+        # elif opt in ("--exclude"):
+        # 	 temp = arg.split(',')
+        # 	 for t in temp:
+        # 	 	exclude.append(t.lower())
+        # 	 print(f'Excluding {exclude}')
 
-	try:
-	    opts, args = getopt.getopt(
-	        sys.argv[3:], "h", ["help"])
-
-	except getopt.GetoptError as err:
-	    print(err)
-	    print(usage)
-	    sys.exit(1)
-
-	for opt, arg in opts:
-	    if opt in ('-h', '--help'):
-	        print(usage)
-	        sys.exit()
-	    # elif opt in ("--exclude"):
-	    # 	 temp = arg.split(',')
-	    # 	 for t in temp:
-	    # 	 	exclude.append(t.lower())
-	    # 	 print(f'Excluding {exclude}')
-
-	exodusII_to_raw(input_mesh, output_folder)
-	
+    exodusII_to_raw(input_mesh, output_folder)
