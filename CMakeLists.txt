@@ -50,6 +50,7 @@ set(SFEM_MODULES
     operators/cvfem_quad4
     operators/cvfem_tet4
     operators/cvfem_tri3
+    operators/edgeshell2
     operators/hex8
     operators/hex8/dg
     operators/hierarchical
@@ -70,7 +71,9 @@ set(SFEM_MODULES
     operators/tri3
     operators/tri6
     operators/trishell3
-    pizzastack solver
+    operators/trishell6
+    pizzastack 
+    solver
     ssmg
 )
 
