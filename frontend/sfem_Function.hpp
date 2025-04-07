@@ -315,6 +315,8 @@ namespace sfem {
         void enable_AoS_to_SoA(const bool val);
         void clear();
 
+        void log_time(const real_t t);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

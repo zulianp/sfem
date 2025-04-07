@@ -118,7 +118,7 @@ int quadshell4_integrate_values(const ptrdiff_t                   nelements,
 
 #pragma omp parallel for
     for (idx_t e = 0; e < nelements; ++e) {
-        scalar_t element_vector[4] = {0};
+        scalar_t element_vector[4] = {0,0,0,0};
 
         const idx_t ev[4] = {elements[0][e], elements[1][e], elements[2][e], elements[3][e]};
 

@@ -24,24 +24,19 @@ int integrate_value(const int                    element_type,
 
     switch (element_type) {
         case BEAM2: {
-            edgeshell2_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
-            break;
+            return edgeshell2_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
         case EDGESHELL2: {
-            edgeshell2_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
-            break;
+            return edgeshell2_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
         case TRISHELL3: {
-            trishell3_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
-            break;
+            return trishell3_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
         case TRISHELL6: {
-            trishell6_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
-            break;
+            return trishell6_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
         case QUADSHELL4: {
-            quadshell4_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
-            break;
+            return quadshell4_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
 
         default: {
@@ -66,24 +61,19 @@ int integrate_values(const int                         element_type,
 
     switch (element_type) {
         case BEAM2: {
-            edgeshell2_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
-            break;
+            return edgeshell2_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
         case EDGESHELL2: {
-            edgeshell2_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
-            break;
+            return edgeshell2_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
         case TRISHELL3: {
-            trishell3_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
-            break;
+            return trishell3_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
         case TRISHELL6: {
-            trishell6_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
-            break;
+            return trishell6_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
         case QUADSHELL4: {
-            quadshell4_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
-            break;
+            return quadshell4_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
 
         default: {
