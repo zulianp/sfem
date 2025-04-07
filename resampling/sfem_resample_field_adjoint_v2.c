@@ -746,8 +746,6 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
     // tet_vertices is automatically freed by the function
 
-    int tet_vertices_size = 0;
-
     if (&tets_out != NULL) {
         free(*tets_out);
         *tets_out = NULL;
@@ -844,7 +842,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
             if (tets_size >= tets_capacity) {
                 tets_capacity += tet_delta_capacity;
                 *tets_out = realloc(*tets_out, sizeof(struct tet_vertices) * tets_capacity);
-                if (tets_ref == NULL) {
+                if (tets_out == NULL) {
                     fprintf(stderr, "ERROR: realloc failed\n");
                     exit(1);
                 }
@@ -915,6 +913,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
     //////////////////////////////////////////////
 
+    sfem_stack_clear(stack);
     sfem_stack_destroy(stack);
     stack = NULL;
 

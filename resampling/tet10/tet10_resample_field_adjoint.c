@@ -3,6 +3,7 @@
 #include "tet10_resample_field_V2.h"
 
 #include "quadratures_rule.h"
+#include "sfem_stack.h"
 #include "tet10_weno.h"
 
 #include "sfem_base.h"
@@ -82,7 +83,7 @@ tet10_uniform_refinement(const real_t* const          x,        //
         rTets[ni].w[9] = 0.5 * (rTets[ni].w[2] + rTets[ni].w[3]);
     }
 
-    return 0;
+    return 8;
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -590,6 +591,167 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
 }
 
 ///////////////////////////////////////////////////////////////////////
+// tet10_iterative_refinement
+///////////////////////////////////////////////////////////////////////
+int                                                                              //
+tet10_iterative_refinement(const real_t* const           x,                      //
+                           const real_t* const           y,                      //
+                           const real_t* const           z,                      //
+                           const real_t* const           w,                      //
+                           const real_t                  dx,                     //
+                           const real_t                  dy,                     //
+                           const real_t                  dz,                     //
+                           const real_t                  alpha_th,               //
+                           const real_t                  degenerated_tet_ratio,  //
+                           const int                     max_refined_tets,       // Maximum number of iterations
+                           struct tet10_vertices** const rTets_out) {            //
+
+    size_t       tets_capacity      = 8;
+    const size_t tet_delta_capacity = 8;
+
+    if (*rTets_out != NULL) {
+        free(*rTets_out);
+        *rTets_out = NULL;
+    }
+
+    *rTets_out = malloc(sizeof(struct tet10_vertices) * tets_capacity);
+
+    int tets_size                  = 0;
+    int flag_loop                  = 1;
+    int n_tet                      = 0;
+    int total_refined_tets         = 0;
+    int degenerated_tetrahedra_cnt = 0;
+    int refinements_cnt            = 0;
+
+    struct sfem_stack* stack = sfem_stack_create(100);
+
+    struct tet10_vertices* first_tet10 = malloc(sizeof(struct tet10_vertices));
+    struct tet10_vertices  rTets[8];
+
+    for (int i = 0; i < 10; i++) {
+        first_tet10->x[i] = x[i];
+        first_tet10->y[i] = y[i];
+        first_tet10->z[i] = z[i];
+        first_tet10->w[i] = w[i];
+    }
+
+    sfem_stack_push(stack, first_tet10);
+
+    while (flag_loop == 1 && sfem_stack_size(stack) > 0) {
+        struct tet10_vertices* tet10_head = sfem_stack_pop(stack);
+
+        if (tet10_head == NULL) {
+            fprintf(stderr, "tet10_iterative_refinement: tet10_head == NULL\n");
+            exit(1);
+            return -1;
+        }
+
+        real_type edges_length[6];
+
+        int vertex_a = -1;
+        int vertex_b = -1;
+
+        const real_type max_edges_length =             //
+                tet_edge_max_length(tet10_head->x[0],  //
+                                    tet10_head->y[0],  //
+                                    tet10_head->z[0],  //
+                                    tet10_head->x[1],  //
+                                    tet10_head->y[1],  //
+                                    tet10_head->z[1],  //
+                                    tet10_head->x[2],  //
+                                    tet10_head->y[2],  //
+                                    tet10_head->z[2],  //
+                                    tet10_head->x[3],  //
+                                    tet10_head->y[3],  //
+                                    tet10_head->z[3],  //
+                                    &vertex_a,         // Output
+                                    &vertex_b,         // Output
+                                    edges_length);     // Output
+
+        const real_t alpha_tet           = max_edges_length / dx;
+        const real_t max_min_edges_ratio = ratio_abs_max_min(edges_length, 6);
+
+        int degenerated_tet = 0;
+
+        if (max_min_edges_ratio > degenerated_tet_ratio && alpha_tet > alpha_th) {
+            degenerated_tetrahedra_cnt++;
+            degenerated_tet = 1;
+        }
+
+        if (alpha_tet <= alpha_th) {  // The tetrahedron is not refined
+
+            if (tets_size >= tets_capacity) {
+                tets_capacity += tet_delta_capacity;
+                *rTets_out = realloc(*rTets_out, sizeof(struct tet10_vertices) * tets_capacity);
+                if (*rTets_out == NULL) {
+                    fprintf(stderr, "ERROR: realloc failed\n");
+                    exit(1);
+                }
+            }
+
+            // (*rTets_out)[tets_size] = *tet10_head;
+            memcpy(&(*rTets_out)[tets_size], tet10_head, sizeof(struct tet10_vertices));
+            tets_size++;
+
+            if (tets_size >= max_refined_tets) {
+                flag_loop = 0;
+            }
+
+        } else if (degenerated_tet == 1) {
+            const int nt = tet10_refine_two_edge_vertex(tet10_head->x,  //
+                                                        tet10_head->y,  //
+                                                        tet10_head->z,  //
+                                                        tet10_head->w,  //
+                                                        vertex_a,       //
+                                                        vertex_b,       //
+                                                        rTets);         //
+
+            if (nt != 2) {
+                fprintf(stderr, "tet10_refine_two_edge_vertex: %d != 2, %s:%d\n", nt, __FILE__, __LINE__);
+                exit(1);
+                return -1;
+            }
+
+            n_tet = 2;
+            refinements_cnt++;
+
+            for (int ni = 0; ni < n_tet; ni++) {
+                struct tet10_vertices* tet10_new = malloc(sizeof(struct tet10_vertices));
+                memcpy(tet10_new, &rTets[ni], sizeof(struct tet10_vertices));
+                sfem_stack_push(stack, tet10_new);
+            }
+
+        } else {
+            tet10_uniform_refinement(tet10_head->x,  //
+                                     tet10_head->y,  //
+                                     tet10_head->z,  //
+                                     tet10_head->w,  //
+                                     rTets);         //
+            n_tet = 8;
+            refinements_cnt++;
+
+            for (int ni = 0; ni < n_tet; ni++) {
+                struct tet10_vertices* tet10_new = malloc(sizeof(struct tet10_vertices));
+                memcpy(tet10_new, &rTets[ni], sizeof(struct tet10_vertices));
+                sfem_stack_push(stack, tet10_new);
+            }
+        }  // end if
+
+        free(tet10_head);
+        tet10_head = NULL;
+    }  // end while
+
+    /////////////////////////////////////////////////////
+    // end and return
+
+    sfem_stack_clear(stack);
+    sfem_stack_destroy(stack);
+    stack = NULL;
+
+    return tets_size;
+}
+
+///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint
 ///////////////////////////////////////////////////////////////////////
 int                                                                                                                    //
@@ -622,11 +784,9 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
 
     const real_t hexahedron_volume = dx * dy * dz;
 
-    struct tet10_vertices* rTets = NULL;
-
-    real_t alpha_max       = 0.0;
-    real_t alpha_mim       = 1e9;
-    int    refinements_cnt = 0;
+    // real_t alpha_max       = 0.0;
+    // real_t alpha_mim       = 1e9;
+    // int    refinements_cnt = 0;
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         idx_t ev[10];
@@ -664,7 +824,38 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
                                      weighted_field[ev[9]]};
 
         // generate iterative refinement
+        struct tet10_vertices* rTets_out = NULL;
+
+        const int ref_tet10_cnt = tet10_iterative_refinement(x,                      //
+                                                             y,                      //
+                                                             z,                      //
+                                                             wf_tet10,               //
+                                                             dx,                     //
+                                                             dy,                     //
+                                                             dz,                     //
+                                                             alpha_th,               //
+                                                             degenerated_tet_ratio,  //
+                                                             20,                     //
+                                                             &rTets_out);            //
 
         // perform the adjoint on the refined mesh
-    }
+
+        for (int ir = 0; ir < ref_tet10_cnt; ir++) {
+            hex8_to_isoparametric_tet10_resample_tet_adjoint(rTets_out[ir].x,  //
+                                                             rTets_out[ir].y,  //
+                                                             rTets_out[ir].z,  //
+                                                             rTets_out[ir].w,  //
+                                                             stride,           //
+                                                             origin,           //
+                                                             delta,            //
+                                                             data);            //
+
+        }  // end for over refined tets
+           //
+        free(rTets_out);
+        rTets_out = NULL;
+
+    }  // end for over elements
+
+    return 0;
 }
