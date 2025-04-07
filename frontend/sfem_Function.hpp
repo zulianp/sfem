@@ -24,7 +24,6 @@
 
 namespace sfem {
 
-
     class Sideset final {
     public:
         int                                    read(MPI_Comm comm, const char *path);
@@ -172,7 +171,19 @@ namespace sfem {
 
     class NeumannConditions final : public Op {
     public:
+        struct Condition {
+            enum ElemType                    element_type { INVALID };
+            std::shared_ptr<Sideset>         sideset;  /// Maybe undefined in certain cases
+            std::shared_ptr<Buffer<idx_t *>> surface;
+            std::shared_ptr<Buffer<real_t>>  values;
+            real_t                           value{0};
+            int                              component{0};
+        };
+
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
+
+        static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
+                                                         const std::vector<struct Condition>  &conditions);
 
         const char *name() const override;
 
@@ -190,22 +201,9 @@ namespace sfem {
 
         int value(const real_t *x, real_t *const out) override;
 
-        void add_condition(const ptrdiff_t local_size,
-                           const ptrdiff_t global_size,
-                           idx_t *const    idx,
-                           const int       component,
-                           real_t *const   values);
-
-        void add_condition(const ptrdiff_t local_size,
-                           const ptrdiff_t global_size,
-                           idx_t *const    idx,
-                           const int       component,
-                           const real_t    value);
-
         inline bool is_linear() const override { return true; }
 
         int   n_conditions() const;
-        void *impl_conditions();
 
     private:
         class Impl;
