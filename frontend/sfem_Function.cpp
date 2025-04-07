@@ -424,6 +424,8 @@ namespace sfem {
             }
         }
 
+        auto st = shell_type(side_type(space->element_type()));
+
         printf("conds = %d, splitter=%c\n", count, splitter[0]);
 
         // NODESET/SIDESET
@@ -441,8 +443,7 @@ namespace sfem {
                     pattern += "/i*.raw";
                     std::vector<std::string> paths = find_files(pattern);
 
-                    auto st   = side_type(space->element_type());
-                    int  nnxs = elem_num_nodes(st);
+                    int nnxs = elem_num_nodes(st);
                     if (int(paths.size()) != nnxs) {
                         SFEM_ERROR("Incorrect number of sides!");
                     }
@@ -471,13 +472,13 @@ namespace sfem {
                         }
                     }
 
-                    cneumann_conditions.surface = manage_host_buffer(nnxs, nse, surface);
+                    cneumann_conditions.element_type = st;
+                    cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
                     auto sideset                = Sideset::create_from_file(comm, pch);
                     cneumann_conditions.sideset = sideset;
-                    auto st                     = side_type(space->element_type());
-                    int  nnxs                   = elem_num_nodes(st);
+                    int nnxs                    = elem_num_nodes(st);
 
                     auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
 
@@ -491,7 +492,8 @@ namespace sfem {
                         SFEM_ERROR("FAILED TO EXTRACT SIDES!");
                     }
 
-                    cneumann_conditions.surface = surface;
+                    cneumann_conditions.element_type = st;
+                    cneumann_conditions.surface      = surface;
                 }
 
                 conds.push_back(cneumann_conditions);
@@ -575,9 +577,9 @@ namespace sfem {
         for (auto &c : impl_->conditions) {
             if (c.values) {
                 err |= integrate_values(c.element_type,
-                                        mesh->n_elements(),
+                                        c.surface->extent(1),
                                         mesh->n_nodes(),
-                                        mesh->elements()->data(),
+                                        c.surface->data(),
                                         mesh->points()->data(),
                                         // Use negative sign since we are on LHS
                                         -c.value,
@@ -587,9 +589,9 @@ namespace sfem {
                                         out);
             } else {
                 err |= integrate_value(c.element_type,
-                                       mesh->n_elements(),
+                                       c.surface->extent(1),
                                        mesh->n_nodes(),
-                                       mesh->elements()->data(),
+                                       c.surface->data(),
                                        mesh->points()->data(),
                                        // Use negative sign since we are on LHS
                                        -c.value,
@@ -619,7 +621,7 @@ namespace sfem {
 
         for (auto &c : nc->impl_->conditions) {
             if (!c.surface) {
-                auto st   = side_type(space->element_type());
+                auto st   = shell_type(side_type(space->element_type()));
                 int  nnxs = elem_num_nodes(st);
 
                 auto surface = sfem::create_host_buffer<idx_t>(nnxs, c.sideset->parent()->size());
@@ -633,7 +635,8 @@ namespace sfem {
                     SFEM_ERROR("Unable to create surface from sideset!");
                 }
 
-                c.surface = surface;
+                c.surface      = surface;
+                c.element_type = st;
             }
         }
 
@@ -1196,6 +1199,17 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    void Output::log_time(const real_t t)
+    {
+        if (log_is_empty(&impl_->time_logger)) {
+            char path[2048];
+            sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
+            log_create_file(&impl_->time_logger, path, "w");
+        }
+
+        log_write_double(&impl_->time_logger, t);
+    }
+
     int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
@@ -1238,12 +1252,6 @@ namespace sfem {
             }
         }
 
-        if (log_is_empty(&impl_->time_logger)) {
-            sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
-            log_create_file(&impl_->time_logger, path, "w");
-        }
-
-        log_write_double(&impl_->time_logger, t);
         return SFEM_SUCCESS;
     }
 
