@@ -5,7 +5,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
-int test_explicit_euler() {
+std::shared_ptr<sfem::Function> create_elasticity_function() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -16,16 +16,14 @@ int test_explicit_euler() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    auto blas = sfem::blas<real_t>(es);
-
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(comm,
                                           // Grid
-                                          10,
-                                          10,
-                                          10,
+                                          8,
+                                          4,
+                                          4,
                                           // Geometry
                                           0.,
                                           0.,
@@ -50,6 +48,8 @@ int test_explicit_euler() {
     // sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
     // sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0, .component = 2};
 
+    // sfem::NeumannConditions
+
     sfem::DirichletConditions::Condition right0{.sideset = right_sideset, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 0};
@@ -60,45 +60,68 @@ int test_explicit_euler() {
     auto linear_elasticity = sfem::create_op(fs, "LinearElasticity", es);
     linear_elasticity->initialize();
     f->add_operator(linear_elasticity);
+    return f;
+}
 
-    auto displacement = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto g = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    
-    real_t dt = 0.001;
-    real_t T = 5;
-    size_t export_freq = 20;
+std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
+    auto fs = f->space();
+    auto es = f->execution_space();
+
+    auto blas = sfem::blas<real_t>(es);
 
     auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto mass        = sfem::create_op(fs, "LumpedMass", es);
+    auto mass            = sfem::create_op(fs, "LumpedMass", es);
     mass->initialize();
     mass->hessian_diag(nullptr, inv_mass_vector->data());
     f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
     blas->reciprocal(inv_mass_vector->size(), 1, inv_mass_vector->data());
+    return inv_mass_vector;
+}
 
-    size_t steps = 0;
-    real_t t = 0;
+std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+    auto fs = f->space();
 
-    std::string output_dir = "explicit_euler";
     sfem::create_directory(output_dir.c_str());
     auto output = f->output();
     output->enable_AoS_to_SoA(fs->block_size() > 1);
     output->set_output_dir(output_dir.c_str());
 
-    SFEM_TEST_ASSERT(m->write(output_dir.c_str()) == SFEM_SUCCESS);
-    
+    fs->mesh_ptr()->write(output_dir.c_str());
+    return output;
+}
+
+int test_explicit_euler() {
+    auto f               = create_elasticity_function();
+    auto inv_mass_vector = create_inverse_mass_vector(f);
+    auto output          = create_output(f, "explicit_euler");
+
+    auto fs = f->space();
+    auto m  = fs->mesh_ptr();
+    auto es = f->execution_space();
+
+    auto blas = sfem::blas<real_t>(es);
+
+    auto displacement = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+    real_t dt          = 0.001;
+    real_t T           = 5;
+    size_t export_freq = 20;
+    size_t steps       = 0;
+    real_t t           = 0;
+
     output->write_time_step("disp", t, displacement->data());
-    
 
-    while(t < T) {
-    	f->gradient(displacement->data(), g->data());
+    while (t < T) {
+        f->gradient(displacement->data(), g->data());
         blas->scal(g->size(), -dt, g->data());
-    	blas->xypaz(g->size(), g->data(), inv_mass_vector->data(), 1, displacement->data());
+        blas->xypaz(g->size(), g->data(), inv_mass_vector->data(), 1, displacement->data());
 
-    	t += dt;
-    	if(++steps % export_freq == 0) {
-    		// Write to disk
-    		output->write_time_step("disp", t, displacement->data());
-    	}
+        t += dt;
+        if (++steps % export_freq == 0) {
+            // Write to disk
+            output->write_time_step("disp", t, displacement->data());
+        }
     }
 
     return SFEM_TEST_SUCCESS;
@@ -115,4 +138,3 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-
