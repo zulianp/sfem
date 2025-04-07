@@ -31,6 +31,13 @@ sfem_stack_destroy(sfem_stack_t* stack) {  //
     }
 }
 
+void                                     //
+sfem_stack_clear(sfem_stack_t* stack) {  //
+    while (sfem_stack_size(stack) > 0) {
+        free(sfem_stack_pop(stack));
+    }
+}
+
 void*                                 //
 sfem_stack_push(sfem_stack_t* stack,  //
                 void*         item) {         //

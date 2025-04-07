@@ -1448,18 +1448,23 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 
     const real_t alpha_th = 2.0;
 
-    hex8_to_isoparametric_tet10_resample_field_refine_adjoint(0,                //
-                                                              mesh->nelements,  //
-                                                              mesh->nnodes,     //
-                                                              mesh->elements,   //
-                                                              mesh->points,     //
-                                                              n,                //
-                                                              stride,           //
-                                                              origin,           //
-                                                              delta,            //
-                                                              weighted_field,   //
-                                                              alpha_th,         //
-                                                              data);            //
+    hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(  //
+
+            // hex8_to_isoparametric_tet10_resample_field_refine_adjoint(
+            // //
+
+            0,                //
+            mesh->nelements,  //
+            mesh->nnodes,     //
+            mesh->elements,   //
+            mesh->points,     //
+            n,                //
+            stride,           //
+            origin,           //
+            delta,            //
+            weighted_field,   //
+            alpha_th,         //
+            data);            //
 
     const real_t    volume_hex = delta[0] * delta[1] * delta[2];
     const ptrdiff_t data_size  = n[0] * n[1] * n[2];

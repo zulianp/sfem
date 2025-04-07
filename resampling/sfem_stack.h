@@ -44,6 +44,14 @@ size_t sfem_stack_size(sfem_stack_t* stack);
 void sfem_stack_destroy(sfem_stack_t* stack);
 
 /**
+ * @brief Clears the stack, freeing all allocated memory 
+ * by the stack but not the items in the stack.
+ * 
+ * @param stack 
+ */
+void sfem_stack_clear(sfem_stack_t* stack);
+
+/**
  * @brief Pushes an item onto the stack
  *
  * If the stack is full, its capacity will be increased by delta_capacity.
