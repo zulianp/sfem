@@ -31,12 +31,12 @@ void boundary_condition_create(boundary_condition_t *const bc,
                                const real_t value,
                                real_t *const values);
 
-void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
-                                           geom_t **const SFEM_RESTRICT points,
-                                           const int n_conditions,
-                                           const boundary_condition_t *const cond,
-                                           const int block_size,
-                                           real_t *g);
+// void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
+//                                            geom_t **const SFEM_RESTRICT points,
+//                                            const int n_conditions,
+//                                            const boundary_condition_t *const cond,
+//                                            const int block_size,
+//                                            real_t *g);
 
 void apply_dirichlet_condition_vec(const int n_conditions,
                                    const boundary_condition_t *const cond,
