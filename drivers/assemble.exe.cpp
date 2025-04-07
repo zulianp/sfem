@@ -4,33 +4,8 @@
 #include <string.h>
 
 #include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
-#include "utils.h"
 
-#include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-
-#include "laplacian.h"
-#include "mass.h"
-
-#include "dirichlet.h"
-#include "neumann.h"
-
-#include "read_mesh.h"
-
-ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
-    MPI_Status status;
-    MPI_Offset nbytes;
-    MPI_File file;
-    MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
-    MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
-    *data = malloc(nbytes);
-
-    MPI_CATCH_ERROR(MPI_File_read_at_all(file, 0, *data, nbytes, MPI_CHAR, &status));
-    return nbytes;
-}
+#include "sfem_API.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -41,224 +16,116 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
+    double tick = MPI_Wtime();
+
     if (size != 1) {
-        fprintf(stderr, "Parallel execution not supported!\n");
-        return EXIT_FAILURE;
+        SFEM_ERROR("Parallel execution not supported!\n");
     }
 
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <folder> [output_folder=./]\n", argv[0]);
-        return EXIT_FAILURE;
+    if (argc != 3) {
+        SFEM_ERROR("usage: %s <folder> <output>\n", argv[0]);
     }
 
-    const char *output_folder = "./";
-    if (argc > 2) {
-        output_folder = argv[2];
-    }
+    const char *output_folder    = argv[2];
+    const char *SFEM_OPERATOR    = "Laplacian";
+    int         SFEM_BLOCK_SIZE  = 1;
+    int         SFEM_EXPORT_FP32 = 0;
 
-    printf("%s %s %s\n", argv[0], argv[1], output_folder);
-
-    int SFEM_LAPLACIAN = 1;
-    int SFEM_HANDLE_DIRICHLET = 1;
-    int SFEM_HANDLE_NEUMANN = 0;
-    int SFEM_HANDLE_RHS = 0;
-    int SFEM_EXPORT_FP32 = 0;
-    int SFEM_USE_MACRO = 0;
-    
-
-    SFEM_READ_ENV(SFEM_LAPLACIAN, atoi);
-    SFEM_READ_ENV(SFEM_HANDLE_DIRICHLET, atoi);
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+    SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
     SFEM_READ_ENV(SFEM_EXPORT_FP32, atoi);
-    SFEM_READ_ENV(SFEM_HANDLE_NEUMANN, atoi);
-    SFEM_READ_ENV(SFEM_HANDLE_RHS, atoi);
-    SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
-
-    printf("----------------------------------------\n");
-    printf(
-        "Environment variables:\n- SFEM_LAPLACIAN=%d\n- SFEM_HANDLE_DIRICHLET=%d\n- "
-        "SFEM_HANDLE_NEUMANN=%d\n- SFEM_HANDLE_RHS=%d\n- SFEM_EXPORT_FP32=%d\n- SFEM_USE_MACRO=%d\n",
-        SFEM_LAPLACIAN,
-        SFEM_HANDLE_DIRICHLET,
-        SFEM_HANDLE_NEUMANN,
-        SFEM_HANDLE_RHS,
-        SFEM_EXPORT_FP32,
-        SFEM_USE_MACRO);
-    printf("----------------------------------------\n");
 
     MPI_Datatype value_type = SFEM_EXPORT_FP32 ? MPI_FLOAT : MPI_DOUBLE;
-
-    double tick = MPI_Wtime();
+    auto         es         = sfem::EXECUTION_SPACE_HOST;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
     const char *folder = argv[1];
+    auto        m      = sfem::Mesh::create_from_file(comm, folder);
+    auto        fs     = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+    auto        f      = sfem::Function::create(fs);
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    f->add_operator(op);
 
-    if(SFEM_USE_MACRO) {
-        mesh.element_type = macro_type_variant((enum ElemType)mesh.element_type);
-    }
+    auto dbc = sfem::DirichletConditions::create_from_env(fs);
+    f->add_constraint(dbc);
 
-    double tack = MPI_Wtime();
-    printf("assemble.c: read\t\t%g seconds\n", tack - tick);
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Build CRS graph
-    ///////////////////////////////////////////////////////////////////////////////
-
-    ptrdiff_t nnz = 0;
-    count_t *rowptr = 0;
-    idx_t *colidx = 0;
-    real_t *values = 0;
-
-    build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
-
-    nnz = rowptr[mesh.nnodes];
-    values = (real_t *)malloc(nnz * sizeof(real_t));
-    memset(values, 0, nnz * sizeof(real_t));
-
-    double tock = MPI_Wtime();
-    printf("assemble.c: build crs\t\t%g seconds\n", tock - tack);
-    tack = tock;
+    auto nbc = sfem::NeumannConditions::create_from_env(fs);
+    f->add_operator(nbc);
 
     ///////////////////////////////////////////////////////////////////////////////
-    // Operator assembly
-    ///////////////////////////////////////////////////////////////////////////////
-    if (SFEM_LAPLACIAN) {
-        laplacian_crs(mesh.element_type,
-                                   mesh.nelements,
-                                   mesh.nnodes,
-                                   mesh.elements,
-                                   mesh.points,
-                                   rowptr,
-                                   colidx,
-                                   values);
-    }
-
-    tock = MPI_Wtime();
-    printf("assemble.c: assembly\t\t%g seconds\n", tock - tack);
-    tack = tock;
-
-    ///////////////////////////////////////////////////////////////////////////////
-    // Boundary conditions
+    // Zero solution vector
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t *rhs = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
-    memset(rhs, 0, mesh.nnodes * sizeof(real_t));
+    auto x = sfem::create_buffer<real_t>(m->n_nodes(), es);
 
-    if (SFEM_HANDLE_NEUMANN) {  // Neumann
-        char path[1024 * 10];
-        sprintf(path, "%s/on.raw", folder);
+    ///////////////////////////////////////////////////////////////////////////////
+    // Build CRS matrix
+    ///////////////////////////////////////////////////////////////////////////////
 
-        const char *SFEM_NEUMANN_FACES = 0;
-        SFEM_READ_ENV(SFEM_NEUMANN_FACES, );
+    auto      crs_graph = f->crs_graph();
+    ptrdiff_t nnz       = crs_graph->nnz();
+    auto      values    = sfem::create_buffer<real_t>(nnz, es);
+    f->hessian_crs(x->data(), crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
-        if (SFEM_NEUMANN_FACES) {
-            strcpy(path, SFEM_NEUMANN_FACES);
-            printf("SFEM_NEUMANN_FACES=%s\n", path);
-        }
+    ///////////////////////////////////////////////////////////////////////////////
+    // RHS
+    ///////////////////////////////////////////////////////////////////////////////
 
-        idx_t *faces_neumann = 0;
+    auto rhs = sfem::create_buffer<real_t>(m->n_nodes(), es);
+    f->gradient(x->data(), rhs->data());
 
-        enum ElemType st = side_type(mesh.element_type);
-        int nnodesxface = elem_num_nodes(st);
-        ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
-        idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);
-        assert(nfaces * nnodesxface * sizeof(idx_t) == nfacesxnxe);
+    auto blas = sfem::blas<real_t>(es);
 
-        surface_forcing_function(st, nfaces, faces_neumann, mesh.points, 1.0, rhs);
-        free(faces_neumann);
-    }
-
-    if (SFEM_HANDLE_DIRICHLET) {
-        // Dirichlet
-        char path[1024 * 10];
-        sprintf(path, "%s/zd.raw", folder);
-
-        const char *SFEM_DIRICHLET_NODES = 0;
-        SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
-
-        if (SFEM_DIRICHLET_NODES) {
-            strcpy(path, SFEM_DIRICHLET_NODES);
-            printf("SFEM_DIRICHLET_NODES=%s\n", path);
-        }
-
-        idx_t *dirichlet_nodes = 0;
-        ptrdiff_t nn = read_file(comm, path, (void **)&dirichlet_nodes);
-        assert((nn / sizeof(idx_t)) * sizeof(idx_t) == nn);
-        nn /= sizeof(idx_t);
-
-        constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs);
-        crs_constraint_nodes_to_identity(nn, dirichlet_nodes, 1, rowptr, colidx, values);
-    }
-
-    if (SFEM_HANDLE_RHS) {
-        if (SFEM_EXPORT_FP32) {
-            array_dtof(mesh.nnodes, (const real_t *)rhs, (float *)rhs);
-        }
-
-        {
-            char path[1024 * 10];
-            sprintf(path, "%s/rhs.raw", output_folder);
-            array_write(comm, path, value_type, rhs, mesh.nnodes, mesh.nnodes);
-        }
-    }
-
-    free(rhs);
-
-    tock = MPI_Wtime();
-    printf("assemble.c: boundary\t\t%g seconds\n", tock - tack);
-    tack = tock;
+    // Move to RHS
+    blas->scal(rhs->size(), -1, rhs->data());
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector
     ///////////////////////////////////////////////////////////////////////////////
 
+    sfem::create_directory(output_folder);
+
     if (SFEM_EXPORT_FP32) {
-        array_dtof(nnz, (const real_t *)values, (float *)values);
+        array_dtof(nnz, (const real_t *)values->data(), (float *)values->data());
     }
 
     {
         crs_t crs_out;
-        crs_out.rowptr = (char *)rowptr;
-        crs_out.colidx = (char *)colidx;
-        crs_out.values = (char *)values;
-        crs_out.grows = mesh.nnodes;
-        crs_out.lrows = mesh.nnodes;
-        crs_out.lnnz = nnz;
-        crs_out.gnnz = nnz;
-        crs_out.start = 0;
-        crs_out.rowoffset = 0;
+        crs_out.rowptr      = (char *)crs_graph->rowptr()->data();
+        crs_out.colidx      = (char *)crs_graph->colidx()->data();
+        crs_out.values      = (char *)values->data();
+        crs_out.grows       = m->n_nodes();
+        crs_out.lrows       = m->n_nodes();
+        crs_out.lnnz        = nnz;
+        crs_out.gnnz        = nnz;
+        crs_out.start       = 0;
+        crs_out.rowoffset   = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
         crs_out.colidx_type = SFEM_MPI_IDX_T;
         crs_out.values_type = value_type;
         crs_write_folder(comm, output_folder, &crs_out);
     }
 
-    tock = MPI_Wtime();
-    printf("assemble.c: write\t\t%g seconds\n", tock - tack);
-    tack = tock;
+    {
+        if (SFEM_EXPORT_FP32) {
+            array_dtof(rhs->size(), (const real_t *)rhs->data(), (float *)rhs->data());
+        }
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    ///////////////////////////////////////////////////////////////////////////////
+        {
+            char path[1024 * 10];
+            sprintf(path, "%s/rhs.raw", output_folder);
+            array_write(comm, path, value_type, rhs->data(), rhs->size(), rhs->size());
+        }
+    }
 
-    free(rowptr);
-    free(colidx);
-    free(values);
+    ptrdiff_t nelements = m->n_elements();
+    ptrdiff_t nnodes    = m->n_nodes();
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
-
-    mesh_destroy(&mesh);
-
-    tock = MPI_Wtime();
+    double tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");

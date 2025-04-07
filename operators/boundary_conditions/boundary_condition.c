@@ -48,24 +48,24 @@ void boundary_condition_create(boundary_condition_t *const bc,
     // }
 }
 
-void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
-                                           geom_t **const SFEM_RESTRICT points,
-                                           const int n_conditions,
-                                           const boundary_condition_t *const cond,
-                                           const int block_size,
-                                           real_t *g) {
-    for (int i = 0; i < n_conditions; i++) {
-        surface_forcing_function_vec(side_type(element_type),
-                                     cond[i].local_size,
-                                     cond[i].idx,
-                                     points,
-                                     -  // Use negative sign since we are on LHS
-                                     cond[i].value,
-                                     block_size,
-                                     cond[i].component,
-                                     g);
-    }
-}
+// void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
+//                                            geom_t **const SFEM_RESTRICT points,
+//                                            const int n_conditions,
+//                                            const boundary_condition_t *const cond,
+//                                            const int block_size,
+//                                            real_t *g) {
+//     for (int i = 0; i < n_conditions; i++) {
+//         surface_forcing_function_vec(side_type(element_type),
+//                                      cond[i].local_size,
+//                                      cond[i].idx,
+//                                      points,
+//                                      -  // Use negative sign since we are on LHS
+//                                      cond[i].value,
+//                                      block_size,
+//                                      cond[i].component,
+//                                      g);
+//     }
+// }
 
 void apply_dirichlet_condition_vec(const int n_conditions,
                                    const boundary_condition_t *const cond,
