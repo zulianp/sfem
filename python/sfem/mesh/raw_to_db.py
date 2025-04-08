@@ -18,9 +18,10 @@ hex8_names = ("hexahedron", "hex", "hex8", "HEX8")
 quad4_names = ("quad", "quad4", "QUAD4")
 tri3_names = ("tri", "tri3", "TRI3")
 
-try: geom_t
-except NameError: 
-    print('raw_to_db: self contained mode')
+try:
+    geom_t
+except NameError:
+    print("raw_to_db: self contained mode")
     geom_t = np.float32
     idx_t = np.int32
 
@@ -33,26 +34,35 @@ max_nodes_x_element = 10
 
 def write_transient_data(
     output_path,
-    points, cells, 
-    point_data, point_data_type,
-    cell_data, cell_data_type, n_time_steps, time_whole, time_step_format):
+    points,
+    cells,
+    point_data,
+    point_data_type,
+    cell_data,
+    cell_data_type,
+    n_time_steps,
+    time_whole,
+    time_step_format,
+):
 
     with meshio.xdmf.TimeSeriesWriter(output_path) as writer:
         writer.write_points_cells(points, cells)
 
-        # steps = [None] * n_time_steps 
+        # steps = [None] * n_time_steps
         cell_data_steps = [None] * n_time_steps
 
-        if cell_data: 
-            paths = cell_data.split(',')
-            types = cell_data_type.split(',')
+        if cell_data:
+            paths = cell_data.split(",")
+            types = cell_data_type.split(",")
 
             for p in paths:
                 cell_data_files = glob.glob(p, recursive=False)
                 cell_data_files.sort()
 
-                if(len(cell_data_files) < n_time_steps):
-                    print(f"Invalid sequence length {len(cell_data_files)} for pattern {p}")
+                if len(cell_data_files) < n_time_steps:
+                    print(
+                        f"Invalid sequence length {len(cell_data_files)} for pattern {p}"
+                    )
 
                 for i in range(0, n_time_steps):
                     if not cell_data_steps[i]:
@@ -62,20 +72,28 @@ def write_transient_data(
 
         point_data_steps = [None] * n_time_steps
 
-        if point_data: 
-            paths = point_data.split(',')
-            types = point_data_type.split(',')
+
+
+        if point_data:
+            paths = point_data.split(",")
+            types = point_data_type.split(",")
+
 
             for p in paths:
                 point_data_files = glob.glob(p, recursive=False)
                 point_data_files.sort()
 
-                if(len(point_data_files) < n_time_steps):
-                    print(f"Invalid sequence length {len(point_data_files)} for pattern {p}")
+                if len(point_data_files) < n_time_steps:
+                    print(
+                        f"Invalid sequence length {len(point_data_files)} for pattern {p}"
+                    )
 
                 for i in range(0, n_time_steps):
                     if not point_data_steps[i]:
                         point_data_steps[i] = []
+
+                    if i >= len(point_data_files):
+                        print(f"Trying to acess file that does not exists at index {i}/{n_time_steps}")
 
                     point_data_steps[i].append(point_data_files[i])
 
@@ -83,59 +101,66 @@ def write_transient_data(
             name_to_point_data = {}
             name_to_cell_data = {}
 
-            cds = point_data_steps[t];
+            cds = point_data_steps[t]
 
             has_point_data = False
             has_cell_data = False
-           
+
             if cds:
                 has_point_data = True
                 for cd in cds:
                     data = np.fromfile(cd, dtype=point_data_type)
                     name = os.path.basename(cd)
                     name = os.path.splitext(os.path.splitext(name)[0])[0]
-                    name = name.replace('.', '_')
+                    name = name.replace(".", "_")
                     name_to_point_data[name] = data
 
-                    if(len(data) != len(data)):
+                    if len(data) != len(data):
                         frame = inspect.currentframe()
-                        print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}")
+                        print(
+                            f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}"
+                        )
                         exit(1)
 
-            cds = cell_data_steps[t];
-           
+            cds = cell_data_steps[t]
+
             if cds:
                 has_cell_data = True
                 for cd in cds:
                     data = np.fromfile(cd, dtype=cell_data_type)
                     name = os.path.basename(cd)
                     name = os.path.splitext(os.path.splitext(name)[0])[0]
-                    name = name.replace('.', '_')
+                    name = name.replace(".", "_")
                     name_to_cell_data[name] = data
 
-                    if(len(data) != len(data)):
+                    if len(data) != len(data):
                         frame = inspect.currentframe()
-                        print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}")
+                        print(
+                            f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {len(data)}"
+                        )
                         exit(1)
 
             if has_point_data and not has_cell_data:
                 writer.write_data(time_whole[t], point_data=name_to_point_data)
             elif not has_point_data and has_cell_data:
                 writer.write_data(time_whole[t], cell_data=name_to_cell_data)
-            elif has_point_data and has_cell_data: 
-                writer.write_data(time_whole[t], point_data=name_to_point_data, cell_data=name_to_cell_data)
+            elif has_point_data and has_cell_data:
+                writer.write_data(
+                    time_whole[t],
+                    point_data=name_to_point_data,
+                    cell_data=name_to_cell_data,
+                )
 
-            
 
 def add_fields(field_data, field_data_type, storage, check_len):
-    if field_data: 
-        paths = field_data.split(',')
-        types = field_data_type.split(',')
+    if field_data:
+        paths = field_data.split(",")
+        types = field_data_type.split(",")
 
         n_paths = len(paths)
 
-        if(n_paths != len(types)):
-            if(len(types) == 1):
+        if n_paths != len(types):
+            if len(types) == 1:
                 # One for all is allowed
                 types = [types[0]] * len(paths)
             else:
@@ -153,36 +178,41 @@ def add_fields(field_data, field_data_type, storage, check_len):
                 data = np.fromfile(f, dtype=t)
                 name = os.path.splitext(os.path.basename(f))[0]
 
-                if(len(data) != check_len):
+                if len(data) != check_len:
                     frame = inspect.currentframe()
-                    print(f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {check_len}")
+                    print(
+                        f"Error in {__file__} at line {frame.f_lineno}:\n .... data length is different from number of nodes {len(data)} != {check_len}"
+                    )
 
                     sys.exit(1)
 
-                print(f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}")
+                print(
+                    f"field: {name}, min={np.min(data)}, max={np.max(data)}, sum={np.sum(data)} type={t}"
+                )
                 storage[name] = data
 
-def raw_to_db(argv):
-    usage = f'usage: {argv[0]} <input_folder> <output_mesh>'
 
-    if(len(argv) < 3):
+def raw_to_db(argv):
+    usage = f"usage: {argv[0]} <input_folder> <output_mesh>"
+
+    if len(argv) < 3:
         print(usage)
         sys.exit(1)
 
     raw_mesh_folder = argv[1]
     output_path = argv[2]
     raw_xyz_folder = raw_mesh_folder
-    
-    point_data  = None
+
+    point_data = None
     point_data_type = "float64"
 
-    cell_data  = None
+    cell_data = None
     cell_data_type = "float64"
 
     transient = False
     time_step_format = "%s.%d.%d.raw"
     n_time_steps = 1
-    time_whole=[]
+    time_whole = []
 
     cell_type = None
     verbose = False
@@ -190,8 +220,25 @@ def raw_to_db(argv):
 
     try:
         opts, args = getopt.getopt(
-            argv[3:], "p:d:c:t:hv",
-            ["coords=", "point_data=", "point_data_type=", "cell_type=", "cell_data=", "cell_data_type=", "transient", "time_step_format", "n_time_steps=", "time_whole=", "time_whole_txt=", "help", "verbose", "ssref"])
+            argv[3:],
+            "p:d:c:t:hv",
+            [
+                "coords=",
+                "point_data=",
+                "point_data_type=",
+                "cell_type=",
+                "cell_data=",
+                "cell_data_type=",
+                "transient",
+                "time_step_format",
+                "n_time_steps=",
+                "time_whole=",
+                "time_whole_txt=",
+                "help",
+                "verbose",
+                "ssref",
+            ],
+        )
 
     except getopt.GetoptError as err:
         print(err)
@@ -199,10 +246,10 @@ def raw_to_db(argv):
         sys.exit(1)
 
     for opt, arg in opts:
-        if opt in ('-h', '--help'):
+        if opt in ("-h", "--help"):
             print(usage)
             sys.exit()
-        elif opt in ('-v', '--verbose'):
+        elif opt in ("-v", "--verbose"):
             verbose = True
         elif opt in ("-p", "--point_data"):
             point_data = arg
@@ -238,42 +285,43 @@ def raw_to_db(argv):
         else:
             n_time_steps = len(time_whole)
 
+        print(f"Found {n_time_steps} time steps!")
+
     points = []
-    for pfn in ['x.raw', 'y.raw', 'z.raw']:
-        path = f'{raw_xyz_folder}/{pfn}'
+    for pfn in ["x.raw", "y.raw", "z.raw"]:
+        path = f"{raw_xyz_folder}/{pfn}"
         if os.path.exists(path):
             if verbose:
-                print(f'Reading {path}...')
+                print(f"Reading {path}...")
             x = np.fromfile(path, dtype=geom_t)
             points.append(x)
 
     # Attempt format x0, x1, x2
     if len(points) == 0:
         for d in range(0, 3):
-            path = f'{raw_xyz_folder}/x{d}.raw'
+            path = f"{raw_xyz_folder}/x{d}.raw"
             if os.path.exists(path):
                 if verbose:
-                    print(f'Reading {path}...')
+                    print(f"Reading {path}...")
                 x = np.fromfile(path, dtype=geom_t)
                 points.append(x)
 
-            
     idx = []
     for i in range(0, max_nodes_x_element):
-        path = f'{raw_mesh_folder}/i{i}.raw'
+        path = f"{raw_mesh_folder}/i{i}.raw"
         if os.path.exists(path):
             if verbose:
-                print(f'Reading {path}...')
+                print(f"Reading {path}...")
             ii = np.fromfile(path, dtype=idx_t)
             idx.append(ii)
         else:
-            path = f'{raw_mesh_folder}/i{i}.int32.raw'
+            path = f"{raw_mesh_folder}/i{i}.int32.raw"
             if os.path.exists(path):
                 if verbose:
-                    print(f'Reading {path}...')
+                    print(f"Reading {path}...")
                 ii = np.fromfile(path, dtype=idx_t)
                 idx.append(ii)
-            else:    
+            else:
                 # No more indices to read!
                 break
 
@@ -299,14 +347,14 @@ def raw_to_db(argv):
     #     elif cell_type == "hexahedron"
     #         # Implement me!
     #         assert False
-    
+
     if cell_type == None:
         if len(idx) == 3:
             cell_type = "triangle"
         elif len(idx) == 6:
             cell_type = "triangle6"
         elif len(idx) == 4:
-            if(len(points) == 2):
+            if len(points) == 2:
                 cell_type = "quad"
             else:
                 cell_type = "tetra"
@@ -319,7 +367,7 @@ def raw_to_db(argv):
         elif len(idx) == 1:
             cell_type = "vertex"
 
-    print(f'numnodes = {len(idx)} -> {cell_type}')
+    print(f"numnodes = {len(idx)} -> {cell_type}")
     n_points = len(points[0])
     n_cells = len(idx[0])
 
@@ -328,18 +376,23 @@ def raw_to_db(argv):
         return
 
     points = np.array(points).transpose()
-    cells = [
-        (cell_type, np.array(idx).transpose())
-    ]
+    cells = [(cell_type, np.array(idx).transpose())]
 
     if transient:
         print("Transient mode!")
 
         write_transient_data(
-           output_path,
-           points, cells, 
-           point_data, point_data_type,
-           cell_data, cell_data_type, n_time_steps, time_whole, time_step_format)
+            output_path,
+            points,
+            cells,
+            point_data,
+            point_data_type,
+            cell_data,
+            cell_data_type,
+            n_time_steps,
+            time_whole,
+            time_step_format,
+        )
     else:
         mesh = meshio.Mesh(points, cells)
 
@@ -348,8 +401,8 @@ def raw_to_db(argv):
 
         mesh.write(output_path)
 
+
 # Example usage
 # ./raw_to_db.py raw_db mesh_db.vtk --point_data='raw_db/point_data/*,raw_db/x.raw' --point_data_type='float64,float32'
-if __name__ == '__main__':
+if __name__ == "__main__":
     raw_to_db(sys.argv)
-

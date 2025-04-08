@@ -3,13 +3,9 @@
 from sfem_codegen import *
 
 c = coeffs("fff", 6)
-FFF = sp.Matrix(3, 3, [
-	c[0], c[1], c[2], 
-	c[1], c[3], c[4],
-	c[2], c[4], c[5]
-])
+FFF = sp.Matrix(3, 3, [c[0], c[1], c[2], c[1], c[3], c[4], c[2], c[4], c[5]])
 
-L = sp.symbols('L')
+L = sp.symbols("L")
 
 J = sp.eye(3, 3)
 
@@ -56,44 +52,42 @@ J5 = J5 / L
 
 Js = [J0, J1, J2, J3, J4, J5]
 
+
 def read_file(path):
-	with open(path, 'r') as f:
-	    tpl = f.read()
-	    return tpl
-	assert False
-	return ""
+    with open(path, "r") as f:
+        tpl = f.read()
+        return tpl
+    assert False
+    return ""
+
 
 def assign_fff(name, mat):
-	rows, cols = mat.shape
+    rows, cols = mat.shape
 
-	expr = []
-	idx = 0
-	for i in range(0, rows):
-		for j in range(i, cols):
-			var = sp.symbols(f'{name}[{idx}]')
-			expr.append(ast.Assignment(var, mat[i, j]))
-			idx += 1
-	return expr
+    expr = []
+    idx = 0
+    for i in range(0, rows):
+        for j in range(i, cols):
+            var = sp.symbols(f"{name}[{idx}]")
+            expr.append(ast.Assignment(var, mat[i, j]))
+            idx += 1
+    return expr
+
 
 def fff_code(name, FFF):
-	funs = []
-	tpl = read_file('tpl/macro_sub_jacobian_tpl.c')
-	code = tpl.format(
-		NUM=name,
-		CODE=c_gen(assign_fff("sub_fff", FFF))
-	)
+    funs = []
+    tpl = read_file("tpl/macro_sub_jacobian_tpl.c")
+    code = tpl.format(NUM=name, CODE=c_gen(assign_fff("sub_fff", FFF)))
 
-	return code
+    return code
+
 
 C = 0
 for Ji in Js:
-	detJi = determinant(Ji)
-	Ji_inv = inverse(Ji)
+    detJi = determinant(Ji)
+    Ji_inv = inverse(Ji)
 
-	FFFi = Ji_inv * FFF * Ji_inv.T * detJi
+    FFFi = Ji_inv * FFF * Ji_inv.T * detJi
 
-	print(fff_code(F'{C}', FFFi))
-	C += 1
-
-
-
+    print(fff_code(f"{C}", FFFi))
+    C += 1

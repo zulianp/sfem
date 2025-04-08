@@ -16,11 +16,11 @@ import time
 import sys
 
 import gmsh
+
 # import mapdl_archive
 import numpy as np
+
 # import pyvista as pv
-
-
 
 
 # Define geometric parameters
@@ -46,7 +46,7 @@ AR = 2  # rotor position in mechanical degrees
 # N_TAN_DENSITY = 10
 # Z_SUBDIVIDE = 3
 
-TIMES=1
+TIMES = 1
 
 if len(sys.argv) == 2:
     TIMES = int(sys.argv[1])

@@ -1,12 +1,12 @@
 #ifndef SFEM_API_HPP
 #define SFEM_API_HPP
 
+#include "adj_table.h"
 #include "crs_graph.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_mask.h"
 #include "sfem_mesh.h"
-#include "adj_table.h"
 
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
@@ -258,6 +258,21 @@ namespace sfem {
                                                                    const std::vector<DirichletConditions::Condition> &conditions,
                                                                    const ExecutionSpace                               es) {
         auto conds = sfem::DirichletConditions::create(space, conditions);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            return sfem::to_device(conds);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return conds;
+    }
+
+    static std::shared_ptr<NeumannConditions> create_neumann_conditions(
+            const std::shared_ptr<FunctionSpace>            &space,
+            const std::vector<NeumannConditions::Condition> &conditions,
+            const ExecutionSpace                             es) {
+        auto conds = sfem::NeumannConditions::create(space, conditions);
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -1098,8 +1113,7 @@ namespace sfem {
         return max_node_id;
     }
 
-    static std::shared_ptr<sfem::Sideset> create_skin_sideset(const std::shared_ptr<sfem::Mesh> &mesh)
-    {
+    static std::shared_ptr<sfem::Sideset> create_skin_sideset(const std::shared_ptr<sfem::Mesh> &mesh) {
         ptrdiff_t      n_surf_elements = 0;
         element_idx_t *parent          = 0;
         int16_t       *side_idx        = 0;
@@ -1114,8 +1128,9 @@ namespace sfem {
             SFEM_ERROR("Failed to extract skin!\n");
         }
 
-        auto sideset = std::make_shared<sfem::Sideset>(
-                mesh->comm(), sfem::manage_host_buffer(n_surf_elements, parent), sfem::manage_host_buffer(n_surf_elements, side_idx));
+        auto sideset = std::make_shared<sfem::Sideset>(mesh->comm(),
+                                                       sfem::manage_host_buffer(n_surf_elements, parent),
+                                                       sfem::manage_host_buffer(n_surf_elements, side_idx));
 
         return sideset;
     }

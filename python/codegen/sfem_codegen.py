@@ -6,15 +6,15 @@ import rich
 from time import perf_counter
 
 from rich.syntax import Syntax
+
 console = rich.get_console()
 verbose_gen = False
 
 real_t = "scalar_t"
 
+
 def c_log(expr):
     console.print(expr)
-
-
 
 
 # from sympy.matrices.dense import eye
@@ -22,29 +22,45 @@ def c_log(expr):
 # from sympy.physics.quantum import TensorProduct
 # from sympy.physics.matrices import msigma
 
+
+def perp(e):
+    return sp.Matrix(2, 1, [-e[1], e[0]])
+
+
 def det2(mat):
-    return mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1];
+    return mat[0, 0] * mat[1, 1] - mat[1, 0] * mat[0, 1]
+
 
 def inv2(mat):
     mat_inv = sp.zeros(2, 2)
     det = det2(mat)
 
-    mat_inv[0] = mat[1,1] / det
-    mat_inv[1] = -mat[0,1] / det
-    mat_inv[2] = -mat[1,0] / det
-    mat_inv[3] = mat[0,0] / det
+    mat_inv[0] = mat[1, 1] / det
+    mat_inv[1] = -mat[0, 1] / det
+    mat_inv[2] = -mat[1, 0] / det
+    mat_inv[3] = mat[0, 0] / det
     return mat_inv
+
 
 def adjugate2(mat):
     ret = sp.zeros(2, 2)
-    ret[0] = mat[1,1]
-    ret[1] = -mat[0,1]
-    ret[2] = -mat[1,0]
-    ret[3] = mat[0,0]
+    ret[0] = mat[1, 1]
+    ret[1] = -mat[0, 1]
+    ret[2] = -mat[1, 0]
+    ret[3] = mat[0, 0]
     return ret
 
+
 def det3(mat):
-    return mat[0, 0] * mat[1, 1] * mat[2, 2] + mat[0, 1] * mat[1, 2] * mat[2, 0] + mat[0, 2] * mat[1, 0] * mat[2, 1] - mat[0, 0] * mat[1, 2] * mat[2, 1] - mat[0, 1] * mat[1, 0] * mat[2, 2] - mat[0, 2] * mat[1, 1] * mat[2, 0]
+    return (
+        mat[0, 0] * mat[1, 1] * mat[2, 2]
+        + mat[0, 1] * mat[1, 2] * mat[2, 0]
+        + mat[0, 2] * mat[1, 0] * mat[2, 1]
+        - mat[0, 0] * mat[1, 2] * mat[2, 1]
+        - mat[0, 1] * mat[1, 0] * mat[2, 2]
+        - mat[0, 2] * mat[1, 1] * mat[2, 0]
+    )
+
 
 def determinant(mat):
     rows, cols = mat.shape
@@ -52,6 +68,7 @@ def determinant(mat):
         return det2(mat)
     else:
         return det3(mat)
+
 
 def inv3(mat):
     # Sympy version (same but slower)
@@ -69,20 +86,22 @@ def inv3(mat):
     mat_inv[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]) / det
     return mat_inv
 
+
 def adjugate3(mat):
     # Sympy version (same but slower)
     # return mat.inv()
     ret = sp.zeros(3, 3)
-    ret[0, 0] = (mat[1, 1] * mat[2, 2] - mat[1, 2] * mat[2, 1])
-    ret[0, 1] = (mat[0, 2] * mat[2, 1] - mat[0, 1] * mat[2, 2])
-    ret[0, 2] = (mat[0, 1] * mat[1, 2] - mat[0, 2] * mat[1, 1])
-    ret[1, 0] = (mat[1, 2] * mat[2, 0] - mat[1, 0] * mat[2, 2])
-    ret[1, 1] = (mat[0, 0] * mat[2, 2] - mat[0, 2] * mat[2, 0])
-    ret[1, 2] = (mat[0, 2] * mat[1, 0] - mat[0, 0] * mat[1, 2])
-    ret[2, 0] = (mat[1, 0] * mat[2, 1] - mat[1, 1] * mat[2, 0])
-    ret[2, 1] = (mat[0, 1] * mat[2, 0] - mat[0, 0] * mat[2, 1])
-    ret[2, 2] = (mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0])
+    ret[0, 0] = mat[1, 1] * mat[2, 2] - mat[1, 2] * mat[2, 1]
+    ret[0, 1] = mat[0, 2] * mat[2, 1] - mat[0, 1] * mat[2, 2]
+    ret[0, 2] = mat[0, 1] * mat[1, 2] - mat[0, 2] * mat[1, 1]
+    ret[1, 0] = mat[1, 2] * mat[2, 0] - mat[1, 0] * mat[2, 2]
+    ret[1, 1] = mat[0, 0] * mat[2, 2] - mat[0, 2] * mat[2, 0]
+    ret[1, 2] = mat[0, 2] * mat[1, 0] - mat[0, 0] * mat[1, 2]
+    ret[2, 0] = mat[1, 0] * mat[2, 1] - mat[1, 1] * mat[2, 0]
+    ret[2, 1] = mat[0, 1] * mat[2, 0] - mat[0, 0] * mat[2, 1]
+    ret[2, 2] = mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]
     return ret
+
 
 def inverse(mat):
     rows, cols = mat.shape
@@ -90,6 +109,7 @@ def inverse(mat):
         return inv2(mat)
     else:
         return inv3(mat)
+
 
 def pseudo_inverse(mat):
     rows, cols = mat.shape
@@ -99,12 +119,14 @@ def pseudo_inverse(mat):
     AtA_inv = inverse(AtA)
     return AtA_inv * mat.T
 
+
 def pseudo_determinant(mat):
     rows, cols = mat.shape
     assert cols <= rows
 
     AtA = mat.T * mat
     return sp.sqrt(determinant(AtA))
+
 
 def adjugate(mat):
     rows, cols = mat.shape
@@ -117,17 +139,21 @@ def adjugate(mat):
 import sympy as sy
 import numpy as np
 import sys
+
+
 # Function to count different operation types
 def opcount(expr):
     basic_ops = div_ops = sqrt_ops = 0
-    
+
     def traverse(e):
         nonlocal basic_ops, div_ops, sqrt_ops
-        
+
         if isinstance(e, sy.Pow):
             if e.exp == -1:  # Division is represented as power(-1)
                 div_ops += 1
-            elif isinstance(e.exp, sy.Number) and float(e.exp) == 0.5:  # Square root as power(0.5)
+            elif (
+                isinstance(e.exp, sy.Number) and float(e.exp) == 0.5
+            ):  # Square root as power(0.5)
                 sqrt_ops += 1
             else:
                 basic_ops += 1
@@ -137,12 +163,13 @@ def opcount(expr):
         elif isinstance(e, (sy.Add, sy.Mul)):
             if len(e.args) > 0:
                 basic_ops += len(e.args) - 1  # n operands = n-1 operations
-        
+
         for arg in e.args:
             traverse(arg)
-    
+
     traverse(expr)
     return basic_ops, div_ops, sqrt_ops
+
 
 def flopcount(opcounts):
     return opcounts[0] + 8 * opcounts[1] + 12 * opcounts[2]
@@ -160,68 +187,76 @@ class SFEMCodePrinter(sp.printing.c.C99CodePrinter):
         else:
             return super()._print_Pow(expr)
 
-def c_gen(expr, dump=False, optimizations='basic'):
+
+def c_gen(expr, dump=False, optimizations="basic"):
 
     if verbose_gen:
         console.print("--------------------------")
-        console.print(f'Running cse')
+        console.print(f"Running cse")
 
-    opcounts = np.array([0,0,0])
+    opcounts = np.array([0, 0, 0])
 
     start = perf_counter()
 
-    print(f'// optimizations={optimizations}')
+    if verbose_gen:
+        print(f"// optimizations={optimizations}")
+
     sub_expr, simpl_expr = sp.cse(expr, optimizations=optimizations)
 
     # sub_ops = sp.count_ops(sub_expr, visual=True)
     # result_ops = sp.count_ops(simpl_expr, visual=True)
     # cost = f'FLOATING POINT OPS!\n//\t- Result: {result_ops}\n//\t- Subexpressions: {sub_ops}'
-    
+
     printer = SFEMCodePrinter()
     lines = []
 
-    for var,expr in sub_expr:
-        lines.append(f'const {real_t} {var} = {printer.doprint(expr)};')
+    for var, expr in sub_expr:
+        lines.append(f"const {real_t} {var} = {printer.doprint(expr)};")
         opcounts += opcount(expr)
 
     for v in simpl_expr:
         lines.append(printer.doprint(v))
         opcounts += opcount(v)
 
-    code_string=f'\n'.join(lines)
+    code_string = f"\n".join(lines)
 
     stop = perf_counter()
     if verbose_gen:
-        console.print(f'Elapsed  {stop - start} seconds')
+        console.print(f"Elapsed  {stop - start} seconds")
         console.print("--------------------------")
-        console.print(f'generated code')
+        console.print(f"generated code")
 
     # code_string = f'//{cost}\n' + code_string
     # code_string = f'//TODO COST\n' + code_string
 
     if dump:
         console.print(
-"""
+            """
 // mundane ops: %d divs: %d sqrts: %d 
 // total ops: %d
-""" % (tuple(opcounts) + (flopcount(opcounts),)))
+"""
+            % (tuple(opcounts) + (flopcount(opcounts),))
+        )
 
         console.print(code_string)
 
     return code_string
 
-def c_code(expr, optimizations='basic'):
+
+def c_code(expr, optimizations="basic"):
     code_string = c_gen(expr, True, optimizations=optimizations)
+
 
 def inner(l, r):
     rows, cols = l.shape
-    
+
     ret = 0
     for d1 in range(0, rows):
         for d2 in range(0, cols):
             ret += l[d1, d2] * r[d1, d2]
 
     return ret
+
 
 def dot3(l, r):
     ret = 0
@@ -230,34 +265,34 @@ def dot3(l, r):
 
     return ret
 
+
 def tr(mat):
     rows, cols = mat.shape
-    assert(rows == cols)
+    assert rows == cols
 
     ret = 0
     for d1 in range(0, rows):
         ret += mat[d1, d1]
     return ret
 
+
 def ref_fun(x, y, z):
-    return [
-     1 - x - y - z, 
-     x,
-     y,
-     z
-    ]
+    return [1 - x - y - z, x, y, z]
+
 
 def fun(x, y, z):
     xmb = x - b[0]
     ymb = y - b[1]
     zmb = z - b[2]
 
-    xref = Ainv[0, 0] * xmb + Ainv[0, 1] * ymb  + Ainv[0, 2] * zmb
-    yref = Ainv[1, 0] * xmb + Ainv[1, 1] * ymb  + Ainv[1, 2] * zmb
-    zref = Ainv[2, 0] * xmb + Ainv[2, 1] * ymb  + Ainv[2, 2] * zmb
+    xref = Ainv[0, 0] * xmb + Ainv[0, 1] * ymb + Ainv[0, 2] * zmb
+    yref = Ainv[1, 0] * xmb + Ainv[1, 1] * ymb + Ainv[1, 2] * zmb
+    zref = Ainv[2, 0] * xmb + Ainv[2, 1] * ymb + Ainv[2, 2] * zmb
     return ref_fun(xref, yref, zref)
 
-qx, qy, qz, qw = sp.symbols('qx qy qz qw', real=True)
+
+qx, qy, qz, qw = sp.symbols("qx qy qz qw", real=True)
+
 
 def q_point(dims):
     if dims == 1:
@@ -267,24 +302,25 @@ def q_point(dims):
     elif dims == 3:
         return sp.Matrix(3, 1, [qx, qy, qz])
     else:
-        assert False 
+        assert False
+
 
 # Element coordinates
 # x0, x1, x2, x3 = sp.symbols('x0 x1 x2 x3', real=True)
 # y0, y1, y2, y3 = sp.symbols('y0 y1 y2 y3', real=True)
 # z0, z1, z2, z3 = sp.symbols('z0 z1 z2 z3', real=True)
 
-x0, x1, x2, x3 = sp.symbols('px0 px1 px2 px3', real=True)
-y0, y1, y2, y3 = sp.symbols('py0 py1 py2 py3', real=True)
-z0, z1, z2, z3 = sp.symbols('pz0 pz1 pz2 pz3', real=True)
+x0, x1, x2, x3 = sp.symbols("px0 px1 px2 px3", real=True)
+y0, y1, y2, y3 = sp.symbols("py0 py1 py2 py3", real=True)
+z0, z1, z2, z3 = sp.symbols("pz0 pz1 pz2 pz3", real=True)
 
-x4, x5, x6, x7 = sp.symbols('px4 px5 px6 px7', real=True)
-y4, y5, y6, y7 = sp.symbols('py4 py5 py6 py7', real=True)
-z4, z5, z6, z7 = sp.symbols('pz4 pz5 pz6 pz7', real=True)
+x4, x5, x6, x7 = sp.symbols("px4 px5 px6 px7", real=True)
+y4, y5, y6, y7 = sp.symbols("py4 py5 py6 py7", real=True)
+z4, z5, z6, z7 = sp.symbols("pz4 pz5 pz6 pz7", real=True)
 
-x8, x9, x10, x11 = sp.symbols('px8 px9 px10 px11', real=True)
-y8, y9, y10, y11 = sp.symbols('py8 py9 py10 py11', real=True)
-z8, z9, z10, z11 = sp.symbols('pz8 pz9 pz10 pz11', real=True)
+x8, x9, x10, x11 = sp.symbols("px8 px9 px10 px11", real=True)
+y8, y9, y10, y11 = sp.symbols("py8 py9 py10 py11", real=True)
+z8, z9, z10, z11 = sp.symbols("pz8 pz9 pz10 pz11", real=True)
 
 px = [x0, x1, x2, x3]
 py = [y0, y1, y2, y3]
@@ -296,15 +332,26 @@ element_points = [px, py, pz]
 q = sp.Matrix(3, 1, [qx, qy, qz])
 
 # Affine transformation
-A = sp.Matrix(3, 3, [
-     x1 - x0, x2 - x0, x3 - x0,
-     y1 - y0, y2 - y0, y3 - y0,
-     z1 - z0, z2 - z0, z3 - z0,
-    ])
+A = sp.Matrix(
+    3,
+    3,
+    [
+        x1 - x0,
+        x2 - x0,
+        x3 - x0,
+        y1 - y0,
+        y2 - y0,
+        y3 - y0,
+        z1 - z0,
+        z2 - z0,
+        z3 - z0,
+    ],
+)
 
 Ainv = inv3(A)
 
 b = sp.Matrix(3, 1, [x0, y0, z0])
+
 
 def symm_grad(x, y, z):
     ret = []
@@ -318,9 +365,7 @@ def symm_grad(x, y, z):
         g = [gix, giy, giz]
 
         for d1 in range(0, 3):
-            eps = sp.Matrix(3, 3, [0, 0, 0, 
-                                   0, 0, 0, 
-                                   0, 0, 0])
+            eps = sp.Matrix(3, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0])
 
             for d2 in range(0, 3):
                 eps[d1, d2] = g[d2]
@@ -330,6 +375,7 @@ def symm_grad(x, y, z):
 
         i += 1
     return ret
+
 
 def tgrad(x, y, z):
     ret = []
@@ -343,9 +389,7 @@ def tgrad(x, y, z):
         g = [gix, giy, giz]
 
         for d1 in range(0, 3):
-            G = sp.Matrix(3, 3, [0, 0, 0, 
-                                   0, 0, 0, 
-                                   0, 0, 0])
+            G = sp.Matrix(3, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0])
 
             for d2 in range(0, 3):
                 G[d1, d2] = g[d2]
@@ -355,24 +399,25 @@ def tgrad(x, y, z):
         i += 1
     return ret
 
+
 def generic_grad(prefix):
-    gx, gy, gz = sp.symbols(f'{prefix}[0] {prefix}[1] {prefix}[2]')
+    gx, gy, gz = sp.symbols(f"{prefix}[0] {prefix}[1] {prefix}[2]")
     g = sp.Matrix(3, 1, [gx, gy, gz])
     return g
+
 
 def tensorize_grad(g):
     ret = []
 
     for d1 in range(0, 3):
-        G = sp.Matrix(3, 3, [0, 0, 0, 
-                             0, 0, 0, 
-                             0, 0, 0])
+        G = sp.Matrix(3, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0])
 
         for d2 in range(0, 3):
             G[d1, d2] = g[d2]
 
         ret.append(G)
     return ret
+
 
 def generic_symm_grad(prefix):
     ret = []
@@ -380,17 +425,16 @@ def generic_symm_grad(prefix):
     g = generic_grad(prefix)
 
     for d1 in range(0, 3):
-        G = sp.Matrix(3, 3, [0, 0, 0, 
-                             0, 0, 0, 
-                             0, 0, 0])
+        G = sp.Matrix(3, 3, [0, 0, 0, 0, 0, 0, 0, 0, 0])
 
         for d2 in range(0, 3):
             G[d1, d2] = g[d2]
 
-        G = (G + G.T)/2
+        G = (G + G.T) / 2
 
         ret.append(G)
     return ret
+
 
 def subsmat(expr, oldmat, newmat):
     rows, cols = oldmat.shape
@@ -402,8 +446,9 @@ def subsmat(expr, oldmat, newmat):
     for d1 in range(0, rows):
         for d2 in range(0, cols):
             expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
-    
+
     return expr
+
 
 def subsmat3x3(expr, oldmat, newmat):
     for d1 in range(0, 3):
@@ -411,66 +456,71 @@ def subsmat3x3(expr, oldmat, newmat):
             expr = expr.subs(oldmat[d1, d2], newmat[d1, d2])
     return expr
 
+
 def subsvec3(expr, oldvec, newvec):
     for d1 in range(0, 3):
         expr = expr.subs(oldvec[d1], newvec[d1])
     return expr
 
+
 def coeffs(name, n):
     list_coeffs = []
 
     for i in range(0, n):
-        ui= sp.symbols(f'{name}[{i}]', real=True)
+        ui = sp.symbols(f"{name}[{i}]", real=True)
         list_coeffs.append(ui)
 
     ret = sp.Matrix(n, 1, list_coeffs)
     return ret
 
 
-def coeffs_SoA(name, dim, n, prefix=['x', 'y', 'z']):
+def coeffs_SoA(name, dim, n, prefix=["x", "y", "z"]):
     list_coeffs = []
 
     for d in range(0, dim):
-        name_d = f'{name}{prefix[d]}'
+        name_d = f"{name}{prefix[d]}"
         for i in range(0, n):
-            ui= sp.symbols(f'{name_d}[{i}]', real=True)
+            ui = sp.symbols(f"{name_d}[{i}]", real=True)
             list_coeffs.append(ui)
 
-    ret = sp.Matrix(dim*n, 1, list_coeffs)
+    ret = sp.Matrix(dim * n, 1, list_coeffs)
     return ret
+
 
 def matrix_coeff(name, rows, cols):
     list_coeffs = []
 
     for i in range(0, rows):
         for j in range(0, cols):
-            ui = sp.symbols(f'{name}[{i * rows + j}]', real=True)
+            ui = sp.symbols(f"{name}[{i * rows + j}]", real=True)
             list_coeffs.append(ui)
 
     ret = sp.Matrix(rows, cols, list_coeffs)
     return ret
 
+
 def sym_matrix_coeff(name, rows, cols):
     ret = sp.zeros(rows, cols)
-    
+
     idx = 0
     for i in range(0, rows):
-        ui = sp.symbols(f'{name}[{idx}]', real=True)
+        ui = sp.symbols(f"{name}[{idx}]", real=True)
         idx += 1
         ret[i, i] = ui
-        for j in range(i+1, cols):
-            ui = sp.symbols(f'{name}[{idx}]', real=True)
+        for j in range(i + 1, cols):
+            ui = sp.symbols(f"{name}[{idx}]", real=True)
             idx += 1
             ret[i, j] = ui
             ret[j, i] = ui
     return ret
+
 
 def strided_matrix_coeff(name, rows, cols, stride):
     list_coeffs = []
 
     for i in range(0, rows):
         for j in range(0, cols):
-            ui = sp.symbols(f'{name}[{i * rows + j}*{stride}]', real=True)
+            ui = sp.symbols(f"{name}[{i * rows + j}*{stride}]", real=True)
             list_coeffs.append(ui)
 
     ret = sp.Matrix(rows, cols, list_coeffs)
@@ -478,7 +528,7 @@ def strided_matrix_coeff(name, rows, cols, stride):
 
 
 def matrix_sum(M):
-    ret = 0.0;
+    ret = 0.0
     rows, cols = M.shape
 
     for d1 in range(0, rows):
@@ -488,7 +538,7 @@ def matrix_sum(M):
 
 
 def norm2(v):
-    ret = 0.0;
+    ret = 0.0
 
     rows, cols = v.shape
 
@@ -498,37 +548,43 @@ def norm2(v):
 
     return sp.sqrt(ret)
 
+
 def cross(a, b):
-    return sp.Matrix(3, 1, [
-        a[1] * b[2] - a[2]*b[1],
-        a[2] * b[0] - a[0]*b[2],
-        a[0] * b[1] - a[1]*b[0]
-    ])
+    return sp.Matrix(
+        3,
+        1,
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ],
+    )
 
 
 def stot(x):
     return sp.Matrix(1, 1, [x])
 
+
 def vec3(x, y, z):
     return sp.Matrix(3, 1, [x, y, z])
+
 
 def vec2(x, y):
     return sp.Matrix(2, 1, [x, y])
 
-def eigenvalues(A):
-    s0, s1, s2 = sp.symbols('s0 s1 s2', real=True)
-    s3, s4, s5 = sp.symbols('s3 s4 s5', real=True)
-    s6, s7, s8 = sp.symbols('s6 s7 s8', real=True)
 
-    S = sp.Matrix(3, 3, [s0, s1, s2,
-                         s3, s4, s5,
-                         s6, s7, s8])
+def eigenvalues(A):
+    s0, s1, s2 = sp.symbols("s0 s1 s2", real=True)
+    s3, s4, s5 = sp.symbols("s3 s4 s5", real=True)
+    s6, s7, s8 = sp.symbols("s6 s7 s8", real=True)
+
+    S = sp.Matrix(3, 3, [s0, s1, s2, s3, s4, s5, s6, s7, s8])
     Se = S.eigenvals()
-    ret = sp.Matrix(3, 1, [0]*3)
+    ret = sp.Matrix(3, 1, [0] * 3)
 
     d = 0
     for e in Se:
-        e_subs = e  
+        e_subs = e
         for i in range(0, 3):
             for j in range(0, 3):
                 e_subs = e_subs.subs(S[i, j], A[i, j])
@@ -536,6 +592,7 @@ def eigenvalues(A):
         d += 1
 
     return ret
+
 
 def assign_nnz_matrix(names, mat):
     rows, cols = mat.shape
@@ -548,6 +605,7 @@ def assign_nnz_matrix(names, mat):
                 expr.append(ast.Assignment(name, mat[i, j]))
                 check.add(name)
     return expr
+
 
 def compress_nnz(names, mat):
     rows, cols = mat.shape
@@ -562,11 +620,27 @@ def compress_nnz(names, mat):
                 check.add(name)
     return sp.Matrix(len(vals), 1, vals)
 
+
+def assign_value(name, value):
+    var = sp.symbols(f"{name}")
+    return [ast.Assignment(var, value)]
+
+
 def assign_matrix(name, mat):
     rows, cols = mat.shape
     expr = []
     for i in range(0, rows):
         for j in range(0, cols):
-            var = sp.symbols(f'{name}[{i*cols + j}]')
+            var = sp.symbols(f"{name}[{i*cols + j}]")
             expr.append(ast.Assignment(var, mat[i, j]))
+    return expr
+
+
+def add_assign_matrix(name, mat):
+    rows, cols = mat.shape
+    expr = []
+    for i in range(0, rows):
+        for j in range(0, cols):
+            var = sp.symbols(f"{name}[{i*cols + j}]")
+            expr.append(ast.AddAugmentedAssignment(var, mat[i, j]))
     return expr

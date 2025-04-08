@@ -87,8 +87,8 @@ void lagrange_hex_integrate(
     static const int Q3   = Q2 * Q;
     static const int SIZE = MAX(Q3, N3);
 
-    T temp1[SIZE];
-    T temp2[SIZE];
+    T temp1[N * Q2];
+    T temp2[N2 * Q];
 
     for (int i = 0; i < N; i++) {
         for (int qk = 0; qk < Q; qk++) {

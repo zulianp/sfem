@@ -1,10 +1,12 @@
 # import linear_elasticity as material
 # import neohookean as material
 import viscous_power_density_curnier as material
+
 # import isotropic_phase_field as material
 import time
 from multiprocessing import Queue
 from multiprocessing import Process as Worker
+
 
 def parallel_eval(n, fun):
     tasks = []
@@ -20,7 +22,7 @@ def parallel_eval(n, fun):
         t.start()
 
         if i != 0 and i % max_cores == 1:
-            print('Joining intermediate results!')
+            print("Joining intermediate results!")
             for t in tasks:
                 t.join()
             tasks = []
@@ -35,7 +37,8 @@ def parallel_eval(n, fun):
 
     return expr
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     tick = time.time()
     ntf = material.n_test_functions()
 
@@ -50,7 +53,7 @@ if __name__ == '__main__':
 
     # if True:
     #     exit()
-    
+
     print("// --------------------------------")
     print("// Grad")
     print("// --------------------------------")
@@ -64,12 +67,12 @@ if __name__ == '__main__':
 
     hessian_tuples = parallel_eval(ntf, material.makehessian)
 
-    hessian_expr = [0]*(ntf*ntf)
-    
+    hessian_expr = [0] * (ntf * ntf)
+
     for hts in hessian_tuples:
         for ht in hts:
             i, j, expression = ht
-            hessian_expr[i*ntf + j] = expression
+            hessian_expr[i * ntf + j] = expression
 
     material.c_code(hessian_expr)
 
@@ -85,4 +88,4 @@ if __name__ == '__main__':
     # material.c_code(expr)
 
     tock = time.time()
-    print(f'// Code generation took {round(tock - tick, 4)} seconds')
+    print(f"// Code generation took {round(tock - tick, 4)} seconds")

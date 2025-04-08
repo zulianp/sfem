@@ -32,14 +32,15 @@
 
 #include "cvfem_operators.h"
 #include "hex8_laplacian.h"
+#include "integrate_values.h"
 #include "laplacian.h"
 #include "linear_elasticity.h"
 #include "mass.h"
 #include "neohookean_ogden.h"
+#include "spectral_hex_laplacian.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
 #include "sshex8_stencil_element_matrix_apply.h"
-#include "spectral_hex_laplacian.h"
 
 // Mesh
 #include "adj_table.h"
@@ -376,23 +377,11 @@ namespace sfem {
     class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
-
-        ~Impl() {
-            if (neumann_conditions) {
-                for (int i = 0; i < n_neumann_conditions; i++) {
-                    free(neumann_conditions[i].idx);
-                }
-
-                free(neumann_conditions);
-            }
-        }
-
-        int                   n_neumann_conditions{0};
-        boundary_condition_t *neumann_conditions{nullptr};
+        std::vector<struct Condition>  conditions;
+        ~Impl() {}
     };
 
-    int   NeumannConditions::n_conditions() const { return impl_->n_neumann_conditions; }
-    void *NeumannConditions::impl_conditions() { return (void *)impl_->neumann_conditions; }
+    int NeumannConditions::n_conditions() const { return impl_->conditions.size(); }
 
     const char *NeumannConditions::name() const { return "NeumannConditions"; }
 
@@ -403,24 +392,170 @@ namespace sfem {
     std::shared_ptr<NeumannConditions> NeumannConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeumannConditions::create_from_env");
 
-        auto nc = std::make_unique<NeumannConditions>(space);
-
+        auto  neumann_conditions     = std::make_unique<NeumannConditions>(space);
+        char *SFEM_NEUMANN_SURFACE   = 0;
         char *SFEM_NEUMANN_SIDESET   = 0;
         char *SFEM_NEUMANN_VALUE     = 0;
         char *SFEM_NEUMANN_COMPONENT = 0;
-        SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
+
+        SFEM_READ_ENV(SFEM_NEUMANN_SURFACE, );
         SFEM_READ_ENV(SFEM_NEUMANN_VALUE, );
         SFEM_READ_ENV(SFEM_NEUMANN_COMPONENT, );
+        SFEM_READ_ENV(SFEM_NEUMANN_SIDESET, );
 
-        auto mesh = (mesh_t *)space->mesh().impl_mesh();
-        read_neumann_conditions(mesh,
-                                SFEM_NEUMANN_SIDESET,
-                                SFEM_NEUMANN_VALUE,
-                                SFEM_NEUMANN_COMPONENT,
-                                &nc->impl_->neumann_conditions,
-                                &nc->impl_->n_neumann_conditions);
+        assert(!SFEM_NEUMANN_SURFACE || !SFEM_NEUMANN_SIDESET);
 
-        return nc;
+        if (!SFEM_NEUMANN_SURFACE && !SFEM_NEUMANN_SIDESET) return neumann_conditions;
+
+        MPI_Comm comm = space->mesh_ptr()->comm();
+        int      rank;
+        MPI_Comm_rank(comm, &rank);
+
+        auto &conds = neumann_conditions->impl_->conditions;
+
+        char       *sets     = SFEM_NEUMANN_SIDESET ? SFEM_NEUMANN_SIDESET : SFEM_NEUMANN_SURFACE;
+        const char *splitter = ",";
+        int         count    = 1;
+        {
+            int i = 0;
+            while (sets[i]) {
+                count += (sets[i++] == splitter[0]);
+                assert(i <= strlen(sets));
+            }
+        }
+
+        auto st = shell_type(side_type(space->element_type()));
+
+        printf("conds = %d, splitter=%c\n", count, splitter[0]);
+
+        // NODESET/SIDESET
+        {
+            const char *pch = strtok(sets, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Reading file (%d/%d): %s\n", ++i, count, pch);
+                struct Condition cneumann_conditions;
+                cneumann_conditions.value     = 0;
+                cneumann_conditions.component = 0;
+
+                if (SFEM_NEUMANN_SURFACE) {
+                    std::string pattern = pch;
+                    pattern += "/i*.raw";
+                    std::vector<std::string> paths = find_files(pattern);
+
+                    int nnxs = elem_num_nodes(st);
+                    if (int(paths.size()) != nnxs) {
+                        SFEM_ERROR("Incorrect number of sides!");
+                    }
+
+                    idx_t **surface{nullptr};
+
+                    ptrdiff_t nse = 0;
+                    {
+                        surface = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+                        int k   = 0;
+                        for (auto &p : paths) {
+                            idx_t    *ii{nullptr};
+                            ptrdiff_t lsize{0}, gsize{0};
+                            if (array_create_from_file(comm, pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
+                                SFEM_ERROR("Failed to read file %s\n", pch);
+                                break;
+                            }
+
+                            if (!nse || nse != lsize) {
+                                assert(!nse || nse == lsize);
+                                SFEM_ERROR("Inconsistent lenghts between files!\n");
+                            }
+
+                            nse          = lsize;
+                            surface[k++] = ii;
+                        }
+                    }
+
+                    cneumann_conditions.element_type = st;
+                    cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
+
+                } else {
+                    auto sideset                = Sideset::create_from_file(comm, pch);
+                    cneumann_conditions.sideset = sideset;
+                    int nnxs                    = elem_num_nodes(st);
+
+                    auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
+
+                    auto mesh = space->mesh_ptr();
+                    if (extract_surface_from_sideset(space->element_type(),
+                                                     mesh->elements()->data(),
+                                                     sideset->parent()->size(),
+                                                     sideset->parent()->data(),
+                                                     sideset->lfi()->data(),
+                                                     surface->data()) != SFEM_SUCCESS) {
+                        SFEM_ERROR("FAILED TO EXTRACT SIDES!");
+                    }
+
+                    cneumann_conditions.element_type = st;
+                    cneumann_conditions.surface      = surface;
+                }
+
+                conds.push_back(cneumann_conditions);
+
+                pch = strtok(NULL, splitter);
+            }
+        }
+
+        if (SFEM_NEUMANN_COMPONENT) {
+            const char *pch = strtok(SFEM_NEUMANN_COMPONENT, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Parsing comps (%d/%d): %s\n", i + 1, count, pch);
+                conds[i].component = atoi(pch);
+                i++;
+
+                pch = strtok(NULL, splitter);
+            }
+        }
+
+        if (SFEM_NEUMANN_VALUE) {
+            static const char *path_key     = "path:";
+            const int          path_key_len = strlen(path_key);
+
+            const char *pch = strtok(SFEM_NEUMANN_VALUE, splitter);
+            int         i   = 0;
+            while (pch != NULL) {
+                printf("Parsing  values (%d/%d): %s\n", i + 1, count, pch);
+                assert(i < count);
+
+                if (strncmp(pch, path_key, path_key_len) == 0) {
+                    conds[i].value = 0;
+
+                    real_t   *values{nullptr};
+                    ptrdiff_t lsize, gsize;
+                    if (array_create_from_file(comm, pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                        SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
+                    }
+
+                    if (conds[i].surface->extent(1) != lsize) {
+                        if (!rank) {
+                            SFEM_ERROR(
+                                    "read_boundary_conditions: len(idx) != len(values) (%ld != "
+                                    "%ld)\nfile:%s\n",
+                                    (long)conds[i].surface->extent(1),
+                                    (long)lsize,
+                                    pch + path_key_len);
+                        }
+                    }
+
+                    conds[i].value = 1;
+
+                } else {
+                    conds[i].value = atof(pch);
+                }
+                i++;
+
+                pch = strtok(NULL, splitter);
+            }
+        }
+
+        return neumann_conditions;
     }
 
     NeumannConditions::~NeumannConditions() = default;
@@ -432,27 +567,45 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NeumannConditions::gradient(const real_t *const x, real_t *const out) {
+    int NeumannConditions::gradient(const real_t *const /*x*/, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
+        auto space = impl_->space;
+        auto mesh  = space->mesh_ptr();
 
-        for (int i = 0; i < impl_->n_neumann_conditions; i++) {
-            surface_forcing_function_vec(side_type((enum ElemType)impl_->space->element_type()),
-                                         impl_->neumann_conditions[i].local_size,
-                                         impl_->neumann_conditions[i].idx,
-                                         mesh->points,
-                                         -  // Use negative sign since we are on LHS
-                                         impl_->neumann_conditions[i].value,
-                                         impl_->space->block_size(),
-                                         impl_->neumann_conditions[i].component,
-                                         out);
+        int err = 0;
+        for (auto &c : impl_->conditions) {
+            if (c.values) {
+                err |= integrate_values(c.element_type,
+                                        c.surface->extent(1),
+                                        mesh->n_nodes(),
+                                        c.surface->data(),
+                                        mesh->points()->data(),
+                                        // Use negative sign since we are on LHS
+                                        -c.value,
+                                        c.values->data(),
+                                        space->block_size(),
+                                        c.component,
+                                        out);
+            } else {
+                err |= integrate_value(c.element_type,
+                                       c.surface->extent(1),
+                                       mesh->n_nodes(),
+                                       c.surface->data(),
+                                       mesh->points()->data(),
+                                       // Use negative sign since we are on LHS
+                                       -c.value,
+                                       space->block_size(),
+                                       c.component,
+                                       out);
+            }
         }
 
-        return SFEM_SUCCESS;
+        return err;
     }
 
     int NeumannConditions::apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) {
+        // No-Op
         return SFEM_SUCCESS;
     }
 
@@ -461,53 +614,33 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    void NeumannConditions::add_condition(const ptrdiff_t local_size,
-                                          const ptrdiff_t global_size,
-                                          idx_t *const    idx,
-                                          const int       component,
-                                          const real_t    value) {
-        impl_->neumann_conditions = (boundary_condition_t *)realloc(
-                impl_->neumann_conditions, (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
+    std::shared_ptr<NeumannConditions> NeumannConditions::create(const std::shared_ptr<FunctionSpace> &space,
+                                                                 const std::vector<struct Condition>  &conditions) {
+        auto nc               = std::make_unique<NeumannConditions>(space);
+        nc->impl_->conditions = conditions;
 
-        auto          mesh  = (mesh_t *)impl_->space->mesh().impl_mesh();
-        enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
-        int           nns   = elem_num_nodes(stype);
+        for (auto &c : nc->impl_->conditions) {
+            if (!c.surface) {
+                auto st   = shell_type(side_type(space->element_type()));
+                int  nnxs = elem_num_nodes(st);
 
-        assert((local_size / nns) * nns == local_size);
-        assert((global_size / nns) * nns == global_size);
+                auto surface = sfem::create_host_buffer<idx_t>(nnxs, c.sideset->parent()->size());
+                auto mesh    = space->mesh_ptr();
+                if (extract_surface_from_sideset(space->element_type(),
+                                                 mesh->elements()->data(),
+                                                 c.sideset->parent()->size(),
+                                                 c.sideset->parent()->data(),
+                                                 c.sideset->lfi()->data(),
+                                                 surface->data()) != SFEM_SUCCESS) {
+                    SFEM_ERROR("Unable to create surface from sideset!");
+                }
 
-        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
-                                  local_size / nns,
-                                  global_size / nns,
-                                  idx,
-                                  component,
-                                  value,
-                                  nullptr);
+                c.surface      = surface;
+                c.element_type = st;
+            }
+        }
 
-        impl_->n_neumann_conditions++;
-    }
-
-    void NeumannConditions::add_condition(const ptrdiff_t local_size,
-                                          const ptrdiff_t global_size,
-                                          idx_t *const    idx,
-                                          const int       component,
-                                          real_t *const   values) {
-        impl_->neumann_conditions = (boundary_condition_t *)realloc(
-                impl_->neumann_conditions, (impl_->n_neumann_conditions + 1) * sizeof(boundary_condition_t));
-
-        auto          mesh  = (mesh_t *)impl_->space->mesh().impl_mesh();
-        enum ElemType stype = side_type((enum ElemType)impl_->space->element_type());
-        int           nns   = elem_num_sides(stype);
-
-        boundary_condition_create(&impl_->neumann_conditions[impl_->n_neumann_conditions],
-                                  local_size / nns,
-                                  global_size / nns,
-                                  idx,
-                                  component,
-                                  0,
-                                  values);
-
-        impl_->n_neumann_conditions++;
+        return nc;
     }
 
     int Constraint::apply_zero(real_t *const x) { return apply_value(0, x); }
@@ -1066,25 +1199,59 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
-        SFEM_TRACE_SCOPE("Output::write_time_step");
-
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        sfem::create_directory(impl_->output_dir.c_str());
-
-        char path[2048];
-        sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
-
-        if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
-            return SFEM_FAILURE;
-        }
-
+    void Output::log_time(const real_t t)
+    {
         if (log_is_empty(&impl_->time_logger)) {
+            char path[2048];
             sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
             log_create_file(&impl_->time_logger, path, "w");
         }
 
         log_write_double(&impl_->time_logger, t);
+    }
+
+    int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
+        SFEM_TRACE_SCOPE("Output::write_time_step");
+
+        auto      mesh       = (mesh_t *)impl_->space->mesh().impl_mesh();
+        const int block_size = impl_->space->block_size();
+
+        char path[2048];
+
+        if (impl_->AoS_to_SoA && block_size > 1) {
+            ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
+
+            auto buff = create_host_buffer<real_t>(n_blocks);
+            auto bb   = buff->data();
+
+            for (int b = 0; b < block_size; b++) {
+                for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                    bb[i] = x[i * block_size + b];
+                }
+
+                char b_name[1024];
+                sprintf(b_name, "%s.%d", name, b);
+                sprintf(path,
+                        impl_->time_dependent_file_format.c_str(),
+                        impl_->output_dir.c_str(),
+                        b_name,
+                        impl_->export_counter++);
+
+                if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                    return SFEM_FAILURE;
+                }
+            }
+
+        } else {
+            sfem::create_directory(impl_->output_dir.c_str());
+
+            sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
+
+            if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
+                return SFEM_FAILURE;
+            }
+        }
+
         return SFEM_SUCCESS;
     }
 
