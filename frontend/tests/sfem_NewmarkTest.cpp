@@ -52,7 +52,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
     f->add_constraint(d_conds);
 
-    sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 1, .component = 0};
+    sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
 
@@ -177,8 +177,8 @@ int test_newmark() {
     auto            solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto            g            = sfem::create_buffer<real_t>(ndofs, es);
 
-    real_t dt          = 0.01;
-    real_t T           = 2;
+    real_t dt          = 0.1;
+    real_t T           = 40;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
@@ -228,8 +228,8 @@ int test_newmark() {
         ////////////////////////////////
         
         // acceleration
-        blas->axpby(ndofs, -4/dt, displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4/dt, solution->data(), acceleration->data());
+        blas->axpby(ndofs, -4/(dt * dt), displacement->data(), -1, acceleration->data());
+        blas->axpy(ndofs, 4/(dt * dt), solution->data(), acceleration->data());
         blas->axpy(ndofs, -4/dt, velocity->data(), acceleration->data());
         
         // velocity
