@@ -14,6 +14,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cmath>
 
 template <int N, int Qx, int Qy, int Qz, typename T>
 static SFEM_INLINE void lagrange_hex_interpolate_face(
