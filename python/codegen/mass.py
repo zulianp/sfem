@@ -6,15 +6,15 @@ rf = ref_fun(qx, qy, qz)
 dV = det3(A)
 
 expr = []
-sumterms=0
+sumterms = 0
 for i in range(0, 4):
-	for j in range(0, 4):
-		form = rf[i] * rf[j] * dV
-		integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
- 
-		bform = sp.symbols(f'element_matrix[{i*4+j}]')
-		expr.append(ast.Assignment(bform, sp.simplify(integr)))
-		sumterms+=integr
+    for j in range(0, 4):
+        form = rf[i] * rf[j] * dV
+        integr = sp.integrate(form, (qz, 0, 1 - qx - qy), (qy, 0, 1 - qx), (qx, 0, 1))
+
+        bform = sp.symbols(f"element_matrix[{i*4+j}]")
+        expr.append(ast.Assignment(bform, sp.simplify(integr)))
+        sumterms += integr
 
 c_code(expr)
 
@@ -35,4 +35,4 @@ test = test.subs(z1, 0)
 test = test.subs(z2, 0)
 test = test.subs(z3, 1)
 
-print(f'{test} = 1/6')
+print(f"{test} = 1/6")
