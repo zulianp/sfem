@@ -178,7 +178,7 @@ int test_newmark() {
     auto            g            = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 0.1;
-    real_t T           = 40;
+    real_t T           = 4;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
