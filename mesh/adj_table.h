@@ -4,6 +4,8 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

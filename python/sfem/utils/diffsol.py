@@ -4,8 +4,9 @@ import numpy as np
 import sys, getopt
 import os
 
+
 def main(argv):
-    if(len(argv) < 3):
+    if len(argv) < 3:
         print(f"Usage {argv[0]} <left.fp32.raw> <right.fp32.raw> <out.fp32.raw>")
         return
 
@@ -20,11 +21,12 @@ def main(argv):
     x = np.fromfile(left, dtype=left_dtype)
     y = np.fromfile(right, dtype=right_dtype)
 
-    if(len(x) != len(y)):
+    if len(x) != len(y):
         exit(1)
 
     z = x.astype(out_dtype) - y.astype(out_dtype)
     z.tofile(out)
-        
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     main(sys.argv)
