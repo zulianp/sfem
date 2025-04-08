@@ -118,8 +118,8 @@ int test_explicit_euler() {
     auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     real_t dt          = 0.0001;
-    real_t T           = 50 * dt;
-    size_t export_freq = 50;
+    real_t T           = 5 * dt;
+    size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
 
@@ -192,22 +192,24 @@ int test_newmark() {
         output->write_time_step("acceleration", t, acceleration->data());
     }
 
-    auto material_op = sfem::create_linear_operator("MF", f, nullptr, es);
-    auto linear_op   = sfem::make_op<real_t>(
-            material_op->rows(),
-            material_op->cols(),
-            [=](const real_t *const x, real_t *const y) {
-                blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
-                blas->scal(ndofs, 4 / (dt * dt), y);
-                material_op->apply(x, y);
-            },
-            es);
-
-    auto solver = sfem::create_cg<real_t>(linear_op, es);
-    solver->verbose = false;
-
     while (t < T) {
         for (int k = 0; k < nliter; k++) {
+            // This could be put out of the loop since the operator is linear. 
+            // We will do nonlinear materials next, so we keep it here.
+            auto material_op = sfem::create_linear_operator("MF", f, solution, es);
+            auto linear_op   = sfem::make_op<real_t>(
+                    material_op->rows(),
+                    material_op->cols(),
+                    [=](const real_t *const x, real_t *const y) {
+                        blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
+                        blas->scal(ndofs, 4 / (dt * dt), y);
+                        material_op->apply(x, y);
+                    },
+                    es);
+
+            auto solver     = sfem::create_cg<real_t>(linear_op, es);
+            solver->verbose = false;
+
             // Use increment as temp buffer
             blas->zeros(ndofs, increment->data());
             blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
@@ -216,8 +218,9 @@ int test_newmark() {
             blas->axpy(ndofs, -1, acceleration->data(), increment->data());
             blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
 
+            // Adds material gradient computation to g
             f->gradient(solution->data(), g->data());
-            
+
             blas->zeros(ndofs, increment->data());
             solver->apply(g->data(), increment->data());
             blas->axpy(ndofs, -1, increment->data(), solution->data());
@@ -226,15 +229,15 @@ int test_newmark() {
         ////////////////////////////////
         // Update all quantities
         ////////////////////////////////
-        
+
         // acceleration
-        blas->axpby(ndofs, -4/(dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4/(dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4/dt, velocity->data(), acceleration->data());
-        
+        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
+        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
+        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
+
         // velocity
-        blas->axpby(ndofs, -2/dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2/dt, solution->data(), velocity->data());
+        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
+        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
 
         // displacement
         blas->copy(ndofs, solution->data(), displacement->data());
