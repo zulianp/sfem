@@ -118,8 +118,8 @@ int test_explicit_euler() {
     auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     real_t dt          = 0.0001;
-    real_t T           = 50 * dt;
-    size_t export_freq = 50;
+    real_t T           = 5 * dt;
+    size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
 
@@ -196,7 +196,7 @@ int test_newmark() {
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear. 
             // We will do nonlinear materials next, so we keep it here.
-            auto material_op = sfem::create_linear_operator("MF", f, nullptr, es);
+            auto material_op = sfem::create_linear_operator("MF", f, solution, es);
             auto linear_op   = sfem::make_op<real_t>(
                     material_op->rows(),
                     material_op->cols(),
@@ -218,6 +218,7 @@ int test_newmark() {
             blas->axpy(ndofs, -1, acceleration->data(), increment->data());
             blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
 
+            // Adds material gradient computation to g
             f->gradient(solution->data(), g->data());
 
             blas->zeros(ndofs, increment->data());
