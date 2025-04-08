@@ -24,6 +24,7 @@ typedef struct {
     enum ElemType     element_type;         // Element type
     AcceleratorsType  use_accelerator;      // Use accelerator such as CUDA
     AdjointRefineType adjoint_refine_type;  // Adjoint refine type
+    int               max_iterations;       // Maximum number of iterations
     real_t            alpha_th;             // Threshold for adjoint refinement
 } sfem_resample_field_info;
 

@@ -590,6 +590,29 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
     RETURN_FROM_FUNCTION(ret);
 }
 
+int                                                                 //
+insert_tet10_in_output_array(struct tet10_vertices*  tet10_head,    //
+                             struct tet10_vertices** rTets_out,     //
+                             int tets_size, size_t* tets_capacity,  //
+                             const size_t tet_delta_capacity) {
+    // Check if there is enough space in the output array
+    // If not, allocate more space
+    if (tets_size >= *tets_capacity) {
+        *tets_capacity += tet_delta_capacity;
+        *rTets_out = realloc(*rTets_out, sizeof(struct tet10_vertices) * (*tets_capacity));
+        if (*rTets_out == NULL) {
+            fprintf(stderr, "ERROR: realloc failed in insert_tet10_in_output_array: %s:%d\n", __FILE__, __LINE__);
+            exit(1);
+        }
+    }
+
+    // Copy the tet10_head to the output array
+    memcpy(&(*rTets_out)[tets_size], tet10_head, sizeof(struct tet10_vertices));
+
+    // Incrementa e restituisci il nuovo contatore
+    return tets_size + 1;
+}
+
 ///////////////////////////////////////////////////////////////////////
 // tet10_iterative_refinement
 ///////////////////////////////////////////////////////////////////////
@@ -678,26 +701,32 @@ tet10_iterative_refinement(const real_t* const           x,                     
             degenerated_tet = 1;
         }
 
-        if (alpha_tet <= alpha_th) {  // The tetrahedron is not refined
-
-            if (tets_size >= tets_capacity) {
-                tets_capacity += tet_delta_capacity;
-                *rTets_out = realloc(*rTets_out, sizeof(struct tet10_vertices) * tets_capacity);
-                if (*rTets_out == NULL) {
-                    fprintf(stderr, "ERROR: realloc failed\n");
-                    exit(1);
-                }
-            }
-
-            // (*rTets_out)[tets_size] = *tet10_head;
-            memcpy(&(*rTets_out)[tets_size], tet10_head, sizeof(struct tet10_vertices));
-            tets_size++;
+        if (alpha_tet <= alpha_th) {
+            tets_size = insert_tet10_in_output_array(tet10_head,  //
+                                                     rTets_out,
+                                                     tets_size,
+                                                     &tets_capacity,
+                                                     tet_delta_capacity);
 
             if (tets_size >= max_refined_tets) {
+                while (sfem_stack_size(stack) > 0) {
+                    struct tet10_vertices* tet10_head_loc = sfem_stack_pop(stack);
+
+                    tets_size = insert_tet10_in_output_array(tet10_head_loc,  //
+                                                             rTets_out,
+                                                             tets_size,
+                                                             &tets_capacity,
+                                                             tet_delta_capacity);
+                    free(tet10_head_loc);
+                }
+
                 flag_loop = 0;
             }
 
         } else if (degenerated_tet == 1) {
+            // The tetrahedron is degenerated and needs to be refined
+            // By the bisection of the longest edge
+
             const int nt = tet10_refine_two_edge_vertex(tet10_head->x,  //
                                                         tet10_head->y,  //
                                                         tet10_head->z,  //
@@ -722,6 +751,9 @@ tet10_iterative_refinement(const real_t* const           x,                     
             }
 
         } else {
+            // The tetrahedron is not degenerated and needs to be refined
+            // By applying the uniform refinement.
+
             tet10_uniform_refinement(tet10_head->x,  //
                                      tet10_head->y,  //
                                      tet10_head->z,  //
@@ -788,6 +820,8 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
     // real_t alpha_mim       = 1e9;
     // int    refinements_cnt = 0;
 
+    int max_refinements_cnt = 0;
+
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         idx_t ev[10];
 
@@ -835,8 +869,12 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
                                                              dz,                     //
                                                              alpha_th,               //
                                                              degenerated_tet_ratio,  //
-                                                             20,                     //
+                                                             60,                     //
                                                              &rTets_out);            //
+
+        max_refinements_cnt = ref_tet10_cnt > max_refinements_cnt ? ref_tet10_cnt : max_refinements_cnt;
+
+        // printf("ref_tet10_cnt: %d\n", ref_tet10_cnt);
 
         // perform the adjoint on the refined mesh
 
@@ -856,6 +894,8 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
         rTets_out = NULL;
 
     }  // end for over elements
+
+    printf("max_refinements_cnt: %d, %s:%d\n", max_refinements_cnt, __FILE__, __LINE__);
 
     return 0;
 }

@@ -714,6 +714,40 @@ push_tet_vertices(struct sfem_stack*         stack,     //
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+// add_tetrahedron_to_array //////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                 //
+add_tetrahedron_to_array(const struct tet_vertices* tet_head,       //
+                         struct tet_vertices**      tets_out,       //
+                         int                        tets_size,      //
+                         int*                       tets_capacity,  //
+                         const int                  tet_delta_capacity) {            //
+
+    // Check if we need to expand the array
+    if (tets_size >= *tets_capacity) {
+        *tets_capacity += tet_delta_capacity;
+
+        struct tet_vertices* new_tets = realloc(*tets_out, sizeof(struct tet_vertices) * (*tets_capacity));
+
+        // Check if realloc failed
+        if (new_tets == NULL) {
+            fprintf(stderr, "ERROR: realloc failed: %s:%d\n", __FILE__, __LINE__);
+            return -1;  // Return error code
+        }
+
+        *tets_out = new_tets;  // Update the pointer with the new allocation
+    }
+
+    // Add the new tetrahedron
+    (*tets_out)[tets_size] = *tet_head;
+
+    // Return the new size
+    return tets_size + 1;
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 // tet4_iterative_refinement /////////////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -839,20 +873,39 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
             // Resample the tetrahedron
             // No other refinement is needed
 
-            if (tets_size >= tets_capacity) {
-                tets_capacity += tet_delta_capacity;
-                *tets_out = realloc(*tets_out, sizeof(struct tet_vertices) * tets_capacity);
-                if (tets_out == NULL) {
-                    fprintf(stderr, "ERROR: realloc failed\n");
-                    exit(1);
+            tets_size = add_tetrahedron_to_array(tet_head,             // The tetrahedron to add
+                                                 tets_out,             // The array of tetrahedra
+                                                 tets_size,            // The current size of the array
+                                                 &tets_capacity,       // The current capacity of the array
+                                                 tet_delta_capacity);  // The delta capacity of the array
+
+            // if (tets_size >= tets_capacity) {
+            //     tets_capacity += tet_delta_capacity;
+            //     *tets_out = realloc(*tets_out, sizeof(struct tet_vertices) * tets_capacity);
+            //     if (tets_out == NULL) {
+            //         fprintf(stderr, "ERROR: realloc failed\n");
+            //         exit(1);
+            //     }
+            // }
+
+            // (*tets_out)[tets_size] = *tet_head;
+            // tets_size++;
+            // total_refined_tets++;
+
+            if (tets_size >= max_refined_tets) {
+                while (sfem_stack_size(stack) > 0) {
+                    struct tet_vertices* tet_loc = (struct tet_vertices*)sfem_stack_pop(stack);
+
+                    tets_size = add_tetrahedron_to_array(tet_loc,              // The tetrahedron to add
+                                                         tets_out,             // The array of tetrahedra
+                                                         tets_size,            // The current size of the array
+                                                         &tets_capacity,       // The current capacity of the array
+                                                         tet_delta_capacity);  // The delta capacity of the array
+                    free(tet_loc);
                 }
+
+                flag_loop = 0;
             }
-
-            (*tets_out)[tets_size] = *tet_head;
-            tets_size++;
-            total_refined_tets++;
-
-            if (tets_size >= max_refined_tets) flag_loop = 0;
 
         } else if (degenerated_tet == 1) {
             // Refine the tetrahedron
