@@ -1427,6 +1427,8 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
     free(mass_vector);
     mass_vector = NULL;
 
+    const real_t alpha_th = 2.0;
+
 #define TEST_REFINE_ADJOINT 1
 #if TEST_REFINE_ADJOINT == 0
 
@@ -1445,8 +1447,6 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 #elif TEST_REFINE_ADJOINT == 1
 
 #pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
-
-    const real_t alpha_th = 2.0;
 
     hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(0,                //
                                                                      mesh->nelements,  //
