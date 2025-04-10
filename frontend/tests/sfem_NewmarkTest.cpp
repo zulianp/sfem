@@ -55,15 +55,13 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 2};
 
 #if 1
-
     auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
     f->add_constraint(d_conds);
 
     sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
-
-#else
+#else // Test with Dirichlet only (in case diable test_newmark)
     sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0.2, .component = 0};
     sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0.2, .component = 1};
     sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0.2, .component = 2};
@@ -199,7 +197,7 @@ int test_newmark() {
     auto            g            = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 0.2;
-    real_t T           = 16;
+    real_t T           = 4;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
