@@ -17,9 +17,9 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     }
 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int  res = 16;
+    int  res = 4;
     auto m   = sfem::Mesh::create_hex8_cube(comm,
                                           // Grid
                                           res * 2,
@@ -186,10 +186,12 @@ int test_newmark() {
 
     bool enable_output = true;
     if (enable_output) {
-        output->log_time(t);
         output->write_time_step("disp", t, displacement->data());
         output->write_time_step("velocity", t, velocity->data());
         output->write_time_step("acceleration", t, acceleration->data());
+
+        // If no issues encountered we log the time
+        output->log_time(t);
     }
 
     while (t < T) {
@@ -245,12 +247,14 @@ int test_newmark() {
         t += dt;
         if (++steps % export_freq == 0 && enable_output) {
             printf("%g/%g\n", double(t), double(T));
-            output->log_time(t);
-
+            
             // Write to disk
             output->write_time_step("disp", t, displacement->data());
             output->write_time_step("velocity", t, velocity->data());
             output->write_time_step("acceleration", t, acceleration->data());
+
+            // If no issues encountered we log the time
+            output->log_time(t);
         }
     }
 
