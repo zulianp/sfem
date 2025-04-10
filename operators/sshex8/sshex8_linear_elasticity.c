@@ -31,24 +31,6 @@ static void print_matrix(int r, int c, const scalar_t *const m) {
     printf("]\n");
 }
 
-static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
-                                       const scalar_t                      determinant,
-                                       const scalar_t                      h,
-                                       scalar_t *const SFEM_RESTRICT       sub_adjugate,
-                                       scalar_t *const SFEM_RESTRICT       sub_determinant) {
-    const scalar_t x0  = POW2(h);
-    sub_adjugate[0]    = adjugate[0] * x0;
-    sub_adjugate[1]    = adjugate[1] * x0;
-    sub_adjugate[2]    = adjugate[2] * x0;
-    sub_adjugate[3]    = adjugate[3] * x0;
-    sub_adjugate[4]    = adjugate[4] * x0;
-    sub_adjugate[5]    = adjugate[5] * x0;
-    sub_adjugate[6]    = adjugate[6] * x0;
-    sub_adjugate[7]    = adjugate[7] * x0;
-    sub_adjugate[8]    = adjugate[8] * x0;
-    sub_determinant[0] = determinant * (POW3(h));
-}
-
 // FIXME there is probably a bug in here!
 int sshex8_linear_elasticity_apply(const int                    level,
                                    const ptrdiff_t              nelements,
