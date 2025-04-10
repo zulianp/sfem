@@ -40,6 +40,7 @@
 #include "spectral_hex_laplacian.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
+#include "sshex8_mass.h"
 #include "sshex8_stencil_element_matrix_apply.h"
 
 // Mesh
@@ -609,6 +610,11 @@ namespace sfem {
         auto space = impl_->space;
         auto mesh  = space->mesh_ptr();
 
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) {
+            points = space->semi_structured_mesh().points();
+        }
+
         int err = 0;
         for (auto &c : impl_->conditions) {
             if (c.values) {
@@ -616,7 +622,7 @@ namespace sfem {
                                         c.surface->extent(1),
                                         mesh->n_nodes(),
                                         c.surface->data(),
-                                        mesh->points()->data(),
+                                        points->data(),
                                         // Use negative sign since we are on LHS
                                         -c.value,
                                         c.values->data(),
@@ -628,7 +634,7 @@ namespace sfem {
                                        c.surface->extent(1),
                                        mesh->n_nodes(),
                                        c.surface->data(),
-                                       mesh->points()->data(),
+                                       points->data(),
                                        // Use negative sign since we are on LHS
                                        -c.value,
                                        space->block_size(),
@@ -2317,7 +2323,6 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
-  
     class SpectralElementLaplacian : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -2715,7 +2720,7 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
-      class SemiStructuredLumpedMass final : public Op {
+    class SemiStructuredLumpedMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
@@ -2761,11 +2766,28 @@ namespace sfem {
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
             SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::hessian_diag");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            auto &ssm = space->semi_structured_mesh();
+            if (space->block_size() == 1) {
+                return affine_sshex8_mass_lumped(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), values);
+            } else {
+                const ptrdiff_t n = space->n_dofs() / space->block_size();
 
-            SFEM_ERROR("IMPLEMENT ME!");
+                auto buff = create_host_buffer<real_t>(n);
+                real_t *temp = buff->data();
+                int err = affine_sshex8_mass_lumped(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), temp);
 
-            return SFEM_SUCCESS;
+                if (err) SFEM_ERROR("Failure in affine_sshex8_mass_lumped\n");
+
+                int bs = space->block_size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    for (int b = 0; b < bs; b++) {
+                        values[i * bs + b] += temp[i];
+                    }
+                }
+            }
         }
 
         int hessian_crs(const real_t *const  x,
@@ -2793,7 +2815,6 @@ namespace sfem {
 
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
-
 
     class CVFEMMass final : public Op {
     public:
