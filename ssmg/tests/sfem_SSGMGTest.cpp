@@ -80,7 +80,7 @@ int test_ssgmg_poisson_cube() {
     int block_size = 1;
     auto fs = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    // fs->semi_structured_mesh().apply_hierarchical_renumbering();
    
     auto f   = sfem::Function::create(fs);
     auto op  = sfem::create_op(fs, SFEM_OPERATOR, es);

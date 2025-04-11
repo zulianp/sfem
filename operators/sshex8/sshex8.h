@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include "sfem_base.h"
+#include "sfem_macros.h"
 
 static SFEM_INLINE int sshex8_nxe(int level) {
     const int corners    = 8;
@@ -20,6 +21,24 @@ static SFEM_INLINE int sshex8_lidx(const int L, const int x, const int y, const 
     assert(ret < sshex8_nxe(L));
     assert(ret >= 0);
     return ret;
+}
+
+static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjugate,
+                                       const scalar_t                      determinant,
+                                       const scalar_t                      h,
+                                       scalar_t *const SFEM_RESTRICT       sub_adjugate,
+                                       scalar_t *const SFEM_RESTRICT       sub_determinant) {
+    const scalar_t x0  = POW2(h);
+    sub_adjugate[0]    = adjugate[0] * x0;
+    sub_adjugate[1]    = adjugate[1] * x0;
+    sub_adjugate[2]    = adjugate[2] * x0;
+    sub_adjugate[3]    = adjugate[3] * x0;
+    sub_adjugate[4]    = adjugate[4] * x0;
+    sub_adjugate[5]    = adjugate[5] * x0;
+    sub_adjugate[6]    = adjugate[6] * x0;
+    sub_adjugate[7]    = adjugate[7] * x0;
+    sub_adjugate[8]    = adjugate[8] * x0;
+    sub_determinant[0] = determinant * (POW3(h));
 }
 
 static void sshex8_apply_element_matrix(const int                           level,
