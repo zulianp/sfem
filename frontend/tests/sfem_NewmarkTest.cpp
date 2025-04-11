@@ -192,12 +192,13 @@ int test_newmark() {
     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
     auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
     auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    
     auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto            solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto            g            = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 0.2;
-    real_t T           = 4;
+    real_t T           = 16;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
@@ -224,8 +225,11 @@ int test_newmark() {
                     material_op->rows(),
                     material_op->cols(),
                     [=](const real_t *const x, real_t *const y) {
-                        blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
-                        blas->scal(ndofs, 4 / (dt * dt), y);
+                        {
+                            SFEM_TRACE_SCOPE("Newmark::hessian_apply_integr");
+                            blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
+                            blas->scal(ndofs, 4 / (dt * dt), y);
+                        }
                         material_op->apply(x, y);
                     },
                     es);
