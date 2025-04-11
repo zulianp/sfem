@@ -40,6 +40,7 @@
 #include "spectral_hex_laplacian.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
+#include "sshex8_mass.h"
 #include "sshex8_stencil_element_matrix_apply.h"
 
 // Mesh
@@ -374,6 +375,54 @@ namespace sfem {
         return sfem::manage_host_buffer(n_nodes, nodes);
     }
 
+    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::shared_ptr<Sideset>       &sideset) {
+        if (space->has_semi_structured_mesh()) {
+            auto &&ssmesh = space->semi_structured_mesh();
+            auto   ss_sides =
+                    sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sideset->parent()->size());
+
+            if (sshex8_extract_surface_from_sideset(ssmesh.level(),
+                                                    ssmesh.element_data(),
+                                                    sideset->parent()->size(),
+                                                    sideset->parent()->data(),
+                                                    sideset->lfi()->data(),
+                                                    ss_sides->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract surface from sideset!\n");
+            }
+
+            idx_t           *idx          = nullptr;
+            ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
+            std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+
+            // FiXME harcoded for sshex8
+            sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+
+            const int nnxs    = 4;
+            const int nexs    = ssmesh.level() * ssmesh.level();
+            auto      surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size() * nexs);
+
+            ssquad4_to_standard_quad4_mesh(ssmesh.level(), sideset->parent()->size(), ss_sides->data(), surface->data());
+            return {QUADSHELL4, surface};
+        } else {
+            auto st   = shell_type(side_type(space->element_type()));
+            int  nnxs = elem_num_nodes(st);
+
+            auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
+            auto mesh    = space->mesh_ptr();
+            if (extract_surface_from_sideset(space->element_type(),
+                                             mesh->elements()->data(),
+                                             sideset->parent()->size(),
+                                             sideset->parent()->data(),
+                                             sideset->lfi()->data(),
+                                             surface->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to create surface from sideset!");
+            }
+            return {st, surface};
+        }
+    }
+
     class NeumannConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -478,22 +527,10 @@ namespace sfem {
                 } else {
                     auto sideset                = Sideset::create_from_file(comm, pch);
                     cneumann_conditions.sideset = sideset;
-                    int nnxs                    = elem_num_nodes(st);
 
-                    auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
-
-                    auto mesh = space->mesh_ptr();
-                    if (extract_surface_from_sideset(space->element_type(),
-                                                     mesh->elements()->data(),
-                                                     sideset->parent()->size(),
-                                                     sideset->parent()->data(),
-                                                     sideset->lfi()->data(),
-                                                     surface->data()) != SFEM_SUCCESS) {
-                        SFEM_ERROR("FAILED TO EXTRACT SIDES!");
-                    }
-
-                    cneumann_conditions.element_type = st;
-                    cneumann_conditions.surface      = surface;
+                    auto surface                     = create_surface_from_sideset(space, sideset);
+                    cneumann_conditions.element_type = surface.first;
+                    cneumann_conditions.surface      = surface.second;
                 }
 
                 conds.push_back(cneumann_conditions);
@@ -573,6 +610,11 @@ namespace sfem {
         auto space = impl_->space;
         auto mesh  = space->mesh_ptr();
 
+        auto points = mesh->points();
+        if (space->has_semi_structured_mesh()) {
+            points = space->semi_structured_mesh().points();
+        }
+
         int err = 0;
         for (auto &c : impl_->conditions) {
             if (c.values) {
@@ -580,7 +622,7 @@ namespace sfem {
                                         c.surface->extent(1),
                                         mesh->n_nodes(),
                                         c.surface->data(),
-                                        mesh->points()->data(),
+                                        points->data(),
                                         // Use negative sign since we are on LHS
                                         -c.value,
                                         c.values->data(),
@@ -592,7 +634,7 @@ namespace sfem {
                                        c.surface->extent(1),
                                        mesh->n_nodes(),
                                        c.surface->data(),
-                                       mesh->points()->data(),
+                                       points->data(),
                                        // Use negative sign since we are on LHS
                                        -c.value,
                                        space->block_size(),
@@ -621,22 +663,9 @@ namespace sfem {
 
         for (auto &c : nc->impl_->conditions) {
             if (!c.surface) {
-                auto st   = shell_type(side_type(space->element_type()));
-                int  nnxs = elem_num_nodes(st);
-
-                auto surface = sfem::create_host_buffer<idx_t>(nnxs, c.sideset->parent()->size());
-                auto mesh    = space->mesh_ptr();
-                if (extract_surface_from_sideset(space->element_type(),
-                                                 mesh->elements()->data(),
-                                                 c.sideset->parent()->size(),
-                                                 c.sideset->parent()->data(),
-                                                 c.sideset->lfi()->data(),
-                                                 surface->data()) != SFEM_SUCCESS) {
-                    SFEM_ERROR("Unable to create surface from sideset!");
-                }
-
-                c.surface      = surface;
-                c.element_type = st;
+                auto surface   = create_surface_from_sideset(space, c.sideset);
+                c.element_type = surface.first;
+                c.surface      = surface.second;
             }
         }
 
@@ -1199,8 +1228,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    void Output::log_time(const real_t t)
-    {
+    void Output::log_time(const real_t t) {
         if (log_is_empty(&impl_->time_logger)) {
             char path[2048];
             sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
@@ -2692,6 +2720,102 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
+    class SemiStructuredLumpedMass final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum ElemType                  element_type { INVALID };
+
+        const char *name() const override { return "ss:LumpedMass"; }
+        inline bool is_linear() const override { return true; }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::create");
+
+            if (!space->has_semi_structured_mesh()) {
+                SFEM_ERROR(
+                        "[Error] SemiStructuredLumpedMass::create requires space with "
+                        "semi_structured_mesh!\n");
+            }
+
+            assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+            auto ret          = std::make_unique<SemiStructuredLumpedMass>(space);
+            ret->element_type = (enum ElemType)space->element_type();
+
+            return ret;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::derefine_op");
+
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
+            if (space->has_semi_structured_mesh()) {
+                auto ret          = std::make_shared<SemiStructuredLumpedMass>(space);
+                ret->element_type = element_type;
+                return ret;
+            } else {
+                auto ret          = std::make_shared<LumpedMass>(space);
+                ret->element_type = macro_base_elem(element_type);
+                return ret;
+            }
+        }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        SemiStructuredLumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::hessian_diag");
+
+            auto &ssm = space->semi_structured_mesh();
+            if (space->block_size() == 1) {
+                return affine_sshex8_mass_lumped(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), values);
+            } else {
+                const ptrdiff_t n = space->n_dofs() / space->block_size();
+
+                auto buff = create_host_buffer<real_t>(n);
+                real_t *temp = buff->data();
+                int err = affine_sshex8_mass_lumped(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), temp);
+
+                if (err) SFEM_ERROR("Failure in affine_sshex8_mass_lumped\n");
+
+                int bs = space->block_size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; i++) {
+                    for (int b = 0; b < bs; b++) {
+                        values[i * bs + b] += temp[i];
+                    }
+                }
+            }
+        }
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            assert(0);
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
     class CVFEMMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -3125,6 +3249,7 @@ namespace sfem {
             instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
+            instance_.private_register_op("ss:LumpedMass", SemiStructuredLumpedMass::create);
             instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
             instance_.private_register_op("ss:SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
