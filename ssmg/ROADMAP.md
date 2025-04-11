@@ -152,6 +152,21 @@ MS := Milestone
 **MS 4:**
    - [ ] Proof-reading P3
 
+
+### Gabriele
+   - [ ] Collects and presents the convergence numbers of the MATLAB-based problems for P1 
+   - [ ] Total number of iterations, inner iterations, number of linearizations, total number of smoothing steps, local energy norm, convergence rate (energy?), Penetration norm, difference from reference solution
+   - [ ] 2D scalar problems, obstacle problem with source term and obstacle
+         1. Create 2D meshes using Trelis scripting (with increasing resolution, max resolution 100K), Square 
+         3. Compare with monotone MG
+         
+   - [ ] 3D problems
+         1. One sphere problem
+         2. Multi-sphere problem
+         3. Complex surface problem
+   - [ ] Show, contact stresses 
+
+
 ### Nice to have (When there is time or requests)
 
 - [ ] YML config for parameters
