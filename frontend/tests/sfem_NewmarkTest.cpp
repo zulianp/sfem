@@ -16,15 +16,17 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    int SFEM_BASE_RESOLUTION = 4;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    int  res = 16;
-    auto m   = sfem::Mesh::create_hex8_cube(comm,
+    int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(comm,
                                           // Grid
-                                          res * 2,
-                                          res,
-                                          res,
+                                          SFEM_BASE_RESOLUTION * 2,
+                                          SFEM_BASE_RESOLUTION,
+                                          SFEM_BASE_RESOLUTION,
                                           // Geometry
                                           0.,
                                           0.,
@@ -35,7 +37,10 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+        // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    }
 
     auto f = sfem::Function::create(fs);
 
@@ -49,12 +54,20 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 0, .component = 1};
     sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 2};
 
+#if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
     f->add_constraint(d_conds);
 
     sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
+#else // Test with Dirichlet only (in case diable test_newmark)
+    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0.2, .component = 0};
+    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0.2, .component = 1};
+    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0.2, .component = 2};
+    auto d_conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2, right0, right1, right2}, es);
+    f->add_constraint(d_conds);
+#endif
 
     auto linear_elasticity = sfem::create_op(fs, "LinearElasticity", es);
     linear_elasticity->initialize();
@@ -99,7 +112,11 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->enable_AoS_to_SoA(fs->block_size() > 1);
     output->set_output_dir(output_dir.c_str());
 
-    fs->mesh_ptr()->write(output_dir.c_str());
+    if (fs->has_semi_structured_mesh()) {
+        fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
+    } else {
+        fs->mesh_ptr()->write(output_dir.c_str());
+    }
     return output;
 }
 
@@ -118,20 +135,22 @@ int test_explicit_euler() {
     auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     real_t dt          = 0.0001;
-    real_t T           = 5 * dt;
+    real_t T           = 50 * dt;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
 
-    bool enable_output = false;
+    bool SFEM_EXPLICIT_EULER_ENABLE_OUTPUT = false;
+    SFEM_READ_ENV(SFEM_EXPLICIT_EULER_ENABLE_OUTPUT, atoi);
 
-    if (enable_output) {
-        output->log_time(t);
+    if (SFEM_EXPLICIT_EULER_ENABLE_OUTPUT) {
         output->write_time_step("disp", t, displacement->data());
 
         blas->zeros(g->size(), g->data());
         f->gradient(displacement->data(), g->data());
         output->write_time_step("g", t, g->data());
+
+        output->log_time(t);
     }
 
     while (t < T) {
@@ -143,15 +162,15 @@ int test_explicit_euler() {
         t += dt;
 
         // Output
-        if (++steps % export_freq == 0 && enable_output) {
-            output->log_time(t);
-
+        if (++steps % export_freq == 0 && SFEM_EXPLICIT_EULER_ENABLE_OUTPUT) {
             // Write to disk
             output->write_time_step("disp", t, displacement->data());
 
             blas->zeros(g->size(), g->data());
             f->gradient(displacement->data(), g->data());
             output->write_time_step("g", t, g->data());
+
+            output->log_time(t);
         }
     }
 
@@ -173,36 +192,44 @@ int test_newmark() {
     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
     auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
     auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    
     auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto            solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto            g            = sfem::create_buffer<real_t>(ndofs, es);
 
-    real_t dt          = 0.1;
-    real_t T           = 4;
+    real_t dt          = 0.2;
+    real_t T           = 16;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
     int    nliter      = 1;
 
-    bool enable_output = true;
-    if (enable_output) {
-        output->log_time(t);
+    bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
+    SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
+
+    if (SFEM_NEWMARK_ENABLE_OUTPUT) {
         output->write_time_step("disp", t, displacement->data());
         output->write_time_step("velocity", t, velocity->data());
         output->write_time_step("acceleration", t, acceleration->data());
+
+        // If no issues encountered we log the time
+        output->log_time(t);
     }
 
     while (t < T) {
         for (int k = 0; k < nliter; k++) {
-            // This could be put out of the loop since the operator is linear. 
+            // This could be put out of the loop since the operator is linear.
             // We will do nonlinear materials next, so we keep it here.
             auto material_op = sfem::create_linear_operator("MF", f, solution, es);
             auto linear_op   = sfem::make_op<real_t>(
                     material_op->rows(),
                     material_op->cols(),
                     [=](const real_t *const x, real_t *const y) {
-                        blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
-                        blas->scal(ndofs, 4 / (dt * dt), y);
+                        {
+                            SFEM_TRACE_SCOPE("Newmark::hessian_apply_integr");
+                            blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
+                            blas->scal(ndofs, 4 / (dt * dt), y);
+                        }
                         material_op->apply(x, y);
                     },
                     es);
@@ -243,14 +270,16 @@ int test_newmark() {
         blas->copy(ndofs, solution->data(), displacement->data());
 
         t += dt;
-        if (++steps % export_freq == 0 && enable_output) {
+        if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
             printf("%g/%g\n", double(t), double(T));
-            output->log_time(t);
 
             // Write to disk
             output->write_time_step("disp", t, displacement->data());
             output->write_time_step("velocity", t, velocity->data());
             output->write_time_step("acceleration", t, acceleration->data());
+
+            // If no issues encountered we log the time
+            output->log_time(t);
         }
     }
 
