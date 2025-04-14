@@ -268,7 +268,7 @@ namespace sfem {
         return conds;
     }
 
-    static std::shared_ptr<NeumannConditions> create_neumann_conditions(
+    static std::shared_ptr<Op> create_neumann_conditions(
             const std::shared_ptr<FunctionSpace>            &space,
             const std::vector<NeumannConditions::Condition> &conditions,
             const ExecutionSpace                             es) {
