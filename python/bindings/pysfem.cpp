@@ -427,18 +427,19 @@ NB_MODULE(pysfem, m) {
               dc->apply_value(value, y.data());
           });
 
-    m.def("add_condition",
-          [](std::shared_ptr<NeumannConditions> &nc,
-             nb::ndarray<idx_t>
-                     idx,
-             const int component,
-             const real_t value) {
-              size_t n = idx.size();
-              auto c_idx = (idx_t *)malloc(n * sizeof(idx_t));
-              memcpy(c_idx, idx.data(), n * sizeof(idx_t));
+    // FIXME
+    // m.def("add_condition",
+    //       [](std::shared_ptr<NeumannConditions> &nc,
+    //          nb::ndarray<idx_t>
+    //                  idx,
+    //          const int component,
+    //          const real_t value) {
+    //           size_t n = idx.size();
+    //           auto c_idx = (idx_t *)malloc(n * sizeof(idx_t));
+    //           memcpy(c_idx, idx.data(), n * sizeof(idx_t));
 
-              nc->add_condition(n, n, c_idx, component, value);
-          });
+    //           nc->add_condition(n, n, c_idx, component, value);
+    //       });
 
     nb::class_<Operator_t>(m, "Operator")
             .def("__add__",
