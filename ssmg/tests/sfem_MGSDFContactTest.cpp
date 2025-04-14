@@ -159,7 +159,6 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-
     int SFEM_N_SPHERES = 2;
     SFEM_READ_ENV(SFEM_N_SPHERES, atoi);
     auto sdf = sfem::create_sdf(comm,
@@ -173,7 +172,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                 y_top * 0.5,
                                 1.1,
                                 [SFEM_N_SPHERES](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
-                                    geom_t dd        = 1000000;
+                                    geom_t       dd = 1000000;
                                     const geom_t hx = 1. / (SFEM_N_SPHERES + 1);
                                     const geom_t hz = 1. / (SFEM_N_SPHERES + 1);
                                     const geom_t hy = 1. / (SFEM_N_SPHERES + 1);
@@ -181,14 +180,14 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                     for (int i = 0; i < SFEM_N_SPHERES; i++) {
                                         for (int j = 0; j < SFEM_N_SPHERES; j++) {
                                             geom_t cx = hx + i * hx, cy = -0.1, cz = hz + j * hz;
-                                            geom_t radius = 1./(8 + SFEM_N_SPHERES);
+                                            geom_t radius = 1. / (8 + SFEM_N_SPHERES);
 
                                             const geom_t dx = cx - x;
                                             const geom_t dy = cy - y;
                                             const geom_t dz = cz - z;
 
                                             const geom_t ddij = radius - sqrt(dx * dx + dy * dy + dz * dz);
-                                            dd = fabs(ddij) < fabs(dd) ? ddij : dd;
+                                            dd                = fabs(ddij) < fabs(dd) ? ddij : dd;
                                         }
                                     }
 
@@ -288,10 +287,10 @@ int test_contact() {
 
     if (SFEM_USE_SPMG) {
         std::shared_ptr<sfem::Input> in;
-        const char * SFEM_SSMGC_YAML{nullptr};
+        const char                  *SFEM_SSMGC_YAML{nullptr};
         SFEM_READ_ENV(SFEM_SSMGC_YAML, );
 
-        if(SFEM_SSMGC_YAML) {
+        if (SFEM_SSMGC_YAML) {
             in = sfem::YAMLNoIndent::create_from_file(SFEM_SSMGC_YAML);
         }
 
@@ -307,7 +306,7 @@ int test_contact() {
     auto blas = sfem::blas<real_t>(es);
     blas->zeros(rhs->size(), rhs->data());
     f->gradient(x->data(), rhs->data());
-    
+
     blas->zeros(x->size(), x->data());
     contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
     out->write("contact_stress", x->data());
