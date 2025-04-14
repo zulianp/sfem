@@ -290,6 +290,8 @@ namespace sfem {
         ~Impl() {}
 
         void displace_points(const real_t *disp) {
+            assert(!is_ptr_device(disp));
+
             if (space->has_semi_structured_mesh()) {
                 displace_points_semistructured(disp);
                 return;

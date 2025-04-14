@@ -59,8 +59,9 @@ namespace sfem {
 
         buffer_host_to_device(n0 * sizeof(T *), host_dev_ptrs.data(), dev_buff0);
 
-        return std::make_shared<Buffer<T*>>(
-                n0, n1,
+        return std::make_shared<Buffer<T *>>(
+                n0,
+                n1,
                 dev_buff0,
                 [n0, host_dev_ptrs](int n, void **ptr) {
                     for (size_t i0 = 0; i0 < n0; i0++) {
