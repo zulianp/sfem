@@ -39,7 +39,7 @@ def run(path_mesh, name_op):
 	space.promote_to_semi_structured(8) 
 	print(f'FINE: #dofs {space.n_dofs()}')
 
-	coarse_space = space.derefine()
+	coarse_space = space.derefine(1)
 
 	# Geometric P/R
 	prolongation = sfem.create_hierarchical_prolongation(coarse_space, space, execution_space)
