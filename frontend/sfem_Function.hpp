@@ -188,6 +188,10 @@ namespace sfem {
         int  value(const real_t  */*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
     };
 
+    inline std::shared_ptr<NoOp> no_op() {
+        return std::make_shared<NoOp>();
+    }
+
     class NeumannConditions final : public Op {
     public:
         struct Condition {
@@ -225,6 +229,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int n_conditions() const;
+        std::shared_ptr<FunctionSpace> space();
+        std::vector<struct Condition> &conditions();
 
     private:
         class Impl;

@@ -9,6 +9,7 @@
 #include "sfem_Buffer.hpp"
 
 #include <memory>
+#include <vector>
 
 namespace sfem {
 
