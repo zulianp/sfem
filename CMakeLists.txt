@@ -113,17 +113,18 @@ endif()
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda
-        operators/cuda
         frontend/cuda
-        operators/tet4/cuda
-        operators/macro_tet4/cuda
-        operators/tet10/cuda
-        operators/sstet4/cuda
-        operators/hex8/cuda
-        operators/sshex8/cuda
-        operators/hierarchical/cuda
-        resampling/cuda
         operators/boundary_conditions/cuda
+        operators/cuda
+        operators/hex8/cuda
+        operators/hierarchical/cuda
+        operators/macro_tet4/cuda
+        operators/quadshell4/cuda
+        operators/sshex8/cuda
+        operators/sstet4/cuda
+        operators/tet10/cuda
+        operators/tet4/cuda
+        resampling/cuda
         )
 
     if(SFEM_ENABLE_AMG)

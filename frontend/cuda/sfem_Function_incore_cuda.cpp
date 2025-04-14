@@ -220,6 +220,9 @@ namespace sfem {
                                                   .values       = (c.values) ? to_device(c.values) : nullptr,
                                                   .value        = c.value,
                                                   .component    = c.component};
+
+                // TODO Nodal to elemental for coordinates
+                                                  
                 conditions.push_back(cond);
             }
         }
