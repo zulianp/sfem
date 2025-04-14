@@ -661,15 +661,67 @@ namespace sfem {
         auto nc               = std::make_unique<NeumannConditions>(space);
         nc->impl_->conditions = conditions;
 
+        std::map<  //
+                std::shared_ptr<Sideset>,
+                std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>>>
+                sideset_to_surface;
+
         for (auto &c : nc->impl_->conditions) {
             if (!c.surface) {
-                auto surface   = create_surface_from_sideset(space, c.sideset);
-                c.element_type = surface.first;
-                c.surface      = surface.second;
+                auto it = sideset_to_surface.find(c.sideset);
+                if (it == sideset_to_surface.end()) {
+                    auto surface                  = create_surface_from_sideset(space, c.sideset);
+                    c.element_type                = surface.first;
+                    c.surface                     = surface.second;
+                    sideset_to_surface[c.sideset] = surface;
+                } else {
+                    c.element_type = it->second.first;
+                    c.surface      = it->second.second;
+                }
             }
         }
 
         return nc;
+    }
+
+    std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) {
+        // std::map<  //
+        //         std::shared_ptr<Sideset>,
+        //         std::shared_ptr<Buffer<idx_t *>>>
+        //         sideset_to_surface;
+
+        // auto  coarse = std::make_shared<NeumannConditions>(derefined_space);
+        // auto &conds  = impl_->conditions;
+
+        // for (auto &c : nc->impl_->conditions) {
+        //     auto it = sideset_to_surface.find(c.sideset);
+
+        //     struct Condition cc = {.element_type = c.element_type,
+        //                            .sideset      = c.sideset,
+        //                            .surface      = nullptr,
+        //                            .values       = nullptr,
+        //                            .value        = c.value,
+        //                            .component    = c.component};
+
+        //     if (it == sideset_to_surface.end()) {
+        //         // Derefine surface
+        //     } else {
+        //         // Reuse derefined surface
+        //         cc.surface = it->second;
+        //     }
+
+        //     if (c.values) {
+        //         // Restrict values
+        //         SFEM_ERROR("IMPLEMENT ME!\n");
+        //     }
+
+        //     conds.push_back(cc);
+        // }
+
+        // auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, fine_sides);
+
+        // SFEM_ERROR("NOT NEEDED FOR NEUMANN!\n")
+        return std::make_shared<NoOp>();
     }
 
     int Constraint::apply_zero(real_t *const x) { return apply_value(0, x); }
@@ -1592,7 +1644,10 @@ namespace sfem {
         auto ret = std::make_shared<Function>(space);
 
         for (auto &o : impl_->ops) {
-            ret->impl_->ops.push_back(o->derefine_op(space));
+            auto dop = o->derefine_op(space);
+            if (!dop->is_no_op()) {
+                ret->impl_->ops.push_back(dop);
+            }
         }
 
         for (auto &c : impl_->constraints) {
@@ -2773,9 +2828,9 @@ namespace sfem {
             } else {
                 const ptrdiff_t n = space->n_dofs() / space->block_size();
 
-                auto buff = create_host_buffer<real_t>(n);
+                auto    buff = create_host_buffer<real_t>(n);
                 real_t *temp = buff->data();
-                int err = affine_sshex8_mass_lumped(
+                int     err  = affine_sshex8_mass_lumped(
                         ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), temp);
 
                 if (err) SFEM_ERROR("Failure in affine_sshex8_mass_lumped\n");
