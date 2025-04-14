@@ -15,6 +15,9 @@
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
+// C++ includes
+#include "sfem_SemiStructuredMesh.hpp"
+
 namespace sfem {
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
@@ -203,12 +206,67 @@ namespace sfem {
         return std::make_shared<GPUDirichletConditions>(dc);
     }
 
-    // class GPUNeumannConditions final : public Op {
-    // public:
-    //     GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &dc) {
-    //         assert(false && "IMPLEMENT ME!");
-    //     }
-    // };
+    class GPUNeumannConditions final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace>                   space;
+        std::shared_ptr<NeumannConditions>               h_neumann;
+        std::vector<struct NeumannConditions::Condition> conditions;
+
+        GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
+            for (auto &c : nc->conditions()) {
+                NeumannConditions::Condition cond{.element_type = c.element_type,
+                                                  .sideset      = (c.sideset) ? to_device(c.sideset) : nullptr,
+                                                  .surface      = to_device(c.surface),
+                                                  .values       = (c.values) ? to_device(c.values) : nullptr,
+                                                  .value        = c.value,
+                                                  .component    = c.component};
+                conditions.push_back(cond);
+            }
+        }
+
+        const char *name() const override
+        {
+            return "gpu:NeumannConditions";
+        }
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override
+        {
+            return SFEM_SUCCESS;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override
+        {
+            SFEM_ERROR("IMPLEMENT ME!");
+            return SFEM_SUCCESS;
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override
+        {
+            return SFEM_SUCCESS;
+        }
+
+        int value(const real_t *x, real_t *const out) override
+        {
+            return SFEM_SUCCESS;
+        }
+
+        inline bool is_linear() const override { return true; }
+
+        int n_conditions() const;
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            // auto h_derefined = h_neumann->derefine_op(derefined_space);
+            // return std::make_shared<GPUNeumannConditions>(h_derefined);
+            return no_op();
+        }
+    };
+
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
+        return std::make_shared<GPUNeumannConditions>(nc);
+    }
 
     class GPULaplacian final : public Op {
     public:

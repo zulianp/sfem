@@ -8,9 +8,15 @@
 
 // #include <cuda_runtime.h>
 
+#include "sfem_CRSGraph.hpp"
+#include "sfem_Buffer.hpp"
+
+#include <memory>
+
 namespace sfem {
     void register_device_ops();
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements(
             const std::shared_ptr<FunctionSpace> &space,
@@ -35,6 +41,12 @@ namespace sfem {
 
         return
             std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T*>> to_device(const std::shared_ptr<Buffer<T*>> &in) {
+        SFEM_ERROR("IMPLEMENT ME!");
+        return nullptr;
     }
 
 

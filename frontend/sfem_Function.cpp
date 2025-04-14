@@ -430,6 +430,9 @@ namespace sfem {
         ~Impl() {}
     };
 
+    std::shared_ptr<FunctionSpace> NeumannConditions::space() { return impl_->space; }
+    std::vector<struct NeumannConditions::Condition> &NeumannConditions::conditions() { return impl_->conditions; }
+
     int NeumannConditions::n_conditions() const { return impl_->conditions.size(); }
 
     const char *NeumannConditions::name() const { return "NeumannConditions"; }
@@ -721,7 +724,7 @@ namespace sfem {
         // auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, fine_sides);
 
         // SFEM_ERROR("NOT NEEDED FOR NEUMANN!\n")
-        return std::make_shared<NoOp>();
+        return no_op();
     }
 
     int Constraint::apply_zero(real_t *const x) { return apply_value(0, x); }
