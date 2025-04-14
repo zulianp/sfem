@@ -35,6 +35,7 @@
 #else
 namespace sfem {
     static void device_synchronize() {}
+    static bool is_ptr_device(const void *) { return false; }
 }  // namespace sfem
 #endif
 
@@ -268,10 +269,9 @@ namespace sfem {
         return conds;
     }
 
-    static std::shared_ptr<Op> create_neumann_conditions(
-            const std::shared_ptr<FunctionSpace>            &space,
-            const std::vector<NeumannConditions::Condition> &conditions,
-            const ExecutionSpace                             es) {
+    static std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                         const std::vector<NeumannConditions::Condition> &conditions,
+                                                         const ExecutionSpace                             es) {
         auto conds = sfem::NeumannConditions::create(space, conditions);
 
 #ifdef SFEM_ENABLE_CUDA

@@ -224,34 +224,23 @@ namespace sfem {
             }
         }
 
-        const char *name() const override
-        {
-            return "gpu:NeumannConditions";
-        }
+        const char *name() const override { return "gpu:NeumannConditions"; }
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
-                        real_t *const        values) override
-        {
+                        real_t *const        values) override {
             return SFEM_SUCCESS;
         }
 
-        int gradient(const real_t *const x, real_t *const out) override
-        {
+        int gradient(const real_t *const x, real_t *const out) override {
             SFEM_ERROR("IMPLEMENT ME!");
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override
-        {
-            return SFEM_SUCCESS;
-        }
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
 
-        int value(const real_t *x, real_t *const out) override
-        {
-            return SFEM_SUCCESS;
-        }
+        int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
 
         inline bool is_linear() const override { return true; }
 
