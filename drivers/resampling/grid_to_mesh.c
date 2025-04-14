@@ -437,6 +437,9 @@ int main(int argc, char* argv[]) {
             // double min_temp = temp[0];
 
             n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+
+            printf("nlocal: %ld %ld %ld, %s:%d\n", nlocal[0], nlocal[1], nlocal[2], __FILE__, __LINE__);
+
             field = malloc(n_zyx * sizeof(real_t));
 
             // TODO: are data to analyze the results

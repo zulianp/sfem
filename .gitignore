@@ -248,3 +248,4 @@ heat_equation
 workflows/resample/data_5_tet10/metadata_sdf.float32.yml
 workflows/resample/data_5_tet10/metadata_sdf.float32.yml
 workflows/resample/data_5_tet4/metadata_sdf.float32.yml
+workflows/resample/metadata_test_field_t10.yml
