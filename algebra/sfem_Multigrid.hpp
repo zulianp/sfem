@@ -177,6 +177,10 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>>& restrictions() { return restriction_; }
         std::vector<std::shared_ptr<Operator<T>>> smoothers() { return smoother_; }
 
+        void set_execution_space(enum ExecutionSpace es) {
+            execution_space_ = es;
+        }
+
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
         std::vector<std::shared_ptr<Operator<T>>> smoother_;
