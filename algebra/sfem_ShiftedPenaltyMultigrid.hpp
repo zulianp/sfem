@@ -26,7 +26,98 @@ namespace sfem {
     template <typename T>
     static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
 
-    /// level 0 is the finest
+    /**
+     * @class ShiftedPenaltyMultigrid
+     * @brief A multigrid solver with shifted penalty method for constrained optimization problems.
+     *
+     * This class implements a multigrid solver that incorporates a shifted penalty method
+     * to handle constraints. It supports various cycle types (V-cycle, W-cycle) and provides
+     * mechanisms for nonlinear smoothing, penalty parameter updates, and coarse space corrections.
+     * Level 0 is the finest.
+     *
+     * @tparam T The data type for numerical computations (e.g., float, double).
+     *
+     * ### Public Enums:
+     * - `CycleType`: Defines the type of multigrid cycle (V_CYCLE, W_CYCLE).
+     * - `CycleReturnCode`: Return codes for the multigrid cycle (CYCLE_CONTINUE, CYCLE_CONVERGED, CYCLE_FAILURE).
+     *
+     * ### Nested Classes:
+     * - `Memory`: Manages memory buffers for solution, right-hand side, work, and diagonal data.
+     * - `Stats`: Collects and outputs statistics about the solver's performance.
+     *
+     * ### Public Methods:
+     * - `set_upper_bound`: Sets the upper bound for the solution.
+     * - `set_lower_bound`: Sets the lower bound for the solution.
+     * - `set_penalty_parameter`: Sets the penalty parameter for the shifted penalty method.
+     * - `set_constraints_op`: Sets the constraint operators and their transpose.
+     * - `add_level_constraint_op_x_op`: Adds a level-specific constraint operator.
+     * - `apply`: Applies the multigrid solver to solve the system.
+     * - `clear`: Clears all levels and associated data.
+     * - `n_levels`: Returns the number of levels in the multigrid hierarchy.
+     * - `rows`: Returns the number of rows in the finest level operator.
+     * - `cols`: Returns the number of columns in the finest level operator.
+     * - `add_level`: Adds a level to the multigrid hierarchy.
+     * - `add_constraints_restriction`: Adds a restriction operator for constraints.
+     * - `default_init`: Initializes the solver with default settings.
+     * - `set_max_it`: Sets the maximum number of iterations.
+     * - `set_max_inner_it`: Sets the maximum number of inner iterations.
+     * - `set_atol`: Sets the absolute tolerance for convergence.
+     * - `set_nlsmooth_steps`: Sets the number of nonlinear smoothing steps.
+     * - `set_cycle_type`: Sets the type of multigrid cycle.
+     * - `set_project_coarse_space_correction`: Enables or disables coarse space correction projection.
+     * - `set_max_penalty_param`: Sets the maximum penalty parameter.
+     * - `set_penalty_param`: Sets the initial penalty parameter.
+     * - `enable_line_search`: Enables or disables line search for coarse space corrections.
+     * - `collect_energy_norm_correction`: Enables or disables collection of energy norm corrections.
+     * - `set_debug`: Enables or disables debug mode.
+     *
+     * ### Private Methods:
+     * - `make_buffer`: Creates a memory buffer for a given size.
+     * - `ensure_init`: Ensures that the solver is initialized.
+     * - `init`: Initializes the solver's memory and data structures.
+     * - `shifted_op`: Constructs a shifted operator for a given level.
+     * - `eval_residual_and_jacobian`: Evaluates the residual and Jacobian for the current solution.
+     * - `penalty_pseudo_galerkin_assembly`: Assembles the penalty pseudo-Galerkin operator.
+     * - `nonlinear_smooth`: Performs nonlinear smoothing on the finest level.
+     * - `nonlinear_cycle`: Executes a nonlinear multigrid cycle.
+     * - `cycle`: Executes a multigrid cycle for a given level.
+     * - `collect_stats`: Collects solver statistics.
+     * - `write_stats`: Writes solver statistics to a CSV file.
+     * - `monitor`: Monitors and logs the solver's progress.
+     *
+     * ### Private Members:
+     * - `execution_space_`: The execution space for computations (e.g., host or device).
+     * - `operator_`: Operators for each level in the multigrid hierarchy.
+     * - `smoother_`: Smoothers or solvers for each level.
+     * - `prolongation_`: Prolongation operators for each level.
+     * - `restriction_`: Restriction operators for each level.
+     * - `constraints_op_`: Constraint operator for the finest level.
+     * - `constraints_op_transpose_`: Transpose of the constraint operator.
+     * - `constraints_op_x_op_`: Constraint operators for each level.
+     * - `constraints_restriction_`: Restriction operators for constraints.
+     * - `upper_bound_`: Upper bound for the solution.
+     * - `lower_bound_`: Lower bound for the solution.
+     * - `correction`, `lagr_lb`, `lagr_ub`: Buffers for corrections and Lagrange multipliers.
+     * - `memory_`: Memory buffers for each level.
+     * - `wrap_input_`: Flag to indicate whether to wrap input arrays.
+     * - `max_it_`, `iterations_`: Maximum and current iteration counts.
+     * - `cycle_type_`: Type of multigrid cycle.
+     * - `atol_`: Absolute tolerance for convergence.
+     * - `verbose`: Flag for verbose output.
+     * - `project_coarse_space_correction_`: Flag for coarse space correction projection.
+     * - `line_search_enabled_`: Flag for enabling line search.
+     * - `skip_coarse`: Flag to skip coarse grid corrections.
+     * - `collect_energy_norm_correction_`: Flag to collect energy norm corrections.
+     * - `penalty_param_`, `max_penalty_param_`: Penalty parameter and its maximum value.
+     * - `nlsmooth_steps`: Number of nonlinear smoothing steps.
+     * - `max_inner_it`: Maximum number of inner iterations.
+     * - `count_smoothing_steps`: Counter for smoothing steps.
+     * - `debug`: Flag for debug mode.
+     * - `stats`: Vector to store solver statistics.
+     * - `blas_`: BLAS implementation for numerical operations.
+     * - `impl_`: Implementation of the shifted penalty method.
+     */
+
     template <typename T>
     class ShiftedPenaltyMultigrid final : public Operator<T> {
     public:
