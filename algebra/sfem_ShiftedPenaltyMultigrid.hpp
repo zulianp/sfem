@@ -417,10 +417,13 @@ namespace sfem {
         void enable_line_search(const bool val) { line_search_enabled_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const bool val) { debug = val; }
+        void set_execution_space(enum ExecutionSpace es) {
+            execution_space_ = es;
+        }
 
-    private:
         BLAS_Tpl<T>&           blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
+    private:
 
         std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());

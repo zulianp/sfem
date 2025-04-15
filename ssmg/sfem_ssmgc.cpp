@@ -319,7 +319,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
-            mg->execution_space_ = EXECUTION_SPACE_DEVICE;
+            mg->set_execution_space(EXECUTION_SPACE_DEVICE);
         } else
 #endif
         {
