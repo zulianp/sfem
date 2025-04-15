@@ -754,7 +754,6 @@ namespace sfem {
                      const T   norm_rpen,
                      const T   penetration_tol,
                      const T   penalty_param) {
-            // if (iter == max_it_ || (norm_pen < atol_ && norm_rpen < atol_)) {
             printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
                    "penalty_param "
                    "%e\n",
@@ -766,7 +765,6 @@ namespace sfem {
                    norm_rpen,
                    penetration_tol,
                    penalty_param);
-            // }
         }
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
