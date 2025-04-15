@@ -879,18 +879,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
                                                  &tets_capacity,       // The current capacity of the array
                                                  tet_delta_capacity);  // The delta capacity of the array
 
-            // if (tets_size >= tets_capacity) {
-            //     tets_capacity += tet_delta_capacity;
-            //     *tets_out = realloc(*tets_out, sizeof(struct tet_vertices) * tets_capacity);
-            //     if (tets_out == NULL) {
-            //         fprintf(stderr, "ERROR: realloc failed\n");
-            //         exit(1);
-            //     }
-            // }
-
-            // (*tets_out)[tets_size] = *tet_head;
-            // tets_size++;
-            // total_refined_tets++;
+            total_refined_tets++;
 
             if (tets_size >= max_refined_tets) {
                 while (sfem_stack_size(stack) > 0) {
@@ -902,6 +891,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
                                                          &tets_capacity,       // The current capacity of the array
                                                          tet_delta_capacity);  // The delta capacity of the array
                     free(tet_loc);
+                    total_refined_tets++;
                 }
 
                 flag_loop = 0;
@@ -973,7 +963,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
     free(tets_ref);
     tets_ref = NULL;
 
-    return total_refined_tets;
+    return tets_size;
 }
 
 //////////////////////////////////////////////////////////
@@ -1066,26 +1056,6 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
                                            alpha_th,               //
                                            100,                    // Maximum number of tets
                                            &tets_iter);            // Output
-
-        // real_t vol_base = tet4_measure_v2(x0,
-        //                                   x1,
-        //                                   x2,
-        //                                   x3,
-        //                                   //
-        //                                   y0,
-        //                                   y1,
-        //                                   y2,
-        //                                   y3,
-        //                                   //
-        //                                   z0,
-        //                                   z1,
-        //                                   z2,
-        //                                   z3);
-        // real_t* V        = malloc(sizeof(real_t) * n_tets);
-        // real_t  vol_iter = volume_tet_array(tets_iter, n_tets, V);
-        // free(V);
-        // V = NULL;
-        // printf("tet4_iterative_refinement: vol_base = %g, vol_iter = %g, n_tets: %d\n", vol_base, vol_iter, n_tets);
 
         for (int tet_id = 0; tet_id < n_tets; tet_id++) {
             // Volume of the tetrahedron
