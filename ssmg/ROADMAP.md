@@ -123,15 +123,24 @@ MS := Milestone
 **MS 3: ()**
 
    - [ ] GPU porting of all missing discretization routines (Operators, SDF sampling, some algebra)
+   - [ ] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
+   - [ ] GPU: Shiftable Jacobi
+   - [ ] GPU: constaints_mask 
+   - [ ] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
+   - [ ] GPU: ssquad4_restrict
+   - [ ] GPU: SparseBlockVector
 
 **MS 4: ()**
 
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
+   
 
 **MS (optional):**
 
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
+   - [ ] Explore high-order HEXA
+   - [ ] Explore sum factorization algorithm for HEX8
 
 
 ### Hardik

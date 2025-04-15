@@ -37,7 +37,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     const int n = base_resolution * fs->semi_structured_mesh().level();
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -88,7 +88,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     const int n = base_resolution * fs->semi_structured_mesh().level();
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -150,7 +150,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     const int n = base_resolution * fs->semi_structured_mesh().level();
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.1, .component = 1};
+    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
@@ -210,6 +210,12 @@ int test_contact() {
     // if (SFEM_EXECUTION_SPACE) {
     //     es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     // }
+
+    // PLAN:
+    // Keep contact conditions on the host, sample gaps and normals on the host and transfer to device
+    // Operators and blas on the device
+    // 1) Shifted Penalty
+    // 2) SPMG
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
@@ -294,10 +300,10 @@ int test_contact() {
             in = sfem::YAMLNoIndent::create_from_file(SFEM_SSMGC_YAML);
         }
 
-        auto solver = sfem::create_ssmgc(f, contact_conds, es, in);
+        auto solver = sfem::create_ssmgc(f, contact_conds, in);
         solver->apply(rhs->data(), x->data());
     } else {
-        auto solver = sfem::create_shifted_penalty(f, contact_conds, es, nullptr);
+        auto solver = sfem::create_shifted_penalty(f, contact_conds, nullptr);
         solver->apply(rhs->data(), x->data());
     }
 
