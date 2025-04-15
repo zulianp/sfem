@@ -127,7 +127,8 @@ MS := Milestone
    - [ ] GPU: Shiftable Jacobi
    - [ ] GPU: constaints_mask 
    - [ ] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
-   - [ ] GPU: ssquad4_restrict
+   - [ ] GPU: sshex8_restrict and sshex8_prolongate
+   - [ ] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector
 
 **MS 4: ()**
