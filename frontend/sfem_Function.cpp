@@ -2846,6 +2846,8 @@ namespace sfem {
                     }
                 }
             }
+
+            return SFEM_SUCCESS;
         }
 
         int hessian_crs(const real_t *const  x,
