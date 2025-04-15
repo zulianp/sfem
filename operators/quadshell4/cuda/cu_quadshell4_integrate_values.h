@@ -10,7 +10,7 @@ extern "C" {
 int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
                                   const ptrdiff_t                    stride,  // Stride for elements and coords
                                   const idx_t *const SFEM_RESTRICT   elements,
-                                  const geom_t **const SFEM_RESTRICT coords,
+                                  const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                                   const real_t                       value,
                                   const int                          block_size,
                                   const int                          component,
@@ -21,7 +21,7 @@ int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
 int cu_quadshell4_integrate_values(const ptrdiff_t                    nelements,
                                    const ptrdiff_t                    stride,  // Stride for elements and coords
                                    const idx_t *const SFEM_RESTRICT   elements,
-                                   const geom_t **const SFEM_RESTRICT coords,
+                                   const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                                    const enum RealType                real_type,
                                    void *const SFEM_RESTRICT          values,
                                    const int                          block_size,

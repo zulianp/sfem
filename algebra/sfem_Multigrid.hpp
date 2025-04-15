@@ -16,8 +16,8 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_Tracer.hpp"
-#include "sfem_tpl_blas.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_tpl_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 namespace sfem {
@@ -27,8 +27,8 @@ namespace sfem {
     class Multigrid final : public Operator<T> {
     public:
         BLAS_Tpl<T> blas_;
-        bool verbose{true};
-        bool debug{false};
+        bool        verbose{true};
+        bool        debug{false};
 
         enum CycleType {
             V_CYCLE = 1,
@@ -42,7 +42,7 @@ namespace sfem {
             std::shared_ptr<Buffer<T>> rhs;
             std::shared_ptr<Buffer<T>> solution;
             std::shared_ptr<Buffer<T>> work;
-            inline ptrdiff_t size() const { return solution->size(); }
+            inline ptrdiff_t           size() const { return solution->size(); }
             ~Memory() {}
         };
 
@@ -57,11 +57,9 @@ namespace sfem {
 
             // Wrap input arrays into fine level of mg
             if (wrap_input_) {
-                memory_[finest_level()]->solution =
-                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
+                memory_[finest_level()]->solution = Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
 
-                memory_[finest_level()]->rhs =
-                        Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
+                memory_[finest_level()]->rhs = Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
             }
 
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
@@ -113,8 +111,8 @@ namespace sfem {
         int test_interp() {
             ensure_init();
 
-            auto finest_A = operator_[0];
-            int finest_dim = finest_A->rows();
+            auto finest_A   = operator_[0];
+            int  finest_dim = finest_A->rows();
             auto finest_vec = create_host_buffer<T>(finest_dim);
             auto finest_out = create_host_buffer<T>(finest_dim);
             for (int i = 0; i < finest_dim; i++) {
@@ -126,12 +124,12 @@ namespace sfem {
 
             int failure = 0;
             for (int level = 0; level < n_levels() - 1; level++) {
-                auto pt = restriction_[level];
-                auto p = prolongation_[level + 1];
-                auto A = operator_[level];
-                auto Ac = operator_[level + 1];
-                int coarse_dim = Ac->rows();
-                int fine_dim = A->rows();
+                auto pt         = restriction_[level];
+                auto p          = prolongation_[level + 1];
+                auto A          = operator_[level];
+                auto Ac         = operator_[level + 1];
+                int  coarse_dim = Ac->rows();
+                int  fine_dim   = A->rows();
 
                 assert(p->rows() == coarse_dim);
                 assert(p->cols() == fine_dim);
@@ -148,9 +146,9 @@ namespace sfem {
                 T ac1 = this->blas().norm2(coarse_dim, out1->data());
                 printf("Level %d: ||Ac 1|| = %f\n", level, ac1);
 
-                auto temp = create_host_buffer<T>(fine_dim);
+                auto temp  = create_host_buffer<T>(fine_dim);
                 auto temp2 = create_host_buffer<T>(fine_dim);
-                auto out2 = create_host_buffer<T>(coarse_dim);
+                auto out2  = create_host_buffer<T>(coarse_dim);
                 p->apply(coarse_vec->data(), temp->data());
                 /* only nueman
                     for (int i = 0; i < fine_dim; i++) {
@@ -175,11 +173,9 @@ namespace sfem {
 
         std::vector<std::shared_ptr<Operator<T>>>& operators() { return operator_; }
         std::vector<std::shared_ptr<Operator<T>>>& restrictions() { return restriction_; }
-        std::vector<std::shared_ptr<Operator<T>>> smoothers() { return smoother_; }
+        std::vector<std::shared_ptr<Operator<T>>>  smoothers() { return smoother_; }
 
-        void set_execution_space(enum ExecutionSpace es) {
-            execution_space_ = es;
-        }
+        void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
 
     private:
         std::vector<std::shared_ptr<Operator<T>>> operator_;
@@ -190,12 +186,12 @@ namespace sfem {
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
-        bool wrap_input_{true};
+        bool                                 wrap_input_{true};
 
         int max_it_{10};
         int iterations_{0};
         int cycle_type_{V_CYCLE};
-        T atol_{1e-10};
+        T   atol_{1e-10};
 
         T norm_residual_0{1};
         T norm_residual_previous{1};
@@ -226,14 +222,14 @@ namespace sfem {
 
                 size_t n = smoother_[l]->rows();
                 if (l != finest_level() || !wrap_input_) {
-                    auto x = this->blas().allocate(n);
+                    auto x               = this->blas().allocate(n);
                     memory_[l]->solution = Buffer<T>::own(n, x, this->blas().destroy);
 
-                    auto r = this->blas().allocate(n);
+                    auto r          = this->blas().allocate(n);
                     memory_[l]->rhs = Buffer<T>::own(n, r, this->blas().destroy);
                 }
 
-                auto w = this->blas().allocate(n);
+                auto w           = this->blas().allocate(n);
                 memory_[l]->work = Buffer<T>::own(n, w, this->blas().destroy);
             }
 
@@ -241,7 +237,7 @@ namespace sfem {
         }
 
         CycleReturnCode cycle(const int level) {
-            auto mem = memory_[level];
+            auto mem      = memory_[level];
             auto smoother = smoother_[level];
 
             if (coarsest_level() == level) {
@@ -251,8 +247,7 @@ namespace sfem {
                         this->blas().zeros(mem->size(), mem->work->data());
                         operator_[level]->apply(mem->solution->data(), mem->work->data());
                         this->blas().axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                        printf("|| r_H || = %g\n",
-                               this->blas().norm2(mem->work->size(), mem->work->data()));
+                        printf("|| r_H || = %g\n", this->blas().norm2(mem->work->size(), mem->work->data()));
                     }
                     return CYCLE_CONTINUE;
                 } else {
@@ -260,10 +255,10 @@ namespace sfem {
                 }
             }
 
-            auto op = operator_[level];
-            auto restriction = restriction_[level];
+            auto op           = operator_[level];
+            auto restriction  = restriction_[level];
             auto prolongation = prolongation_[coarser_level(level)];
-            auto mem_coarse = memory_[coarser_level(level)];
+            auto mem_coarse   = memory_[coarser_level(level)];
 
             for (int k = 0; k < this->cycle_type_; k++) {
                 smoother->apply(mem->rhs->data(), mem->solution->data());
@@ -278,7 +273,7 @@ namespace sfem {
                         T norm_residual = this->blas().norm2(mem->work->size(), mem->work->data());
 
                         if (iterations_ == 0) {
-                            norm_residual_0 = norm_residual;
+                            norm_residual_0        = norm_residual;
                             norm_residual_previous = norm_residual;
 
                             if (verbose) {
@@ -319,8 +314,7 @@ namespace sfem {
                 {
                     if (debug) {
                         printf("|| c_H || = %g\n",
-                               (double)this->blas().norm2(mem_coarse->solution->size(),
-                                                        mem_coarse->solution->data()));
+                               (double)this->blas().norm2(mem_coarse->solution->size(), mem_coarse->solution->data()));
                     }
 
                     // Prolongation
@@ -328,8 +322,7 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
                     if (debug) {
-                        printf("|| c_h || = %g\n",
-                               (double)this->blas().norm2(mem->work->size(), mem->work->data()));
+                        printf("|| c_h || = %g\n", (double)this->blas().norm2(mem->work->size(), mem->work->data()));
                     }
 
                     // Apply coarse space correction
@@ -340,8 +333,7 @@ namespace sfem {
                     this->blas().zeros(mem->size(), mem->work->data());
                     op->apply(mem->solution->data(), mem->work->data());
                     this->blas().axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
-                    printf("|| r_h || = %g\n",
-                           this->blas().norm2(mem->work->size(), mem->work->data()));
+                    printf("|| r_h || = %g\n", this->blas().norm2(mem->work->size(), mem->work->data()));
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
