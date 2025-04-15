@@ -9,19 +9,19 @@ extern "C" {
 #endif
 
 int sshex8_hierarchical_restriction(int                                 level,
-                                          const ptrdiff_t                     nelements,
-                                          idx_t **const SFEM_RESTRICT         elements,
-                                          const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
-                                          const int                           vec_size,
-                                          const real_t *const SFEM_RESTRICT   from,
-                                          real_t *const SFEM_RESTRICT         to);
+                                    const ptrdiff_t                     nelements,
+                                    idx_t **const SFEM_RESTRICT         elements,
+                                    const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                    const int                           vec_size,
+                                    const real_t *const SFEM_RESTRICT   from,
+                                    real_t *const SFEM_RESTRICT         to);
 
 int sshex8_hierarchical_prolongation(int                               level,
-                                           const ptrdiff_t                   nelements,
-                                           idx_t **const SFEM_RESTRICT       elements,
-                                           const int                         vec_size,
-                                           const real_t *const SFEM_RESTRICT from,
-                                           real_t *const SFEM_RESTRICT       to);
+                                     const ptrdiff_t                   nelements,
+                                     idx_t **const SFEM_RESTRICT       elements,
+                                     const int                         vec_size,
+                                     const real_t *const SFEM_RESTRICT from,
+                                     real_t *const SFEM_RESTRICT       to);
 
 int sshex8_element_node_incidence_count(const int                     level,
                                         const int                     stride,
