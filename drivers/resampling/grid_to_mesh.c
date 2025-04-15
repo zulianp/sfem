@@ -401,8 +401,8 @@ int main(int argc, char* argv[]) {
     SFEM_READ_ENV(SFEM_READ_FP32, atoi);
 
     printf("SFEM_READ_FP32 = %d, %s:%d\n", SFEM_READ_FP32, __FILE__, __LINE__);
-    ptrdiff_t n_zyx = 0;
 
+    ptrdiff_t n_zyx = 0;
     {
         double ndarray_read_tick = MPI_Wtime();
 
@@ -426,15 +426,10 @@ int main(int argc, char* argv[]) {
                                          (void**)&temp,  //
                                          nlocal,         //
                                          nglobal)) {     //
+
+                fprintf(stderr, "Error: ndarray_create_from_file failed %s:%d\n", __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
             }
-
-            // {  /// DEBUG ///
-            // printf("temp (ptr): %p, %s:%d\n", (void *)temp, __FILE__, __LINE__);
-
-            // double norm_temp = 0.0;
-            // double max_temp = temp[0];
-            // double min_temp = temp[0];
 
             n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
 
@@ -447,31 +442,10 @@ int main(int argc, char* argv[]) {
             field_alpha  = calloc(n_zyx, sizeof(real_t));
             filed_volume = calloc(n_zyx, sizeof(real_t));
 
-            // if (field == NULL) {
-            //     fprintf(stderr, "Error: malloc failed\n");
-            //     exit(EXIT_FAILURE);
-            // }
-
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
-
-                // norm_temp += (double)(temp[i] * temp[i]);
-                // max_temp = (double)(fmax(max_temp, temp[i]));
-                // min_temp = (double)(fmin(min_temp, temp[i]));
             }
 
-            // norm_temp = sqrt(norm_temp);
-
-            // printf("\n");
-            // printf("norm_temp = %1.14e , %s:%d\n", norm_temp, __FILE__, __LINE__);
-            // printf("max_temp  = %1.14e , %s:%d\n", max_temp, __FILE__, __LINE__);
-            // printf("min_temp  = %1.14e , %s:%d\n", min_temp, __FILE__, __LINE__);
-            // printf("n_zyx     = %ld , %s:%d\n", n_zyx, __FILE__, __LINE__);
-            // printf("field == NULL: %s, %s:%d\n", field == NULL ? "true" : "false", __FILE__,
-            // __LINE__); printf("size field = %ld MB , %s:%d\n", (n_zyx * sizeof(real_t) / 1024 /
-            // 1024), __FILE__, __LINE__);
-
-            // } /// end DEBUG ///
             free(temp);
 
         } else {
@@ -680,7 +654,7 @@ int main(int argc, char* argv[]) {
                     //                                          &info);      //
 
                     info.alpha_th            = 2.5;
-                    info.adjoint_refine_type = ADJOINT_REFINE_ONE_STEP;
+                    info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
 
                     ret_resample_adjoint =                             //
                             resample_field_adjoint_tet4(mpi_size,      //
@@ -697,17 +671,17 @@ int main(int argc, char* argv[]) {
                                                         filed_volume,  //
                                                         &info);        //
 
-                    BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
+                    // BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
 
-                    ret_resample_adjoint = in_out_field_mesh_tet4(mpi_size,           //
-                                                                  mpi_rank,           //
-                                                                  &mesh,              //
-                                                                  nlocal,             //
-                                                                  stride,             //
-                                                                  origin,             //
-                                                                  delta,              //
-                                                                  &bit_array_in_out,  //
-                                                                  &info);             //
+                    // ret_resample_adjoint = in_out_field_mesh_tet4(mpi_size,           //
+                    //                                               mpi_rank,           //
+                    //                                               &mesh,              //
+                    //                                               nlocal,             //
+                    //                                               stride,             //
+                    //                                               origin,             //
+                    //                                               delta,              //
+                    //                                               &bit_array_in_out,  //
+                    //                                               &info);             //
 
                     unsigned int max_field_cnt = 0;
                     unsigned int max_in_out    = 0;
@@ -718,29 +692,30 @@ int main(int argc, char* argv[]) {
                     double max_field = __DBL_MIN__;
                     double min_field = __DBL_MAX__;
 
+                    // TEST:
                     // TEST: write the in out field and the field_cnt
-                    real_t hexa_volume = delta[0] * delta[1] * delta[2];
-                    for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                        if (field_cnt[i] > max_field_cnt) {
-                            max_field_cnt = field_cnt[i];
-                            max_in_out    = get_bit(bit_array_in_out, i);
-                        }
+                    // real_t hexa_volume = delta[0] * delta[1] * delta[2];
+                    // for (ptrdiff_t i = 0; i < n_zyx; i++) {
+                    //     if (field_cnt[i] > max_field_cnt) {
+                    //         max_field_cnt = field_cnt[i];
+                    //         max_in_out    = get_bit(bit_array_in_out, i);
+                    //     }
 
-                        field[i] /= hexa_volume;
+                    //     field[i] /= hexa_volume;
 
-                        if (field[i] > max_field) {
-                            max_field = field[i];
-                        }
+                    //     if (field[i] > max_field) {
+                    //         max_field = field[i];
+                    //     }
 
-                        if (field[i] < min_field) {
-                            min_field = field[i];
-                        }
+                    //     if (field[i] < min_field) {
+                    //         min_field = field[i];
+                    //     }
 
-                        if (field_cnt[i] > 0 && field_cnt[i] < min_non_zero_field_cnt) {
-                            min_non_zero_field_cnt = field_cnt[i];
-                            min_non_zero_in_out    = get_bit(bit_array_in_out, i);
-                        }
-                    }
+                    //     if (field_cnt[i] > 0 && field_cnt[i] < min_non_zero_field_cnt) {
+                    //         min_non_zero_field_cnt = field_cnt[i];
+                    //         min_non_zero_in_out    = get_bit(bit_array_in_out, i);
+                    //     }
+                    // }
 
                     printf("\n");
                     printf("max_field_cnt = %u, in_out = %u\n", max_field_cnt, max_in_out);
@@ -751,8 +726,8 @@ int main(int argc, char* argv[]) {
                     printf("min_field = %1.14e\n", min_field);
                     printf("\n");
 
-                    // TEST: write the in out field and the field_cnt
-                    real_t* bit_array_in_out_real = to_real_array(bit_array_in_out);
+                    // // TEST: write the in out field and the field_cnt
+                    // real_t* bit_array_in_out_real = to_real_array(bit_array_in_out);
 
                     // TEST: write the in out field and the field_cnt
                     real_t* field_cnt_real = (real_t*)malloc(n_zyx * sizeof(real_t));
@@ -768,14 +743,14 @@ int main(int argc, char* argv[]) {
                                   nlocal,
                                   nglobal);
 
-                    // TEST: write the in out field and the field_cnt
-                    ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/bit_array.raw",
-                                  MPI_FLOAT,
-                                  3,
-                                  bit_array_in_out_real,
-                                  nlocal,
-                                  nglobal);
+                    // // TEST: write the in out field and the field_cnt
+                    // ndarray_write(MPI_COMM_WORLD,
+                    //               "/home/sriva/git/sfem/workflows/resample/bit_array.raw",
+                    //               MPI_FLOAT,
+                    //               3,
+                    //               bit_array_in_out_real,
+                    //               nlocal,
+                    //               nglobal);
 
                     // TEST: write the in out field and the field_cnt
                     ndarray_write(MPI_COMM_WORLD,
@@ -802,9 +777,9 @@ int main(int argc, char* argv[]) {
                                   nlocal,
                                   nglobal);
 
-                    // TEST: write the in out field and the field_cnt
-                    free(bit_array_in_out_real);
-                    bit_array_in_out_real = NULL;
+                    // // TEST: write the in out field and the field_cnt
+                    // free(bit_array_in_out_real);
+                    // bit_array_in_out_real = NULL;
 
                     free(field_cnt_real);
                     field_cnt_real = NULL;
