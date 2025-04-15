@@ -681,7 +681,7 @@ namespace sfem {
         }
 
         ////////////////////////////////////////////////////////////////////////////////////
-        mg->debug = true;
+        mg->set_debug(true);
         mg->enable_line_search(enable_line_search);
         mg->set_max_it(max_it);
         mg->set_max_inner_it(max_inner_it);

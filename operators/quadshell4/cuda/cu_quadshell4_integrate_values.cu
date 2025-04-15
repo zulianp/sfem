@@ -189,14 +189,14 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
 
 template <typename T>
 int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    nelements,
-                                      const ptrdiff_t                    stride,  // Stride for elements and coords
-                                      const idx_t *const SFEM_RESTRICT   elements,
-                                      const geom_t **const SFEM_RESTRICT coords,
-                                      const T * const SFEM_RESTRICT                       values,
-                                      const int                          vec_size,
-                                      const int                          component,
-                                      T *const SFEM_RESTRICT             out,
-                                      void                              *stream) {
+                                       const ptrdiff_t                    stride,  // Stride for elements and coords
+                                       const idx_t *const SFEM_RESTRICT   elements,
+                                       const geom_t **const SFEM_RESTRICT coords,
+                                       const T *const SFEM_RESTRICT       values,
+                                       const int                          vec_size,
+                                       const int                          component,
+                                       T *const SFEM_RESTRICT             out,
+                                       void                              *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     // Hand tuned
@@ -223,7 +223,6 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
-
 
 extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
                                          const ptrdiff_t                    stride,  // Stride for elements and coords
