@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
         printf("Using Shifted-Penalty Multigrid\n");
-        solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+        solver = sfem::create_ssmgc(f, contact_conds, nullptr);
     } else {
         printf("Using Shifted-Penalty\n");
         int SFEM_USE_STEEPEST_DESCENT = 0;
