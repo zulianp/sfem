@@ -15,6 +15,7 @@
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
 #include "sfem_resample_field.h"
+#include "sfem_resample_field_tet4_math.h"
 
 #include "mass.h"
 #include "mesh_utils.h"
@@ -515,6 +516,9 @@ int main(int argc, char* argv[]) {
                    &nlocal[2],
                    &origin[2]);
 
+        n_zyx = nlocal[0] * nlocal[1] * nlocal[2];  // Update n_zyx after field_view
+        printf("nlocal: %ld %ld %ld, %s:%d\n", nlocal[0], nlocal[1], nlocal[2], __FILE__, __LINE__);
+
         free(field);
         field = pfield;
     }
@@ -591,7 +595,7 @@ int main(int argc, char* argv[]) {
 
             // TESTING: apply mesh_fun_b to g
 
-            apply_fun_to_mesh(mesh.nnodes, mesh.points, mesh_fun_c, g);
+            apply_fun_to_mesh(mesh.nnodes, (const geom_t**)mesh.points, mesh_fun_c, g);
             const real_t alpha_th_tet10 = 2.5;
 
             switch (info.element_type) {
@@ -610,6 +614,36 @@ int main(int argc, char* argv[]) {
                                                               field_cnt,  //
                                                               &info);     //
 
+                    real_t max_field_tet10 = __DBL_MIN__;
+                    real_t min_field_tet10 = __DBL_MAX__;
+
+                    normalize_field_and_find_min_max(field, n_zyx, delta, &min_field_tet10, &max_field_tet10);
+
+                    MPI_Barrier(MPI_COMM_WORLD);
+
+                    int z_size_local = nlocal[2];
+                    int z_size       = 0;
+                    MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+                    for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {
+                        if (mpi_rank == print_rank) {
+                            printf("Rank %d: max_field_tet10 = %1.14e\n", mpi_rank, max_field_tet10);
+                            printf("Rank %d: min_field_tet10 = %1.14e\n", mpi_rank, min_field_tet10);
+                            printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
+                            if (mpi_rank == 0) {
+                                printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
+                            } else {
+                                // Other ranks don't have the reduced value
+                                printf("Rank %d: global_z_size = N/A (not root)\n", mpi_rank);
+                            }
+                            printf("Rank %d: nlocal = %ld %ld %ld\n", mpi_rank, nlocal[0], nlocal[1], nlocal[2]);
+                            printf("Rank %d: nglobal = %ld %ld %ld\n\n", mpi_rank, nglobal[0], nglobal[1], nglobal[2]);
+                            fflush(stdout);  // Ensure output is flushed before the next rank prints
+                        }
+                        // Barrier ensures that only one rank prints at a time in order
+                        MPI_Barrier(MPI_COMM_WORLD);
+                    }
+
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field_t10.raw",
                                   MPI_FLOAT,
@@ -618,23 +652,6 @@ int main(int argc, char* argv[]) {
                                   nlocal,
                                   nglobal);
 
-                    {
-                        double max_field = __DBL_MIN__;
-                        double min_field = __DBL_MAX__;
-
-                        for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                            if (field[i] > max_field) {
-                                max_field = field[i];
-                            }
-
-                            if (field[i] < min_field) {
-                                min_field = field[i];
-                            }
-                        }
-
-                        printf("T10 max_field = %1.14e\n", max_field);
-                        printf("T10 min_field = %1.14e\n", min_field);
-                    }
                     break;
 
                 case TET4:
@@ -686,45 +703,42 @@ int main(int argc, char* argv[]) {
                     unsigned int max_field_cnt = 0;
                     unsigned int max_in_out    = 0;
 
-                    unsigned int min_non_zero_field_cnt = UINT_MAX;
-                    unsigned int min_non_zero_in_out    = 0;
+                    // unsigned int min_non_zero_field_cnt = UINT_MAX;
+                    // unsigned int min_non_zero_in_out    = 0;
 
-                    double max_field = __DBL_MIN__;
-                    double min_field = __DBL_MAX__;
+                    MPI_Barrier(MPI_COMM_WORLD);
 
-                    // TEST:
-                    // TEST: write the in out field and the field_cnt
-                    // real_t hexa_volume = delta[0] * delta[1] * delta[2];
-                    // for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                    //     if (field_cnt[i] > max_field_cnt) {
-                    //         max_field_cnt = field_cnt[i];
-                    //         max_in_out    = get_bit(bit_array_in_out, i);
-                    //     }
+                    float_t min_field = 0.0;
+                    float_t max_field = 0.0;
 
-                    //     field[i] /= hexa_volume;
+                    normalize_field_and_find_min_max(field, n_zyx, delta, &min_field, &max_field);
 
-                    //     if (field[i] > max_field) {
-                    //         max_field = field[i];
-                    //     }
+                    z_size_local = nlocal[2];
+                    z_size       = 0;
+                    MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-                    //     if (field[i] < min_field) {
-                    //         min_field = field[i];
-                    //     }
+                    for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {
+                        if (mpi_rank == print_rank) {
+                            printf("Rank %d: max_field_tet10 = %1.14e\n", mpi_rank, max_field_tet10);
+                            printf("Rank %d: min_field_tet10 = %1.14e\n", mpi_rank, min_field_tet10);
+                            printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
+                            if (mpi_rank == 0) {
+                                printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
+                            } else {
+                                // Other ranks don't have the reduced value
+                                printf("Rank %d: global_z_size = N/A (not root)\n", mpi_rank);
+                            }
+                            printf("Rank %d: nlocal = %ld %ld %ld\n", mpi_rank, nlocal[0], nlocal[1], nlocal[2]);
+                            printf("Rank %d: nglobal = %ld %ld %ld\n\n", mpi_rank, nglobal[0], nglobal[1], nglobal[2]);
+                            fflush(stdout);  // Ensure output is flushed before the next rank prints
+                        }
+                        // Barrier ensures that only one rank prints at a time in order
+                        MPI_Barrier(MPI_COMM_WORLD);
+                    }
 
-                    //     if (field_cnt[i] > 0 && field_cnt[i] < min_non_zero_field_cnt) {
-                    //         min_non_zero_field_cnt = field_cnt[i];
-                    //         min_non_zero_in_out    = get_bit(bit_array_in_out, i);
-                    //     }
-                    // }
-
-                    printf("\n");
-                    printf("max_field_cnt = %u, in_out = %u\n", max_field_cnt, max_in_out);
-                    printf("min_non_zero_field_cnt = %u, in_out = %u\n", min_non_zero_field_cnt, min_non_zero_in_out);
-                    printf("\n");
-
-                    printf("max_field = %1.14e\n", max_field);
-                    printf("min_field = %1.14e\n", min_field);
-                    printf("\n");
+                    // printf("max_field = %1.14e\n", max_field);
+                    // printf("min_field = %1.14e\n", min_field);
+                    // printf("\n");
 
                     // // TEST: write the in out field and the field_cnt
                     // real_t* bit_array_in_out_real = to_real_array(bit_array_in_out);
@@ -753,29 +767,29 @@ int main(int argc, char* argv[]) {
                     //               nglobal);
 
                     // TEST: write the in out field and the field_cnt
-                    ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/field_cnt.raw",
-                                  MPI_FLOAT,
-                                  3,
-                                  field_cnt_real,
-                                  nlocal,
-                                  nglobal);
+                    // ndarray_write(MPI_COMM_WORLD,
+                    //               "/home/sriva/git/sfem/workflows/resample/field_cnt.raw",
+                    //               MPI_FLOAT,
+                    //               3,
+                    //               field_cnt_real,
+                    //               nlocal,
+                    //               nglobal);
 
-                    ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/test_field_alpha.raw",
-                                  MPI_FLOAT,
-                                  3,
-                                  field_alpha,
-                                  nlocal,
-                                  nglobal);
+                    // ndarray_write(MPI_COMM_WORLD,
+                    //               "/home/sriva/git/sfem/workflows/resample/test_field_alpha.raw",
+                    //               MPI_FLOAT,
+                    //               3,
+                    //               field_alpha,
+                    //               nlocal,
+                    //               nglobal);
 
-                    ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/test_field_volume.raw",
-                                  MPI_FLOAT,
-                                  3,
-                                  filed_volume,
-                                  nlocal,
-                                  nglobal);
+                    // ndarray_write(MPI_COMM_WORLD,
+                    //               "/home/sriva/git/sfem/workflows/resample/test_field_volume.raw",
+                    //               MPI_FLOAT,
+                    //               3,
+                    //               filed_volume,
+                    //               nlocal,
+                    //               nglobal);
 
                     // // TEST: write the in out field and the field_cnt
                     // free(bit_array_in_out_real);

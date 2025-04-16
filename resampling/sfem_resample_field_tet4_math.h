@@ -1,9 +1,11 @@
 #ifndef __SFEM_RESAMPLE_FIELD_TET4_MATH_H__
 #define __SFEM_RESAMPLE_FIELD_TET4_MATH_H__
 
+#include <float.h>   // Include for FLT_MAX, DBL_MAX
 #include <stddef.h>  // Add this for ptrdiff_t type
 #include "sfem_base.h"
 #include "sfem_config.h"
+#include "sfem_config.h"  // Include the generated config header
 
 #define real_type real_t
 
@@ -587,6 +589,13 @@ field_analytic_create(const int n);  //
 
 void  //
 field_analytic_destroy(struct field_analytic* field);
+
+void                                                        //
+normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Field data to normalize
+                                 const ptrdiff_t n_zyx,     // Input: Total size of the field array
+                                 const geom_t    delta[3],  // Input: Grid spacing
+                                 real_t*         out_min,   // Output: Minimum value found in the field
+                                 real_t*         out_max);
 
 #ifdef __cplusplus
 }  // extern "C"
