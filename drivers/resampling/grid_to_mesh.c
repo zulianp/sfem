@@ -275,6 +275,43 @@ int check_string_in_args(const int argc, const char* argv[], const char* target,
     return 0;
 }
 
+void  //
+print_rank_info(int mpi_rank, int mpi_size, real_t max_field, real_t min_field, ptrdiff_t n_zyx, const ptrdiff_t* nlocal,
+                const geom_t* origin, const geom_t* delta, const ptrdiff_t* nglobal) {
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    int z_size_local = nlocal[2];
+    int z_size       = 0;
+    MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {
+        if (mpi_rank == print_rank) {
+            real_t origin_z = origin[2];
+            real_t delta_z  = (real_t)(delta[2]) * (real_t)(nlocal[2] - 1);
+            real_t max_z    = origin_z + delta_z;
+
+            printf("Rank %d: max_field = %1.14e\n", mpi_rank, max_field);
+            printf("Rank %d: min_field = %1.14e\n", mpi_rank, min_field);
+            printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
+            if (mpi_rank == 0) {
+                printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
+            } else {
+                // Other ranks don't have the reduced value
+                printf("Rank %d: global_z_size = N/A (not root)\n", mpi_rank);
+            }
+            printf("Rank %d: nlocal = %ld %ld %ld\n", mpi_rank, nlocal[0], nlocal[1], nlocal[2]);
+            printf("Rank %d: origin = %1.5e %1.5e %1.5e\n", mpi_rank, origin[0], origin[1], origin[2]);
+            printf("Rank %d: delta = %1.5e %1.5e %1.5e\n", mpi_rank, delta[0], delta[1], delta[2]);
+            printf("Rank %d: origin_z = %1.5e, delta_z = %1.5e, max_z = %1.5e\n", mpi_rank, origin_z, delta_z, max_z);
+            printf("Rank %d: nglobal = %ld %ld %ld\n\n", mpi_rank, nglobal[0], nglobal[1], nglobal[2]);
+
+            fflush(stdout);  // Ensure output is flushed before the next rank prints
+        }
+        // Barrier ensures that only one rank prints at a time in order
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+}
+
 real_t mesh_fun_a(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
 
 real_t mesh_fun_b(real_t x, real_t y, real_t z) { return 2.0 * (sin(3.0 * x) + cos(3.0 * y) + sin(3.0 * z)); }
@@ -332,9 +369,10 @@ int main(int argc, char* argv[]) {
 
     double tick = MPI_Wtime();
 
-    ptrdiff_t   nglobal[3]  = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
-    geom_t      origin[3]   = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
-    geom_t      delta[3]    = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
+    ptrdiff_t nglobal[3] = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
+    geom_t    origin[3]  = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
+    geom_t    delta[3]   = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
+
     const char* data_path   = argv[10];
     const char* folder      = argv[11];
     const char* output_path = argv[12];
@@ -619,30 +657,7 @@ int main(int argc, char* argv[]) {
 
                     normalize_field_and_find_min_max(field, n_zyx, delta, &min_field_tet10, &max_field_tet10);
 
-                    MPI_Barrier(MPI_COMM_WORLD);
-
-                    int z_size_local = nlocal[2];
-                    int z_size       = 0;
-                    MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-                    for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {
-                        if (mpi_rank == print_rank) {
-                            printf("Rank %d: max_field_tet10 = %1.14e\n", mpi_rank, max_field_tet10);
-                            printf("Rank %d: min_field_tet10 = %1.14e\n", mpi_rank, min_field_tet10);
-                            printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
-                            if (mpi_rank == 0) {
-                                printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
-                            } else {
-                                // Other ranks don't have the reduced value
-                                printf("Rank %d: global_z_size = N/A (not root)\n", mpi_rank);
-                            }
-                            printf("Rank %d: nlocal = %ld %ld %ld\n", mpi_rank, nlocal[0], nlocal[1], nlocal[2]);
-                            printf("Rank %d: nglobal = %ld %ld %ld\n\n", mpi_rank, nglobal[0], nglobal[1], nglobal[2]);
-                            fflush(stdout);  // Ensure output is flushed before the next rank prints
-                        }
-                        // Barrier ensures that only one rank prints at a time in order
-                        MPI_Barrier(MPI_COMM_WORLD);
-                    }
+                    print_rank_info(mpi_rank, mpi_size, max_field_tet10, min_field_tet10, n_zyx, nlocal, origin, delta, nglobal);
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field_t10.raw",
@@ -713,8 +728,8 @@ int main(int argc, char* argv[]) {
 
                     normalize_field_and_find_min_max(field, n_zyx, delta, &min_field, &max_field);
 
-                    z_size_local = nlocal[2];
-                    z_size       = 0;
+                    int z_size_local = nlocal[2];
+                    int z_size       = 0;
                     MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
                     for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {

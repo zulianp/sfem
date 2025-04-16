@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import os, sys
+import os
+import sys
 import time
 # from concurrent.futures import ThreadPoolExecutor
 
 
-#output_path = os.path.join(
-   # os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
+# output_path = os.path.join(
+# os.environ['HOME'], 'git/sfem/workflows/resample/sdf.float32.raw')
 # output_path = os.path.join(os.environ['SCRATCH'], 'prj/sfem/workflows/resample/sdf.float32.raw')
-output_path = sys.argv[1] 
+output_path = sys.argv[1]
 
 print("sdf_test.py: ==========================================")
 print(f'sdf_test.py: Writing field to {output_path}')
@@ -25,9 +26,11 @@ if len(sys.argv) > 2:
     try:
         grid_size = int(sys.argv[2])
         D = grid_size
-        print(f'sdf_test.py: Using grid size D = {D} from command line argument')
+        print(
+            f'sdf_test.py: Using grid size D = {D} from command line argument')
     except ValueError:
-        print(f'sdf_test.py: Warning - second argument is not a valid integer, using default D = {D}')
+        print(
+            f'sdf_test.py: Warning - second argument is not a valid integer, using default D = {D}')
 
 dims = (D, D, D)
 
@@ -125,7 +128,7 @@ elif option == 2:
 elif option == 3:
     print("sdf_test.py: Using field: np.ones_like(X)")
     field = np.ones_like(X)
-    
+
 else:
     print("sdf_test.py: Zero field")
     field = np.zeros_like(X)
@@ -142,6 +145,10 @@ print(f'sdf_test.py: Time taken to generate field: {clock} seconds')
 
 np.reshape(field, (dims[0]*dims[1]*dims[2], 1)).tofile(output_path)
 
+dx_val = (pmax[0] - pmin[0])/(dims[0] - 1)
+dy_val = (pmax[1] - pmin[1])/(dims[1] - 1)
+dz_val = (pmax[2] - pmin[2])/(dims[2] - 1)
+
 header = f'nx: {dims[0]}\n'
 header += f'ny: {dims[1]}\n'
 header += f'nz: {dims[2]}\n'
@@ -150,10 +157,23 @@ header += f'type: float\n'
 header += f'ox: {pmin[0]}\n'
 header += f'oy: {pmin[1]}\n'
 header += f'oz: {pmin[2]}\n'
-header += f'dx: {(pmax[0] - pmin[0])/(dims[0] - 1)}\n'
-header += f'dy: {(pmax[1] - pmin[1])/(dims[1] - 1)}\n'
-header += f'dz: {(pmax[2] - pmin[2])/(dims[2] - 1)}\n'
+header += f'dx: {dx_val}\n'
+header += f'dy: {dy_val}\n'
+header += f'dz: {dz_val}\n'
 header += f'path: {os.path.abspath(output_path)}\n'
+
+print(f"sdf_test.py: nx: {dims[0]}")
+print(f"sdf_test.py: ny: {dims[1]}")
+print(f"sdf_test.py: nz: {dims[2]}")
+print(f"sdf_test.py: block_size: 1")
+print(f"sdf_test.py: type: float")
+print(f"sdf_test.py: ox: {pmin[0]}")
+print(f"sdf_test.py: oy: {pmin[1]}")
+print(f"sdf_test.py: oz: {pmin[2]}")
+print(f"sdf_test.py: dx: {dx_val}")
+print(f"sdf_test.py: dy: {dy_val}")
+print(f"sdf_test.py: dz: {dz_val}")
+print(f"sdf_test.py: path: {os.path.abspath(output_path)}")
 
 fname, fextension = os.path.splitext(output_path)
 pdir = os.path.dirname(fname)
