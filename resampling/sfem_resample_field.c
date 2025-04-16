@@ -1,7 +1,11 @@
+#include <float.h>  // Include for FLT_MAX, DBL_MAX
 #include <math.h>
 #include <stddef.h>
+#include <stddef.h>  // Add this for ptrdiff_t type
 #include <stdio.h>
 #include <string.h>
+#include "sfem_base.h"
+#include "sfem_config.h"  // Include the generated config header
 
 #include "matrixio_array.h"
 #include "sfem_resample_field.h"
@@ -1244,32 +1248,32 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
     }
 
     if (data_cnt != NULL) {
-        ret = tet4_cnt_mesh_adjoint(0,                              //
-                                    mesh->nelements,                //
-                                    mesh->nnodes,                   //
-                                    (const idx_t**)mesh->elements,  //
-                                    (const geom_t**)mesh->points,   //
-                                    n,                              //
-                                    stride,                         //
-                                    origin,                         //
-                                    delta,                          //
-                                    mass_vector,                    //
-                                    data_cnt);                      //
+        // ret = tet4_cnt_mesh_adjoint(0,                              //
+        //                             mesh->nelements,                //
+        //                             mesh->nnodes,                   //
+        //                             (const idx_t**)mesh->elements,  //
+        //                             (const geom_t**)mesh->points,   //
+        //                             n,                              //
+        //                             stride,                         //
+        //                             origin,                         //
+        //                             delta,                          //
+        //                             mass_vector,                    //
+        //                             data_cnt);                      //
     }
 
     if (alpha != NULL) {
-        tet4_alpha_volume_mesh_adjoint(0,                              //
-                                       mesh->nelements,                //
-                                       mesh->nnodes,                   //
-                                       (const idx_t**)mesh->elements,  //
-                                       (const geom_t**)mesh->points,   //
-                                       n,                              //
-                                       stride,                         //
-                                       origin,                         //
-                                       delta,                          //
-                                       mass_vector,                    //
-                                       alpha,                          //
-                                       volume);                        //
+        // tet4_alpha_volume_mesh_adjoint(0,                              //
+        //                                mesh->nelements,                //
+        //                                mesh->nnodes,                   //
+        //                                (const idx_t**)mesh->elements,  //
+        //                                (const geom_t**)mesh->points,   //
+        //                                n,                              //
+        //                                stride,                         //
+        //                                origin,                         //
+        //                                delta,                          //
+        //                                mass_vector,                    //
+        //                                alpha,                          //
+        //                                volume);                        //
     }
 
     free(mass_vector);
@@ -1478,11 +1482,11 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 
 #endif
 
-    const real_t    volume_hex = delta[0] * delta[1] * delta[2];
-    const ptrdiff_t data_size  = n[0] * n[1] * n[2];
-    for (ptrdiff_t i = 0; i < data_size; i++) {
-        data[i] /= volume_hex;
-    }
+    // const real_t    volume_hex = delta[0] * delta[1] * delta[2];
+    // const ptrdiff_t data_size  = n[0] * n[1] * n[2];
+    // for (ptrdiff_t i = 0; i < data_size; i++) {
+    //     data[i] /= volume_hex;
+    // }
     free(weighted_field);
     weighted_field = NULL;
 
@@ -1837,4 +1841,92 @@ field_view_ensure_margin(MPI_Comm                             comm,          //
     }
 
     return 0;
+}
+
+// Function to normalize the field by hexahedron volume and find min/max
+void                                                        //
+normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Field data to normalize
+                                 const ptrdiff_t n_zyx,     // Input: Total size of the field array
+                                 const geom_t    delta[3],  // Input: Grid spacing
+                                 real_t*         out_min,   // Output: Minimum value found in the field
+                                 real_t*         out_max) {         // Output: Maximum value found in the field
+
+    if (!field || !delta || !out_min || !out_max) {
+        fprintf(stderr, "Error: Invalid arguments provided to %s\n", __func__);
+        // Optionally set outputs to sentinel values based on real_t type
+        if (out_min) {
+#ifdef SFEM_REAL_T_IS_FLOAT32
+            *out_min = FLT_MAX;
+#elif defined(SFEM_REAL_T_IS_FLOAT64)
+            *out_min = DBL_MAX;
+#else
+            // Fallback or error for unsupported types
+            *out_min = 0;  // Or some other indicator
+            fprintf(stderr, "Warning: Unsupported real_t type for sentinel min value in %s\n", __func__);
+#endif
+        }
+        if (out_max) {
+#ifdef SFEM_REAL_T_IS_FLOAT32
+            *out_max = -FLT_MAX;
+#elif defined(SFEM_REAL_T_IS_FLOAT64)
+            *out_max = -DBL_MAX;
+#else
+            // Fallback or error for unsupported types
+            *out_max = 0;  // Or some other indicator
+            fprintf(stderr, "Warning: Unsupported real_t type for sentinel max value in %s\n", __func__);
+#endif
+        }
+        return;
+    }
+
+// Initialize min/max based on the actual type of real_t using config macros
+#ifdef SFEM_REAL_T_IS_FLOAT32
+    // real_t is float (32-bit)
+    real_t min_val = FLT_MAX;
+    real_t max_val = -FLT_MAX;
+#elif defined(SFEM_REAL_T_IS_FLOAT64)
+    // real_t is double (64-bit)
+    real_t min_val = DBL_MAX;
+    real_t max_val = -DBL_MAX;  // Use negative max for correct comparison
+#else
+// Fallback for unknown or unsupported real_t type
+#error "SFEM_REAL_T_IS_FLOAT32 or SFEM_REAL_T_IS_FLOAT64 must be defined in sfem_config.h"
+    // Define dummy values to allow compilation attempt, though it will fail at #error
+    real_t min_val = 0;
+    real_t max_val = 0;
+#endif
+
+    const real_t hexa_volume = delta[0] * delta[1] * delta[2];
+
+    // Avoid division by zero or near-zero volume
+    if (hexa_volume <= 1e-16) {  // Use a small threshold instead of exact zero
+        fprintf(stderr,
+                "Warning: hexa_volume is zero or close to zero (%g) in %s. Skipping normalization.\n",
+                (double)hexa_volume,  // Cast to double for printf
+                __func__);
+        // Find min/max without normalization
+        for (ptrdiff_t i = 0; i < n_zyx; i++) {
+            if (field[i] > max_val) {
+                max_val = field[i];
+            }
+            if (field[i] < min_val) {
+                min_val = field[i];
+            }
+        }
+    } else {
+        // Normalize and find min/max
+        for (ptrdiff_t i = 0; i < n_zyx; i++) {
+            field[i] /= hexa_volume;
+
+            if (field[i] > max_val) {
+                max_val = field[i];
+            }
+            if (field[i] < min_val) {
+                min_val = field[i];
+            }
+        }
+    }
+
+    *out_min = min_val;
+    *out_max = max_val;
 }
