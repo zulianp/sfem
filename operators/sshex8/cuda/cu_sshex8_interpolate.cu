@@ -541,17 +541,11 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
 }
 
 static const int TILE_SIZE = 8;
+#define ROUND_ROBIN(val, shift) ((val + shift) & (TILE_SIZE - 1))
 
-static inline __device__ int is_even(const int v)
-{
-    return (v & 1) ^ 0;
-}
+static inline __device__ int is_even(const int v) { return (v & 1) ^ 0; }
 
-static inline __device__ int is_odd(const int v)
-{
-    return (v & 1);
-}
-
+static inline __device__ int is_odd(const int v) { return (v & 1); }
 
 // Even TO sub-elements are used to interpolate from FROM sub-elements
 template <typename From, typename To>
@@ -572,6 +566,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                             To *const SFEM_RESTRICT         to) {
     static_assert(TILE_SIZE == 8, "This only works with tile size 8!");
 
+    // Uunsigned char necessary for multiple instantiations
     extern __shared__ unsigned char cu_buff[];
 
     const int step_factor = to_level / from_level;
@@ -581,7 +576,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     const int n_tiles = blockDim.x / TILE_SIZE;
     const int sub_idx = threadIdx.x % TILE_SIZE;
 
-    From *in = (From*)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
+    From *in = (From *)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
 
     // hex8 idx
     const int xi = sub_idx % 4;
@@ -590,13 +585,13 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     assert(n_tiles * TILE_SIZE == blockDim.x);
 
     // 1 macro element per tile
-    ptrdiff_t e = blockIdx.x * n_tiles + tile;
+    const ptrdiff_t e = blockIdx.x * n_tiles + tile;
 
     const To to_h = 1 / (To)to_level;
 
-    const int to_even = is_even(to_level);
+    const int to_even     = is_even(to_level);
     const int from_nloops = from_level + to_even;
-    const int to_nloops   = to_level   + to_even;
+    const int to_nloops   = to_level + to_even;
 
     // Vector loop
     for (int d = 0; d < vec_size; d++) {
@@ -610,11 +605,14 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                     const bool from_exists =
                             e < nelements && off_from_zi <= from_level && off_from_yi <= from_level && off_from_xi <= from_level;
-                    const int idx_from = cu_sshex8_lidx(from_level, off_from_zi, off_from_yi, off_from_xi);
+                    const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
+                                                        off_from_zi * from_level_stride,
+                                                        off_from_yi * from_level_stride,
+                                                        off_from_xi * from_level_stride);
 
                     // Wait for shared memory transactions to be finished
                     __syncwarp();
-                   
+
                     // Gather
                     if (from_exists) {
                         const idx_t     gidx = from_elements[idx_from * stride + e];
@@ -626,15 +624,15 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                     // Wait for in to be filled
                     __syncwarp();
-                    
+
                     int start_zi = from_zi * step_factor;
-                    start_zi += is_odd(start_zi); // Skip odd numbers
+                    start_zi += is_odd(start_zi);  // Skip odd numbers
 
                     int start_yi = from_yi * step_factor;
-                    start_yi += is_odd(start_yi); // Skip odd numbers
+                    start_yi += is_odd(start_yi);  // Skip odd numbers
 
                     int start_xi = from_xi * step_factor;
-                    start_xi += is_odd(start_xi); // Skip odd numbers
+                    start_xi += is_odd(start_xi);  // Skip odd numbers
 
                     const int end_zi = MIN(to_nloops, start_zi + step_factor);
                     const int end_yi = MIN(to_nloops, start_yi + step_factor);
@@ -648,10 +646,18 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                 const int off_to_yi = (to_yi + yi);
                                 const int off_to_xi = (to_xi + xi);
 
-                                const To x = off_to_xi * to_h;
-                                const To y = off_to_yi * to_h;
-                                const To z = off_to_zi * to_h;
+                                const To x = (off_to_xi - start_xi) * to_h;
+                                const To y = (off_to_yi - start_yi) * to_h;
+                                const To z = (off_to_zi - start_zi) * to_h;
 
+                                assert(x >= 0);
+                                assert(x <= 1);
+                                assert(y >= 0);
+                                assert(y <= 1);
+                                assert(z >= 0);
+                                assert(z <= 1);
+
+                                // This requires 64 bytes on the stack frame
                                 // Cartesian order
                                 To f[8] = {// Bottom
                                            (1 - x) * (1 - y) * (1 - z),
@@ -666,7 +672,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                                 To out = 0;
                                 for (int v = 0; v < 8; v++) {
-                                    const int round_robin = (v + sub_idx) % TILE_SIZE;
+                                    const int round_robin = ROUND_ROBIN(v, sub_idx);
                                     // there should be no bank conflicts due to round robin
                                     out += f[round_robin] * in[round_robin];
                                 }
@@ -677,7 +683,11 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                                 if (to_exists) {
                                     // set the value to the output
-                                    const int idx_to = cu_sshex8_lidx(to_level, off_to_zi, off_to_yi, off_to_xi);
+                                    const int idx_to = cu_sshex8_lidx(to_level * to_level_stride,
+                                                                      off_to_zi * to_level_stride,
+                                                                      off_to_yi * to_level_stride,
+                                                                      off_to_xi * to_level_stride);
+
                                     to[(to_elements[idx_to] * vec_size + d) * to_stride] = out;
                                 }
                             }
