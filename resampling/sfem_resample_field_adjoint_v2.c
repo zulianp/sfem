@@ -740,7 +740,8 @@ add_tetrahedron_to_array(const struct tet_vertices* tet_head,       //
     }
 
     // Add the new tetrahedron
-    (*tets_out)[tets_size] = *tet_head;
+    // (*tets_out)[tets_size] = *tet_head;
+    memcpy(&(*tets_out)[tets_size], tet_head, sizeof(struct tet_vertices));
 
     // Return the new size
     return tets_size + 1;
@@ -1034,6 +1035,16 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
         struct tet_vertices* tets_iter = NULL;
         int                  n_tets    = 0;
 
+        // if (weighted_field[ev[0]] > 1.001 || weighted_field[ev[1]] > 1.001 || weighted_field[ev[2]] > 1.001 ||
+        //     weighted_field[ev[3]] > 1.001) {
+        //     printf("WARNING: tet_id = %d, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g\n",
+        //            element_i,
+        //            weighted_field[ev[0]],
+        //            weighted_field[ev[1]],
+        //            weighted_field[ev[2]],
+        //            weighted_field[ev[3]]);
+        // }
+
         n_tets = tet4_iterative_refinement(x0,                     // Tetrahedron vertices X-coordinates
                                            x1,                     //
                                            x2,                     //
@@ -1080,6 +1091,10 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
             const real_type wf1 = tets_iter[tet_id].w1;
             const real_type wf2 = tets_iter[tet_id].w2;
             const real_type wf3 = tets_iter[tet_id].w3;
+
+            // if (wf0 > 1.001 || wf1 > 1.001 || wf2 > 1.001 || wf3 > 1.001) {
+            //     printf("tet_id = %d, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g\n", tet_id, wf0, wf1, wf2, wf3);
+            // }
 
             // const real_type sampled_volume = hexahedron_volume * (real_type)(TET_QUAD_NQP);
 
