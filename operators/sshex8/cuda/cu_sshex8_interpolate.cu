@@ -369,8 +369,53 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                           const enum RealType                 to_type,
                                           const ptrdiff_t                     to_stride,
                                           To *const SFEM_RESTRICT             to) {
-    // TODO
-    assert(false);
+    static_assert(TILE_SIZE == 8, "This only works with tile size 8!");
+
+    // Uunsigned char necessary for multiple instantiations
+    extern __shared__ unsigned char cu_buff[];
+
+    const int step_factor = from_level / to_level;
+
+    // Tile number in group
+    const int tile    = threadIdx.x / TILE_SIZE;
+    const int n_tiles = blockDim.x / TILE_SIZE;
+    const int sub_idx = threadIdx.x % TILE_SIZE;
+
+    To *out = (From *)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
+
+    // hex8 idx
+    const int xi = sub_idx % 4;
+    const int yi = (sub_idx / 2) % 2;
+    const int zi = sub_idx / 4;
+    assert(n_tiles * TILE_SIZE == blockDim.x);
+
+    // 1 macro element per tile
+    const ptrdiff_t e = blockIdx.x * n_tiles + tile;
+
+    const To from_h = 1 / (To)from_level;
+
+    const int from_even     = is_even(from_level);
+    const int to_nloops = to_level + to_even;
+    const int from_nloops   = from_level + from_even;
+
+    // Vector loop
+    for (int d = 0; d < vec_size; d++) {
+        // loop on all TO micro elements
+        for (int to_zi = 0; to_zi < to_nloops; to_zi++) {
+            for (int to_yi = 0; to_yi < to_nloops; to_yi++) {
+                for (int to_xi = 0; to_xi < to_nloops; to_xi++) {
+
+                    // Reset shared mem buffer
+                    out[sub_idx] = 0;
+                    __syncwarp();
+
+
+
+
+                }
+            }
+        }
+    }
 }
 
 template <typename From, typename To>
@@ -544,7 +589,6 @@ static const int TILE_SIZE = 8;
 #define ROUND_ROBIN(val, shift) ((val + shift) & (TILE_SIZE - 1))
 
 static inline __device__ int is_even(const int v) { return (v & 1) ^ 0; }
-
 static inline __device__ int is_odd(const int v) { return (v & 1); }
 
 // Even TO sub-elements are used to interpolate from FROM sub-elements
