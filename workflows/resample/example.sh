@@ -69,7 +69,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=18
+n_procs=8
 # n_procs=2
 # n_procs=8
 

@@ -25,7 +25,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-// main ////////////////////////////////////////////////////////////////////////
+// apply_fun_to_mesh ///////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 int                                                              //
@@ -47,6 +47,10 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
 
     RETURN_FROM_FUNCTION(0);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
@@ -1175,9 +1179,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
         {
             // exchange ghost nodes and add contribution
-            if (mpi_size > 1) {
-                perform_exchange_operations((mesh_t*)mesh, mass_vector, g);
-            }  // end if mpi_size > 1
+            // if (mpi_size > 1) {
+            //     perform_exchange_operations((mesh_t*)mesh, mass_vector, g);
+            // }  // end if mpi_size > 1
 
             // divide by the mass vector
             for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
@@ -1401,13 +1405,13 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                                         mesh->points,     //
                                         mass_vector);     //
 
-        // exchange ghost nodes and add contribution
-        if (mpi_size > 1) {                                                     //
-            printf("perform_exchange_operations %s:%d\n", __FILE__, __LINE__);  //
-            perform_exchange_operations(mesh,                                   //
-                                        mass_vector,                            //
-                                        weighted_field);                        //
-        }
+        // // exchange ghost nodes and add contribution
+        // if (mpi_size > 1) {                                                     //
+        //     printf("perform_exchange_operations %s:%d\n", __FILE__, __LINE__);  //
+        //     perform_exchange_operations(mesh,                                   //
+        //                                 mass_vector,                            //
+        //                                 weighted_field);                        //
+        // }
 
         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {  //
             // assert(mass_vector[i] != 0);                             //
@@ -1759,7 +1763,7 @@ int field_view(MPI_Comm                             comm,          //
                                     origin,         //
                                     delta,          //
                                     field,          //
-                                    2,              //
+                                    3,              //
                                     field_out,      //
                                     z_nlocal_out,   //
                                     z_origin_out);  //
