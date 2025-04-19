@@ -222,7 +222,7 @@ namespace sfem {
                                                   .component    = c.component};
 
                 // TODO Nodal to elemental for coordinates
-                                                  
+
                 conditions.push_back(cond);
             }
         }
@@ -413,12 +413,19 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
-            auto ret = std::make_shared<GPULaplacian>(derefined_space);
-            assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
-            assert(ret->element_type == macro_base_elem(fff->element_type()));
-            // FIXME we can save on the storage of FFFs
-            ret->initialize();
-            return ret;
+            if (derefined_space->has_semi_structured_mesh()) {
+                auto ret          = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
+                ret->element_type = element_type;
+                ret->initialize();
+                return ret;
+            } else {
+                auto ret = std::make_shared<GPULaplacian>(derefined_space);
+                assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
+                assert(ret->element_type == macro_base_elem(fff->element_type()));
+                // FIXME we can save on the storage of FFFs
+                ret->initialize();
+                return ret;
+            }
         }
 
         int hessian_crs(const real_t *const  x,
