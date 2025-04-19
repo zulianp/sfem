@@ -402,9 +402,11 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                           const enum RealType                 to_type,
                                           const ptrdiff_t                     to_stride,
                                           To *const SFEM_RESTRICT             to) {
-    static_assert(TILE_SIZE == 8, "This only works with tile size 8!");
+    static_assert(TILE_SIZE == 8,
+                  "This only works with tile size 8 because the implementation assumes a fixed tile size for shared memory "
+                  "layout and indexing.");
 
-    // Uunsigned char necessary for multiple instantiations
+    // Unsigned char necessary for multiple template instantiations of this kernel
     extern __shared__ unsigned char cu_buff[];
 
     const int step_factor = from_level / to_level;
@@ -412,14 +414,16 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
     // // Tile number in group
     const int tile    = threadIdx.x / TILE_SIZE;
     const int n_tiles = blockDim.x / TILE_SIZE;
+
+    // linear index in tile in 0, ..., 7
     const int sub_idx = threadIdx.x % TILE_SIZE;
 
-    To *in = (From *)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
+    From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
-    // // hex8 idx
-    const int xi = sub_idx % 4;
-    const int yi = (sub_idx / 2) % 2;
-    const int zi = sub_idx / 4;
+    // Tensor index in tile
+    const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
+    const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
+    const int zi = (sub_idx >> 2);        // equivalent to sub_idx / 4
     assert(n_tiles * TILE_SIZE == blockDim.x);
 
     // // 1 macro element per tile
@@ -432,7 +436,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
 
     // // Vector loop
     for (int d = 0; d < vec_size; d++) {
-        //     // loop on all TO micro elements
+        // loop on all TO micro elements
         for (int to_zi = 0; to_zi < to_nloops; to_zi++) {
             for (int to_yi = 0; to_yi < to_nloops; to_yi++) {
                 for (int to_xi = 0; to_xi < to_nloops; to_xi++) {
@@ -871,22 +875,21 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     const int to_npoints  = to_level + 1;
 
     // Tile number in group
-    const int tile    = threadIdx.x / TILE_SIZE;
-    const int n_tiles = blockDim.x / TILE_SIZE;
-    const int sub_idx = threadIdx.x % TILE_SIZE;
+    const int tile    = threadIdx.x >> 3;   // same as threadIdx.x / 8
+    const int n_tiles = blockDim.x >> 3;    // same as blockDim.x / 8
+    const int sub_idx = threadIdx.x & 0x7;  // same as threadIdx.x % 8
 
-    From *in = (From *)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
+    // Potential bug ??
+    From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
     // hex8 idx
-    const int xi = sub_idx % 4;
-    const int yi = (sub_idx / 2) % 2;
-    const int zi = sub_idx / 4;
+    const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
+    const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
+    const int zi = (sub_idx >> 2);        // equivalent to sub_idx / 4
     assert(n_tiles * TILE_SIZE == blockDim.x);
 
     // 1 macro element per tile
     const ptrdiff_t e = blockIdx.x * n_tiles + tile;
-
-    const To to_h = 1 / (To)to_level;
 
     const int to_even     = is_even(to_level);
     const int from_nloops = from_level + to_even;
@@ -941,6 +944,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                     for (int to_zi = start_zi; to_zi < end_zi; to_zi += 2) {
                         for (int to_yi = start_yi; to_yi < end_yi; to_yi += 2) {
                             for (int to_xi = start_xi; to_xi < end_xi; to_xi += 2) {
+                                // Tile-level parallelism due to xi, yi, zi
                                 const int off_to_zi = (to_zi + zi);
                                 const int off_to_yi = (to_yi + yi);
                                 const int off_to_xi = (to_xi + xi);
