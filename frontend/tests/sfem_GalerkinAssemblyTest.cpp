@@ -68,12 +68,11 @@ int test_cube() {
     int SFEM_ELEMENT_DEREFINE = 1;
     SFEM_READ_ENV(SFEM_ELEMENT_DEREFINE, atoi);
 
-    // int SFEM_VERBOSE = 0;
-    // SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+    int SFEM_DEBUG_EXPORT = 0;
+    SFEM_READ_ENV(SFEM_DEBUG_EXPORT, atoi);
 
-    int block_size = 1;
-
-    auto m = sfem::Mesh::create_hex8_cube(
+    int  block_size = 1;
+    auto m          = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
@@ -128,6 +127,7 @@ int test_cube() {
         auto      points = fs_coarse->semi_structured_mesh().points()->data();
         for (ptrdiff_t i = 0; i < n; i++) {
             data[i] = points[0][i] * points[0][i];
+            // data[i] = points[0][i];
         }
     }
 
@@ -187,7 +187,7 @@ int test_cube() {
             // expected: is application of coarse operator
             real_t diff = fabs(actual[i] - expected[i]);
             err[i]      = diff;
-            if (diff > 1e-8) {
+            if (!(1e-8 < diff)) {
                 printf("%ld) %g != %g (%g, %g)\n",
                        i,
                        (double)actual[i],
@@ -203,26 +203,46 @@ int test_cube() {
             }
         }
 
+        if (SFEM_DEBUG_EXPORT) {
+            sfem::create_directory("galerkin");
+            sfem::create_directory("galerkin/fields");
+
+            {  // COARSE
+                SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
+
+                sfem::Output out(fs_coarse);
+
+                out.set_output_dir("galerkin/fields");
+                SFEM_TEST_ASSERT(out.write("R", h_actual->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
+            }
+
+            {  // FINE
+#ifdef SFEM_ENABLE_CUDA
+                auto h_prolongated = sfem::to_host(prolongated);
+#else
+                auto h_prolongated = prolongated;
+#endif
+
+                sfem::create_directory("galerkin_fine");
+                sfem::create_directory("galerkin_fine/fields");
+                SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard("galerkin_fine") == SFEM_SUCCESS);
+
+                sfem::Output out(fs);
+                out.set_output_dir("galerkin_fine/fields");
+
+                SFEM_TEST_ASSERT(out.write("P", h_prolongated->data()) == SFEM_SUCCESS);
+            }
+        }
+
         if (arg_largest_diff != -1) {
+            fflush(stdout);
             printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
             SFEM_TEST_ASSERT(largest_diff < 1e-7);
         }
     }
-
-#if 0
-    sfem::create_directory("galerkin");
-    sfem::create_directory("galerkin/fields");
-
-    SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
-
-    sfem::Output out(fs_coarse);
-
-    out.set_output_dir("galerkin/fields");
-    SFEM_TEST_ASSERT(out.write("R", h_actual->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
-#endif
 
     return SFEM_TEST_SUCCESS;
 }

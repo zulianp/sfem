@@ -411,8 +411,6 @@ namespace sfem {
             : space(space), element_type(space->element_type()) {}
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
-
             if (derefined_space->has_semi_structured_mesh()) {
                 auto ret          = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
                 ret->element_type = element_type;
@@ -741,14 +739,19 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
-
-            auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
-            assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
-            assert(ret->element_type == macro_base_elem(adjugate->element_type()));
-            // ret->adjugate = adjugate;
-            ret->initialize();
-            return ret;
+            if (derefined_space->has_semi_structured_mesh()) {
+                auto ret          = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
+                ret->element_type = element_type;
+                ret->initialize();
+                return ret;
+            } else {
+                auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
+                assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+                assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+                // ret->adjugate = adjugate;
+                ret->initialize();
+                return ret;
+            }
         }
 
         const char *name() const override { return "ss::gpu::LinearElasticity"; }
