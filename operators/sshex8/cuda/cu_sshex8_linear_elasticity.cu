@@ -1331,25 +1331,25 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(
         const ptrdiff_t out_stride, real_t *const SFEM_RESTRICT outx,
         real_t *const SFEM_RESTRICT outy, real_t *const SFEM_RESTRICT outz, void *stream) {
     switch (level) {
-        // case 2: {
-        //     return my_kernel<real_t, 2>(nelements,
-        //                                 stride,
-        //                                 interior_start,
-        //                                 elements,
-        //                                 (cu_jacobian_t *)jacobian_adjugate,
-        //                                 (cu_jacobian_t *)jacobian_determinant,
-        //                                 mu,
-        //                                 lambda,
-        //                                 u_stride,
-        //                                 (real_t *)ux,
-        //                                 (real_t *)uy,
-        //                                 (real_t *)uz,
-        //                                 out_stride,
-        //                                 (real_t *)outx,
-        //                                 (real_t *)outy,
-        //                                 (real_t *)outz,
-        //                                 stream);
-        // }
+        case 2: {
+            return my_kernel<real_t, 2>(nelements,
+                                        stride,
+                                        interior_start,
+                                        elements,
+                                        (cu_jacobian_t *)jacobian_adjugate,
+                                        (cu_jacobian_t *)jacobian_determinant,
+                                        mu,
+                                        lambda,
+                                        u_stride,
+                                        (real_t *)ux,
+                                        (real_t *)uy,
+                                        (real_t *)uz,
+                                        out_stride,
+                                        (real_t *)outx,
+                                        (real_t *)outy,
+                                        (real_t *)outz,
+                                        stream);
+        }
         case 3: {
             return my_kernel<real_t, 3>(nelements,
                                         stride,

@@ -12,7 +12,7 @@ static const int TILE_SIZE = 8;
 #define ROUND_ROBIN(val, shift) ((val + shift) & (TILE_SIZE - 1))
 #define ROUND_ROBIN_2(val, shift) ((val + shift) & (2 - 1))
 
-static inline __device__ int is_even(const int v) { return (v & 1) ^ 0; }
+static inline __device__ int is_even(const int v) { return !(v & 1); }
 static inline __device__ int is_odd(const int v) { return (v & 1); }
 
 template <typename T>
@@ -411,16 +411,14 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
 
     const int step_factor = from_level / to_level;
 
-    // // Tile number in group
-    const int tile    = threadIdx.x / TILE_SIZE;
-    const int n_tiles = blockDim.x / TILE_SIZE;
-
-    // linear index in tile in 0, ..., 7
-    const int sub_idx = threadIdx.x % TILE_SIZE;
+    // Tile number in group
+    const int tile    = threadIdx.x >> 3;   // same as threadIdx.x / 8
+    const int n_tiles = blockDim.x >> 3;    // same as blockDim.x / 8
+    const int sub_idx = threadIdx.x & 0x7;  // same as threadIdx.x % 8
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
-    // Tensor index in tile
+    // hex8 idx
     const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
     const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
     const int zi = (sub_idx >> 2);        // equivalent to sub_idx / 4
@@ -471,12 +469,13 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                     const bool from_exists = e < nelements && off_from_zi <= from_level &&
                                                              off_from_yi <= from_level && off_from_xi <= from_level;
 
-                                    const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
-                                                                        off_from_xi * from_level_stride,
-                                                                        off_from_yi * from_level_stride,
-                                                                        off_from_zi * from_level_stride);
                                     __syncwarp();
                                     if (from_exists) {
+                                        const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
+                                                                            off_from_xi * from_level_stride,
+                                                                            off_from_yi * from_level_stride,
+                                                                            off_from_zi * from_level_stride);
+
                                         const idx_t     gidx = from_elements[idx_from * stride + e];
                                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                                         in[sub_idx]          = from[idx] / from_element_to_node_incidence_count[gidx];
@@ -513,7 +512,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                                           to_yi * to_level_stride,
                                                           to_zi * to_level_stride);
 
-                        atomicAdd(&to[(to_elements[idx_to] * vec_size + d) * to_stride], acc);
+                        atomicAdd(&to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride], acc);
                     }
                 }
             }
@@ -550,48 +549,50 @@ int cu_sshex8_restrict_tpl(const ptrdiff_t                     nelements,
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
-    ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+    ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size / TILE_SIZE - 1) / (block_size / TILE_SIZE));
 
     ShapeInterpolation<To> S(from_level / to_level, from_level % 2 == 0);
+
+    size_t shared_mem_size = block_size * sizeof(From);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                            stride,
-                                                                            from_level,
-                                                                            from_level_stride,
-                                                                            from_elements,
-                                                                            from_element_to_node_incidence_count,
-                                                                            to_level,
-                                                                            to_level_stride,
-                                                                            to_elements,
-                                                                            S.data,
-                                                                            vec_size,
-                                                                            from_type,
-                                                                            from_stride,
-                                                                            from,
-                                                                            to_type,
-                                                                            to_stride,
-                                                                            to);
+        cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, shared_mem_size, s>>>(nelements,
+                                                                                          stride,
+                                                                                          from_level,
+                                                                                          from_level_stride,
+                                                                                          from_elements,
+                                                                                          from_element_to_node_incidence_count,
+                                                                                          to_level,
+                                                                                          to_level_stride,
+                                                                                          to_elements,
+                                                                                          S.data,
+                                                                                          vec_size,
+                                                                                          from_type,
+                                                                                          from_stride,
+                                                                                          from,
+                                                                                          to_type,
+                                                                                          to_stride,
+                                                                                          to);
     } else {
-        cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, 0>>>(nelements,
-                                                                         stride,
-                                                                         from_level,
-                                                                         from_level_stride,
-                                                                         from_elements,
-                                                                         from_element_to_node_incidence_count,
-                                                                         to_level,
-                                                                         to_level_stride,
-                                                                         to_elements,
-                                                                         S.data,
-                                                                         vec_size,
-                                                                         from_type,
-                                                                         from_stride,
-                                                                         from,
-                                                                         to_type,
-                                                                         to_stride,
-                                                                         to);
+        cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, shared_mem_size>>>(nelements,
+                                                                                       stride,
+                                                                                       from_level,
+                                                                                       from_level_stride,
+                                                                                       from_elements,
+                                                                                       from_element_to_node_incidence_count,
+                                                                                       to_level,
+                                                                                       to_level_stride,
+                                                                                       to_elements,
+                                                                                       S.data,
+                                                                                       vec_size,
+                                                                                       from_type,
+                                                                                       from_stride,
+                                                                                       from,
+                                                                                       to_type,
+                                                                                       to_stride,
+                                                                                       to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -692,7 +693,7 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
     }
 }
 
-// #define PROLONGATE_IN_KERNEL_BASIS_VERSION
+#define PROLONGATE_IN_KERNEL_BASIS_VERSION  // The other version needs debugging
 #ifdef PROLONGATE_IN_KERNEL_BASIS_VERSION
 
 // Even TO sub-elements are used to interpolate from FROM sub-elements
@@ -720,22 +721,22 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     const int step_factor = to_level / from_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x / TILE_SIZE;
-    const int n_tiles = blockDim.x / TILE_SIZE;
-    const int sub_idx = threadIdx.x % TILE_SIZE;
+    const int tile    = threadIdx.x >> 3;   // same as threadIdx.x / 8
+    const int n_tiles = blockDim.x >> 3;    // same as blockDim.x / 8
+    const int sub_idx = threadIdx.x & 0x7;  // same as threadIdx.x % 8
 
-    From *in = (From *)&cu_buff[sub_idx * TILE_SIZE * sizeof(From)];
+    From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
     // hex8 idx
-    const int xi = sub_idx % 4;
-    const int yi = (sub_idx / 2) % 2;
-    const int zi = sub_idx / 4;
+    const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
+    const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
+    const int zi = (sub_idx >> 2);        // equivalent to sub_idx / 4
     assert(n_tiles * TILE_SIZE == blockDim.x);
 
     // 1 macro element per tile
     const ptrdiff_t e = blockIdx.x * n_tiles + tile;
 
-    const To to_h = 1 / (To)to_level;
+    const To between_h = (From)from_level / (To)to_level;
 
     const int to_even     = is_even(to_level);
     const int from_nloops = from_level + to_even;
@@ -753,16 +754,17 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                     const bool from_exists =
                             e < nelements && off_from_zi <= from_level && off_from_yi <= from_level && off_from_xi <= from_level;
-                    const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
-                                                        off_from_xi * from_level_stride,
-                                                        off_from_yi * from_level_stride,
-                                                        off_from_zi * from_level_stride);
 
                     // Wait for shared memory transactions to be finished
                     __syncwarp();
 
                     // Gather
                     if (from_exists) {
+                        const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
+                                                            off_from_xi * from_level_stride,
+                                                            off_from_yi * from_level_stride,
+                                                            off_from_zi * from_level_stride);
+
                         const idx_t     gidx = from_elements[idx_from * stride + e];
                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                         in[sub_idx]          = from[idx];
@@ -794,9 +796,9 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                 const int off_to_yi = (to_yi + yi);
                                 const int off_to_xi = (to_xi + xi);
 
-                                const To x = (off_to_xi - start_xi) * to_h;
-                                const To y = (off_to_yi - start_yi) * to_h;
-                                const To z = (off_to_zi - start_zi) * to_h;
+                                const To x = (off_to_xi - from_xi * step_factor) * between_h;
+                                const To y = (off_to_yi - from_yi * step_factor) * between_h;
+                                const To z = (off_to_zi - from_zi * step_factor) * between_h;
 
                                 assert(x >= 0);
                                 assert(x <= 1);
@@ -818,10 +820,19 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                            (1 - x) * y * z,
                                            x * y * z};
 
+#ifndef NDEBUG
+                                To pou = 0;
+                                for (int i = 0; i < 8; i++) {
+                                    pou += f[i];
+                                }
+
+                                assert(fabs(1 - pou) < 1e-8);
+#endif
+
                                 To out = 0;
                                 for (int v = 0; v < 8; v++) {
                                     const int round_robin = ROUND_ROBIN(v, sub_idx);
-                                    // there should be no bank conflicts due to round robin
+                                    // There should be no bank conflicts due to round robin
                                     out += f[round_robin] * in[round_robin];
                                 }
 
@@ -836,7 +847,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                                       off_to_yi * to_level_stride,
                                                                       off_to_zi * to_level_stride);
 
-                                    to[(to_elements[idx_to] * vec_size + d) * to_stride] = out;
+                                    to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
                                 }
                             }
                         }
@@ -895,6 +906,22 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     const int from_nloops = from_level + to_even;
     const int to_nloops   = to_level + to_even;
 
+    // if (e == 0) {
+    //     printf("%d) %d %d %d\n", sub_idx, xi, yi, zi);
+    //     if (!sub_idx) {
+    //         printf("from_level %d, to_level %d, step_factor %d, to_even %d, from_nloops %d, to_nloops %d, tile %d, n_tiles
+    //         %d\n",
+    //                from_level,
+    //                to_level,
+    //                step_factor,
+    //                to_even,
+    //                from_nloops,
+    //                to_nloops,
+    //                tile,
+    //                n_tiles);
+    //     }
+    // }
+
     // Vector loop
     for (int d = 0; d < vec_size; d++) {
         // loop on all FROM micro elements
@@ -907,16 +934,17 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
                     const bool from_exists =
                             e < nelements && off_from_zi <= from_level && off_from_yi <= from_level && off_from_xi <= from_level;
-                    const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
-                                                        off_from_zi * from_level_stride,
-                                                        off_from_yi * from_level_stride,
-                                                        off_from_xi * from_level_stride);
 
                     // Wait for shared memory transactions to be finished
                     __syncwarp();
 
                     // Gather
                     if (from_exists) {
+                        const int idx_from = cu_sshex8_lidx(from_level * from_level_stride,
+                                                            off_from_zi * from_level_stride,
+                                                            off_from_yi * from_level_stride,
+                                                            off_from_xi * from_level_stride);
+
                         const idx_t     gidx = from_elements[idx_from * stride + e];
                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                         in[sub_idx]          = from[idx];
@@ -949,20 +977,29 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                 const int off_to_yi = (to_yi + yi);
                                 const int off_to_xi = (to_xi + xi);
 
-                                const From *const Sx = &S[(off_to_xi - start_xi)];
-                                const From *const Sy = &S[(off_to_yi - start_yi)];
-                                const From *const Sz = &S[(off_to_zi - start_zi)];
+                                const From *const Sx = &S[(off_to_xi - from_xi)];
+                                const From *const Sy = &S[(off_to_yi - from_yi)];
+                                const From *const Sz = &S[(off_to_zi - from_zi)];
 
                                 To out = 0;
+                                // for (int vz = 0; vz < 2; vz++) {
+                                //     const int rrvz = ROUND_ROBIN_2(vz, zi);
+                                //     for (int vy = 0; vy < 2; vy++) {
+                                //         const int rrvy = ROUND_ROBIN_2(vy, yi);
+                                //         for (int vx = 0; vx < 2; vx++) {
+                                //             const int rrvx = ROUND_ROBIN_2(vx, xi);
+                                //             const int idx  = rrvz * 4 + rrvy * 2 + rrvx;
+                                //             out += Sx[rrvx * to_npoints] * Sy[rrvy * to_npoints] * Sz[rrvz * to_npoints] *
+                                //                    in[idx];
+                                //         }
+                                //     }
+                                // }
+
                                 for (int vz = 0; vz < 2; vz++) {
-                                    const int rrvz = ROUND_ROBIN_2(vz, zi);
                                     for (int vy = 0; vy < 2; vy++) {
-                                        const int rrvy = ROUND_ROBIN_2(vy, yi);
                                         for (int vx = 0; vx < 2; vx++) {
-                                            const int rrvx = ROUND_ROBIN_2(vx, xi);
-                                            const int idx  = rrvz * 4 + rrvy * 2 + rrvx;
-                                            out += Sx[rrvx * to_npoints] * Sy[rrvy * to_npoints] * Sz[rrvz * to_npoints] *
-                                                   in[idx];
+                                            const int idx = vz * 4 + vy * 2 + vx;
+                                            out += Sx[vx * to_npoints] * Sy[vy * to_npoints] * Sz[vz * to_npoints] * in[idx];
                                         }
                                     }
                                 }
@@ -978,7 +1015,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                                       off_to_yi * to_level_stride,
                                                                       off_to_zi * to_level_stride);
 
-                                    to[(to_elements[idx_to] * vec_size + d) * to_stride] = out;
+                                    to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
                                 }
                             }
                         }
@@ -1010,10 +1047,9 @@ int cu_sshex8_prolongate_tpl(const ptrdiff_t                 nelements,
                              void                           *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
-    const int block_size = 128;
-    ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size * TILE_SIZE - 1) / (block_size * TILE_SIZE));
-
-    size_t shared_mem_size = block_size * sizeof(From);
+    const int block_size      = 128;
+    ptrdiff_t n_blocks        = MAX(ptrdiff_t(1), (nelements + block_size / TILE_SIZE - 1) / (block_size / TILE_SIZE));
+    size_t    shared_mem_size = block_size * sizeof(From);
 
 #ifndef PROLONGATE_IN_KERNEL_BASIS_VERSION
     ShapeInterpolation<To> S(to_level / from_level);
