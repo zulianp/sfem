@@ -80,7 +80,7 @@ int test_ssgmg_poisson_cube() {
     int block_size = 1;
     auto fs = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    fs->semi_structured_mesh().apply_hierarchical_renumbering();
    
     auto f   = sfem::Function::create(fs);
     auto op  = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -121,10 +121,10 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     int SFEM_BASE_RESOLUTION = 4;
-    // SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
 
 
