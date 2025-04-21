@@ -335,6 +335,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
+
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
@@ -362,6 +364,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
+
                                 auto &ssm = to_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                     ssm.n_elements(),
@@ -383,6 +387,8 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_prolongation_element_based");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
                                                                             mesh->nelements,
@@ -423,6 +429,7 @@ namespace sfem {
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_prolongate");
+
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
@@ -518,6 +525,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_restrict");
+
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
@@ -546,6 +555,8 @@ namespace sfem {
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_restriction");
+
                                 auto &ssm = from_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_restriction(ssm.level(),
                                                                    ssm.n_elements(),
@@ -569,6 +580,8 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_restriction_element_based");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
                                                                            mesh->nelements,
@@ -595,6 +608,7 @@ namespace sfem {
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
+
                                 auto &ssm = from_space->semi_structured_mesh();
                                 sshex8_hierarchical_restriction(ssm.level(),
                                                                 ssm.n_elements(),
@@ -634,6 +648,8 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("hierarchical_restriction_with_counting");
+                            
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_restriction_with_counting(from_element,
                                                                    to_element,
