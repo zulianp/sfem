@@ -26,8 +26,8 @@ public:
         std::vector<T> S_host(2 * (nodes + padding), 0);
         double         h = 1. / steps;
         for (int i = 0; i < nodes; i++) {
-            S_host[0 * (nodes + padding) + i] = h * i;
-            S_host[1 * (nodes + padding) + i] = (1 - h * i);
+            S_host[0 * (nodes + padding) + i] = (1 - h * i);
+            S_host[1 * (nodes + padding) + i] = h * i;
         }
 
         auto nbytes = S_host.size() * sizeof(T);
@@ -449,14 +449,15 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                     const int y_odd = is_odd(y_start);
                     const int x_odd = is_odd(x_start);
 
-                    const int z_end = (zi == to_level ? 1 : step_factor) + z_odd;
-                    const int y_end = (yi == to_level ? 1 : step_factor) + y_odd;
-                    const int x_end = (xi == to_level ? 1 : step_factor) + x_odd;
+                    // Figure out local index range
+                    const int z_end = (z_start == to_level ? 1 : step_factor) + z_odd;
+                    const int y_end = (y_start == to_level ? 1 : step_factor) + y_odd;
+                    const int x_end = (x_start == to_level ? 1 : step_factor) + x_odd;
 
                     for (int from_zi = z_odd; from_zi < z_end; from_zi += 2) {
                         for (int from_yi = y_odd; from_yi < y_end; from_yi += 2) {
                             for (int from_xi = x_odd; from_xi < x_end; from_xi += 2) {
-                                // read from global mem
+                                // Parallel read from global mem on 8 fine nodes
                                 {
                                     const int zz = z_start + from_zi;
                                     const int yy = y_start + from_yi;
@@ -466,8 +467,10 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                     const int off_from_yi = (yy + yi);
                                     const int off_from_xi = (xx + xi);
 
-                                    const bool from_exists = e < nelements && off_from_zi <= from_level &&
-                                                             off_from_yi <= from_level && off_from_xi <= from_level;
+                                    const bool from_exists = e < nelements &&              // Check element exists
+                                                             off_from_zi <= from_level &&  //
+                                                             off_from_yi <= from_level &&  //
+                                                             off_from_xi <= from_level;
 
                                     __syncwarp();
                                     if (from_exists) {
@@ -497,7 +500,10 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                             const int rrdx = ROUND_ROBIN_2(dx, xi);
                                             // No bank conflicts due to round robin for single precision
                                             const To c = in[rrdz * 4 + rrdy * 2 + rrdx];
-                                            acc += c * Sx[rrdx] * Sy[rrdy] * Sz[rrdz];
+                                            const To f = Sx[rrdx] * Sy[rrdy] * Sz[rrdz];
+                                            assert(f >= 0);
+                                            assert(f <= 1);
+                                            acc += c * f;
                                         }
                                     }
                                 }
@@ -505,12 +511,20 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                         }
                     }
 
-                    const bool exists = e < nelements && to_zi <= to_level && to_yi <= to_level && to_xi <= to_level;
+                    // Parallel accumulate on 8 coarse nodes
+                    const int off_to_zi = to_zi + zi;
+                    const int off_to_yi = to_yi + yi;
+                    const int off_to_xi = to_xi + xi;
+
+                    const bool exists = e < nelements &&          // Check element exists
+                                        off_to_zi <= to_level &&  //
+                                        off_to_yi <= to_level &&  //
+                                        off_to_xi <= to_level;
                     if (exists) {
                         const int idx_to = cu_sshex8_lidx(to_level * to_level_stride,
-                                                          to_xi * to_level_stride,
-                                                          to_yi * to_level_stride,
-                                                          to_zi * to_level_stride);
+                                                          off_to_xi * to_level_stride,
+                                                          off_to_yi * to_level_stride,
+                                                          off_to_zi * to_level_stride);
 
                         atomicAdd(&to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride], acc);
                     }

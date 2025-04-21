@@ -153,6 +153,9 @@ int test_cube() {
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
     OP_TIME(prolongation, input->data(), prolongated->data());
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
+
+    sfem::blas<real_t>(es)->values(Ax_fine->size(), 1.0, Ax_fine->data());
+
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
     double tock = MPI_Wtime();
@@ -167,17 +170,17 @@ int test_cube() {
 
     // Compare two results
 #ifdef SFEM_ENABLE_CUDA
-    auto h_actual   = sfem::to_host(restricted);
-    auto h_expected = sfem::to_host(Ax_coarse);
+    auto h_restricted = sfem::to_host(restricted);
+    auto h_Ax_coarse  = sfem::to_host(Ax_coarse);
 #else
-    auto h_actual   = restricted;
-    auto h_expected = Ax_coarse;
+    auto h_restricted = restricted;
+    auto h_Ax_coarse  = Ax_coarse;
 #endif
     {
         auto      err      = error->data();
         ptrdiff_t n        = fs_coarse->n_dofs();
-        auto      actual   = h_actual->data();
-        auto      expected = h_expected->data();
+        auto      actual   = h_restricted->data();
+        auto      expected = h_Ax_coarse->data();
 
         real_t    largest_diff        = 0;
         real_t    largest_diff_factor = 0;
@@ -213,7 +216,7 @@ int test_cube() {
                 sfem::Output out(fs_coarse);
 
                 out.set_output_dir("galerkin/fields");
-                SFEM_TEST_ASSERT(out.write("R", h_actual->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(out.write("R", h_restricted->data()) == SFEM_SUCCESS);
                 SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
                 SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
                 SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
