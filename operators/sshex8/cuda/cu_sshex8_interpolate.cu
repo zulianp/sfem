@@ -20,20 +20,34 @@ class ShapeInterpolation {
 public:
     T     *data{nullptr};
     size_t nodes{0};
+    int    stride{0};
 
     ShapeInterpolation(const int steps, const int padding = 0) {
-        nodes = (steps + 1);
-        std::vector<T> S_host(2 * (nodes + padding), 0);
+        nodes  = (steps + 1);
+        stride = nodes + padding;
+        std::vector<T> S_host(2 * stride, 0);
         double         h = 1. / steps;
         for (int i = 0; i < nodes; i++) {
-            S_host[0 * (nodes + padding) + i] = (1 - h * i);
-            S_host[1 * (nodes + padding) + i] = h * i;
+            S_host[0 * stride + i] = (1 - h * i);
+            S_host[1 * stride + i] = h * i;
         }
 
         auto nbytes = S_host.size() * sizeof(T);
 
         SFEM_CUDA_CHECK(cudaMalloc((void **)&data, nbytes));
         SFEM_CUDA_CHECK(cudaMemcpy(data, S_host.data(), nbytes, cudaMemcpyHostToDevice));
+
+#if 0
+        for (int i = 0; i < stride; i++) {
+            printf("%g ", (double)S_host[0 * stride + i]);
+        }
+        printf("\n");
+
+        for (int i = 0; i < stride; i++) {
+            printf("%g ", (double)S_host[1 * stride + i]);
+        }
+        printf("\n");
+#endif 
     }
 
     ~ShapeInterpolation() { cudaFree(data); }
@@ -430,7 +444,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
     const int       to_nloops = to_level + from_even;
 
     // Add padding (Make sure that S has the correct padding)
-    const int S_stride = from_level + 1 + from_even;
+    const int S_stride = step_factor + 1 + from_even;
 
     // // Vector loop
     for (int d = 0; d < vec_size; d++) {
@@ -507,6 +521,19 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                         }
                                     }
                                 }
+
+                                // for (int dz = 0; dz < 2; dz++) {
+                                //     for (int dy = 0; dy < 2; dy++) {
+                                //         for (int dx = 0; dx < 2; dx++) {
+                                //             int      cidx = dz * 4 + dy * 2 + dx;
+                                //             const To c    = in[cidx];
+                                //             const To f    = Sx[dx] * Sy[dy] * Sz[dz];
+                                //             assert(f >= 0);
+                                //             assert(f <= 1);
+                                //             acc += c * f;
+                                //         }
+                                //     }
+                                // }
                             }
                         }
                     }
