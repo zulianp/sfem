@@ -154,7 +154,7 @@ int test_cube() {
     OP_TIME(prolongation, input->data(), prolongated->data());
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
 
-    sfem::blas<real_t>(es)->values(Ax_fine->size(), 1.0, Ax_fine->data());
+    // sfem::blas<real_t>(es)->values(Ax_fine->size(), 1.0, Ax_fine->data());
 
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
@@ -190,7 +190,7 @@ int test_cube() {
             // expected: is application of coarse operator
             real_t diff = fabs(actual[i] - expected[i]);
             err[i]      = diff;
-            if (!(1e-8 < diff)) {
+            if (diff > 1e-8 || diff != diff) {
                 printf("%ld) %g != %g (%g, %g)\n",
                        i,
                        (double)actual[i],
