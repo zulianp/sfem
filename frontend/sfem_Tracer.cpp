@@ -11,6 +11,10 @@
 #include <fstream>
 #include <map>
 
+#ifdef SFEM_ENABLE_CUDA
+#include <nvToolsExt.h>
+#endif
+
 // #define SFEM_ENABLE_BLOCK_KERNELS
 
 namespace sfem {
@@ -63,7 +67,9 @@ namespace sfem {
 #ifdef SFEM_ENABLE_BLOCK_KERNELS
         sfem::device_synchronize();
 #endif
-
+#ifdef SFEM_ENABLE_CUDA
+        nvtxRangePushA(name);
+#endif
         elapsed = MPI_Wtime();
     }
 
@@ -73,6 +79,9 @@ namespace sfem {
 #endif
 
         elapsed = MPI_Wtime() - elapsed;
+#ifdef SFEM_ENABLE_CUDA
+        nvtxRangePop();
+#endif
         Tracer::instance().record_event(name, elapsed);
     }
 
