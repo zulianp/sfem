@@ -36,6 +36,15 @@ struct field_mpi_domain {
 typedef struct field_mpi_domain field_mpi_domain_t;
 
 /**
+ * @brief Prints the field_mpi_domain_t structure.
+ *
+ * @param domain
+ */
+void print_field_mpi_domain(const field_mpi_domain_t* const domain);  //
+
+int test_field_mpi_domain(int argc, char* argv[]);
+
+/**
  * @brief Builds a field_mpi_domain_t structure.
  *
  * @param mpi_rank The MPI rank associated with this domain.
@@ -46,7 +55,7 @@ typedef struct field_mpi_domain field_mpi_domain_t;
  * @return field_mpi_domain_t The populated structure.
  */
 field_mpi_domain_t                                 //
-build_field_mpi_domain(const int        mpi_rank,  //
+make_field_mpi_domain(const int        mpi_rank,  //
                        const ptrdiff_t  n_zyx,     //
                        const ptrdiff_t* nlocal,    //
                        const geom_t*    origin,    //
@@ -59,9 +68,9 @@ build_field_mpi_domain(const int        mpi_rank,  //
  * @param domain_b
  * @param overlapped_domain
  */
-void                                                                   //
-calculate_overlapped_Z_domain(field_mpi_domain_t* domain_a,            //
-                              field_mpi_domain_t* domain_b,            //
-                              field_mpi_domain_t* overlapped_domain);  //
+int                                                                  //
+calculate_subset_Z_domain(const field_mpi_domain_t* const domain_a,  //
+                          const field_mpi_domain_t* const domain_b,  //
+                          field_mpi_domain_t* const       sub_domain);     //
 
 #endif  // __FIELD_MPI_DOMAIN_H__
