@@ -40,3 +40,42 @@ field_mpi_domain_t build_field_mpi_domain(const int        mpi_rank,  //
 
     return domain;
 }
+
+// struct field_mpi_domain {
+//     int    mpi_rank;          // MPI rank associated with this domain
+//     int    n_zyx;             // Total number of elements in the z, y, and x directions
+//     int    start_indices[3];  // Start indices for the z, y, and x directions (with respect to the global grid)
+//     int    nlocal[3];         // Number of local elements in the z, y, and x directions
+//     geom_t origin[3];         // Local origin coordinates in the z, y, and x directions
+// };
+
+void                                                                    //
+calculate_overlapped_Z_domain(field_mpi_domain_t* domain_a,             //
+                              field_mpi_domain_t* domain_b,             //
+                              field_mpi_domain_t* overlapped_domain) {  //
+
+    // Calculate the overlapped domain based on the start indices and nlocal values
+    // This find the portion of domain_b that is a subset of domain_a
+
+    overlapped_domain->mpi_rank = domain_a->mpi_rank;
+
+    const int start_index_z_a = domain_a->start_indices[2];
+    const int end_index_z_a   = start_index_z_a + domain_a->nlocal[2] - 1;
+    const int start_index_z_b = domain_b->start_indices[2];
+    const int end_index_z_b   = start_index_z_b + domain_b->nlocal[2] - 1;
+
+    int overlap_start = 0;
+    int overlap_end   = 0;
+
+    if (start_index_z_b > start_index_z_a && start_index_z_b < end_index_z_a) {
+        // Overlap exists
+        overlap_start = start_index_z_b;
+        overlap_end   = end_index_z_a;
+    } else if (start_index_z_a > start_index_z_b && start_index_z_a < end_index_z_b) {
+        // Overlap exists
+        overlapped_domain->start_indices[2] = start_index_z_a;
+    } else {
+        // No overlap, set to 0 or handle as needed
+        overlapped_domain->start_indices[2] = 0;
+    }
+}

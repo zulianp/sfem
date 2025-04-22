@@ -28,7 +28,7 @@
 struct field_mpi_domain {
     int    mpi_rank;          // MPI rank associated with this domain
     int    n_zyx;             // Total number of elements in the z, y, and x directions
-    int    start_indices[3];  // Start indices for the z, y, and x directions
+    int    start_indices[3];  // Start indices for the z, y, and x directions (with respect to the global grid)
     int    nlocal[3];         // Number of local elements in the z, y, and x directions
     geom_t origin[3];         // Local origin coordinates in the z, y, and x directions
 };
@@ -51,5 +51,17 @@ build_field_mpi_domain(const int        mpi_rank,  //
                        const ptrdiff_t* nlocal,    //
                        const geom_t*    origin,    //
                        const geom_t*    delta);       //
+
+/**
+ * @brief
+ *
+ * @param domain_a
+ * @param domain_b
+ * @param overlapped_domain
+ */
+void                                                                   //
+calculate_overlapped_Z_domain(field_mpi_domain_t* domain_a,            //
+                              field_mpi_domain_t* domain_b,            //
+                              field_mpi_domain_t* overlapped_domain);  //
 
 #endif  // __FIELD_MPI_DOMAIN_H__
