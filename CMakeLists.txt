@@ -120,6 +120,7 @@ if(SFEM_ENABLE_CUDA)
         operators/hierarchical/cuda
         operators/macro_tet4/cuda
         operators/quadshell4/cuda
+        operators/spectral_hex/cuda
         operators/sshex8/cuda
         operators/sstet4/cuda
         operators/tet10/cuda
