@@ -17,6 +17,7 @@
 
 // C++ includes
 #include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_Tracer.hpp"
 
 namespace sfem {
 
@@ -436,6 +437,8 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_diag");
+
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_laplacian_diag(ssm.level(),
                                                    fff->n_elements(),
@@ -449,6 +452,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_apply");
+
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                     fff->n_elements(),
@@ -463,6 +468,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_apply");
+
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                     fff->n_elements(),
@@ -654,6 +661,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("cu_linear_elasticity_bsr");
+
             return cu_linear_elasticity_bsr(element_type,
                                             adjugate->n_elements(),
                                             adjugate->n_elements(),
@@ -670,6 +679,8 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            SFEM_TRACE_SCOPE("cu_linear_elasticity_diag");
+
             return cu_linear_elasticity_diag(element_type,
                                              adjugate->n_elements(),
                                              adjugate->n_elements(),
@@ -684,6 +695,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_linear_elasticity_apply");
+
             return cu_linear_elasticity_apply(element_type,
                                               adjugate->n_elements(),
                                               adjugate->n_elements(),
@@ -699,6 +712,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_linear_elasticity_apply");
+
             return cu_linear_elasticity_apply(element_type,
                                               adjugate->n_elements(),
                                               adjugate->n_elements(),
@@ -739,6 +754,8 @@ namespace sfem {
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity::derefine_op");
+
             if (derefined_space->has_semi_structured_mesh()) {
                 auto ret          = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
                 ret->element_type = element_type;
@@ -791,6 +808,7 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            SFEM_TRACE_SCOPE("cu_affine_sshex8_linear_elasticity_diag");
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
                                                            adjugate->n_elements(),
@@ -810,6 +828,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("gradient");
+
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                             adjugate->n_elements(),
@@ -833,6 +853,8 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_affine_sshex8_linear_elasticity_apply");
+
             auto &ssm = space->semi_structured_mesh();
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                             adjugate->n_elements(),
