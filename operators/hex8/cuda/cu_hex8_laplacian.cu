@@ -38,16 +38,18 @@ __global__ void cu_affine_hex8_laplacian_apply_tiled_kernel(const ptrdiff_t nele
     const ptrdiff_t vidx =
             e + stride * ((sub_idx == 3 || sub_idx == 7) ? (sub_idx - 1)
                                                          : ((sub_idx == 2 || sub_idx == 6) ? (sub_idx + 1) : sub_idx));
+    // read from global mem
     const ptrdiff_t gidx = elements[vidx];
 
     T fff[6];
     for (int d = 0; d < 6; d++) {
         fff[d] = g_fff[d * stride + e];
     }
+
     static const T D[2 * 2] = {-1, 1, -1, 1};
     static const T qw[2]    = {0.5, 0.5};
 
-    // Gather
+    // Gather from global mem to shared mem
     element_u[sub_idx]   = (e < nelements) ? u[gidx] : 0;
     element_out[sub_idx] = 0;
     gx[sub_idx]          = 0;
@@ -60,6 +62,8 @@ __global__ void cu_affine_hex8_laplacian_apply_tiled_kernel(const ptrdiff_t nele
     const int zi = (sub_idx >> 2);        // equivalent to sub_idx / 4
 
     cu_spectral_hex_laplacian_apply_tiled<2, T>(xi, yi, zi, D, fff, qw, element_u, gx, gy, gz, element_out);
+
+    // Scatter from shared mem to global mem
     atomicAdd(&values[gidx], element_out[sub_idx]);
 }
 
@@ -120,7 +124,7 @@ __global__ void cu_affine_hex8_laplacian_apply_kernel(const ptrdiff_t           
             fff[d] = g_fff[d * stride + e];
         }
 
-#if 0
+#if 1
         for (int v = 0; v < 8; ++v) {
             element_u[v] = u[ev[v]];
         }
