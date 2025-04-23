@@ -521,19 +521,6 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                         }
                                     }
                                 }
-
-                                // for (int dz = 0; dz < 2; dz++) {
-                                //     for (int dy = 0; dy < 2; dy++) {
-                                //         for (int dx = 0; dx < 2; dx++) {
-                                //             int      cidx = dz * 4 + dy * 2 + dx;
-                                //             const To c    = in[cidx];
-                                //             const To f    = Sx[dx] * Sy[dy] * Sz[dz];
-                                //             assert(f >= 0);
-                                //             assert(f <= 1);
-                                //             acc += c * f;
-                                //         }
-                                //     }
-                                // }
                             }
                         }
                     }
@@ -787,10 +774,12 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     for (int d = 0; d < vec_size; d++) {
         // loop on all FROM micro elements
         for (int from_zi = 0; from_zi < from_nloops; from_zi++) {
+            const int off_from_zi = (from_zi + zi);
+            
             for (int from_yi = 0; from_yi < from_nloops; from_yi++) {
-                for (int from_xi = 0; from_xi < from_nloops; from_xi++) {
-                    const int off_from_zi = (from_zi + zi);
-                    const int off_from_yi = (from_yi + yi);
+                const int off_from_yi = (from_yi + yi);
+
+                for (int from_xi = 0; from_xi < from_nloops; from_xi++) {    
                     const int off_from_xi = (from_xi + xi);
 
                     const bool from_exists =

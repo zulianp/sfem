@@ -126,8 +126,6 @@ int test_ssgmg_linear_elasticity_cube() {
     int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-
-
     geom_t Lx = 1;
     auto   m  = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);

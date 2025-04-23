@@ -109,6 +109,8 @@ namespace sfem {
     std::shared_ptr<Sideset> Sideset::create_from_selector(
             const std::shared_ptr<Mesh>                                         &mesh,
             const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector) {
+        SFEM_TRACE_SCOPE("Sideset::create_from_selector");
+
         const ptrdiff_t nelements = mesh->n_elements();
         const ptrdiff_t nnodes    = mesh->n_nodes();
         const int       dim       = mesh->spatial_dimension();
@@ -174,6 +176,8 @@ namespace sfem {
     }
 
     int Sideset::read(MPI_Comm comm, const char *folder) {
+        SFEM_TRACE_SCOPE("Sideset::read");
+        
         impl_->comm = comm;
 
         std::string    folder_ = folder;

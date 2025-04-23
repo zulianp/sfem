@@ -71,6 +71,9 @@ int test_cube() {
     int SFEM_DEBUG_EXPORT = 0;
     SFEM_READ_ENV(SFEM_DEBUG_EXPORT, atoi);
 
+    int SFEM_DEBUG_PRINT = 0;
+    SFEM_READ_ENV(SFEM_DEBUG_PRINT, atoi);
+
     int  block_size = 1;
     auto m          = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
@@ -78,7 +81,9 @@ int test_cube() {
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+
+    if(SFEM_ELEMENT_REFINE_LEVEL != 5)
+        fs->semi_structured_mesh().apply_hierarchical_renumbering();
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -121,10 +126,17 @@ int test_cube() {
             es);
 
     auto h_input = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
+
     {
-        ptrdiff_t n      = fs_coarse->n_dofs();
-        auto      data   = h_input->data();
-        auto      points = fs_coarse->semi_structured_mesh().points()->data();
+        geom_t **points{nullptr};
+        if (fs_coarse->has_semi_structured_mesh()) {
+            points = fs_coarse->semi_structured_mesh().points()->data();
+        } else {
+            points = fs_coarse->mesh_ptr()->points()->data();
+        }
+
+        ptrdiff_t n    = fs_coarse->n_dofs();
+        auto      data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
             data[i] = points[0][i] * points[0][i];
             // data[i] = points[0][i];
@@ -153,9 +165,6 @@ int test_cube() {
     OP_TIME(coarse_op, input->data(), Ax_coarse->data());
     OP_TIME(prolongation, input->data(), prolongated->data());
     OP_TIME(fine_op, prolongated->data(), Ax_fine->data());
-
-    // sfem::blas<real_t>(es)->values(Ax_fine->size(), 1.0, Ax_fine->data());
-
     OP_TIME(restriction, Ax_fine->data(), restricted->data());
 
     double tock = MPI_Wtime();
@@ -204,6 +213,29 @@ int test_cube() {
                 arg_largest_diff    = i;
                 largest_diff_factor = actual[i] / expected[i];
             }
+        }
+
+        if(SFEM_DEBUG_PRINT) {
+            std::cout << "--------------\n";
+            std::cout << "Prolongated\n";
+            std::cout << "--------------\n";
+#ifdef SFEM_ENABLE_CUDA
+            sfem::to_host(prolongated)->print(std::cout);
+#else
+            prolongated->print(std::cout);
+#endif
+
+            std::cout << "--------------\n";
+            std::cout << "Actual\n";
+            std::cout << "--------------\n";
+            h_restricted->print(std::cout);
+
+            std::cout << "--------------\n";
+            std::cout << "Expected\n";
+            std::cout << "--------------\n";
+            h_Ax_coarse->print(std::cout);
+            
+            std::cout << "--------------\n";
         }
 
         if (SFEM_DEBUG_EXPORT) {
