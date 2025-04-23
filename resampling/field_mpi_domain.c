@@ -12,10 +12,10 @@
  * @return field_mpi_domain_t The populated structure.
  */
 field_mpi_domain_t make_field_mpi_domain(const int        mpi_rank,  //
-                                          const ptrdiff_t  n_zyx,     //
-                                          const ptrdiff_t* nlocal,    //
-                                          const geom_t*    origin,    //
-                                          const geom_t*    delta) {      //
+                                         const ptrdiff_t  n_zyx,     //
+                                         const ptrdiff_t* nlocal,    //
+                                         const geom_t*    origin,    //
+                                         const geom_t*    delta) {      //
     field_mpi_domain_t domain;
 
     domain.mpi_rank = mpi_rank;
@@ -78,8 +78,9 @@ calculate_subset_Z_domain(const field_mpi_domain_t* const domain_a,  //
     // Calculate the overlapped domain based on the start indices and nlocal values
     // This function find the portion of domain_b that is a subset of domain_a
 
-    sub_domain->mpi_rank  = domain_a->mpi_rank;
-    sub_domain->n_zyx     = domain_a->n_zyx;
+    sub_domain->mpi_rank = domain_a->mpi_rank;
+    sub_domain->n_zyx    = domain_a->n_zyx;
+
     sub_domain->nlocal[0] = domain_a->nlocal[0];
     sub_domain->nlocal[1] = domain_a->nlocal[1];
     sub_domain->origin[0] = domain_a->origin[0];
@@ -112,7 +113,22 @@ calculate_subset_Z_domain(const field_mpi_domain_t* const domain_a,  //
     }
 
     // Calculate the start index for the overlapped domain
+    // We assume that only the z dimension is being overlapped
+    // The x and y dimensions remain the same as domain_a and domain_b
+
+    sub_domain->start_indices[0] = domain_a->start_indices[0];
+    sub_domain->start_indices[1] = domain_a->start_indices[1];
+
     sub_domain->start_indices[2] = overlap_start;
+
+    // Calculate the origin for the overlapped domain
+    // We assume that only the z dimension is being overlapped
+    // The x and y dimensions remain the same as domain_a and domain_b
+    sub_domain->origin[2] = overlap_start * (domain_a->origin[2] / domain_a->start_indices[2]);
+
+    // Calculate the total number of elements in the overlapped domain
+    // This is the product of the number of elements in each dimension
+    sub_domain->n_zyx = sub_domain->nlocal[0] * sub_domain->nlocal[1] * sub_domain->nlocal[2];
 
     return 1;  // Return 1 to indicate that the overlap was found (TRUE case)
 }
@@ -160,22 +176,51 @@ field_mpi_domain_t initialize_field_mpi_domain(const int mpi_rank, const int sta
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
+// is_point_in_domain
+///////////////////////////////////////////////////////////////////////////////////
+int                                                         //
+is_point_in_domain(const field_mpi_domain_t* const domain,  //
+                   const geom_t                    point[3]) {                 //
+
+    // Check if the point is within the bounds of the domain
+    const real_t delta = domain->origin[2] / domain->start_indices[2];
+
+    const real_t min_x = domain->origin[0];
+    const real_t max_x = domain->origin[0] + (domain->nlocal[0] - 1) * delta;
+    const real_t min_y = domain->origin[1];
+    const real_t max_y = domain->origin[1] + (domain->nlocal[1] - 1) * delta;
+    const real_t min_z = domain->origin[2];
+    const real_t max_z = domain->origin[2] + (domain->nlocal[2] - 1) * delta;
+
+    if (point[0] >= min_x &&  //
+        point[0] <= max_x &&  //
+        point[1] >= min_y &&  //
+        point[1] <= max_y &&  //
+        point[2] >= min_z &&  //
+        point[2] <= max_z) {  //
+        return 1;             // Point is inside the domain
+    } else {
+        return 0;  // Point is outside the domain
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////
 // tets_field_mpi_domain
 ///////////////////////////////////////////////////////////////////////////////////
 int test_field_mpi_domain(int argc, char* argv[]) {  //
 
     field_mpi_domain_t domain_a, domain_b, overlapped_domain;
 
-    float_t delta = 1.0;
+    float_t delta = 0.1;
 
     domain_a = initialize_field_mpi_domain(0,       // mpi_rank
-                                           200,     // start_z
+                                           700,     // start_z
                                            100,     // nlocal_x
                                            100,     // nlocal_y
                                            300,     // nlocal_z
                                            delta);  //
 
-    domain_b = initialize_field_mpi_domain(1,       // mpi_rank
+    domain_b = initialize_field_mpi_domain(0,       // mpi_rank
                                            250,     // start_z
                                            100,     // nlocal_x
                                            100,     // nlocal_y
@@ -184,6 +229,16 @@ int test_field_mpi_domain(int argc, char* argv[]) {  //
 
     print_field_mpi_domain(&domain_a);
     print_field_mpi_domain(&domain_b);
+
+    int result = calculate_subset_Z_domain(&domain_a, &domain_b, &overlapped_domain);
+
+    if (result) {
+        printf("Overlapped domain:\n");
+        print_field_mpi_domain(&overlapped_domain);
+    } else {
+        printf("No overlap found.\n");
+        print_field_mpi_domain(&overlapped_domain);
+    }
 
     return 0;
 }

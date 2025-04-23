@@ -62,7 +62,7 @@ make_field_mpi_domain(const int        mpi_rank,  //
                        const geom_t*    delta);       //
 
 /**
- * @brief
+ * @brief Calculates the subset of the Z domain that overlaps between two field_mpi_domain_t structures.
  *
  * @param domain_a
  * @param domain_b
@@ -72,5 +72,8 @@ int                                                                  //
 calculate_subset_Z_domain(const field_mpi_domain_t* const domain_a,  //
                           const field_mpi_domain_t* const domain_b,  //
                           field_mpi_domain_t* const       sub_domain);     //
+
+
+int is_point_in_domain(const field_mpi_domain_t* const domain, const geom_t point[3]);
 
 #endif  // __FIELD_MPI_DOMAIN_H__
