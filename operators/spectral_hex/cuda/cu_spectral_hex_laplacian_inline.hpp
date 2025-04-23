@@ -119,6 +119,7 @@ inline __device__ void cu_spectral_hex_laplacian_apply_tiled(const int i,
 
         T acc[3] = {D0[0] * u0[0], D1[0] * u1[0], D2[0] * u2[0]};
 
+// #pragma unroll
         for (int n = 1; n < N; n++) {
             acc[0] += D0[n] * u0[n];
             acc[1] += D1[n] * u1[n * N];
@@ -148,6 +149,7 @@ inline __device__ void cu_spectral_hex_laplacian_apply_tiled(const int i,
 
         T acc[3] = {D0[0] * g0[0], D1[0] * g1[0], D2[0] * g2[0]};
 
+// #pragma unroll
         for (int n = 1; n < N; n++) {
             const int nidx = n * N;
             acc[0] += D0[nidx] * g0[n];
