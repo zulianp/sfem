@@ -28,6 +28,7 @@ __global__ void cu_affine_hex8_laplacian_apply_tiled_kernel(const ptrdiff_t nele
     const ptrdiff_t offset       = tile * 8 * sizeof(T);
     const ptrdiff_t block_offset = sizeof(T) * blockDim.x;
 
+    // !! Bank conflicts if T=double
     T *element_u   = (T *)&shared_mem[offset];
     T *gx          = (T *)&shared_mem[offset + block_offset];
     T *gy          = (T *)&shared_mem[offset + block_offset * 2];
@@ -38,7 +39,7 @@ __global__ void cu_affine_hex8_laplacian_apply_tiled_kernel(const ptrdiff_t nele
     const ptrdiff_t vidx =
             e + stride * ((sub_idx == 3 || sub_idx == 7) ? (sub_idx - 1)
                                                          : ((sub_idx == 2 || sub_idx == 6) ? (sub_idx + 1) : sub_idx));
-    // read from global mem
+    // read from global mem (not coalesced)
     const ptrdiff_t gidx = elements[vidx];
 
     T fff[6];
@@ -218,6 +219,7 @@ extern int cu_affine_hex8_laplacian_apply(const ptrdiff_t                  nelem
     SFEM_READ_ENV(SFEM_AFFINE_HEX8_TILED, atoi);
 
     if (SFEM_AFFINE_HEX8_TILED) {
+        // This is slower than the other variant
         switch (real_type_xy) {
             case SFEM_REAL_DEFAULT: {
                 return cu_affine_hex8_laplacian_apply_tiled_tpl(
