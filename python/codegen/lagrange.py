@@ -25,8 +25,9 @@ def uniform_lagr(order, x, h):
 
     return sp.Matrix(len(l), 1, l)
 
+
 def eval_gauss_legendre(order):
-    x, w = gauss_legendre(order*3, 10)
+    x, w = gauss_legendre(order * 3, 10)
     n = len(x)
     for i in range(0, n):
         x[i] = (x[i] + 1) / 2
@@ -39,11 +40,11 @@ def eval_gauss_legendre(order):
         w[i] = w[i] / sum_w
 
     h = sp.Rational(1, order)
-    xsymb = sp.symbols('x')
+    xsymb = sp.symbols("x")
     l = uniform_lagr(order, xsymb, h)
 
     print(x)
-    
+
     S = sp.zeros(len(w), len(l))
     D = sp.zeros(len(w), len(l))
 
@@ -55,8 +56,8 @@ def eval_gauss_legendre(order):
     print(S)
     print(D)
 
-    expr = assign_matrix('S', S)
-    expr.extend(assign_matrix('D', D))
+    expr = assign_matrix("S", S)
+    expr.extend(assign_matrix("D", D))
     c_code(expr)
 
 
@@ -73,8 +74,6 @@ def plot_uniform_lagr(order):
         plt.plot(x, l[i], label=f"f{i}")
         plt.legend()
     plt.show()
-
-
 
 
 if __name__ == "__main__":
