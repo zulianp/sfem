@@ -134,10 +134,10 @@ static int acu_affine_sshex8_laplacian_apply_local_mem_tpl(const ptrdiff_t nelem
 }
 
 //////////////////////
+#if 0 // Bad performance
 
-// Bad performance
 template <typename T, int LEVEL, int BATCH_SIZE>
-__global__ void cu_affine_sshex8_laplacian_apply_local_mem_batched_3D_kernel(
+__global__ void cu_affine_sshex8_laplacian_apply_local_mem_batched_BAD_kernel(
         const ptrdiff_t                          nelements,
         const ptrdiff_t                          stride,  // Stride for elements and fff
         const ptrdiff_t                          interior_start,
@@ -261,6 +261,8 @@ __global__ void cu_affine_sshex8_laplacian_apply_local_mem_batched_3D_kernel(
         }
     }
 }
+
+#endif
 
 template <typename T, int LEVEL, int BATCH_SIZE>
 __global__ void cu_affine_sshex8_laplacian_apply_local_mem_batched_kernel(const ptrdiff_t nelements,
