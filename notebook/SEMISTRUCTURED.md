@@ -419,3 +419,15 @@ With numerical quadrature and with symbolic integration
 | SFEM_ELEMENT_REFINE_LEVEL | #macro-elems | #dofs | TTS [ms] | TP [GDOF/s] |
 | 4 | 473125 | 92463957  | 9.97 |  9.2 |
 | 5 | 473125 | 179958447 | 51.2 |  3.5 |
+
+
+
+# Vector Laplacian
+
+```c++
+VectorLaplacian::apply  						Avg: 0.00732866 [s], 	TP 223.107 [MDOF/s]
+Laplacian::apply  								Avg: 0.00708555 [s], 	TP 76.9206 [MDOF/s]
+SemiStructuredLaplacian[2]::apply(stencil)  	Avg: 0.0203366 [s], 	TP 210.298 [MDOF/s]
+SemiStructuredLaplacian[4]::apply(stencil)  	Avg: 0.00964955 [s], 	TP 443.206 [MDOF/s]
+SemiStructuredLaplacian[8]::apply(stencil)  	Avg: 0.052335 [s], 		TP 647.428 [MDOF/s]
+```
