@@ -133,25 +133,19 @@ static int cu_affine_sshex8_laplacian_apply_tpl(const int                       
                 return acu_affine_sshex8_laplacian_apply_local_mem_tpl<T, 2>(
                         nelements, stride, interior_start, elements, fff, x, y, stream);
             }
-#if 0  // Disabled to reduce compilation times (warp level version is the fastest)
-            case 4: {
-                return acu_affine_sshex8_laplacian_apply_local_mem_tpl<T, 4>(
-                        nelements, stride, interior_start, elements, fff, x, y, stream);
-            }
-            case 6: {
-                return acu_affine_sshex8_laplacian_apply_local_mem_tpl<T, 6>(
-                        nelements, stride, interior_start, elements, fff, x, y, stream);
-            }
-            case 8: {
-                return acu_affine_sshex8_laplacian_apply_local_mem_tpl<T, 8>(
-                        nelements, stride, interior_start, elements, fff, x, y, stream);
-            }
-#endif
-            case 16: {
-                return acu_affine_sshex8_laplacian_apply_local_mem_tpl<T, 16>(
-                        nelements, stride, interior_start, elements, fff, x, y, stream);
-            }
+            default:
+                break;
+        }
+    }
 
+    int SFEM_HEX8_LOCAL_MEM_BATCHED_KERNEL = 1;
+    SFEM_READ_ENV(SFEM_HEX8_LOCAL_MEM_BATCHED_KERNEL, atoi);
+    if (SFEM_HEX8_LOCAL_MEM_BATCHED_KERNEL) {
+        switch (level) {
+            case 16: {
+                return acu_affine_sshex8_laplacian_apply_local_mem_batched_tpl<T, 16, 4>(
+                        nelements, stride, interior_start, elements, fff, x, y, stream);
+            }
             default:
                 break;
         }
