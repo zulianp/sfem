@@ -28,6 +28,9 @@
 
 #define OP_TIME(op, x, y)                                      \
     do {                                                       \
+        if (SFEM_REPEAT > 1) {                                 \
+            op->apply(x, y);                                   \
+        }                                                      \
         sfem::device_synchronize();                            \
         double start = MPI_Wtime();                            \
         for (int r = 0; r < SFEM_REPEAT; r++) {                \
