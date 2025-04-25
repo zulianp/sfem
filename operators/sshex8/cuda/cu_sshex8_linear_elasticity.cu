@@ -155,7 +155,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
         // Gather from global to "local"
         for (int d = 0; d < 3; d++) {
             cu_sshex8_gather<T, LEVEL, T>(
-                    nelements, stride, interior_start, e, elements, u_stride, g_u[d], u_block[d]);
+                    nelements, stride, e, elements, u_stride, g_u[d], u_block[d]);
         }
 
         // Get geometry
@@ -243,7 +243,6 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
         for (int d = 0; d < 3; d++) {
             cu_sshex8_scatter_add<T, LEVEL, T>(nelements,
                                                      stride,
-                                                     interior_start,
                                                      e,
                                                      elements,
                                                      out_block[d],
@@ -404,7 +403,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
         {
             // Gather from global to "local"
             cu_sshex8_gather<T, LEVEL, T>(
-                    nelements, stride, interior_start, e, elements, u_stride, g_u[0], u_block);
+                    nelements, stride, e, elements, u_stride, g_u[0], u_block);
 
 #ifdef HEX8_SEGMENTED_SYMBOLIC
             cu_hex8_linear_elasticity_integral_matrix_block_0_0<T, T>(
@@ -447,7 +446,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
         {
             // Gather from global to "local"
             cu_sshex8_gather<T, LEVEL, T>(
-                    nelements, stride, interior_start, e, elements, u_stride, g_u[1], u_block);
+                    nelements, stride, e, elements, u_stride, g_u[1], u_block);
 
 #ifdef HEX8_SEGMENTED_SYMBOLIC
             cu_hex8_linear_elasticity_integral_matrix_block_0_1<T, T>(
@@ -490,7 +489,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
         {
             // Gather from global to "local"
             cu_sshex8_gather<T, LEVEL, T>(
-                    nelements, stride, interior_start, e, elements, u_stride, g_u[2], u_block);
+                    nelements, stride, e, elements, u_stride, g_u[2], u_block);
 
 #ifdef HEX8_SEGMENTED_SYMBOLIC
             cu_hex8_linear_elasticity_integral_matrix_block_0_2<T, T>(
@@ -533,7 +532,6 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
         for (int d = 0; d < 3; d++) {
             cu_sshex8_scatter_add<T, LEVEL, T>(nelements,
                                                      stride,
-                                                     interior_start,
                                                      e,
                                                      elements,
                                                      out_block[d],
