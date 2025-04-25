@@ -70,7 +70,7 @@ for i in range(0, to_level + padding):
                         for d1 in range(0, 2):
                             for d2 in range(0, 2):
                                 c = rh[ll + d1, mm + d2]  # Divide by count factor
-                                # Register add? 
+                                # Register add?
                                 rH[i + k1, j + k2] += (
                                     c * phi[k1, l + d1] * phi[k2, m + d2]
                                 )
