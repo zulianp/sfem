@@ -36,13 +36,13 @@ int affine_hex8_vector_laplacian_apply(const ptrdiff_t              nelements,
         const scalar_t lz[8] = {z[ev[0]], z[ev[1]], z[ev[2]], z[ev[3]], z[ev[4]], z[ev[5]], z[ev[6]], z[ev[7]]};
 
         // Assume affine here!
-        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, fff);
+        hex8_fff(lx, ly, lz, (scalar_t)0.5, (scalar_t)0.5, (scalar_t)0.5, fff);
 
         accumulator_t laplacian_matrix[8 * 8];
         hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
 
         for (int d = 0; d < vector_size; d++) {
-            const real_t *const SFEM_RESTRICT ud = u[d];
+            const real_t *const ud = u[d];
 
             for (int v = 0; v < 8; ++v) {
                 element_u[v] = ud[ev[v] * stride];
@@ -63,7 +63,7 @@ int affine_hex8_vector_laplacian_apply(const ptrdiff_t              nelements,
                 }
             }
 
-            real_t *const SFEM_RESTRICT vd = values[d];
+            real_t *const vd = values[d];
             for (int edof_i = 0; edof_i < 8; ++edof_i) {
                 const idx_t dof_i = ev[edof_i];
 
