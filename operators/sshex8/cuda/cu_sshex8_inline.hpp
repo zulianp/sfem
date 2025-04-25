@@ -11,12 +11,11 @@
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
 #endif
 
-template<typename scalar_t>
-static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t stride,
-                                                         const cu_jacobian_t *const SFEM_RESTRICT
-                                                                 fff,
-                                                         const scalar_t h,
-                                                         scalar_t *const SFEM_RESTRICT sub_fff) {
+template <typename scalar_t>
+static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t                          stride,
+                                                         const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                                         const scalar_t                           h,
+                                                         scalar_t *const SFEM_RESTRICT            sub_fff) {
     sub_fff[0] = (scalar_t)fff[0 * stride] * h;
     sub_fff[1] = (scalar_t)fff[1 * stride] * h;
     sub_fff[2] = (scalar_t)fff[2 * stride] * h;
@@ -26,21 +25,16 @@ static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t stride,
 }
 
 static inline __device__ __host__ int cu_sshex8_nxe(int level) {
-    const int corners = 8;
+    const int corners    = 8;
     const int edge_nodes = 12 * (level - 1);
     const int face_nodes = 6 * (level - 1) * (level - 1);
-    const int vol_nodes = (level - 1) * (level - 1) * (level - 1);
+    const int vol_nodes  = (level - 1) * (level - 1) * (level - 1);
     return corners + edge_nodes + face_nodes + vol_nodes;
 }
 
-static inline __device__ __host__ int cu_sshex8_txe(int level) {
-    return level * level * level;
-}
+static inline __device__ __host__ int cu_sshex8_txe(int level) { return level * level * level; }
 
-static inline __device__ __host__ int cu_sshex8_lidx(const int L,
-                                                           const int x,
-                                                           const int y,
-                                                           const int z) {
+static inline __device__ __host__ int cu_sshex8_lidx(const int L, const int x, const int y, const int z) {
     int Lp1 = L + 1;
     int ret = z * (Lp1 * Lp1) + y * Lp1 + x;
     assert(ret < cu_sshex8_nxe(L));
@@ -51,15 +45,52 @@ static inline __device__ __host__ int cu_sshex8_lidx(const int L,
 #define SFEM_HEX8_BLOCK_IDX(x, y, z) ((z)*BLOCK_SIZE_2 + (y)*BLOCK_SIZE + (x))
 
 template <typename real_t, int LEVEL, typename scalar_t>
-static inline __host__ __device__ void cu_sshex8_gather(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const ptrdiff_t e,
-        const idx_t *const SFEM_RESTRICT elements,
-        const ptrdiff_t x_stride,
-        const real_t *const SFEM_RESTRICT x,
-        scalar_t *const SFEM_RESTRICT x_block) {
+static inline __host__ __device__ void cu_sshex8_gather(const ptrdiff_t                   nelements,
+                                                        const ptrdiff_t                   stride,  // Stride for elements and fff
+                                                        const ptrdiff_t                   e,
+                                                        const idx_t *const SFEM_RESTRICT  elements,
+                                                        const ptrdiff_t                   x_stride,
+                                                        const real_t *const SFEM_RESTRICT x,
+                                                        scalar_t *const SFEM_RESTRICT     x_block) {
+    for (int zi = 0; zi <= LEVEL; zi++) {
+        for (int yi = 0; yi <= LEVEL; yi++) {
+            for (int xi = 0; xi <= LEVEL; xi++) {
+                const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
+                idx_t     gidx = elements[lidx * stride + e];
+                x_block[lidx]  = x[gidx * x_stride];
+            }
+        }
+    }
+}
+
+template <typename real_t, int LEVEL, typename scalar_t>
+static inline __host__ __device__ void cu_sshex8_scatter_add(const ptrdiff_t nelements,
+                                                             const ptrdiff_t stride,  // Stride for elements and fff
+                                                             const ptrdiff_t e,
+                                                             const idx_t *const SFEM_RESTRICT elements,
+                                                             scalar_t *const SFEM_RESTRICT    y_block,
+                                                             const ptrdiff_t                  y_stride,
+                                                             real_t *const SFEM_RESTRICT      y) {
+    for (int zi = 0; zi <= LEVEL; zi++) {
+        for (int yi = 0; yi <= LEVEL; yi++) {
+            for (int xi = 0; xi <= LEVEL; xi++) {
+                const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
+                idx_t     gidx = elements[lidx * stride + e];
+                atomicAdd(&y[gidx * y_stride], y_block[lidx]);
+            }
+        }
+    }
+}
+
+template <typename real_t, int LEVEL, typename scalar_t>
+static inline __host__ __device__ void cu_sshex8_gather_flat(const ptrdiff_t nelements,
+                                                             const ptrdiff_t stride,  // Stride for elements and fff
+                                                             const ptrdiff_t interior_start,
+                                                             const ptrdiff_t e,
+                                                             const idx_t *const SFEM_RESTRICT  elements,
+                                                             const ptrdiff_t                   x_stride,
+                                                             const real_t *const SFEM_RESTRICT x,
+                                                             scalar_t *const SFEM_RESTRICT     x_block) {
     static const int BLOCK_SIZE = LEVEL + 1;
 
 #ifndef NDEBUG
@@ -74,7 +105,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, 0);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -86,7 +117,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, LEVEL);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -98,7 +129,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, 0, yi, zi);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -110,7 +141,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, LEVEL, yi, zi);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -122,7 +153,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, xi, 0, zi);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -134,7 +165,7 @@ static inline __host__ __device__ void cu_sshex8_gather(
                 const int lidx = cu_sshex8_lidx(LEVEL, xi, LEVEL, zi);
                 assert(lidx < BLOCK_SIZE_3);
                 const idx_t idx = elements[lidx * stride + e];
-                x_block[lidx] = x[idx * x_stride];
+                x_block[lidx]   = x[idx * x_stride];
             }
         }
     }
@@ -144,11 +175,11 @@ static inline __host__ __device__ void cu_sshex8_gather(
         for (int zi = 1; zi < LEVEL; zi++) {
             for (int yi = 1; yi < LEVEL; yi++) {
                 for (int xi = 1; xi < LEVEL; xi++) {
-                    const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
-                    const int Lm1 = LEVEL - 1;
-                    const int en = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
-                    const ptrdiff_t idx = interior_start + e * (Lm1 * Lm1 * Lm1) + en;
-                    x_block[lidx] = x[idx * x_stride];
+                    const int       lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
+                    const int       Lm1  = LEVEL - 1;
+                    const int       en   = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
+                    const ptrdiff_t idx  = interior_start + e * (Lm1 * Lm1 * Lm1) + en;
+                    x_block[lidx]        = x[idx * x_stride];
                 }
             }
         }
@@ -156,15 +187,14 @@ static inline __host__ __device__ void cu_sshex8_gather(
 }
 
 template <typename real_t, int LEVEL, typename scalar_t>
-static inline __host__ __device__ void cu_sshex8_scatter_add(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start,
-        const ptrdiff_t e,
-        const idx_t *const SFEM_RESTRICT elements,
-        scalar_t *const SFEM_RESTRICT y_block,
-        const ptrdiff_t y_stride,
-        real_t *const SFEM_RESTRICT y) {
+static inline __host__ __device__ void cu_sshex8_scatter_flat_add(const ptrdiff_t nelements,
+                                                                  const ptrdiff_t stride,  // Stride for elements and fff
+                                                                  const ptrdiff_t interior_start,
+                                                                  const ptrdiff_t e,
+                                                                  const idx_t *const SFEM_RESTRICT elements,
+                                                                  scalar_t *const SFEM_RESTRICT    y_block,
+                                                                  const ptrdiff_t                  y_stride,
+                                                                  real_t *const SFEM_RESTRICT      y) {
     static const int BLOCK_SIZE = LEVEL + 1;
 
 #ifndef NDEBUG
@@ -249,10 +279,10 @@ static inline __host__ __device__ void cu_sshex8_scatter_add(
         for (int zi = 1; zi < LEVEL; zi++) {
             for (int yi = 1; yi < LEVEL; yi++) {
                 for (int xi = 1; xi < LEVEL; xi++) {
-                    const int lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
-                    const int Lm1 = LEVEL - 1;
-                    const int en = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
-                    const ptrdiff_t idx = interior_start + e * (Lm1 * Lm1 * Lm1) + en;
+                    const int       lidx = cu_sshex8_lidx(LEVEL, xi, yi, zi);
+                    const int       Lm1  = LEVEL - 1;
+                    const int       en   = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
+                    const ptrdiff_t idx  = interior_start + e * (Lm1 * Lm1 * Lm1) + en;
                     y[idx * y_stride] += y_block[lidx];
                 }
             }
