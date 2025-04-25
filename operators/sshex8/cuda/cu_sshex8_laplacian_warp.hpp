@@ -54,14 +54,14 @@ __global__ void cu_affine_sshex8_laplacian_apply_kernel_warp(
         T element_vector[8] = {0};
         if (is_element) {
             // gather
-            T element_u[8] = {x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)],
-                              x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)],
-                              x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
-                              x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)],
-                              x_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)],
-                              x_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
-                              x_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
-                              x_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
+            T element_u[8] = {x_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y, threadIdx.z)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y, threadIdx.z)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y + 1, threadIdx.z)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y, threadIdx.z + 1)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
+                              x_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
 
 #ifdef CU_SSHEX8_WARP_USE_ELEMENTAL_MATRIX
             for (int i = 0; i < 8; i++) {
@@ -78,17 +78,17 @@ __global__ void cu_affine_sshex8_laplacian_apply_kernel_warp(
 #endif
 
             // TODO With stencil version atomics can be avoided
-            atomicAdd(&y_block[B_(threadIdx.x, threadIdx.y, threadIdx.z)], element_vector[0]);
-            atomicAdd(&y_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z)], element_vector[1]);
-            atomicAdd(&y_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y, threadIdx.z)], element_vector[0]);
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y, threadIdx.z)], element_vector[1]);
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y + 1, threadIdx.z)],
                       element_vector[2]);
-            atomicAdd(&y_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z)], element_vector[3]);
-            atomicAdd(&y_block[B_(threadIdx.x, threadIdx.y, threadIdx.z + 1)], element_vector[4]);
-            atomicAdd(&y_block[B_(threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y + 1, threadIdx.z)], element_vector[3]);
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y, threadIdx.z + 1)], element_vector[4]);
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
                       element_vector[5]);
-            atomicAdd(&y_block[B_(threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
                       element_vector[6]);
-            atomicAdd(&y_block[B_(threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)],
+            atomicAdd(&y_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)],
                       element_vector[7]);
         }
 
