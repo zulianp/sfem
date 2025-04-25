@@ -131,41 +131,41 @@ template <typename scalar_t, typename accumulator_t>
 static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_apply_fff_integral(const scalar_t *const SFEM_RESTRICT fff,
                                                                                  const scalar_t *SFEM_RESTRICT       u,
                                                                                  accumulator_t *SFEM_RESTRICT element_vector) {
-    const scalar_t x0  = (1.0 / 6.0) * fff[4];
+    const scalar_t x0  = (scalar_t)(1.0 / 6.0) * fff[4];
     const scalar_t x1  = u[7] * x0;
-    const scalar_t x2  = (1.0 / 9.0) * fff[3];
+    const scalar_t x2  = (scalar_t)(1.0 / 9.0) * fff[3];
     const scalar_t x3  = u[3] * x2;
-    const scalar_t x4  = (1.0 / 9.0) * fff[5];
+    const scalar_t x4  = (scalar_t)(1.0 / 9.0) * fff[5];
     const scalar_t x5  = u[4] * x4;
-    const scalar_t x6  = (1.0 / 12.0) * u[6];
+    const scalar_t x6  = (scalar_t)(1.0 / 12.0) * u[6];
     const scalar_t x7  = fff[4] * x6;
-    const scalar_t x8  = (1.0 / 36.0) * u[6];
+    const scalar_t x8  = (scalar_t)(1.0 / 36.0) * u[6];
     const scalar_t x9  = fff[3] * x8;
     const scalar_t x10 = fff[5] * x8;
     const scalar_t x11 = u[0] * x0;
     const scalar_t x12 = u[0] * x2;
     const scalar_t x13 = u[0] * x4;
-    const scalar_t x14 = (1.0 / 12.0) * fff[4];
+    const scalar_t x14 = (scalar_t)(1.0 / 12.0) * fff[4];
     const scalar_t x15 = u[1] * x14;
-    const scalar_t x16 = (1.0 / 36.0) * fff[3];
+    const scalar_t x16 = (scalar_t)(1.0 / 36.0) * fff[3];
     const scalar_t x17 = u[5] * x16;
-    const scalar_t x18 = (1.0 / 36.0) * fff[5];
+    const scalar_t x18 = (scalar_t)(1.0 / 36.0) * fff[5];
     const scalar_t x19 = u[2] * x18;
-    const scalar_t x20 = (1.0 / 6.0) * fff[1];
-    const scalar_t x21 = (1.0 / 12.0) * fff[1];
+    const scalar_t x20 = (scalar_t)(1.0 / 6.0) * fff[1];
+    const scalar_t x21 = (scalar_t)(1.0 / 12.0) * fff[1];
     const scalar_t x22 = -fff[1] * x6 + u[0] * x20 - u[2] * x20 + u[4] * x21;
-    const scalar_t x23 = (1.0 / 6.0) * fff[2];
-    const scalar_t x24 = (1.0 / 12.0) * fff[2];
+    const scalar_t x23 = (scalar_t)(1.0 / 6.0) * fff[2];
+    const scalar_t x24 = (scalar_t)(1.0 / 12.0) * fff[2];
     const scalar_t x25 = -fff[2] * x6 + u[0] * x23 + u[3] * x24 - u[5] * x23;
-    const scalar_t x26 = (1.0 / 9.0) * fff[0];
-    const scalar_t x27 = (1.0 / 36.0) * u[7];
-    const scalar_t x28 = (1.0 / 18.0) * fff[0];
+    const scalar_t x26 = (scalar_t)(1.0 / 9.0) * fff[0];
+    const scalar_t x27 = (scalar_t)(1.0 / 36.0) * u[7];
+    const scalar_t x28 = (scalar_t)(1.0 / 18.0) * fff[0];
     const scalar_t x29 = -u[2] * x28 + u[3] * x28 + u[4] * x28 - u[5] * x28;
     const scalar_t x30 = fff[0] * x27 - fff[0] * x8 + u[0] * x26 - u[1] * x26 + x29;
-    const scalar_t x31 = (1.0 / 18.0) * fff[3];
+    const scalar_t x31 = (scalar_t)(1.0 / 18.0) * fff[3];
     const scalar_t x32 = u[2] * x31;
     const scalar_t x33 = u[7] * x31;
-    const scalar_t x34 = (1.0 / 18.0) * fff[5];
+    const scalar_t x34 = (scalar_t)(1.0 / 18.0) * fff[5];
     const scalar_t x35 = u[5] * x34;
     const scalar_t x36 = u[7] * x34;
     const scalar_t x37 = u[1] * x31;
@@ -205,7 +205,7 @@ static SFEM_INLINE __host__ __device__ void cu_hex8_laplacian_apply_fff_integral
     const scalar_t x71 = u[3] * x14;
     const scalar_t x72 = u[4] * x18;
     const scalar_t x73 = u[1] * x24 + u[2] * x23 - u[4] * x24 - u[7] * x23;
-    const scalar_t x74 = (1.0 / 36.0) * fff[0];
+    const scalar_t x74 = (scalar_t)(1.0 / 36.0) * fff[0];
     const scalar_t x75 = u[0] * x28 - u[1] * x28 - u[6] * x28 + u[7] * x28;
     const scalar_t x76 = -u[2] * x26 + u[3] * x26 + u[4] * x74 - u[5] * x74 + x75;
     const scalar_t x77 = x35 + x36 - x39 - x40 + x56 + x57 - x60 - x61;
@@ -468,12 +468,86 @@ static inline __device__ __host__ void cu_hex8_laplacian_diag_fff_integral(const
 }
 
 template <typename scalar_t, typename accumulator_t>
-static inline __device__ __host__ void cu_hex8_laplacian_apply_add_fff_sum_factorization(const scalar_t *const SFEM_RESTRICT fff,
-                                                                                         scalar_t *const SFEM_RESTRICT       u,
-                                                                                         accumulator_t *const SFEM_RESTRICT out) {
-    static const scalar_t D[2 * 2] = {-1, 1, -1, 1};
-    static const scalar_t qw[2]    = {0.5, 0.5};
-    cu_spectral_hex_laplacian_apply<2, scalar_t>(D, fff, qw, u, out);
+static inline __device__ __host__ void cu_hex8_laplacian_apply_add_fff_trick(const scalar_t *const SFEM_RESTRICT fff,
+                                                                             scalar_t *const SFEM_RESTRICT       u,
+                                                                             accumulator_t *const SFEM_RESTRICT  out) {
+    // static const scalar_t D[2 * 2] = {-1, 1, -1, 1};
+    // static const scalar_t qw[2]    = {0.5, 0.5};
+    // cu_spectral_hex_laplacian_apply<2, scalar_t>(D, fff, qw, u, out);
+
+    const scalar_t x0  = u[0] - u[1];
+    const scalar_t x1  = 0.25 * fff[0];
+    const scalar_t x2  = x0 * x1;
+    const scalar_t x3  = -u[3];
+    const scalar_t x4  = u[0] + x3;
+    const scalar_t x5  = 0.25 * fff[3];
+    const scalar_t x6  = x4 * x5;
+    const scalar_t x7  = u[0] - u[4];
+    const scalar_t x8  = 0.25 * fff[5];
+    const scalar_t x9  = x7 * x8;
+    const scalar_t x10 = 0.125 * fff[1];
+    const scalar_t x11 = x0 * x10;
+    const scalar_t x12 = 0.125 * fff[2];
+    const scalar_t x13 = x0 * x12;
+    const scalar_t x14 = -u[5];
+    const scalar_t x15 = u[4] + x14;
+    const scalar_t x16 = x12 * x15;
+    const scalar_t x17 = u[2] + x3;
+    const scalar_t x18 = x10 * x17;
+    const scalar_t x19 = -x18;
+    const scalar_t x20 = x11 + x13 + x16 + x19;
+    const scalar_t x21 = x10 * x4;
+    const scalar_t x22 = u[1] - u[2];
+    const scalar_t x23 = x10 * x22;
+    const scalar_t x24 = 0.125 * fff[4];
+    const scalar_t x25 = x24 * x4;
+    const scalar_t x26 = -u[7];
+    const scalar_t x27 = u[4] + x26;
+    const scalar_t x28 = x24 * x27;
+    const scalar_t x29 = x21 + x23 + x25 + x28;
+    const scalar_t x30 = x12 * x7;
+    const scalar_t x31 = u[1] + x14;
+    const scalar_t x32 = x12 * x31;
+    const scalar_t x33 = x24 * x7;
+    const scalar_t x34 = u[3] + x26;
+    const scalar_t x35 = x24 * x34;
+    const scalar_t x36 = x30 + x32 + x33 + x35;
+    const scalar_t x37 = x24 * x31;
+    const scalar_t x38 = -u[6];
+    const scalar_t x39 = u[2] + x38;
+    const scalar_t x40 = x24 * x39;
+    const scalar_t x41 = x22 * x5 + x37 + x40;
+    const scalar_t x42 = x22 * x24;
+    const scalar_t x43 = u[5] + x38;
+    const scalar_t x44 = x24 * x43;
+    const scalar_t x45 = x31 * x8 + x42 + x44;
+    const scalar_t x46 = x12 * x39;
+    const scalar_t x47 = x12 * x34;
+    const scalar_t x48 = -x1 * x17 + x46 + x47;
+    const scalar_t x49 = x12 * x17;
+    const scalar_t x50 = -x49;
+    const scalar_t x51 = u[6] + x26;
+    const scalar_t x52 = x12 * x51;
+    const scalar_t x53 = -x52;
+    const scalar_t x54 = x34 * x8 + x50 + x53;
+    const scalar_t x55 = x39 * x8;
+    const scalar_t x56 = x10 * x27;
+    const scalar_t x57 = x10 * x43;
+    const scalar_t x58 = x1 * x15 + x56 + x57;
+    const scalar_t x59 = x10 * x15;
+    const scalar_t x60 = x10 * x51;
+    const scalar_t x61 = -x60;
+    const scalar_t x62 = x27 * x5 + x59 + x61;
+    const scalar_t x63 = x43 * x5;
+    const scalar_t x64 = x1 * x51;
+    out[0]             = x2 + x20 + x29 + x36 + x6 + x9;
+    out[1]             = -x2 + x20 - x21 - x23 - x30 - x32 + x41 + x45;
+    out[2]             = -x11 + x18 + x29 - x33 - x35 + x48 + x54 - x6;
+    out[3]             = -x11 - x19 - x21 - x23 - x41 + x42 + x44 - x48 - x49 - x52 + x55;
+    out[4]             = -x13 - x16 - x25 - x28 + x36 + x58 + x62 - x9;
+    out[5]             = -x13 - x16 - x30 - x32 + x37 + x40 - x45 - x58 + x59 - x60 + x63;
+    out[6]             = -x25 - x28 - x33 - x35 + x46 + x47 - x54 + x56 + x57 - x62 - x64;
+    out[7]             = -x37 - x40 - x42 - x44 - x46 - x47 - x50 - x53 - x55 - x56 - x57 - x59 - x61 - x63 + x64;
 }
 
 #endif  // CU_HEX8_LAPLACIAN_INLINE_HPP
