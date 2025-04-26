@@ -5,6 +5,10 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
+// FIXME
+#include "hex8_fff.h"
+#include "sshex8_laplacian.h"
+
 int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
@@ -16,6 +20,41 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->set_op(linear_op);
     cg->set_rtol(1e-8);
 
+#if 0
+    // FIXME
+    if (fs->has_semi_structured_mesh()) {
+        auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
+
+        if (SFEM_SUCCESS != hex8_fff_fill(fs->mesh_ptr()->n_elements(),
+                                          fs->mesh_ptr()->elements()->data(),
+                                          fs->mesh_ptr()->points()->data(),
+                                          fff->data())) {
+            SFEM_ERROR("Unable to create fff");
+        }
+
+        auto prec = sfem::make_op<real_t>(
+                fs->n_dofs(),
+                fs->n_dofs(),
+                [=](const real_t *x, real_t *y) {
+                    SFEM_TRACE_SCOPE("affine_sshex8_laplacian_substructuring_preconditioner_fff");
+
+                    f->copy_constrained_dofs(x, y);
+
+                    affine_sshex8_laplacian_substructuring_preconditioner_fff(fs->semi_structured_mesh().level(),
+                                                                              fs->semi_structured_mesh().n_elements(),
+                                                                              fs->semi_structured_mesh().elements()->data(),
+                                                                              fff->data(),
+                                                                              x,
+                                                                              y);
+
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
+
+        cg->set_preconditioner_op(prec);
+    }
+#endif
+
     auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     // f->hessian_diag(nullptr, diag->data());
     // cg->set_preconditioner_op(create_shiftable_jacobi(diag, es));
@@ -26,7 +65,6 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
-
     double tick = MPI_Wtime();
     SFEM_TEST_ASSERT(cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     double tock = MPI_Wtime();
@@ -34,13 +72,13 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
-    if(SFEM_VERBOSE) {
+    if (SFEM_VERBOSE) {
         printf("---------------------\n");
         printf("%s #dofs %ld (%g seconds)\n", output_dir.c_str(), fs->n_dofs(), tock - tick);
         printf("---------------------\n");
     }
 
-#if 0
+#if 1
     sfem::create_directory(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
@@ -157,11 +195,15 @@ int test_poisson_and_boundary_selector() {
     auto right_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (2 - 1e-5) && x < (2 + 1e-5); });
 
+        auto top_sideset = sfem::Sideset::create_from_selector(
+                m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
+
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    // sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
 
     if (block_size == 1) {
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, top}, es);
         f->add_constraint(conds);
     } else {
         sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
@@ -169,7 +211,7 @@ int test_poisson_and_boundary_selector() {
         sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = -1, .component = 2};
         sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 1, .component = 2};
 
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, right, right1, right2}, es);
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, top, right1, right2}, es);
         f->add_constraint(conds);
     }
 
@@ -275,8 +317,8 @@ int main(int argc, char *argv[]) {
     sfem::register_device_ops();
 #endif
 
-    SFEM_RUN_TEST(test_poisson);
-    SFEM_RUN_TEST(test_linear_elasticity);
+    // SFEM_RUN_TEST(test_poisson);
+    // SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector);
 
 #ifdef SFEM_ENABLE_RYAML
