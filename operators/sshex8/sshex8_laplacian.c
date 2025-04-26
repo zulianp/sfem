@@ -6,6 +6,7 @@
 #include "hex8_quadrature.h"
 #include "sshex8_skeleton_stencil.h"
 #include "stencil3.h"
+#include "stencil_cg.h"
 #include "tet4_inline_cpu.h"
 
 #include <math.h>
@@ -702,6 +703,154 @@ int affine_sshex8_laplacian_stencil_apply_fff(const int                         
         free(ev);
         free(eu);
         free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_laplacian_substructuring_preconditioner_fff(const int                             level,
+                                                              const ptrdiff_t                       nelements,
+                                                              idx_t **const SFEM_RESTRICT           elements,
+                                                              const jacobian_t *const SFEM_RESTRICT g_fff,
+                                                              const real_t *const SFEM_RESTRICT     rhs,
+                                                              real_t *const SFEM_RESTRICT           u) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        idx_t    *ev   = malloc(nxe * sizeof(idx_t));
+        scalar_t *eu   = malloc(nxe * sizeof(scalar_t));
+        scalar_t *erhs = malloc(nxe * sizeof(scalar_t));
+        scalar_t *r    = malloc(nxe * sizeof(scalar_t));
+        scalar_t *p    = malloc(nxe * sizeof(scalar_t));
+        scalar_t *Ap   = malloc(nxe * sizeof(scalar_t));
+
+        scalar_t      element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t      fff[6];
+
+        const scalar_t h = 1. / level;
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[d] = u[ev[d]];
+                    assert(eu[d] == eu[d]);
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    erhs[d] = rhs[ev[d]];
+                    assert(erhs[d] == erhs[d]);
+                }
+
+                for (int d = 0; d < 6; d++) {
+                    fff[d] = g_fff[e * 6 + d] * h;
+                }
+            }
+
+            printf("----------------------------\n");
+            printf("IN\n");
+            printf("----------------------------\n");
+            for (ptrdiff_t zi = 0; zi <= level; zi++) {
+                for (ptrdiff_t yi = 0; yi <= level; yi++) {
+                    for (ptrdiff_t xi = 0; xi <= level; xi++) {
+                        const int   lidx = sshex8_lidx(level, xi, yi, zi);
+                        printf("%g ", eu[lidx]);
+                    }
+                    printf("\t");
+                }
+                printf("\n");
+            }
+            printf("----------------------------\n");
+            for (ptrdiff_t zi = 0; zi <= level; zi++) {
+                for (ptrdiff_t yi = 0; yi <= level; yi++) {
+                    for (ptrdiff_t xi = 0; xi <= level; xi++) {
+                        const int   lidx = sshex8_lidx(level, xi, yi, zi);
+                        printf("%g ", erhs[lidx]);
+                    }
+                    printf("\t");
+                }
+                printf("\n");
+            }
+            printf("----------------------------\n");
+
+            accumulator_t laplacian_matrix[8 * 8];
+            hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+            scalar_t laplacian_stencil[3 * 3 * 3];
+            hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
+
+            sshex8_copy_boundary(level + 1, level + 1, level + 1, eu, erhs);
+
+            int err = sshex8_stencil_cg(nxe,
+                                        1e-8,
+                                        1e-16,
+                                        // Grid info
+                                        level + 1,
+                                        level + 1,
+                                        level + 1,
+                                        laplacian_stencil,
+                                        erhs,
+                                        r,
+                                        p,
+                                        Ap,
+                                        eu);
+
+            if (SFEM_SUCCESS != err) {
+                // fprintf(stderr, "FAILED to solved laplacian subsystem\n");
+                SFEM_ERROR("FAILED to solved laplacian subsystem\n");
+
+                continue;
+            }
+
+            printf("----------------------------\n");
+            printf("OUT\n");
+            printf("----------------------------\n");
+            for (ptrdiff_t zi = 0; zi <= level; zi++) {
+                for (ptrdiff_t yi = 0; yi <= level; yi++) {
+                    for (ptrdiff_t xi = 0; xi <= level; xi++) {
+                        const int   lidx = sshex8_lidx(level, xi, yi, zi);
+                        printf("%g ", eu[lidx]);
+                    }
+                    printf("\t");
+                }
+                printf("\n");
+            }
+            printf("----------------------------\n");
+
+            {
+                // Scatter elemental data
+                // for (int d = 0; d < nxe; d++) {
+                //     assert(eu[d] == eu[d]);
+                //     u[ev[d]] = eu[d];
+                // }
+
+                for (int zi = 0; zi < level; zi++) {
+                    for (int yi = 0; yi < level; yi++) {
+                        for (int xi = 0; xi < level; xi++) {
+                            const int   lidx = sshex8_lidx(level, xi, yi, zi);
+                            const idx_t gidx = ev[lidx];
+                            u[gidx]          = eu[lidx];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+        free(eu);
+        free(erhs);
+        free(r);
+        free(p);
+        free(Ap);
     }
 
     return SFEM_SUCCESS;
