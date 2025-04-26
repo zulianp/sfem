@@ -43,9 +43,11 @@
 #include "sshex8_linear_elasticity.h"
 #include "sshex8_mass.h"
 #include "sshex8_stencil_element_matrix_apply.h"
+#include "sshex8_vector_laplacian.h"
 
 // Mesh
 #include "adj_table.h"
+#include "hex8_fff.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
@@ -2254,6 +2256,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
 
+        std::shared_ptr<Buffer<jacobian_t>> fff;
+
         long   calls{0};
         double total_time{0};
 
@@ -2263,12 +2267,24 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("VectorLaplacian::create");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
             assert(1 != space->block_size());
-
             auto ret          = std::make_unique<VectorLaplacian>(space);
             ret->element_type = (enum ElemType)space->element_type();
+
+            int SFEM_VECTOR_LAPLACIAN_FFF = 1;
+            SFEM_READ_ENV(SFEM_VECTOR_LAPLACIAN_FFF, atoi);
+
+            if (SFEM_VECTOR_LAPLACIAN_FFF) {
+                ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
+
+                if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
+                                                  space->mesh_ptr()->elements()->data(),
+                                                  space->mesh_ptr()->points()->data(),
+                                                  ret->fff->data())) {
+                    SFEM_ERROR("Unable to create fff");
+                }
+            }
+
             return ret;
         }
 
@@ -2339,21 +2355,34 @@ namespace sfem {
 
             // AoS
             for (int d = 0; d < block_size; d++) {
-                vec_in[d]  = const_cast<real_t*>(&h[d]);
+                vec_in[d]  = const_cast<real_t *>(&h[d]);
                 vec_out[d] = &out[d];
             }
 
             auto mesh = space->mesh_ptr();
-            int  err  = affine_hex8_vector_laplacian_apply(
-                    // element_type,
-                    mesh->n_elements(),
-                    mesh->n_nodes(),
-                    mesh->elements()->data(),
-                    mesh->points()->data(),
-                    block_size,
-                    block_size,
-                    vec_in.data(),
-                    vec_out.data());
+            int  err;
+            if (this->fff) {
+                err = affine_hex8_vector_laplacian_apply_fff(
+                        // element_type,
+                        mesh->n_elements(),
+                        mesh->elements()->data(),
+                        this->fff->data(),
+                        block_size,
+                        block_size,
+                        vec_in.data(),
+                        vec_out.data());
+            } else {
+                err = affine_hex8_vector_laplacian_apply(
+                        // element_type,
+                        mesh->n_elements(),
+                        mesh->n_nodes(),
+                        mesh->elements()->data(),
+                        mesh->points()->data(),
+                        block_size,
+                        block_size,
+                        vec_in.data(),
+                        vec_out.data());
+            }
 
             double tock = MPI_Wtime();
             total_time += (tock - tick);
@@ -2370,12 +2399,152 @@ namespace sfem {
         int report(const real_t *const) override { return SFEM_SUCCESS; }
     };
 
+    class SemiStructuredVectorLaplacian : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        enum ElemType                  element_type { INVALID };
+
+        std::shared_ptr<Buffer<jacobian_t>> fff;
+
+        long   calls{0};
+        double total_time{0};
+
+        ~SemiStructuredVectorLaplacian() {
+            if (calls) {
+                printf("SemiStructuredVectorLaplacian[%d]::apply called %ld times. "
+                       "Total: %g [s], "
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
+                       space->semi_structured_mesh().level(),
+                       calls,
+                       total_time,
+                       total_time / calls,
+                       1e-6 * space->n_dofs() / (total_time / calls));
+            }
+        }
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("SemiStructuredVectorLaplacian::create");
+
+            assert(space->has_semi_structured_mesh());
+            if (!space->has_semi_structured_mesh()) {
+                fprintf(stderr,
+                        "[Error] SemiStructuredVectorLaplacian::create requires space with "
+                        "semi_structured_mesh!\n");
+                return nullptr;
+            }
+
+            assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+            auto ret = std::make_unique<SemiStructuredVectorLaplacian>(space);
+
+            ret->element_type = (enum ElemType)space->element_type();
+
+            ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
+
+            if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
+                                              space->mesh_ptr()->elements()->data(),
+                                              space->mesh_ptr()->points()->data(),
+                                              ret->fff->data())) {
+                SFEM_ERROR("Unable to create fff");
+            }
+
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            fprintf(stderr, "[Error] ss:Laplacian::lor_op NOT IMPLEMENTED!\n");
+            assert(false);
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_TRACE_SCOPE("SemiStructuredVectorLaplacian::derefine_op");
+
+            assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
+            if (space->has_semi_structured_mesh()) {
+                auto ret                      = std::make_shared<SemiStructuredVectorLaplacian>(space);
+                ret->element_type             = element_type;
+                return ret;
+            } else {
+                auto ret          = std::make_shared<VectorLaplacian>(space);
+                ret->element_type = macro_base_elem(element_type);
+                return ret;
+            }
+        }
+
+        const char *name() const override { return "ss:Laplacian"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize() override { return SFEM_SUCCESS; }
+
+        SemiStructuredVectorLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_ERROR("[Error] ss:Laplacian::hessian_diag NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_ERROR("[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("SemiStructuredVectorLaplacian::apply");
+
+            assert(element_type == SSHEX8);  // REMOVEME once generalized approach
+
+            auto &ssm = space->semi_structured_mesh();
+
+            double tick = MPI_Wtime();
+
+            const int             block_size = space->block_size();
+            std::vector<real_t *> vec_in(block_size), vec_out(block_size);
+
+            // AoS
+            for (int d = 0; d < block_size; d++) {
+                vec_in[d]  = const_cast<real_t *>(&h[d]);
+                vec_out[d] = &out[d];
+            }
+
+            int err = affine_sshex8_vector_laplacian_apply_fff(ssm.level(),
+                                                               ssm.n_elements(),
+                                                               ssm.element_data(),
+                                                               this->fff->data(),
+                                                               block_size,
+                                                               block_size,
+                                                               vec_in.data(),
+                                                               vec_out.data());
+
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+            return err;
+        }
+
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_ERROR("[Error] ss:Laplacian::value NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+    };
+
     class SemiStructuredLaplacian : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
         bool                           use_affine_approximation{true};
         bool                           use_stencil{true};
+
+        std::shared_ptr<Buffer<jacobian_t>> fff;
 
         long   calls{0};
         double total_time{0};
@@ -2416,6 +2585,20 @@ namespace sfem {
             int SFEM_ENABLE_HEX8_STENCIL = ret->use_stencil;
             SFEM_READ_ENV(SFEM_ENABLE_HEX8_STENCIL, atoi);
             ret->use_stencil = SFEM_ENABLE_HEX8_STENCIL;
+
+            int SFEM_SS_LAPLACIAN_FFF = 1;
+            SFEM_READ_ENV(SFEM_SS_LAPLACIAN_FFF, atoi);
+
+            if (SFEM_SS_LAPLACIAN_FFF) {
+                ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
+
+                if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
+                                                  space->mesh_ptr()->elements()->data(),
+                                                  space->mesh_ptr()->points()->data(),
+                                                  ret->fff->data())) {
+                    SFEM_ERROR("Unable to create fff");
+                }
+            }
 
             return ret;
         }
@@ -2481,16 +2664,23 @@ namespace sfem {
             double tick = MPI_Wtime();
 
             int err = 0;
-            if (use_stencil) {
-                err = affine_sshex8_laplacian_stencil_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
-            } else if (use_affine_approximation) {
-                err = affine_sshex8_laplacian_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
 
+            if (this->fff) {
+                SFEM_TRACE_SCOPE("affine_sshex8_laplacian_stencil_apply_fff");
+                affine_sshex8_laplacian_stencil_apply_fff(
+                        ssm.level(), ssm.n_elements(), ssm.element_data(), this->fff->data(), h, out);
             } else {
-                err = sshex8_laplacian_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                if (use_stencil) {
+                    err = affine_sshex8_laplacian_stencil_apply(
+                            ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                } else if (use_affine_approximation) {
+                    err = affine_sshex8_laplacian_apply(
+                            ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+
+                } else {
+                    err = sshex8_laplacian_apply(
+                            ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                }
             }
 
             double tock = MPI_Wtime();
@@ -3435,6 +3625,7 @@ namespace sfem {
             instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
+            instance_.private_register_op("ss:VectorLaplacian", SemiStructuredVectorLaplacian::create);
             instance_.private_register_op("ss:Laplacian", SemiStructuredLaplacian::create);
             instance_.private_register_op("ss:LumpedMass", SemiStructuredLumpedMass::create);
             instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
