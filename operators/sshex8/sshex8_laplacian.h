@@ -39,6 +39,13 @@ int affine_sshex8_laplacian_stencil_apply(const int                         leve
                                           const real_t *const SFEM_RESTRICT u,
                                           real_t *const SFEM_RESTRICT       values);
 
+int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
+                                              const ptrdiff_t                       nelements,
+                                              idx_t **const SFEM_RESTRICT           elements,
+                                              const jacobian_t *const SFEM_RESTRICT fff,
+                                              const real_t *const SFEM_RESTRICT     u,
+                                              real_t *const SFEM_RESTRICT           values);
+
 int sshex8_laplacian_element_matrix(int                           level,
                                     const ptrdiff_t               nelements,
                                     const ptrdiff_t               nnodes,
