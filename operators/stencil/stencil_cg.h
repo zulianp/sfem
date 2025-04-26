@@ -63,6 +63,64 @@ int sshex8_copy_boundary(const ptrdiff_t                     xc,
     return SFEM_SUCCESS;
 }
 
+int sshex8_zero_boundary(const ptrdiff_t                     xc,
+                         const ptrdiff_t                     yc,
+                         const ptrdiff_t                     zc,
+                         scalar_t *const SFEM_RESTRICT       out) {
+    const ptrdiff_t zstride = yc * xc;
+    const ptrdiff_t ystride = xc;
+    // Bottom
+    for (int yi = 0; yi < yc; yi++) {
+        for (int xi = 0; xi < xc; xi++) {
+            const ptrdiff_t idx = yi * ystride + xi;
+            out[idx]            = 0;
+        }
+    }
+
+    // Top
+    for (int yi = 0; yi < yc; yi++) {
+        for (int xi = 0; xi < xc; xi++) {
+            const ptrdiff_t idx = (zc - 1) * zstride + yi * ystride + xi;
+            out[idx]            = 0;
+        }
+    }
+
+    // Front
+    for (int zi = 1; zi < zc - 1; zi++) {
+        for (int xi = 0; xi < xc; xi++) {
+            const ptrdiff_t idx = zi * zstride + 0 * ystride + xi;
+            out[idx]            = 0;
+        }
+    }
+
+    // Back
+    for (int zi = 1; zi < zc - 1; zi++) {
+        for (int xi = 0; xi < xc; xi++) {
+            const ptrdiff_t idx = zi * zstride + (yc - 1) * ystride + xi;
+            out[idx]            = 0;
+        }
+    }
+
+    // Left
+    for (int zi = 1; zi < zc - 1; zi++) {
+        for (int yi = 1; yi < (yc - 1); yi++) {
+            const ptrdiff_t idx = zi * zstride + yi * ystride + 0;
+            out[idx]            = 0;
+        }
+    }
+
+    // Right
+    for (int zi = 1; zi < zc - 1; zi++) {
+        for (int yi = 1; yi < (yc - 1); yi++) {
+            const ptrdiff_t idx = zi * zstride + yi * ystride + xc - 1;
+            out[idx]            = 0;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+
 int sshex8_stencil_cg(const int      max_it,
                       const scalar_t rtol,
                       const scalar_t atol,
@@ -72,9 +130,11 @@ int sshex8_stencil_cg(const int      max_it,
                       const ptrdiff_t                     zc,
                       const scalar_t *const SFEM_RESTRICT stencil,
                       const scalar_t *const SFEM_RESTRICT b,
+                      // Temps
                       scalar_t *const SFEM_RESTRICT       r,
                       scalar_t *const SFEM_RESTRICT       p,
                       scalar_t *const SFEM_RESTRICT       Ap,
+                      // Out
                       scalar_t *const                     x) {
     const ptrdiff_t size = xc * yc * zc;
     memset(r, 0, size * sizeof(scalar_t));
@@ -102,9 +162,7 @@ int sshex8_stencil_cg(const int      max_it,
 
     int info = SFEM_FAILURE;
     for (int iterations = 0; iterations < max_it; iterations++) {
-        for (ptrdiff_t i = 0; i < size; i++) {
-            Ap[i] = 0;
-        }
+        memset(Ap, 0, size*sizeof(scalar_t));
 
         sshex8_stencil(xc, yc, zc, stencil, p, Ap);
 
@@ -144,7 +202,8 @@ int sshex8_stencil_cg(const int      max_it,
             //     printf("\n");
             // }
             // printf("----------------------------\n");
-            return SFEM_FAILURE;
+            info = SFEM_FAILURE;
+            break;
         }
 
         const scalar_t alpha = rtr / ptAp;

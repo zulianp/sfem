@@ -9,7 +9,7 @@
 #include "hex8_fff.h"
 #include "sshex8_laplacian.h"
 
-int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
@@ -20,8 +20,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->set_op(linear_op);
     cg->set_rtol(1e-8);
 
-#if 0
-    // FIXME
+    std::shared_ptr<sfem::Operator<real_t>> inner;
     if (fs->has_semi_structured_mesh()) {
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
 
@@ -32,32 +31,134 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
             SFEM_ERROR("Unable to create fff");
         }
 
-        auto prec = sfem::make_op<real_t>(
+        inner = sfem::make_op<real_t>(
                 fs->n_dofs(),
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
-                    SFEM_TRACE_SCOPE("affine_sshex8_laplacian_substructuring_preconditioner_fff");
-
-                    f->copy_constrained_dofs(x, y);
-
-                    affine_sshex8_laplacian_substructuring_preconditioner_fff(fs->semi_structured_mesh().level(),
-                                                                              fs->semi_structured_mesh().n_elements(),
-                                                                              fs->semi_structured_mesh().elements()->data(),
-                                                                              fff->data(),
-                                                                              x,
-                                                                              y);
-
+                    SFEM_TRACE_SCOPE("affine_sshex8_laplacian_substructuring_inner_fff");
+                    affine_sshex8_laplacian_substructuring_inner_fff(fs->semi_structured_mesh().level(),
+                                                                     fs->semi_structured_mesh().n_elements(),
+                                                                     fs->semi_structured_mesh().elements()->data(),
+                                                                     fff->data(),
+                                                                     x,
+                                                                     y);
                     f->copy_constrained_dofs(x, y);
                 },
                 es);
+    }
 
-        cg->set_preconditioner_op(prec);
+    auto            f_coarse     = f->derefine(1);
+    auto            fs_coarse    = f_coarse->space();
+    const ptrdiff_t ndofs_coarse = f_coarse->space()->n_dofs();
+    auto            diag         = sfem::create_buffer<real_t>(ndofs_coarse, es);
+    f_coarse->hessian_diag(nullptr, diag->data());
+    auto linear_op_coarse = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto jacobi_coarse    = sfem::create_shiftable_jacobi(diag, es);
+    auto solver_coarse    = sfem::create_cg<real_t>(linear_op, es);
+    solver_coarse->set_preconditioner_op(jacobi_coarse);
+
+    auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto c      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto buffer = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+    f->apply_constraints(x->data());
+    f->apply_constraints(rhs->data());
+
+    double tick = MPI_Wtime();
+
+    auto P = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
+    auto R = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+
+    auto blas = sfem::blas<real_t>(es);
+    for (int i = 0; i < 1; i++) {
+        // Compute whole buffer
+        blas->zeros(c->size(), c->data());
+        linear_op->apply(x->data(), c->data());
+
+        blas->zeros(buffer->size(), buffer->data());
+        R->apply(c->data(), buffer->data());
+
+        // Subtract on coarse space only
+        blas->axpby(ndofs_coarse, 1, rhs->data(), -1, buffer->data());
+
+        {
+            // Coarse space
+            blas->zeros(ndofs_coarse, c->data());
+            solver_coarse->apply(buffer->data(), c->data());
+
+            blas->zeros(buffer->size(), buffer->data());
+            P->apply(c->data(), buffer->data());
+
+            blas->axpy(ndofs_coarse, 1, buffer->data(), x->data());
+        }
+
+        // Compute whole buffer
+        blas->zeros(buffer->size(), buffer->data());
+        linear_op->apply(x->data(), buffer->data());
+        blas->axpby(buffer->size(), 1, rhs->data(), -1, buffer->data());
+
+        {
+            // Inner
+            blas->zeros(c->size(), c->data());
+            inner->apply(buffer->data(), c->data());
+            blas->axpy(c->size(), 1, c->data(), x->data());
+        }
+
+        real_t rnorm = blas->norm2(buffer->size(), buffer->data());
+        printf("%d %g\n", i, rnorm);
+
+        if (rnorm < 1e-6) break;
+    }
+
+    double tock = MPI_Wtime();
+
+    int SFEM_VERBOSE = 0;
+    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+
+    if (SFEM_VERBOSE) {
+        printf("---------------------\n");
+        printf("%s #dofs %ld (%g seconds)\n", output_dir.c_str(), fs->n_dofs(), tock - tick);
+        printf("---------------------\n");
+    }
+
+#if 1
+    sfem::create_directory(output_dir.c_str());
+
+    if (fs->has_semi_structured_mesh()) {
+        SFEM_TEST_ASSERT(m->write((output_dir + "/coarse_mesh").c_str()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+    } else {
+        SFEM_TEST_ASSERT(m->write((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+    }
+
+    auto output = f->output();
+    output->enable_AoS_to_SoA(fs->block_size() > 1);
+    output->set_output_dir(output_dir.c_str());
+
+#ifdef SFEM_ENABLE_CUDA
+    if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
+        SFEM_TEST_ASSERT(output->write("x", sfem::to_host(x)->data()) == SFEM_SUCCESS);
+    } else
+#endif
+    {
+        SFEM_TEST_ASSERT(output->write("x", x->data()) == SFEM_SUCCESS);
     }
 #endif
 
-    auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    // f->hessian_diag(nullptr, diag->data());
-    // cg->set_preconditioner_op(create_shiftable_jacobi(diag, es));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
+    auto es        = f->execution_space();
+    auto fs        = f->space();
+    auto m         = fs->mesh_ptr();
+    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto cg        = sfem::create_cg<real_t>(linear_op, es);
+    cg->verbose    = true;
+    cg->set_max_it(20000);
+    cg->set_op(linear_op);
+    cg->set_rtol(1e-8);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -78,7 +179,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
         printf("---------------------\n");
     }
 
-#if 1
+#if 0
     sfem::create_directory(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
@@ -181,8 +282,10 @@ int test_poisson_and_boundary_selector() {
     int SFEM_BASE_RESOLUTION = 6;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
+    int x_dim = 1;
+
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+            comm, SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
@@ -192,11 +295,13 @@ int test_poisson_and_boundary_selector() {
     auto left_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
-    auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (2 - 1e-5) && x < (2 + 1e-5); });
+    auto right_sideset =
+            sfem::Sideset::create_from_selector(m, [x_dim](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+                return x > (x_dim - 1e-5) && x < (x_dim + 1e-5);
+            });
 
-        auto top_sideset = sfem::Sideset::create_from_selector(
-                m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
+    auto top_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
 
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
     // sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
