@@ -53,12 +53,12 @@ int sshex8_laplacian_element_matrix(int                           level,
                                     geom_t **const SFEM_RESTRICT  points,
                                     scalar_t *const SFEM_RESTRICT values);
 
-int affine_sshex8_laplacian_substructuring_preconditioner_fff(const int                             level,
-                                                              const ptrdiff_t                       nelements,
-                                                              idx_t **const SFEM_RESTRICT           elements,
-                                                              const jacobian_t *const SFEM_RESTRICT fff,
-                                                              const real_t *const SFEM_RESTRICT     rhs,
-                                                              real_t *const SFEM_RESTRICT           u);
+int affine_sshex8_laplacian_substructuring_inner_fff(const int                             level,
+                                                     const ptrdiff_t                       nelements,
+                                                     idx_t **const SFEM_RESTRICT           elements,
+                                                     const jacobian_t *const SFEM_RESTRICT fff,
+                                                     const real_t *const SFEM_RESTRICT     rhs,
+                                                     real_t *const SFEM_RESTRICT           u);
 #ifdef __cplusplus
 }
 #endif
