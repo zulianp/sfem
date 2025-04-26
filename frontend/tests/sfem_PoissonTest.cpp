@@ -16,11 +16,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
-    cg->set_max_it(20000);
-    cg->set_op(linear_op);
-    cg->set_rtol(1e-8);
+    cg->set_max_it(100);
+    cg->set_atol(1e-8);
 
-    std::shared_ptr<sfem::Operator<real_t>> inner;
     if (fs->has_semi_structured_mesh()) {
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
 
@@ -31,86 +29,56 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
             SFEM_ERROR("Unable to create fff");
         }
 
-        inner = sfem::make_op<real_t>(
+        auto count = sfem::create_buffer<uint16_t>(fs->semi_structured_mesh().n_nodes(), es);
+        {
+            auto buff     = count->data();
+            auto elements = fs->semi_structured_mesh().element_data();
+
+            const int nxe = fs->semi_structured_mesh().n_nodes_per_element();
+
+            // #pragma omp parallel for // BAD performance with parallel for
+            for (int d = 0; d < nxe; d++) {
+                for (ptrdiff_t i = 0; i < fs->semi_structured_mesh().n_elements(); ++i) {
+                    // #pragma omp atomic update
+                    buff[elements[d][i]]++;
+                }
+            }
+        }
+
+        auto constraints_mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        f->constaints_mask(constraints_mask->data());
+
+        auto bjacobi = sfem::make_op<real_t>(
                 fs->n_dofs(),
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_substructuring_inner_fff");
-                    affine_sshex8_laplacian_substructuring_inner_fff(fs->semi_structured_mesh().level(),
-                                                                     fs->semi_structured_mesh().n_elements(),
-                                                                     fs->semi_structured_mesh().elements()->data(),
-                                                                     fff->data(),
-                                                                     x,
-                                                                     y);
+
+                    affine_sshex8_laplacian_bjacobi_fff(fs->semi_structured_mesh().level(),
+                                                        fs->semi_structured_mesh().n_elements(),
+                                                        fs->semi_structured_mesh().elements()->data(),
+                                                        fff->data(),
+                                                        count->data(),
+                                                        constraints_mask->data(),
+                                                        x,
+                                                        y);
+
                     f->copy_constrained_dofs(x, y);
                 },
                 es);
+
+        cg->set_preconditioner_op(bjacobi);
     }
 
-    auto            f_coarse     = f->derefine(1);
-    auto            fs_coarse    = f_coarse->space();
-    const ptrdiff_t ndofs_coarse = f_coarse->space()->n_dofs();
-    auto            diag         = sfem::create_buffer<real_t>(ndofs_coarse, es);
-    f_coarse->hessian_diag(nullptr, diag->data());
-    auto linear_op_coarse = sfem::create_linear_operator("MF", f, nullptr, es);
-    auto jacobi_coarse    = sfem::create_shiftable_jacobi(diag, es);
-    auto solver_coarse    = sfem::create_cg<real_t>(linear_op, es);
-    solver_coarse->set_preconditioner_op(jacobi_coarse);
-
     auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto c      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto buffer = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
     double tick = MPI_Wtime();
-
-    auto P = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
-    auto R = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
-
-    auto blas = sfem::blas<real_t>(es);
-    for (int i = 0; i < 1; i++) {
-        // Compute whole buffer
-        blas->zeros(c->size(), c->data());
-        linear_op->apply(x->data(), c->data());
-
-        blas->zeros(buffer->size(), buffer->data());
-        R->apply(c->data(), buffer->data());
-
-        // Subtract on coarse space only
-        blas->axpby(ndofs_coarse, 1, rhs->data(), -1, buffer->data());
-
-        {
-            // Coarse space
-            blas->zeros(ndofs_coarse, c->data());
-            solver_coarse->apply(buffer->data(), c->data());
-
-            blas->zeros(buffer->size(), buffer->data());
-            P->apply(c->data(), buffer->data());
-
-            blas->axpy(ndofs_coarse, 1, buffer->data(), x->data());
-        }
-
-        // Compute whole buffer
-        blas->zeros(buffer->size(), buffer->data());
-        linear_op->apply(x->data(), buffer->data());
-        blas->axpby(buffer->size(), 1, rhs->data(), -1, buffer->data());
-
-        {
-            // Inner
-            blas->zeros(c->size(), c->data());
-            inner->apply(buffer->data(), c->data());
-            blas->axpy(c->size(), 1, c->data(), x->data());
-        }
-
-        real_t rnorm = blas->norm2(buffer->size(), buffer->data());
-        printf("%d %g\n", i, rnorm);
-
-        if (rnorm < 1e-6) break;
-    }
-
+    // SFEM_TEST_ASSERT
+    (cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     double tock = MPI_Wtime();
 
     int SFEM_VERBOSE = 0;
