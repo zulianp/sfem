@@ -1,15 +1,34 @@
 #ifndef STENCIL_CG_H
 #define STENCIL_CG_H
 
-#include <math.h>
 #include "sfem_base.h"
 #include "stencil3.h"
 
-int sshex8_copy_boundary(const ptrdiff_t                     xc,
-                         const ptrdiff_t                     yc,
-                         const ptrdiff_t                     zc,
-                         const scalar_t *const SFEM_RESTRICT in,
-                         scalar_t *const SFEM_RESTRICT       out) {
+#include <math.h>
+#include <stdio.h>
+
+static void sshe8_print(const char *name, const ptrdiff_t xc, const ptrdiff_t yc, const ptrdiff_t zc, const scalar_t *const m) {
+    printf("----------------------------\n");
+    printf("%s\n", name);
+    printf("----------------------------\n");
+    for (ptrdiff_t zi = 0; zi < zc; zi++) {
+        for (ptrdiff_t yi = 0; yi < yc; yi++) {
+            for (ptrdiff_t xi = 0; xi < xc; xi++) {
+                ptrdiff_t idx = zi * yc * xc + yi * xc + xi;
+                printf("%.2f ", m[idx]);
+            }
+            printf("\t");
+        }
+        printf("\n");
+    }
+    printf("----------------------------\n");
+}
+
+static int sshex8_copy_boundary(const ptrdiff_t                     xc,
+                                const ptrdiff_t                     yc,
+                                const ptrdiff_t                     zc,
+                                const scalar_t *const SFEM_RESTRICT in,
+                                scalar_t *const SFEM_RESTRICT       out) {
     const ptrdiff_t zstride = yc * xc;
     const ptrdiff_t ystride = xc;
     // Bottom
@@ -63,7 +82,7 @@ int sshex8_copy_boundary(const ptrdiff_t                     xc,
     return SFEM_SUCCESS;
 }
 
-int sshex8_zero_boundary(const ptrdiff_t xc, const ptrdiff_t yc, const ptrdiff_t zc, scalar_t *const SFEM_RESTRICT out) {
+static int sshex8_zero_boundary(const ptrdiff_t xc, const ptrdiff_t yc, const ptrdiff_t zc, scalar_t *const SFEM_RESTRICT out) {
     const ptrdiff_t zstride = yc * xc;
     const ptrdiff_t ystride = xc;
     // Bottom
@@ -117,21 +136,21 @@ int sshex8_zero_boundary(const ptrdiff_t xc, const ptrdiff_t yc, const ptrdiff_t
     return SFEM_SUCCESS;
 }
 
-int sshex8_stencil_cg(const int      max_it,
-                      const scalar_t rtol,
-                      const scalar_t atol,
-                      // Grid info
-                      const ptrdiff_t                     xc,
-                      const ptrdiff_t                     yc,
-                      const ptrdiff_t                     zc,
-                      const scalar_t *const SFEM_RESTRICT stencil,
-                      const scalar_t *const SFEM_RESTRICT b,
-                      // Temps
-                      scalar_t *const SFEM_RESTRICT r,
-                      scalar_t *const SFEM_RESTRICT p,
-                      scalar_t *const SFEM_RESTRICT Ap,
-                      // Out
-                      scalar_t *const x) {
+static int sshex8_stencil_cg(const int      max_it,
+                             const scalar_t rtol,
+                             const scalar_t atol,
+                             // Grid info
+                             const ptrdiff_t                     xc,
+                             const ptrdiff_t                     yc,
+                             const ptrdiff_t                     zc,
+                             const scalar_t *const SFEM_RESTRICT stencil,
+                             const scalar_t *const SFEM_RESTRICT b,
+                             // Temps
+                             scalar_t *const SFEM_RESTRICT r,
+                             scalar_t *const SFEM_RESTRICT p,
+                             scalar_t *const SFEM_RESTRICT Ap,
+                             // Out
+                             scalar_t *const x) {
     const ptrdiff_t size = xc * yc * zc;
     memset(r, 0, size * sizeof(scalar_t));
     sshex8_stencil(xc, yc, zc, stencil, x, r);
@@ -237,28 +256,30 @@ int sshex8_stencil_cg(const int      max_it,
     return info;
 }
 
-int sshex8_stencil_cg_constrained(const int      max_it,
-                                  const scalar_t rtol,
-                                  const scalar_t atol,
-                                  // Grid info
-                                  const ptrdiff_t                     xc,
-                                  const ptrdiff_t                     yc,
-                                  const ptrdiff_t                     zc,
-                                  const scalar_t *const SFEM_RESTRICT stencil,
-                                  const int *const                    constraints,
-                                  const scalar_t *const SFEM_RESTRICT b,
-                                  // Temps
-                                  scalar_t *const SFEM_RESTRICT r,
-                                  scalar_t *const SFEM_RESTRICT p,
-                                  scalar_t *const SFEM_RESTRICT Ap,
-                                  // Out
-                                  scalar_t *const x) {
+static int sshex8_stencil_cg_constrained(const int      max_it,
+                                         const scalar_t rtol,
+                                         const scalar_t atol,
+                                         // Grid info
+                                         const ptrdiff_t                          xc,
+                                         const ptrdiff_t                          yc,
+                                         const ptrdiff_t                          zc,
+                                         const scalar_t *const SFEM_RESTRICT      stencil,
+                                         const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                         const int *const                         constraints,
+                                         const scalar_t *const SFEM_RESTRICT      b,
+                                         // Temps
+                                         scalar_t *const SFEM_RESTRICT r,
+                                         scalar_t *const SFEM_RESTRICT p,
+                                         scalar_t *const SFEM_RESTRICT Ap,
+                                         // Out
+                                         scalar_t *const x) {
     const ptrdiff_t size = xc * yc * zc;
     memset(r, 0, size * sizeof(scalar_t));
     sshex8_stencil(xc, yc, zc, stencil, x, r);
+    sshex8_surface_stencil(xc, yc, zc, 1, xc, xc * yc, element_matrix, x, r);
 
     for (ptrdiff_t i = 0; i < size; i++) {
-        if(constraints[i]) {
+        if (constraints[i]) {
             r[i] = x[i];
         }
     }
@@ -292,13 +313,13 @@ int sshex8_stencil_cg_constrained(const int      max_it,
         memset(Ap, 0, size * sizeof(scalar_t));
 
         sshex8_stencil(xc, yc, zc, stencil, p, Ap);
+        sshex8_surface_stencil(xc, yc, zc, 1, xc, xc * yc, element_matrix, p, Ap);
 
         for (ptrdiff_t i = 0; i < size; i++) {
-            if(constraints[i]) {
+            if (constraints[i]) {
                 Ap[i] = p[i];
             }
         }
-
 
         scalar_t ptAp = 0;
         for (ptrdiff_t i = 0; i < size; i++) {

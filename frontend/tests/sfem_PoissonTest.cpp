@@ -14,10 +14,8 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
-    auto cg        = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose    = true;
-    cg->set_max_it(100);
-    cg->set_atol(1e-8);
+
+    std::shared_ptr<sfem::Operator<real_t>> bjacobi;
 
     if (fs->has_semi_structured_mesh()) {
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
@@ -45,10 +43,10 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
             }
         }
 
-        auto constraints_mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+        auto constraints_mask = sfem::create_buffer<mask_t>(fs->n_dofs(), es);
         f->constaints_mask(constraints_mask->data());
 
-        auto bjacobi = sfem::make_op<real_t>(
+        bjacobi = sfem::make_op<real_t>(
                 fs->n_dofs(),
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
@@ -60,25 +58,29 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
+                                                        // FIXME: pass dual graph for inner/outer boundary
                                                         x,
                                                         y);
-
-                    f->copy_constrained_dofs(x, y);
                 },
                 es);
-
-        cg->set_preconditioner_op(bjacobi);
     }
 
-    auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
     double tick = MPI_Wtime();
-    // SFEM_TEST_ASSERT
-    (cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+
+    auto solver     = sfem::create_cg(linear_op, es);
+    solver->set_preconditioner_op(bjacobi);
+    solver->verbose = true;
+    solver->set_max_it(4);
+    solver->apply(rhs->data(), x->data());
+
+    // bjacobi->apply(rhs->data(), x->data());
+
     double tock = MPI_Wtime();
 
     int SFEM_VERBOSE = 0;
@@ -111,6 +113,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 #endif
     {
         SFEM_TEST_ASSERT(output->write("x", x->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(output->write("rhs", rhs->data()) == SFEM_SUCCESS);
     }
 #endif
 
@@ -272,11 +275,11 @@ int test_poisson_and_boundary_selector() {
             m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
 
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    // sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
     sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
 
     if (block_size == 1) {
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, top}, es);
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
         f->add_constraint(conds);
     } else {
         sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
