@@ -649,7 +649,7 @@ namespace sfem {
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("hierarchical_restriction_with_counting");
-                            
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_restriction_with_counting(from_element,
                                                                    to_element,
@@ -892,13 +892,23 @@ namespace sfem {
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
-            return sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
-                                    d_crs_graph->n_nodes(),
-                                    block_size,
-                                    d_crs_graph->rowptr(),
-                                    d_crs_graph->colidx(),
-                                    values,
-                                    (real_t)1);
+            auto spmv = sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                         d_crs_graph->n_nodes(),
+                                         block_size,
+                                         d_crs_graph->rowptr(),
+                                         d_crs_graph->colidx(),
+                                         values,
+                                         (real_t)1);
+
+            return  // Owns the pointers
+                    return sfem::make_op<real_t>(
+                            f->space()->n_dofs(),
+                            f->space()->n_dofs(),
+                            [=](const real_t *const x, real_t *const y) {
+                                spmv->apply(x, y);
+                                f->copy_constrained_dofs(x, y);
+                            },
+                            es);
         }
 #endif
         auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
@@ -915,7 +925,16 @@ namespace sfem {
                                      crs_graph->colidx(),
                                      values,
                                      (real_t)1);
-        return spmv;
+        // return spmv;
+        // Owns the pointers
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    spmv->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
     }
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,

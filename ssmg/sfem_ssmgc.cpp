@@ -79,7 +79,7 @@ namespace sfem {
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
-        std::string coarse_op_type                     = "MF";
+        std::string coarse_op_type                     = es == EXECUTION_SPACE_HOST ? "BSR" : "MF";
         int         linear_smoothing_steps             = 2;
         int         coarse_linear_smoothing_steps      = 10;
         bool        enable_coarse_space_preconditioner = true;
