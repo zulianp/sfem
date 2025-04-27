@@ -2,22 +2,7 @@
 #define CU_HEX_INLINE_HPP
 
 #include "sfem_defs.h"
-
-#ifndef POW2
-#define POW2(a) ((a) * (a))
-#endif
-
-#ifndef POW3
-#define POW3(a) ((a) * (a) * (a))
-#endif
-
-#ifndef MAX
-#define MAX(a, b) ((a) < (b) ? (b) : (a))
-#endif
-
-#ifndef MIN
-#define MIN(a, b) ((a) > (b) ? (b) : (a))
-#endif
+#include "sfem_macros.h"
 
 template <typename idx_t>
 static inline __device__ __host__ idx_t cu_hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {

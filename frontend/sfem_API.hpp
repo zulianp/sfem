@@ -900,15 +900,15 @@ namespace sfem {
                                          values,
                                          (real_t)1);
 
-            return  // Owns the pointers
-                    return sfem::make_op<real_t>(
-                            f->space()->n_dofs(),
-                            f->space()->n_dofs(),
-                            [=](const real_t *const x, real_t *const y) {
-                                spmv->apply(x, y);
-                                f->copy_constrained_dofs(x, y);
-                            },
-                            es);
+            // Owns the pointers
+            return sfem::make_op<real_t>(
+                    f->space()->n_dofs(),
+                    f->space()->n_dofs(),
+                    [=](const real_t *const x, real_t *const y) {
+                        spmv->apply(x, y);
+                        f->copy_constrained_dofs(x, y);
+                    },
+                    es);
         }
 #endif
         auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
