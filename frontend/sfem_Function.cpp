@@ -2513,8 +2513,8 @@ namespace sfem {
 
             assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
             if (space->has_semi_structured_mesh()) {
-                auto ret                      = std::make_shared<SemiStructuredVectorLaplacian>(space);
-                ret->element_type             = element_type;
+                auto ret          = std::make_shared<SemiStructuredVectorLaplacian>(space);
+                ret->element_type = element_type;
                 return ret;
             } else {
                 auto ret          = std::make_shared<VectorLaplacian>(space);
