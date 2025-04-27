@@ -873,6 +873,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const jacobian_t *const SFEM_RESTRICT g_fff,
                                         const uint16_t *const                 count,
                                         const mask_t *const                   mask,
+                                        const element_idx_t *const            adjaciency_table,
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u) {
     const int nxe      = sshex8_nxe(level);
@@ -932,10 +933,12 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
             memset(r, 0, nxe * sizeof(scalar_t));
 
+            const element_idx_t * const neighs = &adjaciency_table[e * 6];
+
             sshex8_stencil(nn, nn, nn, laplacian_stencil, eu, r);
             sshex8_surface_stencil(nn, nn, nn, 1, nn, nn * nn, laplacian_matrix, eu, r);
 
-            // FIXME neumann boundary conditions and inner boundaries
+            // FIXME Handle 0-neumann boundary conditions and inner boundaries
 
             for (int v = 0; v < nxe; v++) {
                 if (emask[v]) {
@@ -967,25 +970,6 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                                     Ap,
                                                     //
                                                     eu);
-
-            // sshex8_zero_boundary(nn, nn, nn, eu);
-            // sshex8_zero_boundary(nn, nn, nn, erhs);
-            // int err = sshex8_stencil_cg(nxe,
-            //                             1e-8,
-            //                             1e-16,
-            //                             // Grid info
-            //                             nn,
-            //                             nn,
-            //                             nn,
-            //                             laplacian_stencil,
-            //                             //
-            //                             erhs,
-            //                             //
-            //                             r,
-            //                             p,
-            //                             Ap,
-            //                             //
-            //                             eu);
 
             if (SFEM_SUCCESS != err) {
                 SFEM_ERROR("FAILED to solve laplacian subsystem\n");

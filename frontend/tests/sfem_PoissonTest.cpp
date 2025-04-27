@@ -34,10 +34,8 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
             const int nxe = fs->semi_structured_mesh().n_nodes_per_element();
 
-            // #pragma omp parallel for // BAD performance with parallel for
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < fs->semi_structured_mesh().n_elements(); ++i) {
-                    // #pragma omp atomic update
                     buff[elements[d][i]]++;
                 }
             }
@@ -45,6 +43,12 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
         auto constraints_mask = sfem::create_buffer<mask_t>(fs->n_dofs(), es);
         f->constaints_mask(constraints_mask->data());
+
+        auto           mesh  = fs->mesh_ptr();
+        const int      ns    = elem_num_sides(fs->element_type());
+        element_idx_t *table = 0;
+        create_element_adj_table(mesh->n_elements(), mesh->n_nodes(), mesh->element_type(), mesh->elements()->data(), &table);
+        auto adj_table = sfem::manage_host_buffer(fs->semi_structured_mesh().n_elements() * ns, table);
 
         bjacobi = sfem::make_op<real_t>(
                 fs->n_dofs(),
@@ -58,7 +62,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
-                                                        // FIXME: pass dual graph for inner/outer boundary
+                                                        adj_table->data(),
                                                         x,
                                                         y);
                 },
@@ -66,14 +70,14 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     }
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto rhs    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     f->apply_constraints(x->data());
     f->apply_constraints(rhs->data());
 
     double tick = MPI_Wtime();
 
-    auto solver     = sfem::create_cg(linear_op, es);
+    auto solver = sfem::create_cg(linear_op, es);
     solver->set_preconditioner_op(bjacobi);
     solver->verbose = true;
     solver->set_max_it(4);
