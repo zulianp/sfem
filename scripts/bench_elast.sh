@@ -8,15 +8,15 @@ make -j8 sfem_GalerkinAssemblyTest
 export OMP_NUM_THREADS=8
 export OMP_PROC_BIND=true
 
-export SFEM_REPEAT=2
+export SFEM_REPEAT=10
 export SFEM_BLOCK_SIZE=3
 export SFEM_ELEMENT_DEREFINE=0
 
 export SFEM_ELEMENT_REFINE_LEVEL=4
-res=(2 4 6 8 16 32 40)
+# res=(2 4 6 8 16 32 40)
 
-# export SFEM_ELEMENT_REFINE_LEVEL=16
-# res=(2 4 8)
+export SFEM_ELEMENT_REFINE_LEVEL=8
+res=(2 4 8 10)
 
 rm -f log_bsr.md
 rm -f log_mf.md
