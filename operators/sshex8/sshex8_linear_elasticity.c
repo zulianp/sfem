@@ -282,26 +282,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           real_t *const                outx,
                                           real_t *const                outy,
                                           real_t *const                outz) {
-#define SSHEX8_USE_MV  // assemblying the elemental matrix is much faster
-#ifndef SSHEX8_USE_MV
-    int SFEM_HEX8_QUADRATURE_ORDER = 1;
-    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
-    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
-
-    int             n_qp = line_q3_n;
-    const scalar_t *qx   = line_q3_x;
-    const scalar_t *qw   = line_q3_w;
-    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
-        n_qp = line_q2_n;
-        qx   = line_q2_x;
-        qw   = line_q2_w;
-    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
-        n_qp = line_q6_n;
-        qx   = line_q6_x;
-        qw   = line_q6_w;
-    }
-#endif
-
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -316,8 +296,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                                 sshex8_lidx(level, level, 0, level),
                                                 sshex8_lidx(level, level, level, level),
                                                 sshex8_lidx(level, 0, level, level)};
-    int       Lm1                            = level - 1;
-    int       Lm13                           = Lm1 * Lm1 * Lm1;
 
 #pragma omp parallel
     {
@@ -338,8 +316,8 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
 
         scalar_t m_adjugate[9], adjugate[9];
 
-        scalar_t      element_u[3][8];
-        accumulator_t element_out[3][8];
+        scalar_t      element_u[3 * 8];
+        accumulator_t element_out[3 * 8];
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
 #pragma omp for
@@ -382,14 +360,7 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
             scalar_t sub_adjugate[9];
             scalar_t sub_determinant;
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
-
-            // hex8_linear_elasticity_matrix(
-            //         mu, lambda, adjugate, jacobian_determinant, element_matrix);
-            // print_matrix(8*3, 8*3, element_matrix);
-
-#ifdef SSHEX8_USE_MV
             hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
-#endif
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
@@ -408,87 +379,32 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                       sshex8_lidx(level, xi, yi + 1, zi + 1)};
 
                         for (int d = 0; d < 8; d++) {
-                            element_u[0][d] = eu[0][lev[d]];
-                            element_u[1][d] = eu[1][lev[d]];
-                            element_u[2][d] = eu[2][lev[d]];
+                            element_u[0 * 8 + d] = eu[0][lev[d]];
+                            element_u[1 * 8 + d] = eu[1][lev[d]];
+                            element_u[2 * 8 + d] = eu[2][lev[d]];
                         }
 
-                        for (int d = 0; d < 8; d++) {
-                            element_out[0][d] = 0;
-                            element_out[1][d] = 0;
-                            element_out[2][d] = 0;
+                        for (int d = 0; d < 3 * 8; d++) {
+                            element_out[d] = 0;
                         }
-#ifdef SSHEX8_USE_MV
 
-                        for (int d = 0; d < 3; d++) {
-                            const scalar_t *const block = &element_matrix[d * 8 * (3 * 8)];
-
-                            for (int i = 0; i < 8; i++) {
-                                const int offset = i * (3 * 8);
-
-                                const scalar_t *const xcol = &block[offset];
-                                for (int j = 0; j < 8; j++) {
-                                    element_out[d][i] += xcol[j] * element_u[0][j];
-                                }
-
-                                const scalar_t *const ycol = &block[offset + 8];
-                                for (int j = 0; j < 8; j++) {
-                                    element_out[d][i] += ycol[j] * element_u[1][j];
-                                }
-
-                                const scalar_t *const zcol = &block[offset + 2 * 8];
-                                for (int j = 0; j < 8; j++) {
-                                    element_out[d][i] += zcol[j] * element_u[2][j];
-                                }
+                        for (int i = 0; i < 3 * 8; i++) {
+                            const scalar_t *const col = &element_matrix[i * 3 * 8];
+                            const scalar_t        ui  = element_u[i];
+                            for (int j = 0; j < 3 * 8; j++) {
+                                element_out[j] += ui * col[j];
                             }
                         }
-
-#else
-                        for (int kz = 0; kz < n_qp; kz++) {
-                            for (int ky = 0; ky < n_qp; ky++) {
-                                for (int kx = 0; kx < n_qp; kx++) {
-                                    hex8_linear_elasticity_apply_adj(mu,
-                                                                     lambda,
-                                                                     sub_adjugate,
-                                                                     sub_determinant,
-                                                                     qx[kx],
-                                                                     qx[ky],
-                                                                     qx[kz],
-                                                                     qw[kx] * qw[ky] * qw[kz],
-                                                                     element_u[0],
-                                                                     element_u[1],
-                                                                     element_u[2],
-                                                                     element_out[0],
-                                                                     element_out[1],
-                                                                     element_out[2]);
-                                }
-                            }
-                        }
-
-#endif
-
-                        // printf("%d, %d, %d)\n", xi, yi, zi);
-                        // for (int d = 0; d < 8; d++) {
-                        //     printf("%d) (%d, %d, %d) %g => %g\n", lev[d],  xi, yi, zi,
-                        //     element_u[0][d], element_out[0][d]);
-                        // }
-                        // printf("\n");
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
-                            v[0][lev[d]] += element_out[0][d];
-                            v[1][lev[d]] += element_out[1][d];
-                            v[2][lev[d]] += element_out[2][d];
+                            v[0][lev[d]] += element_out[0 * 8 + d];
+                            v[1][lev[d]] += element_out[1 * 8 + d];
+                            v[2][lev[d]] += element_out[2 * 8 + d];
                         }
                     }
                 }
             }
-
-            // for (int d = 0; d < nxe; d++) {
-            //     printf("%d)\t%g -> %g\n", ev[d], eu[0][d], v[0][d]);
-            // }
-
-            // printf("\n");
 
             {
                 // Scatter elemental data
