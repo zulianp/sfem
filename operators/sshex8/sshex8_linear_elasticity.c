@@ -320,6 +320,15 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
         accumulator_t element_out[3 * 8];
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
+        // Aliases for reduced complexity inside
+        scalar_t *element_ux = &element_u[0 * 8];
+        scalar_t *element_uy = &element_u[1 * 8];
+        scalar_t *element_uz = &element_u[2 * 8];
+
+        scalar_t *element_outx = &element_out[0 * 8];
+        scalar_t *element_outy = &element_out[1 * 8];
+        scalar_t *element_outz = &element_out[2 * 8];
+
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
             {
@@ -379,9 +388,10 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                       sshex8_lidx(level, xi, yi + 1, zi + 1)};
 
                         for (int d = 0; d < 8; d++) {
-                            element_u[0 * 8 + d] = eu[0][lev[d]];
-                            element_u[1 * 8 + d] = eu[1][lev[d]];
-                            element_u[2 * 8 + d] = eu[2][lev[d]];
+                            const int lidx = lev[d];
+                            element_ux[d] = eu[0][lidx];
+                            element_uy[d] = eu[1][lidx];
+                            element_uz[d] = eu[2][lidx];
                         }
 
                         for (int d = 0; d < 3 * 8; d++) {
@@ -398,9 +408,10 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
 
                         // Accumulate to macro-element buffer
                         for (int d = 0; d < 8; d++) {
-                            v[0][lev[d]] += element_out[0 * 8 + d];
-                            v[1][lev[d]] += element_out[1 * 8 + d];
-                            v[2][lev[d]] += element_out[2 * 8 + d];
+                            const int lidx = lev[d];
+                            v[0][lidx] += element_outx[d];
+                            v[1][lidx] += element_outy[d];
+                            v[2][lidx] += element_outz[d];
                         }
                     }
                 }
