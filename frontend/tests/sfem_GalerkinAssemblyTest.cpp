@@ -60,9 +60,14 @@ int test_cube() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    const char *SFEM_OPERATOR       = "Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = "MF";
+    const char *SFEM_OPERATOR = "Laplacian";
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+
+    const char *SFEM_FINE_OP_TYPE = "MF";
+    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+
     const char *SFEM_COARSE_OP_TYPE = "MF";
+    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -85,11 +90,13 @@ int test_cube() {
     int SFEM_HIERARCHICAL_RENUMBERING = 1;
     SFEM_READ_ENV(SFEM_HIERARCHICAL_RENUMBERING, atoi);
 
-    int  block_size = 1;
-    auto m          = sfem::Mesh::create_hex8_cube(
+    int SFEM_BLOCK_SIZE = 1;
+    SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
 
@@ -147,11 +154,12 @@ int test_cube() {
             points = fs_coarse->mesh_ptr()->points()->data();
         }
 
-        ptrdiff_t n    = fs_coarse->n_dofs();
+        ptrdiff_t n    = fs_coarse->mesh_ptr()->n_nodes();
         auto      data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
-            data[i] = points[0][i] * points[0][i];
-            // data[i] = points[0][i];
+            for (int b = 0; b < SFEM_BLOCK_SIZE; b++) {
+                data[i * SFEM_BLOCK_SIZE + b] = (b + 1) * points[0][i] * points[0][i];
+            }
         }
     }
 
@@ -259,6 +267,7 @@ int test_cube() {
                     SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
 
                     sfem::Output out(fs_coarse);
+                    out.enable_AoS_to_SoA(SFEM_BLOCK_SIZE > 1);
 
                     out.set_output_dir("galerkin/fields");
                     SFEM_TEST_ASSERT(out.write("R", h_restricted->data()) == SFEM_SUCCESS);
