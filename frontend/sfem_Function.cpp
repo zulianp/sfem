@@ -48,6 +48,7 @@
 // Mesh
 #include "adj_table.h"
 #include "hex8_fff.h"
+#include "hex8_jacobian.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
@@ -1698,12 +1699,23 @@ namespace sfem {
         long   calls{0};
         double total_time{0};
 
+        class Jacobians {
+        public:
+            std::shared_ptr<Buffer<jacobian_t>> adjugate;
+            std::shared_ptr<Buffer<jacobian_t>> determinant;
+
+            Jacobians(const ptrdiff_t n_elements, const int size_adjugate)
+                : adjugate(sfem::create_host_buffer<jacobian_t>(n_elements * size_adjugate)),
+                  determinant(sfem::create_host_buffer<jacobian_t>(n_elements)) {}
+        };
+
+        std::shared_ptr<Jacobians> jacobians;
+
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("LinearElasticity::create");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
-            assert(mesh->spatial_dim == space->block_size());
+            auto mesh = space->mesh_ptr();
+            assert(mesh->spatial_dimension() == space->block_size());
 
             auto ret = std::make_unique<LinearElasticity>(space);
 
@@ -1716,6 +1728,7 @@ namespace sfem {
             ret->mu           = SFEM_SHEAR_MODULUS;
             ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
             ret->element_type = (enum ElemType)space->element_type();
+
             return ret;
         }
 
@@ -1742,7 +1755,22 @@ namespace sfem {
         const char *name() const override { return "LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override { return SFEM_SUCCESS; }
+        int initialize() override {
+            auto mesh = space->mesh_ptr();
+
+            if (element_type == HEX8) {
+                jacobians = std::make_shared<Jacobians>(mesh->n_elements(),
+                                                        mesh->spatial_dimension() * elem_manifold_dim(element_type));
+
+                hex8_adjugate_and_det_fill(mesh->n_elements(),
+                                           mesh->elements()->data(),
+                                           mesh->points()->data(),
+                                           jacobians->adjugate->data(),
+                                           jacobians->determinant->data());
+            }
+
+            return SFEM_SUCCESS;
+        }
 
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -1866,8 +1894,30 @@ namespace sfem {
 
             double tick = MPI_Wtime();
 
-            linear_elasticity_apply_aos(
-                    element_type, mesh->nelements, mesh->nnodes, mesh->elements, mesh->points, this->mu, this->lambda, h, out);
+            if (jacobians) {
+                SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
+                linear_elasticity_apply_adjugate_aos(element_type,
+                                                     mesh->nelements,
+                                                     mesh->nnodes,
+                                                     mesh->elements,
+                                                     jacobians->adjugate->data(),
+                                                     jacobians->determinant->data(),
+                                                     this->mu,
+                                                     this->lambda,
+                                                     h,
+                                                     out);
+            } else {
+                SFEM_TRACE_SCOPE("linear_elasticity_apply_aos");
+                linear_elasticity_apply_aos(element_type,
+                                            mesh->nelements,
+                                            mesh->nnodes,
+                                            mesh->elements,
+                                            mesh->points,
+                                            this->mu,
+                                            this->lambda,
+                                            h,
+                                            out);
+            }
 
             double tock = MPI_Wtime();
             total_time += (tock - tick);
@@ -1973,6 +2023,7 @@ namespace sfem {
                 ret->use_affine_approximation = use_affine_approximation;
                 ret->mu                       = mu;
                 ret->lambda                   = lambda;
+                // ret->initialize();
                 return ret;
             } else {
                 assert(space->element_type() == macro_base_elem(element_type));
@@ -1980,6 +2031,7 @@ namespace sfem {
                 ret->element_type = macro_base_elem(element_type);
                 ret->mu           = mu;
                 ret->lambda       = lambda;
+                ret->initialize();
                 return ret;
             }
         }
