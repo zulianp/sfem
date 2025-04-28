@@ -64,7 +64,7 @@ SPMG =  Shifted--Penalty Multigrid
 ## Milestones
 
 MS := Milestone
-() slot for achived milesone MM/YY (e.g., 02/2025)
+() slot for achieved milesone MM/YY (e.g., 02/2025)
 
 ### Austen
 
@@ -102,7 +102,7 @@ MS := Milestone
 **MS 1: ()**
 
    - [x] Two-level method matrix-free SPGMG on GPU (basic)
-   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
+   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (reduced size of constrained dofs and quantities, normal field)
    - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
    - [x] Basic tracing facilities for timing different parts of the code (CPU only)
    - [x] GMG: Hierarchical indexing for no redundancy multilevel discretization
@@ -124,9 +124,9 @@ MS := Milestone
 
    - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,)
    - [ ] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
-   - [ ] GPU: ShiftableBlockSymJacobi
-   - [ ] GPU: constaints_mask 
-   - [ ] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
+   - [X] GPU: ShiftableBlockSymJacobi
+   - [ ] GPU: constraints_mask 
+   - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
    - [X] GPU: sshex8_restrict and sshex8_prolongate
    - [X] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector

@@ -13,6 +13,8 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
+#define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
+
 static void* SFEM_DEFAULT_STREAM = 0;
 
 SFEM_INLINE static int real_type_size(enum RealType type) {
@@ -63,34 +65,34 @@ SFEM_INLINE static const char* integer_type_to_string(enum IntegerType type) {
 }
 
 enum ElemType {
-    NIL = 0,
-    NODE1 = 1,
-    EDGE2 = 2,
-    EDGE3 = 11,
-    EDGESHELL2 = 101,
-    BEAM2 = 100002,
-    TRI3 = 3,
-    TRI6 = 6,
-    TRI10 = 1010,
-    TRISHELL3 = 103,
-    TRISHELL6 = 106,
-    TRISHELL10 = 110,
-    QUAD4 = 40,
-    QUADSHELL4 = 140,
-    TET4 = 4,
-    TET10 = 10,
-    TET20 = 20,
-    HEX8 = 8,
-    WEDGE6 = 1006,
-    MACRO = 200,
-    MACRO_TRI3 = (MACRO + TRI3),
+    NIL             = 0,
+    NODE1           = 1,
+    EDGE2           = 2,
+    EDGE3           = 11,
+    EDGESHELL2      = 101,
+    BEAM2           = 100002,
+    TRI3            = 3,
+    TRI6            = 6,
+    TRI10           = 1010,
+    TRISHELL3       = 103,
+    TRISHELL6       = 106,
+    TRISHELL10      = 110,
+    QUAD4           = 40,
+    QUADSHELL4      = 140,
+    TET4            = 4,
+    TET10           = 10,
+    TET20           = 20,
+    HEX8            = 8,
+    WEDGE6          = 1006,
+    MACRO           = 200,
+    MACRO_TRI3      = (MACRO + TRI3),
     MACRO_TRISHELL3 = (MACRO + TRISHELL3),
-    MACRO_TET4 = (MACRO + TET4),
-    SSTET4 = 4000,
-    SSQUAD4 = 40000,
-    SSQUADSHELL4 = 140000,
-    SSHEX8 = 8000,
-    INVALID = -1
+    MACRO_TET4      = (MACRO + TET4),
+    SSTET4          = 4000,
+    SSQUAD4         = 40000,
+    SSQUADSHELL4    = 140000,
+    SSHEX8          = 8000,
+    INVALID         = -1
 };
 
 SFEM_INLINE static enum ElemType type_from_string(const char* str) {
@@ -433,14 +435,7 @@ SFEM_INLINE static int is_second_order_lagrange(const enum ElemType type) {
     }
 }
 
-enum HEX8_Sides {
-    HEX8_LEFT = 3,
-    HEX8_RIGHT = 1,
-    HEX8_BOTTOM = 4,
-    HEX8_TOP = 5,
-    HEX8_FRONT = 0,
-    HEX8_BACK = 2
-};
+enum HEX8_Sides { HEX8_LEFT = 3, HEX8_RIGHT = 1, HEX8_BOTTOM = 4, HEX8_TOP = 5, HEX8_FRONT = 0, HEX8_BACK = 2 };
 
 #ifdef __cplusplus
 }
