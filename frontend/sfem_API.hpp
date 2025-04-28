@@ -1,37 +1,49 @@
 #ifndef SFEM_API_HPP
 #define SFEM_API_HPP
 
+// C includes
 #include "adj_table.h"
 #include "crs_graph.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_mask.h"
 #include "sfem_mesh.h"
+#include "sfem_prolongation_restriction.h"
+#include "sshex8.h"
+#include "sshex8_interpolate.h"
+#include "ssquad4.h"
 
+// C++ includes
+#include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
+#include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
 
+// CUDA includes
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_sshex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_ShiftableJacobi.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_solver.hpp"
-
 #else
 namespace sfem {
     static void device_synchronize() {}
@@ -39,22 +51,11 @@ namespace sfem {
 }  // namespace sfem
 #endif
 
-#include "sfem_ShiftableJacobi.hpp"
-#include "sfem_Stationary.hpp"
-#include "sfem_prolongation_restriction.h"
-#include "sshex8.h"
-#include "sshex8_interpolate.h"
-
-#include "ssquad4.h"
-
-#include <sys/stat.h>
+// Externals
 #include "matrixio_crs.h"
 
-#include "sfem_glob.hpp"
-
-// C++
-#include "sfem_CRSGraph.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+// System
+#include <sys/stat.h>
 
 namespace sfem {
 
@@ -79,7 +80,7 @@ namespace sfem {
 
         // // FIXME make simpler version
         auto impl = sfem::blas<T>(es)->xypaz;
-        return std::make_shared<LambdaOperator<T>>(
+        return sfem::make_op<T>(
                 n,
                 n,
                 [n, diagonal_scaling, impl](const T *const x, T *const y) {
@@ -147,6 +148,24 @@ namespace sfem {
 
         ret->set_diag(diag);
         return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(
+            const std::shared_ptr<Buffer<T>>      &diag,
+            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
+            const ExecutionSpace                   es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
+            CUDA_BLAS<T>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_CUDA<T>::build(ret->impl);
+            ret->execution_space_ = es;
+            return ret;
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        return sfem::h_shiftable_block_sym_jacobi(diag, constraints_mask, es);
     }
 
     template <typename T>
