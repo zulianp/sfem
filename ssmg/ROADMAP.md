@@ -113,7 +113,7 @@ MS := Milestone
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
-   - [ ] Export facilities for Paper 1
+   - [X] Export facilities for Paper 1
    - [ ] Nonlinear obstacle contact loop (Optional)
 
 **MS 2: ()**
@@ -122,13 +122,13 @@ MS := Milestone
 
 **MS 3: ()**
 
-   - [ ] GPU porting of all missing discretization routines (Operators, SDF sampling, some algebra)
+   - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,)
    - [ ] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
-   - [ ] GPU: Shiftable Jacobi
+   - [ ] GPU: ShiftableBlockSymJacobi
    - [ ] GPU: constaints_mask 
    - [ ] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
-   - [ ] GPU: sshex8_restrict and sshex8_prolongate
-   - [ ] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [X] GPU: sshex8_restrict and sshex8_prolongate
+   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector
 
 **MS 4: ()**
