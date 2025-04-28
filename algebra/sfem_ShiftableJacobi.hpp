@@ -10,6 +10,8 @@
 
 #include "sfem_Buffer.hpp"
 
+#include "sfem_openmp_ShiftableJacobi.hpp"
+
 namespace sfem {
     template <typename T>
     static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
@@ -19,6 +21,8 @@ namespace sfem {
     public:
         ExecutionSpace             execution_space_{EXECUTION_SPACE_INVALID};
         BLAS_Tpl<T>                blas;
+        
+
         std::shared_ptr<Buffer<T>> diag;
         std::shared_ptr<Buffer<T>> inv_diag;
         T                          relaxation_parameter{0.3};
@@ -70,6 +74,8 @@ namespace sfem {
     public:
         ExecutionSpace                  execution_space_{EXECUTION_SPACE_INVALID};
         BLAS_Tpl<T>                     blas;
+        // ShiftableBlockSymJacobi_Tpl<T> impl;
+        
         std::shared_ptr<Buffer<T>>      diag;
         std::shared_ptr<Buffer<T>>      inv_diag;
         std::shared_ptr<Buffer<mask_t>> constraints_mask;
@@ -79,6 +85,7 @@ namespace sfem {
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
+            // ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -246,7 +253,7 @@ namespace sfem {
             const T x2 = mat_1 * mat_5;
             const T x3 = mat_1 * mat_8;
             const T x4 = mat_2 * mat_4;
-            const T x5 = 1.0 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
+            const T x5 = 1 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
             assert(x5 == x5);
             *mat_inv_0 = x5 * (x0 - x1);
             *mat_inv_1 = x5 * (mat_2 * mat_7 - x3);
