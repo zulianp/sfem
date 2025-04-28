@@ -56,6 +56,13 @@ namespace sfem {
         e.second += duration;
     }
 
+    void Tracer::record_event(std::string &&name, const double duration)
+    {
+        auto &e = impl_->events[name];
+        e.first++;
+        e.second += duration;
+    }
+
     Tracer::Tracer() : impl_(std::make_unique<Impl>()) {}
 
     Tracer::~Tracer() {
@@ -63,12 +70,31 @@ namespace sfem {
         impl_ = nullptr;
     }
 
+    ScopedEvent::ScopedEvent(const char *format, int num) {
+        char str[1024];
+        int  err = snprintf(str, 1024, format, num);
+        if (err < 0) SFEM_ERROR("UNABLE TO TRACE %s\n", format);
+
+        // memcpy(name, name, strlen(name)+1);
+
+        name = str;
+
+
+#ifdef SFEM_ENABLE_BLOCK_KERNELS
+        sfem::device_synchronize();
+#endif
+#ifdef SFEM_ENABLE_CUDA
+        nvtxRangePushA(name.c_str());
+#endif
+        elapsed = MPI_Wtime();
+    }
+
     ScopedEvent::ScopedEvent(const char *name) : name(name) {
 #ifdef SFEM_ENABLE_BLOCK_KERNELS
         sfem::device_synchronize();
 #endif
 #ifdef SFEM_ENABLE_CUDA
-        nvtxRangePushA(name);
+        nvtxRangePushA(this->name.c_str());
 #endif
         elapsed = MPI_Wtime();
     }
@@ -82,7 +108,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         nvtxRangePop();
 #endif
-        Tracer::instance().record_event(name, elapsed);
+        Tracer::instance().record_event(std::move(name), elapsed);
     }
 
 }  // namespace sfem

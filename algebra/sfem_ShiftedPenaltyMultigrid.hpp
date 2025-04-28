@@ -652,7 +652,7 @@ namespace sfem {
         }
 
         CycleReturnCode cycle(const int level) {
-            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::cycle");
+            SFEM_TRACE_SCOPE_VARIANT("ShiftedPenaltyMultigrid::cycle(%d)", level);
 
             auto mem      = memory_[level];
             auto smoother = smoother_[level];

@@ -263,9 +263,7 @@ int test_contact() {
         contact_conds = build_cuboid_sphere_contact(f, SFEM_BASE_RESOLUTION);
     } else if (strcmp(SFEM_CONTACT_CASE, "multisphere") == 0) {
         contact_conds = build_cuboid_multisphere_contact(f, SFEM_BASE_RESOLUTION);
-    }
-
-    else {
+    } else {
         SFEM_ERROR("SFEM_CONTACT_CASE=%s not valid!\n", SFEM_CONTACT_CASE);
     }
 
