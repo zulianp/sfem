@@ -440,7 +440,6 @@ namespace sfem {
             auto &ssm = space->semi_structured_mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_diag[%d]", ssm.level());
 
-            
             return cu_affine_sshex8_laplacian_diag(ssm.level(),
                                                    fff->n_elements(),
                                                    fff->n_elements(),  // stride
@@ -729,6 +728,22 @@ namespace sfem {
                                               stream);
         }
 
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
+
+            return cu_linear_elasticity_block_diag_sym_aos(element_type,
+                                                           adjugate->n_elements(),
+                                                           adjugate->n_elements(),
+                                                           adjugate->elements(),
+                                                           adjugate->jacobian_adjugate(),
+                                                           adjugate->jacobian_determinant(),
+                                                           this->mu,
+                                                           this->lambda,
+                                                           real_type,
+                                                           values,
+                                                           stream);
+        }
+
         int value(const real_t *x, real_t *const out) override {
             std::cerr << "Unimplemented function ---> value in GPULinearElasticity\n";
             assert(0);
@@ -827,6 +842,29 @@ namespace sfem {
                                                            &values[1],
                                                            &values[2],
                                                            SFEM_DEFAULT_STREAM);
+        }
+
+        int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", ssm.level());
+
+            return cu_affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
+                                                                     adjugate->n_elements(),
+                                                                     adjugate->n_elements(),
+                                                                     adjugate->elements(),
+                                                                     adjugate->jacobian_adjugate(),
+                                                                     adjugate->jacobian_determinant(),
+                                                                     this->mu,
+                                                                     this->lambda,
+                                                                     6,
+                                                                     real_type,
+                                                                     &out[0],
+                                                                     &out[1],
+                                                                     &out[2],
+                                                                     &out[3],
+                                                                     &out[4],
+                                                                     &out[5],
+                                                                     SFEM_DEFAULT_STREAM);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
