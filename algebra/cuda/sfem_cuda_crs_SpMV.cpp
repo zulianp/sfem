@@ -429,6 +429,8 @@ namespace sfem {
         }
 
         void apply(const real_t* const x, real_t* const y) {
+            SFEM_TRACE_SCOPE("BSRSpMV_CUDA::apply");
+
             if (!initialized) {
                 initialize(x, y);
                 initialized = true;

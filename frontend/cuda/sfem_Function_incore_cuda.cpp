@@ -437,9 +437,10 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_diag");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_diag[%d]", ssm.level());
+
+            
             return cu_affine_sshex8_laplacian_diag(ssm.level(),
                                                    fff->n_elements(),
                                                    fff->n_elements(),  // stride
@@ -452,9 +453,9 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_apply");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
+
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                     fff->n_elements(),
                                                     fff->n_elements(),  // stride
@@ -468,9 +469,9 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_affine_sshex8_laplacian_apply");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
+
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
                                                     fff->n_elements(),
                                                     fff->n_elements(),  // stride
@@ -808,8 +809,9 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            SFEM_TRACE_SCOPE("cu_affine_sshex8_linear_elasticity_diag");
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", ssm.level());
+
             return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
                                                            adjugate->n_elements(),
                                                            adjugate->n_elements(),
@@ -828,9 +830,9 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_TRACE_SCOPE("gradient");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
+
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                             adjugate->n_elements(),
                                                             adjugate->n_elements(),
@@ -853,9 +855,9 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_affine_sshex8_linear_elasticity_apply");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
+
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
                                                             adjugate->n_elements(),
                                                             adjugate->n_elements(),

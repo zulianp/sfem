@@ -2,7 +2,10 @@
 #define SFEM_OPENMP_SHIFTABLEJACOBI_HPP
 
 #include "sfem_base.h"
+#include "sfem_mask.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 
 namespace sfem {
