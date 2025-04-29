@@ -6,7 +6,9 @@
 #include "lumped_ptdp.h"
 
 #ifdef SFEM_ENABLE_CUDA
+#include "cu_ssquad4_interpolate.h"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#include "sfem_Function_incore_cuda.hpp"
 #endif
 
 namespace sfem {
@@ -46,7 +48,7 @@ namespace sfem {
         f->hessian_block_diag_sym(nullptr, diag->data());
         f->constaints_mask(mask->data());
 
-        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        auto sj = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
         cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);
@@ -183,7 +185,7 @@ namespace sfem {
             fi->constaints_mask(mask->data());
             fi->hessian_block_diag_sym(nullptr, diag->data());
 
-            auto sj                  = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+            auto sj                  = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
             sj->relaxation_parameter = 1. / fsi->block_size();
             auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
 
@@ -215,7 +217,7 @@ namespace sfem {
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
             f_coarse->constaints_mask(mask->data());
 
-            auto sj_coarse                  = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+            auto sj_coarse                  = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
             sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             coarse_solver->set_preconditioner_op(sj_coarse);
         }
@@ -333,8 +335,15 @@ namespace sfem {
         contact_conds->init();
         auto cc_op       = contact_conds->linear_constraints_op();
         auto cc_op_t     = contact_conds->linear_constraints_op_transpose();
-        auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+        auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), sfem::MEMORY_SPACE_HOST);
         contact_conds->signed_distance(upper_bound->data());
+
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == es) {
+            upper_bound = sfem::to_device(upper_bound);
+            // TODO cc_op and cc_op_t to device
+        }
+#endif
 
         // Top-level only
         mg->set_upper_bound(upper_bound);
@@ -347,7 +356,16 @@ namespace sfem {
         contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
 
         auto fine_sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
-        mg->add_level_constraint_op_x_op(fine_sbv);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == es) {
+            // keep host fine_sbv available
+            mg->add_level_constraint_op_x_op(sfem::to_device(fine_sbv));
+        } else 
+#endif
+        {
+            mg->add_level_constraint_op_x_op(fine_sbv);
+        }
 
         auto fine_sides   = contact_conds->ss_sides();
         auto fine_mapping = contact_conds->node_mapping();
@@ -365,11 +383,10 @@ namespace sfem {
 
             auto coarse_normal_prod = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
             auto coarse_sbv         = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
-            mg->add_level_constraint_op_x_op(coarse_sbv);
 
             auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
             ssquad4_element_node_incidence_count(level, 1, fine_sides->extent(1), fine_sides->data(), count->data());
-            
+
             ssquad4_restrict(fine_sides->extent(1),  // nelements
                              level,                  // from_level
                              1,                      // from_level_stride
@@ -400,11 +417,43 @@ namespace sfem {
                 }
             }
 
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                count        = sfem::to_device(count);
+                fine_sides   = sfem::to_device(fine_sides);
+                coarse_sides = sfem::to_device(coarse_sides);
+                coarse_sbv   = sfem::to_device(coarse_sbv);
+            }
+#endif
+            mg->add_level_constraint_op_x_op(coarse_sbv);
+
             auto c_restriction = sfem::make_op<real_t>(
                     coarse_node_mapping->size(),
                     fine_mapping->size(),
                     [=, f_coarse = functions[i]](const real_t *const from, real_t *const to) {
                         SFEM_TRACE_SCOPE("ssquad4_restrict");
+
+#ifdef SFEM_ENABLE_CUDA
+                        if (es == EXECUTION_SPACE_DEVICE) {
+                            cu_ssquad4_restrict(fine_sides->extent(1),
+                                                level,
+                                                1,
+                                                fine_sides->data(),
+                                                count->data(),
+                                                coarse_level,
+                                                1,
+                                                coarse_sides->data(),
+                                                1,
+                                                SFEM_REAL_DEFAULT,
+                                                1,
+                                                from,
+                                                SFEM_REAL_DEFAULT,
+                                                1,
+                                                to,
+                                                SFEM_DEFAULT_STREAM);
+                            return;
+                        }
+#endif
                         ssquad4_restrict(fine_sides->extent(1),  // nelements
                                          level,                  // from_level
                                          1,                      // from_level_stride

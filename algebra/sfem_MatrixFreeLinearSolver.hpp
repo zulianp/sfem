@@ -34,6 +34,14 @@ namespace sfem {
         const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
         ptrdiff_t                             n_blocks() const { return idx_->size(); }
 
+        enum MemorySpace mem_space() const {
+            if (data_) {
+                return data_->mem_space();
+            }
+
+            return MEMORY_SPACE_INVALID;
+        }
+
         void print(std::ostream& os) const {
             for (ptrdiff_t i = 0; i < n_blocks(); i++) {
                 os << idx_->data()[i] << ") ";
@@ -129,13 +137,6 @@ namespace sfem {
         auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
         ret->sbv     = sbv;
         ret->scaling = scaling;
-
-        const ptrdiff_t    n_blocks   = sbv->n_blocks();
-        const idx_t* const idx        = sbv->idx()->data();
-        const T* const     dd         = sbv->data()->data();
-        const T* const     s          = scaling->data();
-        const int          block_size = 3;
-        assert(sbv->block_size() == 6);
         return ret;
     }
 
