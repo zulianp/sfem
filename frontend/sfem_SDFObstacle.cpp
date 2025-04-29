@@ -55,4 +55,54 @@ namespace sfem {
                 normals[1],
                 normals[2]);
     }
+
+    int SDFObstacle::sample_normals(enum ElemType                element_type,
+                                    const ptrdiff_t              nelements,
+                                    const ptrdiff_t              nnodes,
+                                    idx_t **const SFEM_RESTRICT  elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    real_t **const SFEM_RESTRICT normals) {
+        auto sdf = impl_->sdf;
+        return resample_gap_normals(
+                // Mesh
+                element_type,
+                nelements,
+                nnodes,
+                elements,
+                points,
+                // SDF
+                sdf->nlocal(),
+                sdf->stride(),
+                sdf->origin(),
+                sdf->delta(),
+                sdf->data(),
+                // Output
+                normals[0],
+                normals[1],
+                normals[2]);
+    }
+
+    int SDFObstacle::sample_value(enum ElemType                element_type,
+                                  const ptrdiff_t              nelements,
+                                  const ptrdiff_t              nnodes,
+                                  idx_t **const SFEM_RESTRICT  elements,
+                                  geom_t **const SFEM_RESTRICT points,
+                                  real_t *const SFEM_RESTRICT  gap) {
+        auto sdf = impl_->sdf;
+        return resample_gap_value(
+                // Mesh
+                element_type,
+                nelements,
+                nnodes,
+                elements,
+                points,
+                // SDF
+                sdf->nlocal(),
+                sdf->stride(),
+                sdf->origin(),
+                sdf->delta(),
+                sdf->data(),
+                // Output
+                gap);
+    }
 }  // namespace sfem
