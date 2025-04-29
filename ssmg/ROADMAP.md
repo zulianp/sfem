@@ -126,10 +126,10 @@ MS := Milestone
    - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,)
    - [ ] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
    - [X] GPU: ShiftableBlockSymJacobi
-   - [ ] GPU: constraints_mask 
+   - [ ] GPU: constraints_mask (minimal)
    - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
    - [X] GPU: sshex8_restrict and sshex8_prolongate
-   - [ ] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector
 
 **MS 4: ()**
