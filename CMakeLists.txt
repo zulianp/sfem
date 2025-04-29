@@ -122,6 +122,7 @@ if(SFEM_ENABLE_CUDA)
         operators/quadshell4/cuda
         operators/spectral_hex/cuda
         operators/sshex8/cuda
+        operators/ssquad4/cuda
         operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
@@ -139,16 +140,22 @@ foreach(MODULE ${SFEM_MODULES})
 
     if(SFEM_ENABLE_CUDA)
         file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cuh")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
     if(SFEM_MODULE_KERNEL_SOURCES)
         list(APPEND SFEM_KERNEL_SOURCES "${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
+
+    if(SFEM_MODULE_KERNEL_HEADERS)
+        list(APPEND SFEM_KERNEL_HEADERS "${SFEM_MODULE_KERNEL_HEADERS}")
+    endif()
 endforeach(MODULE)
 
 if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
+    list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
 endif()
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
