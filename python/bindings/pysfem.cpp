@@ -375,12 +375,12 @@ NB_MODULE(pysfem, m) {
               dc->add_condition(n, n, c_idx, component, value);
           });
 
-    m.def("gradient",
-          [](const std::shared_ptr<ContactConditions> &cc,
-             nb::ndarray<real_t>
-                     x,
-             nb::ndarray<real_t>
-                     y) { cc->gradient(x.data(), y.data()); });
+    // m.def("gradient",
+    //       [](const std::shared_ptr<ContactConditions> &cc,
+    //          nb::ndarray<real_t>
+    //                  x,
+    //          nb::ndarray<real_t>
+    //                  y) { cc->gradient(x.data(), y.data()); });
 
     m.def("signed_distance",
           [](const std::shared_ptr<ContactConditions> &cc,
@@ -403,7 +403,7 @@ NB_MODULE(pysfem, m) {
     m.def("contact_conditions_from_file",
           [](const std::shared_ptr<FunctionSpace> &space,
              const char *path) -> std::shared_ptr<ContactConditions> {
-              return ContactConditions::create_from_file(space, path);
+              return ContactConditions::create_from_file(space, path, sfem::EXECUTION_SPACE_HOST);
           });
 
     nb::class_<NeumannConditions, Op>(m, "NeumannConditions")

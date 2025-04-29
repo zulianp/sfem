@@ -18,6 +18,14 @@ namespace sfem {
         virtual std::shared_ptr<Buffer<idx_t *>>  elements()           = 0;
         virtual std::shared_ptr<Buffer<idx_t>>    node_mapping()       = 0;
         virtual enum ElemType                     element_type() const = 0;
+
+        virtual std::shared_ptr<Buffer<idx_t *>>  semi_structured_elements()      
+        {
+            return nullptr;
+        }
+
+        virtual void displace_points(const real_t *disp) = 0;
+        virtual void collect_points() = 0;
     };
 
     class MeshContactSurface final : public ContactSurface {
@@ -29,10 +37,17 @@ namespace sfem {
                                                           const std::shared_ptr<Sideset>       &sideset,
                                                           const enum ExecutionSpace             es);
 
+        static std::unique_ptr<MeshContactSurface> create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                    const std::string                    &path,
+                                                                    const enum ExecutionSpace             es);
+
         std::shared_ptr<Buffer<geom_t *>> points() override;
         std::shared_ptr<Buffer<idx_t *>>  elements() override;
         std::shared_ptr<Buffer<idx_t>>    node_mapping() override;
         enum ElemType                     element_type() const override;
+
+        void displace_points(const real_t *disp) override;
+        void collect_points() override;
 
     public:
         class Impl;
@@ -53,6 +68,13 @@ namespace sfem {
                                                             const std::shared_ptr<Sideset>       &sideset,
                                                             const enum ExecutionSpace             es);
 
+        static std::unique_ptr<SSMeshContactSurface> create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                      const std::string                    &path);
+
+        std::shared_ptr<Buffer<idx_t *>>  semi_structured_elements()  override;
+        void displace_points(const real_t *disp) override;
+        void collect_points() override;
+        
     public:
         class Impl;
         std::unique_ptr<Impl> impl_;
