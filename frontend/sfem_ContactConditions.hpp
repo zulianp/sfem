@@ -59,12 +59,14 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space();
 
-        const std::shared_ptr<Buffer<idx_t>> &node_mapping();
+        const std::shared_ptr<Buffer<idx_t>> node_mapping();
 
-        static std::shared_ptr<ContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
+        static std::shared_ptr<ContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space,
+                                                                  const enum ExecutionSpace             es);
 
         static std::shared_ptr<ContactConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
-                                                                   const std::string                    &path);
+                                                                   const std::string                    &path,
+                                                                   const enum ExecutionSpace             es);
 
         static std::shared_ptr<ContactConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::shared_ptr<Grid<geom_t>>  &sdf,
@@ -73,7 +75,7 @@ namespace sfem {
 
         // int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int mask(mask_t *mask);
-        int gradient(const real_t *const x, real_t *const g);
+        // int gradient(const real_t *const x, real_t *const g);
         int signed_distance(const real_t *const x, real_t *const g);
         int signed_distance(real_t *const g);
 
@@ -97,7 +99,7 @@ namespace sfem {
         int full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s);
 
         std::shared_ptr<Buffer<idx_t *>> ss_sides();
-        std::shared_ptr<Sideset>         sideset();
+        // std::shared_ptr<Sideset>         sideset();
 
     private:
         class Impl;
