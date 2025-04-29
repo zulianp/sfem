@@ -6,8 +6,8 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_Grid.hpp"
 
-#include <memory>
 #include <mpi.h>
+#include <memory>
 
 namespace sfem {
     class Obstacle {
@@ -20,6 +20,20 @@ namespace sfem {
                            geom_t **const SFEM_RESTRICT points,
                            real_t **const SFEM_RESTRICT normals,
                            real_t *const SFEM_RESTRICT  gap) = 0;
+
+        virtual int sample_normals(enum ElemType                element_type,
+                                   const ptrdiff_t              nelements,
+                                   const ptrdiff_t              nnodes,
+                                   idx_t **const SFEM_RESTRICT  elements,
+                                   geom_t **const SFEM_RESTRICT points,
+                                   real_t **const SFEM_RESTRICT normals) = 0;
+
+        virtual int sample_value(enum ElemType                element_type,
+                                 const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 real_t *const SFEM_RESTRICT  gap) = 0;
     };
 
     class SDFObstacle final : public Obstacle {
@@ -36,7 +50,23 @@ namespace sfem {
                     real_t **const SFEM_RESTRICT normals,
                     real_t *const SFEM_RESTRICT  gap) override;
 
-        static std::shared_ptr<SDFObstacle> create_from_file(MPI_Comm comm, const std::string &path, const enum ExecutionSpace es);
+        int sample_normals(enum ElemType                element_type,
+                           const ptrdiff_t              nelements,
+                           const ptrdiff_t              nnodes,
+                           idx_t **const SFEM_RESTRICT  elements,
+                           geom_t **const SFEM_RESTRICT points,
+                           real_t **const SFEM_RESTRICT normals) override;
+
+        int sample_value(enum ElemType                element_type,
+                         const ptrdiff_t              nelements,
+                         const ptrdiff_t              nnodes,
+                         idx_t **const SFEM_RESTRICT  elements,
+                         geom_t **const SFEM_RESTRICT points,
+                         real_t *const SFEM_RESTRICT  gap) override;
+
+        static std::shared_ptr<SDFObstacle> create_from_file(MPI_Comm                  comm,
+                                                             const std::string        &path,
+                                                             const enum ExecutionSpace es);
         static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace es);
 
     public:
