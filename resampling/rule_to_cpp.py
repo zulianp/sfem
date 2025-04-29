@@ -1,3 +1,8 @@
+# Originally from:
+# SHUNN, Lee; HAM, Frank. Symmetric quadrature rules for tetrahedra based on a cubic close-packed lattice arrangement. 
+# Journal of Computational and Applied Mathematics, 2012, 236.17: 4348-4364.
+############################################################################################
+
 import re
 
 import numpy as np
