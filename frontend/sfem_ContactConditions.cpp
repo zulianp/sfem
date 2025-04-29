@@ -623,17 +623,6 @@ namespace sfem {
         impl_->space = space;
     }
 
-    std::shared_ptr<Constraint> ContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
-                                                            const bool                            as_zero) const {
-        assert(false);
-        return nullptr;
-    }
-
-    std::shared_ptr<Constraint> ContactConditions::lor() const {
-        assert(false);
-        return nullptr;
-    }
-
     ContactConditions::~ContactConditions() = default;
 
     std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace> &space,
@@ -704,7 +693,7 @@ namespace sfem {
         return create_from_file(space, SFEM_CONTACT);
     }
 
-    int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
+    // int ContactConditions::apply(real_t *const x) { return apply_value(0, x); }
 
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
         impl_->displace_points(x);
@@ -849,10 +838,6 @@ namespace sfem {
         }
 
         return SFEM_SUCCESS;
-    }
-
-    int ContactConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        return update(x) || normal_project(h, out);
     }
 
     int ContactConditions::init() {
@@ -1011,43 +996,6 @@ namespace sfem {
         }
 
         return err;
-    }
-
-    int ContactConditions::apply_value(const real_t value, real_t *const x) {
-        SFEM_TRACE_SCOPE("ContactConditions::apply_value");
-
-        const ptrdiff_t    n   = impl_->node_mapping->size();
-        const idx_t *const idx = impl_->node_mapping->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            x[idx[i]] = value;
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int ContactConditions::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
-        SFEM_TRACE_SCOPE("ContactConditions::copy_constrained_dofs");
-
-        const ptrdiff_t    n   = impl_->node_mapping->size();
-        const idx_t *const idx = impl_->node_mapping->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            dest[idx[i]] = src[idx[i]];
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int ContactConditions::hessian_crs(const real_t *const  x,
-                                       const count_t *const rowptr,
-                                       const idx_t *const   colidx,
-                                       real_t *const        values) {
-        SFEM_TRACE_SCOPE("ContactConditions::hessian_crs");
-
-        // TODO Householder matrix?
-        assert(false);
-        return SFEM_FAILURE;
     }
 
     int ContactConditions::mask(mask_t *mask) {
