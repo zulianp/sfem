@@ -117,6 +117,7 @@ MS := Milestone
    - [ ] Nonlinear obstacle contact loop (Optional)
 
 **MS 2: ()**
+
    - [ ] Drafting/Finalizing P1
    - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
@@ -128,7 +129,7 @@ MS := Milestone
    - [ ] GPU: constraints_mask 
    - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
    - [X] GPU: sshex8_restrict and sshex8_prolongate
-   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [ ] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector
 
 **MS 4: ()**
@@ -136,7 +137,6 @@ MS := Milestone
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
    
-
 **MS (optional):**
 
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
@@ -147,6 +147,7 @@ MS := Milestone
 ### Hardik
 
 **MS 1: ()**
+
    - [x] MatLab implementation of SPGMG in 2D (scalar problem)
    - [ ] Update strategy of Lagrange multiplier
    - [ ] MatLab implementations for Paper 1 (P1)
@@ -156,20 +157,20 @@ MS := Milestone
    - [ ] Finalizing P1
 
 **MS 3:**
-   - [ ] Conceptualizing and Running verification experiments for P2/P3
+
+   - [ ] Conceptualizing verification experiments for P2/P3
    - [ ] Help drafting P2
 
 **MS 4:**
    - [ ] Proof-reading P3
 
-
 ### Gabriele
+
    - [ ] Collects and presents the convergence numbers of the MATLAB-based problems for P1 
    - [ ] Total number of iterations, inner iterations, number of linearizations, total number of smoothing steps, local energy norm, convergence rate (energy?), Penetration norm, difference from reference solution
    - [ ] 2D scalar problems, obstacle problem with source term and obstacle
          1. Create 2D meshes using Trelis scripting (with increasing resolution, max resolution 100K), Square 
          3. Compare with monotone MG
-         
    - [ ] 3D problems
          1. One sphere problem
          2. Multi-sphere problem
@@ -205,8 +206,6 @@ MS := Milestone
    - [x] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
    - [x] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
 
-
-
 - [ ] Post-processor 
    - [ ] Cauchy  stress for HEX8/SSHEX8
    - [ ] Contact stress for HEX8/SSHEX8 (lambda = M^-1 (b - A x))
@@ -224,7 +223,6 @@ If rejected content goes to **P2**
 - [ ] Options:
    1) SPAMG
    2) Comparing matrix-based (different formats) and matrix-free operator in the context of **P2** (Either Conference Proceeding or CCF Transactions on High Performance Computing):
-
 
 ## Maybes
 
