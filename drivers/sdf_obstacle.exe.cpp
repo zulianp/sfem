@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS);
+    auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS, es);
 
     ptrdiff_t ndofs = fs->n_dofs();
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
