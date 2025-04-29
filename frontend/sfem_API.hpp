@@ -152,20 +152,29 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(
+            const int dim,
             const std::shared_ptr<Buffer<T>>      &diag,
             const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
             const ExecutionSpace                   es) {
+
+        auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
+
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
-            auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
             CUDA_BLAS<T>::build_blas(ret->blas);
-            ShiftableBlockSymJacobi_CUDA<T>::build(ret->impl);
-            ret->execution_space_ = es;
+            ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl);
             return ret;
-        }
+        } else 
 #endif  // SFEM_ENABLE_CUDA
+        {
+            OpenMP_BLAS<T>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_OpenMP<T>::build(dim, ret->impl);
+        }
 
-        return sfem::h_shiftable_block_sym_jacobi(diag, constraints_mask, es);
+        ret->execution_space_ = es;
+        ret->constraints_mask = constraints_mask;
+        ret->set_diag(diag);
+        return ret;
     }
 
     template <typename T>

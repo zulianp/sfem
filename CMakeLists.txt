@@ -46,6 +46,7 @@ set(SFEM_MODULES
     operators 
     operators/beam2 
     operators/boundary_conditions
+    operators/contact
     operators/cvfem 
     operators/cvfem_quad4
     operators/cvfem_tet4
@@ -115,6 +116,7 @@ if(SFEM_ENABLE_CUDA)
         algebra/cuda
         frontend/cuda
         operators/boundary_conditions/cuda
+        operators/contact/cuda
         operators/cuda
         operators/hex8/cuda
         operators/hierarchical/cuda
