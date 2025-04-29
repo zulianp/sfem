@@ -298,7 +298,7 @@ int test_poisson_and_boundary_selector() {
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
-    return test_linear_function(f, "test_poisson_and_boundary_selector");
+    return test_linear_function_0(f, "test_poisson_and_boundary_selector");
 }
 
 int test_linear_elasticity() {

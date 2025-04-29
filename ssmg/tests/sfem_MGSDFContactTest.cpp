@@ -205,11 +205,11 @@ int test_contact() {
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     // FIXME make it work!
-    // const char *SFEM_EXECUTION_SPACE{nullptr};
-    // SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
-    // if (SFEM_EXECUTION_SPACE) {
-    //     es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    // }
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+    }
 
     // PLAN:
     // Keep contact conditions on the host, sample gaps and normals on the host and transfer to device
