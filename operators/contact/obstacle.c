@@ -37,3 +37,43 @@ int         obstacle_distribute_contact_forces(const int                        
 
     return SFEM_SUCCESS;
 }
+
+int         obstacle_hessian_block_diag_sym(const int                         dim,
+                                            const ptrdiff_t                   n,
+                                            const idx_t *const SFEM_RESTRICT  idx,
+                                            real_t **const SFEM_RESTRICT      normals,
+                                            const real_t *const SFEM_RESTRICT m,
+                                            const real_t *const               x,
+                                            real_t *const                     values) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        real_t *const v = &values[i * 6];
+
+        int d_idx = 0;
+        for (int d1 = 0; d1 < dim; d1++) {
+            for (int d2 = d1; d2 < dim; d2++) {
+                v[d_idx++] += m[i] * normals[d1][i] * normals[d2][i];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int         obstacle_contact_stress(const int                         dim,
+                                    const ptrdiff_t                   n,
+                                    const idx_t *const SFEM_RESTRICT  idx,
+                                    real_t **const SFEM_RESTRICT      normals,
+                                    const real_t *const SFEM_RESTRICT m,
+                                    const real_t *const               r,
+                                    real_t *const                     s) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        for (int d = 0; d < dim; d++) {
+            const real_t ri = r[idx[i] * dim + d] / m[i];
+            s[idx[i] * dim] += normals[d][i] * ri;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
