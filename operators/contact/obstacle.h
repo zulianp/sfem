@@ -24,6 +24,22 @@ int obstacle_distribute_contact_forces(const int                         dim,
                                        const real_t *const               f,
                                        real_t *const                     out);
 
+int obstacle_hessian_block_diag_sym(const int                         dim,
+                                    const ptrdiff_t                   n,
+                                    const idx_t *const SFEM_RESTRICT  idx,
+                                    real_t **const SFEM_RESTRICT      normals,
+                                    const real_t *const SFEM_RESTRICT m,
+                                    const real_t *const               x,
+                                    real_t *const                     values);
+
+int obstacle_contact_stress(const int                         dim,
+                            const ptrdiff_t                   n,
+                            const idx_t *const SFEM_RESTRICT  idx,
+                            real_t **const SFEM_RESTRICT      normals,
+                            const real_t *const SFEM_RESTRICT m,
+                            const real_t *const               r,
+                            real_t *const                     s);
+
 #ifdef __cplusplus
 }
 #endif

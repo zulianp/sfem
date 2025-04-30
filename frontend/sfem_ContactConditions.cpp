@@ -18,6 +18,7 @@
 #include "sfem_API.hpp"
 
 #include "adj_table.h"
+#include "obstacle.h"
 #include "sfem_hex8_mesh_graph.h"
 #include "sfem_sshex8_skin.h"
 #include "sshex8_mesh.h"
@@ -30,6 +31,11 @@
 #include "sfem_SDFObstacle.hpp"
 
 #include <vector>
+
+#ifdef SFEM_ENABLE_CUDA
+#include "cu_obstacle.h"
+#include "sfem_cuda_blas.hpp"
+#endif
 
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
@@ -280,6 +286,8 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>>        mass_vector;
         bool                                   debug{false};
         bool                                   variational{true};
+        enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
+        std::shared_ptr<BLAS_Tpl<real_t>>      blas_;
 
         ~Impl() {}
 
@@ -326,6 +334,12 @@ namespace sfem {
                 area += m[i];
             }
 
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == execution_space) {
+                mass_vector = sfem::to_device(mass_vector);
+            }
+#endif
+
             printf("AREA: %g\n", (double)area);
             assert(area > 0);
         }
@@ -360,6 +374,8 @@ namespace sfem {
 
         cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
         cc->impl_->assemble_mass_vector();
+        cc->impl_->blas_           = sfem::blas<real_t>(es);
+        cc->impl_->execution_space = es;
         return cc;
     }
 
@@ -447,14 +463,17 @@ namespace sfem {
         const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
         const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
-        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
-        auto normals = impl_->normals->data();
+        const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        auto      normals = impl_->normals->data();
 
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            for (int d = 0; d < dim; d++) {
-                out[i] += h[idx[i] * dim + d] * normals[d][i];
-            }
+        int err;
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            err = cu_obstacle_normal_project(dim, n, idx, normals, h, out);
+        } else
+#endif
+        {
+            err = obstacle_normal_project(dim, n, idx, normals, h, out);
         }
 
         if (impl_->debug) {
@@ -463,7 +482,7 @@ namespace sfem {
             }
         }
 
-        return SFEM_SUCCESS;
+        return err;
     }
 
     int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
@@ -473,14 +492,16 @@ namespace sfem {
 
         const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
         auto      normals = impl_->normals->data();
+        auto      m       = impl_->mass_vector->data();
 
-        auto m = impl_->mass_vector->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            const real_t fi = f[i] * m[i];
-            for (int d = 0; d < dim; d++) {
-                out[idx[i] * dim + d] += normals[d][i] * fi;
-            }
+        int err;
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
+        } else
+#endif
+        {
+            err = obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
         }
 
         if (impl_->debug) {
@@ -489,26 +510,22 @@ namespace sfem {
             }
         }
 
-        return SFEM_SUCCESS;
+        return err;
     }
 
     int ContactConditions::full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s) {
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-        auto               m   = impl_->mass_vector->data();
-        const int          dim = impl_->space->mesh_ptr()->spatial_dimension();
+        const ptrdiff_t    n       = impl_->contact_surface->node_mapping()->size();
+        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
+        auto               m       = impl_->mass_vector->data();
+        const int          dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        auto               normals = impl_->normals->data();
 
-        auto normals = impl_->normals->data();
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            for (int d = 0; d < dim; d++) {
-                const real_t ri = r[idx[i] * dim + d] / m[i];
-                s[idx[i] * dim] += normals[d][i] * ri;
-            }
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s);
         }
-
-        return SFEM_SUCCESS;
+#endif
+        return obstacle_contact_stress(dim, n, idx, normals, m, r, s);
     }
 
     int ContactConditions::init() {
@@ -526,6 +543,12 @@ namespace sfem {
                                        cs->points()->data(),
                                        impl_->normals->data());
         }
+
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            impl_->normals = sfem::to_device(impl_->normals);
+        }
+#endif
 
         return err;
     }
@@ -556,23 +579,34 @@ namespace sfem {
     int ContactConditions::signed_distance(real_t *const g) {
         SFEM_TRACE_SCOPE("ContactConditions::signed_distance");
 
-        auto cs = impl_->contact_surface;
+        auto cs  = impl_->contact_surface;
+        int  err = 0;
 
-        int err = 0;
-        for (auto &obs : impl_->obstacles) {
-            // FIXME always sample gap and normals together
-            err += obs->sample_value(cs->element_type(),
-                                     cs->elements()->extent(1),
-                                     cs->node_mapping()->size(),
-                                     cs->elements()->data(),
-                                     cs->points()->data(),
-                                     g);
+#ifdef SFEM_ENABLE_CUDA
+        if (is_ptr_device(g)) {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+        } else
+#endif
+        {
+            for (auto &obs : impl_->obstacles) {
+                // FIXME always sample gap and normals together
+                err += obs->sample_value(cs->element_type(),
+                                         cs->elements()->extent(1),
+                                         cs->node_mapping()->size(),
+                                         cs->elements()->data(),
+                                         cs->points()->data(),
+                                         g);
+            }
         }
 
         return err;
     }
 
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
+        if (is_ptr_device(disp)) {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+        }
+
         impl_->contact_surface->displace_points(disp);
         return signed_distance(g);
     }
@@ -598,19 +632,13 @@ namespace sfem {
         auto      normals = impl_->normals->data();
 
         auto m = impl_->mass_vector->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            real_t *const v = &values[i * 6];
 
-            int d_idx = 0;
-            for (int d1 = 0; d1 < dim; d1++) {
-                for (int d2 = d1; d2 < dim; d2++) {
-                    v[d_idx++] += m[i] * normals[d1][i] * normals[d2][i];
-                }
-            }
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
         }
-
-        return SFEM_SUCCESS;
+#endif
+        return obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
     }
 
 }  // namespace sfem
