@@ -399,7 +399,7 @@ int main(int argc, char* argv[]) {
     // printf("========================================\n\n");
     PRINT_CURRENT_FUNCTION;
 
-    return test_field_mpi_domain(argc, argv);
+    // return test_field_mpi_domain(argc, argv);
 
     sfem_resample_field_info info;
 
