@@ -59,7 +59,7 @@ namespace sfem {
     Grid<T>::~Grid() = default;
 
     template <class T>
-    std::unique_ptr<Grid<T>> Grid<T>::create_from_file(MPI_Comm comm, const std::string &path) {
+    std::shared_ptr<Grid<T>> Grid<T>::create_from_file(MPI_Comm comm, const std::string &path) {
         auto ret = std::make_unique<Grid<T>>(comm);
         auto in  = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
@@ -107,6 +107,19 @@ namespace sfem {
 
         ptrdiff_t size    = ret->impl_->stride[2] * ret->impl_->nlocal[2];
         ret->impl_->field = Buffer<T>::own(size, data, free, MEMORY_SPACE_HOST);
+
+
+        geom_t SFEM_GRID_SHIFT = 0;
+        geom_t SFEM_GRID_SCALE = 1;
+
+
+        SFEM_READ_ENV(SFEM_GRID_SHIFT, atof);
+        SFEM_READ_ENV(SFEM_GRID_SCALE, atof);
+
+#pragma omp parallel for
+        for(ptrdiff_t i = 0; i < size; i++) {
+            data[i] = SFEM_GRID_SCALE * (data[i] + SFEM_GRID_SHIFT);
+        }
         return ret;
     }
 
@@ -206,7 +219,7 @@ namespace sfem {
     }
 
     template <class T>
-    std::unique_ptr<Grid<T>> Grid<T>::create(MPI_Comm     comm,
+    std::shared_ptr<Grid<T>> Grid<T>::create(MPI_Comm     comm,
                                              const int    nx,
                                              const int    ny,
                                              const int    nz,
