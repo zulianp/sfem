@@ -144,10 +144,10 @@ int main(int argc, char *argv[]) {
 
         ///////////////////////////////////////////////////////////////////////////////
 
-        auto parent          = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent_buff);
-        auto side_idx        = sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx_buff);
-        auto table           = sfem::manage_host_buffer<element_idx_t>(n_surf_elements * nsxe, table_buff);
-        auto element_mapping = sfem::create_host_buffer<element_idx_t>(n_elements);
+        auto parent              = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent_buff);
+        auto side_idx            = sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx_buff);
+        auto table               = sfem::manage_host_buffer<element_idx_t>(n_surf_elements * nsxe, table_buff);
+        auto element_mapping_ptr = sfem::create_host_buffer<element_idx_t>(n_elements + 1);
 
         auto local_side_table = sfem::create_host_buffer<int>(nsxe * nnxs);
         fill_local_side_table(element_type_hack, local_side_table->data());
@@ -164,11 +164,7 @@ int main(int argc, char *argv[]) {
         int16_t       closest_side    = -1;
         real_t        closest_sq_dist = 1000000;
 
-        auto emap = element_mapping->data();
-
-        for (ptrdiff_t i = 0; i < n_elements; i++) {
-            emap[i] = SFEM_ELEMENT_IDX_INVALID;
-        }
+        auto emap_ptr = element_mapping_ptr->data();
 
 #pragma omp parallel for
         for (ptrdiff_t e = 0; e < n_surf_elements; ++e) {
@@ -176,7 +172,8 @@ int main(int argc, char *argv[]) {
             element_idx_t sp              = surf_parents[e];
             int16_t       s               = surf_idx[e];
 
-            emap[sp] = e;
+#pragma omp atomic update
+            emap_ptr[sp + 1]++;
 
             for (int n = 0; n < nnxs; n++) {
                 idx_t node = elements[lst[s * nnxs + n]][e];
@@ -199,6 +196,24 @@ int main(int argc, char *argv[]) {
                     closest_element = e;
                     closest_side    = s;
                 }
+            }
+        }
+
+        for (ptrdiff_t i = 0; i < n_elements; i++) {
+            emap_ptr[i + 1] += emap_ptr[i];
+        }
+
+        ptrdiff_t nmaps               = emap_ptr[n_elements];
+        auto      element_mapping_idx = sfem::create_host_buffer<int16_t>(nmaps);
+
+        auto emap_idx = element_mapping_idx->data();
+
+        {
+            auto book_keeping = sfem::create_host_buffer<element_idx_t>(n_elements);
+            auto bk           = book_keeping->data();
+            for (ptrdiff_t e = 0; e < n_surf_elements; ++e) {
+                element_idx_t sp                  = surf_parents[e];
+                emap_idx[emap_ptr[sp] + bk[sp]++] = e;
             }
         }
 
@@ -253,31 +268,36 @@ int main(int argc, char *argv[]) {
                 real_t current_thres = angle_threshold;
                 for (int neigh = 0; neigh < nsxe; neigh++) {
                     const element_idx_t neigh_sp = adj[sp * nsxe + neigh];
-                    const element_idx_t neigh_e  = emap[neigh_sp];
-                    if (neigh_e == SFEM_ELEMENT_IDX_INVALID || eselect[neigh_e]) continue;
+                    if (neigh_sp == SFEM_ELEMENT_IDX_INVALID) continue;
 
-                    int16_t neigh_s = surf_idx[neigh_e];
+                    for (int k = emap_ptr[neigh_sp]; k < emap_ptr[neigh_sp + 1]; k++) {
+                        const element_idx_t neigh_e = emap_idx[k];
 
-                    real_t cos_angle;
-                    {
-                        const idx_t idx0 = elements[lst[neigh_s * nnxs + 0]][neigh_sp];
-                        const idx_t idx1 = elements[lst[neigh_s * nnxs + 1]][neigh_sp];
+                        if (neigh_e == SFEM_ELEMENT_IDX_INVALID || eselect[neigh_e]) continue;
 
-                        real_t p0a[2];
-                        real_t p1a[2];
-                        real_t na[2];
+                        int16_t neigh_s = surf_idx[neigh_e];
 
-                        for (int d = 0; d < 2; ++d) {
-                            p0a[d] = points[d][idx0];
-                            p1a[d] = points[d][idx1];
+                        real_t cos_angle;
+                        {
+                            const idx_t idx0 = elements[lst[neigh_s * nnxs + 0]][neigh_sp];
+                            const idx_t idx1 = elements[lst[neigh_s * nnxs + 1]][neigh_sp];
+
+                            real_t p0a[2];
+                            real_t p1a[2];
+                            real_t na[2];
+
+                            for (int d = 0; d < 2; ++d) {
+                                p0a[d] = points[d][idx0];
+                                p1a[d] = points[d][idx1];
+                            }
+
+                            normal2(p0a, p1a, na);
+                            cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]));
                         }
 
-                        normal2(p0a, p1a, na);
-                        cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]));
-                    }
-
-                    if (cos_angle > angle_threshold) {
-                        equeue[next_slot++ % size_queue] = neigh_e;
+                        if (cos_angle > angle_threshold) {
+                            equeue[next_slot++ % size_queue] = neigh_e;
+                        }
                     }
                 }
 
@@ -313,32 +333,35 @@ int main(int argc, char *argv[]) {
                 for (int neigh = 0; neigh < nsxe; neigh++) {
                     const element_idx_t neigh_sp = adj[sp * nsxe + neigh];
                     if (neigh_sp == SFEM_ELEMENT_IDX_INVALID) continue;
-                    const element_idx_t neigh_e = emap[neigh_sp];
-                    if (neigh_e == SFEM_ELEMENT_IDX_INVALID || eselect[neigh_e]) continue;
 
-                    int16_t neigh_s = surf_idx[neigh_e];
+                    for (int k = emap_ptr[neigh_sp]; k < emap_ptr[neigh_sp + 1]; k++) {
+                        const element_idx_t neigh_e = emap_idx[k];
+                        if (neigh_e == SFEM_ELEMENT_IDX_INVALID || eselect[neigh_e]) continue;
 
-                    real_t cos_angle;
-                    {
-                        const idx_t idx0 = elements[lst[neigh_s * nnxs + 0]][neigh_sp];
-                        const idx_t idx1 = elements[lst[neigh_s * nnxs + 1]][neigh_sp];
-                        const idx_t idx2 = elements[lst[neigh_s * nnxs + 2]][neigh_sp];
+                        int16_t neigh_s = surf_idx[neigh_e];
 
-                        real_t ua[3];
-                        real_t va[3];
-                        real_t na[3];
+                        real_t cos_angle;
+                        {
+                            const idx_t idx0 = elements[lst[neigh_s * nnxs + 0]][neigh_sp];
+                            const idx_t idx1 = elements[lst[neigh_s * nnxs + 1]][neigh_sp];
+                            const idx_t idx2 = elements[lst[neigh_s * nnxs + 2]][neigh_sp];
 
-                        for (int d = 0; d < 3; ++d) {
-                            ua[d] = points[d][idx1] - points[d][idx0];
-                            va[d] = points[d][idx2] - points[d][idx0];
+                            real_t ua[3];
+                            real_t va[3];
+                            real_t na[3];
+
+                            for (int d = 0; d < 3; ++d) {
+                                ua[d] = points[d][idx1] - points[d][idx0];
+                                va[d] = points[d][idx2] - points[d][idx0];
+                            }
+
+                            normal(ua, va, na);
+                            cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
                         }
 
-                        normal(ua, va, na);
-                        cos_angle = fabs((n[0] * na[0]) + (n[1] * na[1]) + (n[2] * na[2]));
-                    }
-
-                    if (cos_angle > angle_threshold) {
-                        equeue[next_slot++ % size_queue] = neigh_e;
+                        if (cos_angle > angle_threshold) {
+                            equeue[next_slot++ % size_queue] = neigh_e;
+                        }
                     }
                 }
 
