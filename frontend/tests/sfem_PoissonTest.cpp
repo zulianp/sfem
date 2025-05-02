@@ -248,11 +248,13 @@ int test_poisson_and_boundary_selector() {
     int SFEM_ELEMENT_REFINE_LEVEL = 1;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int block_size = 1;
+    int SFEM_BLOCK_SIZE = 1;
     if (strcmp(SFEM_OPERATOR, "VectorLaplacian") == 0) {
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
-        block_size = 3;
+        SFEM_BLOCK_SIZE = 3;
     }
+
+    // SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
     int SFEM_BASE_RESOLUTION = 6;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
@@ -261,7 +263,7 @@ int test_poisson_and_boundary_selector() {
 
     auto m = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
 
@@ -282,7 +284,7 @@ int test_poisson_and_boundary_selector() {
     sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
     sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
 
-    if (block_size == 1) {
+    if (SFEM_BLOCK_SIZE == 1) {
         auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
         f->add_constraint(conds);
     } else {
