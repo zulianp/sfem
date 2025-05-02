@@ -14,23 +14,24 @@
 #include "ssquad4.h"
 
 // C++ includes
-#include "sfem_CRSGraph.hpp"
-#include "sfem_Chebyshev3.hpp"
-#include "sfem_ContactConditions.hpp"
-#include "sfem_CooSym.hpp"
-#include "sfem_Function.hpp"
-#include "sfem_Multigrid.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-#include "sfem_ShiftableJacobi.hpp"
-#include "sfem_Stationary.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_ContactConditions.hpp"
+#include "sfem_Context.hpp"
+#include "sfem_CooSym.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
+#include "sfem_CRSGraph.hpp"
+#include "sfem_Function.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
+#include "sfem_Multigrid.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA

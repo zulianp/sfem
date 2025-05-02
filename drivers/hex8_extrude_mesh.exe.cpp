@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
             hex8_points->data());
 
     sfem::create_directory(output_folder);
-
+    
     std::string path_output_format = output_folder;
     path_output_format += "/i%d.raw";
     hex8_elements->to_files(path_output_format.c_str());
