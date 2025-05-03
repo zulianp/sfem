@@ -7,8 +7,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_ssquad4_interpolate.h"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
 namespace sfem {
@@ -94,6 +94,7 @@ namespace sfem {
         bool        collect_energy_norm_correction     = true;
         int         max_it                             = 50;
         real_t      atol                               = (sizeof(real_t) == sizeof(double)) ? 1e-11 : 5e-7;
+        real_t      relaxation_parameter               = 1. / f->space()->block_size();
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -186,7 +187,7 @@ namespace sfem {
             fi->hessian_block_diag_sym(nullptr, diag->data());
 
             auto sj                  = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
-            sj->relaxation_parameter = 1. / fsi->block_size();
+            sj->relaxation_parameter = relaxation_parameter;
             auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
 
             if (i == 0) {
@@ -361,7 +362,7 @@ namespace sfem {
         if (EXECUTION_SPACE_DEVICE == es) {
             // keep host fine_sbv available
             mg->add_level_constraint_op_x_op(sfem::to_device(fine_sbv));
-        } else 
+        } else
 #endif
         {
             mg->add_level_constraint_op_x_op(fine_sbv);
