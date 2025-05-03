@@ -204,7 +204,9 @@ int main(int argc, char *argv[]) {
         }
 
         ptrdiff_t nmaps               = emap_ptr[n_elements];
-        auto      element_mapping_idx = sfem::create_host_buffer<int16_t>(nmaps);
+        auto      element_mapping_idx = sfem::create_host_buffer<ptrdiff_t>(nmaps);
+
+        assert(nmaps < table->size());
 
         auto emap_idx = element_mapping_idx->data();
 
@@ -217,12 +219,18 @@ int main(int argc, char *argv[]) {
             }
         }
 
+#ifndef NDEBUG
+        for(ptrdiff_t i = 0; i < nmaps; i++) {
+            assert(emap_idx[i] < table->size());
+        }
+#endif
+
         if (closest_element == SFEM_IDX_INVALID) {
             SFEM_ERROR("Invalid set up! for mesh #nelements %ld #nodes %ld\n", n_elements, n_nodes);
         }
 
         auto adj      = table->data();
-        auto selected = sfem::create_host_buffer<uint8_t>(n_elements);
+        auto selected = sfem::create_host_buffer<uint8_t>(table->size());
         auto eselect  = selected->data();
 
         ptrdiff_t size_queue    = (n_elements + 1);
@@ -336,6 +344,7 @@ int main(int argc, char *argv[]) {
 
                     for (int k = emap_ptr[neigh_sp]; k < emap_ptr[neigh_sp + 1]; k++) {
                         const element_idx_t neigh_e = emap_idx[k];
+                        assert(neigh_e < selected->size());
                         if (neigh_e == SFEM_ELEMENT_IDX_INVALID || eselect[neigh_e]) continue;
 
                         int16_t neigh_s = surf_idx[neigh_e];
