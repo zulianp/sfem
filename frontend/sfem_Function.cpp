@@ -2056,9 +2056,8 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
-            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_bsr");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_bsr", ssm.level());
 
             return affine_sshex8_elasticity_bsr(ssm.level(),
                                                 ssm.n_elements(),
@@ -2073,9 +2072,9 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
-            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_diag");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_diag", ssm.level());
+
             return affine_sshex8_linear_elasticity_diag(ssm.level(),
                                                         ssm.n_elements(),
                                                         ssm.interior_start(),
@@ -2090,9 +2089,9 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
-            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::hessian_block_diag_sym");
-
             auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_block_diag_sym", ssm.level());
+
             return affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
                                                                   ssm.n_elements(),
                                                                   ssm.interior_start(),
@@ -2112,11 +2111,10 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
-            SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::apply");
+            auto &ssm = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::apply", ssm.level());
 
             assert(element_type == SSHEX8);  // REMOVEME once generalized approach
-
-            auto &ssm = space->semi_structured_mesh();
 
             calls++;
 
