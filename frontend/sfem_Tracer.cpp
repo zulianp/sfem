@@ -75,10 +75,7 @@ namespace sfem {
         int  err = snprintf(str, 1024, format, num);
         if (err < 0) SFEM_ERROR("UNABLE TO TRACE %s\n", format);
 
-        // memcpy(name, name, strlen(name)+1);
-
         name = str;
-
 
 #ifdef SFEM_ENABLE_BLOCK_KERNELS
         sfem::device_synchronize();

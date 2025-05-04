@@ -30,10 +30,13 @@ namespace sfem {
         std::shared_ptr<Buffer<element_idx_t>> parent();
         std::shared_ptr<Buffer<int16_t>>       lfi();
         static std::shared_ptr<Sideset>        create_from_file(MPI_Comm comm, const char *path);
+        ptrdiff_t size() const;
 
         Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
         Sideset();
         ~Sideset();
+
+        static std::shared_ptr<Sideset> create(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
 
         static std::shared_ptr<Sideset> create_from_selector(
                 const std::shared_ptr<Mesh>                                         &mesh,

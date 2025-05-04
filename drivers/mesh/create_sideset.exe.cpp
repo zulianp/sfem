@@ -142,8 +142,6 @@ int main(int argc, char *argv[]) {
             SFEM_ERROR("Failed to extract extract_sideset_from_adj_table!\n");
         }
 
-        ///////////////////////////////////////////////////////////////////////////////
-
         auto parent              = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent_buff);
         auto side_idx            = sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx_buff);
         auto table               = sfem::manage_host_buffer<element_idx_t>(n_surf_elements * nsxe, table_buff);
