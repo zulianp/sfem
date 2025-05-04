@@ -58,10 +58,10 @@
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -104,6 +104,16 @@ namespace sfem {
 
     Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
     Sideset::~Sideset() = default;
+
+    ptrdiff_t Sideset::size() const{
+        return impl_->parent->size();
+    }
+
+    std::shared_ptr<Sideset> Sideset::create(MPI_Comm                                      comm,
+                                             const std::shared_ptr<Buffer<element_idx_t>> &parent,
+                                             const std::shared_ptr<Buffer<int16_t>>       &lfi) {
+        return std::make_shared<Sideset>(comm, parent, lfi);
+    }
 
     std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path) {
         auto ret = std::make_shared<Sideset>();

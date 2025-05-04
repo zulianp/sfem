@@ -128,7 +128,7 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
     contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
     out->write("contact_stress", x->data());
 
-    return SFEM_TEST_SUCCESS;
+    return SFEM_SUCCESS;
 }
 
 int main(int argc, char *argv[]) {
