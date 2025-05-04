@@ -195,7 +195,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
     geom_t radius[3] = {0, 0, 0};
 
     for (int d = 0; d < dim; d++) {
-// #pragma omp parallel for
+#pragma omp parallel for
         for (ptrdiff_t s = 0; s < nsides; s++) {
             bmin[d][s] = pos_infty;
             bmax[d][s] = neg_infty;
@@ -203,7 +203,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
 
         const geom_t *const x = points[d];
 
-// #pragma omp parallel for
+#pragma omp parallel for
         for (ptrdiff_t i = 0; i < nsides; i++) {
             const element_idx_t e    = parent[i];
             const int16_t       side = lfi[i];
@@ -274,6 +274,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
     auto cell_ptr = sfem::create_host_buffer<ptrdiff_t>(ncells + 1);
     auto cp       = cell_ptr->data();
 
+    // #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nsides; i++) {
         geom_t point[3];
         for (int d = 0; d < dim; d++) {
@@ -281,6 +282,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
         }
 
         const ptrdiff_t idx = cell_list_idx(dim, stride, o, delta, point);
+        // #pragma atomic update
         cp[idx + 1]++;
     }
 
@@ -294,14 +296,21 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
     auto bookeepping = sfem::create_host_buffer<ptrdiff_t>(ncells);
     auto bk          = bookeepping->data();
 
+#pragma omp parallel for
     for (ptrdiff_t i = 0; i < nsides; i++) {
         geom_t point[3];
         for (int d = 0; d < dim; d++) {
             point[d] = bmin[d][i];
         }
 
-        const ptrdiff_t idx     = cell_list_idx(dim, stride, o, delta, point);
-        ci[cp[idx] + bk[idx]++] = i;
+        const ptrdiff_t idx = cell_list_idx(dim, stride, o, delta, point);
+
+        {
+            ptrdiff_t offset;
+#pragma atomic update
+            offset = bk[idx]++;
+            ci[cp[idx] + offset] = i;
+        }
     }
 
     return CellList::create(dim, n, stride, o, delta, max_radius, cell_ptr, cell_idx);
@@ -345,11 +354,12 @@ int self_contact(sfem::Context &context, int argc, char *argv[]) {
 
     //             // Check every neighboring cell including this one
     //             // (Discard using normal orientation, Discard connected elements using dual graph)
-    //             // 
+    //             //
     //         }
     //     }
     // }
 
+    printf("#nelements %ld #nnodes %ld #nsides %ld\n", m->n_elements(), m->n_nodes(), surface->sideset->parent()->size());
     return SFEM_SUCCESS;
 }
 
