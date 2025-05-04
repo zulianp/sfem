@@ -35,12 +35,14 @@
 
 using namespace sfem;
 
-class SelfContact {
+class SelfContactSurface {
 public:
     std::shared_ptr<sfem::Buffer<element_idx_t>> table;
     std::shared_ptr<sfem::Sideset>               sideset;
 
-    static std::shared_ptr<SelfContact> create(const std::shared_ptr<sfem::Mesh> &mesh) {
+    static std::shared_ptr<SelfContactSurface> create(const std::shared_ptr<sfem::Mesh> &mesh) {
+        SFEM_TRACE_SCOPE("SelfContactSurface::create");
+
         enum ElemType element_type_hack = mesh->element_type();
         switch (element_type_hack) {
             case TRI6: {
@@ -83,7 +85,7 @@ public:
             SFEM_ERROR("Failed to extract extract_sideset_from_adj_table!\n");
         }
 
-        auto ret     = std::make_shared<SelfContact>();
+        auto ret     = std::make_shared<SelfContactSurface>();
         ret->sideset = sfem::Sideset::create(mesh->comm(),
                                              sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent_buff),
                                              sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx_buff));
@@ -158,6 +160,8 @@ static SFEM_INLINE ptrdiff_t cell_list_idx(const int                            
 std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sfem::Mesh>    &mesh,
                                                         const std::shared_ptr<sfem::Sideset> &sideset,
                                                         const geom_t                          radius_factor = 1) {
+    SFEM_TRACE_SCOPE("create_cell_list_from_sideset");
+
     const ptrdiff_t nnodes = mesh->n_nodes();
 
     const ptrdiff_t nelements = mesh->n_elements();
@@ -191,7 +195,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
     geom_t radius[3] = {0, 0, 0};
 
     for (int d = 0; d < dim; d++) {
-#pragma omp parallel for
+// #pragma omp parallel for
         for (ptrdiff_t s = 0; s < nsides; s++) {
             bmin[d][s] = pos_infty;
             bmax[d][s] = neg_infty;
@@ -199,7 +203,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
 
         const geom_t *const x = points[d];
 
-#pragma omp parallel for
+// #pragma omp parallel for
         for (ptrdiff_t i = 0; i < nsides; i++) {
             const element_idx_t e    = parent[i];
             const int16_t       side = lfi[i];
@@ -306,7 +310,7 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
 int self_contact(sfem::Context &context, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("self_contact");
 
-    MPI_Comm comm = context.comm();
+    auto comm = context.comm();
 
     if (argc != 3) {
         fprintf(stderr, "usage: %s <mesh> <output>\n", argv[0]);
@@ -321,8 +325,30 @@ int self_contact(sfem::Context &context, int argc, char *argv[]) {
     const int dim = m->spatial_dimension();
     const int nxe = elem_num_nodes(m->element_type());
 
-    auto self_contact = SelfContact::create(m);
-    auto cell_list    = create_cell_list_from_sideset(m, self_contact->sideset);
+    auto surface   = SelfContactSurface::create(m);
+    auto cell_list = create_cell_list_from_sideset(m, surface->sideset);
+
+    // const ptrdiff_t ncells   = cell_list->cell_ptr->size() - 1;
+    // auto            cell_ptr = cell_list->cell_ptr->data();
+    // auto            cell_idx = cell_list->cell_idx->data();
+
+    // {
+    //     auto parent = surface->sideset->parent()->data();
+    //     auto lfi    = surface->sideset->lfi()->data();
+    //     for (ptrdiff_t c = 0; c < ncells; c++) {
+
+    //         // For every cell
+    //         for (ptrdiff_t k = cell_ptr[c]; k < cell_ptr[c+1]; k++) {
+    //             const ptrdiff_t     idx = cell_idx[k];
+    //             const element_idx_t sp  = parent[idx];
+    //             const element_idx_t s   = lfi[idx];
+
+    //             // Check every neighboring cell including this one
+    //             // (Discard using normal orientation, Discard connected elements using dual graph)
+    //             // 
+    //         }
+    //     }
+    // }
 
     return SFEM_SUCCESS;
 }
