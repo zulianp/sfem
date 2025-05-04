@@ -141,15 +141,16 @@ void create_element_adj_table_from_dual_graph(const ptrdiff_t                   
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type_for_algo, local_side_table);
 
-    idx_t nodes1[SFEM_MAX_NUM_NODES_PER_SIDE];
-    idx_t nodes2[SFEM_MAX_NUM_NODES_PER_SIDE];
-    int   assigned[SFEM_MAX_NUM_SIDES];
-
     enum ElemType st = side_type(element_type_for_algo);
     const int     nn = elem_num_nodes(st);
     const int     ns = elem_num_sides(element_type_for_algo);
 
+#pragma omp parallel for
     for (ptrdiff_t e = 0; e < n_elements; e++) {
+        idx_t nodes1[SFEM_MAX_NUM_NODES_PER_SIDE];
+        idx_t nodes2[SFEM_MAX_NUM_NODES_PER_SIDE];
+        int   assigned[SFEM_MAX_NUM_SIDES];
+
         const count_t begin = adj_ptr[e];
         const count_t end   = adj_ptr[e + 1];
         const count_t range = end - begin;
@@ -364,6 +365,8 @@ int extract_sideset_from_adj_table(const enum ElemType                      elem
                                    ptrdiff_t *SFEM_RESTRICT                 n_surf_elements,
                                    element_idx_t **SFEM_RESTRICT            parent_element,
                                    int16_t **SFEM_RESTRICT                  side_idx) {
+    double tick = MPI_Wtime();
+
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type, local_side_table);
     enum ElemType st = side_type(element_type);
@@ -394,6 +397,9 @@ int extract_sideset_from_adj_table(const enum ElemType                      elem
             }
         }
     }
+
+    double tock = MPI_Wtime();
+    printf("adj_table.c: extract_sideset_from_adj_table\t%g seconds\n", tock - tick);
 
     return SFEM_SUCCESS;
 }
