@@ -9,7 +9,7 @@ __global__ void obstacle_normal_project_kernel(const int                        
                                                real_t **const SFEM_RESTRICT      normals,
                                                const real_t *const SFEM_RESTRICT h,
                                                real_t *const SFEM_RESTRICT       out) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockIdx.x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         const ptrdiff_t     ii  = idx[i] * dim;
         const real_t *const hii = &h[ii];
         for (int d = 0; d < dim; d++) {
@@ -25,7 +25,7 @@ __global__ void obstacle_distribute_contact_forces_kernel(const int             
                                                           const real_t *const SFEM_RESTRICT m,
                                                           const real_t *const               f,
                                                           real_t *const                     out) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockIdx.x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         const ptrdiff_t ii  = idx[i] * dim;
         real_t *const   oii = &out[ii];
         const real_t    fi  = f[i] * m[i];
@@ -75,7 +75,7 @@ __global__ void obstacle_hessian_block_diag_sym_kernel(const int                
                                                        const real_t *const SFEM_RESTRICT m,
                                                        const real_t *const               x,
                                                        real_t *const                     values) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockIdx.x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         real_t *const v = &values[i * 6];
 
         int d_idx = 0;
@@ -111,7 +111,7 @@ __global__ void obstacle_contact_stress_kernel(const int                        
                                                const real_t *const SFEM_RESTRICT m,
                                                const real_t *const               r,
                                                real_t *const                     s) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockIdx.x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         for (int d = 0; d < dim; d++) {
             const real_t ri = r[idx[i] * dim + d] / m[i];
             s[idx[i] * dim] += normals[d][i] * ri;

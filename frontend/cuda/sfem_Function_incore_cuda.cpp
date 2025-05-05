@@ -10,11 +10,11 @@
 #include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
+#include "cu_mask.h"
 #include "cu_sshex8_laplacian.h"
 #include "cu_sshex8_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
-#include "cu_mask.h"
 
 // C++ includes
 #include "sfem_SemiStructuredMesh.hpp"
@@ -48,8 +48,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Sideset> to_device(const std::shared_ptr<Sideset> &sideset) {
-        // FIXME
-        return nullptr;
+        return std::make_shared<Sideset>(sideset->comm(), to_device(sideset->parent()), to_device(sideset->lfi()));
     }
 
     class FFF {
