@@ -37,6 +37,8 @@
 #include "sfem_cuda_blas.hpp"
 #endif
 
+static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
+
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
     public:
@@ -364,12 +366,12 @@ namespace sfem {
                                                                  const std::shared_ptr<Sideset>       &sideset,
                                                                  const enum ExecutionSpace             es) {
         auto cc = std::make_unique<ContactConditions>(space);
-        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es));
+        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es_to_be_ported));
 
         if (space->has_semi_structured_mesh()) {
-            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es);
+            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es_to_be_ported);
         } else {
-            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es);
+            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es_to_be_ported);
         }
 
         cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
@@ -532,6 +534,13 @@ namespace sfem {
         SFEM_TRACE_SCOPE("ContactConditions::init");
 
         auto cs = impl_->contact_surface;
+
+        // FIXME
+#ifdef SFEM_ENABLE_CUDA
+        if (MEMORY_SPACE_DEVICE == impl_->normals->mem_space()) {
+            impl_->normals = sfem::to_host(impl_->normals);
+        }
+#endif
 
         int err = 0;
         for (auto &obs : impl_->obstacles) {

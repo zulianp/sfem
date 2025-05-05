@@ -14,6 +14,7 @@
 #include "cu_sshex8_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
+#include "cu_mask.h"
 
 // C++ includes
 #include "sfem_SemiStructuredMesh.hpp"
@@ -196,8 +197,17 @@ namespace sfem {
         }
 
         int mask(mask_t *mask) override {
-            assert(false);
-            return SFEM_FAILURE;
+            SFEM_TRACE_SCOPE("GPUDirichletConditions::mask");
+
+            const int block_size = space->block_size();
+
+            int err = SFEM_SUCCESS;
+            for (auto &c : conditions) {
+                auto nodeset = c.nodeset->data();
+                err += cu_mask_nodes(c.nodeset->size(), nodeset, block_size, c.component, mask);
+            }
+
+            return err;
         }
 
         ~GPUDirichletConditions() {}

@@ -12,10 +12,10 @@ static SFEM_INLINE void normalize(real_t* const vec3) {
 static SFEM_INLINE void normal(const idx_t                  i0,
                                const idx_t                  i1,
                                const idx_t                  i2,
-                               geom_t** const SFEM_RESTRICT xyz,
+                               geom_t** const SFEM_RESTRICT points,
                                real_t* const SFEM_RESTRICT  n) {
-    real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
-    real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
+    real_t u[3] = {points[0][i1] - points[0][i0], points[1][i1] - points[1][i0], points[2][i1] - points[2][i0]};
+    real_t v[3] = {points[0][i2] - points[0][i0], points[1][i2] - points[1][i0], points[2][i2] - points[2][i0]};
 
     normalize(u);
     normalize(v);
@@ -30,11 +30,11 @@ static SFEM_INLINE void normal(const idx_t                  i0,
 void extrude(const ptrdiff_t              nsides,
              const ptrdiff_t              nnodes,
              idx_t** const SFEM_RESTRICT  sides,
-             geom_t** const SFEM_RESTRICT xyz,
+             geom_t** const SFEM_RESTRICT points,
              const ptrdiff_t              nlayers,
              const geom_t                 height,
              idx_t** const SFEM_RESTRICT  extruded_elements,
-             geom_t** const SFEM_RESTRICT extruded_xyz) {
+             geom_t** const SFEM_RESTRICT extruded_points) {
     double tick = MPI_Wtime();
 
     geom_t** pseudo_normals = (geom_t**)malloc(3 * sizeof(geom_t*));
@@ -48,7 +48,7 @@ void extrude(const ptrdiff_t              nsides,
         const idx_t i2 = sides[2][i];
 
         real_t n[3];
-        normal(i0, i1, i2, xyz, n);
+        normal(i0, i1, i2, points, n);
 
         for (int d = 0; d < 3; d++) {
             pseudo_normals[d][i0] += n[d];
@@ -89,7 +89,7 @@ void extrude(const ptrdiff_t              nsides,
     for (ptrdiff_t l = 0; l <= nlayers; l++) {
         for (ptrdiff_t i = 0; i < nnodes; ++i) {
             for (int dd = 0; dd < 3; dd++) {
-                extruded_xyz[dd][l * nnodes + i] = xyz[dd][i] + (l * dh * pseudo_normals[dd][i]);
+                extruded_points[dd][l * nnodes + i] = points[dd][i] + (l * dh * pseudo_normals[dd][i]);
             }
         }
     }
