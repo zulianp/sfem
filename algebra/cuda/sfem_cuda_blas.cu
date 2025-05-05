@@ -521,4 +521,70 @@ namespace sfem {
 #endif
     }
 
+    template <typename T>
+    __global__ void sbv_mult3_kernel(const ptrdiff_t    n_blocks,
+                                     const idx_t *const idx,
+                                     const T *const     dd,
+                                     const T *const     s,
+                                     const T *const     x,
+                                     T *const           y) {
+        const int block_size = 3;
+
+        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
+            auto di = &dd[i * 6];
+            auto si = s[i];
+
+            const idx_t b  = idx[i];
+            auto        xi = &x[b * block_size];
+            auto        yi = &y[b * block_size];
+
+            T buff[3] = {0, 0, 0};
+
+            int d_idx = 0;
+            for (int d1 = 0; d1 < block_size; d1++) {
+                const auto m = si * di[d_idx++];
+                buff[d1] += m * xi[d1];
+                for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                    const auto m = si * di[d_idx++];
+                    buff[d1] += m * xi[d2];
+                    buff[d2] += m * xi[d1];
+                }
+            }
+
+            yi[0] += buff[0];
+            yi[1] += buff[1];
+            yi[2] += buff[2];
+        }
+    }
+
+    template <typename T>
+    int sbv_mult3(const ptrdiff_t    n_blocks,
+                  const idx_t *const idx,
+                  const T *const     dd,
+                  const T *const     s,
+                  const T *const     x,
+                  T *const           y) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        int       kernel_block_size = 128;
+        ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+        sbv_mult3_kernel<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    }
+
+    template int sbv_mult3<float>(const ptrdiff_t,
+                                  const idx_t *const,
+                                  const float *const,
+                                  const float *const,
+                                  const float *const,
+                                  float *const);
+    template int sbv_mult3<double>(const ptrdiff_t,
+                                   const idx_t *const,
+                                   const double *const,
+                                   const double *const,
+                                   const double *const,
+                                   double *const);
+
 }  // namespace sfem

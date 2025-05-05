@@ -355,6 +355,8 @@ namespace sfem {
         };
 
         tpl.calc_J_pen = &calc_J_pen_tpl<T>;
+
+        assert(tpl.good());
     }
 
     template class CUDA_ShiftedPenalty<float>;

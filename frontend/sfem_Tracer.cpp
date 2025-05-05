@@ -43,6 +43,8 @@ namespace sfem {
             os << std::flush;
             os.close();
         }
+
+        bool log_mode{false};
     };
 
     Tracer &Tracer::instance() {
@@ -61,9 +63,20 @@ namespace sfem {
         auto &e = impl_->events[name];
         e.first++;
         e.second += duration;
+
+        if(impl_->log_mode) {
+            printf("-- LOG: %s (%g)\n", name.c_str(), duration);
+            fflush(stdout);
+        }
     }
 
-    Tracer::Tracer() : impl_(std::make_unique<Impl>()) {}
+    Tracer::Tracer() : impl_(std::make_unique<Impl>()) {
+
+        int SFEM_ENABLE_LOG = 0;
+        SFEM_READ_ENV(SFEM_ENABLE_LOG, atoi);
+        impl_->log_mode = SFEM_ENABLE_LOG;
+
+    }
 
     Tracer::~Tracer() {
         impl_->dump();
@@ -102,6 +115,7 @@ namespace sfem {
 #endif
 
         elapsed = MPI_Wtime() - elapsed;
+
 #ifdef SFEM_ENABLE_CUDA
         nvtxRangePop();
 #endif

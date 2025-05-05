@@ -109,6 +109,11 @@ namespace sfem {
         return impl_->parent->size();
     }
 
+    MPI_Comm Sideset::comm() const
+    {
+        return impl_->comm;
+    }
+
     std::shared_ptr<Sideset> Sideset::create(MPI_Comm                                      comm,
                                              const std::shared_ptr<Buffer<element_idx_t>> &parent,
                                              const std::shared_ptr<Buffer<int16_t>>       &lfi) {

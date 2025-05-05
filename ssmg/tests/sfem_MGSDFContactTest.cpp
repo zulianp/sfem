@@ -308,15 +308,21 @@ int test_contact() {
         solver->apply(rhs->data(), x->data());
     }
 
+#ifdef SFEM_ENABLE_CUDA
+    x = sfem::to_host(x);
+#endif
+
     out->write("disp", x->data());
 
-    auto blas = sfem::blas<real_t>(es);
-    blas->zeros(rhs->size(), rhs->data());
-    f->gradient(x->data(), rhs->data());
+    if (es != sfem::EXECUTION_SPACE_DEVICE) {
+        auto blas = sfem::blas<real_t>(es);
+        blas->zeros(rhs->size(), rhs->data());
+        f->gradient(x->data(), rhs->data());
 
-    blas->zeros(x->size(), x->data());
-    contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
-    out->write("contact_stress", x->data());
+        blas->zeros(x->size(), x->data());
+        contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
+        out->write("contact_stress", x->data());
+    }
 
     return SFEM_TEST_SUCCESS;
 }

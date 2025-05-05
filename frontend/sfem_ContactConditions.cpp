@@ -573,7 +573,7 @@ namespace sfem {
                 this->n_constrained_dofs(),
                 space->n_dofs(),
                 [=](const real_t *const h, real_t *const out) { normal_project(h, out); },
-                EXECUTION_SPACE_HOST);
+                impl_->execution_space);
     }
 
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op_transpose() {
@@ -582,7 +582,7 @@ namespace sfem {
                 space->n_dofs(),
                 this->n_constrained_dofs(),
                 [=](const real_t *const f, real_t *const out) { distribute_contact_forces(f, out); },
-                EXECUTION_SPACE_HOST);
+                impl_->execution_space);
     }
 
     int ContactConditions::signed_distance(real_t *const g) {
