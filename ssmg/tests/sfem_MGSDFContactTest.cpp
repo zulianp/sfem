@@ -21,7 +21,8 @@
 
 #include "sfem_ssmgc.hpp"
 
-static const geom_t y_top = 0.2;
+static const geom_t               y_top           = 0.2;
+static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                      const int                              base_resolution) {
@@ -91,7 +92,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es_to_be_ported);
     f->add_constraint(conds);
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
@@ -266,16 +267,25 @@ int test_contact() {
     auto            gap   = sfem::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(rhs->data());
-    contact_conds->update(x->data());
-    contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
+    // contact_conds->update(x->data()); // FIXME
+    contact_conds->init();
 
     fs->mesh_ptr()->write("test_contact/coarse_mesh");
     fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
     auto out = f->output();
     out->set_output_dir("test_contact/out");
     out->enable_AoS_to_SoA(true);
-    out->write("gap", gap->data());
+
+    if (es != sfem::EXECUTION_SPACE_DEVICE) {
+        contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
+        out->write("gap", gap->data());
+    }
+
+#ifdef SFEM_ENABLE_CUDA
+    out->write("rhs", sfem::to_host(rhs)->data());
+#else
     out->write("rhs", rhs->data());
+#endif
 
     f->apply_constraints(x->data());
 

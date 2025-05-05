@@ -109,6 +109,7 @@ MS := Milestone
    - [x] SSHEX8-Mesh online generation from HEX8
    - [x] Multilevel GMG on CPU
    - [x] Contact stresses post-processor for SSHEX8
+   - [x] BC mask
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact

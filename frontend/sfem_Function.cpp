@@ -2946,7 +2946,8 @@ namespace sfem {
                                                    mesh->points()->data(),
                                                    element_matrix->data());
 
-            element_matrix->print(std::cout);
+            // element_matrix->print(std::cout);
+            return SFEM_SUCCESS;
         }
 
         SemiStructuredEMLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}

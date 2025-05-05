@@ -135,9 +135,20 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 #define SFEM_WARP_SIZE 32
 #define SFEM_WARP_FULL_MASK 0xffffffff
 
+#ifdef SFEM_ENABLE_CUDA
+
+// To enable atomicOr we need int
+typedef int mask_t;
+#define SFEM_MPI_MASK_T MPI_INT
+#define SFEM_PTRDIFF_INVALID -1
+
+#else
+
 typedef char mask_t;
 #define SFEM_MPI_MASK_T MPI_CHAR
 #define SFEM_PTRDIFF_INVALID -1
+
+#endif // SFEM_ENABLE_CUDA
 
 typedef int64_t sshex_side_code_t;
 
