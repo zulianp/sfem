@@ -392,6 +392,12 @@ int self_contact(sfem::Context &context, int argc, char *argv[]) {
         const real_t cos_angle_threshold = 0;
         printf("cos_angle_threshold = %g\n", cos_angle_threshold);
 
+        // 1) Vector and Matrix assembly
+        // Block-vector: N
+        // Scalar coupling matrix B = [D, O], Off-diag COO: i,j,v for temp storage
+        // 2) Reduce COO to CSR
+        // 3) Compute B^T N N^T B ? (only for MG?)
+
         for (ptrdiff_t c = 0; c < ncells; c++) {
             // For every cell
             for (ptrdiff_t k = cell_ptr[c]; k < cell_ptr[c + 1]; k++) {
@@ -487,7 +493,10 @@ int self_contact(sfem::Context &context, int argc, char *argv[]) {
 
                                 ncandidates++;
 
+                                // Construct interpolation matrix
                                 // Sample distance?
+                                // Sample normals
+
                             }
                         }
                     }

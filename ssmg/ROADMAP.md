@@ -115,12 +115,11 @@ MS := Milestone
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
    - [X] Export facilities for Paper 1
-   - [ ] Nonlinear obstacle contact loop (Optional)
+   
 
 **MS 2: ()**
 
    - [ ] Drafting/Finalizing P1
-   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 
@@ -132,6 +131,7 @@ MS := Milestone
    - [X] GPU: sshex8_restrict and sshex8_prolongate
    - [X] GPU: ssquad4_restrict and ssquad4_prolongate
    - [ ] GPU: SparseBlockVector
+   - [ ] Test/Debug GPU porting
 
 **MS 4: ()**
 
@@ -143,7 +143,8 @@ MS := Milestone
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
    - [ ] Explore high-order HEXA
    - [ ] Explore sum factorization algorithm for HEX8
-
+   - [ ] Contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
+   - [ ] Nonlinear obstacle contact loop
 
 ### Hardik
 

@@ -328,7 +328,6 @@ extern int cu_ssquad4_hierarchical_restriction(const int                        
     }
 }
 
-
 static const int TILE_SIZE = 4;
 #define ROUND_ROBIN(val, shift) ((val + shift) & (TILE_SIZE - 1))
 #define ROUND_ROBIN_2(val, shift) ((val + shift) & (2 - 1))
@@ -362,17 +361,16 @@ public:
     ~ShapeInterpolation() { cudaFree(data); }
 };
 
-
 template <typename From, typename To>
-__global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     nelements,
+__global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t nelements,
                                            // const ptrdiff_t                     stride,
                                            const int                           from_level,
                                            const int                           from_level_stride,
-                                           idx_t **const SFEM_RESTRICT          from_elements,
+                                           idx_t **const SFEM_RESTRICT         from_elements,
                                            const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                                            const int                           to_level,
                                            const int                           to_level_stride,
-                                           idx_t **const SFEM_RESTRICT          to_elements,
+                                           idx_t **const SFEM_RESTRICT         to_elements,
                                            const To *const SFEM_RESTRICT       S,
                                            const int                           vec_size,
                                            const enum RealType                 from_type,
@@ -391,8 +389,8 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
     const int step_factor = from_level / to_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4; 
-    const int n_tiles = blockDim.x >> 2;  
+    const int tile    = threadIdx.x >> 4;
+    const int n_tiles = blockDim.x >> 2;
     const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
@@ -497,15 +495,15 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
 }
 
 template <typename From, typename To>
-int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
+int cu_ssquad4_restrict_tpl(const ptrdiff_t nelements,
                             // const ptrdiff_t                     stride,
                             const int                           from_level,
                             const int                           from_level_stride,
-                            idx_t **const SFEM_RESTRICT          from_elements,
+                            idx_t **const SFEM_RESTRICT         from_elements,
                             const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                             const int                           to_level,
                             const int                           to_level_stride,
-                            idx_t **const SFEM_RESTRICT          to_elements,
+                            idx_t **const SFEM_RESTRICT         to_elements,
                             const int                           vec_size,
                             const enum RealType                 from_type,
                             const ptrdiff_t                     from_stride,
@@ -575,15 +573,15 @@ int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
     return SFEM_SUCCESS;
 }
 
-extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
+extern int cu_ssquad4_restrict(const ptrdiff_t nelements,
                                // const ptrdiff_t                     stride,
                                const int                           from_level,
                                const int                           from_level_stride,
-                               idx_t **const SFEM_RESTRICT          from_elements,
+                               idx_t **const SFEM_RESTRICT         from_elements,
                                const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                                const int                           to_level,
                                const int                           to_level_stride,
-                               idx_t **const SFEM_RESTRICT          to_elements,
+                               idx_t **const SFEM_RESTRICT         to_elements,
                                const int                           vec_size,
                                const enum RealType                 from_type,
                                const ptrdiff_t                     from_stride,
@@ -694,8 +692,8 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
     const int step_factor = to_level / from_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4; 
-    const int n_tiles = blockDim.x >> 2;  
+    const int tile    = threadIdx.x >> 4;
+    const int n_tiles = blockDim.x >> 2;
     const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
