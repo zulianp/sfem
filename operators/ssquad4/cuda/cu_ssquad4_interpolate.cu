@@ -391,9 +391,9 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
     const int step_factor = from_level / to_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;   // same as threadIdx.x / 8
-    const int n_tiles = blockDim.x >> 4;    // same as blockDim.x / 8
-    const int sub_idx = threadIdx.x & 0x3;  // same as threadIdx.x % 8
+    const int tile    = threadIdx.x >> 4; 
+    const int n_tiles = blockDim.x >> 2;  
+    const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
@@ -694,9 +694,9 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
     const int step_factor = to_level / from_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;   // same as threadIdx.x / 8
-    const int n_tiles = blockDim.x >> 4;    // same as blockDim.x / 8
-    const int sub_idx = threadIdx.x & 0x3;  // same as threadIdx.x % 8
+    const int tile    = threadIdx.x >> 4; 
+    const int n_tiles = blockDim.x >> 2;  
+    const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 

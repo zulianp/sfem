@@ -93,7 +93,7 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space_ == EXECUTION_SPACE_HOST);
+            assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             const ptrdiff_t n_blocks = d->size() / 6;

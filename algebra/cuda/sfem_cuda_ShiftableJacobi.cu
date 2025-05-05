@@ -7,7 +7,6 @@
 
 #include "cu_mask.cuh"
 
-
 namespace sfem {
     namespace private_ {
 

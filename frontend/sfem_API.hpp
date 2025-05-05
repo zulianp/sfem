@@ -164,7 +164,6 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             CUDA_BLAS<T>::build_blas(ret->blas);
             ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl);
-            return ret;
         } else 
 #endif  // SFEM_ENABLE_CUDA
         {

@@ -68,6 +68,8 @@ namespace sfem {
     std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
                                                                   const std::shared_ptr<ContactConditions> contact_conds,
                                                                   const std::shared_ptr<Input>            &in) {
+        static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
+
         if (!f->space()->has_semi_structured_mesh()) {
             SFEM_ERROR("create_ssmgc cannot build MG without a semistructured mesh");
         }
@@ -322,6 +324,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
             CUDA_BLAS<real_t>::build_blas(mg->blas());
+            CUDA_ShiftedPenalty<real_t>::build(mg->impl());
             mg->set_execution_space(EXECUTION_SPACE_DEVICE);
         } else
 #endif
@@ -360,13 +363,11 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
-            // keep host fine_sbv available
-            mg->add_level_constraint_op_x_op(sfem::to_device(fine_sbv));
-        } else
-#endif
-        {
-            mg->add_level_constraint_op_x_op(fine_sbv);
+            fine_sbv = sfem::to_device(fine_sbv);
         }
+#endif
+
+        mg->add_level_constraint_op_x_op(fine_sbv);
 
         auto fine_sides   = contact_conds->ss_sides();
         auto fine_mapping = contact_conds->node_mapping();
@@ -382,23 +383,51 @@ namespace sfem {
             const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
             auto            coarse_node_mapping    = sfem::view(fine_mapping, 0, n_coarse_contact_nodes);
 
-            auto coarse_normal_prod = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es);
+            auto coarse_normal_prod = sfem::create_buffer<real_t>(sym_block_size * coarse_node_mapping->size(), es_to_be_ported);
             auto coarse_sbv         = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
 
             auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
             ssquad4_element_node_incidence_count(level, 1, fine_sides->extent(1), fine_sides->data(), count->data());
 
-            ssquad4_restrict(fine_sides->extent(1),  // nelements
-                             level,                  // from_level
-                             1,                      // from_level_stride
-                             fine_sides->data(),     // from_elements
-                             count->data(),          // from_element_to_node_incidence_count
-                             coarse_level,           // to_level
-                             1,                      // to_level_stride
-                             coarse_sides->data(),   // to_elements
-                             sym_block_size,         // vec_size
-                             fine_sbv->data()->data(),
-                             coarse_sbv->data()->data());
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                count        = sfem::to_device(count);
+                fine_sides   = sfem::to_device(fine_sides);
+                coarse_sides = sfem::to_device(coarse_sides);
+                coarse_sbv   = sfem::to_device(coarse_sbv);
+
+                cu_ssquad4_restrict(fine_sides->extent(1),
+                                    level,
+                                    1,
+                                    fine_sides->data(),
+                                    count->data(),
+                                    coarse_level,
+                                    1,
+                                    coarse_sides->data(),
+                                    sym_block_size,
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    fine_sbv->data()->data(),
+                                    SFEM_REAL_DEFAULT,
+                                    1,
+                                    coarse_sbv->data()->data(),
+                                    SFEM_DEFAULT_STREAM);
+            } else
+#endif
+
+            {
+                ssquad4_restrict(fine_sides->extent(1),  // nelements
+                                 level,                  // from_level
+                                 1,                      // from_level_stride
+                                 fine_sides->data(),     // from_elements
+                                 count->data(),          // from_element_to_node_incidence_count
+                                 coarse_level,           // to_level
+                                 1,                      // to_level_stride
+                                 coarse_sides->data(),   // to_elements
+                                 sym_block_size,         // vec_size
+                                 fine_sbv->data()->data(),
+                                 coarse_sbv->data()->data());
+            }
             if (debug) {
                 auto      f_coarse = functions[i];
                 auto      buff     = sfem::create_host_buffer<real_t>(f_coarse->space()->n_dofs());
@@ -418,14 +447,6 @@ namespace sfem {
                 }
             }
 
-#ifdef SFEM_ENABLE_CUDA
-            if (es == EXECUTION_SPACE_DEVICE) {
-                count        = sfem::to_device(count);
-                fine_sides   = sfem::to_device(fine_sides);
-                coarse_sides = sfem::to_device(coarse_sides);
-                coarse_sbv   = sfem::to_device(coarse_sbv);
-            }
-#endif
             mg->add_level_constraint_op_x_op(coarse_sbv);
 
             auto c_restriction = sfem::make_op<real_t>(
