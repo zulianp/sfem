@@ -6,8 +6,8 @@
 
 #include "cu_hex8_linear_elasticity_inline.hpp"
 #include "cu_hex8_linear_elasticity_integral_inline.hpp"
-#include "cu_sshex8_inline.hpp"
 #include "cu_hex8_linear_elasticity_matrix_inline.hpp"
+#include "cu_sshex8_inline.hpp"
 
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
@@ -1610,7 +1610,9 @@ __global__ void cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
             }
         }
 
-        const T determinant = jacobian_determinant[e];
+        T determinant = jacobian_determinant[e];
+
+        cu_hex8_sub_adj_0_in_place<T>(1. / level, adjugate, &determinant);
 
         // Assemble the diagonal part of the matrix
         for (int edof_i = 0; edof_i < 8; edof_i++) {

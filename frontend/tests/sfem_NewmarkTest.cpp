@@ -289,9 +289,6 @@ int test_newmark() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
     SFEM_RUN_TEST(test_explicit_euler);
     SFEM_RUN_TEST(test_newmark);
 

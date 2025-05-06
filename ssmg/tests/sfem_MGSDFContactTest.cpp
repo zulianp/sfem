@@ -330,10 +330,6 @@ int test_contact() {
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
-
     SFEM_RUN_TEST(test_contact);
 
     SFEM_UNIT_TEST_FINALIZE();
