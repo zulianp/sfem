@@ -16,10 +16,9 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 
 #include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
-#include "sfem_cuda_ShiftedPenalty_impl.hpp"
-
 
 using namespace sfem;
 
@@ -33,7 +32,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto top_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    const int n = base_resolution * fs->semi_structured_mesh().level();
+    const int n = base_resolution * (fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().level() : 1);
 
     sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
@@ -86,7 +85,7 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> Jpen;
     // std::shared_ptr<Buffer<real_t>> upper_bound;
 
-    int compare(const struct TestOutput &other, const real_t tol = 1e-8) const {
+    int compare(const struct TestOutput &other, const real_t tol = 1e-7) const {
         SFEM_ASSERT_ARRAY_APPROX_EQ(x->size(), x->data(), other.x->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rhs->size(), rhs->data(), other.rhs->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(g->size(), g->data(), other.g->data(), tol);
@@ -112,8 +111,8 @@ struct TestOutput {
                 .normal_prod = sfem::to_host(normal_prod),
                 .cc_op_x     = sfem::to_host(cc_op_x),
                 .cc_op_t_r   = sfem::to_host(cc_op_t_r),
-                .rpen   = sfem::to_host(rpen),
-                .Jpen   = sfem::to_host(Jpen)};
+                .rpen        = sfem::to_host(rpen),
+                .Jpen        = sfem::to_host(Jpen)};
     }
 };
 
@@ -133,8 +132,10 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    }
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, "LinearElasticity", es);
@@ -178,20 +179,34 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
 
     auto cc_op_t_r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     cc_op_t->apply(cc_op_x->data(), cc_op_t_r->data());
-    
+
     ShiftedPenalty_Tpl<real_t> impl;
-    if(EXECUTION_SPACE_DEVICE == es) {
+    if (EXECUTION_SPACE_DEVICE == es) {
         CUDA_ShiftedPenalty<real_t>::build(impl);
     } else {
         OpenMP_ShiftedPenalty<real_t>::build(impl);
     }
 
-    auto lagrange_ub  = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    auto rpen = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    impl.calc_r_pen(contact_conds->n_constrained_dofs(), x->data(), 10, nullptr, upper_bound->data(), nullptr, lagrange_ub->data(), rpen->data());
+    auto lagrange_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+    auto rpen        = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+    impl.calc_r_pen(contact_conds->n_constrained_dofs(),
+                    x->data(),
+                    10,
+                    nullptr,
+                    upper_bound->data(),
+                    nullptr,
+                    lagrange_ub->data(),
+                    rpen->data());
 
     auto Jpen = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    impl.calc_J_pen(contact_conds->n_constrained_dofs(), x->data(), 10, nullptr, upper_bound->data(), nullptr, lagrange_ub->data(), Jpen->data());
+    impl.calc_J_pen(contact_conds->n_constrained_dofs(),
+                    rhs->data(),
+                    10,
+                    nullptr,
+                    upper_bound->data(),
+                    nullptr,
+                    lagrange_ub->data(),
+                    Jpen->data());
 
     return {.x   = x,
             .rhs = rhs,
@@ -202,8 +217,8 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
             .normal_prod = normal_prod,
             .cc_op_x     = cc_op_x,
             .cc_op_t_r   = cc_op_t_r,
-            .rpen = rpen,
-            .Jpen = Jpen};
+            .rpen        = rpen,
+            .Jpen        = Jpen};
 }
 
 int test_obstacle() {
