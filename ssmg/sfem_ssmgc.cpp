@@ -378,7 +378,8 @@ namespace sfem {
             auto      coarse_space = functions[i]->space();
             const int coarse_level = coarse_space->has_semi_structured_mesh() ? coarse_space->semi_structured_mesh().level() : 1;
 
-            auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, fine_sides);
+            // FIXME
+            auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, to_host(fine_sides));
 
             const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
             auto            coarse_node_mapping    = sfem::view(fine_mapping, 0, n_coarse_contact_nodes);
@@ -387,7 +388,9 @@ namespace sfem {
             auto coarse_sbv         = sfem::create_sparse_block_vector(coarse_node_mapping, coarse_normal_prod);
 
             auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
-            ssquad4_element_node_incidence_count(level, 1, fine_sides->extent(1), fine_sides->data(), count->data());
+
+            // FIXME
+            ssquad4_element_node_incidence_count(level, 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
 
 #ifdef SFEM_ENABLE_CUDA
             if (es == EXECUTION_SPACE_DEVICE) {
@@ -414,7 +417,6 @@ namespace sfem {
                                     SFEM_DEFAULT_STREAM);
             } else
 #endif
-
             {
                 ssquad4_restrict(fine_sides->extent(1),  // nelements
                                  level,                  // from_level
@@ -447,6 +449,19 @@ namespace sfem {
                 }
             }
 
+#if 0
+            sfem::device_synchronize();
+
+            std::cout << "FINE---------------------\n";
+            to_host(count)->print(std::cout);
+            to_host(fine_sides)->print(std::cout);
+            to_host(fine_sbv)->print(std::cout);
+
+            std::cout << "COARSE---------------------\n";
+            to_host(coarse_sides)->print(std::cout);
+            to_host(coarse_sbv)->print(std::cout);
+#endif
+
             mg->add_level_constraint_op_x_op(coarse_sbv);
 
             auto c_restriction = sfem::make_op<real_t>(
@@ -455,6 +470,7 @@ namespace sfem {
                     [=, f_coarse = functions[i]](const real_t *const from, real_t *const to) {
                         SFEM_TRACE_SCOPE("ssquad4_restrict");
 
+// TODO check (cu_)ssquad4_restrict implementations
 #ifdef SFEM_ENABLE_CUDA
                         if (es == EXECUTION_SPACE_DEVICE) {
                             cu_ssquad4_restrict(fine_sides->extent(1),

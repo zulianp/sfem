@@ -325,13 +325,19 @@ if(SFEM_ENABLE_TESTING)
         amg/tests
     )
 
+    if(SFEM_ENABLE_CUDA)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/tests/cuda
+        )
+
+    endif()
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
     
-    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
-    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+        file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
-    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
-    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
     endforeach(UNIT_TEST)
 

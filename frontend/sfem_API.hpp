@@ -49,6 +49,10 @@
 namespace sfem {
     static void device_synchronize() {}
     static bool is_ptr_device(const void *) { return false; }
+    template <typename T>
+    inline T & to_host(T &ptr) {
+        return ptr;
+    }
 }  // namespace sfem
 #endif
 
@@ -157,7 +161,6 @@ namespace sfem {
             const std::shared_ptr<Buffer<T>>      &diag,
             const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
             const ExecutionSpace                   es) {
-
         auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
