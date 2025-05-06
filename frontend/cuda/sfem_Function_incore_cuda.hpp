@@ -42,19 +42,6 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
-        if (in->mem_space() == MEMORY_SPACE_DEVICE) {
-            return in;
-        }
-
-        auto ret         = std::make_shared<SparseBlockVector<T>>();
-        ret->block_size_ = in->block_size_;
-        ret->idx_        = sfem::to_device(in->idx_);
-        ret->data_       = sfem::to_device(in->data_);
-        return ret;
-    }
-
-    template <typename T>
     std::shared_ptr<Buffer<T *>> to_device(const std::shared_ptr<Buffer<T *>> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
@@ -129,6 +116,32 @@ namespace sfem {
         free(dev_addr);
 
         return buffer;
+    }
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
+        if (in->mem_space() == MEMORY_SPACE_DEVICE) {
+            return in;
+        }
+
+        auto ret         = std::make_shared<SparseBlockVector<T>>();
+        ret->block_size_ = in->block_size_;
+        ret->idx_        = sfem::to_device(in->idx_);
+        ret->data_       = sfem::to_device(in->data_);
+        return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> to_host(const std::shared_ptr<SparseBlockVector<T>> &in) {
+        if (in->mem_space() == MEMORY_SPACE_HOST) {
+            return in;
+        }
+
+        auto ret         = std::make_shared<SparseBlockVector<T>>();
+        ret->block_size_ = in->block_size_;
+        ret->idx_        = sfem::to_host(in->idx_);
+        ret->data_       = sfem::to_host(in->data_);
+        return ret;
     }
 
 }  // namespace sfem

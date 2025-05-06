@@ -72,7 +72,7 @@ int test_amg_poisson() {
 
     auto out = f->output();
     out->set_output_dir("test_amg_poisson/out");
-    if (block_size > 1) out->enable_AoS_to_SoA(true); // Needed only for vector problem
+    if (block_size > 1) out->enable_AoS_to_SoA(true);  // Needed only for vector problem
     SFEM_TEST_ASSERT(out->write("x", x->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(out->write("rhs", rhs->data()) == SFEM_SUCCESS);
 
@@ -121,8 +121,8 @@ int test_amg_sqp() {
         auto idx = bottom->data();
         auto u   = upper_bound->data();
 
-        for(ptrdiff_t i = 0; i < ndofs; i++) {
-            u[i] = 10000; // kind of infinity
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            u[i] = 10000;  // kind of infinity
         }
 
         for (ptrdiff_t i = 0; i < bottom->size(); i++) {
@@ -179,10 +179,6 @@ int test_amg_sqp() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
 
     SFEM_RUN_TEST(test_amg_poisson);
     SFEM_RUN_TEST(test_amg_sqp);
