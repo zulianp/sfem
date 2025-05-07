@@ -139,12 +139,11 @@ extern int cu_ssquad4_hierarchical_prolongation(const int                       
                     level, nelements, stride, elements, vec_size, from_stride, (double *)from, to_stride, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -316,7 +315,7 @@ extern int cu_ssquad4_hierarchical_restriction(const int                        
                                                            stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type "
                     "%s "
                     "(code %d)\n",
@@ -486,7 +485,7 @@ extern int cu_ssquad4_hierarchical_restriction_SoA(const int                    
                                                                stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type "
                     "%s "
                     "(code %d)\n",
@@ -557,7 +556,7 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t nelements,
     const int step_factor = from_level / to_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;
+    const int tile    = threadIdx.x >> 2;
     const int n_tiles = blockDim.x >> 2;
     const int sub_idx = threadIdx.x & 0x3;
 
@@ -657,6 +656,7 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t nelements,
 
                     const ptrdiff_t gidx = to_elements[idx_to][e];
                     const ptrdiff_t idx  = (gidx * vec_size + d) * to_stride;
+                    // printf("[%d] tile=%d/%d sub_idx=%d e=%ld (%d %d) -> %ld) ::> %g\n", threadIdx.x, tile, n_tiles, sub_idx, e, xi, yi, idx, acc);
                     atomicAdd(&to[idx], acc);
                 }
             }
@@ -759,20 +759,20 @@ extern int cu_ssquad4_restrict(const ptrdiff_t nelements,
         return SFEM_FAILURE;
     }
 
-    if (to_level == 1) {
-        return cu_ssquad4_hierarchical_restriction_SoA(from_level,
-                                                       nelements,
-                                                       from_elements,
-                                                       from_element_to_node_incidence_count,
-                                                       vec_size,
-                                                       from_type,
-                                                       from_stride,
-                                                       from,
-                                                       to_type,
-                                                       to_stride,
-                                                       to,
-                                                       stream);
-    }
+    // if (to_level == 1) {
+    //     return cu_ssquad4_hierarchical_restriction_SoA(from_level,
+    //                                                    nelements,
+    //                                                    from_elements,
+    //                                                    from_element_to_node_incidence_count,
+    //                                                    vec_size,
+    //                                                    from_type,
+    //                                                    from_stride,
+    //                                                    from,
+    //                                                    to_type,
+    //                                                    to_stride,
+    //                                                    to,
+    //                                                    stream);
+    // }
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
@@ -828,7 +828,7 @@ extern int cu_ssquad4_restrict(const ptrdiff_t nelements,
         }
 
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongate: not implemented for type "
                     "%s "
                     "(code %d)\n",
@@ -851,10 +851,8 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
                                              const int                       to_level_stride,
                                              idx_t *const SFEM_RESTRICT      to_elements,
                                              const int                       vec_size,
-                                             const enum RealType             from_type,
                                              const ptrdiff_t                 from_stride,
                                              const From *const SFEM_RESTRICT from,
-                                             const enum RealType             to_type,
                                              const ptrdiff_t                 to_stride,
                                              To *const SFEM_RESTRICT         to) {
     static_assert(TILE_SIZE == 4, "This only works with tile size 8!");
@@ -865,7 +863,7 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
     const int step_factor = to_level / from_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;
+    const int tile    = threadIdx.x >> 2;
     const int n_tiles = blockDim.x >> 2;
     const int sub_idx = threadIdx.x & 0x3;
 
@@ -991,10 +989,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                               const int                       to_level_stride,
                               idx_t *const SFEM_RESTRICT      to_elements,
                               const int                       vec_size,
-                              const enum RealType             from_type,
                               const ptrdiff_t                 from_stride,
                               const From *const SFEM_RESTRICT from,
-                              const enum RealType             to_type,
                               const ptrdiff_t                 to_stride,
                               To *const SFEM_RESTRICT         to,
                               void                           *stream) {
@@ -1016,10 +1012,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                                                                                              to_level_stride,
                                                                                              to_elements,
                                                                                              vec_size,
-                                                                                             from_type,
                                                                                              from_stride,
                                                                                              from,
-                                                                                             to_type,
                                                                                              to_stride,
                                                                                              to);
     } else {
@@ -1032,10 +1026,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                                                                                           to_level_stride,
                                                                                           to_elements,
                                                                                           vec_size,
-                                                                                          from_type,
                                                                                           from_stride,
                                                                                           from,
-                                                                                          to_type,
                                                                                           to_stride,
                                                                                           to);
     }
@@ -1076,10 +1068,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                              to_level_stride,
                                                              to_elements,
                                                              vec_size,
-                                                             from_type,
                                                              from_stride,
                                                              (real_t *)from,
-                                                             to_type,
                                                              to_stride,
                                                              (real_t *)to,
                                                              stream);
@@ -1094,10 +1084,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                            to_level_stride,
                                                            to_elements,
                                                            vec_size,
-                                                           from_type,
                                                            from_stride,
                                                            (float *)from,
-                                                           to_type,
                                                            to_stride,
                                                            (float *)to,
                                                            stream);
@@ -1112,10 +1100,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                              to_level_stride,
                                                              to_elements,
                                                              vec_size,
-                                                             from_type,
                                                              from_stride,
                                                              (double *)from,
-                                                             to_type,
                                                              to_stride,
                                                              (double *)to,
                                                              stream);

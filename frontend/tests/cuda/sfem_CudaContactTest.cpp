@@ -2,23 +2,23 @@
 
 #include "sfem_test.h"
 
-#include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
 #include "sfem_base.h"
+#include "matrixio_array.h"
+#include "ssquad4_interpolate.h"
+#include "cu_ssquad4_interpolate.h"
+
+#include "sfem_Function.hpp"
+#include "sfem_Buffer.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
-
-#include "matrixio_array.h"
-
 #include "sfem_API.hpp"
-
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
+
 
 using namespace sfem;
 
@@ -73,16 +73,18 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 }
 
 struct TestOutput {
-    std::shared_ptr<Buffer<real_t>> x;
-    std::shared_ptr<Buffer<real_t>> rhs;
-    std::shared_ptr<Buffer<real_t>> g;
-    std::shared_ptr<Buffer<real_t>> diag;
-    std::shared_ptr<Buffer<mask_t>> mask;
-    std::shared_ptr<Buffer<real_t>> normal_prod;
-    std::shared_ptr<Buffer<real_t>> cc_op_x;
-    std::shared_ptr<Buffer<real_t>> cc_op_t_r;
-    std::shared_ptr<Buffer<real_t>> rpen;
-    std::shared_ptr<Buffer<real_t>> Jpen;
+    bool                                is_ml{false};
+    std::shared_ptr<Buffer<real_t>>     x;
+    std::shared_ptr<Buffer<real_t>>     rhs;
+    std::shared_ptr<Buffer<real_t>>     g;
+    std::shared_ptr<Buffer<real_t>>     diag;
+    std::shared_ptr<Buffer<mask_t>>     mask;
+    std::shared_ptr<Buffer<real_t>>     normal_prod;
+    std::shared_ptr<Buffer<real_t>>     cc_op_x;
+    std::shared_ptr<Buffer<real_t>>     cc_op_t_r;
+    std::shared_ptr<Buffer<real_t>>     rpen;
+    std::shared_ptr<Buffer<real_t>>     Jpen;
+    std::shared_ptr<Buffer<real_t>> restricted;
     // std::shared_ptr<Buffer<real_t>> upper_bound;
 
     int compare(const struct TestOutput &other, const real_t tol = 1e-7) const {
@@ -96,23 +98,41 @@ struct TestOutput {
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_t_r->size(), cc_op_t_r->data(), other.cc_op_t_r->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rpen->size(), rpen->data(), other.rpen->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(Jpen->size(), Jpen->data(), other.Jpen->data(), tol);
+
+        if (is_ml) {
+            // std::cout << "EXPECTED\n";
+            // restricted->print(std::cout);
+
+            // std::cout << "ACUTAL\n";
+            // other.restricted->print(std::cout);
+            // std::cout << std::flush;
+
+            SFEM_ASSERT_ARRAY_APPROX_EQ(restricted->size(), restricted->data(), other.restricted->data(), tol);
+        }
+
         // SFEM_ASSERT_ARRAY_APPROX_EQ(upper_bound->size(), upper_bound->data(), other.upper_bound->data(), tol);
 
         return SFEM_TEST_SUCCESS;
     }
 
     struct TestOutput to_host() {
-        return {.x   = sfem::to_host(x),
-                .rhs = sfem::to_host(rhs),
-                .g   = sfem::to_host(g),
-                // .upper_bound = sfem::to_host(upper_bound),
-                .diag        = sfem::to_host(diag),
-                .mask        = sfem::to_host(mask),
-                .normal_prod = sfem::to_host(normal_prod),
-                .cc_op_x     = sfem::to_host(cc_op_x),
-                .cc_op_t_r   = sfem::to_host(cc_op_t_r),
-                .rpen        = sfem::to_host(rpen),
-                .Jpen        = sfem::to_host(Jpen)};
+        TestOutput to{.x   = sfem::to_host(x),
+                      .rhs = sfem::to_host(rhs),
+                      .g   = sfem::to_host(g),
+                      // .upper_bound = sfem::to_host(upper_bound),
+                      .diag        = sfem::to_host(diag),
+                      .mask        = sfem::to_host(mask),
+                      .normal_prod = sfem::to_host(normal_prod),
+                      .cc_op_x     = sfem::to_host(cc_op_x),
+                      .cc_op_t_r   = sfem::to_host(cc_op_t_r),
+                      .rpen        = sfem::to_host(rpen),
+                      .Jpen        = sfem::to_host(Jpen)};
+
+        if (is_ml) {
+            to.restricted = sfem::to_host(restricted);
+        }
+
+        return to;
     }
 };
 
@@ -208,17 +228,86 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     lagrange_ub->data(),
                     Jpen->data());
 
-    return {.x   = x,
-            .rhs = rhs,
-            .g   = g,
-            /*.upper_bound = upper_bound,*/
-            .diag        = diag,
-            .mask        = mask,
-            .normal_prod = normal_prod,
-            .cc_op_x     = cc_op_x,
-            .cc_op_t_r   = cc_op_t_r,
-            .rpen        = rpen,
-            .Jpen        = Jpen};
+    const bool is_ml = fs->has_semi_structured_mesh();
+
+    TestOutput to{.is_ml = is_ml,
+                  .x     = x,
+                  .rhs   = rhs,
+                  .g     = g,
+                  /*.upper_bound = upper_bound,*/
+                  .diag        = diag,
+                  .mask        = mask,
+                  .normal_prod = normal_prod,
+                  .cc_op_x     = cc_op_x,
+                  .cc_op_t_r   = cc_op_t_r,
+                  .rpen        = rpen,
+                  .Jpen        = Jpen};
+
+    if (is_ml) {
+        int coarse_level = SFEM_ELEMENT_REFINE_LEVEL / 2;
+
+        auto coarse_fs = fs->derefine(coarse_level);
+
+        auto &ssmesh       = fs->semi_structured_mesh();
+        auto  fine_sides   = contact_conds->ss_sides();
+        auto  coarse_sides = sfem::ssquad4_derefine_element_connectivity(ssmesh.level(), coarse_level, to_host(fine_sides));
+
+        auto fine_mapping = contact_conds->node_mapping();
+        auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
+        ssquad4_element_node_incidence_count(ssmesh.level(), 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
+
+        const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
+
+        auto input = sfem::create_host_buffer<real_t>(contact_conds->n_constrained_dofs());
+        {
+            auto in  = input->data();
+            for(ptrdiff_t i = 0; i < contact_conds->n_constrained_dofs(); i++) {
+                in[i] = i;   
+            }
+        }
+
+
+        auto            restricted             = sfem::create_buffer<real_t>(n_coarse_contact_nodes, es);
+
+        if (es == EXECUTION_SPACE_DEVICE) {
+            fine_sides   = to_device(fine_sides);
+            coarse_sides = to_device(coarse_sides);
+            count        = to_device(count);
+
+            cu_ssquad4_restrict(fine_sides->extent(1),
+                                ssmesh.level(),
+                                1,
+                                fine_sides->data(),
+                                count->data(),
+                                coarse_level,
+                                1,
+                                coarse_sides->data(),
+                                1,
+                                SFEM_REAL_DEFAULT,
+                                1,
+                                input->data(),
+                                SFEM_REAL_DEFAULT,
+                                1,
+                                restricted->data(),
+                                SFEM_DEFAULT_STREAM);
+        } else {
+            ssquad4_restrict(fine_sides->extent(1),
+                             ssmesh.level(),
+                             1,
+                             fine_sides->data(),
+                             count->data(),
+                             coarse_level,
+                             1,
+                             coarse_sides->data(),
+                             1,
+                             input->data(),
+                             restricted->data());
+        }
+
+        to.restricted = restricted;
+    }
+
+    return to;
 }
 
 int test_obstacle() {
