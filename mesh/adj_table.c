@@ -141,15 +141,16 @@ void create_element_adj_table_from_dual_graph(const ptrdiff_t                   
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type_for_algo, local_side_table);
 
-    idx_t nodes1[SFEM_MAX_NUM_NODES_PER_SIDE];
-    idx_t nodes2[SFEM_MAX_NUM_NODES_PER_SIDE];
-    int   assigned[SFEM_MAX_NUM_SIDES];
-
     enum ElemType st = side_type(element_type_for_algo);
     const int     nn = elem_num_nodes(st);
     const int     ns = elem_num_sides(element_type_for_algo);
 
+#pragma omp parallel for
     for (ptrdiff_t e = 0; e < n_elements; e++) {
+        idx_t nodes1[SFEM_MAX_NUM_NODES_PER_SIDE];
+        idx_t nodes2[SFEM_MAX_NUM_NODES_PER_SIDE];
+        int   assigned[SFEM_MAX_NUM_SIDES];
+
         const count_t begin = adj_ptr[e];
         const count_t end   = adj_ptr[e + 1];
         const count_t range = end - begin;
@@ -358,23 +359,19 @@ void extract_surface_connectivity_with_adj_table(const ptrdiff_t             n_e
     printf("adj_table.c: extract_surface_connectivity_with_adj_table\t%g seconds\n", tock - tick);
 }
 
-int extract_skin_sideset(const ptrdiff_t               n_elements,
-                         const ptrdiff_t               n_nodes,
-                         const int                     element_type,
-                         idx_t **const SFEM_RESTRICT   elems,
-                         ptrdiff_t *SFEM_RESTRICT      n_surf_elements,
-                         element_idx_t **SFEM_RESTRICT parent_element,
-                         int16_t **SFEM_RESTRICT       side_idx)
-
-{
-    const int      ns    = elem_num_sides(element_type);
-    element_idx_t *table = 0;
-    create_element_adj_table(n_elements, n_nodes, element_type, elems, &table);
+int extract_sideset_from_adj_table(const enum ElemType                      element_type,
+                                   const ptrdiff_t                          n_elements,
+                                   const element_idx_t *const SFEM_RESTRICT table,
+                                   ptrdiff_t *SFEM_RESTRICT                 n_surf_elements,
+                                   element_idx_t **SFEM_RESTRICT            parent_element,
+                                   int16_t **SFEM_RESTRICT                  side_idx) {
+    double tick = MPI_Wtime();
 
     int local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
     fill_local_side_table(element_type, local_side_table);
     enum ElemType st = side_type(element_type);
     const int     nn = elem_num_nodes(st);
+    const int     ns = elem_num_sides(element_type);
 
     *n_surf_elements = 0;
     for (ptrdiff_t e = 0; e < n_elements; e++) {
@@ -401,8 +398,27 @@ int extract_skin_sideset(const ptrdiff_t               n_elements,
         }
     }
 
-    free(table);
+    double tock = MPI_Wtime();
+    printf("adj_table.c: extract_sideset_from_adj_table\t%g seconds\n", tock - tick);
+
     return SFEM_SUCCESS;
+}
+
+int extract_skin_sideset(const ptrdiff_t               n_elements,
+                         const ptrdiff_t               n_nodes,
+                         const int                     element_type,
+                         idx_t **const SFEM_RESTRICT   elems,
+                         ptrdiff_t *SFEM_RESTRICT      n_surf_elements,
+                         element_idx_t **SFEM_RESTRICT parent_element,
+                         int16_t **SFEM_RESTRICT       side_idx)
+
+{
+    const int      ns    = elem_num_sides(element_type);
+    element_idx_t *table = 0;
+    create_element_adj_table(n_elements, n_nodes, element_type, elems, &table);
+    int err = extract_sideset_from_adj_table(element_type, n_elements, table, n_surf_elements, parent_element, side_idx);
+    free(table);
+    return err;
 }
 
 int extract_surface_from_sideset(const int                                element_type,

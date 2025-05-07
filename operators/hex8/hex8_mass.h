@@ -8,21 +8,32 @@
 extern "C" {
 #endif
 
-int hex8_apply_mass(const ptrdiff_t nelements,
-                     const ptrdiff_t nnodes,
-                     idx_t **const SFEM_RESTRICT elements,
-                     geom_t **const SFEM_RESTRICT points,
-                     const ptrdiff_t stride_u,
-                     const real_t *const SFEM_RESTRICT u,
-                     const ptrdiff_t stride_values,
-                     real_t *const SFEM_RESTRICT values);
+int hex8_apply_mass(const ptrdiff_t                   nelements,
+                    const ptrdiff_t                   nnodes,
+                    idx_t **const SFEM_RESTRICT       elements,
+                    geom_t **const SFEM_RESTRICT      points,
+                    const ptrdiff_t                   stride_u,
+                    const real_t *const SFEM_RESTRICT u,
+                    const ptrdiff_t                   stride_values,
+                    real_t *const SFEM_RESTRICT       values);
 
-int hex8_assemble_lumped_mass(const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT points,
-                               const ptrdiff_t stride_values,
-                               real_t *const SFEM_RESTRICT values);
+int hex8_assemble_lumped_mass(const ptrdiff_t              nelements,
+                              const ptrdiff_t              nnodes,
+                              idx_t **const SFEM_RESTRICT  elements,
+                              geom_t **const SFEM_RESTRICT points,
+                              const ptrdiff_t              stride_values,
+                              real_t *const SFEM_RESTRICT  values);
+
+int hex8_lumped_mass_apply(const ptrdiff_t                   nelements,
+                           const ptrdiff_t                   nnodes,
+                           idx_t **const SFEM_RESTRICT       elements,
+                           geom_t **const SFEM_RESTRICT      points,
+                           const real_t                      mass_density,
+                           int                               block_size,
+                           const ptrdiff_t                   stride_u,
+                           const real_t *const SFEM_RESTRICT u,
+                           const ptrdiff_t                   stride_values,
+                           real_t *const SFEM_RESTRICT       out);
 
 #ifdef __cplusplus
 }

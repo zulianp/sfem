@@ -46,6 +46,7 @@ set(SFEM_MODULES
     operators 
     operators/beam2 
     operators/boundary_conditions
+    operators/contact
     operators/cvfem 
     operators/cvfem_quad4
     operators/cvfem_tet4
@@ -113,17 +114,21 @@ endif()
 if(SFEM_ENABLE_CUDA)
      list(APPEND SFEM_MODULES 
         algebra/cuda
-        operators/cuda
         frontend/cuda
-        operators/tet4/cuda
-        operators/macro_tet4/cuda
-        operators/tet10/cuda
-        operators/sstet4/cuda
-        operators/hex8/cuda
-        operators/sshex8/cuda
-        operators/hierarchical/cuda
-        resampling/cuda
         operators/boundary_conditions/cuda
+        operators/contact/cuda
+        operators/cuda
+        operators/hex8/cuda
+        operators/hierarchical/cuda
+        operators/macro_tet4/cuda
+        operators/quadshell4/cuda
+        operators/spectral_hex/cuda
+        operators/sshex8/cuda
+        operators/ssquad4/cuda
+        operators/sstet4/cuda
+        operators/tet10/cuda
+        operators/tet4/cuda
+        resampling/cuda
         )
 
     if(SFEM_ENABLE_AMG)
@@ -137,16 +142,22 @@ foreach(MODULE ${SFEM_MODULES})
 
     if(SFEM_ENABLE_CUDA)
         file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cuh")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
     if(SFEM_MODULE_KERNEL_SOURCES)
         list(APPEND SFEM_KERNEL_SOURCES "${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
+
+    if(SFEM_MODULE_KERNEL_HEADERS)
+        list(APPEND SFEM_KERNEL_HEADERS "${SFEM_MODULE_KERNEL_HEADERS}")
+    endif()
 endforeach(MODULE)
 
 if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
+    list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
 endif()
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
@@ -242,7 +253,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -314,13 +325,19 @@ if(SFEM_ENABLE_TESTING)
         amg/tests
     )
 
+    if(SFEM_ENABLE_CUDA)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/tests/cuda
+        )
+
+    endif()
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
     
-    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
-    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+        file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
-    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
-    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
     endforeach(UNIT_TEST)
 

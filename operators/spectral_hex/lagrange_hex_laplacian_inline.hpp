@@ -363,7 +363,7 @@ int lagrange_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
         lagrange_hex_laplacian_apply<N, Q, scalar_t>(S, D, fff, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
-            assert(!isnan(element_vector[v]));
+            assert(element_vector[v] == element_vector[v]);
 #pragma omp atomic update
             values[ev[v]] += element_vector[v];
         }

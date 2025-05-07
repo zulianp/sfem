@@ -659,20 +659,20 @@ def main():
     # c_log("--------------------------")
     # c_code(op.hessian_sym_SoA())
 
-    # c_log("--------------------------")
-    # c_log("apply")
-    # c_log("--------------------------")
-    # c_code(op.apply())
+    c_log("--------------------------")
+    c_log("apply")
+    c_log("--------------------------")
+    c_code(op.apply())
 
     # c_log("--------------------------")
     # c_log("hessian_diag")
     # c_log("--------------------------")
     # c_code(op.hessian_diag())
 
-    c_log("--------------------------")
-    c_log("cauchy_stress")
-    c_log("--------------------------")
-    c_code(op.cauchy_stress())
+    # c_log("--------------------------")
+    # c_log("cauchy_stress")
+    # c_log("--------------------------")
+    # c_code(op.cauchy_stress())
 
     stop = perf_counter()
     console.print(f"Overall: {stop - start} seconds")

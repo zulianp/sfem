@@ -1,8 +1,10 @@
 #ifndef SPECTRAL_HEX_LAPLACIAN_INLINE_HPP
 #define SPECTRAL_HEX_LAPLACIAN_INLINE_HPP
 
-#include <cstdio>
 #include "sfem_base.h"
+
+#include <cstdio>
+#include <cmath>
 
 template <int N, typename T>
 void spectral_hex_laplacian_readable_apply(
@@ -251,7 +253,7 @@ int spectral_hex_laplacian_apply_tpl(const ptrdiff_t                   nelements
         spectral_hex_laplacian_apply<N, scalar_t>(D, fff, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
-            assert(!isnan(element_vector[v]));
+            assert(element_vector[v] == element_vector[v]);
 #pragma omp atomic update
             values[ev[v]] += element_vector[v];
         }

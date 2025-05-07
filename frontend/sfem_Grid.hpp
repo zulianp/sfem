@@ -15,9 +15,9 @@ namespace sfem {
     template <class T>
     class Grid {
     public:
-        static std::unique_ptr<Grid> create_from_file(MPI_Comm comm, const std::string &path);
+        static std::shared_ptr<Grid> create_from_file(MPI_Comm comm, const std::string &path);
 
-        static std::unique_ptr<Grid> create(MPI_Comm     comm,
+        static std::shared_ptr<Grid> create(MPI_Comm     comm,
                                             const int    nx,
                                             const int    ny,
                                             const int    nz,

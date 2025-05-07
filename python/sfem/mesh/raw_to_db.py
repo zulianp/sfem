@@ -72,12 +72,9 @@ def write_transient_data(
 
         point_data_steps = [None] * n_time_steps
 
-
-
         if point_data:
             paths = point_data.split(",")
             types = point_data_type.split(",")
-
 
             for p in paths:
                 point_data_files = glob.glob(p, recursive=False)
@@ -93,7 +90,9 @@ def write_transient_data(
                         point_data_steps[i] = []
 
                     if i >= len(point_data_files):
-                        print(f"Trying to acess file that does not exists at index {i}/{n_time_steps}")
+                        print(
+                            f"Trying to acess file that does not exists at index {i}/{n_time_steps}"
+                        )
 
                     point_data_steps[i].append(point_data_files[i])
 

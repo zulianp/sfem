@@ -14,6 +14,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cmath>
 
 template <int N, int Q, typename T>
 void lagrange_hex_mass_apply(const T jacobian_determinant,
@@ -147,7 +148,7 @@ int lagrange_hex_mass_apply_tpl(const ptrdiff_t                   nelements,
         lagrange_hex_mass_apply<N, Q, scalar_t>(jacobian_determinant, S, qw, element_u, element_vector);
 
         for (int v = 0; v < N3; v++) {
-            assert(!isnan(element_vector[v]));
+            assert(element_vector[v] == element_vector[v]);
 #pragma omp atomic update
             values[ev[v]] += element_vector[v];
         }
@@ -235,7 +236,7 @@ int spectral_hex_mass_apply_tpl(const ptrdiff_t                   nelements,
 
         // Assume affine here!
         hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
-        assert(!isnan(jacobian_determinant));
+        assert(jacobian_determinant == jacobian_determinant);
 
         for (int v = 0; v < N3; v++) {
 #pragma omp atomic update
