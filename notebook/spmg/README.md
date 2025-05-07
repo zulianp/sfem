@@ -72,3 +72,198 @@ count_iter,count_mg_cycles,count_nl_smooth,count_smooth,norm_penetration,norm_re
 10,34,102,1020,2.14521e-10,2.21501e-12,1.69421e-09,100000,1e-10,0.0195356
 11,36,108,1080,7.21849e-12,9.55059e-13,2.60857e-10,100000,1e-11,0.15397
 ```
+
+# MULTISPHERE
+
+```bash
+#microelements 102400000, #micronodes 103297761
+create_device_elements 200000 729 (ss)
+AREA: 1
+Writing mesh in test_contact/coarse_mesh
+Derefine 8 -> 4
+create_device_elements 200000 125 (ss)
+Derefine 4 -> 2
+create_device_elements 200000 27 (ss)
+Derefine 2 -> 1
+create_device_elements 200000 8
+0) 	L=8
+n_dofs: 309893283
+n_ops: 1
+n_constraints: 1
+1) 	L=4
+n_dofs: 39074643
+n_ops: 1
+n_constraints: 1
+2) 	L=2
+n_dofs: 4969323
+n_ops: 1
+n_constraints: 1
+3) 	L=1
+n_dofs: 642663
+n_ops: 1
+n_constraints: 1
+0) r_norm=0.00184811 (<0.01)
+1) r_norm=0.00039883 (<0.01)
+lagr_ub: 5.224278e+02
+1|2|24) [lagr++ 1] norm_pen 0.000000e+00, norm_rpen 3.988296e-04, penetration_tol 1.584893e-03, penalty_param 1.000000e+02
+0) r_norm=0.000537988 (<0.0001)
+1) r_norm=0.000343337 (<0.0001)
+2) r_norm=0.000220416 (<0.0001)
+3) r_norm=0.000141657 (<0.0001)
+4) r_norm=9.1031e-05 (<0.0001)
+lagr_ub: 3.851690e+02
+2|7|84) [lagr++ 2] norm_pen 0.000000e+00, norm_rpen 9.103099e-05, penetration_tol 2.511886e-05, penalty_param 1.000000e+02
+0) r_norm=1.67194e-05 (<1e-06)
+1) r_norm=1.01319e-05 (<1e-06)
+2) r_norm=6.43469e-06 (<1e-06)
+3) r_norm=4.10117e-06 (<1e-06)
+4) r_norm=2.61619e-06 (<1e-06)
+5) r_norm=1.66945e-06 (<1e-06)
+6) r_norm=1.06559e-06 (<1e-06)
+7) r_norm=6.80242e-07 (<1e-06)
+lagr_ub: 2.758045e+02
+3|15|180) [lagr++ 3] norm_pen 0.000000e+00, norm_rpen 6.802422e-07, penetration_tol 3.981072e-07, penalty_param 1.000000e+02
+0) r_norm=6.01142e-05 (<1e-08)
+1) r_norm=3.78785e-05 (<1e-08)
+2) r_norm=2.40967e-05 (<1e-08)
+3) r_norm=1.53514e-05 (<1e-08)
+4) r_norm=9.78513e-06 (<1e-08)
+5) r_norm=6.23924e-06 (<1e-08)
+6) r_norm=3.9792e-06 (<1e-08)
+7) r_norm=2.5383e-06 (<1e-08)
+8) r_norm=1.6193e-06 (<1e-08)
+9) r_norm=1.03307e-06 (<1e-08)
+10) r_norm=6.59086e-07 (<1e-08)
+11) r_norm=4.20512e-07 (<1e-08)
+12) r_norm=2.68307e-07 (<1e-08)
+13) r_norm=1.71193e-07 (<1e-08)
+14) r_norm=1.09231e-07 (<1e-08)
+15) r_norm=6.96964e-08 (<1e-08)
+16) r_norm=4.4471e-08 (<1e-08)
+17) r_norm=2.83755e-08 (<1e-08)
+18) r_norm=1.81054e-08 (<1e-08)
+19) r_norm=1.15525e-08 (<1e-08)
+20) r_norm=7.37123e-09 (<1e-08)
+lagr_ub: 2.506130e+02
+4|36|432) [lagr++ 4] norm_pen 0.000000e+00, norm_rpen 7.371232e-09, penetration_tol 6.309573e-09, penalty_param 1.000000e+02
+0) r_norm=1.39767e-05 (<1e-10)
+1) r_norm=8.82687e-06 (<1e-10)
+2) r_norm=5.62349e-06 (<1e-10)
+3) r_norm=3.5855e-06 (<1e-10)
+4) r_norm=2.28633e-06 (<1e-10)
+5) r_norm=1.45801e-06 (<1e-10)
+6) r_norm=9.29864e-07 (<1e-10)
+7) r_norm=5.93049e-07 (<1e-10)
+8) r_norm=3.78251e-07 (<1e-10)
+9) r_norm=2.41253e-07 (<1e-10)
+10) r_norm=1.53873e-07 (<1e-10)
+11) r_norm=9.81424e-08 (<1e-10)
+12) r_norm=6.25968e-08 (<1e-10)
+13) r_norm=3.99252e-08 (<1e-10)
+14) r_norm=2.54649e-08 (<1e-10)
+15) r_norm=1.62419e-08 (<1e-10)
+16) r_norm=1.03593e-08 (<1e-10)
+17) r_norm=6.60732e-09 (<1e-10)
+18) r_norm=4.21424e-09 (<1e-10)
+19) r_norm=2.68789e-09 (<1e-10)
+20) r_norm=1.71437e-09 (<1e-10)
+21) r_norm=1.09345e-09 (<1e-10)
+22) r_norm=6.97412e-10 (<1e-10)
+23) r_norm=4.44817e-10 (<1e-10)
+24) r_norm=2.83709e-10 (<1e-10)
+25) r_norm=1.80953e-10 (<1e-10)
+26) r_norm=1.15414e-10 (<1e-10)
+27) r_norm=7.3612e-11 (<1e-10)
+lagr_ub: 2.446918e+02
+5|64|768) [lagr++ 5] norm_pen 0.000000e+00, norm_rpen 7.361200e-11, penetration_tol 1.000000e-10, penalty_param 1.000000e+02
+0) r_norm=3.37149e-06 (<1e-11)
+1) r_norm=2.11674e-06 (<1e-11)
+2) r_norm=1.34635e-06 (<1e-11)
+3) r_norm=8.57828e-07 (<1e-11)
+4) r_norm=5.46852e-07 (<1e-11)
+5) r_norm=3.48679e-07 (<1e-11)
+6) r_norm=2.22337e-07 (<1e-11)
+7) r_norm=1.41781e-07 (<1e-11)
+8) r_norm=9.04123e-08 (<1e-11)
+9) r_norm=5.76561e-08 (<1e-11)
+10) r_norm=3.67676e-08 (<1e-11)
+11) r_norm=2.34469e-08 (<1e-11)
+12) r_norm=1.49522e-08 (<1e-11)
+13) r_norm=9.53503e-09 (<1e-11)
+14) r_norm=6.08048e-09 (<1e-11)
+15) r_norm=3.87752e-09 (<1e-11)
+16) r_norm=2.4727e-09 (<1e-11)
+17) r_norm=1.57684e-09 (<1e-11)
+18) r_norm=1.00555e-09 (<1e-11)
+19) r_norm=6.41233e-10 (<1e-11)
+20) r_norm=4.08912e-10 (<1e-11)
+21) r_norm=2.60761e-10 (<1e-11)
+22) r_norm=1.66286e-10 (<1e-11)
+23) r_norm=1.06039e-10 (<1e-11)
+24) r_norm=6.76203e-11 (<1e-11)
+25) r_norm=4.31209e-11 (<1e-11)
+26) r_norm=2.74978e-11 (<1e-11)
+27) r_norm=1.75351e-11 (<1e-11)
+28) r_norm=1.11819e-11 (<1e-11)
+29) r_norm=7.1306e-12 (<1e-11)
+lagr_ub: 2.433506e+02
+6|94|1128) [lagr++ 6] norm_pen 0.000000e+00, norm_rpen 7.130599e-12, penetration_tol 1.584893e-12, penalty_param 1.000000e+02
+```
+
+```c++
+name,calls,total,avg
+ConjugateGradient::apply,94,3.37316,0.0358847
+ContactConditions::assemble_mass_vector,1,5.04977,5.04977
+ContactConditions::distribute_contact_forces,752,0.00177386,2.35886e-06
+ContactConditions::hessian_block_diag_sym,1,0.000328245,0.000328245
+ContactConditions::init,2,0.0215931,0.0107966
+ContactConditions::normal_project,758,0.00285458,3.76593e-06
+ContactConditions::signed_distance,1,0.00551548,0.00551548
+DirichletConditions::derefine,3,0.0120329,0.00401096
+Function::apply,25391,8.698,0.000342562
+Function::apply_constraints,2,0.000883456,0.000441728
+Function::apply_zero_constraints,564,0.00511146,9.06288e-06
+Function::constaints_mask,4,0.000726054,0.000181514
+Function::copy_constrained_dofs,25391,0.155237,6.11384e-06
+Function::derefine,3,0.0290091,0.0096697
+Function::hessian_block_diag_sym,4,0.0174643,0.00436608
+GPUDirichletConditions::mask,4,0.000716294,0.000179074
+LinearElasticity::hessian_block_diag_sym,1,0.0162065,0.0162065
+Mass::create,1,1.6e-06,1.6e-06
+Mesh::write,1,0.729635,0.729635
+Output::write,2,4.28756,2.14378
+SSMeshContactSurface::collect_points,1,5.04443,5.04443
+ScaledBlockVectorMult::apply,24633,0.087787,3.5638e-06
+SemiStructuredGPULinearElasticity::derefine_op,3,0.016177,0.00539233
+SemiStructuredMesh::export_as_standard,1,5.29403,5.29403
+SemiStructuredMesh::init,1,0.194271,0.194271
+ShiftableBlockSymJacobi::apply,24351,0.0517909,2.12685e-06
+ShiftableBlockSymJacobi::set_diag,4,0.135575,0.0338936
+ShiftableBlockSymJacobi::shift,846,0.00935098,1.10532e-05
+ShiftedPenaltyMultigrid::apply,1,141.941,141.941
+ShiftedPenaltyMultigrid::cycle(1),94,15.0346,0.159943
+ShiftedPenaltyMultigrid::cycle(2),94,7.33414,0.0780228
+ShiftedPenaltyMultigrid::cycle(3),94,3.37492,0.0359034
+ShiftedPenaltyMultigrid::eval_residual_and_jacobian,658,0.0902757,0.000137197
+ShiftedPenaltyMultigrid::nonlinear_cycle,94,76.1171,0.809756
+ShiftedPenaltyMultigrid::nonlinear_smooth,188,0.156422,0.000832032
+ShiftedPenaltyMultigrid::penalty_pseudo_galerkin_assembly,94,0.0202744,0.000215686
+Sideset::create_from_selector,2,0.0304142,0.0152071
+collect_energy_norm_correction,6,0.30126,0.05021
+create_ssgmg::construct,1,0.409778,0.409778
+cu_affine_sshex8_linear_elasticity_apply[2],1974,3.91385,0.0019827
+cu_affine_sshex8_linear_elasticity_apply[4],1974,4.55856,0.0023093
+cu_affine_sshex8_linear_elasticity_apply[8],1886,0.017077,9.05462e-06
+cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[2],1,2.751e-06,2.751e-06
+cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[4],1,2.72e-06,2.72e-06
+cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[8],1,0.00123624,0.00123624
+cu_linear_elasticity_apply,19557,0.0418666,2.14075e-06
+cu_sshex8_hierarchical_prolongation,94,0.000376884,4.0094e-06
+cu_sshex8_hierarchical_restriction,94,0.000292597,3.11273e-06
+cu_sshex8_prolongate,188,0.000513969,2.73388e-06
+cu_sshex8_restrict,188,63.9816,0.340328
+sshex8_extract_nodeset_from_sideset,5,0.0829495,0.0165899
+sshex8_fill_points,1,5.03159,5.03159
+ssquad4_restrict,282,0.0189899,6.734e-05
+test_contact,1,176.592,176.592
+```
