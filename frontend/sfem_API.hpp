@@ -157,7 +157,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(
-            const int dim,
+            const int                              dim,
             const std::shared_ptr<Buffer<T>>      &diag,
             const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
             const ExecutionSpace                   es) {
@@ -167,7 +167,7 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             CUDA_BLAS<T>::build_blas(ret->blas);
             ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl);
-        } else 
+        } else
 #endif  // SFEM_ENABLE_CUDA
         {
             OpenMP_BLAS<T>::build_blas(ret->blas);

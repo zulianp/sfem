@@ -92,7 +92,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
     sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es_to_be_ported);
+    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
