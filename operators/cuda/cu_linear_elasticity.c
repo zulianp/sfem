@@ -1,5 +1,8 @@
 #include "cu_linear_elasticity.h"
 
+#include "sfem_base.h"
+#include "sfem_defs.h"
+
 #include "cu_hex8_linear_elasticity.h"
 #include "cu_macro_tet4_linear_elasticity.h"
 #include "cu_tet10_linear_elasticity.h"
@@ -8,18 +11,18 @@
 #include <mpi.h>
 #include <stdio.h>
 
-extern int cu_linear_elasticity_apply(const enum ElemType element_type,
-                                      const ptrdiff_t nelements,
-                                      const ptrdiff_t stride,  // Stride for elements and fff
+extern int cu_linear_elasticity_apply(const enum ElemType              element_type,
+                                      const ptrdiff_t                  nelements,
+                                      const ptrdiff_t                  stride,  // Stride for elements and fff
                                       const idx_t *const SFEM_RESTRICT elements,
-                                      const void *const SFEM_RESTRICT jacobian_adjugate,
-                                      const void *const SFEM_RESTRICT jacobian_determinant,
-                                      const real_t mu,
-                                      const real_t lambda,
-                                      const enum RealType real_type,
-                                      const real_t *const d_x,
-                                      real_t *const d_y,
-                                      void *stream) {
+                                      const void *const SFEM_RESTRICT  jacobian_adjugate,
+                                      const void *const SFEM_RESTRICT  jacobian_determinant,
+                                      const real_t                     mu,
+                                      const real_t                     lambda,
+                                      const enum RealType              real_type,
+                                      const real_t *const              d_x,
+                                      real_t *const                    d_y,
+                                      void                            *stream) {
     switch (element_type) {
         case TET4: {
             return cu_tet4_linear_elasticity_apply(nelements,
@@ -99,31 +102,23 @@ extern int cu_linear_elasticity_apply(const enum ElemType element_type,
         }
 
         default: {
-            fprintf(stderr,
-                    "Invalid element type %d\n (%s %s:%d)",
-                    element_type,
-                    __FUNCTION__,
-                    __FILE__,
-                    __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
+            SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type);
+            return SFEM_FAILURE;
         }
     }
 }
 
-extern int cu_linear_elasticity_diag(const enum ElemType element_type,
-                                     const ptrdiff_t nelements,
-                                     const ptrdiff_t stride,  // Stride for elements and fff
+extern int cu_linear_elasticity_diag(const enum ElemType              element_type,
+                                     const ptrdiff_t                  nelements,
+                                     const ptrdiff_t                  stride,  // Stride for elements and fff
                                      const idx_t *const SFEM_RESTRICT elements,
-                                     const void *const SFEM_RESTRICT jacobian_adjugate,
-                                     const void *const SFEM_RESTRICT jacobian_determinant,
-                                     const real_t mu,
-                                     const real_t lambda,
-                                     const enum RealType real_type,
-                                     real_t *const d_t,
-                                     void *stream) {
+                                     const void *const SFEM_RESTRICT  jacobian_adjugate,
+                                     const void *const SFEM_RESTRICT  jacobian_determinant,
+                                     const real_t                     mu,
+                                     const real_t                     lambda,
+                                     const enum RealType              real_type,
+                                     real_t *const                    d_t,
+                                     void                            *stream) {
     switch (element_type) {
         case TET4: {
             return cu_tet4_linear_elasticity_diag(nelements,
@@ -171,33 +166,25 @@ extern int cu_linear_elasticity_diag(const enum ElemType element_type,
                                                    stream);
         }
         default: {
-            fprintf(stderr,
-                    "Invalid element type %d\n (%s %s:%d)",
-                    element_type,
-                    __FUNCTION__,
-                    __FILE__,
-                    __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
+            SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type);
+            return SFEM_FAILURE;
         }
     }
 }
 
-int cu_linear_elasticity_bsr(const enum ElemType element_type,
-                             const ptrdiff_t nelements,
-                             const ptrdiff_t stride,
-                             const idx_t *const SFEM_RESTRICT elements,
-                             const void *const SFEM_RESTRICT jacobian_adjugate,
-                             const void *const SFEM_RESTRICT jacobian_determinant,
-                             const real_t mu,
-                             const real_t lambda,
-                             const enum RealType real_type,
+int cu_linear_elasticity_bsr(const enum ElemType                element_type,
+                             const ptrdiff_t                    nelements,
+                             const ptrdiff_t                    stride,
+                             const idx_t *const SFEM_RESTRICT   elements,
+                             const void *const SFEM_RESTRICT    jacobian_adjugate,
+                             const void *const SFEM_RESTRICT    jacobian_determinant,
+                             const real_t                       mu,
+                             const real_t                       lambda,
+                             const enum RealType                real_type,
                              const count_t *const SFEM_RESTRICT rowptr,
-                             const idx_t *const SFEM_RESTRICT colidx,
-                             void *const SFEM_RESTRICT values,
-                             void *stream) {
+                             const idx_t *const SFEM_RESTRICT   colidx,
+                             void *const SFEM_RESTRICT          values,
+                             void                              *stream) {
     switch (element_type) {
         case HEX8: {
             return cu_affine_hex8_linear_elasticity_bsr(nelements,
@@ -214,16 +201,46 @@ int cu_linear_elasticity_bsr(const enum ElemType element_type,
                                                         stream);
         }
         default: {
-            fprintf(stderr,
-                    "Invalid element type %d\n (%s %s:%d)",
-                    element_type,
-                    __FUNCTION__,
-                    __FILE__,
-                    __LINE__);
-            fflush(stderr);
-            assert(0);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
+            SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int cu_linear_elasticity_block_diag_sym_aos(const enum ElemType             element_type,
+                                            const ptrdiff_t                 nelements,
+                                            const ptrdiff_t                 stride,
+                                            idx_t *const SFEM_RESTRICT      elements,
+                                            const void *const SFEM_RESTRICT jacobian_adjugate,
+                                            const void *const SFEM_RESTRICT jacobian_determinant,
+                                            const real_t                    mu,
+                                            const real_t                    lambda,
+                                            const enum RealType             real_type,
+                                            void *const                     out,
+                                            void                           *stream) {
+    switch (element_type) {
+        case HEX8: {
+            return cu_affine_hex8_linear_elasticity_block_diag_sym(nelements,
+                                                                   stride,
+                                                                   elements,
+                                                                   jacobian_adjugate,
+                                                                   jacobian_determinant,
+                                                                   mu,
+                                                                   lambda,
+                                                                   6,
+                                                                   real_type,
+                                                                   // Offset for AoS to SoA style function
+                                                                   out + 0 * real_type_size(real_type),
+                                                                   out + 1 * real_type_size(real_type),
+                                                                   out + 2 * real_type_size(real_type),
+                                                                   out + 3 * real_type_size(real_type),
+                                                                   out + 4 * real_type_size(real_type),
+                                                                   out + 5 * real_type_size(real_type),
+                                                                   stream);
+        }
+        default: {
+            SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type);
+            return SFEM_FAILURE;
         }
     }
 }

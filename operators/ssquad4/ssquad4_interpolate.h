@@ -15,6 +15,21 @@ int ssquad4_element_node_incidence_count(const int                     level,
                                          idx_t **const SFEM_RESTRICT   elements,
                                          uint16_t *const SFEM_RESTRICT count);
 
+int ssquad4_hierarchical_restriction(int                                 level,
+                                     const ptrdiff_t                     nelements,
+                                     idx_t **const SFEM_RESTRICT         elements,
+                                     const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                     const int                           vec_size,
+                                     const real_t *const SFEM_RESTRICT   from,
+                                     real_t *const SFEM_RESTRICT         to);
+
+int ssquad4_hierarchical_prolongation(int                               level,
+                                      const ptrdiff_t                   nelements,
+                                      idx_t **const SFEM_RESTRICT       elements,
+                                      const int                         vec_size,
+                                      const real_t *const SFEM_RESTRICT from,
+                                      real_t *const SFEM_RESTRICT       to);
+
 int ssquad4_restrict(const ptrdiff_t                     nelements,
                      const int                           from_level,
                      const int                           from_level_stride,

@@ -38,7 +38,7 @@ namespace sfem {
                 calc_J_pen;
 
         bool good() const {
-            return ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
+            return sq_norm_ramp_p && sq_norm_ramp_m && ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
         }
     };
 
@@ -157,6 +157,8 @@ namespace sfem {
                     }
                 }
             };
+
+            assert(tpl.good());
         }
     };
 

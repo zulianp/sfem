@@ -4,8 +4,10 @@
 #include "hex8_laplacian_inline_cpu.h"
 
 #include "hex8_quadrature.h"
+#include "sfem_mask.h"
 #include "sshex8_skeleton_stencil.h"
 #include "stencil3.h"
+#include "stencil_cg.h"
 #include "tet4_inline_cpu.h"
 
 #include <math.h>
@@ -602,7 +604,7 @@ int sshex8_laplacian_element_matrix(int                           level,
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
-    const scalar_t h = 1. / level;
+    const scalar_t      h = 1. / level;
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -629,6 +631,368 @@ int sshex8_laplacian_element_matrix(int                           level,
 
         accumulator_t element_matrix[8 * 8];
         hex8_laplacian_matrix_fff_integral(fff, &values[i * 64]);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
+                                              const ptrdiff_t                       nelements,
+                                              idx_t **const SFEM_RESTRICT           elements,
+                                              const jacobian_t *const SFEM_RESTRICT g_fff,
+                                              const real_t *const SFEM_RESTRICT     u,
+                                              real_t *const SFEM_RESTRICT           values) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+    const int Lm1  = level - 1;
+    const int Lm13 = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        scalar_t      *eu = malloc(nxe * sizeof(scalar_t));
+        idx_t         *ev = malloc(nxe * sizeof(idx_t));
+        accumulator_t *v  = malloc(nxe * sizeof(accumulator_t));
+
+        scalar_t      element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t      m_fff[6], fff[6];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[d] = u[ev[d]];
+                    assert(eu[d] == eu[d]);
+                }
+
+                memset(v, 0, nxe * sizeof(accumulator_t));
+
+                for (int d = 0; d < 6; d++) {
+                    m_fff[d] = g_fff[e * 6 + d];
+                }
+            }
+
+            const scalar_t h = 1. / level;
+            hex8_sub_fff_0(m_fff, h, fff);
+
+            accumulator_t laplacian_matrix[8 * 8];
+            hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+            scalar_t laplacian_stencil[3 * 3 * 3];
+            hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
+            sshex8_stencil(level + 1, level + 1, level + 1, laplacian_stencil, eu, v);
+            sshex8_surface_stencil(
+                    level + 1, level + 1, level + 1, 1, level + 1, (level + 1) * (level + 1), laplacian_matrix, eu, v);
+
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+                    assert(v[d] == v[d]);
+#pragma omp atomic update
+                    values[ev[d]] += v[d];
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+        free(eu);
+        free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_laplacian_substructuring_inner_fff(const int                             level,
+                                                     const ptrdiff_t                       nelements,
+                                                     idx_t **const SFEM_RESTRICT           elements,
+                                                     const jacobian_t *const SFEM_RESTRICT g_fff,
+                                                     const real_t *const SFEM_RESTRICT     rhs,
+                                                     real_t *const SFEM_RESTRICT           u) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        idx_t    *ev   = malloc(nxe * sizeof(idx_t));
+        scalar_t *eu   = malloc(nxe * sizeof(scalar_t));
+        scalar_t *erhs = malloc(nxe * sizeof(scalar_t));
+        scalar_t *r    = malloc(nxe * sizeof(scalar_t));
+        scalar_t *p    = malloc(nxe * sizeof(scalar_t));
+        scalar_t *Ap   = malloc(nxe * sizeof(scalar_t));
+
+        scalar_t      element_u[8];
+        accumulator_t element_vector[8];
+        scalar_t      laplacian_stencil[3 * 3 * 3];
+
+        const scalar_t h = 1. / level;
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[d] = u[ev[d]];
+                    assert(eu[d] == eu[d]);
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    erhs[d] = rhs[ev[d]];
+                    assert(erhs[d] == erhs[d]);
+                }
+
+                scalar_t fff[6];
+                for (int d = 0; d < 6; d++) {
+                    fff[d] = g_fff[e * 6 + d] * h;
+                }
+
+                accumulator_t laplacian_matrix[8 * 8];
+                hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+                hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
+            }
+
+            memset(r, 0, nxe * sizeof(scalar_t));
+            sshex8_stencil(level + 1, level + 1, level + 1, laplacian_stencil, eu, r);
+
+            for (int v = 0; v < nxe; v++) {
+                erhs[v] -= r[v];
+            }
+
+            sshex8_zero_boundary(level + 1, level + 1, level + 1, eu);
+            sshex8_zero_boundary(level + 1, level + 1, level + 1, erhs);
+
+            // printf("----------------------------\n");
+            // printf("R\n");
+            // printf("----------------------------\n");
+            // for (ptrdiff_t zi = 0; zi <= level; zi++) {
+            //     for (ptrdiff_t yi = 0; yi <= level; yi++) {
+            //         for (ptrdiff_t xi = 0; xi <= level; xi++) {
+            //             const int   lidx = sshex8_lidx(level, xi, yi, zi);
+            //             printf("%g ", r[lidx]);
+            //         }
+            //         printf("\t");
+            //     }
+            //     printf("\n");
+            // }
+            // printf("----------------------------\n");
+
+            // printf("----------------------------\n");
+            // printf("RHS\n");
+            // printf("----------------------------\n");
+            // for (ptrdiff_t zi = 0; zi <= level; zi++) {
+            //     for (ptrdiff_t yi = 0; yi <= level; yi++) {
+            //         for (ptrdiff_t xi = 0; xi <= level; xi++) {
+            //             const int   lidx = sshex8_lidx(level, xi, yi, zi);
+            //             printf("%g ", erhs[lidx]);
+            //         }
+            //         printf("\t");
+            //     }
+            //     printf("\n");
+            // }
+            // printf("----------------------------\n");
+
+            int err = sshex8_stencil_cg(nxe,
+                                        1e-8,
+                                        1e-16,
+                                        // Grid info
+                                        level + 1,
+                                        level + 1,
+                                        level + 1,
+                                        laplacian_stencil,
+                                        //
+                                        erhs,
+                                        //
+                                        r,
+                                        p,
+                                        Ap,
+                                        //
+                                        eu);
+
+            if (SFEM_SUCCESS != err) {
+                // fprintf(stderr, "FAILED to solved laplacian subsystem\n");
+                SFEM_ERROR("FAILED to solved laplacian subsystem\n");
+
+                continue;
+            }
+
+            // printf("----------------------------\n");
+            // printf("OUT\n");
+            // printf("----------------------------\n");
+            // for (ptrdiff_t zi = 0; zi <= level; zi++) {
+            //     for (ptrdiff_t yi = 0; yi <= level; yi++) {
+            //         for (ptrdiff_t xi = 0; xi <= level; xi++) {
+            //             const int lidx = sshex8_lidx(level, xi, yi, zi);
+            //             printf("%g ", eu[lidx]);
+            //         }
+            //         printf("\t");
+            //     }
+            //     printf("\n");
+            // }
+            // printf("----------------------------\n");
+
+            {
+                // Scatter elemental data
+                for (int zi = 1; zi < level; zi++) {
+                    for (int yi = 1; yi < level; yi++) {
+                        for (int xi = 1; xi < level; xi++) {
+                            const int   lidx = sshex8_lidx(level, xi, yi, zi);
+                            const idx_t gidx = ev[lidx];
+                            u[gidx] += eu[lidx];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+        free(eu);
+        free(erhs);
+        free(r);
+        free(p);
+        free(Ap);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_laplacian_bjacobi_fff(const int                             level,
+                                        const ptrdiff_t                       nelements,
+                                        idx_t **const SFEM_RESTRICT           elements,
+                                        const jacobian_t *const SFEM_RESTRICT g_fff,
+                                        const uint16_t *const                 count,
+                                        const mask_t *const                   mask,
+                                        const element_idx_t *const            adjaciency_table,
+                                        const real_t *const SFEM_RESTRICT     rhs,
+                                        real_t *const SFEM_RESTRICT           u) {
+    const int nxe      = sshex8_nxe(level);
+    const int txe      = sshex8_txe(level);
+    const int nn       = level + 1;
+    const int lystride = nn;
+    const int lzstride = lystride * lystride;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        idx_t    *ev    = malloc(nxe * sizeof(idx_t));
+        scalar_t *eu    = calloc(nxe, sizeof(scalar_t));
+        scalar_t *erhs  = calloc(nxe, sizeof(scalar_t));
+        scalar_t *r     = calloc(nxe, sizeof(scalar_t));
+        scalar_t *p     = calloc(nxe, sizeof(scalar_t));
+        scalar_t *Ap    = calloc(nxe, sizeof(scalar_t));
+        int      *emask = calloc(nxe, sizeof(int));
+
+        scalar_t      element_u[8];
+        accumulator_t element_vector[8];
+        accumulator_t laplacian_matrix[8 * 8];
+        scalar_t      laplacian_stencil[3 * 3 * 3];
+
+        const scalar_t h = 1. / level;
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    emask[d] = mask_get(ev[d], mask);
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[d] = u[ev[d]];
+                    assert(eu[d] == eu[d]);
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    erhs[d] = rhs[ev[d]];
+                    assert(erhs[d] == erhs[d]);
+                }
+
+                scalar_t fff[6];
+                for (int d = 0; d < 6; d++) {
+                    fff[d] = g_fff[e * 6 + d] * h;
+                }
+
+                hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
+                hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
+            }
+
+            memset(r, 0, nxe * sizeof(scalar_t));
+
+            const element_idx_t * const neighs = &adjaciency_table[e * 6];
+
+            sshex8_stencil(nn, nn, nn, laplacian_stencil, eu, r);
+            sshex8_surface_stencil(nn, nn, nn, 1, nn, nn * nn, laplacian_matrix, eu, r);
+
+            // FIXME Handle 0-neumann boundary conditions and inner boundaries
+
+            for (int v = 0; v < nxe; v++) {
+                if (emask[v]) {
+                    r[v] = eu[v];
+                }
+            }
+
+            for (int v = 0; v < nxe; v++) {
+                erhs[v] -= r[v];
+            }
+
+            // sshe8_print("RHS", nn, nn, nn, erhs);
+            memset(eu, 0, nxe * sizeof(scalar_t));
+            int err = sshex8_stencil_cg_constrained(nxe,
+                                                    1e-8,
+                                                    1e-16,
+                                                    // Grid info
+                                                    nn,
+                                                    nn,
+                                                    nn,
+                                                    laplacian_stencil,
+                                                    laplacian_matrix,
+                                                    emask,
+                                                    //
+                                                    erhs,
+                                                    //
+                                                    r,
+                                                    p,
+                                                    Ap,
+                                                    //
+                                                    eu);
+
+            if (SFEM_SUCCESS != err) {
+                SFEM_ERROR("FAILED to solve laplacian subsystem\n");
+                continue;
+            }
+
+            // Scatter elemental data
+            for (int d = 0; d < nxe; d++) {
+                if (emask[d]) continue;
+                const idx_t gidx = ev[d];
+#pragma omp atomic update
+                u[gidx] += (eu[d] / count[gidx]);
+            }
+        }
+
+        // Clean-up
+        free(ev);
+        free(emask);
+        free(eu);
+        free(erhs);
+        free(r);
+        free(p);
+        free(Ap);
     }
 
     return SFEM_SUCCESS;

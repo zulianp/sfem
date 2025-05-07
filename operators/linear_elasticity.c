@@ -282,6 +282,42 @@ int linear_elasticity_apply_aos(const enum ElemType               element_type,
     return SFEM_FAILURE;
 }
 
+int linear_elasticity_apply_adjugate_aos(const enum ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const real_t                          mu,
+                                         const real_t                          lambda,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values) {
+    switch (element_type) {
+        case HEX8: {
+            return affine_hex8_linear_elasticity_apply_adjugate(nelements,
+                                                                nnodes,
+                                                                elements,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                3,
+                                                                &u[0],
+                                                                &u[1],
+                                                                &u[2],
+                                                                3,
+                                                                &values[0],
+                                                                &values[1],
+                                                                &values[2]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
 int linear_elasticity_crs_soa(const enum ElemType                element_type,
                               const ptrdiff_t                    nelements,
                               const ptrdiff_t                    nnodes,

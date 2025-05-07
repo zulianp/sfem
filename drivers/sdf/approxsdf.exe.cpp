@@ -102,7 +102,7 @@ namespace sfem {
         for (int d = 0; d < dim; d++) {
             for (ptrdiff_t i = 0; i < nelements; i++) {
                 for (int v1 = 0; v1 < nxe; v1++) {
-                    for (int v2 = 1; v2 < nxe; v2++) {
+                    for (int v2 = v1 + 1; v2 < nxe; v2++) {
                         geom_t dist = fabs(p[d][elems[v1][i]] - p[d][elems[v2][i]]);
                         radius[d]   = MAX(dist, radius[d]);
                     }
@@ -237,7 +237,7 @@ namespace sfem {
         ptrdiff_t ncells = 1;
         for (int d = 0; d < dim; d++) {
             geom_t extent = (max[d] - min[d]);
-            ret->n[d]     = extent /  max_radius;
+            ret->n[d]     = extent / max_radius;
             ret->delta[d] = extent / ret->n[d];
             ret->o[d]     = min[d];
 

@@ -1,59 +1,66 @@
 #ifndef SFEM_API_HPP
 #define SFEM_API_HPP
 
+// C includes
 #include "adj_table.h"
 #include "crs_graph.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_mask.h"
 #include "sfem_mesh.h"
+#include "sfem_prolongation_restriction.h"
+#include "sshex8.h"
+#include "sshex8_interpolate.h"
+#include "ssquad4.h"
 
-#include "sfem_Chebyshev3.hpp"
-#include "sfem_ContactConditions.hpp"
-#include "sfem_CooSym.hpp"
-#include "sfem_Function.hpp"
-#include "sfem_Multigrid.hpp"
+// C++ includes
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_Chebyshev3.hpp"
+#include "sfem_ContactConditions.hpp"
+#include "sfem_Context.hpp"
+#include "sfem_CooSym.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
+#include "sfem_CRSGraph.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
+#include "sfem_Multigrid.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
 
+// CUDA includes
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_sshex8_interpolate.h"
 #include "cu_tet4_prolongation_restriction.h"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
+#include "sfem_cuda_ShiftableJacobi.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
 #include "sfem_cuda_solver.hpp"
-
 #else
 namespace sfem {
     static void device_synchronize() {}
+    static bool is_ptr_device(const void *) { return false; }
+    template <typename T>
+    inline T & to_host(T &ptr) {
+        return ptr;
+    }
 }  // namespace sfem
 #endif
 
-#include "sfem_ShiftableJacobi.hpp"
-#include "sfem_Stationary.hpp"
-#include "sfem_prolongation_restriction.h"
-#include "sshex8.h"
-#include "sshex8_interpolate.h"
-
-#include "ssquad4.h"
-
-#include <sys/stat.h>
+// Externals
 #include "matrixio_crs.h"
 
-#include "sfem_glob.hpp"
-
-// C++
-#include "sfem_CRSGraph.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+// System
+#include <sys/stat.h>
 
 namespace sfem {
 
@@ -78,7 +85,7 @@ namespace sfem {
 
         // // FIXME make simpler version
         auto impl = sfem::blas<T>(es)->xypaz;
-        return std::make_shared<LambdaOperator<T>>(
+        return sfem::make_op<T>(
                 n,
                 n,
                 [n, diagonal_scaling, impl](const T *const x, T *const y) {
@@ -144,6 +151,31 @@ namespace sfem {
             ret->default_init();
         }
 
+        ret->set_diag(diag);
+        return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(
+            const int                              dim,
+            const std::shared_ptr<Buffer<T>>      &diag,
+            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
+            const ExecutionSpace                   es) {
+        auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<T>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_CUDA<T>::build(dim, ret->impl);
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            OpenMP_BLAS<T>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_OpenMP<T>::build(dim, ret->impl);
+        }
+
+        ret->execution_space_ = es;
+        ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
     }
@@ -268,10 +300,9 @@ namespace sfem {
         return conds;
     }
 
-    static std::shared_ptr<NeumannConditions> create_neumann_conditions(
-            const std::shared_ptr<FunctionSpace>            &space,
-            const std::vector<NeumannConditions::Condition> &conditions,
-            const ExecutionSpace                             es) {
+    static std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                         const std::vector<NeumannConditions::Condition> &conditions,
+                                                         const ExecutionSpace                             es) {
         auto conds = sfem::NeumannConditions::create(space, conditions);
 
 #ifdef SFEM_ENABLE_CUDA
@@ -324,30 +355,71 @@ namespace sfem {
             }
 
             if (to_space->has_semi_structured_mesh()) {
-                return std::make_shared<LambdaOperator<real_t>>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            auto &ssm = to_space->semi_structured_mesh();
-                            cu_sshex8_hierarchical_prolongation(ssm.level(),
-                                                                ssm.n_elements(),
-                                                                ssm.n_elements(),
-                                                                elements->data(),
-                                                                from_space->block_size(),
-                                                                SFEM_REAL_DEFAULT,
-                                                                1,
-                                                                from,
-                                                                SFEM_REAL_DEFAULT,
-                                                                1,
-                                                                to,
-                                                                SFEM_DEFAULT_STREAM);
-                        },
-                        es);
+                if (from_space->has_semi_structured_mesh()) {
+                    auto from_elements = from_space->device_elements();
+                    if (!from_elements) {
+                        from_elements = create_device_elements(from_space, from_space->element_type());
+                        from_space->set_device_elements(from_elements);
+                    }
+
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
+
+                                auto &from_ssm = from_space->semi_structured_mesh();
+                                auto &to_ssm   = to_space->semi_structured_mesh();
+
+                                cu_sshex8_prolongate(from_ssm.n_elements(),
+                                                     from_ssm.n_elements(),
+                                                     from_ssm.level(),
+                                                     1,
+                                                     from_elements->data(),
+                                                     to_ssm.level(),
+                                                     1,
+                                                     elements->data(),
+                                                     from_space->block_size(),
+                                                     SFEM_REAL_DEFAULT,
+                                                     1,
+                                                     from,
+                                                     SFEM_REAL_DEFAULT,
+                                                     1,
+                                                     to,
+                                                     SFEM_DEFAULT_STREAM);
+                            },
+                            es);
+
+                } else {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
+
+                                auto &ssm = to_space->semi_structured_mesh();
+                                cu_sshex8_hierarchical_prolongation(ssm.level(),
+                                                                    ssm.n_elements(),
+                                                                    ssm.n_elements(),
+                                                                    elements->data(),
+                                                                    from_space->block_size(),
+                                                                    SFEM_REAL_DEFAULT,
+                                                                    1,
+                                                                    from,
+                                                                    SFEM_REAL_DEFAULT,
+                                                                    1,
+                                                                    to,
+                                                                    SFEM_DEFAULT_STREAM);
+                            },
+                            es);
+                }
             } else {
-                return std::make_shared<LambdaOperator<real_t>>(
+                return make_op<real_t>(
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_prolongation_element_based");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
                                                                             mesh->nelements,
@@ -388,6 +460,7 @@ namespace sfem {
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_prolongate");
+
                                 auto &from_ssm = from_space->semi_structured_mesh();
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
@@ -460,8 +533,6 @@ namespace sfem {
             }
         }
 
-        // element_to_node_incidence_count->print(std::cout);
-
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             auto dbuff = to_device(element_to_node_incidence_count);
@@ -473,32 +544,75 @@ namespace sfem {
             }
 
             if (from_space->has_semi_structured_mesh()) {
-                return std::make_shared<LambdaOperator<real_t>>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            auto &ssm = from_space->semi_structured_mesh();
-                            cu_sshex8_hierarchical_restriction(ssm.level(),
-                                                               ssm.n_elements(),
-                                                               ssm.n_elements(),
-                                                               elements->data(),
-                                                               dbuff->data(),
-                                                               block_size,
-                                                               SFEM_REAL_DEFAULT,
-                                                               1,
-                                                               from,
-                                                               SFEM_REAL_DEFAULT,
-                                                               1,
-                                                               to,
-                                                               SFEM_DEFAULT_STREAM);
-                        },
-                        es);
+                if (to_space->has_semi_structured_mesh()) {
+                    // FIXME make sure to reuse fine level elements and strides
+                    auto to_elements = to_space->device_elements();
+                    if (!to_elements) {
+                        to_elements = create_device_elements(to_space, to_space->element_type());
+                        to_space->set_device_elements(to_elements);
+                    }
+
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_restrict");
+
+                                auto &from_ssm = from_space->semi_structured_mesh();
+                                auto &to_ssm   = to_space->semi_structured_mesh();
+
+                                cu_sshex8_restrict(from_ssm.n_elements(),
+                                                   from_ssm.n_elements(),
+                                                   from_ssm.level(),
+                                                   1,
+                                                   elements->data(),
+                                                   dbuff->data(),
+                                                   to_ssm.level(),
+                                                   1,
+                                                   to_elements->data(),
+                                                   block_size,
+                                                   SFEM_REAL_DEFAULT,
+                                                   1,
+                                                   from,
+                                                   SFEM_REAL_DEFAULT,
+                                                   1,
+                                                   to,
+                                                   SFEM_DEFAULT_STREAM);
+                            },
+                            es);
+
+                } else {
+                    return make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_restriction");
+
+                                auto &ssm = from_space->semi_structured_mesh();
+                                cu_sshex8_hierarchical_restriction(ssm.level(),
+                                                                   ssm.n_elements(),
+                                                                   ssm.n_elements(),
+                                                                   elements->data(),
+                                                                   dbuff->data(),
+                                                                   block_size,
+                                                                   SFEM_REAL_DEFAULT,
+                                                                   1,
+                                                                   from,
+                                                                   SFEM_REAL_DEFAULT,
+                                                                   1,
+                                                                   to,
+                                                                   SFEM_DEFAULT_STREAM);
+                            },
+                            es);
+                }
 
             } else {
-                return std::make_shared<LambdaOperator<real_t>>(
+                return make_op<real_t>(
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_restriction_element_based");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
                                                                            mesh->nelements,
@@ -525,6 +639,7 @@ namespace sfem {
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
+
                                 auto &ssm = from_space->semi_structured_mesh();
                                 sshex8_hierarchical_restriction(ssm.level(),
                                                                 ssm.n_elements(),
@@ -564,6 +679,8 @@ namespace sfem {
                         to_space->n_dofs(),
                         from_space->n_dofs(),
                         [=](const real_t *const from, real_t *const to) {
+                            SFEM_TRACE_SCOPE("hierarchical_restriction_with_counting");
+
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_restriction_with_counting(from_element,
                                                                    to_element,
@@ -595,7 +712,7 @@ namespace sfem {
             auto d_edges     = to_device(edges);
             auto d_crs_graph = to_device(crs_graph);
 
-            return std::make_shared<LambdaOperator<real_t>>(
+            return make_op<real_t>(
                     rows,
                     cols,
                     [=](const real_t *const from, real_t *const to) {
@@ -615,7 +732,7 @@ namespace sfem {
         }
 #endif  // SFEM_ENABLE_CUDA
 
-        return std::make_shared<LambdaOperator<real_t>>(
+        return make_op<real_t>(
                 rows,
                 cols,
                 [=](const real_t *const from, real_t *const to) {
@@ -647,7 +764,7 @@ namespace sfem {
             auto d_edges     = to_device(edges);
             auto d_crs_graph = to_device(crs_graph);
 
-            return std::make_shared<LambdaOperator<real_t>>(
+            return make_op<real_t>(
                     rows,
                     cols,
                     [=](const real_t *const from, real_t *const to) {
@@ -670,7 +787,7 @@ namespace sfem {
 
 #endif  // SFEM_ENABLE_CUDA
 
-        return std::make_shared<LambdaOperator<real_t>>(
+        return make_op<real_t>(
                 rows,
                 cols,
                 [=](const real_t *const from, real_t *const to) {
@@ -806,13 +923,23 @@ namespace sfem {
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
-            return sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
-                                    d_crs_graph->n_nodes(),
-                                    block_size,
-                                    d_crs_graph->rowptr(),
-                                    d_crs_graph->colidx(),
-                                    values,
-                                    (real_t)1);
+            auto spmv = sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                         d_crs_graph->n_nodes(),
+                                         block_size,
+                                         d_crs_graph->rowptr(),
+                                         d_crs_graph->colidx(),
+                                         values,
+                                         (real_t)1);
+
+            // Owns the pointers
+            return sfem::make_op<real_t>(
+                    f->space()->n_dofs(),
+                    f->space()->n_dofs(),
+                    [=](const real_t *const x, real_t *const y) {
+                        spmv->apply(x, y);
+                        f->copy_constrained_dofs(x, y);
+                    },
+                    es);
         }
 #endif
         auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
@@ -829,7 +956,16 @@ namespace sfem {
                                      crs_graph->colidx(),
                                      values,
                                      (real_t)1);
-        return spmv;
+        // return spmv;
+        // Owns the pointers
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    spmv->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                es);
     }
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,

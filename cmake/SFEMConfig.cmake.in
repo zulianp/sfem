@@ -1,6 +1,6 @@
 @PACKAGE_INIT@
 
-########## old style variables. Preferably you should use target_link_libraries(my_target ParMoonolith::par_moonolith) ################
+########## old style variables. Preferably you should use target_link_libraries(my_target SFEM::sfem) ################
 @OLD_CMAKE_CONFIG_CONTENT@
 ########## end of old style variables ####################################################################################
 

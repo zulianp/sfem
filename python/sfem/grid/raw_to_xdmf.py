@@ -47,8 +47,10 @@ def raw_to_xdmf(path_to_meta_file):
                 time_steps = int(i[12:])
             elif i[:6] == "path: ":
                 binary_path = i[6:]
-            elif i[:6] == "rpath: ":
+            elif i[:7] == "rpath: ":
+                print("rpath: ", i[7:])
                 rpath = int(i[7:])
+                
             elif i[:6] == "type: ":
                 tp = i[6:]
                 if tp == "long\n":

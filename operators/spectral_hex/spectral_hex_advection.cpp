@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cmath>
 
 template <int N, int Q, typename T>
 static SFEM_INLINE void lagrange_hex_advection_apply(
@@ -202,7 +203,7 @@ int lagrange_hex_advection_apply_tpl(const ptrdiff_t                   nelements
                 S, D, adjugate, qw, element_qvx, element_qvy, element_qvz, element_c, element_vector);
 
         for (int v = 0; v < N3; v++) {
-            assert(!isnan(element_vector[v]));
+            assert(element_vector[v] == element_vector[v]);
 #pragma omp atomic update
             values[ev[v]] += element_vector[v];
         }

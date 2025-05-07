@@ -129,6 +129,12 @@ namespace sfem {
                 apply_op(p, v);
 
                 const T ptv = blas.dot(n, r0, v);
+
+                if(ptv == 0) {
+                    info = SFEM_FAILURE;
+                    break;
+                }
+
                 const T alpha = rho / ptv;
 
                 blas.zaxpby(n, 1, x, alpha, p, h);
@@ -148,6 +154,12 @@ namespace sfem {
 
                 const T tts = blas.dot(n, t, s);
                 const T ttt = blas.dot(n, t, t);
+
+                if(ttt == 0) {
+                    info = SFEM_FAILURE;
+                    break;
+                }
+
                 const T omega = tts / ttt;
 
                 blas.zaxpby(n, 1, h, omega, s, x);
@@ -218,6 +230,11 @@ namespace sfem {
                 apply_op(y, v);
 
                 const T ptv = blas.dot(n, r0, v);
+                if(ptv == 0) {
+                    info = SFEM_FAILURE;
+                    break;    
+                }
+
                 const T alpha = rho / ptv;
 
                 blas.zaxpby(n, 1, x, alpha, y, h);
@@ -242,6 +259,13 @@ namespace sfem {
 
                 const T tts = blas.dot(n, t, s);
                 const T ttt = blas.dot(n, t, t);
+
+                if(ttt == 0) {
+                    info = SFEM_FAILURE;
+                    break;    
+                }
+
+
                 const T omega = tts / ttt;
 
                 blas.zaxpby(n, 1, h, omega, z, x);

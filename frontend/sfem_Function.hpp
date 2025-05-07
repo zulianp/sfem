@@ -30,10 +30,14 @@ namespace sfem {
         std::shared_ptr<Buffer<element_idx_t>> parent();
         std::shared_ptr<Buffer<int16_t>>       lfi();
         static std::shared_ptr<Sideset>        create_from_file(MPI_Comm comm, const char *path);
+        ptrdiff_t size() const;
+        MPI_Comm comm() const;
 
         Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
         Sideset();
         ~Sideset();
+
+        static std::shared_ptr<Sideset> create(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
 
         static std::shared_ptr<Sideset> create_from_selector(
                 const std::shared_ptr<Mesh>                                         &mesh,
@@ -162,12 +166,35 @@ namespace sfem {
             return nullptr;
         }
 
+        virtual bool is_no_op() const { return false; }
+
         virtual void                set_option(const std::string                &/*name*/, bool /*val*/) {}
         virtual std::shared_ptr<Op> clone() const {
             assert(false);
             return nullptr;
         }
     };
+
+    class NoOp final : public Op {
+    public:
+        const char *name() const override { return "NoOp"; }
+
+        bool is_linear() const override { return true; }
+        int  hessian_crs(const real_t *const /*x*/,
+                         const count_t *const /*rowptr*/,
+                         const idx_t *const /*colidx*/,
+                         real_t *const /*values*/) override {
+            return SFEM_SUCCESS;
+        }
+        int  gradient(const real_t *const x, real_t *const out) override { return SFEM_SUCCESS; }
+        int  apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
+        bool is_no_op() const override { return true; }
+        int  value(const real_t  */*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
+    };
+
+    inline std::shared_ptr<NoOp> no_op() {
+        return std::make_shared<NoOp>();
+    }
 
     class NeumannConditions final : public Op {
     public:
@@ -184,6 +211,8 @@ namespace sfem {
 
         static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::vector<struct Condition>  &conditions);
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override;
 
         const char *name() const override;
 
@@ -203,7 +232,9 @@ namespace sfem {
 
         inline bool is_linear() const override { return true; }
 
-        int   n_conditions() const;
+        int n_conditions() const;
+        std::shared_ptr<FunctionSpace> space();
+        std::vector<struct Condition> &conditions();
 
     private:
         class Impl;

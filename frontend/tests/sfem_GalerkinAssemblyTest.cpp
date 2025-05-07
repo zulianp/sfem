@@ -28,12 +28,17 @@
 
 #define OP_TIME(op, x, y)                                      \
     do {                                                       \
+        if (SFEM_REPEAT > 1) {                                 \
+            op->apply(x, y);                                   \
+        }                                                      \
         sfem::device_synchronize();                            \
         double start = MPI_Wtime();                            \
-        op->apply(x, y);                                       \
-        sfem::device_synchronize();                            \
+        for (int r = 0; r < SFEM_REPEAT; r++) {                \
+            op->apply(x, y);                                   \
+            sfem::device_synchronize();                        \
+        }                                                      \
         double stop    = MPI_Wtime();                          \
-        double elapsed = stop - start;                         \
+        double elapsed = (stop - start) / SFEM_REPEAT;         \
         printf("%s,\t%.5f,\t%.1f,\t\t%.1f,\t\t(%ld, %ld)\n",   \
                #op,                                            \
                elapsed,                                        \
@@ -55,9 +60,14 @@ int test_cube() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    const char *SFEM_OPERATOR       = "Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = "MF";
+    const char *SFEM_OPERATOR = "Laplacian";
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+
+    const char *SFEM_FINE_OP_TYPE = "MF";
+    SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
+
     const char *SFEM_COARSE_OP_TYPE = "MF";
+    SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -68,18 +78,31 @@ int test_cube() {
     int SFEM_ELEMENT_DEREFINE = 1;
     SFEM_READ_ENV(SFEM_ELEMENT_DEREFINE, atoi);
 
-    // int SFEM_VERBOSE = 0;
-    // SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+    int SFEM_DEBUG_EXPORT = 0;
+    SFEM_READ_ENV(SFEM_DEBUG_EXPORT, atoi);
 
-    int block_size = 1;
+    int SFEM_DEBUG_PRINT = 0;
+    SFEM_READ_ENV(SFEM_DEBUG_PRINT, atoi);
+
+    int SFEM_REPEAT = 1;
+    SFEM_READ_ENV(SFEM_REPEAT, atoi);
+
+    int SFEM_HIERARCHICAL_RENUMBERING = 1;
+    SFEM_READ_ENV(SFEM_HIERARCHICAL_RENUMBERING, atoi);
+
+    int SFEM_BLOCK_SIZE = 1;
+    SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+
+    if (SFEM_HIERARCHICAL_RENUMBERING) {
+        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    }
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -122,12 +145,21 @@ int test_cube() {
             es);
 
     auto h_input = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
+
     {
-        ptrdiff_t n      = fs_coarse->n_dofs();
-        auto      data   = h_input->data();
-        auto      points = fs_coarse->semi_structured_mesh().points()->data();
+        geom_t **points{nullptr};
+        if (fs_coarse->has_semi_structured_mesh()) {
+            points = fs_coarse->semi_structured_mesh().points()->data();
+        } else {
+            points = fs_coarse->mesh_ptr()->points()->data();
+        }
+
+        ptrdiff_t n    = fs_coarse->mesh_ptr()->n_nodes();
+        auto      data = h_input->data();
         for (ptrdiff_t i = 0; i < n; i++) {
-            data[i] = points[0][i] * points[0][i];
+            for (int b = 0; b < SFEM_BLOCK_SIZE; b++) {
+                data[i * SFEM_BLOCK_SIZE + b] = (b + 1) * points[0][i] * points[0][i];
+            }
         }
     }
 
@@ -163,76 +195,118 @@ int test_cube() {
            fs_coarse->n_dofs(),
            tock - tick);
 
-    auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
+    if (SFEM_REPEAT == 1) {
+        auto error = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
-    // Compare two results
+        // Compare two results
 #ifdef SFEM_ENABLE_CUDA
-    auto h_actual   = sfem::to_host(restricted);
-    auto h_expected = sfem::to_host(Ax_coarse);
+        auto h_restricted = sfem::to_host(restricted);
+        auto h_Ax_coarse  = sfem::to_host(Ax_coarse);
 #else
-    auto h_actual   = restricted;
-    auto h_expected = Ax_coarse;
+        auto h_restricted = restricted;
+        auto h_Ax_coarse  = Ax_coarse;
 #endif
-    {
-        auto      err      = error->data();
-        ptrdiff_t n        = fs_coarse->n_dofs();
-        auto      actual   = h_actual->data();
-        auto      expected = h_expected->data();
+        {
+            auto      err      = error->data();
+            ptrdiff_t n        = fs_coarse->n_dofs();
+            auto      actual   = h_restricted->data();
+            auto      expected = h_Ax_coarse->data();
 
-        real_t    largest_diff        = 0;
-        real_t    largest_diff_factor = 0;
-        ptrdiff_t arg_largest_diff    = SFEM_PTRDIFF_INVALID;
-        for (ptrdiff_t i = 0; i < n; i++) {
-            // actual: is composition of operators
-            // expected: is application of coarse operator
-            real_t diff = fabs(actual[i] - expected[i]);
-            err[i]      = diff;
-            if (diff > 1e-8) {
-                printf("%ld) %g != %g (%g, %g)\n",
-                       i,
-                       (double)actual[i],
-                       (double)expected[i],
-                       (double)diff,
-                       (double)actual[i] / expected[i]);
+            real_t    largest_diff        = 0;
+            real_t    largest_diff_factor = 0;
+            ptrdiff_t arg_largest_diff    = SFEM_PTRDIFF_INVALID;
+            for (ptrdiff_t i = 0; i < n; i++) {
+                // actual: is composition of operators
+                // expected: is application of coarse operator
+                real_t diff = fabs(actual[i] - expected[i]);
+                err[i]      = diff;
+                if (diff > 1e-8 || diff != diff) {
+                    printf("%ld) %g != %g (%g, %g)\n",
+                           i,
+                           (double)actual[i],
+                           (double)expected[i],
+                           (double)diff,
+                           (double)actual[i] / expected[i]);
+                }
+
+                if (diff > largest_diff) {
+                    largest_diff        = diff;
+                    arg_largest_diff    = i;
+                    largest_diff_factor = actual[i] / expected[i];
+                }
             }
 
-            if (diff > largest_diff) {
-                largest_diff        = diff;
-                arg_largest_diff    = i;
-                largest_diff_factor = actual[i] / expected[i];
-            }
-        }
+            if (SFEM_DEBUG_PRINT) {
+                std::cout << "--------------\n";
+                std::cout << "Prolongated\n";
+                std::cout << "--------------\n";
+#ifdef SFEM_ENABLE_CUDA
+                sfem::to_host(prolongated)->print(std::cout);
+#else
+                prolongated->print(std::cout);
+#endif
 
-        if (arg_largest_diff != -1) {
-            printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
-            SFEM_TEST_ASSERT(largest_diff < 1e-7);
+                std::cout << "--------------\n";
+                std::cout << "Actual\n";
+                std::cout << "--------------\n";
+                h_restricted->print(std::cout);
+
+                std::cout << "--------------\n";
+                std::cout << "Expected\n";
+                std::cout << "--------------\n";
+                h_Ax_coarse->print(std::cout);
+
+                std::cout << "--------------\n";
+            }
+
+            if (SFEM_DEBUG_EXPORT) {
+                sfem::create_directory("galerkin");
+                sfem::create_directory("galerkin/fields");
+
+                {  // COARSE
+                    SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
+
+                    sfem::Output out(fs_coarse);
+                    out.enable_AoS_to_SoA(SFEM_BLOCK_SIZE > 1);
+
+                    out.set_output_dir("galerkin/fields");
+                    SFEM_TEST_ASSERT(out.write("R", h_restricted->data()) == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
+                }
+
+                {  // FINE
+#ifdef SFEM_ENABLE_CUDA
+                    auto h_prolongated = sfem::to_host(prolongated);
+#else
+                    auto h_prolongated = prolongated;
+#endif
+
+                    sfem::create_directory("galerkin_fine");
+                    sfem::create_directory("galerkin_fine/fields");
+                    SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard("galerkin_fine") == SFEM_SUCCESS);
+
+                    sfem::Output out(fs);
+                    out.set_output_dir("galerkin_fine/fields");
+
+                    SFEM_TEST_ASSERT(out.write("P", h_prolongated->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            if (arg_largest_diff != -1) {
+                fflush(stdout);
+                printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
+                SFEM_TEST_ASSERT(largest_diff < 1e-7);
+            }
         }
     }
-
-#if 0
-    sfem::create_directory("galerkin");
-    sfem::create_directory("galerkin/fields");
-
-    SFEM_TEST_ASSERT(fs_coarse->semi_structured_mesh().export_as_standard("galerkin") == SFEM_SUCCESS);
-
-    sfem::Output out(fs_coarse);
-
-    out.set_output_dir("galerkin/fields");
-    SFEM_TEST_ASSERT(out.write("R", h_actual->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("u", h_input->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("Ax_coarse", Ax_coarse->data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(out.write("err", error->data()) == SFEM_SUCCESS);
-#endif
 
     return SFEM_TEST_SUCCESS;
 }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
 
     SFEM_RUN_TEST(test_cube);
 

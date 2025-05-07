@@ -8,6 +8,7 @@ namespace sfem {
     class FunctionSpace;
     class Op;
     class CRSGraph;
+    class Sideset;
 
     class DirichletConditions;
     class NeumannConditions;
