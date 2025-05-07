@@ -9,6 +9,7 @@ from sfem_codegen import *
 from sympy import init_printing
 from sympy import pprint
 
+import pdb
 init_printing()
 
 # eqviz = True
@@ -52,6 +53,87 @@ def assign_matrix(name, mat):
             var = sp.symbols(f"{name}[{i*cols + j}]")
             expr.append(ast.Assignment(var, mat[i, j]))
     return expr
+
+
+def tensor_element_laplacian(N, D, FFF, qw, u):
+    N2 = N * N
+    N3 = N2 * N
+
+    gx = sp.zeros(N3, 1)
+    gy = sp.zeros(N3, 1)
+    gz = sp.zeros(N3, 1)
+
+    out = sp.zeros(N3, 1)
+
+    use_intermediate = False
+    # use_intermediate = True
+
+    ret = {}
+
+    for k in range(0, N):
+        for j in range(0, N):
+            for i in range(0, N):
+                idx = k * N2 + j * N + i
+
+                D0 = D[N * i:]
+                D1 = D[N * j:]
+                D2 = D[N * k:]
+
+                u0 = u[k * N2 + j * N:]
+                u1 = u[k * N2 + i:]
+                u2 = u[j * N + i:]
+
+                acc = [D0[0] * u0[0], D1[0] * u1[0], D2[0] * u2[0]]
+                for n in range(1, N):
+                    acc[0] += D0[n] * u0[n]
+                    acc[1] += D1[n] * u1[n * N]
+                    acc[2] += D2[n] * u2[n * N2]
+
+                gxq = FFF[0] * acc[0] + FFF[1] * acc[1] + FFF[2] * acc[2]
+                gyq = FFF[1] * acc[0] + FFF[3] * acc[1] + FFF[4] * acc[2]
+                gzq = FFF[2] * acc[0] + FFF[4] * acc[1] + FFF[5] * acc[2]
+                w = qw[i] * qw[j] * qw[k]
+
+                gx[idx] = gxq * w
+                gy[idx] = gyq * w
+                gz[idx] = gzq * w
+
+
+    if use_intermediate:
+        ret["gx"] = gx
+        ret["gy"] = gy
+        ret["gz"] = gz 
+
+        gx = coeffs("gx", N3)
+        gy = coeffs("gy", N3)
+        gz = coeffs("gz", N3)     
+
+    for k in range(0, N):
+        for j in range(0, N):
+            for i in range(0, N):
+                D0 = D[i:]
+                D1 = D[j:]
+                D2 = D[k:]
+
+                g0 = gx[k * N2 + j * N:]
+                g1 = gy[k * N2 + i:]
+                g2 = gz[j * N + i:]
+
+                acc = [D0[0] * g0[0], D1[0] * g1[0], D2[0] * g2[0]]
+                for n in range(1, N):
+                    nidx = n * N
+                    acc[0] += D0[nidx] * g0[n]
+                    acc[1] += D1[nidx] * g1[nidx]
+                    acc[2] += D2[nidx] * g2[n * N2]
+
+                out[k * N2 + j * N + i] += acc[0] + acc[1] + acc[2]
+
+    ret["out"] = out
+
+    for k, v in ret.items():
+        print(f"// {k}")
+        expr = assign_matrix(k, v)
+        c_code(expr, optimizations)
 
 
 def tensor_element_interpolate(S, u):
@@ -229,3 +311,31 @@ if not eqviz and use_factorization:
     q = coeffs("q", Q * Q * Q)
 
 tensor_element_integrate(S, qw, q)
+
+print("\n//----------------------------\n")
+print("Laplacian\n")
+print("\n//----------------------------\n")
+
+
+def hex8_coeffs():
+    u = coeffs("u", 2 * 2* 2)
+    u2 = u[2]
+    u3 = u[3]
+    u6 = u[6]
+    u7 = u[7]
+
+    u[2] = u3
+    u[3] = u2
+
+    u[6] = u7
+    u[7] = u6
+    return u
+
+
+tensor_element_laplacian(
+    2,
+    sp.Matrix(4, 1, [-1, 1, -1, 1]),
+    matrix_coeff("fff", 3, 3),
+    sp.Matrix(2, 1, [0.5, 0.5]),
+    hex8_coeffs(),
+)

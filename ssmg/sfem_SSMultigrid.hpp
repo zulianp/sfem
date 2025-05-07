@@ -117,7 +117,7 @@ namespace sfem {
                 CUDA_ShiftedPenalty<real_t>::build(spmg->impl());
             }
 
-            mg->execution_space_ = EXECUTION_SPACE_DEVICE;
+            mg->set_execution_space(EXECUTION_SPACE_DEVICE);
         } else
 #endif
         {

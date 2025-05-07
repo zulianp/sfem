@@ -64,7 +64,7 @@ SPMG =  Shifted--Penalty Multigrid
 ## Milestones
 
 MS := Milestone
-() slot for achived milesone MM/YY (e.g., 02/2025)
+() slot for achieved milesone MM/YY (e.g., 02/2025)
 
 ### Austen
 
@@ -102,41 +102,54 @@ MS := Milestone
 **MS 1: ()**
 
    - [x] Two-level method matrix-free SPGMG on GPU (basic)
-   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (recuced size of constrained dofs and quantities, normal field)
+   - [x] Baseline obstacle problem with SDF using Shifted-Penalty (reduced size of constrained dofs and quantities, normal field)
    - [x] GMG: prolongation/restriction on CPU for SSHEX8, and SSQUAD4 (for contact boundary)
    - [x] Basic tracing facilities for timing different parts of the code (CPU only)
    - [x] GMG: Hierarchical indexing for no redundancy multilevel discretization
    - [x] SSHEX8-Mesh online generation from HEX8
    - [x] Multilevel GMG on CPU
    - [x] Contact stresses post-processor for SSHEX8
+   - [x] BC mask
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
-   - [ ] Export facilities for Paper 1
-   - [ ] Nonlinear obstacle contact loop (Optional)
+   - [X] Export facilities for Paper 1
+   
 
 **MS 2: ()**
+
    - [ ] Drafting/Finalizing P1
-   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 
-   - [ ] GPU porting of all missing discretization routines (Operators, SDF sampling, some algebra)
+   
+   - [X] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
+   - [X] GPU: ShiftableBlockSymJacobi
+   - [X] GPU: constraints_mask (minimal)
+   - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
+   - [X] GPU: sshex8_restrict and sshex8_prolongate
+   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [X] GPU: SparseBlockVector
+   - [X] Test/Debug GPU porting
 
 **MS 4: ()**
-
+   - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,...)
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
-
+   
 **MS (optional):**
 
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
-
+   - [ ] Explore high-order HEXA
+   - [ ] Explore sum factorization algorithm for HEX8
+   - [ ] Contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
+   - [ ] Nonlinear obstacle contact loop
 
 ### Hardik
 
 **MS 1: ()**
+
    - [x] MatLab implementation of SPGMG in 2D (scalar problem)
    - [ ] Update strategy of Lagrange multiplier
    - [ ] MatLab implementations for Paper 1 (P1)
@@ -146,20 +159,20 @@ MS := Milestone
    - [ ] Finalizing P1
 
 **MS 3:**
-   - [ ] Conceptualizing and Running verification experiments for P2/P3
+
+   - [ ] Conceptualizing verification experiments for P2/P3
    - [ ] Help drafting P2
 
 **MS 4:**
    - [ ] Proof-reading P3
 
-
 ### Gabriele
+
    - [ ] Collects and presents the convergence numbers of the MATLAB-based problems for P1 
    - [ ] Total number of iterations, inner iterations, number of linearizations, total number of smoothing steps, local energy norm, convergence rate (energy?), Penetration norm, difference from reference solution
    - [ ] 2D scalar problems, obstacle problem with source term and obstacle
          1. Create 2D meshes using Trelis scripting (with increasing resolution, max resolution 100K), Square 
          3. Compare with monotone MG
-         
    - [ ] 3D problems
          1. One sphere problem
          2. Multi-sphere problem
@@ -195,8 +208,6 @@ MS := Milestone
    - [x] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
    - [x] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
 
-
-
 - [ ] Post-processor 
    - [ ] Cauchy  stress for HEX8/SSHEX8
    - [ ] Contact stress for HEX8/SSHEX8 (lambda = M^-1 (b - A x))
@@ -214,7 +225,6 @@ If rejected content goes to **P2**
 - [ ] Options:
    1) SPAMG
    2) Comparing matrix-based (different formats) and matrix-free operator in the context of **P2** (Either Conference Proceeding or CCF Transactions on High Performance Computing):
-
 
 ## Maybes
 

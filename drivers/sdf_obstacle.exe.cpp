@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
     f->add_constraint(conds);
     f->add_operator(op);
 
-    auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS);
+    auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS, es);
 
     ptrdiff_t ndofs = fs->n_dofs();
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<sfem::Operator<real_t>> solver;
     if (SFEM_ELEMENT_REFINE_LEVEL > 0 && !SFEM_USE_SHIFTED_PENALTY) {
         printf("Using Shifted-Penalty Multigrid\n");
-        solver = sfem::create_ssmgc(f, contact_conds, es, nullptr);
+        solver = sfem::create_ssmgc(f, contact_conds, nullptr);
     } else {
         printf("Using Shifted-Penalty\n");
         int SFEM_USE_STEEPEST_DESCENT = 0;

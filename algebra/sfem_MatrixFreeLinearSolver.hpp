@@ -1,14 +1,23 @@
 #ifndef SFEM_MATRIX_FREE_LINEAR_SOLVER_HPP
 #define SFEM_MATRIX_FREE_LINEAR_SOLVER_HPP
 
+// C includes
+#include "sfem_base.h"
+
+// C++ includes
+#include "sfem_Buffer.hpp"
+#include "sfem_Tracer.hpp"
+
+// STL includes
 #include <cassert>
 #include <cstddef>
 #include <functional>
 #include <iostream>
 #include <memory>
 
-#include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
+#endif
 
 namespace sfem {
 
@@ -33,6 +42,14 @@ namespace sfem {
         const std::shared_ptr<Buffer<idx_t>>& idx() const { return idx_; }
         const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
         ptrdiff_t                             n_blocks() const { return idx_->size(); }
+
+        enum MemorySpace mem_space() const {
+            if (data_) {
+                return data_->mem_space();
+            }
+
+            return MEMORY_SPACE_INVALID;
+        }
 
         void print(std::ostream& os) const {
             for (ptrdiff_t i = 0; i < n_blocks(); i++) {
@@ -73,49 +90,80 @@ namespace sfem {
     template <typename T>
     class ScaledBlockVectorMult : public Operator<T> {
     public:
-        std::shared_ptr<SparseBlockVector<T>> sbv;
-        std::shared_ptr<Buffer<T>>            scaling;
+        std::shared_ptr<SparseBlockVector<T>>            sbv;
+        std::shared_ptr<Buffer<T>>                       scaling;
+        std::function<int(const T* const x, T* const y)> apply_;
 
-        int apply(const T* const x, T* const y) override {
-            const ptrdiff_t    n_blocks   = sbv->n_blocks();
-            const idx_t* const idx        = sbv->idx()->data();
-            const T* const     dd         = sbv->data()->data();
-            const T* const     s          = scaling->data();
-            const int          block_size = 3;
-            assert(sbv->block_size() == 6);
-
-            for (ptrdiff_t i = 0; i < scaling->size(); i++) {
-                y[i] = 0;
-            }
+        void default_init() {
+            apply_ = [this](const T* const x, T* const y) -> int {
+                const ptrdiff_t    n_blocks   = sbv->n_blocks();
+                const idx_t* const idx        = sbv->idx()->data();
+                const T* const     dd         = sbv->data()->data();
+                const T* const     s          = scaling->data();
+                const int          block_size = 3;
+                assert(sbv->block_size() == 6);
+                // memset(y, 0, n_blocks * 3 * sizeof(T));
 
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                auto di = &dd[i * 6];
-                auto si = s[i];
+                for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                    auto di = &dd[i * 6];
+                    auto si = s[i];
 
-                const idx_t b  = idx[i];
-                auto        xi = &x[b * block_size];
-                auto        yi = &y[b * block_size];
+                    const idx_t b  = idx[i];
+                    auto        xi = &x[b * block_size];
+                    auto        yi = &y[b * block_size];
 
-                T buff[3] = {0, 0, 0};
+                    T buff[3] = {0, 0, 0};
 
-                int d_idx = 0;
-                for (int d1 = 0; d1 < block_size; d1++) {
-                    const auto m = si * di[d_idx++];
-                    buff[d1] += m * xi[d1];
-                    for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                    int d_idx = 0;
+                    for (int d1 = 0; d1 < block_size; d1++) {
                         const auto m = si * di[d_idx++];
-                        buff[d1] += m * xi[d2];
-                        buff[d2] += m * xi[d1];
+                        buff[d1] += m * xi[d1];
+                        for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                            const auto m = si * di[d_idx++];
+                            buff[d1] += m * xi[d2];
+                            buff[d2] += m * xi[d1];
+                        }
                     }
+
+                    yi[0] += buff[0];
+                    yi[1] += buff[1];
+                    yi[2] += buff[2];
                 }
 
-                yi[0] += buff[0];
-                yi[1] += buff[1];
-                yi[2] += buff[2];
-            }
+                return SFEM_SUCCESS;
+            };
+        }
 
-            return SFEM_SUCCESS;
+#ifdef SFEM_ENABLE_CUDA
+        void cuda_init() {
+            assert(sbv->mem_space() == MEMORY_SPACE_DEVICE);
+            apply_ = [this](const T* const x, T* const y) -> int {
+                const ptrdiff_t    n_blocks = this->sbv->n_blocks();
+                const idx_t* const idx      = this->sbv->idx()->data();
+                const T* const     dd       = this->sbv->data()->data();
+                const T* const     s        = this->scaling->data();
+
+                return sbv_mult3<T>(n_blocks, idx, dd, s, x, y);
+            };
+        }
+#endif
+
+        void init() {
+#ifdef SFEM_ENABLE_CUDA
+            if (sbv->mem_space() == MEMORY_SPACE_DEVICE) {
+                cuda_init();
+                return;
+            }
+#endif
+            default_init();
+        }
+
+        ScaledBlockVectorMult() {}
+
+        int apply(const T* const x, T* const y) override {
+            SFEM_TRACE_SCOPE("ScaledBlockVectorMult::apply");
+            return apply_(x, y);
         }
 
         std::ptrdiff_t rows() const override { return sbv->data()->size(); }
@@ -129,13 +177,7 @@ namespace sfem {
         auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
         ret->sbv     = sbv;
         ret->scaling = scaling;
-
-        const ptrdiff_t    n_blocks   = sbv->n_blocks();
-        const idx_t* const idx        = sbv->idx()->data();
-        const T* const     dd         = sbv->data()->data();
-        const T* const     s          = scaling->data();
-        const int          block_size = 3;
-        assert(sbv->block_size() == 6);
+        ret->init();
         return ret;
     }
 

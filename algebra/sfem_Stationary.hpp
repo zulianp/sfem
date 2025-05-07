@@ -11,6 +11,11 @@
 #include "sfem_openmp_blas.hpp"
 
 namespace sfem {
+
+    template <typename T>
+    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es);
+
+    
     template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
@@ -78,17 +83,6 @@ namespace sfem {
                 SFEM_ERROR("Tried to call shift on object that is not subclass of ShiftableOperator!\n");
                 return SFEM_FAILURE;
             }
-
-            // auto prec = std::dynamic_pointer_cast<MatrixFreeLinearSolver<T>>(preconditioner);
-            // if (prec) {
-            //     return prec->set_op_and_diag_shift(op, diag, can_modify_diag_buffer);
-            // } else {
-            //     fprintf(stderr,
-            //             "Tried to call set_op_and_diag_shift on non MatrixFreeLinearSolver "
-            //             "object\n");
-            //     assert(false);
-            //     return SFEM_FAILURE;
-            // }
         }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,

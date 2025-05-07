@@ -27,7 +27,7 @@
 #include <vector>
 
 int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::string &name) {
-    auto fs = f->space();
+    auto fs  = f->space();
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), f->execution_space());
     f->apply_constraints(x->data());
@@ -62,7 +62,7 @@ int test_ssgmg_poisson_cube() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    const char *SFEM_OPERATOR       = "Laplacian";
+    const char *SFEM_OPERATOR = "Laplacian";
     // const char *SFEM_OPERATOR       = "em:Laplacian";
     const char *SFEM_FINE_OP_TYPE   = "MF";
     const char *SFEM_COARSE_OP_TYPE = "MF";
@@ -77,13 +77,13 @@ int test_ssgmg_poisson_cube() {
     auto   m  = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
 
-    int block_size = 1;
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    int  block_size = 1;
+    auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    // fs->semi_structured_mesh().apply_hierarchical_renumbering();
-   
-    auto f   = sfem::Function::create(fs);
-    auto op  = sfem::create_op(fs, SFEM_OPERATOR, es);
+    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+
+    auto f  = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
@@ -121,24 +121,22 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     int SFEM_BASE_RESOLUTION = 4;
-    // SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
-
-
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
     auto   m  = sfem::Mesh::create_hex8_cube(
             comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
 
-    int block_size = 3;
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    int  block_size = 3;
+    auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     fs->semi_structured_mesh().apply_hierarchical_renumbering();
-   
-    auto f   = sfem::Function::create(fs);
-    auto op  = sfem::create_op(fs, SFEM_OPERATOR, es);
+
+    auto f  = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
@@ -161,10 +159,6 @@ int test_ssgmg_linear_elasticity_cube() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
 
     SFEM_RUN_TEST(test_ssgmg_poisson_cube);
     SFEM_RUN_TEST(test_ssgmg_linear_elasticity_cube);
