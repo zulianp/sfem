@@ -1,8 +1,8 @@
 #include "cu_sshex8_laplacian.h"
 
-#include "sfem_cuda_base.h"
-#include "cu_sshex8_inline.hpp"
 #include "cu_hex8_laplacian_inline.hpp"
+#include "cu_sshex8_inline.hpp"
+#include "sfem_cuda_base.h"
 
 #include <cassert>
 #include <cstdio>
@@ -16,25 +16,23 @@
 #endif
 
 template <typename real_t>
-__global__ void cu_affine_sshex8_laplacian_diag_kernel(
-        const int level, const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements, const cu_jacobian_t *const SFEM_RESTRICT fff,
-        real_t *const SFEM_RESTRICT out) {
+__global__ void cu_affine_sshex8_laplacian_diag_kernel(const int                                level,
+                                                       const ptrdiff_t                          nelements,
+                                                       idx_t **const SFEM_RESTRICT              elements,
+                                                       const ptrdiff_t                          fff_stride,
+                                                       const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                                       real_t *const SFEM_RESTRICT              out) {
 #ifndef NDEBUG
     const int nxe = cu_sshex8_nxe(level);
 #endif
 
-
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
-
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         real_t laplacian_diag[8];
         // Build operator
         {
-            scalar_t sub_fff[6];
+            scalar_t       sub_fff[6];
             const scalar_t h = 1. / level;
-            cu_hex8_sub_fff_0(stride, &fff[e], h, sub_fff);
+            cu_hex8_sub_fff_0(fff_stride, &fff[e], h, sub_fff);
             cu_hex8_laplacian_diag_fff_integral(sub_fff, laplacian_diag);
         }
 
@@ -44,18 +42,16 @@ __global__ void cu_affine_sshex8_laplacian_diag_kernel(
                 for (int xi = 0; xi < level; xi++) {
                     assert(cu_sshex8_lidx(level, xi + 1, yi + 1, zi + 1) < nxe);
 
-                    int ev[8] = {
-                            // Bottom
-                            elements[cu_sshex8_lidx(level, xi, yi, zi) * stride + e],
-                            elements[cu_sshex8_lidx(level, xi + 1, yi, zi) * stride + e],
-                            elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi) * stride + e],
-                            elements[cu_sshex8_lidx(level, xi, yi + 1, zi) * stride + e],
-                            // Top
-                            elements[cu_sshex8_lidx(level, xi, yi, zi + 1) * stride + e],
-                            elements[cu_sshex8_lidx(level, xi + 1, yi, zi + 1) * stride + e],
-                            elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi + 1) * stride +
-                                     e],
-                            elements[cu_sshex8_lidx(level, xi, yi + 1, zi + 1) * stride + e]};
+                    int ev[8] = {// Bottom
+                                 elements[cu_sshex8_lidx(level, xi, yi, zi)][e],
+                                 elements[cu_sshex8_lidx(level, xi + 1, yi, zi)][e],
+                                 elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi)][e],
+                                 elements[cu_sshex8_lidx(level, xi, yi + 1, zi)][e],
+                                 // Top
+                                 elements[cu_sshex8_lidx(level, xi, yi, zi + 1)][e],
+                                 elements[cu_sshex8_lidx(level, xi + 1, yi, zi + 1)][e],
+                                 elements[cu_sshex8_lidx(level, xi + 1, yi + 1, zi + 1)][e],
+                                 elements[cu_sshex8_lidx(level, xi, yi + 1, zi + 1)][e]};
 
                     for (int d = 0; d < 8; d++) {
                         assert(laplacian_diag[d] == laplacian_diag[d]);
@@ -68,11 +64,13 @@ __global__ void cu_affine_sshex8_laplacian_diag_kernel(
 }
 
 template <typename T>
-static int cu_affine_sshex8_laplacian_diag_tpl(
-        const int level, const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff, T *const out, void *stream) {
+static int cu_affine_sshex8_laplacian_diag_tpl(const int                                level,
+                                               const ptrdiff_t                          nelements,
+                                               idx_t **const SFEM_RESTRICT              elements,
+                                               const ptrdiff_t                          fff_stride,
+                                               const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                               T *const                                 out,
+                                               void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     // Hand tuned
@@ -80,8 +78,7 @@ static int cu_affine_sshex8_laplacian_diag_tpl(
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_affine_sshex8_laplacian_diag_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_affine_sshex8_laplacian_diag_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -89,61 +86,43 @@ static int cu_affine_sshex8_laplacian_diag_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(
-                level, nelements, stride, elements, fff, out);
+        cu_affine_sshex8_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(level, nelements, elements, fff_stride, fff, out);
     } else {
-        cu_affine_sshex8_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(
-                level, nelements, stride, elements, fff, out);
+        cu_affine_sshex8_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(level, nelements, elements, fff_stride, fff, out);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_affine_sshex8_laplacian_diag(
-        const int level, const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const ptrdiff_t interior_start, const idx_t *const SFEM_RESTRICT elements,
-        const void *const SFEM_RESTRICT fff, const enum RealType real_type_out, void *const out,
-        void *stream) {
+extern int cu_affine_sshex8_laplacian_diag(const int                       level,
+                                           const ptrdiff_t                 nelements,
+                                           idx_t **const SFEM_RESTRICT     elements,
+                                           const ptrdiff_t                 fff_stride,
+                                           const void *const SFEM_RESTRICT fff,
+                                           const enum RealType             real_type_out,
+                                           void *const                     out,
+                                           void                           *stream) {
     switch (real_type_out) {
         case SFEM_REAL_DEFAULT: {
-            return cu_affine_sshex8_laplacian_diag_tpl(level,
-                                                             nelements,
-                                                             stride,
-                                                             interior_start,
-                                                             elements,
-                                                             (cu_jacobian_t *)fff,
-                                                             (real_t *)out,
-                                                             stream);
+            return cu_affine_sshex8_laplacian_diag_tpl(
+                    level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)out, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_affine_sshex8_laplacian_diag_tpl(level,
-                                                             nelements,
-                                                             stride,
-                                                             interior_start,
-                                                             elements,
-                                                             (cu_jacobian_t *)fff,
-                                                             (float *)out,
-                                                             stream);
+            return cu_affine_sshex8_laplacian_diag_tpl(
+                    level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)out, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_affine_sshex8_laplacian_diag_tpl(level,
-                                                             nelements,
-                                                             stride,
-                                                             interior_start,
-                                                             elements,
-                                                             (cu_jacobian_t *)fff,
-                                                             (double *)out,
-                                                             stream);
+            return cu_affine_sshex8_laplacian_diag_tpl(
+                    level, nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)out, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet4_laplacian_diag: not implemented for type %s (code "
                     "%d)\n",
                     real_type_to_string(real_type_out),
                     real_type_out);
-            assert(0);
+
             return SFEM_FAILURE;
         }
     }

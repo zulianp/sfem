@@ -135,6 +135,7 @@ MS := Milestone
 
 **MS 4: ()**
    - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,...)
+   - [ ] SoA refactoring for zero-overhead ML representation
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
    

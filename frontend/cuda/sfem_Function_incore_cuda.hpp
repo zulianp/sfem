@@ -19,7 +19,7 @@ namespace sfem {
     std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
     std::shared_ptr<Sideset>    to_device(const std::shared_ptr<Sideset> &ss);
 
-    std::shared_ptr<Buffer<idx_t>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
                                                           const enum ElemType                   element_type);
 
     template <typename T>
