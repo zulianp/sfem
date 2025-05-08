@@ -316,12 +316,12 @@ namespace sfem {
 
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
-                    penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
+                    penetration_tol = penetration_tol / pow(penalty_param_, penetration_tol_exp);
                     omega           = std::max(atol_, omega / penalty_param_);
 
                 } else {
-                    penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
-                    penetration_tol = 1 / pow(penalty_param_, 0.1);
+                    penalty_param_  = std::min(penalty_param_ * penalty_param_increase, max_penalty_param_);
+                    penetration_tol = 1 / pow(penalty_param_, (1 - penetration_tol_exp));
                     omega           = 1 / penalty_param_;
                 }
 
@@ -789,21 +789,24 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool                                 wrap_input_{true};
 
-        int max_it_{10};
-        int iterations_{0};
-        int cycle_type_{V_CYCLE};
-        T   atol_{1e-10};
-
-        bool verbose{true};
-        bool project_coarse_space_correction_{false};
-        bool line_search_enabled_{true};
-        bool skip_coarse{false};
         bool collect_energy_norm_correction_{false};
-        T    penalty_param_{10};
-        T    max_penalty_param_{10000};
-        int  nlsmooth_steps{3};
-        int  max_inner_it{3};
-        int  count_smoothing_steps{0};
+        bool line_search_enabled_{true};
+        bool project_coarse_space_correction_{false};
+        bool skip_coarse{false};
+        bool verbose{true};
+
+        int count_smoothing_steps{0};
+        int max_inner_it{3};
+        int nlsmooth_steps{3};
+        int cycle_type_{V_CYCLE};
+        int iterations_{0};
+        int max_it_{10};
+
+        T max_penalty_param_{10000};
+        T penalty_param_{10};
+        T penalty_param_increase{10};
+        T atol_{1e-10};
+        T penetration_tol_exp{0.9};
 
         bool                      debug{false};
         std::vector<struct Stats> stats;
