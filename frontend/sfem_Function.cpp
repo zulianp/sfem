@@ -238,7 +238,7 @@ namespace sfem {
         // CRS graph
         std::shared_ptr<CRSGraph>            node_to_node_graph;
         std::shared_ptr<CRSGraph>            dof_to_dof_graph;
-        std::shared_ptr<sfem::Buffer<idx_t>> device_elements;
+        std::shared_ptr<sfem::Buffer<idx_t*>> device_elements;
 
         // Data-structures for semistructured mesh
         std::shared_ptr<SemiStructuredMesh> semi_structured_mesh;
@@ -273,9 +273,9 @@ namespace sfem {
         }
     };
 
-    void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t>> &elems) { impl_->device_elements = elems; }
+    void FunctionSpace::set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t*>> &elems) { impl_->device_elements = elems; }
 
-    std::shared_ptr<sfem::Buffer<idx_t>> FunctionSpace::device_elements() { return impl_->device_elements; }
+    std::shared_ptr<sfem::Buffer<idx_t*>> FunctionSpace::device_elements() { return impl_->device_elements; }
 
     std::shared_ptr<CRSGraph> FunctionSpace::dof_to_dof_graph() {
         impl_->initialize_dof_to_dof_graph(this->block_size());

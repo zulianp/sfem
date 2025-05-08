@@ -372,7 +372,6 @@ namespace sfem {
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
                                 cu_sshex8_prolongate(from_ssm.n_elements(),
-                                                     from_ssm.n_elements(),
                                                      from_ssm.level(),
                                                      1,
                                                      from_elements->data(),
@@ -400,7 +399,6 @@ namespace sfem {
                                 auto &ssm = to_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                     ssm.n_elements(),
-                                                                    ssm.n_elements(),
                                                                     elements->data(),
                                                                     from_space->block_size(),
                                                                     SFEM_REAL_DEFAULT,
@@ -422,7 +420,6 @@ namespace sfem {
 
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
-                                                                            mesh->nelements,
                                                                             elements->data(),
                                                                             from_space->block_size(),
                                                                             SFEM_REAL_DEFAULT,
@@ -562,7 +559,6 @@ namespace sfem {
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
                                 cu_sshex8_restrict(from_ssm.n_elements(),
-                                                   from_ssm.n_elements(),
                                                    from_ssm.level(),
                                                    1,
                                                    elements->data(),
@@ -591,7 +587,6 @@ namespace sfem {
                                 auto &ssm = from_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_restriction(ssm.level(),
                                                                    ssm.n_elements(),
-                                                                   ssm.n_elements(),
                                                                    elements->data(),
                                                                    dbuff->data(),
                                                                    block_size,
@@ -615,7 +610,6 @@ namespace sfem {
 
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
-                                                                           mesh->nelements,
                                                                            elements->data(),
                                                                            dbuff->data(),
                                                                            block_size,

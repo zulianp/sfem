@@ -9,28 +9,28 @@
 extern "C" {
 #endif
 
-int cu_affine_hex8_linear_elasticity_apply(const ptrdiff_t                  nelements,
-                                           const ptrdiff_t                  stride,
-                                           const idx_t *const SFEM_RESTRICT elements,
-                                           const void *const SFEM_RESTRICT  jacobian_adjugate,
-                                           const void *const SFEM_RESTRICT  jacobian_determinant,
-                                           const real_t                     mu,
-                                           const real_t                     lambda,
-                                           const enum RealType              real_type,
-                                           const ptrdiff_t                  u_stride,
-                                           const void *const SFEM_RESTRICT  ux,
-                                           const void *const SFEM_RESTRICT  uy,
-                                           const void *const SFEM_RESTRICT  uz,
-                                           const ptrdiff_t                  out_stride,
-                                           void *const SFEM_RESTRICT        outx,
-                                           void *const SFEM_RESTRICT        outy,
-                                           void *const SFEM_RESTRICT        outz,
-                                           void                            *stream);
+int cu_affine_hex8_linear_elasticity_apply(const ptrdiff_t                 nelements,
+                                           idx_t **const SFEM_RESTRICT     elements,
+                                           const ptrdiff_t                 jacobian_stride,
+                                           const void *const SFEM_RESTRICT jacobian_adjugate,
+                                           const void *const SFEM_RESTRICT jacobian_determinant,
+                                           const real_t                    mu,
+                                           const real_t                    lambda,
+                                           const enum RealType             real_type,
+                                           const ptrdiff_t                 u_stride,
+                                           const void *const SFEM_RESTRICT ux,
+                                           const void *const SFEM_RESTRICT uy,
+                                           const void *const SFEM_RESTRICT uz,
+                                           const ptrdiff_t                 out_stride,
+                                           void *const SFEM_RESTRICT       outx,
+                                           void *const SFEM_RESTRICT       outy,
+                                           void *const SFEM_RESTRICT       outz,
+                                           void                           *stream);
 
 // Block sparse row (BSR) https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-storage-formats
 int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nelements,
-                                         const ptrdiff_t                    stride,
-                                         const idx_t *const SFEM_RESTRICT   elements,
+                                         idx_t **const SFEM_RESTRICT        elements,
+                                         const ptrdiff_t                    jacobian_stride,
                                          const void *const SFEM_RESTRICT    jacobian_adjugate,
                                          const void *const SFEM_RESTRICT    jacobian_determinant,
                                          const real_t                       mu,
@@ -42,8 +42,8 @@ int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nele
                                          void                              *stream);
 
 int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t                 nelements,
-                                                    const ptrdiff_t                 stride,
-                                                    idx_t *const SFEM_RESTRICT      elements,
+                                                    idx_t **const SFEM_RESTRICT     elements,
+                                                    const ptrdiff_t                 jacobian_stride,
                                                     const void *const SFEM_RESTRICT jacobian_adjugate,
                                                     const void *const SFEM_RESTRICT jacobian_determinant,
                                                     const real_t                    mu,

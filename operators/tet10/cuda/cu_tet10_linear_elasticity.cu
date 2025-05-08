@@ -16,78 +16,76 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define POW2(a) ((a) * (a))
 
-
-static inline __device__ __host__ void ref_shape_grad_x(const scalar_t qx,
-                                                        const scalar_t qy,
-                                                        const scalar_t qz,
+static inline __device__ __host__ void ref_shape_grad_x(const scalar_t  qx,
+                                                        const scalar_t  qy,
+                                                        const scalar_t  qz,
                                                         scalar_t *const out) {
     const scalar_t x0 = 4 * qx;
     const scalar_t x1 = 4 * qy;
     const scalar_t x2 = 4 * qz;
     const scalar_t x3 = x1 + x2;
-    out[0] = x0 + x3 - 3;
-    out[1] = x0 - 1;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = -8 * qx - x3 + 4;
-    out[5] = x1;
-    out[6] = -x1;
-    out[7] = -x2;
-    out[8] = x2;
-    out[9] = 0;
+    out[0]            = x0 + x3 - 3;
+    out[1]            = x0 - 1;
+    out[2]            = 0;
+    out[3]            = 0;
+    out[4]            = -8 * qx - x3 + 4;
+    out[5]            = x1;
+    out[6]            = -x1;
+    out[7]            = -x2;
+    out[8]            = x2;
+    out[9]            = 0;
 }
 
-static inline __device__ __host__ void ref_shape_grad_y(const scalar_t qx,
-                                                        const scalar_t qy,
-                                                        const scalar_t qz,
+static inline __device__ __host__ void ref_shape_grad_y(const scalar_t  qx,
+                                                        const scalar_t  qy,
+                                                        const scalar_t  qz,
                                                         scalar_t *const out) {
     const scalar_t x0 = 4 * qy;
     const scalar_t x1 = 4 * qx;
     const scalar_t x2 = 4 * qz;
     const scalar_t x3 = x1 + x2;
-    out[0] = x0 + x3 - 3;
-    out[1] = 0;
-    out[2] = x0 - 1;
-    out[3] = 0;
-    out[4] = -x1;
-    out[5] = x1;
-    out[6] = -8 * qy - x3 + 4;
-    out[7] = -x2;
-    out[8] = 0;
-    out[9] = x2;
+    out[0]            = x0 + x3 - 3;
+    out[1]            = 0;
+    out[2]            = x0 - 1;
+    out[3]            = 0;
+    out[4]            = -x1;
+    out[5]            = x1;
+    out[6]            = -8 * qy - x3 + 4;
+    out[7]            = -x2;
+    out[8]            = 0;
+    out[9]            = x2;
 }
 
-static inline __device__ __host__ void ref_shape_grad_z(const scalar_t qx,
-                                                        const scalar_t qy,
-                                                        const scalar_t qz,
+static inline __device__ __host__ void ref_shape_grad_z(const scalar_t  qx,
+                                                        const scalar_t  qy,
+                                                        const scalar_t  qz,
                                                         scalar_t *const out) {
     const scalar_t x0 = 4 * qz;
     const scalar_t x1 = 4 * qx;
     const scalar_t x2 = 4 * qy;
     const scalar_t x3 = x1 + x2;
-    out[0] = x0 + x3 - 3;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = x0 - 1;
-    out[4] = -x1;
-    out[5] = 0;
-    out[6] = -x2;
-    out[7] = -8 * qz - x3 + 4;
-    out[8] = x1;
-    out[9] = x2;
+    out[0]            = x0 + x3 - 3;
+    out[1]            = 0;
+    out[2]            = 0;
+    out[3]            = x0 - 1;
+    out[4]            = -x1;
+    out[5]            = 0;
+    out[6]            = -x2;
+    out[7]            = -8 * qz - x3 + 4;
+    out[8]            = x1;
+    out[9]            = x2;
 }
 
-static inline __device__ __host__ void apply_micro_kernel(
-        const scalar_t mu,
-        const scalar_t lambda,
-        const scalar_t *const SFEM_RESTRICT adjugate,
-        const scalar_t jacobian_determinant,
-        const scalar_t qx,
-        const scalar_t qy,
-        const scalar_t qz,
-        const scalar_t qw,
-        const scalar_t *const SFEM_RESTRICT u,
-        accumulator_t *const SFEM_RESTRICT element_vector) {
+static inline __device__ __host__ void apply_micro_kernel(const scalar_t                      mu,
+                                                          const scalar_t                      lambda,
+                                                          const scalar_t *const SFEM_RESTRICT adjugate,
+                                                          const scalar_t                      jacobian_determinant,
+                                                          const scalar_t                      qx,
+                                                          const scalar_t                      qy,
+                                                          const scalar_t                      qz,
+                                                          const scalar_t                      qw,
+                                                          const scalar_t *const SFEM_RESTRICT u,
+                                                          accumulator_t *const SFEM_RESTRICT  element_vector) {
     // This can be reduced with 1D products (ref_shape_grad_{x,y,z})
     scalar_t disp_grad[9] = {0};
 
@@ -98,16 +96,16 @@ static inline __device__ __host__ void apply_micro_kernel(
 
     const scalar_t denom = 1;
     {
-        const scalar_t x0 = 1.0 / jacobian_determinant;
-        const scalar_t x1 = 4 * qx;
-        const scalar_t x2 = x1 - 1;
-        const scalar_t x3 = 4 * qy;
-        const scalar_t x4 = -u[6] * x3;
-        const scalar_t x5 = qz - 1;
-        const scalar_t x6 = 8 * qx + 4 * qy + 4 * x5;
-        const scalar_t x7 = 4 * qz;
-        const scalar_t x8 = x1 + x3 + x7 - 3;
-        const scalar_t x9 = u[0] * x8;
+        const scalar_t x0  = 1.0 / jacobian_determinant;
+        const scalar_t x1  = 4 * qx;
+        const scalar_t x2  = x1 - 1;
+        const scalar_t x3  = 4 * qy;
+        const scalar_t x4  = -u[6] * x3;
+        const scalar_t x5  = qz - 1;
+        const scalar_t x6  = 8 * qx + 4 * qy + 4 * x5;
+        const scalar_t x7  = 4 * qz;
+        const scalar_t x8  = x1 + x3 + x7 - 3;
+        const scalar_t x9  = u[0] * x8;
         const scalar_t x10 = -u[7] * x7 + x9;
         const scalar_t x11 = u[1] * x2 - u[4] * x6 + u[5] * x3 + u[8] * x7 + x10 + x4;
         const scalar_t x12 = x3 - 1;
@@ -131,15 +129,15 @@ static inline __device__ __host__ void apply_micro_kernel(
         const scalar_t x30 = -u[24] * x1;
         const scalar_t x31 = u[22] * x12 + u[25] * x1 - u[26] * x14 + u[29] * x7 + x28 + x30;
         const scalar_t x32 = u[23] * x16 - u[27] * x17 + u[28] * x1 + u[29] * x3 + x26 + x27 + x30;
-        disp_grad[0] = x0 * (adjugate[0] * x11 + adjugate[3] * x15 + adjugate[6] * x18);
-        disp_grad[1] = x0 * (adjugate[1] * x11 + adjugate[4] * x15 + adjugate[7] * x18);
-        disp_grad[2] = x0 * (adjugate[2] * x11 + adjugate[5] * x15 + adjugate[8] * x18);
-        disp_grad[3] = x0 * (adjugate[0] * x22 + adjugate[3] * x24 + adjugate[6] * x25);
-        disp_grad[4] = x0 * (adjugate[1] * x22 + adjugate[4] * x24 + adjugate[7] * x25);
-        disp_grad[5] = x0 * (adjugate[2] * x22 + adjugate[5] * x24 + adjugate[8] * x25);
-        disp_grad[6] = x0 * (adjugate[0] * x29 + adjugate[3] * x31 + adjugate[6] * x32);
-        disp_grad[7] = x0 * (adjugate[1] * x29 + adjugate[4] * x31 + adjugate[7] * x32);
-        disp_grad[8] = x0 * (adjugate[2] * x29 + adjugate[5] * x31 + adjugate[8] * x32);
+        disp_grad[0]       = x0 * (adjugate[0] * x11 + adjugate[3] * x15 + adjugate[6] * x18);
+        disp_grad[1]       = x0 * (adjugate[1] * x11 + adjugate[4] * x15 + adjugate[7] * x18);
+        disp_grad[2]       = x0 * (adjugate[2] * x11 + adjugate[5] * x15 + adjugate[8] * x18);
+        disp_grad[3]       = x0 * (adjugate[0] * x22 + adjugate[3] * x24 + adjugate[6] * x25);
+        disp_grad[4]       = x0 * (adjugate[1] * x22 + adjugate[4] * x24 + adjugate[7] * x25);
+        disp_grad[5]       = x0 * (adjugate[2] * x22 + adjugate[5] * x24 + adjugate[8] * x25);
+        disp_grad[6]       = x0 * (adjugate[0] * x29 + adjugate[3] * x31 + adjugate[6] * x32);
+        disp_grad[7]       = x0 * (adjugate[1] * x29 + adjugate[4] * x31 + adjugate[7] * x32);
+        disp_grad[8]       = x0 * (adjugate[2] * x29 + adjugate[5] * x31 + adjugate[8] * x32);
     }
 #else
     // Programmatic way
@@ -201,15 +199,15 @@ static inline __device__ __host__ void apply_micro_kernel(
         const scalar_t x6 = x0 * (disp_grad[5] + disp_grad[7]);
         const scalar_t x7 = (1.0 / 6.0) * disp_grad[4] * x3 + (1.0 / 6.0) * x4;
         const scalar_t x8 = (1.0 / 6.0) * disp_grad[8] * x3 + (1.0 / 6.0) * x4;
-        PxJinv_t[0] = adjugate[0] * x5 + adjugate[1] * x1 + adjugate[2] * x2;
-        PxJinv_t[1] = adjugate[3] * x5 + adjugate[4] * x1 + adjugate[5] * x2;
-        PxJinv_t[2] = adjugate[6] * x5 + adjugate[7] * x1 + adjugate[8] * x2;
-        PxJinv_t[3] = adjugate[0] * x1 + adjugate[1] * x7 + adjugate[2] * x6;
-        PxJinv_t[4] = adjugate[3] * x1 + adjugate[4] * x7 + adjugate[5] * x6;
-        PxJinv_t[5] = adjugate[6] * x1 + adjugate[7] * x7 + adjugate[8] * x6;
-        PxJinv_t[6] = adjugate[0] * x2 + adjugate[1] * x6 + adjugate[2] * x8;
-        PxJinv_t[7] = adjugate[3] * x2 + adjugate[4] * x6 + adjugate[5] * x8;
-        PxJinv_t[8] = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
+        PxJinv_t[0]       = adjugate[0] * x5 + adjugate[1] * x1 + adjugate[2] * x2;
+        PxJinv_t[1]       = adjugate[3] * x5 + adjugate[4] * x1 + adjugate[5] * x2;
+        PxJinv_t[2]       = adjugate[6] * x5 + adjugate[7] * x1 + adjugate[8] * x2;
+        PxJinv_t[3]       = adjugate[0] * x1 + adjugate[1] * x7 + adjugate[2] * x6;
+        PxJinv_t[4]       = adjugate[3] * x1 + adjugate[4] * x7 + adjugate[5] * x6;
+        PxJinv_t[5]       = adjugate[6] * x1 + adjugate[7] * x7 + adjugate[8] * x6;
+        PxJinv_t[6]       = adjugate[0] * x2 + adjugate[1] * x6 + adjugate[2] * x8;
+        PxJinv_t[7]       = adjugate[3] * x2 + adjugate[4] * x6 + adjugate[5] * x8;
+        PxJinv_t[8]       = adjugate[6] * x2 + adjugate[7] * x6 + adjugate[8] * x8;
     }
 
     // Scale by quadrature weight
@@ -220,16 +218,16 @@ static inline __device__ __host__ void apply_micro_kernel(
 // On CPU both versions are equivalent
 #if MICRO_KERNEL_USE_CODEGEN
     {
-        const scalar_t x0 = 4 * qx;
-        const scalar_t x1 = 4 * qy;
-        const scalar_t x2 = 4 * qz;
-        const scalar_t x3 = x0 + x1 + x2 - 3;
-        const scalar_t x4 = x0 - 1;
-        const scalar_t x5 = x1 - 1;
-        const scalar_t x6 = x2 - 1;
-        const scalar_t x7 = PxJinv_t[1] * x0;
-        const scalar_t x8 = PxJinv_t[2] * x0;
-        const scalar_t x9 = qz - 1;
+        const scalar_t x0  = 4 * qx;
+        const scalar_t x1  = 4 * qy;
+        const scalar_t x2  = 4 * qz;
+        const scalar_t x3  = x0 + x1 + x2 - 3;
+        const scalar_t x4  = x0 - 1;
+        const scalar_t x5  = x1 - 1;
+        const scalar_t x6  = x2 - 1;
+        const scalar_t x7  = PxJinv_t[1] * x0;
+        const scalar_t x8  = PxJinv_t[2] * x0;
+        const scalar_t x9  = qz - 1;
         const scalar_t x10 = 8 * qx + 4 * qy + 4 * x9;
         const scalar_t x11 = PxJinv_t[0] * x1;
         const scalar_t x12 = PxJinv_t[2] * x1;
@@ -321,26 +319,25 @@ static inline __device__ __host__ void apply_micro_kernel(
 #undef MICRO_KERNEL_USE_CODEGEN
 }
 
-static inline __device__ __host__ void diag_micro_kernel(const scalar_t mu,
-                                                         const scalar_t lambda,
-                                                         const scalar_t *const SFEM_RESTRICT
-                                                                 adjugate,
-                                                         const scalar_t jacobian_determinant,
-                                                         const scalar_t qx,
-                                                         const scalar_t qy,
-                                                         const scalar_t qz,
-                                                         const scalar_t qw,
-                                                         accumulator_t *const SFEM_RESTRICT diag) {
-    const scalar_t x0 = POW2(adjugate[1] + adjugate[4] + adjugate[7]);
-    const scalar_t x1 = mu * x0;
-    const scalar_t x2 = POW2(adjugate[2] + adjugate[5] + adjugate[8]);
-    const scalar_t x3 = mu * x2;
-    const scalar_t x4 = lambda + 2 * mu;
-    const scalar_t x5 = POW2(adjugate[0] + adjugate[3] + adjugate[6]);
-    const scalar_t x6 = 4 * qx;
-    const scalar_t x7 = 4 * qy;
-    const scalar_t x8 = 4 * qz;
-    const scalar_t x9 = 1.0 / jacobian_determinant;
+static inline __device__ __host__ void diag_micro_kernel(const scalar_t                      mu,
+                                                         const scalar_t                      lambda,
+                                                         const scalar_t *const SFEM_RESTRICT adjugate,
+                                                         const scalar_t                      jacobian_determinant,
+                                                         const scalar_t                      qx,
+                                                         const scalar_t                      qy,
+                                                         const scalar_t                      qz,
+                                                         const scalar_t                      qw,
+                                                         accumulator_t *const SFEM_RESTRICT  diag) {
+    const scalar_t x0  = POW2(adjugate[1] + adjugate[4] + adjugate[7]);
+    const scalar_t x1  = mu * x0;
+    const scalar_t x2  = POW2(adjugate[2] + adjugate[5] + adjugate[8]);
+    const scalar_t x3  = mu * x2;
+    const scalar_t x4  = lambda + 2 * mu;
+    const scalar_t x5  = POW2(adjugate[0] + adjugate[3] + adjugate[6]);
+    const scalar_t x6  = 4 * qx;
+    const scalar_t x7  = 4 * qy;
+    const scalar_t x8  = 4 * qz;
+    const scalar_t x9  = 1.0 / jacobian_determinant;
     const scalar_t x10 = (1.0 / 6.0) * x9;
     const scalar_t x11 = x10 * POW2(x6 + x7 + x8 - 3);
     const scalar_t x12 = POW2(adjugate[1]);
@@ -456,15 +453,12 @@ static inline __device__ __host__ void diag_micro_kernel(const scalar_t mu,
     diag[29] += qw * (x43 * (x4 * x80 + x79 + x92));
 }
 
-static const int n_qp = 8;
-static const scalar_t h_qx[8] =
-        {0.0, 1.0, 0.0, 0.0, 0.333333333333, 0.333333333333, 0.0, 0.333333333333};
+static const int      n_qp    = 8;
+static const scalar_t h_qx[8] = {0.0, 1.0, 0.0, 0.0, 0.333333333333, 0.333333333333, 0.0, 0.333333333333};
 
-static const scalar_t h_qy[8] =
-        {0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.0, 0.333333333333, 0.333333333333};
+static const scalar_t h_qy[8] = {0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.0, 0.333333333333, 0.333333333333};
 
-static const scalar_t h_qz[8] =
-        {0.0, 0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.333333333333, 0.333333333333};
+static const scalar_t h_qz[8] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.333333333333, 0.333333333333, 0.333333333333};
 
 static const scalar_t h_qw[8] = {0.025, 0.025, 0.025, 0.025, 0.225, 0.225, 0.225, 0.225};
 
@@ -485,36 +479,34 @@ static void init_quadrature() {
 }
 
 template <typename T>
-__global__ void cu_tet10_linear_elasticity_apply_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT g_ux,
-        const T *const SFEM_RESTRICT g_uy,
-        const T *const SFEM_RESTRICT g_uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT g_outx,
-        T *const SFEM_RESTRICT g_outy,
-        T *const SFEM_RESTRICT g_outz) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+__global__ void cu_tet10_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
+                                                        idx_t **const SFEM_RESTRICT              elements,
+                                                        const ptrdiff_t                          jacobian_stride,
+                                                        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+                                                        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+                                                        const real_t                             mu,
+                                                        const real_t                             lambda,
+                                                        const ptrdiff_t                          u_stride,
+                                                        const T *const SFEM_RESTRICT             g_ux,
+                                                        const T *const SFEM_RESTRICT             g_uy,
+                                                        const T *const SFEM_RESTRICT             g_uz,
+                                                        const ptrdiff_t                          out_stride,
+                                                        T *const SFEM_RESTRICT                   g_outx,
+                                                        T *const SFEM_RESTRICT                   g_outy,
+                                                        T *const SFEM_RESTRICT                   g_outz) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t ev[10];
 
         // Sub-geometry
-        scalar_t adjugate[9];
-        scalar_t element_u[30];
+        scalar_t      adjugate[9];
+        scalar_t      element_u[30];
         accumulator_t element_vector[30] = {0};
 
         // Copy over jacobian adjugate
         {
             const cu_jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[e];
             for (int i = 0; i < 9; i++) {
-                adjugate[i] = jacobian_adjugate[i * stride];
+                adjugate[i] = jacobian_adjugate[i * jacobian_stride];
             }
         }
 
@@ -526,26 +518,17 @@ __global__ void cu_tet10_linear_elasticity_apply_kernel(
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            ev[v] = elements[v * stride + e];
+            ev[v] = elements[v][e];
         }
 
         for (int v = 0; v < 10; ++v) {
-            element_u[v] = g_ux[ev[v] * u_stride];
+            element_u[v]      = g_ux[ev[v] * u_stride];
             element_u[10 + v] = g_uy[ev[v] * u_stride];
             element_u[20 + v] = g_uz[ev[v] * u_stride];
         }
 
         for (int k = 0; k < n_qp; k++) {
-            apply_micro_kernel(mu,
-                               lambda,
-                               adjugate,
-                               jacobian_determinant,
-                               qx[k],
-                               qy[k],
-                               qz[k],
-                               qw[k],
-                               element_u,
-                               element_vector);
+            apply_micro_kernel(mu, lambda, adjugate, jacobian_determinant, qx[k], qy[k], qz[k], qw[k], element_u, element_vector);
         }
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
@@ -559,13 +542,11 @@ __global__ void cu_tet10_linear_elasticity_apply_kernel(
             }
 
             for (int v = 0; v < 10; v++) {
-                atomicAdd(&g_outy[ev[v] * out_stride],
-                          element_vector[10 + v] / jacobian_determinant);
+                atomicAdd(&g_outy[ev[v] * out_stride], element_vector[10 + v] / jacobian_determinant);
             }
 
             for (int v = 0; v < 10; v++) {
-                atomicAdd(&g_outz[ev[v] * out_stride],
-                          element_vector[20 + v] / jacobian_determinant);
+                atomicAdd(&g_outz[ev[v] * out_stride], element_vector[20 + v] / jacobian_determinant);
             }
         }
 #else
@@ -585,29 +566,29 @@ __global__ void cu_tet10_linear_elasticity_apply_kernel(
 }
 
 template <typename T>
-static int cu_tet10_linear_elasticity_apply_tpl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const ptrdiff_t u_stride,
-        const T *const SFEM_RESTRICT ux,
-        const T *const SFEM_RESTRICT uy,
-        const T *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        T *const SFEM_RESTRICT outx,
-        T *const SFEM_RESTRICT outy,
-        T *const SFEM_RESTRICT outz,
-        void *stream) {
+static int cu_tet10_linear_elasticity_apply_tpl(const ptrdiff_t                          nelements,
+                                                idx_t **const SFEM_RESTRICT              elements,
+                                                const ptrdiff_t                          jacobian_stride,
+                                                const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                const real_t                             mu,
+                                                const real_t                             lambda,
+                                                const ptrdiff_t                          u_stride,
+                                                const T *const SFEM_RESTRICT             ux,
+                                                const T *const SFEM_RESTRICT             uy,
+                                                const T *const SFEM_RESTRICT             uz,
+                                                const ptrdiff_t                          out_stride,
+                                                T *const SFEM_RESTRICT                   outx,
+                                                T *const SFEM_RESTRICT                   outy,
+                                                T *const SFEM_RESTRICT                   outz,
+                                                void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_tet10_linear_elasticity_apply_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_tet10_linear_elasticity_apply_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -615,26 +596,25 @@ static int cu_tet10_linear_elasticity_apply_tpl(
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements,
-                stride,
-                elements,
-                jacobian_adjugate,
-                jacobian_determinant,
-                mu,
-                lambda,
-                u_stride,
-                ux,
-                uy,
-                uz,
-                out_stride,
-                outx,
-                outy,
-                outz);
+        cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0, s>>>(nelements,
+                                                                                elements,
+                                                                                jacobian_stride,
+                                                                                jacobian_adjugate,
+                                                                                jacobian_determinant,
+                                                                                mu,
+                                                                                lambda,
+                                                                                u_stride,
+                                                                                ux,
+                                                                                uy,
+                                                                                uz,
+                                                                                out_stride,
+                                                                                outx,
+                                                                                outy,
+                                                                                outz);
     } else {
         cu_tet10_linear_elasticity_apply_kernel<<<n_blocks, block_size, 0>>>(nelements,
-                                                                             stride,
                                                                              elements,
+                                                                             jacobian_stride,
                                                                              jacobian_adjugate,
                                                                              jacobian_determinant,
                                                                              mu,
@@ -653,31 +633,30 @@ static int cu_tet10_linear_elasticity_apply_tpl(
     return SFEM_SUCCESS;
 }
 
-extern int cu_tet10_linear_elasticity_apply(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and jacobian
-        const idx_t *const SFEM_RESTRICT elements,
-        const void *const SFEM_RESTRICT jacobian_adjugate,
-        const void *const SFEM_RESTRICT jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const enum RealType real_type,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const void *const SFEM_RESTRICT uy,
-        const void *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx,
-        void *const SFEM_RESTRICT outy,
-        void *const SFEM_RESTRICT outz,
-        void *stream) {
+extern int cu_tet10_linear_elasticity_apply(const ptrdiff_t                 nelements,
+                                            idx_t **const SFEM_RESTRICT     elements,
+                                            const ptrdiff_t                 jacobian_stride,
+                                            const void *const SFEM_RESTRICT jacobian_adjugate,
+                                            const void *const SFEM_RESTRICT jacobian_determinant,
+                                            const real_t                    mu,
+                                            const real_t                    lambda,
+                                            const enum RealType             real_type,
+                                            const ptrdiff_t                 u_stride,
+                                            const void *const SFEM_RESTRICT ux,
+                                            const void *const SFEM_RESTRICT uy,
+                                            const void *const SFEM_RESTRICT uz,
+                                            const ptrdiff_t                 out_stride,
+                                            void *const SFEM_RESTRICT       outx,
+                                            void *const SFEM_RESTRICT       outy,
+                                            void *const SFEM_RESTRICT       outz,
+                                            void                           *stream) {
     init_quadrature();
 
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_tet10_linear_elasticity_apply_tpl(nelements,
-                                                        stride,
                                                         elements,
+                                                        jacobian_stride,
                                                         (cu_jacobian_t *)jacobian_adjugate,
                                                         (cu_jacobian_t *)jacobian_determinant,
                                                         mu,
@@ -694,8 +673,8 @@ extern int cu_tet10_linear_elasticity_apply(
         }
         case SFEM_FLOAT32: {
             return cu_tet10_linear_elasticity_apply_tpl(nelements,
-                                                        stride,
                                                         elements,
+                                                        jacobian_stride,
                                                         (cu_jacobian_t *)jacobian_adjugate,
                                                         (cu_jacobian_t *)jacobian_determinant,
                                                         mu,
@@ -712,8 +691,8 @@ extern int cu_tet10_linear_elasticity_apply(
         }
         case SFEM_FLOAT64: {
             return cu_tet10_linear_elasticity_apply_tpl(nelements,
-                                                        stride,
                                                         elements,
+                                                        jacobian_stride,
                                                         (cu_jacobian_t *)jacobian_adjugate,
                                                         (cu_jacobian_t *)jacobian_determinant,
                                                         mu,
@@ -729,12 +708,11 @@ extern int cu_tet10_linear_elasticity_apply(
                                                         stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet10_linear_elasticity_apply: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(real_type),
                     real_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -743,31 +721,29 @@ extern int cu_tet10_linear_elasticity_apply(
 /// --- DIAG
 
 template <typename T>
-__global__ void cu_tet10_linear_elasticity_diag_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const ptrdiff_t diag_stride,
-        T *const SFEM_RESTRICT g_diagx,
-        T *const SFEM_RESTRICT g_diagy,
-        T *const SFEM_RESTRICT g_diagz) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+__global__ void cu_tet10_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
+                                                       idx_t **const SFEM_RESTRICT              elements,
+                                                       const ptrdiff_t                          jacobian_stride,
+                                                       const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+                                                       const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+                                                       const real_t                             mu,
+                                                       const real_t                             lambda,
+                                                       const ptrdiff_t                          diag_stride,
+                                                       T *const SFEM_RESTRICT                   g_diagx,
+                                                       T *const SFEM_RESTRICT                   g_diagy,
+                                                       T *const SFEM_RESTRICT                   g_diagz) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t ev[10];
 
         // Sub-geometry
-        scalar_t adjugate[9];
+        scalar_t      adjugate[9];
         accumulator_t element_vector[30] = {0};
 
         // Copy over jacobian adjugate
         {
             const cu_jacobian_t *const jacobian_adjugate = &g_jacobian_adjugate[e];
             for (int i = 0; i < 9; i++) {
-                adjugate[i] = jacobian_adjugate[i * stride];
+                adjugate[i] = jacobian_adjugate[i * jacobian_stride];
             }
         }
 
@@ -779,19 +755,11 @@ __global__ void cu_tet10_linear_elasticity_diag_kernel(
 
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            ev[v] = elements[v * stride + e];
+            ev[v] = elements[v][e];
         }
 
         for (int k = 0; k < n_qp; k++) {
-            diag_micro_kernel(mu,
-                              lambda,
-                              adjugate,
-                              jacobian_determinant,
-                              qx[k],
-                              qy[k],
-                              qz[k],
-                              qw[k],
-                              element_vector);
+            diag_micro_kernel(mu, lambda, adjugate, jacobian_determinant, qx[k], qy[k], qz[k], qw[k], element_vector);
         }
 
 #ifdef SFEM_ENABLE_FP32_KERNELS
@@ -805,13 +773,11 @@ __global__ void cu_tet10_linear_elasticity_diag_kernel(
             }
 
             for (int v = 0; v < 10; v++) {
-                atomicAdd(&g_diagy[ev[v] * diag_stride],
-                          element_vector[10 + v] / jacobian_determinant);
+                atomicAdd(&g_diagy[ev[v] * diag_stride], element_vector[10 + v] / jacobian_determinant);
             }
 
             for (int v = 0; v < 10; v++) {
-                atomicAdd(&g_diagz[ev[v] * diag_stride],
-                          element_vector[20 + v] / jacobian_determinant);
+                atomicAdd(&g_diagz[ev[v] * diag_stride], element_vector[20 + v] / jacobian_determinant);
             }
         }
 #else
@@ -832,25 +798,25 @@ __global__ void cu_tet10_linear_elasticity_diag_kernel(
 }
 
 template <typename T>
-static int cu_tet10_linear_elasticity_diag_tpl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
-        const real_t mu,
-        const real_t lambda,
-        const ptrdiff_t diag_stride,
-        T *const SFEM_RESTRICT diagx,
-        T *const SFEM_RESTRICT diagy,
-        T *const SFEM_RESTRICT diagz,
-        void *stream) {
+static int cu_tet10_linear_elasticity_diag_tpl(const ptrdiff_t                          nelements,
+                                               idx_t **const SFEM_RESTRICT              elements,
+                                               const ptrdiff_t                          jacobian_stride,
+                                               const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                               const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                               const real_t                             mu,
+                                               const real_t                             lambda,
+                                               const ptrdiff_t                          diag_stride,
+                                               T *const SFEM_RESTRICT                   diagx,
+                                               T *const SFEM_RESTRICT                   diagy,
+                                               T *const SFEM_RESTRICT                   diagz,
+                                               void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_tet10_linear_elasticity_diag_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_tet10_linear_elasticity_diag_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -859,8 +825,8 @@ static int cu_tet10_linear_elasticity_diag_tpl(
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
         cu_tet10_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0, s>>>(nelements,
-                                                                               stride,
                                                                                elements,
+                                                                               jacobian_stride,
                                                                                jacobian_adjugate,
                                                                                jacobian_determinant,
                                                                                mu,
@@ -871,8 +837,8 @@ static int cu_tet10_linear_elasticity_diag_tpl(
                                                                                diagz);
     } else {
         cu_tet10_linear_elasticity_diag_kernel<<<n_blocks, block_size, 0>>>(nelements,
-                                                                            stride,
                                                                             elements,
+                                                                            jacobian_stride,
                                                                             jacobian_adjugate,
                                                                             jacobian_determinant,
                                                                             mu,
@@ -887,26 +853,26 @@ static int cu_tet10_linear_elasticity_diag_tpl(
     return SFEM_SUCCESS;
 }
 
-extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t nelements,
-                                           const ptrdiff_t stride,  // Stride for elements and fff
-                                           const idx_t *const SFEM_RESTRICT elements,
+extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t                 nelements,
+                                           idx_t **const SFEM_RESTRICT     elements,
+                                           const ptrdiff_t                 jacobian_stride,
                                            const void *const SFEM_RESTRICT jacobian_adjugate,
                                            const void *const SFEM_RESTRICT jacobian_determinant,
-                                           const real_t mu,
-                                           const real_t lambda,
-                                           const enum RealType real_type,
-                                           const ptrdiff_t diag_stride,
-                                           void *const SFEM_RESTRICT diagx,
-                                           void *const SFEM_RESTRICT diagy,
-                                           void *const SFEM_RESTRICT diagz,
-                                           void *stream) {
+                                           const real_t                    mu,
+                                           const real_t                    lambda,
+                                           const enum RealType             real_type,
+                                           const ptrdiff_t                 diag_stride,
+                                           void *const SFEM_RESTRICT       diagx,
+                                           void *const SFEM_RESTRICT       diagy,
+                                           void *const SFEM_RESTRICT       diagz,
+                                           void                           *stream) {
     init_quadrature();
 
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_tet10_linear_elasticity_diag_tpl(nelements,
-                                                       stride,
                                                        elements,
+                                                       jacobian_stride,
                                                        (cu_jacobian_t *)jacobian_adjugate,
                                                        (cu_jacobian_t *)jacobian_determinant,
                                                        mu,
@@ -919,8 +885,8 @@ extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t nelements,
         }
         case SFEM_FLOAT32: {
             return cu_tet10_linear_elasticity_diag_tpl(nelements,
-                                                       stride,
                                                        elements,
+                                                       jacobian_stride,
                                                        (cu_jacobian_t *)jacobian_adjugate,
                                                        (cu_jacobian_t *)jacobian_determinant,
                                                        mu,
@@ -933,8 +899,8 @@ extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t nelements,
         }
         case SFEM_FLOAT64: {
             return cu_tet10_linear_elasticity_diag_tpl(nelements,
-                                                       stride,
                                                        elements,
+                                                       jacobian_stride,
                                                        (cu_jacobian_t *)jacobian_adjugate,
                                                        (cu_jacobian_t *)jacobian_determinant,
                                                        mu,
@@ -946,12 +912,11 @@ extern int cu_tet10_linear_elasticity_diag(const ptrdiff_t nelements,
                                                        stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet10_linear_elasticity_diag: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(real_type),
                     real_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }

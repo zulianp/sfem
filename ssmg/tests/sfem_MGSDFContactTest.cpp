@@ -314,6 +314,7 @@ int test_contact() {
 
     out->write("disp", x->data());
 
+    // FIXME
     if (es != sfem::EXECUTION_SPACE_DEVICE) {
         auto blas = sfem::blas<real_t>(es);
         blas->zeros(rhs->size(), rhs->data());
