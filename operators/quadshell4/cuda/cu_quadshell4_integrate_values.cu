@@ -60,8 +60,8 @@ static inline __device__ __host__ void cu_quadshell_4_integrate(const T  px0,
 
 template <typename T>
 __global__ void cu_quadshell4_integrate_value_kernel(const ptrdiff_t                    nelements,
-                                                     const ptrdiff_t                    stride,  // Stride for elements and coords
-                                                     const idx_t *const SFEM_RESTRICT   elements,
+                                                     idx_t **const SFEM_RESTRICT        elements,
+                                                     const ptrdiff_t                    coords_stride,
                                                      const geom_t **const SFEM_RESTRICT coords,
                                                      const real_t                       value,
                                                      const int                          block_size,
@@ -80,34 +80,34 @@ __global__ void cu_quadshell4_integrate_value_kernel(const ptrdiff_t            
 
         cu_quadshell_4_integrate<T>(
                 // X
-                xe[0 * stride],
-                xe[1 * stride],
-                xe[2 * stride],
-                xe[3 * stride],
+                xe[0 * coords_stride],
+                xe[1 * coords_stride],
+                xe[2 * coords_stride],
+                xe[3 * coords_stride],
                 // Y
-                ye[0 * stride],
-                ye[1 * stride],
-                ye[2 * stride],
-                ye[3 * stride],
+                ye[0 * coords_stride],
+                ye[1 * coords_stride],
+                ye[2 * coords_stride],
+                ye[3 * coords_stride],
                 // Z
-                ze[0 * stride],
-                ze[1 * stride],
-                ze[2 * stride],
-                ze[3 * stride],
+                ze[0 * coords_stride],
+                ze[1 * coords_stride],
+                ze[2 * coords_stride],
+                ze[3 * coords_stride],
                 value,
                 element_vector);
 
         for (int v = 0; v < 4; v++) {
-            const ptrdiff_t idx = elements[v * stride + e];
+            const ptrdiff_t idx = elements[v][e];
             atomicAdd(&out[idx * block_size + component], element_vector[v]);
         }
     }
 }
 
 template <typename T>
-__global__ void cu_quadshell4_integrate_values_kernel(const ptrdiff_t                  nelements,
-                                                      const ptrdiff_t                  stride,  // Stride for elements and coords
-                                                      const idx_t *const SFEM_RESTRICT elements,
+__global__ void cu_quadshell4_integrate_values_kernel(const ptrdiff_t                    nelements,
+                                                      idx_t **const SFEM_RESTRICT   elements,
+                                                      const ptrdiff_t                    coords_stride,
                                                       const geom_t **const SFEM_RESTRICT coords,
                                                       const T *const SFEM_RESTRICT       values,
                                                       const int                          block_size,
@@ -126,25 +126,25 @@ __global__ void cu_quadshell4_integrate_values_kernel(const ptrdiff_t           
 
         cu_quadshell_4_integrate<T>(
                 // X
-                xe[0 * stride],
-                xe[1 * stride],
-                xe[2 * stride],
-                xe[3 * stride],
+                xe[0 * coords_stride],
+                xe[1 * coords_stride],
+                xe[2 * coords_stride],
+                xe[3 * coords_stride],
                 // Y
-                ye[0 * stride],
-                ye[1 * stride],
-                ye[2 * stride],
-                ye[3 * stride],
+                ye[0 * coords_stride],
+                ye[1 * coords_stride],
+                ye[2 * coords_stride],
+                ye[3 * coords_stride],
                 // Z
-                ze[0 * stride],
-                ze[1 * stride],
-                ze[2 * stride],
-                ze[3 * stride],
+                ze[0 * coords_stride],
+                ze[1 * coords_stride],
+                ze[2 * coords_stride],
+                ze[3 * coords_stride],
                 values[e],
                 element_vector);
 
         for (int v = 0; v < 4; v++) {
-            const ptrdiff_t idx = elements[v * stride + e];
+            const ptrdiff_t idx = elements[v][e];
             atomicAdd(&out[idx * block_size + component], element_vector[v]);
         }
     }
@@ -152,8 +152,8 @@ __global__ void cu_quadshell4_integrate_values_kernel(const ptrdiff_t           
 
 template <typename T>
 int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelements,
-                                      const ptrdiff_t                    stride,  // Stride for elements and coords
-                                      const idx_t *const SFEM_RESTRICT   elements,
+                                      idx_t **const SFEM_RESTRICT        elements,
+                                      const ptrdiff_t                    coords_stride,
                                       const geom_t **const SFEM_RESTRICT coords,
                                       const real_t                       value,
                                       const int                          vec_size,
@@ -177,10 +177,10 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_quadshell4_integrate_value_kernel<T>
-                <<<n_blocks, block_size, 0, s>>>(nelements, stride, elements, coords, value, vec_size, component, out);
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, value, vec_size, component, out);
     } else {
         cu_quadshell4_integrate_value_kernel<T>
-                <<<n_blocks, vec_size, 0>>>(nelements, stride, elements, coords, value, block_size, component, out);
+                <<<n_blocks, vec_size, 0>>>(nelements, elements, coords_stride, coords, value, block_size, component, out);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -189,8 +189,8 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
 
 template <typename T>
 int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    nelements,
-                                       const ptrdiff_t                    stride,  // Stride for elements and coords
-                                       const idx_t *const SFEM_RESTRICT   elements,
+                                       idx_t **const SFEM_RESTRICT        elements,
+                                       const ptrdiff_t                    coords_stride,
                                        const geom_t **const SFEM_RESTRICT coords,
                                        const T *const SFEM_RESTRICT       values,
                                        const int                          vec_size,
@@ -214,10 +214,10 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_quadshell4_integrate_values_kernel<T>
-                <<<n_blocks, block_size, 0, s>>>(nelements, stride, elements, coords, values, vec_size, component, out);
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, values, vec_size, component, out);
     } else {
         cu_quadshell4_integrate_values_kernel<T>
-                <<<n_blocks, vec_size, 0>>>(nelements, stride, elements, coords, values, block_size, component, out);
+                <<<n_blocks, vec_size, 0>>>(nelements, elements, coords_stride, coords, values, block_size, component, out);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -225,8 +225,8 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
 }
 
 extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
-                                         const ptrdiff_t                    stride,  // Stride for elements and coords
-                                         const idx_t *const SFEM_RESTRICT   elements,
+                                         idx_t **const SFEM_RESTRICT        elements,
+                                         const ptrdiff_t                    coords_stride,
                                          const geom_t **const SFEM_RESTRICT coords,
                                          const real_t                       value,
                                          const int                          vec_size,
@@ -237,15 +237,15 @@ extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nele
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_quadshell4_integrate_value_tpl<real_t>(
-                    nelements, stride, elements, coords, value, vec_size, component, (real_t *)out, stream);
+                    nelements, elements, coords_stride, coords, value, vec_size, component, (real_t *)out, stream);
         }
         case SFEM_FLOAT32: {
             return cu_quadshell4_integrate_value_tpl<float>(
-                    nelements, stride, elements, coords, value, vec_size, component, (float *)out, stream);
+                    nelements, elements, coords_stride, coords, value, vec_size, component, (float *)out, stream);
         }
         case SFEM_FLOAT64: {
             return cu_quadshell4_integrate_value_tpl<double>(
-                    nelements, stride, elements, coords, value, vec_size, component, (double *)out, stream);
+                    nelements, elements, coords_stride, coords, value, vec_size, component, (double *)out, stream);
         }
         default: {
             SFEM_ERROR(
@@ -261,8 +261,8 @@ extern int cu_quadshell4_integrate_value(const ptrdiff_t                    nele
 }
 
 extern int cu_quadshell4_integrate_values(const ptrdiff_t                    nelements,
-                                          const ptrdiff_t                    stride,  // Stride for elements and coords
-                                          const idx_t *const SFEM_RESTRICT   elements,
+                                          idx_t **const SFEM_RESTRICT        elements,
+                                          const ptrdiff_t                    coords_stride,
                                           const geom_t **const SFEM_RESTRICT coords,
                                           const enum RealType                real_type,
                                           void *const SFEM_RESTRICT          values,
@@ -273,15 +273,15 @@ extern int cu_quadshell4_integrate_values(const ptrdiff_t                    nel
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_quadshell4_integrate_values_tpl<real_t>(
-                    nelements, stride, elements, coords, (real_t *)values, vec_size, component, (real_t *)out, stream);
+                    nelements, elements, coords_stride, coords, (real_t *)values, vec_size, component, (real_t *)out, stream);
         }
         case SFEM_FLOAT32: {
             return cu_quadshell4_integrate_values_tpl<float>(
-                    nelements, stride, elements, coords, (float *)values, vec_size, component, (float *)out, stream);
+                    nelements, elements, coords_stride, coords, (float *)values, vec_size, component, (float *)out, stream);
         }
         case SFEM_FLOAT64: {
             return cu_quadshell4_integrate_values_tpl<double>(
-                    nelements, stride, elements, coords, (double *)values, vec_size, component, (double *)out, stream);
+                    nelements, elements, coords_stride, coords, (double *)values, vec_size, component, (double *)out, stream);
         }
         default: {
             SFEM_ERROR(
