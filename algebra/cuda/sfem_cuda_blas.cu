@@ -492,7 +492,7 @@ namespace sfem {
                 cudaMemGetInfo(&free, &total);
                 SFEM_ERROR(
                         "cudaMalloc failed to allocated %g [GB]\n"
-                        "%g [GB] free, %g [GB] total",
+                        "%g [GB] free, %g [GB] total\n",
                         n * sizeof(T) * 1e-9,
                         free * 1e-9,
                         total * 1e-9);
