@@ -17,13 +17,13 @@ namespace sfem {
     public:
         static std::shared_ptr<Grid> create_from_file(MPI_Comm comm, const std::string &path);
 
-        static std::shared_ptr<Grid> create(MPI_Comm     comm,
-                                            const int    nx,
-                                            const int    ny,
-                                            const int    nz,
-                                            const geom_t xmin,
-                                            const geom_t ymin,
-                                            const geom_t zmin,
+        static std::shared_ptr<Grid> create(MPI_Comm        comm,
+                                            const ptrdiff_t nx,
+                                            const ptrdiff_t ny,
+                                            const ptrdiff_t nz,
+                                            const geom_t    xmin,
+                                            const geom_t    ymin,
+                                            const geom_t    zmin,
                                             const geom_t xmax,
                                             const geom_t ymax,
                                             const geom_t zmax);
@@ -57,9 +57,9 @@ namespace sfem {
     };
 
     std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
-                                             const int                                                       nx,
-                                             const int                                                       ny,
-                                             const int                                                       nz,
+                                             const ptrdiff_t                                                 nx,
+                                             const ptrdiff_t                                                 ny,
+                                             const ptrdiff_t                                                 nz,
                                              const geom_t                                                    xmin,
                                              const geom_t                                                    ymin,
                                              const geom_t                                                    zmin,

@@ -19,6 +19,7 @@
 // C++ includes
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_API.hpp"
 
 namespace sfem {
 
@@ -46,7 +47,7 @@ namespace sfem {
         FFF(Mesh &mesh, const enum ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
             : element_type_(element_type), elements_(elements) {
             void *fff{nullptr};
-            if (element_type == HEX8) {
+            if (element_type == HEX8 || element_type == SSHEX8) {
                 cu_hex8_fff_allocate(mesh.n_elements(), &fff);
                 cu_hex8_fff_fill(mesh.n_elements(), mesh.elements()->data(), mesh.points()->data(), fff);
             } else {
@@ -83,7 +84,7 @@ namespace sfem {
             void *jacobian_adjugate{nullptr};
             void *jacobian_determinant{nullptr};
 
-            if (element_type == HEX8) {
+            if (element_type == HEX8 || element_type == SSHEX8) {
                 cu_hex8_adjugate_allocate(mesh.n_elements(), &jacobian_adjugate, &jacobian_determinant);
                 cu_hex8_adjugate_fill(mesh.n_elements(),
                                       mesh.elements()->data(),
@@ -422,8 +423,14 @@ namespace sfem {
             if (derefined_space->has_semi_structured_mesh()) {
                 auto ret          = std::make_shared<SemiStructuredGPULaplacian>(derefined_space);
                 ret->element_type = element_type;
-                // SFEM_ERROR("AVOID replicating indices create view!\n");  // TODO
-                ret->initialize();
+                ret->fff          = std::make_shared<FFF>(
+                        element_type,
+                        sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
+                                                             derefined_space->semi_structured_mesh().level(),
+                                                             fff->elements()),
+                                                             fff->fff());
+                ret->real_type = real_type;
+                ret->stream = stream;
                 return ret;
             } else {
                 auto ret = std::make_shared<GPULaplacian>(derefined_space);
@@ -650,11 +657,13 @@ namespace sfem {
     class SemiStructuredGPULinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        std::shared_ptr<Adjugate>      adjugate;
-        enum RealType                  real_type { SFEM_REAL_DEFAULT };
-        void                          *stream{SFEM_DEFAULT_STREAM};
         enum ElemType                  element_type { INVALID };
-        real_t                         mu{1}, lambda{1};
+        std::shared_ptr<Adjugate>      adjugate;
+
+        real_t mu{1}, lambda{1};
+
+        enum RealType real_type { SFEM_REAL_DEFAULT };
+        void         *stream{SFEM_DEFAULT_STREAM};
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
@@ -665,10 +674,23 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity::derefine_op");
 
             if (derefined_space->has_semi_structured_mesh()) {
-                auto ret          = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
+                auto ret = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
+
+                ret->adjugate = std::make_shared<Adjugate>(
+                        element_type,
+                        sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
+                                                             derefined_space->semi_structured_mesh().level(),
+                                                             adjugate->elements()),
+                                                             adjugate->jacobian_adjugate(),
+                                                             adjugate->jacobian_determinant());
+
                 ret->element_type = element_type;
-                // SFEM_ERROR("AVOID replicating indices create view!\n");  // TODO
-                ret->initialize();
+
+                ret->mu     = mu;
+                ret->lambda = lambda;
+
+                ret->real_type = real_type;
+                ret->stream    = stream;
                 return ret;
             } else {
                 auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
