@@ -10,15 +10,20 @@
 
 namespace sfem {
 
-    template <typename T>
+    template <typename HP, typename LP = HP>
     struct ShiftableBlockSymJacobi_Tpl {
-        std::function<void(const ptrdiff_t, const idx_t* const, const T* const, const T* const, T* const)>
+        std::function<void(const ptrdiff_t, const idx_t* const, const HP* const, const HP* const, LP* const)>
                                                                                        add_sparse_sym_diag_to_diag;
-        std::function<void(const ptrdiff_t, const T* const, T* const)>                 add_sym_diag_to_diag;
-        std::function<void(const ptrdiff_t, const T* const, T* const)>                 sym_diag_to_diag;
-        std::function<void(const ptrdiff_t, const T* const, const T* const, T* const)> apply;
-        std::function<void(const ptrdiff_t, const mask_t* const, T* const)>            apply_mask;
-        std::function<void(const ptrdiff_t, T* const)>                                 inplace_invert;
+
+        std::function<void(const ptrdiff_t, const HP* const, LP* const)>                 add_sym_diag_to_diag;
+
+        std::function<void(const ptrdiff_t, const HP* const, LP* const)>                 sym_diag_to_diag;
+
+        std::function<void(const ptrdiff_t, const LP* const, const HP* const, HP* const)> apply;
+
+        std::function<void(const ptrdiff_t, const mask_t* const, LP* const)>            apply_mask;
+
+        std::function<void(const ptrdiff_t, LP* const)>                                 inplace_invert;
     };
 
     namespace private_ {
@@ -119,118 +124,125 @@ namespace sfem {
             }
         };
 
-        template <typename T>
-        struct SparseBlockSymOps_OpenMP {
-            static void add_sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
+        template <typename In, typename Out>
+        static void SparseBlockSymOps_OpenMP_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
 #pragma omp parallel for
-                for (ptrdiff_t b = 0; b < n_blocks; b++) {
-                    auto di  = &in[b * 6];
-                    auto ivi = &out[b * 9];
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
+                auto di  = &in[b * 6];
+                auto ivi = &out[b * 9];
 
-                    // row 0
-                    ivi[0] += di[0];
-                    ivi[1] += di[1];
-                    ivi[2] += di[2];
+                // row 0
+                ivi[0] += di[0];
+                ivi[1] += di[1];
+                ivi[2] += di[2];
 
-                    // row 1
-                    ivi[3] += di[1];
-                    ivi[4] += di[3];
-                    ivi[5] += di[4];
+                // row 1
+                ivi[3] += di[1];
+                ivi[4] += di[3];
+                ivi[5] += di[4];
 
-                    // row 2
-                    ivi[6] += di[2];
-                    ivi[7] += di[4];
-                    ivi[8] += di[5];
-                }
+                // row 2
+                ivi[6] += di[2];
+                ivi[7] += di[4];
+                ivi[8] += di[5];
             }
+        }
 
-            static void add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
-                                                    const idx_t* const idx,
-                                                    const T* const     dd,
-                                                    const T* const     s,
-                                                    T* const           ivd) {
+        template <typename DD, typename S, typename IVD>
+        static void SparseBlockSymOps_OpenMP_add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
+                                                                         const idx_t* const idx,
+                                                                         const DD* const    dd,
+                                                                         const S* const     s,
+                                                                         IVD* const         ivd) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                    auto di = &dd[i * 6];
-                    auto si = s[i];
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                auto di = &dd[i * 6];
+                auto si = s[i];
 
-                    const idx_t b   = idx[i];
-                    auto        ivi = &ivd[b * 9];
+                const idx_t b   = idx[i];
+                auto        ivi = &ivd[b * 9];
 
-                    // row 0
-                    ivi[0] += si * di[0];
-                    ivi[1] += si * di[1];
-                    ivi[2] += si * di[2];
+                // row 0
+                ivi[0] += si * di[0];
+                ivi[1] += si * di[1];
+                ivi[2] += si * di[2];
 
-                    // row 1
-                    ivi[3] += si * di[1];
-                    ivi[4] += si * di[3];
-                    ivi[5] += si * di[4];
+                // row 1
+                ivi[3] += si * di[1];
+                ivi[4] += si * di[3];
+                ivi[5] += si * di[4];
 
-                    // row 2
-                    ivi[6] += si * di[2];
-                    ivi[7] += si * di[4];
-                    ivi[8] += si * di[5];
-                }
+                // row 2
+                ivi[6] += si * di[2];
+                ivi[7] += si * di[4];
+                ivi[8] += si * di[5];
             }
+        }
 
-            static void sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
+        template <typename In, typename Out>
+        static void SparseBlockSymOps_OpenMP_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
 #pragma omp parallel for
-                for (ptrdiff_t b = 0; b < n_blocks; b++) {
-                    auto di  = &in[b * 6];
-                    auto ivi = &out[b * 9];
+            for (ptrdiff_t b = 0; b < n_blocks; b++) {
+                auto di  = &in[b * 6];
+                auto ivi = &out[b * 9];
 
-                    // row 0
-                    ivi[0] = di[0];
-                    ivi[1] = di[1];
-                    ivi[2] = di[2];
+                // row 0
+                ivi[0] = di[0];
+                ivi[1] = di[1];
+                ivi[2] = di[2];
 
-                    // row 1
-                    ivi[3] = di[1];
-                    ivi[4] = di[3];
-                    ivi[5] = di[4];
+                // row 1
+                ivi[3] = di[1];
+                ivi[4] = di[3];
+                ivi[5] = di[4];
 
-                    // row 2
-                    ivi[6] = di[2];
-                    ivi[7] = di[4];
-                    ivi[8] = di[5];
-                }
+                // row 2
+                ivi[6] = di[2];
+                ivi[7] = di[4];
+                ivi[8] = di[5];
             }
-            static void apply(const ptrdiff_t n_blocks, const T* const inv_diag, const T* const in, T* const out) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                    const T* const xi = &in[i * 3];
-                    T* const       yi = &out[i * 3];
-                    const T* const di = &inv_diag[i * 3 * 3];
+        }
 
-                    for (int d1 = 0; d1 < 3; d1++) {
-                        for (int d2 = 0; d2 < 3; d2++) {
-                            yi[d1] += di[d1 * 3 + d2] * xi[d2];
-                        }
+        template <typename InvDiag, typename In, typename Out>
+        static void SparseBlockSymOps_OpenMP_apply(const ptrdiff_t      n_blocks,
+                                                   const InvDiag* const inv_diag,
+                                                   const In* const      in,
+                                                   Out* const           out) {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                const auto* const xi = &in[i * 3];
+                auto* const       yi = &out[i * 3];
+                const auto* const di = &inv_diag[i * 3 * 3];
+
+                for (int d1 = 0; d1 < 3; d1++) {
+                    for (int d2 = 0; d2 < 3; d2++) {
+                        yi[d1] += di[d1 * 3 + d2] * xi[d2];
                     }
                 }
             }
-        };
+        }
+
     }  // namespace private_
 
-    template <typename T>
+    template <typename HP, typename LP = HP>
     struct ShiftableBlockSymJacobi_OpenMP {
-        static int build(const int dim, ShiftableBlockSymJacobi_Tpl<T>& tpl) {
+        static int build(const int dim, ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl) {
             if (dim != 3) {
                 SFEM_ERROR("ShiftableBlockSymJacobi_OpenMP::build(dim=%d) not supported!\n", dim);
                 return SFEM_FAILURE;
             }
 
-            tpl.add_sym_diag_to_diag        = &private_::SparseBlockSymOps_OpenMP<T>::add_sym_diag_to_diag;
-            tpl.add_sparse_sym_diag_to_diag = &private_::SparseBlockSymOps_OpenMP<T>::add_sparse_sym_diag_to_diag;
-            tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_OpenMP<T>::sym_diag_to_diag;
-            tpl.apply                       = &private_::SparseBlockSymOps_OpenMP<T>::apply;
+            tpl.add_sparse_sym_diag_to_diag = &private_::SparseBlockSymOps_OpenMP_add_sparse_sym_diag_to_diag<HP, HP, LP>;
+            tpl.add_sym_diag_to_diag        = &private_::SparseBlockSymOps_OpenMP_add_sym_diag_to_diag<HP, LP>;
+            tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_OpenMP_sym_diag_to_diag<HP, LP>;
+            tpl.apply                       = &private_::SparseBlockSymOps_OpenMP_apply<LP, HP, HP>;
 
-            tpl.apply_mask     = &private_::Mask3_OpenMP<T>::apply;
-            tpl.inplace_invert = &private_::Invert3_OpenMP<T>::inplace_apply_AoS;
+            tpl.apply_mask     = &private_::Mask3_OpenMP<LP>::apply;
+            tpl.inplace_invert = &private_::Invert3_OpenMP<LP>::inplace_apply_AoS;
             return SFEM_SUCCESS;
         }
     };
+
 }  // namespace sfem
 
 #endif  // SFEM_OPENMP_SHIFTABLEJACOBI_HPP

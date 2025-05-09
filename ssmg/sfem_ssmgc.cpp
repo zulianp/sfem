@@ -11,6 +11,8 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
+// #define SFEM_ENABLE_MIXED_PRECISION
+
 namespace sfem {
     std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
                                                                    const std::shared_ptr<ContactConditions> contact_conds,
@@ -188,7 +190,12 @@ namespace sfem {
             fi->constaints_mask(mask->data());
             fi->hessian_block_diag_sym(nullptr, diag->data());
 
+#ifdef SFEM_ENABLE_MIXED_PRECISION
+            auto sj                  = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(fsi->block_size(), diag, mask, es);
+#else
             auto sj                  = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
+#endif
+
             sj->relaxation_parameter = relaxation_parameter;
             auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
 
@@ -220,7 +227,11 @@ namespace sfem {
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
             f_coarse->constaints_mask(mask->data());
 
+#ifdef SFEM_ENABLE_MIXED_PRECISION
+            auto sj_coarse                  = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(fs_coarse->block_size(), diag, mask, es);
+#else
             auto sj_coarse                  = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
+#endif
             sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             coarse_solver->set_preconditioner_op(sj_coarse);
         }
