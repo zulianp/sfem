@@ -11,7 +11,7 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
-// #define SFEM_ENABLE_MIXED_PRECISION
+#define SFEM_ENABLE_MIXED_PRECISION
 
 namespace sfem {
     std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
