@@ -288,6 +288,7 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
+            SFEM_TRACE_SCOPE("GPULaplacian:initialize");
             auto elements = space->device_elements();
             if (!elements) {
                 elements = create_device_elements(space, space->element_type());
@@ -405,6 +406,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
+            SFEM_TRACE_SCOPE("SemiStructuredGPULaplacian:initialize");
+
             auto elements = space->device_elements();
 
             if (!elements) {
@@ -530,6 +533,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
+            SFEM_TRACE_SCOPE("GPULinearElasticity:initialize");
+
             real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
@@ -706,6 +711,8 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
+            SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
+            
             real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
 
