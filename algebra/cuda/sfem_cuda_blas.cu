@@ -11,14 +11,18 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#define CHECK_CUDA(func)                                                                                              \
-    do {                                                                                                              \
-        cudaError_t status = (func);                                                                                  \
-        if (status != cudaSuccess) {                                                                                  \
-            printf("CUDA API failed at line %d with error: %s (%d)\n", __LINE__, cudaGetErrorString(status), status); \
-            assert(false);                                                                                            \
-            exit(EXIT_FAILURE);                                                                                       \
-        }                                                                                                             \
+#define CHECK_CUDA(func)                                                  \
+    do {                                                                  \
+        cudaError_t status = (func);                                      \
+        if (status != cudaSuccess) {                                      \
+            printf("CUDA API failed at line %s:%d with error: %s (%d)\n", \
+                   __FILE__,                                              \
+                   __LINE__,                                              \
+                   cudaGetErrorString(status),                            \
+                   status);                                               \
+            assert(false);                                                \
+            exit(EXIT_FAILURE);                                           \
+        }                                                                 \
     } while (0)
 
 #ifdef SFEM_ENABLE_CUBLAS
@@ -54,14 +58,18 @@ static const char *myCublasGetErrorString(cublasStatus_t error) {
     return "<unknown>";
 }
 
-#define CHECK_CUBLAS(func)                                                                                                  \
-    do {                                                                                                                    \
-        cublasStatus_t status = (func);                                                                                     \
-        if (status != CUBLAS_STATUS_SUCCESS) {                                                                              \
-            printf("CUBLAS API failed at line %d with error: %s (%d)\n", __LINE__, myCublasGetErrorString(status), status); \
-            assert(false);                                                                                                  \
-            exit(EXIT_FAILURE);                                                                                             \
-        }                                                                                                                   \
+#define CHECK_CUBLAS(func)                                                  \
+    do {                                                                    \
+        cublasStatus_t status = (func);                                     \
+        if (status != CUBLAS_STATUS_SUCCESS) {                              \
+            printf("CUBLAS API failed at line %s:%d with error: %s (%d)\n", \
+                   __FILE__,                                                \
+                   __LINE__,                                                \
+                   myCublasGetErrorString(status),                          \
+                   status);                                                 \
+            assert(false);                                                  \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
     } while (0)
 
 static bool           sfem_blas_initialized = false;
@@ -434,6 +442,13 @@ extern void *d_buffer_alloc(const size_t n) {
     return ptr;
 }
 
+extern void d_memcpy(const ptrdiff_t n, const void *const src, void *const dest) {
+    assert(sfem::is_ptr_device(src));
+    assert(sfem::is_ptr_device(dest));
+
+    cudaMemcpy(dest, src, n, cudaMemcpyDeviceToDevice);
+}
+
 extern void d_buffer_destroy(void *a) {
     cudaFree(a);
     SFEM_DEBUG_SYNCHRONIZE();
@@ -471,8 +486,19 @@ namespace sfem {
         tpl.allocate = [](const std::ptrdiff_t n) -> T * {
             T *ptr = nullptr;
             cudaMalloc((void **)&ptr, n * sizeof(T));
+
+            if (!ptr) {
+                size_t free, total;
+                cudaMemGetInfo(&free, &total);
+                SFEM_ERROR(
+                        "cudaMalloc failed to allocated %g [GB]\n"
+                        "%g [GB] free, %g [GB] total",
+                        n * sizeof(T) * 1e-9,
+                        free * 1e-9,
+                        total * 1e-9);
+            }
+
             cudaMemset(ptr, 0, n * sizeof(T));
-            assert(ptr);
             return ptr;
         };
 
