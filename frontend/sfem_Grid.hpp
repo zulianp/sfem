@@ -24,9 +24,9 @@ namespace sfem {
                                             const geom_t    xmin,
                                             const geom_t    ymin,
                                             const geom_t    zmin,
-                                            const geom_t xmax,
-                                            const geom_t ymax,
-                                            const geom_t zmax);
+                                            const geom_t    xmax,
+                                            const geom_t    ymax,
+                                            const geom_t    zmax);
 
         int to_file(const std::string &folder);
 
