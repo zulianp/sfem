@@ -4,9 +4,9 @@
 #include "sfem_openmp_ShiftableJacobi.hpp"
 
 namespace sfem {
-    template <typename T>
+    template <typename HP, typename LP = HP>
     struct ShiftableBlockSymJacobi_CUDA {
-        static int build(const int dim, struct ShiftableBlockSymJacobi_Tpl<T>& tpl);
+        static int build(const int dim, struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl);
     };
     
 }  // namespace sfem

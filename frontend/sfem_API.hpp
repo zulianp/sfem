@@ -20,6 +20,7 @@
 #include "sfem_Context.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_ShiftableJacobi.hpp"
@@ -151,6 +152,31 @@ namespace sfem {
             ret->default_init();
         }
 
+        ret->set_diag(diag);
+        return ret;
+    }
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
+            const int                              dim,
+            const std::shared_ptr<Buffer<HP>>     &diag,
+            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
+            const ExecutionSpace                   es) {
+        auto ret = std::make_shared<sfem::MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<LP>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl);
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            OpenMP_BLAS<LP>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(dim, ret->impl);
+        }
+
+        ret->execution_space_ = es;
+        ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
     }
@@ -1209,10 +1235,9 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
         if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
-
-            std::vector<idx_t*> host_buff_from(elements->extent(0));
+            std::vector<idx_t *> host_buff_from(elements->extent(0));
             buffer_device_to_host(elements->extent(0) * sizeof(idx_t *), elements->data(), host_buff_from.data());
-            
+
             std::vector<idx_t *> host_dev_ptrs(nxe);
             for (int zi = 0; zi <= to_level; zi++) {
                 for (int yi = 0; yi <= to_level; yi++) {
@@ -1234,9 +1259,7 @@ namespace sfem {
                     nxe,
                     nelements,
                     dev_buff_to,
-                    [nxe, host_dev_ptrs](int n, void **ptr) {
-                        d_buffer_destroy(ptr);
-                    },
+                    [nxe, host_dev_ptrs](int n, void **ptr) { d_buffer_destroy(ptr); },
                     MEMORY_SPACE_DEVICE);
         }
 #endif

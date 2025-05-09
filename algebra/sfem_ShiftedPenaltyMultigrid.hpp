@@ -439,6 +439,8 @@ namespace sfem {
         }
 
         int init() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::init");
+            
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
 

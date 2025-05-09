@@ -5,6 +5,7 @@
 #include "matrixio_ndarray.h"
 
 #include "sfem_glob.hpp"
+#include "sfem_Tracer.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -276,6 +277,8 @@ namespace sfem {
                                              const geom_t                                                    ymax,
                                              const geom_t                                                    zmax,
                                              std::function<geom_t(const geom_t, const geom_t, const geom_t)> f) {
+        SFEM_TRACE_SCOPE("Grid::create_sdf");
+
         auto g = Grid<geom_t>::create(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
 
         const geom_t hx = (xmax - xmin) / (nx - 1);
