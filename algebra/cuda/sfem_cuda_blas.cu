@@ -491,7 +491,7 @@ namespace sfem {
                 size_t free, total;
                 cudaMemGetInfo(&free, &total);
                 SFEM_ERROR(
-                        "cudaMalloc failed to allocated %g [GB]\n"
+                        "cudaMalloc failed to allocate %g [GB]\n"
                         "%g [GB] free, %g [GB] total\n",
                         n * sizeof(T) * 1e-9,
                         free * 1e-9,
@@ -560,7 +560,7 @@ namespace sfem {
             auto di = &dd[i * 6];
             auto si = s[i];
 
-            const idx_t b  = idx[i];
+            const ptrdiff_t b  = idx[i];
             auto        xi = &x[b * block_size];
             auto        yi = &y[b * block_size];
 
@@ -594,7 +594,7 @@ namespace sfem {
 
         int       kernel_block_size = 128;
         ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-        sbv_mult3_kernel<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
+        sbv_mult3_kernel<T><<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
 
         SFEM_DEBUG_SYNCHRONIZE();
         return SFEM_SUCCESS;
@@ -606,6 +606,7 @@ namespace sfem {
                                   const float *const,
                                   const float *const,
                                   float *const);
+
     template int sbv_mult3<double>(const ptrdiff_t,
                                    const idx_t *const,
                                    const double *const,
