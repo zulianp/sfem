@@ -11,8 +11,6 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
 
-#define SFEM_ENABLE_MIXED_PRECISION
-
 namespace sfem {
     std::shared_ptr<ShiftedPenalty<real_t>> create_shifted_penalty(const std::shared_ptr<Function>         &f,
                                                                    const std::shared_ptr<ContactConditions> contact_conds,
@@ -81,59 +79,59 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 10;
-        bool        project_coarse_correction          = false;
-        bool        enable_line_search                 = false;
-        std::string fine_op_type                       = "MF";
-        std::string coarse_op_type                     = es == EXECUTION_SPACE_HOST ? "BSR" : "MF";
-        int         linear_smoothing_steps             = 2;
-        int         coarse_linear_smoothing_steps      = 10;
-        bool        enable_coarse_space_preconditioner = true;
-        bool        coarse_solver_verbose              = false;
-#ifdef SFEM_ENABLE_MIXED_PRECISION
-        real_t max_penalty_param = (sizeof(real_t) == 8) ? 1e5 : 1e4;
-#else
-        real_t max_penalty_param = (sizeof(real_t) == 8) ? 1e6 : 1e4;
-#endif
-        real_t      penalty_param                  = 1e4;
-        bool        debug                          = false;
-        std::string debug_folder                   = "debug_ssmgc";
-        int         max_inner_it                   = 40;
-        bool        collect_energy_norm_correction = true;
-        int         max_it                         = 10;
-        real_t      atol                           = (sizeof(real_t) == sizeof(double)) ? 1e-9 : 5e-7;
-        real_t      relaxation_parameter           = 1. / f->space()->block_size();
-        real_t      penalty_param_increase         = 10;
-        bool        enable_shift                   = true;
+        
+        bool enable_coarse_space_preconditioner = true;
+        bool enable_mixed_precision             = false;
+        
+        bool collect_energy_norm_correction     = true;
+        bool coarse_solver_verbose              = false;
+        bool debug                              = false;
+        bool enable_shift                       = true;
+        bool enable_line_search                 = false;
+        bool project_coarse_correction          = false;
+
+        int coarse_linear_smoothing_steps = 10;
+        int linear_smoothing_steps        = 1;
+        int max_inner_it                  = 40;
+        int max_it                        = 10;
+        int nlsmooth_steps                = 10;
+
+        static constexpr bool is_double = std::is_same<real_t, double>::value;
+
+        real_t atol                   = is_double ? 1e-9 : 5e-7;
+        real_t max_penalty_param      = enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4);
+        real_t penalty_param          = 1e4;
+        real_t penalty_param_increase = 10;
+
+        std::string coarse_op_type = es == EXECUTION_SPACE_HOST ? "BSR" : "MF";
+        std::string debug_folder   = "debug_ssmgc";
+        std::string fine_op_type   = "MF";
 
         if (in) {
-            in->get("nlsmooth_steps", nlsmooth_steps);
-            in->get("project_coarse_correction", project_coarse_correction);
-            in->get("enable_line_search", enable_line_search);
-            in->get("fine_op_type", fine_op_type);
-            in->get("coarse_op_type", coarse_op_type);
-            in->get("linear_smoothing_steps", linear_smoothing_steps);
+            in->get("atol", atol);
             in->get("coarse_linear_smoothing_steps", coarse_linear_smoothing_steps);
-            in->get("enable_coarse_space_preconditioner", enable_coarse_space_preconditioner);
+            in->get("coarse_op_type", coarse_op_type);
             in->get("coarse_solver_verbose", coarse_solver_verbose);
-            in->get("max_penalty_param", max_penalty_param);
-            in->get("penalty_param", penalty_param);
+            in->get("collect_energy_norm_correction", collect_energy_norm_correction);
             in->get("debug", debug);
             in->get("debug_folder", debug_folder);
-            in->get("max_inner_it", max_inner_it);
-            in->get("collect_energy_norm_correction", collect_energy_norm_correction);
-            in->get("max_it", max_it);
-            in->get("atol", atol);
-            in->get("penalty_param_increase", penalty_param_increase);
+            in->get("enable_coarse_space_preconditioner", enable_coarse_space_preconditioner);
+            in->get("enable_line_search", enable_line_search);
+            in->get("enable_mixed_precision", enable_mixed_precision);
+            in->get("enable_mixed_precision", enable_mixed_precision);
             in->get("enable_shift", enable_shift);
+            in->get("fine_op_type", fine_op_type);
+            in->get("linear_smoothing_steps", linear_smoothing_steps);
+            in->get("max_inner_it", max_inner_it);
+            in->get("max_it", max_it);
+            in->get("max_penalty_param", max_penalty_param);
+            in->get("nlsmooth_steps", nlsmooth_steps);
+            in->get("penalty_param", penalty_param);
+            in->get("penalty_param_increase", penalty_param_increase);
+            in->get("project_coarse_correction", project_coarse_correction);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////
-
-        if (!f->space()->has_semi_structured_mesh()) {
-            SFEM_ERROR("[Error] create_ssgmg cannot build MG without a semistructured mesh");
-            return nullptr;
-        }
 
         auto      fs             = f->space();
         auto     &ssmesh         = f->space()->semi_structured_mesh();
@@ -198,14 +196,15 @@ namespace sfem {
             fi->constaints_mask(mask->data());
             fi->hessian_block_diag_sym(nullptr, diag->data());
 
-#ifdef SFEM_ENABLE_MIXED_PRECISION
-            auto sj                  = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(fsi->block_size(), diag, mask, es);
-#else
-            auto sj                  = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
-#endif
+            std::shared_ptr<sfem::Operator<real_t>> sj;
 
-            sj->relaxation_parameter = relaxation_parameter;
-            auto smoother            = sfem::create_stationary<real_t>(linear_op, sj, es);
+            if (enable_mixed_precision) {
+                sj = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(fsi->block_size(), diag, mask, es);
+            } else {
+                sj = sfem::create_shiftable_block_sym_jacobi(fsi->block_size(), diag, mask, es);
+            }
+
+            auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
 
             if (i == 0) {
                 smoother->set_max_it(linear_smoothing_steps);
@@ -235,13 +234,14 @@ namespace sfem {
             auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
             f_coarse->constaints_mask(mask->data());
 
-#ifdef SFEM_ENABLE_MIXED_PRECISION
-            auto sj_coarse = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
-                    fs_coarse->block_size(), diag, mask, es);
-#else
-            auto sj_coarse = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
-#endif
-            sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
+            std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
+            if (enable_mixed_precision) {
+                sj_coarse = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
+                        fs_coarse->block_size(), diag, mask, es);
+            } else {
+                sj_coarse = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
+            }
+
             coarse_solver->set_preconditioner_op(sj_coarse);
         }
 
@@ -558,6 +558,7 @@ namespace sfem {
         mg->collect_energy_norm_correction(collect_energy_norm_correction);
         mg->set_enable_shift(enable_shift);
         mg->set_penalty_param_increase(penalty_param_increase);
+        mg->set_nlsmooth_steps(nlsmooth_steps);
         return mg;
     }
 
