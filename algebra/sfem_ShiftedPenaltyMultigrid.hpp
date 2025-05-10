@@ -448,7 +448,7 @@ namespace sfem {
 
         int init() {
             SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::init");
-            
+
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
 
@@ -812,8 +812,8 @@ namespace sfem {
         int iterations_{0};
         int max_it_{10};
 
-        T max_penalty_param_{10000};
-        T penalty_param_{10};
+        T    max_penalty_param_{10000};
+        T    penalty_param_{10};
         T    penalty_param_increase{10};
         T    atol_{1e-10};
         T    penetration_tol_exp{0.9};
