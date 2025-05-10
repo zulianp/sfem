@@ -105,7 +105,7 @@ namespace sfem {
      * - `atol_`: Absolute tolerance for convergence.
      * - `verbose`: Flag for verbose output.
      * - `project_coarse_space_correction_`: Flag for coarse space correction projection.
-     * - `line_search_enabled_`: Flag for enabling line search.
+     * - `enable_line_search_`: Flag for enabling line search.
      * - `skip_coarse`: Flag to skip coarse grid corrections.
      * - `collect_energy_norm_correction_`: Flag to collect energy norm corrections.
      * - `penalty_param_`, `max_penalty_param_`: Penalty parameter and its maximum value.
@@ -306,9 +306,11 @@ namespace sfem {
                 const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
-                if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
-                count_lagr_mult_updates++;
+                if (enable_shift) {
+                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    count_lagr_mult_updates++;
+                }
 
                 // Store it for diagonstics
                 const T prev_penalty_param = penalty_param_;
@@ -414,10 +416,16 @@ namespace sfem {
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
         void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
-        void enable_line_search(const bool val) { line_search_enabled_ = val; }
+        void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const bool val) { debug = val; }
         void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
+        void set_penalty_param_increase(const real_t val) {
+            penalty_param_increase = val;
+        }
+        void set_enable_shift(const bool val) {
+            enable_shift = val;
+        }
 
         BLAS_Tpl<T>&           blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
@@ -608,7 +616,7 @@ namespace sfem {
                     blas_.zeros(correction->size(), correction->data());
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
-                    if (line_search_enabled_) {
+                    if (enable_line_search_) {
                         // ATTENTION to code changes and side-effects
 
                         //  dot(c, (b - A * x))
@@ -792,7 +800,7 @@ namespace sfem {
         bool                                 wrap_input_{true};
 
         bool collect_energy_norm_correction_{false};
-        bool line_search_enabled_{true};
+        bool enable_line_search_{false};
         bool project_coarse_space_correction_{false};
         bool skip_coarse{false};
         bool verbose{true};
@@ -806,9 +814,10 @@ namespace sfem {
 
         T max_penalty_param_{10000};
         T penalty_param_{10};
-        T penalty_param_increase{10};
-        T atol_{1e-10};
-        T penetration_tol_exp{0.9};
+        T    penalty_param_increase{10};
+        T    atol_{1e-10};
+        T    penetration_tol_exp{0.9};
+        bool enable_shift{true};
 
         bool                      debug{false};
         std::vector<struct Stats> stats;

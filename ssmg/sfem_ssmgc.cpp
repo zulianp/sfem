@@ -81,7 +81,7 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        int         nlsmooth_steps                     = 6;
+        int         nlsmooth_steps                     = 10;
         bool        project_coarse_correction          = false;
         bool        enable_line_search                 = false;
         std::string fine_op_type                       = "MF";
@@ -90,15 +90,21 @@ namespace sfem {
         int         coarse_linear_smoothing_steps      = 10;
         bool        enable_coarse_space_preconditioner = true;
         bool        coarse_solver_verbose              = false;
-        real_t      max_penalty_param                  = (sizeof(real_t) == 8) ? 1e5 : 1e4;
-        real_t      penalty_param                      = 100;
-        bool        debug                              = false;
-        std::string debug_folder                       = "debug_ssmgc";
-        int         max_inner_it                       = 40;
-        bool        collect_energy_norm_correction     = true;
-        int         max_it                             = 50;
-        real_t      atol                               = (sizeof(real_t) == sizeof(double)) ? 1e-11 : 5e-7;
-        real_t      relaxation_parameter               = 1. / f->space()->block_size();
+#ifdef SFEM_ENABLE_MIXED_PRECISION
+        real_t max_penalty_param = (sizeof(real_t) == 8) ? 1e5 : 1e4;
+#else
+        real_t max_penalty_param = (sizeof(real_t) == 8) ? 1e6 : 1e4;
+#endif
+        real_t      penalty_param                  = 1e4;
+        bool        debug                          = false;
+        std::string debug_folder                   = "debug_ssmgc";
+        int         max_inner_it                   = 40;
+        bool        collect_energy_norm_correction = true;
+        int         max_it                         = 10;
+        real_t      atol                           = (sizeof(real_t) == sizeof(double)) ? 1e-9 : 5e-7;
+        real_t      relaxation_parameter           = 1. / f->space()->block_size();
+        real_t      penalty_param_increase         = 10;
+        bool        enable_shift                   = true;
 
         if (in) {
             in->get("nlsmooth_steps", nlsmooth_steps);
@@ -118,6 +124,8 @@ namespace sfem {
             in->get("collect_energy_norm_correction", collect_energy_norm_correction);
             in->get("max_it", max_it);
             in->get("atol", atol);
+            in->get("penalty_param_increase", penalty_param_increase);
+            in->get("enable_shift", enable_shift);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////
@@ -228,9 +236,10 @@ namespace sfem {
             f_coarse->constaints_mask(mask->data());
 
 #ifdef SFEM_ENABLE_MIXED_PRECISION
-            auto sj_coarse                  = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(fs_coarse->block_size(), diag, mask, es);
+            auto sj_coarse = sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(
+                    fs_coarse->block_size(), diag, mask, es);
 #else
-            auto sj_coarse                  = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
+            auto sj_coarse = sfem::create_shiftable_block_sym_jacobi(fs_coarse->block_size(), diag, mask, es);
 #endif
             sj_coarse->relaxation_parameter = 1. / fs_coarse->block_size();
             coarse_solver->set_preconditioner_op(sj_coarse);
@@ -547,6 +556,8 @@ namespace sfem {
         mg->set_penalty_param(penalty_param);
         mg->set_atol(atol);
         mg->collect_energy_norm_correction(collect_energy_norm_correction);
+        mg->set_enable_shift(enable_shift);
+        mg->set_penalty_param_increase(penalty_param_increase);
         return mg;
     }
 
