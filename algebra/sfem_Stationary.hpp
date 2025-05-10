@@ -45,6 +45,8 @@ namespace sfem {
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
+            SFEM_TRACE_SCOPE("StationaryIteration::apply");
+            
             ensure_workspace();
 
             T* r = workspace->data();
