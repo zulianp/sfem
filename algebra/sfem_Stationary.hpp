@@ -26,6 +26,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>> op;
         std::shared_ptr<Operator<T>> preconditioner;
         bool                         verbose{false};
+        bool                         use_arg_as_first_residual{false};
         BLAS_Tpl<T>                  blas;
 
         int iterations_{0};
@@ -46,11 +47,19 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("StationaryIteration::apply");
-            
+
+            iterations_ = 0;
+            if(use_arg_as_first_residual) {
+                iterations_ = 1;
+                preconditioner->apply(b, x);
+            }
+
+            if(iterations_ >= max_it) return SFEM_SUCCESS;
+
             ensure_workspace();
 
             T* r = workspace->data();
-            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
+            for (; iterations_ < max_it; iterations_++) {
                 blas.zeros(workspace->size(), r);
                 op->apply(x, r);
                 blas.axpby(n_dofs, 1.0, b, -1.0, r);
@@ -61,7 +70,7 @@ namespace sfem {
                 preconditioner->apply(r, x);
             }
 
-            return 0;
+            return SFEM_SUCCESS;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
