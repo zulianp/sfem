@@ -79,16 +79,16 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
         // Default/read Input parameters
         ////////////////////////////////////////////////////////////////////////////////////
-        
+
         bool enable_coarse_space_preconditioner = true;
         bool enable_mixed_precision             = false;
-        
-        bool collect_energy_norm_correction     = true;
-        bool coarse_solver_verbose              = false;
-        bool debug                              = false;
-        bool enable_shift                       = true;
-        bool enable_line_search                 = false;
-        bool project_coarse_correction          = false;
+
+        bool collect_energy_norm_correction = true;
+        bool coarse_solver_verbose          = false;
+        bool debug                          = false;
+        bool enable_shift                   = true;
+        bool enable_line_search             = false;
+        bool project_coarse_correction      = false;
 
         int coarse_linear_smoothing_steps = 10;
         int linear_smoothing_steps        = 1;
@@ -208,9 +208,13 @@ namespace sfem {
 
             if (i == 0) {
                 smoother->set_max_it(linear_smoothing_steps);
+
+                // Avoid recomputing the residual and just apply preconditioner
+                smoother->use_arg_as_first_residual = true;
             } else {
                 smoother->set_max_it(coarse_linear_smoothing_steps);
             }
+            
             smoothers_or_solver.push_back(smoother);
         }
 
