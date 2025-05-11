@@ -2,23 +2,21 @@
 
 #include "sfem_test.h"
 
-
-#include "sfem_base.h"
-#include "matrixio_array.h"
-#include "ssquad4_interpolate.h"
 #include "cu_ssquad4_interpolate.h"
+#include "matrixio_array.h"
+#include "sfem_base.h"
+#include "ssquad4_interpolate.h"
 
-#include "sfem_Function.hpp"
-#include "sfem_Buffer.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
 #include "sfem_API.hpp"
-#include "sfem_ShiftedPenaltyMultigrid.hpp"
+#include "sfem_Buffer.hpp"
+#include "sfem_Function.hpp"
 #include "sfem_Function_incore_cuda.hpp"
+#include "sfem_ShiftedPenaltyMultigrid.hpp"
+#include "sfem_crs_SpMV.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.h"
 #include "sfem_cuda_solver.hpp"
-
+#include "spmv.h"
 
 using namespace sfem;
 
@@ -73,18 +71,20 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 }
 
 struct TestOutput {
-    bool                                is_ml{false};
-    std::shared_ptr<Buffer<real_t>>     x;
-    std::shared_ptr<Buffer<real_t>>     rhs;
-    std::shared_ptr<Buffer<real_t>>     g;
-    std::shared_ptr<Buffer<real_t>>     diag;
-    std::shared_ptr<Buffer<mask_t>>     mask;
-    std::shared_ptr<Buffer<real_t>>     normal_prod;
-    std::shared_ptr<Buffer<real_t>>     cc_op_x;
-    std::shared_ptr<Buffer<real_t>>     cc_op_t_r;
-    std::shared_ptr<Buffer<real_t>>     rpen;
-    std::shared_ptr<Buffer<real_t>>     Jpen;
+    bool                            is_ml{false};
+    std::shared_ptr<Buffer<real_t>> x;
+    std::shared_ptr<Buffer<real_t>> rhs;
+    std::shared_ptr<Buffer<real_t>> g;
+    std::shared_ptr<Buffer<real_t>> diag;
+    std::shared_ptr<Buffer<mask_t>> mask;
+    std::shared_ptr<Buffer<real_t>> normal_prod;
+    std::shared_ptr<Buffer<real_t>> cc_op_x;
+    std::shared_ptr<Buffer<real_t>> cc_op_t_r;
+    std::shared_ptr<Buffer<real_t>> rpen;
+    std::shared_ptr<Buffer<real_t>> Jpen;
     std::shared_ptr<Buffer<real_t>> restricted;
+    real_t                          e_pen;
+    std::shared_ptr<Buffer<real_t>> lagr_ub;
     // std::shared_ptr<Buffer<real_t>> upper_bound;
 
     int compare(const struct TestOutput &other, const real_t tol = 1e-7) const {
@@ -98,6 +98,7 @@ struct TestOutput {
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_t_r->size(), cc_op_t_r->data(), other.cc_op_t_r->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rpen->size(), rpen->data(), other.rpen->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(Jpen->size(), Jpen->data(), other.Jpen->data(), tol);
+        SFEM_TEST_APPROXEQ(e_pen, other.e_pen, tol);
 
         if (is_ml) {
             // std::cout << "EXPECTED\n";
@@ -126,7 +127,9 @@ struct TestOutput {
                       .cc_op_x     = sfem::to_host(cc_op_x),
                       .cc_op_t_r   = sfem::to_host(cc_op_t_r),
                       .rpen        = sfem::to_host(rpen),
-                      .Jpen        = sfem::to_host(Jpen)};
+                      .Jpen        = sfem::to_host(Jpen),
+                      .e_pen       = e_pen,
+                      .lagr_ub     = sfem::to_host(lagr_ub)};
 
         if (is_ml) {
             to.restricted = sfem::to_host(restricted);
@@ -228,6 +231,11 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     lagrange_ub->data(),
                     Jpen->data());
 
+    auto e_pen = impl.sq_norm_ramp_p(contact_conds->n_constrained_dofs(), x->data(), upper_bound->data());
+
+    auto lagr_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
+    impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, x->data(), upper_bound->data(), lagr_ub->data());
+
     const bool is_ml = fs->has_semi_structured_mesh();
 
     TestOutput to{.is_ml = is_ml,
@@ -241,7 +249,9 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                   .cc_op_x     = cc_op_x,
                   .cc_op_t_r   = cc_op_t_r,
                   .rpen        = rpen,
-                  .Jpen        = Jpen};
+                  .Jpen        = Jpen,
+                  .e_pen       = e_pen,
+                  .lagr_ub      = lagr_ub};
 
     if (is_ml) {
         int coarse_level = SFEM_ELEMENT_REFINE_LEVEL / 2;
@@ -253,21 +263,21 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
         auto  coarse_sides = sfem::ssquad4_derefine_element_connectivity(ssmesh.level(), coarse_level, to_host(fine_sides));
 
         auto fine_mapping = contact_conds->node_mapping();
-        auto count = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
-        ssquad4_element_node_incidence_count(ssmesh.level(), 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
+        auto count        = sfem::create_host_buffer<uint16_t>(fine_mapping->size());
+        ssquad4_element_node_incidence_count(
+                ssmesh.level(), 1, fine_sides->extent(1), to_host(fine_sides)->data(), count->data());
 
         const ptrdiff_t n_coarse_contact_nodes = sfem::ss_elements_max_node_id(coarse_sides) + 1;
 
         auto input = sfem::create_host_buffer<real_t>(contact_conds->n_constrained_dofs());
         {
-            auto in  = input->data();
-            for(ptrdiff_t i = 0; i < contact_conds->n_constrained_dofs(); i++) {
-                in[i] = i;   
+            auto in = input->data();
+            for (ptrdiff_t i = 0; i < contact_conds->n_constrained_dofs(); i++) {
+                in[i] = i;
             }
         }
 
-
-        auto            restricted             = sfem::create_buffer<real_t>(n_coarse_contact_nodes, es);
+        auto restricted = sfem::create_buffer<real_t>(n_coarse_contact_nodes, es);
 
         if (es == EXECUTION_SPACE_DEVICE) {
             fine_sides   = to_device(fine_sides);

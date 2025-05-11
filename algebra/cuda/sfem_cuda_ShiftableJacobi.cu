@@ -30,7 +30,7 @@ namespace sfem {
                 const T x2 = mat_1 * mat_5;
                 const T x3 = mat_1 * mat_8;
                 const T x4 = mat_2 * mat_4;
-                const T x5 = 1 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
+                const T x5 = (T)1 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
 
                 assert(x5 == x5);
 
@@ -97,8 +97,8 @@ namespace sfem {
             }
         };
 
-        template <typename T>
-        __global__ void sbv3_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
+        template <typename In, typename Out>
+        __global__ void sbv3_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto di  = &in[b * 6];
                 auto ivi = &out[b * 9];
@@ -120,18 +120,18 @@ namespace sfem {
             }
         }
 
-        template <typename T>
+        template <typename DD, typename S, typename IVD>
         __global__ void sbv3_add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
                                                          const idx_t* const idx,
-                                                         const T* const     dd,
-                                                         const T* const     s,
-                                                         T* const           ivd) {
+                                                         const DD* const    dd,
+                                                         const S* const     s,
+                                                         IVD* const         ivd) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
                 auto di = &dd[i * 6];
                 auto si = s[i];
 
-                const idx_t b   = idx[i];
-                auto        ivi = &ivd[b * 9];
+                const ptrdiff_t b   = idx[i];
+                auto            ivi = &ivd[b * 9];
 
                 // row 0
                 ivi[0] += si * di[0];
@@ -150,8 +150,8 @@ namespace sfem {
             }
         }
 
-        template <typename T>
-        __global__ void sbv3_sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
+        template <typename In, typename Out>
+        __global__ void sbv3_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto di  = &in[b * 6];
                 auto ivi = &out[b * 9];
@@ -173,87 +173,94 @@ namespace sfem {
             }
         }
 
-        template <typename T>
-        __global__ void sbv3_apply(const ptrdiff_t n_blocks, const T* const blocks, const T* const in, T* const out) {
+        template <typename B, typename In, typename Out>
+        __global__ void sbv3_apply(const ptrdiff_t n_blocks, const B* const blocks, const In* const in, Out* const out) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
-                const T* const xi = &in[i * 3];
-                T* const       yi = &out[i * 3];
-                const T* const di = &blocks[i * 3 * 3];
+                const auto* const xi = &in[i * 3];
+                auto* const       yi = &out[i * 3];
+                const auto* const di = &blocks[i * 3 * 3];
 
                 for (int d1 = 0; d1 < 3; d1++) {
                     for (int d2 = 0; d2 < 3; d2++) {
-                        yi[d1] += di[d1 * 3 + d2] * xi[d2];
+                        yi[d1] += (Out)di[d1 * 3 + d2] * xi[d2];
                     }
                 }
             }
         }
 
-        template <typename T>
-        struct SparseBlockSymOps_CUDA {
-            static void add_sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
-                SFEM_DEBUG_SYNCHRONIZE();
+        template <typename In, typename Out>
+        static void SparseBlockSymOps_CUDA_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
+            SFEM_DEBUG_SYNCHRONIZE();
 
-                int       kernel_block_size = 128;
-                ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                sbv3_add_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
+            int       kernel_block_size = 128;
+            ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+            sbv3_add_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
 
-                SFEM_DEBUG_SYNCHRONIZE();
-            }
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
 
-            static void add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
-                                                    const idx_t* const idx,
-                                                    const T* const     dd,
-                                                    const T* const     s,
-                                                    T* const           ivd) {
-                SFEM_DEBUG_SYNCHRONIZE();
+        template <typename DD, typename S, typename IVD>
+        static void SparseBlockSymOps_CUDA_add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
+                                                                       const idx_t* const idx,
+                                                                       const DD* const    dd,
+                                                                       const S* const     s,
+                                                                       IVD* const         ivd) {
+            SFEM_DEBUG_SYNCHRONIZE();
 
-                int       kernel_block_size = 128;
-                ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                sbv3_add_sparse_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, ivd);
+            int       kernel_block_size = 128;
+            ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+            sbv3_add_sparse_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, ivd);
 
-                SFEM_DEBUG_SYNCHRONIZE();
-            }
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
 
-            static void sym_diag_to_diag(const ptrdiff_t n_blocks, const T* const in, T* const out) {
-                SFEM_DEBUG_SYNCHRONIZE();
+        template <typename In, typename Out>
+        static void SparseBlockSymOps_CUDA_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
+            SFEM_DEBUG_SYNCHRONIZE();
 
-                int       kernel_block_size = 128;
-                ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                sbv3_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
+            int       kernel_block_size = 128;
+            ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+            sbv3_sym_diag_to_diag<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, in, out);
 
-                SFEM_DEBUG_SYNCHRONIZE();
-            }
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
 
-            static void apply(const ptrdiff_t n_blocks, const T* const inv_diag, const T* const in, T* const out) {
-                SFEM_DEBUG_SYNCHRONIZE();
+        template <typename InvDiag, typename In, typename Out>
+        static void SparseBlockSymOps_CUDA_apply(const ptrdiff_t      n_blocks,
+                                                 const InvDiag* const inv_diag,
+                                                 const In* const      in,
+                                                 Out* const           out) {
+            SFEM_DEBUG_SYNCHRONIZE();
 
-                int       kernel_block_size = 128;
-                ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
-                sbv3_apply<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, inv_diag, in, out);
+            int       kernel_block_size = 128;
+            ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+            sbv3_apply<<<kernel_n_blocks, kernel_block_size>>>(n_blocks, inv_diag, in, out);
 
-                SFEM_DEBUG_SYNCHRONIZE();
-            }
-        };
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
+
     }  // namespace private_
 
-    template <typename T>
-    int ShiftableBlockSymJacobi_CUDA<T>::build(const int dim, struct ShiftableBlockSymJacobi_Tpl<T>& tpl) {
+    template <typename HP, typename LP>
+    int ShiftableBlockSymJacobi_CUDA<HP, LP>::build(const int dim, struct ShiftableBlockSymJacobi_Tpl<HP, LP>& tpl) {
         if (dim != 3) {
             SFEM_ERROR("ShiftableBlockSymJacobi_CUDA::build(dim=%d) not supported!\n", dim);
             return SFEM_FAILURE;
         }
 
-        tpl.add_sym_diag_to_diag        = &private_::SparseBlockSymOps_CUDA<T>::add_sym_diag_to_diag;
-        tpl.add_sparse_sym_diag_to_diag = &private_::SparseBlockSymOps_CUDA<T>::add_sparse_sym_diag_to_diag;
-        tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_CUDA<T>::sym_diag_to_diag;
-        tpl.apply                       = &private_::SparseBlockSymOps_CUDA<T>::apply;
+        tpl.add_sparse_sym_diag_to_diag = &private_::SparseBlockSymOps_CUDA_add_sparse_sym_diag_to_diag<HP, HP, LP>;
+        tpl.add_sym_diag_to_diag        = &private_::SparseBlockSymOps_CUDA_add_sym_diag_to_diag<HP, LP>;
+        tpl.sym_diag_to_diag            = &private_::SparseBlockSymOps_CUDA_sym_diag_to_diag<HP, LP>;
+        tpl.apply                       = &private_::SparseBlockSymOps_CUDA_apply<LP, HP, HP>;
 
-        tpl.apply_mask     = &private_::Mask3_CUDA<T>::apply;
-        tpl.inplace_invert = &private_::Invert3_CUDA<T>::inplace_apply_AoS;
+        tpl.apply_mask     = &private_::Mask3_CUDA<LP>::apply;
+        tpl.inplace_invert = &private_::Invert3_CUDA<LP>::inplace_apply_AoS;
         return SFEM_SUCCESS;
     }
 
     template class ShiftableBlockSymJacobi_CUDA<double>;
     template class ShiftableBlockSymJacobi_CUDA<float>;
+    template class ShiftableBlockSymJacobi_CUDA<double, float>;
+    // template class ShiftableBlockSymJacobi_CUDA<float, half>;
 
 }  // namespace sfem

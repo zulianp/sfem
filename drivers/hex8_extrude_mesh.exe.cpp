@@ -98,6 +98,23 @@ void extrude(const ptrdiff_t              nsides,
     printf("extrude.c: extrude\t%g seconds\n", tock - tick);
 }
 
+void        translate3(const ptrdiff_t             nnodes,
+                       const geom_t                tx,
+                       const geom_t                ty,
+                       const geom_t                tz,
+                       geom_t* const SFEM_RESTRICT x,
+                       geom_t* const SFEM_RESTRICT y,
+                       geom_t* const SFEM_RESTRICT z) {
+    if(tx == 0 && ty == 0 && tz == 0) return;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        x[i] += tx;
+        y[i] += ty;
+        z[i] += tz;
+    }
+}
+
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -134,8 +151,24 @@ int main(int argc, char* argv[]) {
             hex8_elements->data(),
             hex8_points->data());
 
+    geom_t SFEM_TRANSLATE_X = 0;
+    geom_t SFEM_TRANSLATE_Y = 0;
+    geom_t SFEM_TRANSLATE_Z = 0;
+
+    SFEM_READ_ENV(SFEM_TRANSLATE_X, atof);
+    SFEM_READ_ENV(SFEM_TRANSLATE_Y, atof);
+    SFEM_READ_ENV(SFEM_TRANSLATE_Z, atof);
+
+    translate3(hex8_points->extent(1),
+               SFEM_TRANSLATE_X,
+               SFEM_TRANSLATE_Y,
+               SFEM_TRANSLATE_Z,
+               hex8_points->data()[0],
+               hex8_points->data()[1],
+               hex8_points->data()[2]);
+
     sfem::create_directory(output_folder);
-    
+
     std::string path_output_format = output_folder;
     path_output_format += "/i%d.raw";
     hex8_elements->to_files(path_output_format.c_str());
