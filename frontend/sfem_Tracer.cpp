@@ -13,6 +13,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include <nvToolsExt.h>
+#include <cuda_runtime.h>
 #endif
 
 // #define SFEM_ENABLE_BLOCK_KERNELS
@@ -31,8 +32,6 @@ namespace sfem {
             if (!os.good()) {
                 SFEM_ERROR("Unable to write trace file!\n");
             }
-
-            // printf("Writing trace file at %s\n", SFEM_TRACE_FILE);
 
             os << "name,calls,total,avg\n";
             for (auto &e : events) {
@@ -58,24 +57,33 @@ namespace sfem {
         e.second += duration;
     }
 
-    void Tracer::record_event(std::string &&name, const double duration)
-    {
+    void Tracer::record_event(std::string &&name, const double duration) {
         auto &e = impl_->events[name];
         e.first++;
         e.second += duration;
 
-        if(impl_->log_mode) {
+        if (impl_->log_mode) {
+#ifdef SFEM_ENABLE_CUDA
+            size_t free, total;
+            cudaMemGetInfo(&free, &total);
+            printf("-- LOG: %s (%g)\n"
+                   "   MEMORY: free %g [GB] (total %g [GB])\n",
+                   name.c_str(),
+                   duration,
+                   free * 1e-9,
+                   total * 1e-9);
+
+#else
             printf("-- LOG: %s (%g)\n", name.c_str(), duration);
+#endif
             fflush(stdout);
         }
     }
 
     Tracer::Tracer() : impl_(std::make_unique<Impl>()) {
-
         int SFEM_ENABLE_LOG = 0;
         SFEM_READ_ENV(SFEM_ENABLE_LOG, atoi);
         impl_->log_mode = SFEM_ENABLE_LOG;
-
     }
 
     Tracer::~Tracer() {

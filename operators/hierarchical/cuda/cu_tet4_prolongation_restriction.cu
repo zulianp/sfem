@@ -11,36 +11,34 @@
 // ------- PROLONGATION -------- //
 
 template <typename From, typename To>
-__global__ void cu_tet4_to_macrotet4_prolongation_kernel(
-        const ptrdiff_t coarse_nnodes,
-        const count_t *const SFEM_RESTRICT coarse_rowptr,
-        const idx_t *const SFEM_RESTRICT coarse_colidx,
-        const idx_t *const SFEM_RESTRICT fine_node_map,
-        const int vec_size,
-        const From *const SFEM_RESTRICT from,
-        To *const SFEM_RESTRICT to) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < coarse_nnodes;
-         i += blockDim.x * gridDim.x) {
+__global__ void cu_tet4_to_macrotet4_prolongation_kernel(const ptrdiff_t                    coarse_nnodes,
+                                                         const count_t *const SFEM_RESTRICT coarse_rowptr,
+                                                         const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                                         const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                                         const int                          vec_size,
+                                                         const From *const SFEM_RESTRICT    from,
+                                                         To *const SFEM_RESTRICT            to) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < coarse_nnodes; i += blockDim.x * gridDim.x) {
         const ptrdiff_t i_offset = i * vec_size;
 
         for (int v = 0; v < vec_size; v++) {
             to[i_offset + v] = from[i_offset + v];
         }
 
-        const count_t start = coarse_rowptr[i];
-        const count_t end = coarse_rowptr[i + 1];
-        const int extent = end - start;
-        const idx_t *const cols = &coarse_colidx[start];
-        const idx_t *const verts = &fine_node_map[start];
+        const count_t      start  = coarse_rowptr[i];
+        const count_t      end    = coarse_rowptr[i + 1];
+        const int          extent = end - start;
+        const idx_t *const cols   = &coarse_colidx[start];
+        const idx_t *const verts  = &fine_node_map[start];
 
         for (int k = 0; k < extent; k++) {
-            const ptrdiff_t j = cols[k];
-            const idx_t edge = verts[k];
+            const ptrdiff_t j    = cols[k];
+            const idx_t     edge = verts[k];
             if (i < j) {
                 assert(edge >= coarse_nnodes);
 
                 const ptrdiff_t edge_offset = edge * vec_size;
-                const ptrdiff_t j_offset = j * vec_size;
+                const ptrdiff_t j_offset    = j * vec_size;
                 for (int v = 0; v < vec_size; v++) {
                     const To edge_value = 0.5 * (from[i_offset + v] + from[j_offset + v]);
 
@@ -52,24 +50,20 @@ __global__ void cu_tet4_to_macrotet4_prolongation_kernel(
 }
 
 template <typename From, typename To>
-static int cu_tet4_to_macrotet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
+static int cu_tet4_to_macrotet4_prolongation_tpl(const ptrdiff_t                    coarse_nnodes,
                                                  const count_t *const SFEM_RESTRICT coarse_rowptr,
-                                                 const idx_t *const SFEM_RESTRICT coarse_colidx,
-                                                 const idx_t *const SFEM_RESTRICT fine_node_map,
-                                                 const int vec_size,
-                                                 const From *const SFEM_RESTRICT from,
-                                                 To *const SFEM_RESTRICT to,
-                                                 void *stream) {
+                                                 const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                                 const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                                 const int                          vec_size,
+                                                 const From *const SFEM_RESTRICT    from,
+                                                 To *const SFEM_RESTRICT            to,
+                                                 void                              *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
-                                           &block_size,
-                                           cu_tet4_to_macrotet4_prolongation_kernel<From, To>,
-                                           0,
-                                           0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_tet4_to_macrotet4_prolongation_kernel<From, To>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -78,27 +72,27 @@ static int cu_tet4_to_macrotet4_prolongation_tpl(const ptrdiff_t coarse_nnodes,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_tet4_to_macrotet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
-                coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
+        cu_tet4_to_macrotet4_prolongation_kernel<From, To>
+                <<<n_blocks, block_size, 0, s>>>(coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     } else {
-        cu_tet4_to_macrotet4_prolongation_kernel<From, To><<<n_blocks, block_size, 0>>>(
-                coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
+        cu_tet4_to_macrotet4_prolongation_kernel<From, To>
+                <<<n_blocks, block_size, 0>>>(coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t coarse_nnodes,
+extern int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t                    coarse_nnodes,
                                              const count_t *const SFEM_RESTRICT coarse_rowptr,
-                                             const idx_t *const SFEM_RESTRICT coarse_colidx,
-                                             const idx_t *const SFEM_RESTRICT fine_node_map,
-                                             const int vec_size,
-                                             const enum RealType from_type,
-                                             const void *const SFEM_RESTRICT from,
-                                             const enum RealType to_type,
-                                             void *const SFEM_RESTRICT to,
-                                             void *stream) {
+                                             const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                             const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                             const int                          vec_size,
+                                             const enum RealType                from_type,
+                                             const void *const SFEM_RESTRICT    from,
+                                             const enum RealType                to_type,
+                                             void *const SFEM_RESTRICT          to,
+                                             void                              *stream) {
     assert(from_type == to_type && "TODO mixed types!");
     if (from_type != to_type) {
         return SFEM_FAILURE;
@@ -106,42 +100,23 @@ extern int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t coarse_nnodes,
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
-                                                         coarse_rowptr,
-                                                         coarse_colidx,
-                                                         fine_node_map,
-                                                         vec_size,
-                                                         (real_t *)from,
-                                                         (real_t *)to,
-                                                         stream);
+            return cu_tet4_to_macrotet4_prolongation_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (real_t *)from, (real_t *)to, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
-                                                         coarse_rowptr,
-                                                         coarse_colidx,
-                                                         fine_node_map,
-                                                         vec_size,
-                                                         (float *)from,
-                                                         (float *)to,
-                                                         stream);
+            return cu_tet4_to_macrotet4_prolongation_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (float *)from, (float *)to, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_tet4_to_macrotet4_prolongation_tpl(coarse_nnodes,
-                                                         coarse_rowptr,
-                                                         coarse_colidx,
-                                                         fine_node_map,
-                                                         vec_size,
-                                                         (double *)from,
-                                                         (double *)to,
-                                                         stream);
+            return cu_tet4_to_macrotet4_prolongation_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (double *)from, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -152,28 +127,26 @@ extern int cu_tet4_to_macrotet4_prolongation(const ptrdiff_t coarse_nnodes,
 // ------- RESTRICTION -------- //
 
 template <typename From, typename To>
-__global__ void cu_macrotet4_to_tet4_restriction_kernel(
-        const ptrdiff_t coarse_nnodes,
-        const count_t *const SFEM_RESTRICT coarse_rowptr,
-        const idx_t *const SFEM_RESTRICT coarse_colidx,
-        const idx_t *const SFEM_RESTRICT fine_node_map,
-        const int vec_size,
-        const From *const SFEM_RESTRICT from,
-        To *const SFEM_RESTRICT to) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < coarse_nnodes;
-         i += blockDim.x * gridDim.x) {
+__global__ void cu_macrotet4_to_tet4_restriction_kernel(const ptrdiff_t                    coarse_nnodes,
+                                                        const count_t *const SFEM_RESTRICT coarse_rowptr,
+                                                        const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                                        const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                                        const int                          vec_size,
+                                                        const From *const SFEM_RESTRICT    from,
+                                                        To *const SFEM_RESTRICT            to) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < coarse_nnodes; i += blockDim.x * gridDim.x) {
         for (int v = 0; v < vec_size; v++) {
             atomicAdd(&to[i * vec_size + v], from[i * vec_size + v]);
         }
 
-        const count_t start = coarse_rowptr[i];
-        const count_t end = coarse_rowptr[i + 1];
-        const int extent = end - start;
-        const idx_t *const cols = &coarse_colidx[start];
-        const idx_t *const verts = &fine_node_map[start];
+        const count_t      start  = coarse_rowptr[i];
+        const count_t      end    = coarse_rowptr[i + 1];
+        const int          extent = end - start;
+        const idx_t *const cols   = &coarse_colidx[start];
+        const idx_t *const verts  = &fine_node_map[start];
 
         for (int k = 0; k < extent; k++) {
-            const idx_t j = cols[k];
+            const idx_t j    = cols[k];
             const idx_t edge = verts[k];
             if (i < j) {
                 for (int v = 0; v < vec_size; v++) {
@@ -188,24 +161,20 @@ __global__ void cu_macrotet4_to_tet4_restriction_kernel(
 }
 
 template <typename From, typename To>
-static int cu_macrotet4_to_tet4_restriction_tpl(const ptrdiff_t coarse_nnodes,
+static int cu_macrotet4_to_tet4_restriction_tpl(const ptrdiff_t                    coarse_nnodes,
                                                 const count_t *const SFEM_RESTRICT coarse_rowptr,
-                                                const idx_t *const SFEM_RESTRICT coarse_colidx,
-                                                const idx_t *const SFEM_RESTRICT fine_node_map,
-                                                const int vec_size,
-                                                const From *const SFEM_RESTRICT from,
-                                                To *const SFEM_RESTRICT to,
-                                                void *stream) {
+                                                const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                                const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                                const int                          vec_size,
+                                                const From *const SFEM_RESTRICT    from,
+                                                To *const SFEM_RESTRICT            to,
+                                                void                              *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size,
-                                           &block_size,
-                                           cu_macrotet4_to_tet4_restriction_kernel<From, To>,
-                                           0,
-                                           0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_macrotet4_to_tet4_restriction_kernel<From, To>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -214,27 +183,27 @@ static int cu_macrotet4_to_tet4_restriction_tpl(const ptrdiff_t coarse_nnodes,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_macrotet4_to_tet4_restriction_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
-                coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
+        cu_macrotet4_to_tet4_restriction_kernel<From, To>
+                <<<n_blocks, block_size, 0, s>>>(coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     } else {
-        cu_macrotet4_to_tet4_restriction_kernel<From, To><<<n_blocks, block_size, 0>>>(
-                coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
+        cu_macrotet4_to_tet4_restriction_kernel<From, To>
+                <<<n_blocks, block_size, 0>>>(coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, from, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_macrotet4_to_tet4_restriction(const ptrdiff_t coarse_nnodes,
+extern int cu_macrotet4_to_tet4_restriction(const ptrdiff_t                    coarse_nnodes,
                                             const count_t *const SFEM_RESTRICT coarse_rowptr,
-                                            const idx_t *const SFEM_RESTRICT coarse_colidx,
-                                            const idx_t *const SFEM_RESTRICT fine_node_map,
-                                            const int vec_size,
-                                            const enum RealType from_type,
-                                            const void *const SFEM_RESTRICT from,
-                                            const enum RealType to_type,
-                                            void *const SFEM_RESTRICT to,
-                                            void *stream) {
+                                            const idx_t *const SFEM_RESTRICT   coarse_colidx,
+                                            const idx_t *const SFEM_RESTRICT   fine_node_map,
+                                            const int                          vec_size,
+                                            const enum RealType                from_type,
+                                            const void *const SFEM_RESTRICT    from,
+                                            const enum RealType                to_type,
+                                            void *const SFEM_RESTRICT          to,
+                                            void                              *stream) {
     assert(from_type == to_type && "TODO mixed types!");
     if (from_type != to_type) {
         return SFEM_FAILURE;
@@ -242,42 +211,23 @@ extern int cu_macrotet4_to_tet4_restriction(const ptrdiff_t coarse_nnodes,
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macrotet4_to_tet4_restriction_tpl(coarse_nnodes,
-                                                        coarse_rowptr,
-                                                        coarse_colidx,
-                                                        fine_node_map,
-                                                        vec_size,
-                                                        (real_t *)from,
-                                                        (real_t *)to,
-                                                        stream);
+            return cu_macrotet4_to_tet4_restriction_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (real_t *)from, (real_t *)to, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macrotet4_to_tet4_restriction_tpl(coarse_nnodes,
-                                                        coarse_rowptr,
-                                                        coarse_colidx,
-                                                        fine_node_map,
-                                                        vec_size,
-                                                        (float *)from,
-                                                        (float *)to,
-                                                        stream);
+            return cu_macrotet4_to_tet4_restriction_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (float *)from, (float *)to, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macrotet4_to_tet4_restriction_tpl(coarse_nnodes,
-                                                        coarse_rowptr,
-                                                        coarse_colidx,
-                                                        fine_node_map,
-                                                        vec_size,
-                                                        (double *)from,
-                                                        (double *)to,
-                                                        stream);
+            return cu_macrotet4_to_tet4_restriction_tpl(
+                    coarse_nnodes, coarse_rowptr, coarse_colidx, fine_node_map, vec_size, (double *)from, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -287,34 +237,31 @@ extern int cu_macrotet4_to_tet4_restriction(const ptrdiff_t coarse_nnodes,
 
 ////////////////////////////////////////////////////////////////////////
 template <typename From, typename To>
-__global__ void cu_macrotet4_to_tet4_prolongation_element_based_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,
-        const idx_t *const SFEM_RESTRICT elements,
-        const int vec_size,
-        const ptrdiff_t from_stride,
-        const From *const SFEM_RESTRICT from,
-        const ptrdiff_t to_stride,
-        To *const SFEM_RESTRICT to) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+__global__ void cu_macrotet4_to_tet4_prolongation_element_based_kernel(const ptrdiff_t                 nelements,
+                                                                       idx_t **const SFEM_RESTRICT     elements,
+                                                                       const int                       vec_size,
+                                                                       const ptrdiff_t                 from_stride,
+                                                                       const From *const SFEM_RESTRICT from,
+                                                                       const ptrdiff_t                 to_stride,
+                                                                       To *const SFEM_RESTRICT         to) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         // P1
-        const idx_t i0 = elements[0 * stride + e];
-        const idx_t i1 = elements[1 * stride + e];
-        const idx_t i2 = elements[2 * stride + e];
-        const idx_t i3 = elements[3 * stride + e];
+        const idx_t i0 = elements[0][e];
+        const idx_t i1 = elements[1][e];
+        const idx_t i2 = elements[2][e];
+        const idx_t i3 = elements[3][e];
 
         // P2
-        const idx_t i4 = elements[4 * stride + e];
-        const idx_t i5 = elements[5 * stride + e];
-        const idx_t i6 = elements[6 * stride + e];
-        const idx_t i7 = elements[7 * stride + e];
-        const idx_t i8 = elements[8 * stride + e];
-        const idx_t i9 = elements[9 * stride + e];
+        const idx_t i4 = elements[4][e];
+        const idx_t i5 = elements[5][e];
+        const idx_t i6 = elements[6][e];
+        const idx_t i7 = elements[7][e];
+        const idx_t i8 = elements[8][e];
+        const idx_t i9 = elements[9][e];
 
 #ifndef NDEBUG
-        if(i0 == i4) {
-            printf("[%d %d %d %d %d %d %d %d %d %d] (%ld, %ld)\n", i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, e, stride);
+        if (i0 == i4) {
+            printf("[%d %d %d %d %d %d %d %d %d %d] (%ld)\n", i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, e);
         }
 #endif
         assert(i0 != i4);
@@ -347,27 +294,21 @@ __global__ void cu_macrotet4_to_tet4_prolongation_element_based_kernel(
 }
 
 template <typename From, typename To>
-static int cu_macrotet4_to_tet4_prolongation_element_based_tpl(const ptrdiff_t nelements,
-                                                               const ptrdiff_t stride,
-                                                               const idx_t *const SFEM_RESTRICT
-                                                                       elements,
-                                                               const int vec_size,
-                                                               const ptrdiff_t from_stride,
+static int cu_macrotet4_to_tet4_prolongation_element_based_tpl(const ptrdiff_t                 nelements,
+                                                               idx_t **const SFEM_RESTRICT     elements,
+                                                               const int                       vec_size,
+                                                               const ptrdiff_t                 from_stride,
                                                                const From *const SFEM_RESTRICT from,
-                                                               const ptrdiff_t to_stride,
-                                                               To *const SFEM_RESTRICT to,
-                                                               void *stream) {
+                                                               const ptrdiff_t                 to_stride,
+                                                               To *const SFEM_RESTRICT         to,
+                                                               void                           *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size,
-                &block_size,
-                cu_macrotet4_to_tet4_prolongation_element_based_kernel<From, To>,
-                0,
-                0);
+                &min_grid_size, &block_size, cu_macrotet4_to_tet4_prolongation_element_based_kernel<From, To>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -377,29 +318,26 @@ static int cu_macrotet4_to_tet4_prolongation_element_based_tpl(const ptrdiff_t n
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_macrotet4_to_tet4_prolongation_element_based_kernel<From, To>
-                <<<n_blocks, block_size, 0, s>>>(
-                        nelements, stride, elements, vec_size, from_stride, from, to_stride, to);
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, vec_size, from_stride, from, to_stride, to);
     } else {
         cu_macrotet4_to_tet4_prolongation_element_based_kernel<From, To>
-                <<<n_blocks, block_size, 0>>>(
-                        nelements, stride, elements, vec_size, from_stride, from, to_stride, to);
+                <<<n_blocks, block_size, 0>>>(nelements, elements, vec_size, from_stride, from, to_stride, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-int cu_macrotet4_to_tet4_prolongation_element_based(const ptrdiff_t nelements,
-                                                    const ptrdiff_t stride,
-                                                    const idx_t *const SFEM_RESTRICT elements,
-                                                    const int vec_size,
-                                                    const enum RealType from_type,
-                                                    const ptrdiff_t from_stride,
+int cu_macrotet4_to_tet4_prolongation_element_based(const ptrdiff_t                 nelements,
+                                                    idx_t **const SFEM_RESTRICT     elements,
+                                                    const int                       vec_size,
+                                                    const enum RealType             from_type,
+                                                    const ptrdiff_t                 from_stride,
                                                     const void *const SFEM_RESTRICT from,
-                                                    const enum RealType to_type,
-                                                    const ptrdiff_t to_stride,
-                                                    void *const SFEM_RESTRICT to,
-                                                    void *stream) {
+                                                    const enum RealType             to_type,
+                                                    const ptrdiff_t                 to_stride,
+                                                    void *const SFEM_RESTRICT       to,
+                                                    void                           *stream) {
     assert(from_type == to_type && "TODO mixed types!");
     if (from_type != to_type) {
         return SFEM_FAILURE;
@@ -407,45 +345,23 @@ int cu_macrotet4_to_tet4_prolongation_element_based(const ptrdiff_t nelements,
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(nelements,
-                                                                       stride,
-                                                                       elements,
-                                                                       vec_size,
-                                                                       from_stride,
-                                                                       (real_t *)from,
-                                                                       to_stride,
-                                                                       (real_t *)to,
-                                                                       stream);
+            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(
+                    nelements, elements, vec_size, from_stride, (real_t *)from, to_stride, (real_t *)to, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(nelements,
-                                                                       stride,
-                                                                       elements,
-                                                                       vec_size,
-                                                                       from_stride,
-                                                                       (float *)from,
-                                                                       to_stride,
-                                                                       (float *)to,
-                                                                       stream);
+            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(
+                    nelements, elements, vec_size, from_stride, (float *)from, to_stride, (float *)to, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(nelements,
-                                                                       stride,
-                                                                       elements,
-                                                                       vec_size,
-                                                                       from_stride,
-                                                                       (double *)from,
-                                                                       to_stride,
-                                                                       (double *)to,
-                                                                       stream);
+            return cu_macrotet4_to_tet4_prolongation_element_based_tpl(
+                    nelements, elements, vec_size, from_stride, (double *)from, to_stride, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -454,30 +370,27 @@ int cu_macrotet4_to_tet4_prolongation_element_based(const ptrdiff_t nelements,
 /////////////////////////
 
 template <typename From, typename To>
-__global__ void cu_macrotet4_to_tet4_restriction_element_based_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,
-        const idx_t *const SFEM_RESTRICT elements,
-        const uint16_t *const SFEM_RESTRICT e2n_count,
-        const int vec_size,
-        const ptrdiff_t from_stride,
-        const From *const SFEM_RESTRICT from,
-        const ptrdiff_t to_stride,
-        To *const SFEM_RESTRICT to) {
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
-        const idx_t i0 = elements[0 * stride + e];
-        const idx_t i1 = elements[1 * stride + e];
-        const idx_t i2 = elements[2 * stride + e];
-        const idx_t i3 = elements[3 * stride + e];
+__global__ void cu_macrotet4_to_tet4_restriction_element_based_kernel(const ptrdiff_t                     nelements,
+                                                                      idx_t **const SFEM_RESTRICT         elements,
+                                                                      const uint16_t *const SFEM_RESTRICT e2n_count,
+                                                                      const int                           vec_size,
+                                                                      const ptrdiff_t                     from_stride,
+                                                                      const From *const SFEM_RESTRICT     from,
+                                                                      const ptrdiff_t                     to_stride,
+                                                                      To *const SFEM_RESTRICT             to) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        const idx_t i0 = elements[0][e];
+        const idx_t i1 = elements[1][e];
+        const idx_t i2 = elements[2][e];
+        const idx_t i3 = elements[3][e];
 
         // P2
-        const idx_t i4 = elements[4 * stride + e];
-        const idx_t i5 = elements[5 * stride + e];
-        const idx_t i6 = elements[6 * stride + e];
-        const idx_t i7 = elements[7 * stride + e];
-        const idx_t i8 = elements[8 * stride + e];
-        const idx_t i9 = elements[9 * stride + e];
+        const idx_t i4 = elements[4][e];
+        const idx_t i5 = elements[5][e];
+        const idx_t i6 = elements[6][e];
+        const idx_t i7 = elements[7][e];
+        const idx_t i8 = elements[8][e];
+        const idx_t i9 = elements[9][e];
 
         assert(i0 != i4);
 
@@ -514,28 +427,22 @@ __global__ void cu_macrotet4_to_tet4_restriction_element_based_kernel(
 }
 
 template <typename From, typename To>
-static int cu_macrotet4_to_tet4_restriction_element_based_tpl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,
-        const idx_t *const SFEM_RESTRICT elements,
-        const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
-        const int vec_size,
-        const ptrdiff_t from_stride,
-        const From *const SFEM_RESTRICT from,
-        const ptrdiff_t to_stride,
-        To *const SFEM_RESTRICT to,
-        void *stream) {
+static int cu_macrotet4_to_tet4_restriction_element_based_tpl(const ptrdiff_t                     nelements,
+                                                              idx_t **const SFEM_RESTRICT         elements,
+                                                              const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                                              const int                           vec_size,
+                                                              const ptrdiff_t                     from_stride,
+                                                              const From *const SFEM_RESTRICT     from,
+                                                              const ptrdiff_t                     to_stride,
+                                                              To *const SFEM_RESTRICT             to,
+                                                              void                               *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
         cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size,
-                &block_size,
-                cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To>,
-                0,
-                0);
+                &min_grid_size, &block_size, cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -544,46 +451,28 @@ static int cu_macrotet4_to_tet4_restriction_element_based_tpl(
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To>
-                <<<n_blocks, block_size, 0, s>>>(nelements,
-                                                 stride,
-                                                 elements,
-                                                 element_to_node_incidence_count,
-                                                 vec_size,
-                                                 from_stride,
-                                                 from,
-                                                 to_stride,
-                                                 to);
+        cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
+                nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
     } else {
-        cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To>
-                <<<n_blocks, block_size, 0>>>(nelements,
-                                              stride,
-                                              elements,
-                                              element_to_node_incidence_count,
-                                              vec_size,
-                                              from_stride,
-                                              from,
-                                              to_stride,
-                                              to);
+        cu_macrotet4_to_tet4_restriction_element_based_kernel<From, To><<<n_blocks, block_size, 0>>>(
+                nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-int cu_macrotet4_to_tet4_restriction_element_based(const ptrdiff_t nelements,
-                                                   const ptrdiff_t stride,
-                                                   const idx_t *const SFEM_RESTRICT elements,
-                                                   const uint16_t *const SFEM_RESTRICT
-                                                           element_to_node_incidence_count,
-                                                   const int vec_size,
-                                                   const enum RealType from_type,
-                                                   const ptrdiff_t from_stride,
-                                                   const void *const SFEM_RESTRICT from,
-                                                   const enum RealType to_type,
-                                                   const ptrdiff_t to_stride,
-                                                   void *const SFEM_RESTRICT to,
-                                                   void *stream) {
+int cu_macrotet4_to_tet4_restriction_element_based(const ptrdiff_t                     nelements,
+                                                   idx_t **const SFEM_RESTRICT         elements,
+                                                   const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                                   const int                           vec_size,
+                                                   const enum RealType                 from_type,
+                                                   const ptrdiff_t                     from_stride,
+                                                   const void *const SFEM_RESTRICT     from,
+                                                   const enum RealType                 to_type,
+                                                   const ptrdiff_t                     to_stride,
+                                                   void *const SFEM_RESTRICT           to,
+                                                   void                               *stream) {
     assert(from_type == to_type && "TODO mixed types!");
     if (from_type != to_type) {
         return SFEM_FAILURE;
@@ -591,52 +480,45 @@ int cu_macrotet4_to_tet4_restriction_element_based(const ptrdiff_t nelements,
 
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macrotet4_to_tet4_restriction_element_based_tpl(
-                    nelements,
-                    stride,
-                    elements,
-                    element_to_node_incidence_count,
-                    vec_size,
-                    from_stride,
-                    (real_t *)from,
-                    to_stride,
-                    (real_t *)to,
-                    stream);
+            return cu_macrotet4_to_tet4_restriction_element_based_tpl(nelements,
+                                                                      elements,
+                                                                      element_to_node_incidence_count,
+                                                                      vec_size,
+                                                                      from_stride,
+                                                                      (real_t *)from,
+                                                                      to_stride,
+                                                                      (real_t *)to,
+                                                                      stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macrotet4_to_tet4_restriction_element_based_tpl(
-                    nelements,
-                    stride,
-                    elements,
-                    element_to_node_incidence_count,
-                    vec_size,
-                    from_stride,
-                    (float *)from,
-                    to_stride,
-                    (float *)to,
-                    stream);
+            return cu_macrotet4_to_tet4_restriction_element_based_tpl(nelements,
+                                                                      elements,
+                                                                      element_to_node_incidence_count,
+                                                                      vec_size,
+                                                                      from_stride,
+                                                                      (float *)from,
+                                                                      to_stride,
+                                                                      (float *)to,
+                                                                      stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macrotet4_to_tet4_restriction_element_based_tpl(
-                    nelements,
-                    stride,
-                    elements,
-                    element_to_node_incidence_count,
-                    vec_size,
-                    from_stride,
-                    (double *)from,
-                    to_stride,
-                    (double *)to,
-                    stream);
+            return cu_macrotet4_to_tet4_restriction_element_based_tpl(nelements,
+                                                                      elements,
+                                                                      element_to_node_incidence_count,
+                                                                      vec_size,
+                                                                      from_stride,
+                                                                      (double *)from,
+                                                                      to_stride,
+                                                                      (double *)to,
+                                                                      stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error] cu_tet4_to_macrotet4_prolongation_tpl: not implemented for type "
                     "%s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }

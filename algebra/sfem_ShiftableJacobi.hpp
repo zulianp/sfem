@@ -78,7 +78,7 @@ namespace sfem {
         std::shared_ptr<Buffer<T>>      diag;
         std::shared_ptr<Buffer<T>>      inv_diag;
         std::shared_ptr<Buffer<mask_t>> constraints_mask;
-        T                               relaxation_parameter{0.3};
+        T                               relaxation_parameter{1./3};
         int                             block_size{3};
         bool                            is_symmetric{true};
 

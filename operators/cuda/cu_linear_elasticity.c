@@ -11,23 +11,23 @@
 #include <mpi.h>
 #include <stdio.h>
 
-extern int cu_linear_elasticity_apply(const enum ElemType              element_type,
-                                      const ptrdiff_t                  nelements,
-                                      const ptrdiff_t                  stride,  // Stride for elements and fff
-                                      const idx_t *const SFEM_RESTRICT elements,
-                                      const void *const SFEM_RESTRICT  jacobian_adjugate,
-                                      const void *const SFEM_RESTRICT  jacobian_determinant,
-                                      const real_t                     mu,
-                                      const real_t                     lambda,
-                                      const enum RealType              real_type,
-                                      const real_t *const              d_x,
-                                      real_t *const                    d_y,
-                                      void                            *stream) {
+extern int cu_linear_elasticity_apply(const enum ElemType             element_type,
+                                      const ptrdiff_t                 nelements,
+                                      idx_t **const SFEM_RESTRICT     elements,
+                                      const ptrdiff_t                 jacobian_stride,
+                                      const void *const SFEM_RESTRICT jacobian_adjugate,
+                                      const void *const SFEM_RESTRICT jacobian_determinant,
+                                      const real_t                    mu,
+                                      const real_t                    lambda,
+                                      const enum RealType             real_type,
+                                      const real_t *const             d_x,
+                                      real_t *const                   d_y,
+                                      void                           *stream) {
     switch (element_type) {
         case TET4: {
             return cu_tet4_linear_elasticity_apply(nelements,
-                                                   stride,
                                                    elements,
+                                                   jacobian_stride,
                                                    jacobian_adjugate,
                                                    jacobian_determinant,
                                                    mu,
@@ -45,8 +45,8 @@ extern int cu_linear_elasticity_apply(const enum ElemType              element_t
         }
         case MACRO_TET4: {
             return cu_macro_tet4_linear_elasticity_apply(nelements,
-                                                         stride,
                                                          elements,
+                                                         jacobian_stride,
                                                          jacobian_adjugate,
                                                          jacobian_determinant,
                                                          mu,
@@ -64,8 +64,8 @@ extern int cu_linear_elasticity_apply(const enum ElemType              element_t
         }
         case TET10: {
             return cu_tet10_linear_elasticity_apply(nelements,
-                                                    stride,
                                                     elements,
+                                                    jacobian_stride,
                                                     jacobian_adjugate,
                                                     jacobian_determinant,
                                                     mu,
@@ -83,8 +83,8 @@ extern int cu_linear_elasticity_apply(const enum ElemType              element_t
         }
         case HEX8: {
             return cu_affine_hex8_linear_elasticity_apply(nelements,
-                                                          stride,
                                                           elements,
+                                                          jacobian_stride,
                                                           jacobian_adjugate,
                                                           jacobian_determinant,
                                                           mu,
@@ -108,22 +108,22 @@ extern int cu_linear_elasticity_apply(const enum ElemType              element_t
     }
 }
 
-extern int cu_linear_elasticity_diag(const enum ElemType              element_type,
-                                     const ptrdiff_t                  nelements,
-                                     const ptrdiff_t                  stride,  // Stride for elements and fff
-                                     const idx_t *const SFEM_RESTRICT elements,
-                                     const void *const SFEM_RESTRICT  jacobian_adjugate,
-                                     const void *const SFEM_RESTRICT  jacobian_determinant,
-                                     const real_t                     mu,
-                                     const real_t                     lambda,
-                                     const enum RealType              real_type,
-                                     real_t *const                    d_t,
-                                     void                            *stream) {
+extern int cu_linear_elasticity_diag(const enum ElemType             element_type,
+                                     const ptrdiff_t                 nelements,
+                                     idx_t **const SFEM_RESTRICT     elements,
+                                     const ptrdiff_t                 jacobian_stride,
+                                     const void *const SFEM_RESTRICT jacobian_adjugate,
+                                     const void *const SFEM_RESTRICT jacobian_determinant,
+                                     const real_t                    mu,
+                                     const real_t                    lambda,
+                                     const enum RealType             real_type,
+                                     real_t *const                   d_t,
+                                     void                           *stream) {
     switch (element_type) {
         case TET4: {
             return cu_tet4_linear_elasticity_diag(nelements,
-                                                  stride,
                                                   elements,
+                                                  jacobian_stride,
                                                   jacobian_adjugate,
                                                   jacobian_determinant,
                                                   mu,
@@ -137,8 +137,8 @@ extern int cu_linear_elasticity_diag(const enum ElemType              element_ty
         }
         case MACRO_TET4: {
             return cu_macro_tet4_linear_elasticity_diag(nelements,
-                                                        stride,
                                                         elements,
+                                                        jacobian_stride,
                                                         jacobian_adjugate,
                                                         jacobian_determinant,
                                                         mu,
@@ -152,8 +152,8 @@ extern int cu_linear_elasticity_diag(const enum ElemType              element_ty
         }
         case TET10: {
             return cu_tet10_linear_elasticity_diag(nelements,
-                                                   stride,
                                                    elements,
+                                                   jacobian_stride,
                                                    jacobian_adjugate,
                                                    jacobian_determinant,
                                                    mu,
@@ -174,8 +174,8 @@ extern int cu_linear_elasticity_diag(const enum ElemType              element_ty
 
 int cu_linear_elasticity_bsr(const enum ElemType                element_type,
                              const ptrdiff_t                    nelements,
-                             const ptrdiff_t                    stride,
-                             const idx_t *const SFEM_RESTRICT   elements,
+                             idx_t **const SFEM_RESTRICT        elements,
+                             const ptrdiff_t                    jacobian_stride,
                              const void *const SFEM_RESTRICT    jacobian_adjugate,
                              const void *const SFEM_RESTRICT    jacobian_determinant,
                              const real_t                       mu,
@@ -188,8 +188,8 @@ int cu_linear_elasticity_bsr(const enum ElemType                element_type,
     switch (element_type) {
         case HEX8: {
             return cu_affine_hex8_linear_elasticity_bsr(nelements,
-                                                        stride,
                                                         elements,
+                                                        jacobian_stride,
                                                         jacobian_adjugate,
                                                         jacobian_determinant,
                                                         mu,
@@ -209,8 +209,8 @@ int cu_linear_elasticity_bsr(const enum ElemType                element_type,
 
 int cu_linear_elasticity_block_diag_sym_aos(const enum ElemType             element_type,
                                             const ptrdiff_t                 nelements,
-                                            const ptrdiff_t                 stride,
-                                            idx_t *const SFEM_RESTRICT      elements,
+                                            idx_t **const SFEM_RESTRICT     elements,
+                                            const ptrdiff_t                 jacobian_stride,
                                             const void *const SFEM_RESTRICT jacobian_adjugate,
                                             const void *const SFEM_RESTRICT jacobian_determinant,
                                             const real_t                    mu,
@@ -221,8 +221,8 @@ int cu_linear_elasticity_block_diag_sym_aos(const enum ElemType             elem
     switch (element_type) {
         case HEX8: {
             return cu_affine_hex8_linear_elasticity_block_diag_sym(nelements,
-                                                                   stride,
                                                                    elements,
+                                                                   jacobian_stride,
                                                                    jacobian_adjugate,
                                                                    jacobian_determinant,
                                                                    mu,

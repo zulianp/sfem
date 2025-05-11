@@ -14,6 +14,8 @@
 #define POW2(a) ((a) * (a))
 #endif
 
+static const scalar_t infty = 10000;
+
 // #define SFEM_RESAMPLE_GAP_DUAL
 
 static SFEM_INLINE real_t put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
@@ -315,18 +317,14 @@ int quadshell4_resample_gap_local(
 
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                    SFEM_ERROR(
-                            "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                            "%ld)!\n",
-                            g_qx,
-                            g_qy,
-                            g_qz,
-                            i,
-                            j,
-                            k,
-                            n[0],
-                            n[1],
-                            n[2]);
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_gap[edof_i] += infty * quad4_f[edof_i] * dV;
+                    }
+
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_xnormal[edof_i] += 1 * quad4_f[edof_i] * dV;
+                    }
+
                     continue;
                 }
 
@@ -624,18 +622,10 @@ int quadshell4_resample_gap_value_local(
 
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                    SFEM_ERROR(
-                            "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                            "%ld)!\n",
-                            g_qx,
-                            g_qy,
-                            g_qz,
-                            i,
-                            j,
-                            k,
-                            n[0],
-                            n[1],
-                            n[2]);
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
+                    }
+
                     continue;
                 }
 
@@ -809,18 +799,10 @@ int quadshell4_resample_gap_normals_local(
 
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
-                    SFEM_ERROR(
-                            "(%g, %g, %g) (%ld, %ld, %ld) outside domain  (%ld, %ld, "
-                            "%ld)!\n",
-                            g_qx,
-                            g_qy,
-                            g_qz,
-                            i,
-                            j,
-                            k,
-                            n[0],
-                            n[1],
-                            n[2]);
+                    for (int edof_i = 0; edof_i < 4; edof_i++) {
+                        element_xnormal[edof_i] += 1. * quad4_f[edof_i] * dV;
+                    }
+
                     continue;
                 }
 

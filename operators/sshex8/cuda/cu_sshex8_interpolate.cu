@@ -47,7 +47,7 @@ public:
             printf("%g ", (double)S_host[1 * stride + i]);
         }
         printf("\n");
-#endif 
+#endif
     }
 
     ~ShapeInterpolation() { cudaFree(data); }
@@ -56,15 +56,14 @@ public:
 // PROLONGATION
 
 template <typename From, typename To>
-__global__ void cu_sshex8_hierarchical_prolongation_kernel(const int                        level,
-                                                           const ptrdiff_t                  nelements,
-                                                           const ptrdiff_t                  stride,
-                                                           const idx_t *const SFEM_RESTRICT elements,
-                                                           const int                        vec_size,
-                                                           const ptrdiff_t                  from_stride,
-                                                           const From *const SFEM_RESTRICT  from,
-                                                           const ptrdiff_t                  to_stride,
-                                                           To *const SFEM_RESTRICT          to) {
+__global__ void cu_sshex8_hierarchical_prolongation_kernel(const int                       level,
+                                                           const ptrdiff_t                 nelements,
+                                                           idx_t **const SFEM_RESTRICT     elements,
+                                                           const int                       vec_size,
+                                                           const ptrdiff_t                 from_stride,
+                                                           const From *const SFEM_RESTRICT from,
+                                                           const ptrdiff_t                 to_stride,
+                                                           To *const SFEM_RESTRICT         to) {
     const int corners[8] = {// Bottom
                             cu_sshex8_lidx(level, 0, 0, 0),
                             cu_sshex8_lidx(level, level, 0, 0),
@@ -82,7 +81,7 @@ __global__ void cu_sshex8_hierarchical_prolongation_kernel(const int            
         for (int zi = 0; zi < level + 1; zi++) {
             for (int yi = 0; yi < level + 1; yi++) {
                 for (int xi = 0; xi < level + 1; xi++) {
-                    idx_t idx = elements[cu_sshex8_lidx(level, xi, yi, zi) * stride + e];
+                    idx_t idx = elements[cu_sshex8_lidx(level, xi, yi, zi)][e];
 
                     const scalar_t x = xi * h;
                     const scalar_t y = yi * h;
@@ -107,7 +106,7 @@ __global__ void cu_sshex8_hierarchical_prolongation_kernel(const int            
                         scalar_t val = 0;
 
                         for (int v = 0; v < 8; v++) {
-                            const ptrdiff_t global_from_idx = (elements[corners[v] * stride + e] * vec_size + d) * from_stride;
+                            const ptrdiff_t global_from_idx = (elements[corners[v]][e] * vec_size + d) * from_stride;
 
                             assert(from[global_from_idx] == from[global_from_idx]);
                             assert(f[v] == f[v]);
@@ -127,16 +126,15 @@ __global__ void cu_sshex8_hierarchical_prolongation_kernel(const int            
 }
 
 template <typename From, typename To>
-static int cu_sshex8_hierarchical_prolongation_tpl(const int                        level,
-                                                   const ptrdiff_t                  nelements,
-                                                   const ptrdiff_t                  stride,
-                                                   const idx_t *const SFEM_RESTRICT elements,
-                                                   const int                        vec_size,
-                                                   const ptrdiff_t                  from_stride,
-                                                   const From *const SFEM_RESTRICT  from,
-                                                   const ptrdiff_t                  to_stride,
-                                                   To *const SFEM_RESTRICT          to,
-                                                   void                            *stream) {
+static int cu_sshex8_hierarchical_prolongation_tpl(const int                       level,
+                                                   const ptrdiff_t                 nelements,
+                                                   idx_t **const SFEM_RESTRICT     elements,
+                                                   const int                       vec_size,
+                                                   const ptrdiff_t                 from_stride,
+                                                   const From *const SFEM_RESTRICT from,
+                                                   const ptrdiff_t                 to_stride,
+                                                   To *const SFEM_RESTRICT         to,
+                                                   void                           *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     // Hand tuned
@@ -155,28 +153,27 @@ static int cu_sshex8_hierarchical_prolongation_tpl(const int                    
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_sshex8_hierarchical_prolongation_kernel<From, To>
-                <<<n_blocks, block_size, 0, s>>>(level, nelements, stride, elements, vec_size, from_stride, from, to_stride, to);
+                <<<n_blocks, block_size, 0, s>>>(level, nelements, elements, vec_size, from_stride, from, to_stride, to);
     } else {
         cu_sshex8_hierarchical_prolongation_kernel<From, To>
-                <<<n_blocks, block_size, 0>>>(level, nelements, stride, elements, vec_size, from_stride, from, to_stride, to);
+                <<<n_blocks, block_size, 0>>>(level, nelements, elements, vec_size, from_stride, from, to_stride, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_sshex8_hierarchical_prolongation(const int                        level,
-                                               const ptrdiff_t                  nelements,
-                                               const ptrdiff_t                  stride,
-                                               const idx_t *const SFEM_RESTRICT elements,
-                                               const int                        vec_size,
-                                               const enum RealType              from_type,
-                                               const ptrdiff_t                  from_stride,
-                                               const void *const SFEM_RESTRICT  from,
-                                               const enum RealType              to_type,
-                                               const ptrdiff_t                  to_stride,
-                                               void *const SFEM_RESTRICT        to,
-                                               void                            *stream) {
+extern int cu_sshex8_hierarchical_prolongation(const int                       level,
+                                               const ptrdiff_t                 nelements,
+                                               idx_t **const SFEM_RESTRICT     elements,
+                                               const int                       vec_size,
+                                               const enum RealType             from_type,
+                                               const ptrdiff_t                 from_stride,
+                                               const void *const SFEM_RESTRICT from,
+                                               const enum RealType             to_type,
+                                               const ptrdiff_t                 to_stride,
+                                               void *const SFEM_RESTRICT       to,
+                                               void                           *stream) {
     assert(from_type == to_type && "TODO mixed types!");
     if (from_type != to_type) {
         return SFEM_FAILURE;
@@ -185,23 +182,22 @@ extern int cu_sshex8_hierarchical_prolongation(const int                        
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_sshex8_hierarchical_prolongation_tpl(
-                    level, nelements, stride, elements, vec_size, from_stride, (real_t *)from, to_stride, (real_t *)to, stream);
+                    level, nelements, elements, vec_size, from_stride, (real_t *)from, to_stride, (real_t *)to, stream);
         }
         case SFEM_FLOAT32: {
             return cu_sshex8_hierarchical_prolongation_tpl(
-                    level, nelements, stride, elements, vec_size, from_stride, (float *)from, to_stride, (float *)to, stream);
+                    level, nelements, elements, vec_size, from_stride, (float *)from, to_stride, (float *)to, stream);
         }
         case SFEM_FLOAT64: {
             return cu_sshex8_hierarchical_prolongation_tpl(
-                    level, nelements, stride, elements, vec_size, from_stride, (double *)from, to_stride, (double *)to, stream);
+                    level, nelements, elements, vec_size, from_stride, (double *)from, to_stride, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_sshex8_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -212,8 +208,7 @@ extern int cu_sshex8_hierarchical_prolongation(const int                        
 template <typename From, typename To>
 __global__ void cu_sshex8_hierarchical_restriction_kernel(const int                           level,
                                                           const ptrdiff_t                     nelements,
-                                                          const ptrdiff_t                     stride,
-                                                          const idx_t *const SFEM_RESTRICT    elements,
+                                                          idx_t **const SFEM_RESTRICT         elements,
                                                           const uint16_t *const SFEM_RESTRICT e2n_count,
                                                           const int                           vec_size,
                                                           const ptrdiff_t                     from_stride,
@@ -244,7 +239,7 @@ __global__ void cu_sshex8_hierarchical_restriction_kernel(const int             
                 for (int yi = 0; yi < level + 1; yi++) {
                     for (int xi = 0; xi < level + 1; xi++) {
                         const int       lidx = cu_sshex8_lidx(level, xi, yi, zi);
-                        const ptrdiff_t idx  = elements[lidx * stride + e];
+                        const ptrdiff_t idx  = elements[lidx][e];
 
                         const scalar_t x = xi * h;
                         const scalar_t y = yi * h;
@@ -280,7 +275,7 @@ __global__ void cu_sshex8_hierarchical_restriction_kernel(const int             
             }
 
             for (int v = 0; v < 8; v++) {
-                const ptrdiff_t global_to_idx = (elements[corners[v] * stride + e] * vec_size + d) * to_stride;
+                const ptrdiff_t global_to_idx = (elements[corners[v]][e] * vec_size + d) * to_stride;
                 atomicAdd(&to[global_to_idx], acc[v]);
             }
         }
@@ -290,8 +285,7 @@ __global__ void cu_sshex8_hierarchical_restriction_kernel(const int             
 template <typename From, typename To>
 static int cu_sshex8_hierarchical_restriction_tpl(const int                           level,
                                                   const ptrdiff_t                     nelements,
-                                                  const ptrdiff_t                     stride,
-                                                  const idx_t *const SFEM_RESTRICT    elements,
+                                                  idx_t **const SFEM_RESTRICT         elements,
                                                   const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
                                                   const int                           vec_size,
                                                   const ptrdiff_t                     from_stride,
@@ -317,10 +311,10 @@ static int cu_sshex8_hierarchical_restriction_tpl(const int                     
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_sshex8_hierarchical_restriction_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
-                level, nelements, stride, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
+                level, nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
     } else {
         cu_sshex8_hierarchical_restriction_kernel<From, To><<<n_blocks, block_size, 0>>>(
-                level, nelements, stride, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
+                level, nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -329,8 +323,7 @@ static int cu_sshex8_hierarchical_restriction_tpl(const int                     
 
 extern int cu_sshex8_hierarchical_restriction(const int                           level,
                                               const ptrdiff_t                     nelements,
-                                              const ptrdiff_t                     stride,
-                                              const idx_t *const SFEM_RESTRICT    elements,
+                                              idx_t **const SFEM_RESTRICT         elements,
                                               const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
                                               const int                           vec_size,
                                               const enum RealType                 from_type,
@@ -349,7 +342,6 @@ extern int cu_sshex8_hierarchical_restriction(const int                         
         case SFEM_REAL_DEFAULT: {
             return cu_sshex8_hierarchical_restriction_tpl(level,
                                                           nelements,
-                                                          stride,
                                                           elements,
                                                           element_to_node_incidence_count,
                                                           vec_size,
@@ -362,7 +354,6 @@ extern int cu_sshex8_hierarchical_restriction(const int                         
         case SFEM_FLOAT32: {
             return cu_sshex8_hierarchical_restriction_tpl(level,
                                                           nelements,
-                                                          stride,
                                                           elements,
                                                           element_to_node_incidence_count,
                                                           vec_size,
@@ -375,7 +366,6 @@ extern int cu_sshex8_hierarchical_restriction(const int                         
         case SFEM_FLOAT64: {
             return cu_sshex8_hierarchical_restriction_tpl(level,
                                                           nelements,
-                                                          stride,
                                                           elements,
                                                           element_to_node_incidence_count,
                                                           vec_size,
@@ -386,13 +376,12 @@ extern int cu_sshex8_hierarchical_restriction(const int                         
                                                           stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_sshex8_prolongation_tpl: not implemented for type "
                     "%s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -400,14 +389,13 @@ extern int cu_sshex8_hierarchical_restriction(const int                         
 
 template <typename From, typename To>
 __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     nelements,
-                                          const ptrdiff_t                     stride,
                                           const int                           from_level,
                                           const int                           from_level_stride,
-                                          idx_t *const SFEM_RESTRICT          from_elements,
+                                          idx_t **const SFEM_RESTRICT         from_elements,
                                           const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                                           const int                           to_level,
                                           const int                           to_level_stride,
-                                          idx_t *const SFEM_RESTRICT          to_elements,
+                                          idx_t **const SFEM_RESTRICT         to_elements,
                                           const To *const SFEM_RESTRICT       S,
                                           const int                           vec_size,
                                           const enum RealType                 from_type,
@@ -493,7 +481,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                                                             off_from_yi * from_level_stride,
                                                                             off_from_zi * from_level_stride);
 
-                                        const idx_t     gidx = from_elements[idx_from * stride + e];
+                                        const idx_t     gidx = from_elements[idx_from][e];
                                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                                         in[sub_idx]          = from[idx] / from_element_to_node_incidence_count[gidx];
                                     } else {
@@ -540,7 +528,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                                           off_to_yi * to_level_stride,
                                                           off_to_zi * to_level_stride);
 
-                        atomicAdd(&to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride], acc);
+                        atomicAdd(&to[(to_elements[idx_to][e] * vec_size + d) * to_stride], acc);
                     }
                 }
             }
@@ -550,14 +538,13 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
 
 template <typename From, typename To>
 int cu_sshex8_restrict_tpl(const ptrdiff_t                     nelements,
-                           const ptrdiff_t                     stride,
                            const int                           from_level,
                            const int                           from_level_stride,
-                           idx_t *const SFEM_RESTRICT          from_elements,
+                           idx_t **const SFEM_RESTRICT         from_elements,
                            const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                            const int                           to_level,
                            const int                           to_level_stride,
-                           idx_t *const SFEM_RESTRICT          to_elements,
+                           idx_t **const SFEM_RESTRICT         to_elements,
                            const int                           vec_size,
                            const enum RealType                 from_type,
                            const ptrdiff_t                     from_stride,
@@ -587,7 +574,6 @@ int cu_sshex8_restrict_tpl(const ptrdiff_t                     nelements,
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, shared_mem_size, s>>>(nelements,
-                                                                                          stride,
                                                                                           from_level,
                                                                                           from_level_stride,
                                                                                           from_elements,
@@ -605,7 +591,6 @@ int cu_sshex8_restrict_tpl(const ptrdiff_t                     nelements,
                                                                                           to);
     } else {
         cu_sshex8_restrict_kernel<From, To><<<n_blocks, block_size, shared_mem_size>>>(nelements,
-                                                                                       stride,
                                                                                        from_level,
                                                                                        from_level_stride,
                                                                                        from_elements,
@@ -628,14 +613,13 @@ int cu_sshex8_restrict_tpl(const ptrdiff_t                     nelements,
 }
 
 extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
-                              const ptrdiff_t                     stride,
                               const int                           from_level,
                               const int                           from_level_stride,
-                              idx_t *const SFEM_RESTRICT          from_elements,
+                              idx_t **const SFEM_RESTRICT         from_elements,
                               const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                               const int                           to_level,
                               const int                           to_level_stride,
-                              idx_t *const SFEM_RESTRICT          to_elements,
+                              idx_t **const SFEM_RESTRICT         to_elements,
                               const int                           vec_size,
                               const enum RealType                 from_type,
                               const ptrdiff_t                     from_stride,
@@ -652,7 +636,6 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_sshex8_restrict_tpl<real_t, real_t>(nelements,
-                                                          stride,
                                                           from_level,
                                                           from_level_stride,
                                                           from_elements,
@@ -671,7 +654,6 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
         }
         case SFEM_FLOAT32: {
             return cu_sshex8_restrict_tpl<float, float>(nelements,
-                                                        stride,
                                                         from_level,
                                                         from_level_stride,
                                                         from_elements,
@@ -690,7 +672,6 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
         }
         case SFEM_FLOAT64: {
             return cu_sshex8_restrict_tpl<double, double>(nelements,
-                                                          stride,
                                                           from_level,
                                                           from_level_stride,
                                                           from_elements,
@@ -709,13 +690,12 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
         }
 
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_sshex8_prolongate: not implemented for type "
                     "%s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -727,13 +707,12 @@ extern int cu_sshex8_restrict(const ptrdiff_t                     nelements,
 // Even TO sub-elements are used to interpolate from FROM sub-elements
 template <typename From, typename To>
 __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nelements,
-                                            const ptrdiff_t                 stride,
                                             const int                       from_level,
                                             const int                       from_level_stride,
-                                            idx_t *const SFEM_RESTRICT      from_elements,
+                                            idx_t **const SFEM_RESTRICT     from_elements,
                                             const int                       to_level,
                                             const int                       to_level_stride,
-                                            idx_t *const SFEM_RESTRICT      to_elements,
+                                            idx_t **const SFEM_RESTRICT     to_elements,
                                             const int                       vec_size,
                                             const enum RealType             from_type,
                                             const ptrdiff_t                 from_stride,
@@ -775,11 +754,11 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
         // loop on all FROM micro elements
         for (int from_zi = 0; from_zi < from_nloops; from_zi++) {
             const int off_from_zi = (from_zi + zi);
-            
+
             for (int from_yi = 0; from_yi < from_nloops; from_yi++) {
                 const int off_from_yi = (from_yi + yi);
 
-                for (int from_xi = 0; from_xi < from_nloops; from_xi++) {    
+                for (int from_xi = 0; from_xi < from_nloops; from_xi++) {
                     const int off_from_xi = (from_xi + xi);
 
                     const bool from_exists =
@@ -795,7 +774,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                             off_from_yi * from_level_stride,
                                                             off_from_zi * from_level_stride);
 
-                        const idx_t     gidx = from_elements[idx_from * stride + e];
+                        const idx_t     gidx = from_elements[idx_from][e];
                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                         in[sub_idx]          = from[idx];
                     } else {
@@ -877,7 +856,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                                       off_to_yi * to_level_stride,
                                                                       off_to_zi * to_level_stride);
 
-                                    to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
+                                    to[(to_elements[idx_to][e] * vec_size + d) * to_stride] = out;
                                 }
                             }
                         }
@@ -892,13 +871,12 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
 template <typename From, typename To>
 __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nelements,
-                                            const ptrdiff_t                 stride,
                                             const int                       from_level,
                                             const int                       from_level_stride,
-                                            idx_t *const SFEM_RESTRICT      from_elements,
+                                            idx_t **const SFEM_RESTRICT     from_elements,
                                             const int                       to_level,
                                             const int                       to_level_stride,
-                                            idx_t *const SFEM_RESTRICT      to_elements,
+                                            idx_t **const SFEM_RESTRICT     to_elements,
                                             const To *const SFEM_RESTRICT   S,
                                             const int                       vec_size,
                                             const enum RealType             from_type,
@@ -975,7 +953,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                             off_from_yi * from_level_stride,
                                                             off_from_xi * from_level_stride);
 
-                        const idx_t     gidx = from_elements[idx_from * stride + e];
+                        const idx_t     gidx = from_elements[idx_from][e];
                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                         in[sub_idx]          = from[idx];
                     } else {
@@ -1045,7 +1023,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                                       off_to_yi * to_level_stride,
                                                                       off_to_zi * to_level_stride);
 
-                                    to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
+                                    to[(to_elements[idx_to][e] * vec_size + d) * to_stride] = out;
                                 }
                             }
                         }
@@ -1060,13 +1038,12 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
 
 template <typename From, typename To>
 int cu_sshex8_prolongate_tpl(const ptrdiff_t                 nelements,
-                             const ptrdiff_t                 stride,
                              const int                       from_level,
                              const int                       from_level_stride,
-                             idx_t *const SFEM_RESTRICT      from_elements,
+                             idx_t **const SFEM_RESTRICT     from_elements,
                              const int                       to_level,
                              const int                       to_level_stride,
-                             idx_t *const SFEM_RESTRICT      to_elements,
+                             idx_t **const SFEM_RESTRICT     to_elements,
                              const int                       vec_size,
                              const enum RealType             from_type,
                              const ptrdiff_t                 from_stride,
@@ -1089,7 +1066,6 @@ int cu_sshex8_prolongate_tpl(const ptrdiff_t                 nelements,
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
         cu_sshex8_prolongate_kernel<From, To><<<n_blocks, block_size, shared_mem_size, s>>>(nelements,
-                                                                                            stride,
                                                                                             from_level,
                                                                                             from_level_stride,
                                                                                             from_elements,
@@ -1108,7 +1084,6 @@ int cu_sshex8_prolongate_tpl(const ptrdiff_t                 nelements,
                                                                                             to);
     } else {
         cu_sshex8_prolongate_kernel<From, To><<<n_blocks, block_size, shared_mem_size>>>(nelements,
-                                                                                         stride,
                                                                                          from_level,
                                                                                          from_level_stride,
                                                                                          from_elements,
@@ -1132,13 +1107,12 @@ int cu_sshex8_prolongate_tpl(const ptrdiff_t                 nelements,
 }
 
 extern int cu_sshex8_prolongate(const ptrdiff_t                 nelements,
-                                const ptrdiff_t                 stride,
                                 const int                       from_level,
                                 const int                       from_level_stride,
-                                idx_t *const SFEM_RESTRICT      from_elements,
+                                idx_t **const SFEM_RESTRICT     from_elements,
                                 const int                       to_level,
                                 const int                       to_level_stride,
-                                idx_t *const SFEM_RESTRICT      to_elements,
+                                idx_t **const SFEM_RESTRICT     to_elements,
                                 const int                       vec_size,
                                 const enum RealType             from_type,
                                 const ptrdiff_t                 from_stride,
@@ -1155,7 +1129,6 @@ extern int cu_sshex8_prolongate(const ptrdiff_t                 nelements,
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_sshex8_prolongate_tpl<real_t, real_t>(nelements,
-                                                            stride,
                                                             from_level,
                                                             from_level_stride,
                                                             from_elements,
@@ -1173,7 +1146,6 @@ extern int cu_sshex8_prolongate(const ptrdiff_t                 nelements,
         }
         case SFEM_FLOAT32: {
             return cu_sshex8_prolongate_tpl<float, float>(nelements,
-                                                          stride,
                                                           from_level,
                                                           from_level_stride,
                                                           from_elements,
@@ -1191,7 +1163,6 @@ extern int cu_sshex8_prolongate(const ptrdiff_t                 nelements,
         }
         case SFEM_FLOAT64: {
             return cu_sshex8_prolongate_tpl<double, double>(nelements,
-                                                            stride,
                                                             from_level,
                                                             from_level_stride,
                                                             from_elements,
