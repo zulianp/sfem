@@ -14,24 +14,25 @@
 #include "ssquad4.h"
 
 // C++ includes
-#include "sfem_bcgs.hpp"
-#include "sfem_bcrs_sym_SpMV.hpp"
-#include "sfem_bsr_SpMV.hpp"
-#include "sfem_cg.hpp"
+#include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
 #include "sfem_Context.hpp"
 #include "sfem_CooSym.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_CRSGraph.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_mprgp.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_bcgs.hpp"
+#include "sfem_bcrs_sym_SpMV.hpp"
+#include "sfem_bsr_SpMV.hpp"
+#include "sfem_cg.hpp"
+#include "sfem_crs_SpMV.hpp"
+#include "sfem_crs_sym_SpMV.hpp"
+#include "sfem_glob.hpp"
+#include "sfem_mprgp.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
@@ -50,7 +51,7 @@ namespace sfem {
     static void device_synchronize() {}
     static bool is_ptr_device(const void *) { return false; }
     template <typename T>
-    inline T & to_host(T &ptr) {
+    inline T &to_host(T &ptr) {
         return ptr;
     }
 }  // namespace sfem
@@ -151,6 +152,31 @@ namespace sfem {
             ret->default_init();
         }
 
+        ret->set_diag(diag);
+        return ret;
+    }
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
+            const int                              dim,
+            const std::shared_ptr<Buffer<HP>>     &diag,
+            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
+            const ExecutionSpace                   es) {
+        auto ret = std::make_shared<sfem::MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            CUDA_BLAS<LP>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_CUDA<HP, LP>::build(dim, ret->impl);
+        } else
+#endif  // SFEM_ENABLE_CUDA
+        {
+            OpenMP_BLAS<LP>::build_blas(ret->blas);
+            ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(dim, ret->impl);
+        }
+
+        ret->execution_space_ = es;
+        ret->constraints_mask = constraints_mask;
         ret->set_diag(diag);
         return ret;
     }
@@ -372,7 +398,6 @@ namespace sfem {
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
                                 cu_sshex8_prolongate(from_ssm.n_elements(),
-                                                     from_ssm.n_elements(),
                                                      from_ssm.level(),
                                                      1,
                                                      from_elements->data(),
@@ -400,7 +425,6 @@ namespace sfem {
                                 auto &ssm = to_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                     ssm.n_elements(),
-                                                                    ssm.n_elements(),
                                                                     elements->data(),
                                                                     from_space->block_size(),
                                                                     SFEM_REAL_DEFAULT,
@@ -422,7 +446,6 @@ namespace sfem {
 
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
-                                                                            mesh->nelements,
                                                                             elements->data(),
                                                                             from_space->block_size(),
                                                                             SFEM_REAL_DEFAULT,
@@ -562,7 +585,6 @@ namespace sfem {
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
                                 cu_sshex8_restrict(from_ssm.n_elements(),
-                                                   from_ssm.n_elements(),
                                                    from_ssm.level(),
                                                    1,
                                                    elements->data(),
@@ -591,7 +613,6 @@ namespace sfem {
                                 auto &ssm = from_space->semi_structured_mesh();
                                 cu_sshex8_hierarchical_restriction(ssm.level(),
                                                                    ssm.n_elements(),
-                                                                   ssm.n_elements(),
                                                                    elements->data(),
                                                                    dbuff->data(),
                                                                    block_size,
@@ -615,7 +636,6 @@ namespace sfem {
 
                             auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
-                                                                           mesh->nelements,
                                                                            elements->data(),
                                                                            dbuff->data(),
                                                                            block_size,
@@ -1203,6 +1223,71 @@ namespace sfem {
         }
 
         return sfem::hessian_bcrs_sym(f, nullptr, es);
+    }
+
+    static std::shared_ptr<Buffer<idx_t *>> sshex8_derefine_element_connectivity(
+            const int                               from_level,
+            const int                               to_level,
+            const std::shared_ptr<Buffer<idx_t *>> &elements) {
+        const int       step_factor = from_level / to_level;
+        const int       nxe         = (to_level + 1) * (to_level + 1) * (to_level + 1);
+        const ptrdiff_t nelements   = elements->extent(1);
+
+#ifdef SFEM_ENABLE_CUDA
+        if (elements->mem_space() == MEMORY_SPACE_DEVICE) {
+            std::vector<idx_t *> host_buff_from(elements->extent(0));
+            buffer_device_to_host(elements->extent(0) * sizeof(idx_t *), elements->data(), host_buff_from.data());
+
+            std::vector<idx_t *> host_dev_ptrs(nxe);
+            for (int zi = 0; zi <= to_level; zi++) {
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        const int from_lidx = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const int to_lidx   = sshex8_lidx(to_level, xi, yi, zi);
+
+                        assert(from_lidx < elements->extent(0));
+                        assert(to_lidx < host_dev_ptrs.size());
+
+                        host_dev_ptrs[to_lidx] = host_buff_from[from_lidx];
+                    }
+                }
+            }
+
+            idx_t **dev_buff_to = (idx_t **)d_buffer_alloc(nxe * sizeof(idx_t *));
+            buffer_host_to_device(nxe * sizeof(idx_t *), host_dev_ptrs.data(), dev_buff_to);
+            return std::make_shared<Buffer<idx_t *>>(
+                    nxe,
+                    nelements,
+                    dev_buff_to,
+                    [nxe, host_dev_ptrs](int n, void **ptr) { d_buffer_destroy(ptr); },
+                    MEMORY_SPACE_DEVICE);
+        }
+#endif
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                nelements,
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        auto d     = view->data();
+        auto elems = elements->data();
+
+        for (int zi = 0; zi <= to_level; zi++) {
+            for (int yi = 0; yi <= to_level; yi++) {
+                for (int xi = 0; xi <= to_level; xi++) {
+                    const int from_lidx = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                    const int to_lidx   = sshex8_lidx(to_level, xi, yi, zi);
+                    d[to_lidx]          = elems[from_lidx];
+                }
+            }
+        }
+
+        return view;
     }
 
     static std::shared_ptr<Buffer<idx_t *>> ssquad4_derefine_element_connectivity(

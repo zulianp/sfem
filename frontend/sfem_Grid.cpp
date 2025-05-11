@@ -5,9 +5,10 @@
 #include "matrixio_ndarray.h"
 
 #include "sfem_glob.hpp"
+#include "sfem_Tracer.hpp"
 
-#include <sstream>
 #include <fstream>
+#include <sstream>
 
 namespace sfem {
 
@@ -108,24 +109,21 @@ namespace sfem {
         ptrdiff_t size    = ret->impl_->stride[2] * ret->impl_->nlocal[2];
         ret->impl_->field = Buffer<T>::own(size, data, free, MEMORY_SPACE_HOST);
 
-
         geom_t SFEM_GRID_SHIFT = 0;
         geom_t SFEM_GRID_SCALE = 1;
-
 
         SFEM_READ_ENV(SFEM_GRID_SHIFT, atof);
         SFEM_READ_ENV(SFEM_GRID_SCALE, atof);
 
 #pragma omp parallel for
-        for(ptrdiff_t i = 0; i < size; i++) {
+        for (ptrdiff_t i = 0; i < size; i++) {
             data[i] = SFEM_GRID_SCALE * (data[i] + SFEM_GRID_SHIFT);
         }
         return ret;
     }
 
     template <class T>
-    int Grid<T>::to_file(const std::string &folder)
-    {
+    int Grid<T>::to_file(const std::string &folder) {
         std::stringstream ss;
 
         std::string field_path;
@@ -151,7 +149,7 @@ namespace sfem {
 
         sfem::create_directory(folder.c_str());
         std::ofstream os(folder + "/meta.yaml");
-        if(!os.good()) return SFEM_FAILURE;
+        if (!os.good()) return SFEM_FAILURE;
         os << ss.str();
         os.close();
 
@@ -219,16 +217,16 @@ namespace sfem {
     }
 
     template <class T>
-    std::shared_ptr<Grid<T>> Grid<T>::create(MPI_Comm     comm,
-                                             const int    nx,
-                                             const int    ny,
-                                             const int    nz,
-                                             const geom_t xmin,
-                                             const geom_t ymin,
-                                             const geom_t zmin,
-                                             const geom_t xmax,
-                                             const geom_t ymax,
-                                             const geom_t zmax) {
+    std::shared_ptr<Grid<T>> Grid<T>::create(MPI_Comm        comm,
+                                             const ptrdiff_t nx,
+                                             const ptrdiff_t ny,
+                                             const ptrdiff_t nz,
+                                             const geom_t    xmin,
+                                             const geom_t    ymin,
+                                             const geom_t    zmin,
+                                             const geom_t    xmax,
+                                             const geom_t    ymax,
+                                             const geom_t    zmax) {
         auto ret = std::make_unique<Grid<T>>(comm);
 
         auto &impl = ret->impl_;
@@ -269,9 +267,9 @@ namespace sfem {
     template class Grid<double>;
 
     std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
-                                             const int                                                       nx,
-                                             const int                                                       ny,
-                                             const int                                                       nz,
+                                             const ptrdiff_t                                                 nx,
+                                             const ptrdiff_t                                                 ny,
+                                             const ptrdiff_t                                                 nz,
                                              const geom_t                                                    xmin,
                                              const geom_t                                                    ymin,
                                              const geom_t                                                    zmin,
@@ -279,6 +277,8 @@ namespace sfem {
                                              const geom_t                                                    ymax,
                                              const geom_t                                                    zmax,
                                              std::function<geom_t(const geom_t, const geom_t, const geom_t)> f) {
+        SFEM_TRACE_SCOPE("Grid::create_sdf");
+
         auto g = Grid<geom_t>::create(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
 
         const geom_t hx = (xmax - xmin) / (nx - 1);
@@ -289,9 +289,9 @@ namespace sfem {
         auto          stride = g->stride();
 
 #pragma omp parallel for
-        for (int zi = 0; zi < nz; zi++) {
-            for (int yi = 0; yi < ny; yi++) {
-                for (int xi = 0; xi < nx; xi++) {
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
                     const geom_t x                                          = xmin + xi * hx;
                     const geom_t y                                          = ymin + yi * hy;
                     const geom_t z                                          = zmin + zi * hz;

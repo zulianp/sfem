@@ -9,19 +9,17 @@
 #include <cassert>
 
 template <typename real_t>
-__global__ void cu_macro_tet4_laplacian_apply_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elems,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const real_t *const SFEM_RESTRICT x,
-        real_t *const SFEM_RESTRICT y) {
+__global__ void cu_macro_tet4_laplacian_apply_kernel(const ptrdiff_t                          nelements,
+                                                     idx_t **const SFEM_RESTRICT              elems,
+                                                     const ptrdiff_t                          fff_stride,
+                                                     const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                                     const real_t *const SFEM_RESTRICT        x,
+                                                     real_t *const SFEM_RESTRICT              y) {
     scalar_t ex[10];
     scalar_t ey[10];
-    geom_t sub_fff[6];
+    geom_t   sub_fff[6];
 
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
 #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
             ey[v] = 0;
@@ -29,13 +27,13 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(
 
         // collect coeffs
         for (int v = 0; v < 10; ++v) {
-            ex[v] = x[elems[v * stride + e]];
+            ex[v] = x[elems[v][e]];
         }
 
         geom_t offf[6];
 #pragma unroll(6)
         for (int d = 0; d < 6; d++) {
-            offf[d] = fff[d * stride + e];
+            offf[d] = fff[d * fff_stride + e];
         }
 
         // Apply operator
@@ -140,26 +138,25 @@ __global__ void cu_macro_tet4_laplacian_apply_kernel(
 
         // redistribute coeffs
         for (int v = 0; v < 10; ++v) {
-            atomicAdd(&y[elems[v * stride + e]], ey[v]);
+            atomicAdd(&y[elems[v][e]], ey[v]);
         }
     }
 }
 
 template <typename T>
-static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
-                                             const ptrdiff_t stride,  // Stride for elements and fff
-                                             const idx_t *const SFEM_RESTRICT elements,
+static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t                          nelements,
+                                             idx_t **const SFEM_RESTRICT              elements,
+                                             const ptrdiff_t                          fff_stride,
                                              const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                             const T *const SFEM_RESTRICT x,
-                                             T *const SFEM_RESTRICT y,
-                                             void *stream) {
+                                             const T *const SFEM_RESTRICT             x,
+                                             T *const SFEM_RESTRICT                   y,
+                                             void                                    *stream) {
     // Hand tuned
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_macro_tet4_laplacian_apply_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_macro_tet4_laplacian_apply_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -168,52 +165,35 @@ static int cu_macro_tet4_laplacian_apply_tpl(const ptrdiff_t nelements,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
 
-        cu_macro_tet4_laplacian_apply_kernel<T>
-                <<<n_blocks, block_size, 0, s>>>(nelements, stride, elements, fff, x, y);
+        cu_macro_tet4_laplacian_apply_kernel<T><<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, x, y);
     } else {
-        cu_macro_tet4_laplacian_apply_kernel<T>
-                <<<n_blocks, block_size, 0>>>(nelements, stride, elements, fff, x, y);
+        cu_macro_tet4_laplacian_apply_kernel<T><<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, x, y);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t nelements,
-                                         const ptrdiff_t stride,  // Stride for elements and fff
-                                         const idx_t *const SFEM_RESTRICT elements,
+extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t                 nelements,
+                                         idx_t **const SFEM_RESTRICT     elements,
+                                         const ptrdiff_t                 fff_stride,
                                          const void *const SFEM_RESTRICT fff,
-                                         const enum RealType real_type_xy,
+                                         const enum RealType             real_type_xy,
                                          const void *const SFEM_RESTRICT x,
-                                         void *const SFEM_RESTRICT y,
-                                         void *stream) {
+                                         void *const SFEM_RESTRICT       y,
+                                         void                           *stream) {
     switch (real_type_xy) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macro_tet4_laplacian_apply_tpl(nelements,
-                                                     stride,
-                                                     elements,
-                                                     (cu_jacobian_t *)fff,
-                                                     (real_t *)x,
-                                                     (real_t *)y,
-                                                     stream);
+            return cu_macro_tet4_laplacian_apply_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)x, (real_t *)y, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macro_tet4_laplacian_apply_tpl(nelements,
-                                                     stride,
-                                                     elements,
-                                                     (cu_jacobian_t *)fff,
-                                                     (float *)x,
-                                                     (float *)y,
-                                                     stream);
+            return cu_macro_tet4_laplacian_apply_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)x, (float *)y, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macro_tet4_laplacian_apply_tpl(nelements,
-                                                     stride,
-                                                     elements,
-                                                     (cu_jacobian_t *)fff,
-                                                     (double *)x,
-                                                     (double *)y,
-                                                     stream);
+            return cu_macro_tet4_laplacian_apply_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)x, (double *)y, stream);
         }
         default: {
             fprintf(stderr,
@@ -230,24 +210,22 @@ extern int cu_macro_tet4_laplacian_apply(const ptrdiff_t nelements,
 // DIAG
 
 template <typename real_t>
-__global__ void cu_macro_tet4_laplacian_diag_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elems,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        real_t *const SFEM_RESTRICT diag) {
+__global__ void cu_macro_tet4_laplacian_diag_kernel(const ptrdiff_t                          nelements,
+                                                    idx_t **const SFEM_RESTRICT              elems,
+                                                    const ptrdiff_t                          fff_stride,
+                                                    const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                                    real_t *const SFEM_RESTRICT              diag) {
     scalar_t ed[10];
-    geom_t sub_fff[6];
+    geom_t   sub_fff[6];
 
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         for (int v = 0; v < 10; ++v) {
             ed[v] = 0;
         }
 
         geom_t offf[6];
         for (int d = 0; d < 6; d++) {
-            offf[d] = fff[d * stride + e];
+            offf[d] = fff[d * fff_stride + e];
         }
 
         // Apply operator
@@ -289,7 +267,7 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(
         // redistribute coeffs
         // #pragma unroll(10)
         for (int v = 0; v < 10; ++v) {
-            const idx_t idx = elems[v * stride + e];
+            const idx_t idx = elems[v][e];
             assert(ed[v] != 0);
             atomicAdd(&diag[idx], ed[v]);
         }
@@ -297,18 +275,17 @@ __global__ void cu_macro_tet4_laplacian_diag_kernel(
 }
 
 template <typename T>
-static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
-                                            const ptrdiff_t stride,  // Stride for elements and fff
-                                            const idx_t *const SFEM_RESTRICT elements,
+static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t                          nelements,
+                                            idx_t **const SFEM_RESTRICT              elements,
+                                            const ptrdiff_t                          fff_stride,
                                             const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                            T *const SFEM_RESTRICT diag,
-                                            void *stream) {
+                                            T *const SFEM_RESTRICT                   diag,
+                                            void                                    *stream) {
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_macro_tet4_laplacian_diag_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_macro_tet4_laplacian_diag_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -316,36 +293,34 @@ static int cu_macro_tet4_laplacian_diag_tpl(const ptrdiff_t nelements,
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements, stride, elements, fff, diag);
+        cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0, s>>>(nelements, elements, fff_stride, fff, diag);
     } else {
-        cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(
-                nelements, stride, elements, fff, diag);
+        cu_macro_tet4_laplacian_diag_kernel<<<n_blocks, block_size, 0>>>(nelements, elements, fff_stride, fff, diag);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t nelements,
-                                        const ptrdiff_t stride,  // Stride for elements and fff
-                                        const idx_t *const SFEM_RESTRICT elements,
+extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t                 nelements,
+                                        idx_t **const SFEM_RESTRICT     elements,
+                                        const ptrdiff_t                 fff_stride,
                                         const void *const SFEM_RESTRICT fff,
-                                        const enum RealType real_type_diag,
-                                        void *const SFEM_RESTRICT diag,
-                                        void *stream) {
+                                        const enum RealType             real_type_diag,
+                                        void *const SFEM_RESTRICT       diag,
+                                        void                           *stream) {
     switch (real_type_diag) {
         case SFEM_REAL_DEFAULT: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, stride, elements, (cu_jacobian_t *)fff, (real_t *)diag, stream);
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (real_t *)diag, stream);
         }
         case SFEM_FLOAT32: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, stride, elements, (cu_jacobian_t *)fff, (float *)diag, stream);
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (float *)diag, stream);
         }
         case SFEM_FLOAT64: {
             return cu_macro_tet4_laplacian_diag_tpl(
-                    nelements, stride, elements, (cu_jacobian_t *)fff, (double *)diag, stream);
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, (double *)diag, stream);
         }
         default: {
             fprintf(stderr,
@@ -361,29 +336,27 @@ extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t nelements,
 // ------------ CRS
 
 template <typename T>
-__global__ void cu_macro_tet4_laplacian_crs_kernel(
-        const ptrdiff_t nelements,
-        const ptrdiff_t stride,  // Stride for elements and fff
-        const idx_t *const SFEM_RESTRICT elements,
-        const cu_jacobian_t *const SFEM_RESTRICT fff,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        T *const SFEM_RESTRICT values) {
+__global__ void cu_macro_tet4_laplacian_crs_kernel(const ptrdiff_t                          nelements,
+                                                   idx_t **const SFEM_RESTRICT              elements,
+                                                   const ptrdiff_t                          fff_stride,
+                                                   const cu_jacobian_t *const SFEM_RESTRICT fff,
+                                                   const count_t *const SFEM_RESTRICT       rowptr,
+                                                   const idx_t *const SFEM_RESTRICT         colidx,
+                                                   T *const SFEM_RESTRICT                   values) {
     idx_t ev10[10];
     idx_t ev[4];
 
     accumulator_t element_matrix[4 * 4];
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements;
-         e += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         for (int v = 0; v < 10; ++v) {
-            ev10[v] = elements[v * stride + e];
+            ev10[v] = elements[v][e];
         }
 
-        geom_t offf[6];
+        geom_t   offf[6];
         scalar_t sub_fff[6];
 
         for (int d = 0; d < 6; d++) {
-            offf[d] = fff[d * stride + e];
+            offf[d] = fff[d * fff_stride + e];
         }
 
         // Apply operator
@@ -429,20 +402,19 @@ __global__ void cu_macro_tet4_laplacian_crs_kernel(
 }
 
 template <typename T>
-int cu_macro_tet4_laplacian_crs_tpl(const ptrdiff_t nelements,
-                                    const ptrdiff_t stride,  // Stride for elements and fff
-                                    const idx_t *const SFEM_RESTRICT elements,
+int cu_macro_tet4_laplacian_crs_tpl(const ptrdiff_t                          nelements,
+                                    idx_t **const SFEM_RESTRICT              elements,
+                                    const ptrdiff_t                          fff_stride,
                                     const cu_jacobian_t *const SFEM_RESTRICT fff,
-                                    const count_t *const SFEM_RESTRICT rowptr,
-                                    const idx_t *const SFEM_RESTRICT colidx,
-                                    T *const SFEM_RESTRICT values,
-                                    void *stream) {
+                                    const count_t *const SFEM_RESTRICT       rowptr,
+                                    const idx_t *const SFEM_RESTRICT         colidx,
+                                    T *const SFEM_RESTRICT                   values,
+                                    void                                    *stream) {
     int block_size = 128;
 #ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
     {
         int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_macro_tet4_laplacian_crs_kernel<T>, 0, 0);
+        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_macro_tet4_laplacian_crs_kernel<T>, 0, 0);
     }
 #endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
 
@@ -451,55 +423,37 @@ int cu_macro_tet4_laplacian_crs_tpl(const ptrdiff_t nelements,
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
         cu_macro_tet4_laplacian_crs_kernel<<<n_blocks, block_size, 0, s>>>(
-                nelements, stride, elements, fff, rowptr, colidx, values);
+                nelements, elements, fff_stride, fff, rowptr, colidx, values);
     } else {
         cu_macro_tet4_laplacian_crs_kernel<<<n_blocks, block_size, 0>>>(
-                nelements, stride, elements, fff, rowptr, colidx, values);
+                nelements, elements, fff_stride, fff, rowptr, colidx, values);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
 
-extern int cu_macro_tet4_laplacian_crs(const ptrdiff_t nelements,
-                                       const ptrdiff_t stride,  // Stride for elements and fff
-                                       const idx_t *const SFEM_RESTRICT elements,
-                                       const void *const SFEM_RESTRICT fff,
+extern int cu_macro_tet4_laplacian_crs(const ptrdiff_t                    nelements,
+                                       idx_t **const SFEM_RESTRICT        elements,
+                                       const ptrdiff_t                    fff_stride,
+                                       const void *const SFEM_RESTRICT    fff,
                                        const count_t *const SFEM_RESTRICT rowptr,
-                                       const idx_t *const SFEM_RESTRICT colidx,
-                                       const enum RealType real_type,
-                                       void *const SFEM_RESTRICT values,
-                                       void *stream) {
+                                       const idx_t *const SFEM_RESTRICT   colidx,
+                                       const enum RealType                real_type,
+                                       void *const SFEM_RESTRICT          values,
+                                       void                              *stream) {
     switch (real_type) {
         case SFEM_REAL_DEFAULT: {
-            return cu_macro_tet4_laplacian_crs_tpl(nelements,
-                                                   stride,
-                                                   elements,
-                                                   (cu_jacobian_t *)fff,
-                                                   rowptr,
-                                                   colidx,
-                                                   (real_t *)values,
-                                                   stream);
+            return cu_macro_tet4_laplacian_crs_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (real_t *)values, stream);
         }
         case SFEM_FLOAT32: {
-            return cu_macro_tet4_laplacian_crs_tpl(nelements,
-                                                   stride,
-                                                   elements,
-                                                   (cu_jacobian_t *)fff,
-                                                   rowptr,
-                                                   colidx,
-                                                   (float *)values,
-                                                   stream);
+            return cu_macro_tet4_laplacian_crs_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (float *)values, stream);
         }
         case SFEM_FLOAT64: {
-            return cu_macro_tet4_laplacian_crs_tpl(nelements,
-                                                   stride,
-                                                   elements,
-                                                   (cu_jacobian_t *)fff,
-                                                   rowptr,
-                                                   colidx,
-                                                   (double *)values,
-                                                   stream);
+            return cu_macro_tet4_laplacian_crs_tpl(
+                    nelements, elements, fff_stride, (cu_jacobian_t *)fff, rowptr, colidx, (double *)values, stream);
         }
         default: {
             fprintf(stderr,

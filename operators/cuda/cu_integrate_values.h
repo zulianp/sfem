@@ -12,8 +12,7 @@ extern "C" {
 
 int cu_integrate_value(const int                          element_type,
                        const ptrdiff_t                    nelements,
-                       const ptrdiff_t                    stride,  // Stride for elements and coords
-                       const idx_t *const SFEM_RESTRICT   elements,
+                       idx_t **const SFEM_RESTRICT        elements,
                        const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                        const real_t                       value,
                        const int                          block_size,
@@ -24,8 +23,7 @@ int cu_integrate_value(const int                          element_type,
 
 int cu_integrate_values(const int                          element_type,
                         const ptrdiff_t                    nelements,
-                        const ptrdiff_t                    stride,  // Stride for elements and coords
-                        const idx_t *const SFEM_RESTRICT   elements,
+                        idx_t **const SFEM_RESTRICT        elements,
                         const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                         const enum RealType                real_type,
                         void *const SFEM_RESTRICT          values,

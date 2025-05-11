@@ -105,7 +105,7 @@ namespace sfem {
      * - `atol_`: Absolute tolerance for convergence.
      * - `verbose`: Flag for verbose output.
      * - `project_coarse_space_correction_`: Flag for coarse space correction projection.
-     * - `line_search_enabled_`: Flag for enabling line search.
+     * - `enable_line_search_`: Flag for enabling line search.
      * - `skip_coarse`: Flag to skip coarse grid corrections.
      * - `collect_energy_norm_correction_`: Flag to collect energy norm corrections.
      * - `penalty_param_`, `max_penalty_param_`: Penalty parameter and its maximum value.
@@ -306,9 +306,11 @@ namespace sfem {
                 const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
 
-                if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
-                if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
-                count_lagr_mult_updates++;
+                if (enable_shift) {
+                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    count_lagr_mult_updates++;
+                }
 
                 // Store it for diagonstics
                 const T prev_penalty_param = penalty_param_;
@@ -316,12 +318,12 @@ namespace sfem {
 
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
-                    penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
+                    penetration_tol = penetration_tol / pow(penalty_param_, penetration_tol_exp);
                     omega           = std::max(atol_, omega / penalty_param_);
 
                 } else {
-                    penalty_param_  = std::min(penalty_param_ * 10, max_penalty_param_);
-                    penetration_tol = 1 / pow(penalty_param_, 0.1);
+                    penalty_param_  = std::min(penalty_param_ * penalty_param_increase, max_penalty_param_);
+                    penetration_tol = 1 / pow(penalty_param_, (1 - penetration_tol_exp));
                     omega           = 1 / penalty_param_;
                 }
 
@@ -414,10 +416,16 @@ namespace sfem {
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
         void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
-        void enable_line_search(const bool val) { line_search_enabled_ = val; }
+        void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const bool val) { debug = val; }
         void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
+        void set_penalty_param_increase(const real_t val) {
+            penalty_param_increase = val;
+        }
+        void set_enable_shift(const bool val) {
+            enable_shift = val;
+        }
 
         BLAS_Tpl<T>&           blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
@@ -439,6 +447,8 @@ namespace sfem {
         }
 
         int init() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::init");
+
             assert(prolongation_.size() == restriction_.size());
             assert(operator_.size() == smoother_.size());
 
@@ -606,7 +616,7 @@ namespace sfem {
                     blas_.zeros(correction->size(), correction->data());
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
-                    if (line_search_enabled_) {
+                    if (enable_line_search_) {
                         // ATTENTION to code changes and side-effects
 
                         //  dot(c, (b - A * x))
@@ -789,21 +799,25 @@ namespace sfem {
         std::vector<std::shared_ptr<Memory>> memory_;
         bool                                 wrap_input_{true};
 
-        int max_it_{10};
-        int iterations_{0};
-        int cycle_type_{V_CYCLE};
-        T   atol_{1e-10};
-
-        bool verbose{true};
-        bool project_coarse_space_correction_{false};
-        bool line_search_enabled_{true};
-        bool skip_coarse{false};
         bool collect_energy_norm_correction_{false};
-        T    penalty_param_{10};
+        bool enable_line_search_{false};
+        bool project_coarse_space_correction_{false};
+        bool skip_coarse{false};
+        bool verbose{true};
+
+        int count_smoothing_steps{0};
+        int max_inner_it{3};
+        int nlsmooth_steps{3};
+        int cycle_type_{V_CYCLE};
+        int iterations_{0};
+        int max_it_{10};
+
         T    max_penalty_param_{10000};
-        int  nlsmooth_steps{3};
-        int  max_inner_it{3};
-        int  count_smoothing_steps{0};
+        T    penalty_param_{10};
+        T    penalty_param_increase{10};
+        T    atol_{1e-10};
+        T    penetration_tol_exp{0.9};
+        bool enable_shift{true};
 
         bool                      debug{false};
         std::vector<struct Stats> stats;

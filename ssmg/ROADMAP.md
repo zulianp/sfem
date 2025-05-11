@@ -114,7 +114,7 @@ MS := Milestone
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
-   - [X] Export facilities for Paper 1
+   - [x] Export facilities for Paper 1
    
 
 **MS 2: ()**
@@ -124,17 +124,18 @@ MS := Milestone
 **MS 3: ()**
 
    
-   - [X] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
-   - [X] GPU: ShiftableBlockSymJacobi
-   - [X] GPU: constraints_mask (minimal)
-   - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
-   - [X] GPU: sshex8_restrict and sshex8_prolongate
-   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
-   - [X] GPU: SparseBlockVector
-   - [X] Test/Debug GPU porting
+   - [x] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
+   - [x] GPU: ShiftableBlockSymJacobi
+   - [x] GPU: constraints_mask (minimal)
+   - [x] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
+   - [x] GPU: sshex8_restrict and sshex8_prolongate
+   - [x] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [x] GPU: SparseBlockVector
+   - [x] Test/Debug GPU porting
 
 **MS 4: ()**
    - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,...)
+   - [x] SoA refactoring for facilitating zero-overhead ML representation
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
    
