@@ -81,7 +81,7 @@ namespace sfem {
         ////////////////////////////////////////////////////////////////////////////////////
 
         bool enable_coarse_space_preconditioner = true;
-        bool enable_mixed_precision             = false;
+        bool enable_mixed_precision             = true;
 
         bool collect_energy_norm_correction = true;
         bool coarse_solver_verbose          = false;
@@ -214,7 +214,7 @@ namespace sfem {
             } else {
                 smoother->set_max_it(coarse_linear_smoothing_steps);
             }
-            
+
             smoothers_or_solver.push_back(smoother);
         }
 
