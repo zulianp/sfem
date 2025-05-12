@@ -267,7 +267,7 @@ class GPULinearElasticityOp:
         dims = fe.manifold_dim()
         q = fe.quadrature_point()
         shape_grad = fe.physical_tgrad(q)
-        eval_strain = sp.zeros(3, 3)
+        eval_strain = sp.zeros(dims, dims)
 
         for i in range(0, dims * fe.n_nodes()):
             eval_strain += disp[i] * (shape_grad[i] + shape_grad[i].T) / 2
