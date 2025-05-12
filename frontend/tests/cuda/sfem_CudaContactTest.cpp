@@ -85,7 +85,6 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> restricted;
     real_t                          e_pen;
     std::shared_ptr<Buffer<real_t>> lagr_ub;
-    // std::shared_ptr<Buffer<real_t>> upper_bound;
 
     int compare(const struct TestOutput &other, const real_t tol = 1e-7) const {
         SFEM_ASSERT_ARRAY_APPROX_EQ(x->size(), x->data(), other.x->data(), tol);
@@ -101,17 +100,8 @@ struct TestOutput {
         SFEM_TEST_APPROXEQ(e_pen, other.e_pen, tol);
 
         if (is_ml) {
-            // std::cout << "EXPECTED\n";
-            // restricted->print(std::cout);
-
-            // std::cout << "ACUTAL\n";
-            // other.restricted->print(std::cout);
-            // std::cout << std::flush;
-
             SFEM_ASSERT_ARRAY_APPROX_EQ(restricted->size(), restricted->data(), other.restricted->data(), tol);
         }
-
-        // SFEM_ASSERT_ARRAY_APPROX_EQ(upper_bound->size(), upper_bound->data(), other.upper_bound->data(), tol);
 
         return SFEM_TEST_SUCCESS;
     }
@@ -175,6 +165,13 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     f->apply_constraints(x->data());
     f->gradient(x->data(), g->data());
 
+    const int sym_block_size = 6;
+    auto      diag           = sfem::create_buffer<real_t>(fs->n_dofs() / fs->block_size() * sym_block_size, es);
+    auto      mask           = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+
+    f->hessian_block_diag_sym(nullptr, diag->data());
+    f->constaints_mask(mask->data());
+
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
     auto cg        = sfem::create_cg(linear_op, es);
     cg->apply(rhs->data(), x->data());
@@ -182,15 +179,6 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     contact_conds->init();
 
     auto upper_bound = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
-    // contact_conds->signed_distance(upper_bound->data());
-
-    const int sym_block_size = 6;
-    auto      diag           = sfem::create_buffer<real_t>(fs->n_dofs() / fs->block_size() * sym_block_size, es);
-    auto      mask           = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-
-    f->constaints_mask(mask->data());
-    f->hessian_block_diag_sym(nullptr, diag->data());
-
     auto normal_prod = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
     contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
 
