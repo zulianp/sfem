@@ -662,7 +662,6 @@ namespace sfem {
     class SemiStructuredGPULinearElasticity final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
         std::shared_ptr<Adjugate>      adjugate;
 
         real_t mu{1}, lambda{1};
@@ -682,14 +681,13 @@ namespace sfem {
                 auto ret = std::make_shared<SemiStructuredGPULinearElasticity>(derefined_space);
 
                 ret->adjugate = std::make_shared<Adjugate>(
-                        element_type,
+                        derefined_space->element_type(),
                         sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
                                                              derefined_space->semi_structured_mesh().level(),
                                                              adjugate->elements()),
                                                              adjugate->jacobian_adjugate(),
                                                              adjugate->jacobian_determinant());
 
-                ret->element_type = element_type;
 
                 ret->mu     = mu;
                 ret->lambda = lambda;
@@ -713,8 +711,8 @@ namespace sfem {
         int initialize() override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
             
-            real_t SFEM_SHEAR_MODULUS        = 1;
-            real_t SFEM_FIRST_LAME_PARAMETER = 1;
+            real_t SFEM_SHEAR_MODULUS        = mu;
+            real_t SFEM_FIRST_LAME_PARAMETER = lambda;
 
             SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
             SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
@@ -732,7 +730,7 @@ namespace sfem {
         }
 
         SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
-            : space(space), element_type(space->element_type()) {}
+            : space(space) {}
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -776,13 +774,27 @@ namespace sfem {
                                                                      this->lambda,
                                                                      6,
                                                                      real_type,
-                                                                     &out[0],
+                                                                     // Outputs
+                                                                     out,
                                                                      &out[1],
                                                                      &out[2],
                                                                      &out[3],
                                                                      &out[4],
                                                                      &out[5],
                                                                      SFEM_DEFAULT_STREAM);
+
+            // return cu_affine_sshex8_linear_elasticity_block_diag_sym_AoS(ssm.level(),
+            //                                                          adjugate->n_elements(),
+            //                                                          adjugate->elements()->data(),
+            //                                                          adjugate->n_elements(),  // stride
+            //                                                          adjugate->jacobian_adjugate()->data(),
+            //                                                          adjugate->jacobian_determinant()->data(),
+            //                                                          this->mu,
+            //                                                          this->lambda,
+            //                                                          real_type,
+            //                                                          // Outputs
+            //                                                          out,
+            //                                                          SFEM_DEFAULT_STREAM);
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
