@@ -389,9 +389,9 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
 
                         for (int d = 0; d < 8; d++) {
                             const int lidx = lev[d];
-                            element_ux[d] = eu[0][lidx];
-                            element_uy[d] = eu[1][lidx];
-                            element_uz[d] = eu[2][lidx];
+                            element_ux[d]  = eu[0][lidx];
+                            element_uy[d]  = eu[1][lidx];
+                            element_uz[d]  = eu[2][lidx];
                         }
 
                         for (int d = 0; d < 3 * 8; d++) {
@@ -820,11 +820,17 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
                         for (int edof_i = 0; edof_i < 8; edof_i++) {
                             const ptrdiff_t v = ev[lev[edof_i]];
                             // local to global
+#pragma omp atomic update
                             out0[v * out_stride] += blocks[edof_i][0];
+#pragma omp atomic update
                             out1[v * out_stride] += blocks[edof_i][1];
+#pragma omp atomic update
                             out2[v * out_stride] += blocks[edof_i][2];
+#pragma omp atomic update
                             out3[v * out_stride] += blocks[edof_i][3];
+#pragma omp atomic update
                             out4[v * out_stride] += blocks[edof_i][4];
+#pragma omp atomic update
                             out5[v * out_stride] += blocks[edof_i][5];
                         }
                     }
