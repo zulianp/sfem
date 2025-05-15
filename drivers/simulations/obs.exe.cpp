@@ -85,18 +85,6 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
     auto            gap   = sfem::create_buffer<real_t>(ndofs, es);
 
     f->apply_constraints(rhs->data());
-    contact_conds->update(x->data());
-    contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
-
-    sfem::create_directory(output_path.c_str());
-    fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
-    fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
-    auto out = f->output();
-    out->set_output_dir((output_path + "/out").c_str());
-    out->enable_AoS_to_SoA(true);
-    out->write("gap", gap->data());
-    out->write("rhs", rhs->data());
-
     f->apply_constraints(x->data());
 
     int SFEM_USE_SPMG = 1;
@@ -118,15 +106,35 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
         solver->apply(rhs->data(), x->data());
     }
 
-    out->write("disp", x->data());
+    // Output to disk
+    sfem::create_directory(output_path.c_str());
 
-    auto blas = sfem::blas<real_t>(es);
-    blas->zeros(rhs->size(), rhs->data());
-    f->gradient(x->data(), rhs->data());
+    fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
+    fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
 
-    blas->zeros(x->size(), x->data());
-    contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
-    out->write("contact_stress", x->data());
+    auto out = f->output();
+
+    out->set_output_dir((output_path + "/out").c_str());
+    out->enable_AoS_to_SoA(true);
+
+    out->write("rhs",  sfem::to_host(rhs)->data());
+    out->write("disp", sfem::to_host(x)->data());
+
+    if (es != sfem::EXECUTION_SPACE_DEVICE) {
+        // FIXME
+
+        contact_conds->update(x->data());
+        contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
+        out->write("gap", gap->data());
+
+        auto blas = sfem::blas<real_t>(es);
+        blas->zeros(rhs->size(), rhs->data());
+        f->gradient(x->data(), rhs->data());
+
+        blas->zeros(x->size(), x->data());
+        contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
+        out->write("contact_stress", x->data());
+    }
 
     return SFEM_SUCCESS;
 }
