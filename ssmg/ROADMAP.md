@@ -192,6 +192,29 @@ MS := Milestone
 - [ ] Vertical solution (redesign of some parts of the code)
 - [ ] Algorithmic Optimizations and parameter tuning
 
+### DD29 poster and ICCCM presentation
+
+- [ ] Formal presentation of method
+- [ ] Performance analysis on 
+      1. M1 Max (or M4 Gabriele?)
+      2. Shaheen
+      3. GH200 (Grace and Hopper)
+      4. AMD Mi300A?
+- [ ] Speed of light? Kernel performance with NCU
+- [ ] %TTS of different parts of the algorithm NSYS
+- [ ] Test cases Elastic / Fixed
+      1. Cuboid / sphere 
+      2. Cuboid / multiple spheres
+      3. Cylinder / stent
+- [ ] Algorithmic efficiency
+      1. Number of smoothing steps
+      2. Number of MG cycles
+      3. Number of shift update
+      4. Convergence rates
+- [ ] Levels [2, 4, 8, (16)]
+- [ ] Time dependent scenario: visco-elasticity?
+
+
 ## Paper 1: Shifted--Penalty Multigrid for Variational Inequalities
 
 - [ ] Authorship: Hardik, Austen, Rolf, Panayot, Patrick
