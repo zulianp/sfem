@@ -348,6 +348,7 @@ if(SFEM_ENABLE_TESTING)
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
+        list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
 endif()
 

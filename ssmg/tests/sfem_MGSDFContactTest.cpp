@@ -91,7 +91,10 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
                                     return dd;
                                 });
 
-    sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
+    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
@@ -168,7 +171,10 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
                                     return obstacle - y;
                                 });
 
-    sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
+    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
@@ -246,7 +252,10 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                     return dd;
                                 });
 
-    sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
+    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
@@ -264,6 +273,9 @@ int test_contact() {
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    int SFEM_ENABLE_OUPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(comm,
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
@@ -303,7 +315,7 @@ int test_contact() {
 
     f->add_operator(op);
 
-    sfem::create_directory("test_contact");
+    if (SFEM_ENABLE_OUPUT) sfem::create_directory("test_contact");
 
     const char *SFEM_CONTACT_CASE = "sphere";
     SFEM_READ_ENV(SFEM_CONTACT_CASE, );
@@ -329,23 +341,6 @@ int test_contact() {
     // contact_conds->update(x->data()); // FIXME
     contact_conds->init();
 
-    fs->mesh_ptr()->write("test_contact/coarse_mesh");
-    fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
-    auto out = f->output();
-    out->set_output_dir("test_contact/out");
-    out->enable_AoS_to_SoA(true);
-
-    if (es != sfem::EXECUTION_SPACE_DEVICE) {
-        contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
-        out->write("gap", gap->data());
-    }
-
-#ifdef SFEM_ENABLE_CUDA
-    out->write("rhs", sfem::to_host(rhs)->data());
-#else
-    out->write("rhs", rhs->data());
-#endif
-
     f->apply_constraints(x->data());
 
     int SFEM_USE_SPMG = 1;
@@ -367,21 +362,41 @@ int test_contact() {
         solver->apply(rhs->data(), x->data());
     }
 
+    if (SFEM_ENABLE_OUPUT) {
+        fs->mesh_ptr()->write("test_contact/coarse_mesh");
+        fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
+
+        auto out = f->output();
+        out->set_output_dir("test_contact/out");
+        out->enable_AoS_to_SoA(true);
+
+        if (es != sfem::EXECUTION_SPACE_DEVICE) {
+            contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
+            out->write("gap", gap->data());
+        }
+
 #ifdef SFEM_ENABLE_CUDA
-    x = sfem::to_host(x);
+        out->write("rhs", sfem::to_host(rhs)->data());
+#else
+        out->write("rhs", rhs->data());
 #endif
 
-    out->write("disp", x->data());
+#ifdef SFEM_ENABLE_CUDA
+        x = sfem::to_host(x);
+#endif
 
-    // FIXME
-    if (es != sfem::EXECUTION_SPACE_DEVICE) {
-        auto blas = sfem::blas<real_t>(es);
-        blas->zeros(rhs->size(), rhs->data());
-        f->gradient(x->data(), rhs->data());
+        out->write("disp", x->data());
 
-        blas->zeros(x->size(), x->data());
-        contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
-        out->write("contact_stress", x->data());
+        // FIXME
+        if (es != sfem::EXECUTION_SPACE_DEVICE) {
+            auto blas = sfem::blas<real_t>(es);
+            blas->zeros(rhs->size(), rhs->data());
+            f->gradient(x->data(), rhs->data());
+
+            blas->zeros(x->size(), x->data());
+            contact_conds->full_apply_boundary_mass_inverse(rhs->data(), x->data());
+            out->write("contact_stress", x->data());
+        }
     }
 
     return SFEM_TEST_SUCCESS;
