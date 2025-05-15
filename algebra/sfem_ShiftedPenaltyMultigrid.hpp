@@ -237,7 +237,9 @@ namespace sfem {
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     count_inner_iter++;
+                    
                     CycleReturnCode ret = nonlinear_cycle();
+
                     if (ret == CYCLE_CONVERGED) {
                         break;
                     }
@@ -357,7 +359,7 @@ namespace sfem {
 
                 collect_stats({.count_iter             = iterations_ + 1,
                                .count_mg_cycles        = count_inner_iter,
-                               .count_nl_smooth        = (count_inner_iter * nlsmooth_steps),
+                               .count_nl_smooth        = 2 * (count_inner_iter * nlsmooth_steps),
                                .count_smooth           = count_smoothing_steps,
                                .norm_penetration       = norm_pen,
                                .norm_residual          = norm_rpen,
@@ -683,6 +685,8 @@ namespace sfem {
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     return CYCLE_CONTINUE;
                 } else {
+                    fflush(stdout);
+                    fflush(stderr);
                     fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
                     return CYCLE_FAILURE;
                 }
