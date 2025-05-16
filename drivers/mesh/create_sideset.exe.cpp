@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
                 barycenter[d] /= nnxs;
             }
         
-            geom_t sq_dist = 0.;
+            real_t sq_dist = 0.;
             for (int d = 0; d < dim; ++d) {
                 const real_t m_x   = barycenter[d];
                 const real_t roi_x = roi[d];
