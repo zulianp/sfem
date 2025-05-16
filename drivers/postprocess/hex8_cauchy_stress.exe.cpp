@@ -3,6 +3,9 @@
 #include "hex8_linear_elasticity.h"
 #include "hex8_mass.h"
 
+// Paraview Frobenius norm
+// sqrt("cauchy_stress.0" * "cauchy_stress.0" + 2 * "cauchy_stress.1" * "cauchy_stress.1" + 2 * "cauchy_stress.2" * "cauchy_stress.2" +  "cauchy_stress.3" * "cauchy_stress.3" +  2 * "cauchy_stress.4" * "cauchy_stress.4" +"cauchy_stress.5" * "cauchy_stress.5")
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
