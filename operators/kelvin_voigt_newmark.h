@@ -11,13 +11,95 @@ extern "C" {
 
 // HAOYU
 
-int kelvin_voigt_newmark_apply_aos(const enum ElemType               element_type,
-                                   const ptrdiff_t                   nelements,
-                                   const ptrdiff_t                   nnodes,
-                                   idx_t **const SFEM_RESTRICT       elements,
-                                   geom_t **const SFEM_RESTRICT      points,
-                                   const real_t *const SFEM_RESTRICT u,
-                                   real_t *const SFEM_RESTRICT       values);
+// int kelvin_voigt_newmark_apply_aos(const enum ElemType               element_type,
+//                                    const ptrdiff_t                   nelements,
+//                                    const ptrdiff_t                   nnodes,
+//                                    idx_t **const SFEM_RESTRICT       elements,
+//                                    geom_t **const SFEM_RESTRICT      points,
+//                                    const real_t *const SFEM_RESTRICT u,
+//                                    real_t *const SFEM_RESTRICT       values);
+
+///////////////////////////////////////////////// SOA /////////////////////////////////////////////////
+
+int kelvin_voigt_newmark_apply_adjugate_soa(const enum ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         const real_t                          dt,
+                                         const real_t                          gamma,
+                                         const real_t                          beta, 
+                                         const real_t                          k,
+                                         const real_t                          K,
+                                         const real_t                          eta,
+                                         const real_t                          rho,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values);
+
+
+int kelvin_voigt_newmark_gradient_soa(const enum ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         const real_t                          dt,
+                                         const real_t                          gamma,
+                                         const real_t                          beta, 
+                                         const real_t                          k,
+                                         const real_t                          K,
+                                         const real_t                          eta,
+                                         const real_t                          rho,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const real_t *const SFEM_RESTRICT     u_old,
+                                         const real_t *const SFEM_RESTRICT     v_old,
+                                         const real_t *const SFEM_RESTRICT     a_old,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values);
+
+
+
+///////////////////////////////////////////////// AOS /////////////////////////////////////////////////
+
+
+int kelvin_voigt_newmark_apply_adjugate_aos(const enum ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         const real_t                          dt,
+                                         const real_t                          gamma,
+                                         const real_t                          beta, 
+                                         const real_t                          k,
+                                         const real_t                          K,
+                                         const real_t                          eta,
+                                         const real_t                          rho,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values);
+
+
+
+
+
+int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         const real_t                          dt,
+                                         const real_t                          gamma,
+                                         const real_t                          beta, 
+                                         const real_t                          k,
+                                         const real_t                          K,
+                                         const real_t                          eta,
+                                         const real_t                          rho,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                         const real_t *const SFEM_RESTRICT     u_old,
+                                         const real_t *const SFEM_RESTRICT     v_old,
+                                         const real_t *const SFEM_RESTRICT     a_old,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values);
 
 #ifdef __cplusplus
 }
