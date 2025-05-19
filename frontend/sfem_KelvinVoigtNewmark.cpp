@@ -6,6 +6,7 @@
 // C++ includes
 #include "sfem_Tracer.hpp"
 
+#include "hex8_jacobian.h"
 // HAOYU
 
 namespace sfem {
@@ -187,45 +188,53 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        int gradient(const real_t *const u, const real_t *const v, real_t *const out) override {
-            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::gradient");
-            // TODO
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+        // int gradient(const real_t *const u, const real_t *const v, real_t *const out) {
+        //     SFEM_TRACE_SCOPE("KelvinVoigtNewmark::gradient");
+        //     // TODO
+        //     auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-            double tick = MPI_Wtime();
+        //     double tick = MPI_Wtime();
 
-            if (jacobians) {
-                SFEM_TRACE_SCOPE("kelvin_voigt_newmark_gradient_aos");
-                kelvin_voigt_newmark_gradient_aos(element_type, mesh->nelements, mesh->nnodes, mesh->elements, 
-                                this->k, this->K, this->eta,
-                            jacobians->adjugate->data(), jacobians->determinant->data(), u, v, out);
-            } else {
-                SFEM_ERROR("Jacobians not initialized for gradient!\n");
-                return SFEM_FAILURE;
-            }
+        //     if (jacobians) {
+        //         SFEM_TRACE_SCOPE("kelvin_voigt_newmark_gradient_aos");
+        //         kelvin_voigt_newmark_gradient_aos(element_type, mesh->nelements, mesh->nnodes, mesh->elements, 
+        //                         this->k, this->K, this->eta,
+        //                     jacobians->adjugate->data(), jacobians->determinant->data(), u, v, out);
+        //     } else {
+        //         SFEM_ERROR("Jacobians not initialized for gradient!\n");
+        //         return SFEM_FAILURE;
+        //     }
         
-            double tock = MPI_Wtime();
-            total_time += (tock - tick);
-            calls++;
+        //     double tock = MPI_Wtime();
+        //     total_time += (tock - tick);
+        //     calls++;
 
-            return SFEM_SUCCESS;
+        //     return SFEM_SUCCESS;
+        // }
+
+
+        int gradient(const real_t *const x,  real_t *const out) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::gradient with only x");
+            SFEM_ERROR("Called unimplemented method!\n");
+            return SFEM_FAILURE;
         }
 
-        int apply(const real_t *const u, real_t *const out) override {
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("KelvinVoigtNewmark::apply");
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
+            auto mesh = space->mesh_ptr();
             double tick = MPI_Wtime();
 
             if (jacobians) {
                 SFEM_TRACE_SCOPE("kelvin_voigt_newmark_apply_adjugate_soa");
-                kelvin_voigt_newmark_apply_adjugate_soa(element_type,
-                                           mesh->n_elements,
-                                           mesh->n_nodes,
-                                           mesh->elements,
+                kelvin_voigt_newmark_apply_adjugate_soa(mesh->element_type(),
+                                           mesh->n_elements(),
+                                           mesh->n_nodes(),
+                                           mesh->elements()->data(),
+                                           jacobians->adjugate->data(), jacobians->determinant->data(),
                                            this->dt, this->gamma, this->beta,
                                            this->k, this->K, this->eta,
-                                           jacobians->adjugate->data(), jacobians->determinant->data(),
-                                           u,
+                                           h,
                                            out);
             } else {
                 SFEM_ERROR("Jacobians not initialized for apply!\n");
