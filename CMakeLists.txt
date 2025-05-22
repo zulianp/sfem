@@ -67,6 +67,7 @@ if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
         resampling/tet10
+        resampling/hyteg
     )
 endif()
 
