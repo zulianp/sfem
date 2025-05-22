@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <stddef.h>
+#include "hyteg.h"
 
 #include "bit_array.h"
 #include "sfem_base.h"

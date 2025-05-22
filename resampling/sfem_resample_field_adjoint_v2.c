@@ -1039,7 +1039,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
         //     weighted_field[ev[3]] > 1.001) {
         //     printf("WARNING: tet_id = %d, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g\n",
         //            element_i,
-        //            weighted_field[ev[0]],
+        //            end[ev[0]],
         //            weighted_field[ev[1]],
         //            weighted_field[ev[2]],
         //            weighted_field[ev[3]]);
