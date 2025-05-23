@@ -68,6 +68,7 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling
         resampling/tet10
         resampling/hyteg
+        resampling/adjoint
     )
 endif()
 

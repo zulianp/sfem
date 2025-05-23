@@ -13,6 +13,7 @@
 
 // #define real_t real_type
 
+#include "hyteg.h"
 #include "quadratures_rule.h"
 
 #define real_type real_t
@@ -405,6 +406,8 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
     const real_type dy = (real_type)delta[1];
     const real_type dz = (real_type)delta[2];
 
+    const real_type d_min = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+
     const real_type hexahedron_volume = dx * dy * dz;
 
 #if SFEM_LOG_LEVEL >= 5
@@ -464,7 +467,7 @@ tet4_resample_field_local_refine_adjoint(const ptrdiff_t                      st
                                     &vertex_b,      // Output
                                     edges_length);  // Output
 
-        const real_t alpha_tet           = max_edges_length / dx;
+        const real_t alpha_tet           = max_edges_length / d_min;
         const real_t max_min_edges_ratio = ratio_abs_max_min(edges_length, 6);
 
         int degenerated_tet = 0;
