@@ -21,6 +21,28 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+// alpha_to_hyteg_level //////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+int                                                       //
+alpha_to_hyteg_level(const real_t alpha,                  //
+                     const real_t alpha_min_threshold,    //
+                     const real_t alpha_max_threshold) {  //
+
+    if (alpha < alpha_min_threshold) return 1;                           // No refinement
+    if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
+
+    real_t alpha_x = alpha - alpha_min_threshold;  // Shift the alpha to start from 0
+    real_t L_real  = alpha_x / (alpha_max_threshold - alpha_min_threshold) * (real_t)(HYTEG_MAX_REFINEMENT_LEVEL - 1);
+
+    int L = L_real >= 1 ? (int)L_real : 1;                                    // Convert to integer
+    L     = L > HYTEG_MAX_REFINEMENT_LEVEL ? HYTEG_MAX_REFINEMENT_LEVEL : L;  // Clamp to maximum level
+
+    return L;  // Return the level of refinement
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_field_local_refine_adjoint_hyteg ////////
@@ -42,6 +64,13 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
     PRINT_CURRENT_FUNCTION;
     int ret = 0;
+
+    real_t alpha_min_threshold = 2.5;   // Minimum threshold for alpha
+    real_t alpha_max_threshold = 15.0;  // Maximum threshold for alpha
+
+    // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
+    // If the alpha value is below the minimum threshold, no refinement is applied.
+    // If the alpha value is above the maximum threshold, the maximum level of refinement is applied.
 
     const real_type ox = (real_type)origin[0];
     const real_type oy = (real_type)origin[1];
@@ -113,7 +142,21 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                     edges_length);  // Output
 
         const real_t alpha_tet = max_edges_length / d_min;
+
+        const int L = alpha_to_hyteg_level(alpha_tet,             //
+                                           alpha_min_threshold,   //
+                                           alpha_max_threshold);  //
+
+        const int     hteg_num_tetrahedra = get_hyteg_num_tetrahedra(L);
+        const real_t* x_hyteg             = get_hyteg_x(L);
+        const real_t* y_hyteg             = get_hyteg_y(L);
+        const real_t* z_hyteg             = get_hyteg_z(L);
+        const int*    categories_hyteg    = get_hyteg_categories(L);
+
+        for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {
+        }
     }
 
     RETURN_FROM_FUNCTION(ret);
-}
+}  // END OF FUNCTION tet4_resample_field_local_refine_adjoint_hyteg
+//////////////////////////////////////////////////////////
