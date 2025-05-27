@@ -21,15 +21,69 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+real_t                                                     //
+calculate_jacobian_for_category(const int       category,  //
+                                const real_type px0,       //
+                                const real_type py0,       //
+                                const real_type pz0,       //
+                                const real_type px1,       //
+                                const real_type py1,       //
+                                const real_type pz1,       //
+                                const real_type px2,       //
+                                const real_type py2,       //
+                                const real_type pz2,       //
+                                const real_type px3,       //
+                                const real_type py3,       //
+                                const real_type pz3,       //
+                                const real_t    L,         //
+                                const int       tet_i,     //
+                                int*            error_flag) {         //
+    real_t det_jacobian = 0.0;
+    *error_flag         = 0;
+
+    switch (category) {
+        case 0:  // Category 0
+            det_jacobian = det_jacobian_cat0_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        case 1:  // Category 1
+            det_jacobian = det_jacobian_cat1_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        case 2:  // Category 2
+            det_jacobian = det_jacobian_cat2_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        case 3:  // Category 3
+            det_jacobian = det_jacobian_cat3_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        case 4:  // Category 4
+            det_jacobian = det_jacobian_cat4_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        case 5:  // Category 5
+            det_jacobian = det_jacobian_cat5_real(px0, py0, pz0, px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, L);
+            break;
+        default:  // Invalid category
+            fprintf(stderr,
+                    "calculate_jacobian_for_category: Invalid category %d for tetrahedron %d at level "
+                    "%d\n",
+                    category,
+                    tet_i,
+                    L);
+            *error_flag = -1;
+            // The decision to exit should be made by the caller
+            break;
+    }
+    return det_jacobian;
+}
+
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 // alpha_to_hyteg_level //////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
-int                                                       //
-alpha_to_hyteg_level(const real_t alpha,                  //
-                     const real_t alpha_min_threshold,    //
-                     const real_t alpha_max_threshold) {  //
+int                                                     //
+alpha_to_hyteg_level(const real_t alpha,                //
+                     const real_t alpha_min_threshold,  //
+                     const real_t alpha_max_threshold,  //
+                     const int    max_refinement_L) {      //
 
     if (alpha < alpha_min_threshold) return 1;                           // No refinement
     if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
@@ -40,7 +94,7 @@ alpha_to_hyteg_level(const real_t alpha,                  //
     int L = L_real >= 1 ? (int)L_real : 1;                                    // Convert to integer
     L     = L > HYTEG_MAX_REFINEMENT_LEVEL ? HYTEG_MAX_REFINEMENT_LEVEL : L;  // Clamp to maximum level
 
-    return L;  // Return the level of refinement
+    return L >= max_refinement_L ? max_refinement_L : L;  // Return the level, clamped to max_refinement_L
 }
 
 //////////////////////////////////////////////////////////
@@ -67,6 +121,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
     real_t alpha_min_threshold = 2.5;   // Minimum threshold for alpha
     real_t alpha_max_threshold = 15.0;  // Maximum threshold for alpha
+    int    max_refinement_L    = 5;
 
     // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
     // If the alpha value is below the minimum threshold, no refinement is applied.
@@ -143,17 +198,92 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         const real_t alpha_tet = max_edges_length / d_min;
 
-        const int L = alpha_to_hyteg_level(alpha_tet,             //
-                                           alpha_min_threshold,   //
-                                           alpha_max_threshold);  //
+        const int L = alpha_to_hyteg_level(alpha_tet,            //
+                                           alpha_min_threshold,  //
+                                           alpha_max_threshold,  //
+                                           max_refinement_L);    //
 
         const int     hteg_num_tetrahedra = get_hyteg_num_tetrahedra(L);
         const real_t* x_hyteg             = get_hyteg_x(L);
         const real_t* y_hyteg             = get_hyteg_y(L);
         const real_t* z_hyteg             = get_hyteg_z(L);
         const int*    categories_hyteg    = get_hyteg_categories(L);
+        const int*    v0_array_hyteg      = get_hyteg_v0(L);
+        const int*    v1_array_hyteg      = get_hyteg_v1(L);
+        const int*    v2_array_hyteg      = get_hyteg_v2(L);
+        const int*    v3_array_hyteg      = get_hyteg_v3(L);
 
-        for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {
+        for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {  //
+            //
+            const int category = categories_hyteg[tet_i];
+
+            const int v0 = v0_array_hyteg[tet_i];
+            const int v1 = v1_array_hyteg[tet_i];
+            const int v2 = v2_array_hyteg[tet_i];
+            const int v3 = v3_array_hyteg[tet_i];
+
+            // Coordinates of the tetrahedron in the reference space
+            const real_type px0 = x_hyteg[v0];
+            const real_type px1 = x_hyteg[v1];
+            const real_type px2 = x_hyteg[v2];
+            const real_type px3 = x_hyteg[v3];
+
+            const real_type py0 = y_hyteg[v0];
+            const real_type py1 = y_hyteg[v1];
+            const real_type py2 = y_hyteg[v2];
+            const real_type py3 = y_hyteg[v3];
+
+            const real_type pz0 = z_hyteg[v0];
+            const real_type pz1 = z_hyteg[v1];
+            const real_type pz2 = z_hyteg[v2];
+            const real_type pz3 = z_hyteg[v3];
+
+            real_t det_jacobian = 0.0;
+
+            int error_flag = 0;                                             // Error flag for Jacobian calculation
+            det_jacobian   = calculate_jacobian_for_category(category,      //
+                                                           px0,           //
+                                                           py0,           //
+                                                           pz0,           //
+                                                           px1,           //
+                                                           py1,           //
+                                                           pz1,           //
+                                                           px2,           //
+                                                           py2,           //
+                                                           pz2,           //
+                                                           px3,           //
+                                                           py3,           //
+                                                           pz3,           //
+                                                           (real_t)L,     // Level
+                                                           tet_i,         // Tetrahedron index
+                                                           &error_flag);  //
+
+            if (error_flag < 0) {
+                fprintf(stderr,
+                        "tet4_resample_field_local_refine_adjoint_hyteg: Error calculating Jacobian for tetrahedron "
+                        "%d at level %d\n",
+                        tet_i,
+                        L);
+                ret = -1;
+                exit(EXIT_FAILURE);
+            }
+
+            if (det_jacobian == 0.0) {
+                degenerated_tetrahedra_cnt++;
+                continue;  // Skip degenerated tetrahedra
+            }
+
+            // Barycenter of the tetrahedron in the reference space
+            real_type bx = 0.0;
+            real_type by = 0.0;
+            real_type bz = 0.0;
+
+            tet4_barycenter_v2(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, &bx, &by, &bz);
+
+            // Transform barycenter to the physical space
+            bx = ox + dx * bx;
+            by = oy + dy * by;
+            bz = oz + dz * bz;
         }
     }
 
