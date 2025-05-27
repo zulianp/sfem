@@ -267,23 +267,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                 ret = -1;
                 exit(EXIT_FAILURE);
             }
-
-            if (det_jacobian == 0.0) {
-                degenerated_tetrahedra_cnt++;
-                continue;  // Skip degenerated tetrahedra
-            }
-
-            // Barycenter of the tetrahedron in the reference space
-            real_type bx = 0.0;
-            real_type by = 0.0;
-            real_type bz = 0.0;
-
-            tet4_barycenter_v2(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, &bx, &by, &bz);
-
-            // Transform barycenter to the physical space
-            bx = ox + dx * bx;
-            by = oy + dy * by;
-            bz = oz + dz * bz;
         }
     }
 
