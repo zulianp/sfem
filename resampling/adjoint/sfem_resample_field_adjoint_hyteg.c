@@ -238,35 +238,129 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_type pz2 = z_hyteg[v2];
             const real_type pz3 = z_hyteg[v3];
 
+            const real_t fx0, fx1, fx2, fx3;
+            const real_t fy0, fy1, fy2, fy3;
+            const real_t fz0, fz1, fz2, fz3;
+
+            tet4_transform_v2(x0,     // x-coordinates of the vertices
+                              x1,     //
+                              x2,     //
+                              x3,     //
+                              y0,     // y-coordinates of the vertices
+                              y1,     //
+                              y2,     //
+                              y3,     //
+                              z0,     // z-coordinates of the vertices
+                              z1,     //
+                              z2,     //
+                              z3,     //
+                              px0,    // Vertex of the sub-tetrahedron
+                              py0,    //
+                              pz0,    //
+                              &fx0,   // Output coordinates
+                              &fy0,   //
+                              &fz0);  //
+
+            tet4_transform_v2(x0,     // x-coordinates of the vertices
+                              x1,     //
+                              x2,     //
+                              x3,     //
+                              y0,     // y-coordinates of the vertices
+                              y1,     //
+                              y2,     //
+                              y3,     //
+                              z0,     // z-coordinates of the vertices
+                              z1,     //
+                              z2,     //
+                              z3,     //
+                              px1,    // Vertex of the sub-tetrahedron
+                              py1,    //
+                              pz1,    //
+                              &fx1,   // Output coordinates
+                              &fy1,   //
+                              &fz1);  //
+
+            tet4_transform_v2(x0,     // x-coordinates of the vertices
+                              x1,     //
+                              x2,     //
+                              x3,     //
+                              y0,     // y-coordinates of the vertices
+                              y1,     //
+                              y2,     //
+                              y3,     //
+                              z0,     // z-coordinates of the vertices
+                              z1,     //
+                              z2,     //
+                              z3,     //
+                              px2,    // Vertex of the sub-tetrahedron
+                              py2,    //
+                              pz2,    //
+                              &fx2,   // Output coordinates
+                              &fy2,   //
+                              &fz2);  //
+
+            tet4_transform_v2(x0,     // x-coordinates of the vertices
+                              x1,     //
+                              x2,     //
+                              x3,     //
+                              y0,     // y-coordinates of the vertices
+                              y1,     //
+                              y2,     //
+                              y3,     //
+                              z0,     // z-coordinates of the vertices
+                              z1,     //
+                              z2,     //
+                              z3,     //
+                              px3,    // Vertex of the sub-tetrahedron
+                              py3,    //
+                              pz3,    //
+                              &fx3,   // Output coordinates
+                              &fy3,   //
+                              &fz3);  //
+
             real_t det_jacobian = 0.0;
 
-            int error_flag = 0;                                             // Error flag for Jacobian calculation
-            det_jacobian   = calculate_jacobian_for_category(category,      //
-                                                           px0,           //
-                                                           py0,           //
-                                                           pz0,           //
-                                                           px1,           //
-                                                           py1,           //
-                                                           pz1,           //
-                                                           px2,           //
-                                                           py2,           //
-                                                           pz2,           //
-                                                           px3,           //
-                                                           py3,           //
-                                                           pz3,           //
-                                                           (real_t)L,     // Level
-                                                           tet_i,         // Tetrahedron index
-                                                           &error_flag);  //
+            const real_type theta_volume = tet4_measure_v2(fx0,
+                                                           fx1,
+                                                           fx2,
+                                                           fx3,
+                                                           //
+                                                           fy0,
+                                                           fy1,
+                                                           fy2,
+                                                           fy3,
+                                                           //
+                                                           fz0,
+                                                           fz1,
+                                                           fz2,
+                                                           fz3);
 
-            if (error_flag < 0) {
-                fprintf(stderr,
-                        "tet4_resample_field_local_refine_adjoint_hyteg: Error calculating Jacobian for tetrahedron "
-                        "%d at level %d\n",
-                        tet_i,
-                        L);
-                ret = -1;
-                exit(EXIT_FAILURE);
-            }
+            tet4_resample_tetrahedron_local_adjoint(fx0,           // Tetrahedron vertices X-coordinates
+                                                    fx1,           //
+                                                    fx2,           //
+                                                    fx3,           //
+                                                    fy0,           // Tetrahedron vertices Y-coordinates
+                                                    fy1,           //
+                                                    fy2,           //
+                                                    fy3,           //
+                                                    fz0,           // Tetrahedron vertices Z-coordinates
+                                                    fz1,           //
+                                                    fz2,           //
+                                                    fz3,           //
+                                                    theta_volume,  // Volume of the tetrahedron
+                                                    wf0,           // Weighted field at the vertices
+                                                    wf1,           //
+                                                    wf2,           //
+                                                    wf3,           //
+                                                    ox,            // Origin of the grid
+                                                    oy,            //
+                                                    oz,            //
+                                                    dx,            // Spacing of the grid
+                                                    dy,            //
+                                                    dz,            //
+                                                    stride,        // Stride
+                                                    n,             // Size of the grid
+                                                    data);         // Output
         }
     }
 

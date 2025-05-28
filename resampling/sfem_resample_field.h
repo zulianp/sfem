@@ -452,6 +452,34 @@ field_view_ensure_margin(MPI_Comm                             comm,          //
                          ptrdiff_t*                           z_nlocal_out,  //
                          geom_t* const SFEM_RESTRICT          z_origin_out);          //
 
+int                                                                                         //
+tet4_resample_tetrahedron_local_adjoint(const real_t                         x0,            // Tetrahedron vertices X-coordinates
+                                        const real_t                         x1,            //
+                                        const real_t                         x2,            //
+                                        const real_t                         x3,            //
+                                        const real_t                         y0,            // Tetrahedron vertices Y-coordinates
+                                        const real_t                         y1,            //
+                                        const real_t                         y2,            //
+                                        const real_t                         y3,            //
+                                        const real_t                         z0,            // Tetrahedron vertices Z-coordinates
+                                        const real_t                         z1,            //
+                                        const real_t                         z2,            //
+                                        const real_t                         z3,            //
+                                        const real_t                         theta_volume,  // Volume of the tetrahedron
+                                        const real_t                         wf0,           // Weighted field at the vertices
+                                        const real_t                         wf1,           //
+                                        const real_t                         wf2,           //
+                                        const real_t                         wf3,           //
+                                        const real_t                         ox,            // Origin of the grid
+                                        const real_t                         oy,            //
+                                        const real_t                         oz,            //
+                                        const real_t                         dx,            // Spacing of the grid
+                                        const real_t                         dy,            //
+                                        const real_t                         dz,            //
+                                        const ptrdiff_t* const SFEM_RESTRICT stride,        // Stride
+                                        const ptrdiff_t* const SFEM_RESTRICT n,             // Size of the grid
+                                        real_t* const SFEM_RESTRICT          data);                  // Output data
+
 /**
  * @brief Resample a field from a tetrahedral mesh to a structured grid (version 2).
  *
