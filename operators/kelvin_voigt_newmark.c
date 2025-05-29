@@ -215,3 +215,24 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
 }
 
 
+
+
+// int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   element_type,
+//                                          const ptrdiff_t                       nelements,
+//                                          const ptrdiff_t                       nnodes,
+//                                          idx_t **const SFEM_RESTRICT           elements, 
+//                                          const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+//                                          const jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+//                                          const real_t                          dt,
+//                                          const real_t                          gamma,
+//                                          const real_t                          beta,
+//                                          const real_t                          k,
+//                                          const real_t                          K,
+//                                          const real_t                          eta,
+//                                          const real_t *const SFEM_RESTRICT     u,
+//                                          const real_t *const SFEM_RESTRICT     v,  
+//                                          real_t *const SFEM_RESTRICT           values){
+
+//     return kelvin_voigt_newmark_apply_adjugate_aos(element_type, nelements, nnodes, elements, 
+//                     jacobian_adjugate, jacobian_determinant, dt, gamma, beta, k, K, eta, u, values);
+// }

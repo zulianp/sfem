@@ -223,6 +223,7 @@ class GPULinearKVOp:
         else:
             self.increment = coeffs("increment", dims * fe.n_nodes())
 
+
     def displacement_gradient(self):
         expr = assign_matrix(self.disp_grad_name, self.eval_disp_grad)
         return expr
@@ -594,6 +595,7 @@ def main():
     start = perf_counter()
 
     fe = Hex8()
+    # fe = Tri3()
 
     op = GPULinearKVOp(fe)
 
@@ -679,15 +681,15 @@ def main():
     # c_code(op.apply_M())
 
 
-    c_log("//--------------------------")
-    c_log("// lhs_matrix")
-    c_log("//--------------------------")
-    c_code(op.lhs_matrix())
+    # c_log("//--------------------------")
+    # c_log("// lhs_matrix")
+    # c_log("//--------------------------")
+    # c_code(op.lhs_matrix())
 
-    c_log("//--------------------------")
-    c_log("// lhs_sym")
-    c_log("//--------------------------")
-    c_code(op.lhs_sym())
+    # c_log("//--------------------------")
+    # c_log("// lhs_sym")
+    # c_log("//--------------------------")
+    # c_code(op.lhs_sym())
 
     c_log("//--------------------------")
     c_log("// apply_lhs")

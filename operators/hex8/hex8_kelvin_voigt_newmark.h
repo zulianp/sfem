@@ -160,6 +160,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t *const          ux,
                                  const real_t *const          uy,
                                  const real_t *const          uz,
+
                                  const real_t *const          vx,
                                  const real_t *const          vy,
                                  const real_t *const          vz,
