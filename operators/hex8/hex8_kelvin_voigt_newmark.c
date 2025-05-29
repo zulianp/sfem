@@ -80,9 +80,9 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t              nele
     SFEM_UNUSED(nnodes);
 
 
-    int             n_qp = line_q3_n;
-    const scalar_t *qx   = line_q3_x;
-    const scalar_t *qw   = line_q3_w;
+    int             n_qp = line_q2_n;
+    const scalar_t *qx   = line_q2_x;
+    const scalar_t *qw   = line_q2_w;
 
 
 #pragma omp parallel for
@@ -491,9 +491,11 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t *const          ux,
                                  const real_t *const          uy,
                                  const real_t *const          uz,
+
                                  const real_t *const          vx,
                                  const real_t *const          vy,
                                  const real_t *const          vz,
+
 
                                  const ptrdiff_t              out_stride,
                                  real_t *const                outx,
@@ -501,9 +503,9 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
-    int             n_qp = line_q3_n;
-    const scalar_t *qx   = line_q3_x;
-    const scalar_t *qw   = line_q3_w;
+    int             n_qp = line_q2_n;
+    const scalar_t *qx   = line_q2_x;
+    const scalar_t *qw   = line_q2_w;
 
 
 #pragma omp parallel for
@@ -571,6 +573,21 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                                      element_outx,
                                                      element_outy,
                                                      element_outz);
+                    // hex8_kelvin_voigt_newmark_gradient_adj(k,
+                    //                                  K,
+                    //                                  eta,
+                    //                                  jacobian_adjugate,
+                    //                                  jacobian_determinant,
+                    //                                  qx[kx],
+                    //                                  qx[ky],
+                    //                                  qx[kz],
+                    //                                  qw[kx] * qw[ky] * qw[kz],
+                    //                                  element_ux,
+                    //                                  element_uy,
+                    //                                  element_uz,
+                    //                                  element_outx,
+                    //                                  element_outy,
+                    //                                  element_outz);
             }
         }
         }
