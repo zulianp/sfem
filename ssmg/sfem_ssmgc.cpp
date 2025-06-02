@@ -162,7 +162,7 @@ namespace sfem {
             }
         }
 
-        void update_contact(const T *const x) {
+        void update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == es) {
@@ -172,7 +172,8 @@ namespace sfem {
             } else
 #endif
             {
-                contact_conds->signed_distance(upper_bound->data());
+                contact_conds->update(disp);
+                contact_conds->update_signed_distance(disp, upper_bound->data());
             }
         }
 
@@ -365,6 +366,7 @@ namespace sfem {
             bool enable_shift                   = true;
             bool enable_line_search             = false;
             bool project_coarse_correction      = false;
+            bool enable_nl_obstacle             = true;
 
             int coarse_linear_smoothing_steps = 10;
             int linear_smoothing_steps        = 1;
@@ -398,6 +400,7 @@ namespace sfem {
                 in->get("enable_line_search", enable_line_search);
                 in->get("enable_mixed_precision", enable_mixed_precision);
                 in->get("enable_shift", enable_shift);
+                in->get("enable_nl_obstacle", enable_nl_obstacle);
                 in->get("fine_op_type", fine_op_type);
                 in->get("linear_smoothing_steps", linear_smoothing_steps);
                 in->get("max_inner_it", max_inner_it);
@@ -615,6 +618,10 @@ namespace sfem {
             mg->set_enable_shift(enable_shift);
             mg->set_penalty_param_increase(penalty_param_increase);
             mg->set_nlsmooth_steps(nlsmooth_steps);
+
+            if (enable_nl_obstacle) {
+                mg->set_update_constraints([that = this](const T *const disp) { that->update_contact(disp); });
+            }
         }
 
         void init(const std::shared_ptr<Function>         &f,
