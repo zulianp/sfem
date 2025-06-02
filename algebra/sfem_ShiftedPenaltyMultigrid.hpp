@@ -237,7 +237,7 @@ namespace sfem {
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     count_inner_iter++;
-                    
+
                     CycleReturnCode ret = nonlinear_cycle();
 
                     if (ret == CYCLE_CONVERGED) {
@@ -422,12 +422,10 @@ namespace sfem {
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
         void set_debug(const bool val) { debug = val; }
         void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
-        void set_penalty_param_increase(const real_t val) {
-            penalty_param_increase = val;
-        }
-        void set_enable_shift(const bool val) {
-            enable_shift = val;
-        }
+        void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
+        void set_enable_shift(const bool val) { enable_shift = val; }
+
+        void set_update_constraints(std::function<void(const T* const)> fun) { update_constraints_ = fun; }
 
         BLAS_Tpl<T>&           blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
@@ -594,6 +592,10 @@ namespace sfem {
             auto      restriction  = restriction_[level];
             auto      prolongation = prolongation_[coarser_level(level)];
             auto      mem_coarse   = memory_[coarser_level(level)];
+
+            if (update_constraints_) {
+                update_constraints_(mem->solution->data());
+            }
 
             nonlinear_smooth();
 
@@ -794,6 +796,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
         std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
         std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
+        std::function<void(const T* const)>                update_constraints_;
 
         std::shared_ptr<Buffer<T>> upper_bound_;
         std::shared_ptr<Buffer<T>> lower_bound_;
