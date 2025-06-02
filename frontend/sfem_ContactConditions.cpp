@@ -611,6 +611,14 @@ namespace sfem {
         return err;
     }
 
+    int ContactConditions::update_signed_distance(const real_t *const u, real_t *const g) {
+        SFEM_TRACE_SCOPE("ContactConditions::update_signed_distance");
+        signed_distance(g);
+
+        // Prepare for $n^T u^{k+1} \leq g + n^T u^k$
+        return normal_project(u, g);
+    }
+
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
         if (is_ptr_device(disp)) {
             SFEM_ERROR("IMPLEMENT ME!\n");
