@@ -164,11 +164,21 @@ namespace sfem {
 
         void update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
+            auto                      f  = levels[0]->function;
+            const enum ExecutionSpace es = f->execution_space();
+
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == es) {
-                auto upper_bound = sfem::to_host(upper_bound);
-                upper_bound      = sfem::to_device(upper_bound);
-                // TODO cc_op and cc_op_t to device
+                // FIXME avoid copies from/to device
+
+                auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
+                auto hdisp = sfem::to_host(wdisp);
+
+                contact_conds->update(hdisp->data());
+
+                auto hg = sfem::create_host_buffer<T>(upper_bound->size());
+                contact_conds->update_signed_distance(hdisp->data(), hg->data());
+                buffer_host_to_device(hg->size() * sizeof(T), (void*)hg->data(), (void*)upper_bound->data());
             } else
 #endif
             {
@@ -251,29 +261,29 @@ namespace sfem {
                     coarse->sbv   = sfem::to_device(coarse->sbv);
 
                     auto op = sfem::make_op<T>(
-                                 coarse_node_mapping->size() * sym_block_size,
-                                 fine_mapping->size() * sym_block_size,
-                                 [coarse, fine, sym_block_size, level, coarse_level](const T *const from, T *const to) {
-                                     SFEM_TRACE_SCOPE("ssquad4_restrict(sbv)");
+                            coarse->mapping->size() * sym_block_size,
+                            fine->mapping->size() * sym_block_size,
+                            [coarse, fine, sym_block_size, level, coarse_level](const T *const from, T *const to) {
+                                SFEM_TRACE_SCOPE("ssquad4_restrict(sbv)");
 
-                                     cu_ssquad4_restrict(fine->sides->extent(1),
-                                                         level,
-                                                         1,
-                                                         fine->sides->data(),
-                                                         fine->count->data(),
-                                                         coarse_level,
-                                                         1,
-                                                         coarse->sides->data(),
-                                                         sym_block_size,
-                                                         SFEM_REAL_DEFAULT,
-                                                         1,
-                                                         fine->sbv->data()->data(),
-                                                         SFEM_REAL_DEFAULT,
-                                                         1,
-                                                         coarse->sbv->data()->data(),
-                                                         SFEM_DEFAULT_STREAM);
-                                 }),
-                         es;
+                                cu_ssquad4_restrict(fine->sides->extent(1),
+                                                    level,
+                                                    1,
+                                                    fine->sides->data(),
+                                                    fine->count->data(),
+                                                    coarse_level,
+                                                    1,
+                                                    coarse->sides->data(),
+                                                    sym_block_size,
+                                                    SFEM_REAL_DEFAULT,
+                                                    1,
+                                                    fine->sbv->data()->data(),
+                                                    SFEM_REAL_DEFAULT,
+                                                    1,
+                                                    coarse->sbv->data()->data(),
+                                                    SFEM_DEFAULT_STREAM);
+                            },
+                            es);
                     restrict_sbv.push_back(op);
 
                 } else
@@ -304,7 +314,7 @@ namespace sfem {
                 auto c_restriction = sfem::make_op<T>(
                         coarse->mapping->size(),
                         fine->mapping->size(),
-                        [fine, coarse, level, coarse_level](const T *const from, T *const to) {
+                        [fine, coarse, level, coarse_level, es](const T *const from, T *const to) {
                             SFEM_TRACE_SCOPE("ssquad4_restrict");
 
 // TODO check (cu_)ssquad4_restrict implementations
@@ -650,7 +660,7 @@ namespace sfem {
         int ll = 0;
         for (auto l : ret->impl_->levels) {
             std::cout << "-----------------------\n";
-            std::cout << "level " << ll << "\n";
+            std::cout << "level " << ll++ << "\n";
             l->print();
         }
         // ret->impl_->mg = create_ssmgc(f, contact_conds, in);

@@ -115,8 +115,8 @@ MS := Milestone
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
    - [x] Export facilities for Paper 1
-   - [ ] Nonlinear obstacle contact loop
-   - [ ] Refactoring: multilevel constraints restriction
+   - [x] Nonlinear obstacle contact loop
+   - [x] Refactoring: multilevel constraints restriction
    
 
 **MS 2: ()**
