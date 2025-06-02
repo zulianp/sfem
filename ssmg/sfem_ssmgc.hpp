@@ -16,10 +16,6 @@ namespace sfem {
                                                                    const std::shared_ptr<ContactConditions> contact_conds,
                                                                    const std::shared_ptr<Input>            &in);
 
-    std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc_old(const std::shared_ptr<Function>         &f,
-                                                                      const std::shared_ptr<ContactConditions> contact_conds,
-                                                                      const std::shared_ptr<Input>            &in);
-
     template <typename T>
     class SSMGC final : public Operator<T> {
     public:
@@ -40,21 +36,10 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    std::shared_ptr<SSMGC<real_t>> create_ssmgc_new(const std::shared_ptr<Function>         &f,
-                                                    const std::shared_ptr<ContactConditions> contact_conds,
-                                                    const std::shared_ptr<Input>            &in);
-
-    inline std::shared_ptr<SSMGC<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
+    std::shared_ptr<SSMGC<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
                                                 const std::shared_ptr<ContactConditions> contact_conds,
-                                                const std::shared_ptr<Input>            &in) {
-        return create_ssmgc_new(f, contact_conds, in);
-    }
+                                                const std::shared_ptr<Input>            &in);
 
-    // inline std::shared_ptr<ShiftedPenaltyMultigrid<real_t>> create_ssmgc(const std::shared_ptr<Function>         &f,
-    //                                                               const std::shared_ptr<ContactConditions> contact_conds,
-    //                                                               const std::shared_ptr<Input>            &in) {
-    //     return create_ssmgc_old(f, contact_conds, in);
-    // }
 }  // namespace sfem
 
 #endif  // SFEM_SSMGC_HPP
