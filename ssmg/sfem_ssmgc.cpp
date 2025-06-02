@@ -381,7 +381,7 @@ namespace sfem {
             int coarse_linear_smoothing_steps = 10;
             int linear_smoothing_steps        = 1;
             int max_inner_it                  = 40;
-            int max_it                        = 10;
+            int max_it                        = 15;
             int nlsmooth_steps                = 10;
             int max_coarse_it                 = 40000;
 
@@ -630,7 +630,10 @@ namespace sfem {
             mg->set_nlsmooth_steps(nlsmooth_steps);
 
             if (enable_nl_obstacle) {
-                mg->set_update_constraints([that = this](const T *const disp) { that->update_contact(disp); });
+                mg->set_update_constraints([that = this](const T *const disp) { 
+                    that->update_contact(disp); 
+                    that->restrict_contact_constraints();
+                });
             }
         }
 
