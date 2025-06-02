@@ -115,6 +115,8 @@ MS := Milestone
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
    - [x] Export facilities for Paper 1
+   - [ ] Nonlinear obstacle contact loop
+   - [ ] Refactoring: multilevel constraints restriction
    
 
 **MS 2: ()**
@@ -145,7 +147,7 @@ MS := Milestone
    - [ ] Explore high-order HEXA
    - [ ] Explore sum factorization algorithm for HEX8
    - [ ] Contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
-   - [ ] Nonlinear obstacle contact loop
+   
 
 ### Hardik
 

@@ -3508,7 +3508,7 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("NeoHookeanOgden::create");
 
-            assert(mesh->spatial_dim == space->block_size());
+            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
 
             auto ret = std::make_unique<NeoHookeanOgden>(space);
 
