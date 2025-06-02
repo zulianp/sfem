@@ -242,6 +242,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_t fy0, fy1, fy2, fy3;
             const real_t fz0, fz1, fz2, fz3;
 
+            // Transform the vertices of the sub-tetrahedron to the physical space
             tet4_transform_v2(x0,     // x-coordinates of the vertices
                               x1,     //
                               x2,     //
@@ -320,6 +321,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             real_t det_jacobian = 0.0;
 
+            // Calculate the volume of the tetrahedron
             const real_type theta_volume = tet4_measure_v2(fx0,
                                                            fx1,
                                                            fx2,
