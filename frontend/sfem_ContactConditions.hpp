@@ -77,6 +77,9 @@ namespace sfem {
         int mask(mask_t *mask);
         // int gradient(const real_t *const x, real_t *const g);
         int signed_distance(const real_t *const x, real_t *const g);
+
+        // Call update(x) before calling this
+        int update_signed_distance(const real_t *const u, real_t *const g);
         int signed_distance(real_t *const g);
 
         int hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
