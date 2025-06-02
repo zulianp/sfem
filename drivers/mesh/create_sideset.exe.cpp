@@ -173,19 +173,24 @@ int main(int argc, char *argv[]) {
 #pragma omp atomic update
             emap_ptr[sp + 1]++;
 
-            for (int n = 0; n < nnxs; n++) {
-                idx_t node = elements[lst[s * nnxs + n]][e];
-
-                geom_t sq_dist = 0.;
-                for (int d = 0; d < dim; ++d) {
-                    const real_t m_x   = points[d][node];
-                    const real_t roi_x = roi[d];
-                    const real_t diff  = m_x - roi_x;
-                    sq_dist += diff * diff;
+            geom_t barycenter[3]= {0., 0., 0.};
+            for (int d = 0; d < dim; ++d) {
+                for (int n = 0; n < nnxs; n++) {
+                    idx_t node = elements[lst[s * nnxs + n]][e];
+                    barycenter[d] += points[d][node];
                 }
-
-                element_sq_dist = MIN(element_sq_dist, sq_dist);
+                barycenter[d] /= nnxs;
             }
+        
+            real_t sq_dist = 0.;
+            for (int d = 0; d < dim; ++d) {
+                const real_t m_x   = barycenter[d];
+                const real_t roi_x = roi[d];
+                const real_t diff  = m_x - roi_x;
+                sq_dist += diff * diff;
+            }
+
+            element_sq_dist = MIN(element_sq_dist, sq_dist);
 
 #pragma omp critical
             {
