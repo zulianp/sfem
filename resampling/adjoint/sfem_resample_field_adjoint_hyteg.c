@@ -21,6 +21,35 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+int                                                                                         //
+tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                         x0,      // Tetrahedron vertices X-coordinates
+                                              const real_t                         x1,      //
+                                              const real_t                         x2,      //
+                                              const real_t                         x3,      //
+                                              const real_t                         y0,      // Tetrahedron vertices Y-coordinates
+                                              const real_t                         y1,      //
+                                              const real_t                         y2,      //
+                                              const real_t                         y3,      //
+                                              const real_t                         z0,      // Tetrahedron vertices Z-coordinates
+                                              const real_t                         z1,      //
+                                              const real_t                         z2,      //
+                                              const real_t                         z3,      //
+                                              const real_t                         detCat,  // determinant of the category.
+                                              const real_t                         wf0,     // Weighted field at the vertices
+                                              const real_t                         wf1,     //
+                                              const real_t                         wf2,     //
+                                              const real_t                         wf3,     //
+                                              const real_t                         ox,      // Origin of the grid
+                                              const real_t                         oy,      //
+                                              const real_t                         oz,      //
+                                              const real_t                         dx,      // Spacing of the grid
+                                              const real_t                         dy,      //
+                                              const real_t                         dz,      //
+                                              const ptrdiff_t* const SFEM_RESTRICT stride,  // Stride
+                                              const ptrdiff_t* const SFEM_RESTRICT n,       // Size of the grid
+                                              real_t* const SFEM_RESTRICT          data) {           //
+}
+
 real_t                                                     //
 calculate_jacobian_for_category(const int       category,  //
                                 const real_type px0,       //
@@ -321,7 +350,8 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             real_t det_jacobian = 0.0;
 
-            // Calculate the volume of the tetrahedron
+            // Calculate the volume of the HyTeg tetrahedron
+            // In the physical space
             const real_type theta_volume = tet4_measure_v2(fx0,
                                                            fx1,
                                                            fx2,
@@ -337,32 +367,32 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                            fz2,
                                                            fz3);
 
-            tet4_resample_tetrahedron_local_adjoint(fx0,           // Tetrahedron vertices X-coordinates
-                                                    fx1,           //
-                                                    fx2,           //
-                                                    fx3,           //
-                                                    fy0,           // Tetrahedron vertices Y-coordinates
-                                                    fy1,           //
-                                                    fy2,           //
-                                                    fy3,           //
-                                                    fz0,           // Tetrahedron vertices Z-coordinates
-                                                    fz1,           //
-                                                    fz2,           //
-                                                    fz3,           //
-                                                    theta_volume,  // Volume of the tetrahedron
-                                                    wf0,           // Weighted field at the vertices
-                                                    wf1,           //
-                                                    wf2,           //
-                                                    wf3,           //
-                                                    ox,            // Origin of the grid
-                                                    oy,            //
-                                                    oz,            //
-                                                    dx,            // Spacing of the grid
-                                                    dy,            //
-                                                    dz,            //
-                                                    stride,        // Stride
-                                                    n,             // Size of the grid
-                                                    data);         // Output
+            tet4_resample_tetrahedron_local_hyteg_adjoint(fx0,           // Tetrahedron vertices X-coordinates
+                                                          fx1,           //
+                                                          fx2,           //
+                                                          fx3,           //
+                                                          fy0,           // Tetrahedron vertices Y-coordinates
+                                                          fy1,           //
+                                                          fy2,           //
+                                                          fy3,           //
+                                                          fz0,           // Tetrahedron vertices Z-coordinates
+                                                          fz1,           //
+                                                          fz2,           //
+                                                          fz3,           //
+                                                          theta_volume,  // Volume of the tetrahedron
+                                                          wf0,           // Weighted field at the vertices
+                                                          wf1,           //
+                                                          wf2,           //
+                                                          wf3,           //
+                                                          ox,            // Origin of the grid
+                                                          oy,            //
+                                                          oz,            //
+                                                          dx,            // Spacing of the grid
+                                                          dy,            //
+                                                          dz,            //
+                                                          stride,        // Stride
+                                                          n,             // Size of the grid
+                                                          data);         // Output
         }
     }
 
