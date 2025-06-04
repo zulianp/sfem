@@ -22,10 +22,11 @@ typedef enum {
 } AcceleratorsType;                     //
 
 typedef enum {
-    ADJOINT_BASE             = 0,  //
-    ADJOINT_REFINE_ONE_STEP  = 1,  //
-    ADJOINT_REFINE_ITERATIVE = 2   //
-} AdjointRefineType;               //
+    ADJOINT_BASE = 0,                //
+    ADJOINT_REFINE_ONE_STEP,         //
+    ADJOINT_REFINE_ITERATIVE,        //
+    ADJOINT_REFINE_HYTEG_REFINEMENT  //
+} AdjointRefineType;                 //
 
 static void* SFEM_DEFAULT_STREAM = 0;
 

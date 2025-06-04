@@ -761,8 +761,9 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    info.alpha_th            = 2.5;
-                    info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
+                    info.alpha_th = 2.5;
+                    // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
+                    info.adjoint_refine_type = ADJOINT_BASE;
 
                     ret_resample_adjoint =                             //
                             resample_field_adjoint_tet4(mpi_size,      //

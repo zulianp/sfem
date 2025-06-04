@@ -69,7 +69,7 @@ echo $sizes
 echo $origins
 echo $scaling
 
-n_procs=8
+n_procs=1
 # n_procs=2
 # n_procs=8
 
@@ -97,6 +97,13 @@ set -x
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 export SFEM_ADJOINT=1
+
+if [[ $SFEM_ADJOINT -eq 1 ]]
+then
+	echo "Running in adjoint mode"
+else
+	echo "Running in forward mode"
+fi
 
 if [[ SFEM_ADJOINT -eq 1 ]]
 then
