@@ -248,7 +248,7 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
                                           &i7);    //
 
         // Integrate the values of the field at the vertices of the tetrahedral element
-        const real_type dV = detCat * tet_qw[quad_i];
+        const real_type dV = det_jacobian * tet_qw[quad_i];
         const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
 
         const real_type d0 = It * hex8_f0;
@@ -335,6 +335,8 @@ alpha_to_hyteg_level(const real_t alpha,                //
                      const real_t alpha_min_threshold,  //
                      const real_t alpha_max_threshold,  //
                      const int    max_refinement_L) {      //
+
+    return 1; ///// TODO
 
     if (alpha < alpha_min_threshold) return 1;                           // No refinement
     if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
@@ -572,34 +574,110 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             real_t f0_out, f1_out, f2_out, f3_out;
 
-            real_t wf0 = tet4_eval_dual_basis_weighted_physical(fx0,
-                                                                fy0,
-                                                                fz0,  // Coordinates of the first vertex
-                                                                x0,
-                                                                y0,
-                                                                z0,  // Coordinates of the first vertex in physical space
-                                                                x1,  // Coordinates of the second vertex in physical space
-                                                                y1,
-                                                                z1,  // Coordinates of the second vertex in physical space
-                                                                x2,  // Coordinates of the third vertex in physical space
-                                                                y2,
-                                                                z2,  // Coordinates of the third vertex in physical space
-                                                                x3,  // Coordinates of the fourth vertex in physical space
-                                                                y3,
-                                                                z3,  // Coordinates of the fourth vertex in physical space
-                                                                weighted_field[ev[0]],  // Weighted field at the first vertex
-                                                                weighted_field[ev[1]],  // Weighted field at the second vertex
-                                                                weighted_field[ev[2]],  // Weighted field at the third vertex
-                                                                weighted_field[ev[3]],  // Weighted field at the fourth vertex
-                                                                &f0_out,
-                                                                &f1_out,
-                                                                &f2_out,
-                                                                &f3_out);  //
+            const real_t wf0 =
+                    tet4_eval_dual_basis_weighted_physical(fx0,
+                                                           fy0,
+                                                           fz0,  // Coordinates of the first vertex
+                                                           x0,   // Coordinates of the first tet vertex in the physical space
+                                                           y0,
+                                                           z0,
+                                                           x1,  // Coordinates of the second tet vertex in physical space
+                                                           y1,
+                                                           z1,
+                                                           x2,  // Coordinates of the third tet vertex in physical space
+                                                           y2,
+                                                           z2,
+                                                           x3,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3,
+                                                           z3,
+                                                           weighted_field[ev[0]],  // Weighted field at the first vertex
+                                                           weighted_field[ev[1]],  // Weighted field at the second vertex
+                                                           weighted_field[ev[2]],  // Weighted field at the third vertex
+                                                           weighted_field[ev[3]],  // Weighted field at the fourth vertex
+                                                           &f0_out,
+                                                           &f1_out,
+                                                           &f2_out,
+                                                           &f3_out);  //
+
+            const real_t wf1 =
+                    tet4_eval_dual_basis_weighted_physical(fx1,
+                                                           fy1,
+                                                           fz1,  // Coordinates of the first vertex
+                                                           x0,   // Coordinates of the first tet vertex in the physical space
+                                                           y0,
+                                                           z0,
+                                                           x1,  // Coordinates of the second tet vertex in physical space
+                                                           y1,
+                                                           z1,
+                                                           x2,  // Coordinates of the third tet vertex in physical space
+                                                           y2,
+                                                           z2,
+                                                           x3,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3,
+                                                           z3,
+                                                           weighted_field[ev[0]],  // Weighted field at the first vertex
+                                                           weighted_field[ev[1]],  // Weighted field at the second vertex
+                                                           weighted_field[ev[2]],  // Weighted field at the third vertex
+                                                           weighted_field[ev[3]],  // Weighted field at the fourth vertex
+                                                           &f0_out,
+                                                           &f1_out,
+                                                           &f2_out,
+                                                           &f3_out);  //
+
+            const real_t wf2 =
+                    tet4_eval_dual_basis_weighted_physical(fx2,
+                                                           fy2,
+                                                           fz2,  // Coordinates of the first vertex
+                                                           x0,   // Coordinates of the first tet vertex in the physical space
+                                                           y0,
+                                                           z0,
+                                                           x1,  // Coordinates of the second tet vertex in physical space
+                                                           y1,
+                                                           z1,
+                                                           x2,  // Coordinates of the third tet vertex in physical space
+                                                           y2,
+                                                           z2,
+                                                           x3,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3,
+                                                           z3,
+                                                           weighted_field[ev[0]],  // Weighted field at the first vertex
+                                                           weighted_field[ev[1]],  // Weighted field at the second vertex
+                                                           weighted_field[ev[2]],  // Weighted field at the third vertex
+                                                           weighted_field[ev[3]],  // Weighted field at the fourth vertex
+                                                           &f0_out,
+                                                           &f1_out,
+                                                           &f2_out,
+                                                           &f3_out);  //
+
+            const real_t wf3 =
+                    tet4_eval_dual_basis_weighted_physical(fx3,
+                                                           fy3,
+                                                           fz3,  // Coordinates of the first vertex
+                                                           x0,   // Coordinates of the first tet vertex in the physical space
+                                                           y0,
+                                                           z0,
+                                                           x1,  // Coordinates of the second tet vertex in physical space
+                                                           y1,
+                                                           z1,
+                                                           x2,  // Coordinates of the third tet vertex in physical space
+                                                           y2,
+                                                           z2,
+                                                           x3,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3,
+                                                           z3,
+                                                           weighted_field[ev[0]],  // Weighted field at the first vertex
+                                                           weighted_field[ev[1]],  // Weighted field at the second vertex
+                                                           weighted_field[ev[2]],  // Weighted field at the third vertex
+                                                           weighted_field[ev[3]],  // Weighted field at the fourth vertex
+                                                           &f0_out,
+                                                           &f1_out,
+                                                           &f2_out,
+                                                           &f3_out);  //
 
             // real_t wf1 = tet4_eval_dual_basis_weighted_physical
 
-                    int error_flag   = 0;
-            real_t      det_jacobian = calculate_det_Jacobian_for_category(category,      //
+            int    error_flag   = 0;
+            real_t det_jacobian = calculate_det_Jacobian_for_category(category,      //
                                                                       fx0,           //
                                                                       fy0,           //
                                                                       fz0,           //

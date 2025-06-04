@@ -1234,6 +1234,23 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                            data);                          //
             break;
 
+        case ADJOINT_REFINE_HYTEG_REFINEMENT:
+
+            ret = tet4_resample_field_local_refine_adjoint_hyteg(0,                              //
+                                                                 mesh->nelements,                //
+                                                                 mesh->nnodes,                   //
+                                                                 (const idx_t**)mesh->elements,  //
+                                                                 (const geom_t**)mesh->points,   //
+                                                                 n,                              //
+                                                                 stride,                         //
+                                                                 origin,                         //
+                                                                 delta,                          //
+                                                                 mass_vector,                    //
+                                                                 2.5,                            //
+                                                                 data);                          //
+
+            break;
+
         case ADJOINT_BASE:
         default:
             ret = tet4_resample_field_local_adjoint(0,                              //
