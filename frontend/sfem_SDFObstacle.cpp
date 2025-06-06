@@ -8,6 +8,7 @@ namespace sfem {
     public:
         std::shared_ptr<Grid<geom_t>> sdf;
         bool                          variational{true};
+        enum ExecutionSpace execution_space{EXECUTION_SPACE_HOST};
     };
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(MPI_Comm                  comm,
@@ -16,10 +17,11 @@ namespace sfem {
         return create(Grid<geom_t>::create_from_file(comm, path.c_str()), es);
     }
 
-    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace es) {
+    std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace execution_space) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
         auto obs        = std::make_shared<SDFObstacle>();
         obs->impl_->sdf = sdf;
+        obs->impl_->execution_space = execution_space;
         return obs;
     }
 
@@ -36,6 +38,12 @@ namespace sfem {
                             real_t **const SFEM_RESTRICT normals,
                             real_t *const SFEM_RESTRICT  gap) {
         auto sdf = impl_->sdf;
+
+#ifdef SFEM_ENABLE_CUDA
+        if(impl_->execution_space == EXECUTION_SPACE_DEVICE) {
+            assert(false); // TODO
+        }
+#endif
         return resample_gap(
                 // Mesh
                 element_type,

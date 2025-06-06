@@ -376,13 +376,14 @@ namespace sfem {
             bool enable_shift                   = true;
             bool enable_line_search             = false;
             bool project_coarse_correction      = false;
-            bool enable_nl_obstacle             = true;
+
+            int SFEM_ENABLE_NL_OBSTACLE = 1;
 
             int coarse_linear_smoothing_steps = 10;
             int linear_smoothing_steps        = 1;
             int max_inner_it                  = 40;
             int max_it                        = 15;
-            int nlsmooth_steps                = 10;
+            int nlsmooth_steps                = 15;
             int max_coarse_it                 = 40000;
 
             static constexpr bool is_double = std::is_same<real_t, double>::value;
@@ -410,7 +411,7 @@ namespace sfem {
                 in->get("enable_line_search", enable_line_search);
                 in->get("enable_mixed_precision", enable_mixed_precision);
                 in->get("enable_shift", enable_shift);
-                in->get("enable_nl_obstacle", enable_nl_obstacle);
+                in->get("enable_nl_obstacle", SFEM_ENABLE_NL_OBSTACLE);
                 in->get("fine_op_type", fine_op_type);
                 in->get("linear_smoothing_steps", linear_smoothing_steps);
                 in->get("max_inner_it", max_inner_it);
@@ -629,7 +630,7 @@ namespace sfem {
             mg->set_penalty_param_increase(penalty_param_increase);
             mg->set_nlsmooth_steps(nlsmooth_steps);
 
-            if (enable_nl_obstacle) {
+            if (SFEM_ENABLE_NL_OBSTACLE) {
                 mg->set_update_constraints([that = this](const T *const disp) { 
                     that->update_contact(disp); 
                     that->restrict_contact_constraints();
