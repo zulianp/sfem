@@ -336,7 +336,7 @@ alpha_to_hyteg_level(const real_t alpha,                //
                      const real_t alpha_max_threshold,  //
                      const int    max_refinement_L) {      //
 
-    return 1; ///// TODO
+    return 1;  ///// TODO
 
     if (alpha < alpha_min_threshold) return 1;                           // No refinement
     if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
@@ -394,8 +394,8 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
 #if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
-    printf("Start: %s: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
-    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("= Start: %s: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+    printf("= Hexahedron volume = %g\n", hexahedron_volume);
     printf("============================================================\n");
 #endif
 
@@ -410,6 +410,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         }
 
         // Read the coordinates of the vertices of the tetrahedron
+        // In the physical space
         const real_type x0 = xyz[0][ev[0]];
         const real_type x1 = xyz[0][ev[1]];
         const real_type x2 = xyz[0][ev[2]];
@@ -674,25 +675,29 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                            &f2_out,
                                                            &f3_out);  //
 
+            // printf("Weighted field values: %g, %g, %g, %g\n", wf0, wf1, wf2, wf3);
+
             // real_t wf1 = tet4_eval_dual_basis_weighted_physical
 
             int    error_flag   = 0;
             real_t det_jacobian = calculate_det_Jacobian_for_category(category,      //
-                                                                      fx0,           //
-                                                                      fy0,           //
-                                                                      fz0,           //
-                                                                      fx1,           //
-                                                                      fy1,           //
-                                                                      fz1,           //
-                                                                      fx2,           //
-                                                                      fy2,           //
-                                                                      fz2,           //
-                                                                      fx3,           //
-                                                                      fy3,           //
-                                                                      fz3,           //
+                                                                      x0,            //
+                                                                      y0,            //
+                                                                      z0,            //
+                                                                      x1,            //
+                                                                      y1,            //
+                                                                      z1,            //
+                                                                      x2,            //
+                                                                      y2,            //
+                                                                      z2,            //
+                                                                      x3,            //
+                                                                      y3,            //
+                                                                      z3,            //
                                                                       L,             //
                                                                       tet_i,         //
                                                                       &error_flag);  //
+
+            // printf("det_jacobian = %g\n", det_jacobian);
 
             // // Calculate the volume of the HyTeg tetrahedron
             // // In the physical space
