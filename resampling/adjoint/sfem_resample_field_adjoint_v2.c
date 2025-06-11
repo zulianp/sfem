@@ -2250,6 +2250,68 @@ tet_edge_max_length(const real_t  v0x,            //
     return max_length;
 }
 
+int                                              //
+tet_normalize_by_edge(const real_t v0x,          // Input tetrahedron coordinates
+                      const real_t v0y,          //
+                      const real_t v0z,          //
+                      const real_t v1x,          //
+                      const real_t v1y,          //
+                      const real_t v1z,          //
+                      const real_t v2x,          //
+                      const real_t v2y,          //
+                      const real_t v2z,          //
+                      const real_t v3x,          //
+                      const real_t v3y,          //
+                      const real_t v3z,          //
+                      const int    vertex_a,     // Vertices defining the edge to normalize
+                      const int    vertex_b,     //
+                      const real_t edge_length,  // Current edge length
+                      real_t*      out_v0x,      // Output normalized tetrahedron
+                      real_t*      out_v0y,      //
+                      real_t*      out_v0z,      //
+                      real_t*      out_v1x,      //
+                      real_t*      out_v1y,      //
+                      real_t*      out_v1z,      //
+                      real_t*      out_v2x,      //
+                      real_t*      out_v2y,      //
+                      real_t*      out_v2z,      //
+                      real_t*      out_v3x,      //
+                      real_t*      out_v3y,      //
+                      real_t*      out_v3z) {         //
+
+    // Check valid vertex indices
+    if (vertex_a < 0 || vertex_a > 3 || vertex_b < 0 || vertex_b > 3 || vertex_a == vertex_b) {
+        return 1;  // Error: invalid vertices
+    }
+
+    // Check if edge length is valid
+    if (edge_length < 1e-10) {
+        return 2;  // Error: edge length too small
+    }
+
+    // Calculate the scaling factor
+    const real_t scale = 1.0 / edge_length;
+
+    // Scale all coordinates
+    *out_v0x = v0x * scale;
+    *out_v0y = v0y * scale;
+    *out_v0z = v0z * scale;
+
+    *out_v1x = v1x * scale;
+    *out_v1y = v1y * scale;
+    *out_v1z = v1z * scale;
+
+    *out_v2x = v2x * scale;
+    *out_v2y = v2y * scale;
+    *out_v2z = v2z * scale;
+
+    *out_v3x = v3x * scale;
+    *out_v3y = v3y * scale;
+    *out_v3z = v3z * scale;
+
+    return 0;  // Success
+}
+
 //////////////////////////////////////////////////////////
 
 #define MY_ABS_MM(x) ((x) > 0 ? (x) : -(x))

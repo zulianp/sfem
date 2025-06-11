@@ -411,20 +411,20 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         // Read the coordinates of the vertices of the tetrahedron
         // In the physical space
-        const real_type x0 = xyz[0][ev[0]];
-        const real_type x1 = xyz[0][ev[1]];
-        const real_type x2 = xyz[0][ev[2]];
-        const real_type x3 = xyz[0][ev[3]];
+        const real_type x0_p = xyz[0][ev[0]];
+        const real_type x1_p = xyz[0][ev[1]];
+        const real_type x2_p = xyz[0][ev[2]];
+        const real_type x3_p = xyz[0][ev[3]];
 
-        const real_type y0 = xyz[1][ev[0]];
-        const real_type y1 = xyz[1][ev[1]];
-        const real_type y2 = xyz[1][ev[2]];
-        const real_type y3 = xyz[1][ev[3]];
+        const real_type y0_p = xyz[1][ev[0]];
+        const real_type y1_p = xyz[1][ev[1]];
+        const real_type y2_p = xyz[1][ev[2]];
+        const real_type y3_p = xyz[1][ev[3]];
 
-        const real_type z0 = xyz[2][ev[0]];
-        const real_type z1 = xyz[2][ev[1]];
-        const real_type z2 = xyz[2][ev[2]];
-        const real_type z3 = xyz[2][ev[3]];
+        const real_type z0_p = xyz[2][ev[0]];
+        const real_type z1_p = xyz[2][ev[1]];
+        const real_type z2_p = xyz[2][ev[2]];
+        const real_type z3_p = xyz[2][ev[3]];
 
         // Compute the alpha_tet to decide if the tetrahedron is refined
         // Sides of the tetrahedron
@@ -434,21 +434,62 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         int vertex_b = -1;
 
         const real_type max_edges_length =          //
-                tet_edge_max_length(x0,             //
-                                    y0,             //
-                                    z0,             //
-                                    x1,             //
-                                    y1,             //
-                                    z1,             //
-                                    x2,             //
-                                    y2,             //
-                                    z2,             //
-                                    x3,             //
-                                    y3,             //
-                                    z3,             //
+                tet_edge_max_length(x0_p,           //
+                                    y0_p,           //
+                                    z0_p,           //
+                                    x1_p,           //
+                                    y1_p,           //
+                                    z1_p,           //
+                                    x2_p,           //
+                                    y2_p,           //
+                                    z2_p,           //
+                                    x3_p,           //
+                                    y3_p,           //
+                                    z3_p,           //
                                     &vertex_a,      // Output
                                     &vertex_b,      // Output
                                     edges_length);  // Output
+
+        real_type x0_n = x0_p;
+        real_type x1_n = x1_p;
+        real_type x2_n = x2_p;
+        real_type x3_n = x3_p;
+        real_type y0_n = y0_p;
+        real_type y1_n = y1_p;
+        real_type y2_n = y2_p;
+        real_type y3_n = y3_p;
+        real_type z0_n = z0_p;
+        real_type z1_n = z1_p;
+        real_type z2_n = z2_p;
+        real_type z3_n = z3_p;
+
+        // tet_normalize_by_edge(x0_p,              //
+        //                       x1_p,              //
+        //                       x2_p,              //
+        //                       x3_p,              //
+        //                       y0_p,              //
+        //                       y1_p,              //
+        //                       y2_p,              //
+        //                       y3_p,              //
+        //                       z0_p,              //
+        //                       z1_p,              //
+        //                       z2_p,              //
+        //                       z3_p,              //
+        //                       vertex_a,          // Vertex A
+        //                       vertex_b,          // Vertex B
+        //                       max_edges_length,  //
+        //                       &x0_n,             // Normalized coordinates
+        //                       &x1_n,             //
+        //                       &x2_n,             //
+        //                       &x3_n,             //
+        //                       &y0_n,             //
+        //                       &y1_n,             //
+        //                       &y2_n,             //
+        //                       &y3_n,             //
+        //                       &z0_n,             //
+        //                       &z1_n,             //
+        //                       &z2_n,             //
+        //                       &z3_n);            //
 
         const real_t alpha_tet = max_edges_length / d_min;
 
@@ -478,20 +519,20 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         //            hteg_num_tetrahedra);
         // }
 
-        const real_type theta_volume_main = tet4_measure_v2(x0,
-                                                            x1,
-                                                            x2,
-                                                            x3,
+        const real_type theta_volume_main = tet4_measure_v2(x0_n,  //
+                                                            x1_n,  //
+                                                            x2_n,  //
+                                                            x3_n,  //
                                                             //
-                                                            y0,
-                                                            y1,
-                                                            y2,
-                                                            y3,
+                                                            y0_n,  //
+                                                            y1_n,  //
+                                                            y2_n,  //
+                                                            y3_n,  //
                                                             //
-                                                            z0,
-                                                            z1,
-                                                            z2,
-                                                            z3);
+                                                            z0_n,   //
+                                                            z1_n,   //
+                                                            z2_n,   //
+                                                            z3_n);  //
 
         real_type theta_volume_acc = 0.0;
 
@@ -524,19 +565,19 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_t fy0, fy1, fy2, fy3;
             const real_t fz0, fz1, fz2, fz3;
 
-            // Transform the vertices of the sub-tetrahedron to the physical space
-            tet4_transform_v2(x0,     // x-coordinates of the vertices
-                              x1,     //
-                              x2,     //
-                              x3,     //
-                              y0,     // y-coordinates of the vertices
-                              y1,     //
-                              y2,     //
-                              y3,     //
-                              z0,     // z-coordinates of the vertices
-                              z1,     //
-                              z2,     //
-                              z3,     //
+            // Transform the vertnces of the sub-tetrahedron to the physical space
+            tet4_transform_v2(x0_n,   // x-coordinates of the vertices
+                              x1_n,   //
+                              x2_n,   //
+                              x3_n,   //
+                              y0_n,   // y-coordinates of the vertices
+                              y1_n,   //
+                              y2_n,   //
+                              y3_n,   //
+                              z0_n,   // z-coordinates of the vertices
+                              z1_n,   //
+                              z2_n,   //
+                              z3_p,   //
                               px0,    // Vertex of the sub-tetrahedron
                               py0,    //
                               pz0,    //
@@ -544,18 +585,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                               &fy0,   //
                               &fz0);  //
 
-            tet4_transform_v2(x0,     // x-coordinates of the vertices
-                              x1,     //
-                              x2,     //
-                              x3,     //
-                              y0,     // y-coordinates of the vertices
-                              y1,     //
-                              y2,     //
-                              y3,     //
-                              z0,     // z-coordinates of the vertices
-                              z1,     //
-                              z2,     //
-                              z3,     //
+            tet4_transform_v2(x0_n,   // x-coordinates of the vertices
+                              x1_n,   //
+                              x2_n,   //
+                              x3_n,   //
+                              y0_n,   // y-coordinates of the vertices
+                              y1_n,   //
+                              y2_n,   //
+                              y3_n,   //
+                              z0_n,   // z-coordinates of the vertices
+                              z1_n,   //
+                              z2_n,   //
+                              z3_n,   //
                               px1,    // Vertex of the sub-tetrahedron
                               py1,    //
                               pz1,    //
@@ -563,18 +604,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                               &fy1,   //
                               &fz1);  //
 
-            tet4_transform_v2(x0,     // x-coordinates of the vertices
-                              x1,     //
-                              x2,     //
-                              x3,     //
-                              y0,     // y-coordinates of the vertices
-                              y1,     //
-                              y2,     //
-                              y3,     //
-                              z0,     // z-coordinates of the vertices
-                              z1,     //
-                              z2,     //
-                              z3,     //
+            tet4_transform_v2(x0_n,   // x-coordinates of the vertices
+                              x1_n,   //
+                              x2_n,   //
+                              x3_n,   //
+                              y0_n,   // y-coordinates of the vertices
+                              y1_n,   //
+                              y2_n,   //
+                              y3_n,   //
+                              z0_n,   // z-coordinates of the vertices
+                              z1_n,   //
+                              z2_n,   //
+                              z3_n,   //
                               px2,    // Vertex of the sub-tetrahedron
                               py2,    //
                               pz2,    //
@@ -582,18 +623,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                               &fy2,   //
                               &fz2);  //
 
-            tet4_transform_v2(x0,     // x-coordinates of the vertices
-                              x1,     //
-                              x2,     //
-                              x3,     //
-                              y0,     // y-coordinates of the vertices
-                              y1,     //
-                              y2,     //
-                              y3,     //
-                              z0,     // z-coordinates of the vertices
-                              z1,     //
-                              z2,     //
-                              z3,     //
+            tet4_transform_v2(x0_n,   // x-coordinates of the vertices
+                              x1_n,   //
+                              x2_n,   //
+                              x3_n,   //
+                              y0_n,   // y-coordinates of the vertices
+                              y1_n,   //
+                              y2_n,   //
+                              y3_n,   //
+                              z0_n,   // z-coordinates of the vertices
+                              z1_n,   //
+                              z2_n,   //
+                              z3_n,   //
                               px3,    // Vertex of the sub-tetrahedron
                               py3,    //
                               pz3,    //
@@ -607,18 +648,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                     tet4_eval_dual_basis_weighted_physical(fx0,  // Coordinates of the vertex where the value is calculated.
                                                            fy0,
                                                            fz0,
-                                                           x0,  // Coordinates of the first tet vertex in the physical space
-                                                           y0,
-                                                           z0,
-                                                           x1,  // Coordinates of the second tet vertex in physical space
-                                                           y1,
-                                                           z1,
-                                                           x2,  // Coordinates of the third tet vertex in physical space
-                                                           y2,
-                                                           z2,
-                                                           x3,  // Coordinates of the fourth tet vertex in physical space
-                                                           y3,
-                                                           z3,
+                                                           x0_n,  // Coordinates of the first tet vertex in the physical space
+                                                           y0_n,
+                                                           z0_n,
+                                                           x1_n,  // Coordinates of the second tet vertex in physical space
+                                                           y1_n,
+                                                           z1_n,
+                                                           x2_n,  // Coordinates of the third tet vertex in physical space
+                                                           y2_n,
+                                                           z2_n,
+                                                           x3_n,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3_n,
+                                                           z3_n,
                                                            weighted_field[ev[0]],  // Weighted field at the first vertex
                                                            weighted_field[ev[1]],  // Weighted field at the second vertex
                                                            weighted_field[ev[2]],  // Weighted field at the third vertex
@@ -631,19 +672,19 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_t wf1 =
                     tet4_eval_dual_basis_weighted_physical(fx1,
                                                            fy1,
-                                                           fz1,  // Coordinates of the first vertex
-                                                           x0,   // Coordinates of the first tet vertex in the physical space
-                                                           y0,
-                                                           z0,
-                                                           x1,  // Coordinates of the second tet vertex in physical space
-                                                           y1,
-                                                           z1,
-                                                           x2,  // Coordinates of the third tet vertex in physical space
-                                                           y2,
-                                                           z2,
-                                                           x3,  // Coordinates of the fourth tet vertex in physical space
-                                                           y3,
-                                                           z3,
+                                                           fz1,   // Coordinates of the first vertex
+                                                           x0_n,  // Coordinates of the first tet vertex in the physical space
+                                                           y0_n,
+                                                           z0_n,
+                                                           x1_n,  // Coordinates of the second tet vertex in physical space
+                                                           y1_n,
+                                                           z1_n,
+                                                           x2_n,  // Coordinates of the third tet vertex in physical space
+                                                           y2_n,
+                                                           z2_n,
+                                                           x3_n,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3_n,
+                                                           z3_n,
                                                            weighted_field[ev[0]],  // Weighted field at the first vertex
                                                            weighted_field[ev[1]],  // Weighted field at the second vertex
                                                            weighted_field[ev[2]],  // Weighted field at the third vertex
@@ -656,19 +697,19 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_t wf2 =
                     tet4_eval_dual_basis_weighted_physical(fx2,
                                                            fy2,
-                                                           fz2,  // Coordinates of the first vertex
-                                                           x0,   // Coordinates of the first tet vertex in the physical space
-                                                           y0,
-                                                           z0,
-                                                           x1,  // Coordinates of the second tet vertex in physical space
-                                                           y1,
-                                                           z1,
-                                                           x2,  // Coordinates of the third tet vertex in physical space
-                                                           y2,
-                                                           z2,
-                                                           x3,  // Coordinates of the fourth tet vertex in physical space
-                                                           y3,
-                                                           z3,
+                                                           fz2,   // Coordinates of the first vertex
+                                                           x0_n,  // Coordinates of the first tet vertex in the physical space
+                                                           y0_n,
+                                                           z0_n,
+                                                           x1_n,  // Coordinates of the second tet vertex in physical space
+                                                           y1_n,
+                                                           z1_n,
+                                                           x2_n,  // Coordinates of the third tet vertex in physical space
+                                                           y2_n,
+                                                           z2_n,
+                                                           x3_n,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3_n,
+                                                           z3_n,
                                                            weighted_field[ev[0]],  // Weighted field at the first vertex
                                                            weighted_field[ev[1]],  // Weighted field at the second vertex
                                                            weighted_field[ev[2]],  // Weighted field at the third vertex
@@ -681,19 +722,19 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_t wf3 =
                     tet4_eval_dual_basis_weighted_physical(fx3,
                                                            fy3,
-                                                           fz3,  // Coordinates of the first vertex
-                                                           x0,   // Coordinates of the first tet vertex in the physical space
-                                                           y0,
-                                                           z0,
-                                                           x1,  // Coordinates of the second tet vertex in physical space
-                                                           y1,
-                                                           z1,
-                                                           x2,  // Coordinates of the third tet vertex in physical space
-                                                           y2,
-                                                           z2,
-                                                           x3,  // Coordinates of the fourth tet vertex in physical space
-                                                           y3,
-                                                           z3,
+                                                           fz3,   // Coordinates of the first vertex
+                                                           x0_n,  // Coordinates of the first tet vertex in the physical space
+                                                           y0_n,
+                                                           z0_n,
+                                                           x1_n,  // Coordinates of the second tet vertex in physical space
+                                                           y1_n,
+                                                           z1_n,
+                                                           x2_n,  // Coordinates of the third tet vertex in physical space
+                                                           y2_n,
+                                                           z2_n,
+                                                           x3_n,  // Coordinates of the fourth tet vertex in physical space
+                                                           y3_n,
+                                                           z3_n,
                                                            weighted_field[ev[0]],  // Weighted field at the first vertex
                                                            weighted_field[ev[1]],  // Weighted field at the second vertex
                                                            weighted_field[ev[2]],  // Weighted field at the third vertex
@@ -709,18 +750,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             int    error_flag   = 0;
             real_t det_jacobian = calculate_det_Jacobian_for_category(category,      //
-                                                                      x0,            //
-                                                                      y0,            //
-                                                                      z0,            //
-                                                                      x1,            //
-                                                                      y1,            //
-                                                                      z1,            //
-                                                                      x2,            //
-                                                                      y2,            //
-                                                                      z2,            //
-                                                                      x3,            //
-                                                                      y3,            //
-                                                                      z3,            //
+                                                                      x0_n,          //
+                                                                      y0_n,          //
+                                                                      z0_n,          //
+                                                                      x1_n,          //
+                                                                      y1_n,          //
+                                                                      z1_n,          //
+                                                                      x2_n,          //
+                                                                      y2_n,          //
+                                                                      z2_n,          //
+                                                                      x3_n,          //
+                                                                      y3_n,          //
+                                                                      z3_n,          //
                                                                       L,             //
                                                                       tet_i,         //
                                                                       &error_flag);  //
@@ -786,11 +827,11 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        // printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
-        //        element_i,
-        //        theta_volume_main,
-        //        theta_volume_acc,
-        //        (theta_volume_acc / theta_volume_main));
+        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
+               element_i,
+               theta_volume_main,
+               theta_volume_acc,
+               (theta_volume_acc / theta_volume_main));
     }
 
     RETURN_FROM_FUNCTION(ret);

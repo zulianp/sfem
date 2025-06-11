@@ -539,6 +539,35 @@ tet_edge_max_length(const real_t  v0x,           //
                     int*          vertex_b,      //
                     real_t* const edge_length);  //
 
+int                                              //
+tet_normalize_by_edge(const real_t v0x,          // Input tetrahedron coordinates
+                      const real_t v0y,          //
+                      const real_t v0z,          //
+                      const real_t v1x,          //
+                      const real_t v1y,          //
+                      const real_t v1z,          //
+                      const real_t v2x,          //
+                      const real_t v2y,          //
+                      const real_t v2z,          //
+                      const real_t v3x,          //
+                      const real_t v3y,          //
+                      const real_t v3z,          //
+                      const int    vertex_a,     // Vertices defining the edge to normalize
+                      const int    vertex_b,     //
+                      const real_t edge_length,  // Current edge length
+                      real_t*      out_v0x,      // Output normalized tetrahedron
+                      real_t*      out_v0y,      //
+                      real_t*      out_v0z,      //
+                      real_t*      out_v1x,      //
+                      real_t*      out_v1y,      //
+                      real_t*      out_v1z,      //
+                      real_t*      out_v2x,      //
+                      real_t*      out_v2y,      //
+                      real_t*      out_v2z,      //
+                      real_t*      out_v3x,      //
+                      real_t*      out_v3y,      //
+                      real_t*      out_v3z);
+
 /**
  * @brief Compute the ratio of the absolute maximum and minimum values in an array
  *
