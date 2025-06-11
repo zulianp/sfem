@@ -761,8 +761,8 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    info.alpha_th = 2.5;
-                    // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
+                    info.alpha_th            = 2.5;
+                    info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                     // info.adjoint_refine_type = ADJOINT_BASE;
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 
@@ -823,7 +823,7 @@ int main(int argc, char* argv[]) {
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field.raw",
-                                  MPI_FLOAT,
+                                  ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
                                   3,
                                   field,
                                   nlocal,
