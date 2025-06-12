@@ -337,7 +337,7 @@ alpha_to_hyteg_level(const real_t alpha,                //
                      const real_t alpha_max_threshold,  //
                      const int    max_refinement_L) {      //
 
-    // return 1;  ///// TODO
+    return 1;  ///// TODO
 
     if (alpha < alpha_min_threshold) return 1;                           // No refinement
     if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
@@ -450,46 +450,49 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                     &vertex_b,      // Output
                                     edges_length);  // Output
 
-        real_type x0_n = x0_p;
-        real_type x1_n = x1_p;
-        real_type x2_n = x2_p;
-        real_type x3_n = x3_p;
-        real_type y0_n = y0_p;
-        real_type y1_n = y1_p;
-        real_type y2_n = y2_p;
-        real_type y3_n = y3_p;
-        real_type z0_n = z0_p;
-        real_type z1_n = z1_p;
-        real_type z2_n = z2_p;
-        real_type z3_n = z3_p;
+        real_t x0_n = x0_p;
+        real_t x1_n = x1_p;
+        real_t x2_n = x2_p;
+        real_t x3_n = x3_p;
+        real_t y0_n = y0_p;
+        real_t y1_n = y1_p;
+        real_t y2_n = y2_p;
+        real_t y3_n = y3_p;
+        real_t z0_n = z0_p;
+        real_t z1_n = z1_p;
+        real_t z2_n = z2_p;
+        real_t z3_n = z3_p;
 
-        // tet_normalize_by_edge(x0_p,              //
-        //                       x1_p,              //
-        //                       x2_p,              //
-        //                       x3_p,              //
-        //                       y0_p,              //
-        //                       y1_p,              //
-        //                       y2_p,              //
-        //                       y3_p,              //
-        //                       z0_p,              //
-        //                       z1_p,              //
-        //                       z2_p,              //
-        //                       z3_p,              //
-        //                       vertex_a,          // Vertex A
-        //                       vertex_b,          // Vertex B
-        //                       max_edges_length,  //
-        //                       &x0_n,             // Normalized coordinates
-        //                       &x1_n,             //
-        //                       &x2_n,             //
-        //                       &x3_n,             //
-        //                       &y0_n,             //
-        //                       &y1_n,             //
-        //                       &y2_n,             //
-        //                       &y3_n,             //
-        //                       &z0_n,             //
-        //                       &z1_n,             //
-        //                       &z2_n,             //
-        //                       &z3_n);            //
+        // const real_t scale_tet =                         //
+        //         tet_normalize_by_edge(x0_p,              //
+        //                               y0_p,              //
+        //                               z0_p,              //
+        //                               x1_p,              //
+        //                               y1_p,              //
+        //                               z1_p,              //
+        //                               x2_p,              //
+        //                               y2_p,              //
+        //                               z2_p,              //
+        //                               x3_p,              //
+        //                               y3_p,              //
+        //                               z3_p,              //
+        //                               vertex_a,          // Vertices defining the edge to normalize
+        //                               vertex_b,          //
+        //                               max_edges_length,  // Current edge length
+        //                               &x0_n,             // Output normalized tetrahedron
+        //                               &y0_n,             //
+        //                               &z0_n,             //
+        //                               &x1_n,             //
+        //                               &y1_n,             //
+        //                               &z1_n,             //
+        //                               &x2_n,             //
+        //                               &y2_n,             //
+        //                               &z2_n,             //
+        //                               &x3_n,             //
+        //                               &y3_n,             //
+        //                               &z3_n);            //
+
+        // continue;
 
         const real_t alpha_tet = max_edges_length / d_min;
 
@@ -561,11 +564,26 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const real_type pz2 = z_hyteg[v2];
             const real_type pz3 = z_hyteg[v3];
 
+            // printf("Tet vertices: px0 = %g, py0 = %g, pz0 = %g || px1 = %g, py1 = %g, pz1 = %g || "
+            //        "px2 = %g, py2 = %g, pz2 = %g || px3 = %g, py3 = %g, pz3 = %g\n",
+            //        px0,
+            //        py0,
+            //        pz0,
+            //        px1,
+            //        py1,
+            //        pz1,
+            //        px2,
+            //        py2,
+            //        pz2,
+            //        px3,
+            //        py3,
+            //        pz3);
+
             const real_t fx0, fx1, fx2, fx3;
             const real_t fy0, fy1, fy2, fy3;
             const real_t fz0, fz1, fz2, fz3;
 
-            // Transform the vertnces of the sub-tetrahedron to the physical space
+            // Transform the vertices of the sub-tetrahedron to the physical space
             tet4_transform_v2(x0_n,   // x-coordinates of the vertices
                               x1_n,   //
                               x2_n,   //
@@ -577,13 +595,24 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                               z0_n,   // z-coordinates of the vertices
                               z1_n,   //
                               z2_n,   //
-                              z3_p,   //
+                              z3_n,   //
                               px0,    // Vertex of the sub-tetrahedron
                               py0,    //
                               pz0,    //
                               &fx0,   // Output coordinates
                               &fy0,   //
                               &fz0);  //
+
+            printf("px0: %g, py0: %g, pz0: %g => fx0: %g, fy0: %g, fz0: %g || x0_n: %g, y0_n: %g, z0_n: %g\n",
+                   px0,
+                   py0,
+                   pz0,
+                   fx0,
+                   fy0,
+                   fz0,
+                   x0_n,
+                   y0_n,
+                   z0_n);
 
             tet4_transform_v2(x0_n,   // x-coordinates of the vertices
                               x1_n,   //
