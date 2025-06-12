@@ -112,7 +112,7 @@ fi
 
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
+raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
 
 
 # Function to create metadata and convert raw files to XDMF format
