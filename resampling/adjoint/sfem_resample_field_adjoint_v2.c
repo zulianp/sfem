@@ -2250,7 +2250,7 @@ tet_edge_max_length(const real_t  v0x,            //
     return max_length;
 }
 
-int                                              //
+real_t                                           //
 tet_normalize_by_edge(const real_t v0x,          // Input tetrahedron coordinates
                       const real_t v0y,          //
                       const real_t v0z,          //
@@ -2280,19 +2280,16 @@ tet_normalize_by_edge(const real_t v0x,          // Input tetrahedron coordinate
                       real_t*      out_v3z) {         //
 
     // Check valid vertex indices
-    if (vertex_a < 0 || vertex_a > 3 || vertex_b < 0 || vertex_b > 3 || vertex_a == vertex_b) {
+    if (vertex_a < 0 || vertex_a > 3 || vertex_b < 0 || vertex_b > 3 || vertex_a == vertex_b)
         return 1;  // Error: invalid vertices
-    }
 
     // Check if edge length is valid
-    if (edge_length < 1e-10) {
-        return 2;  // Error: edge length too small
-    }
+    if (edge_length < 1e-10) return 2;  // Error: edge length too small
 
     // Calculate the scaling factor
     const real_t scale = 1.0 / edge_length;
 
-    // Scale all coordinates
+    // // Scale all coordinates
     *out_v0x = v0x * scale;
     *out_v0y = v0y * scale;
     *out_v0z = v0z * scale;

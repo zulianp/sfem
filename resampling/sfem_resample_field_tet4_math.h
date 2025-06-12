@@ -539,7 +539,7 @@ tet_edge_max_length(const real_t  v0x,           //
                     int*          vertex_b,      //
                     real_t* const edge_length);  //
 
-int                                              //
+real_t                                           //
 tet_normalize_by_edge(const real_t v0x,          // Input tetrahedron coordinates
                       const real_t v0y,          //
                       const real_t v0z,          //
