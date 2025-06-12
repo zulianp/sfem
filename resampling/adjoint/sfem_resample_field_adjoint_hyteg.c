@@ -337,7 +337,7 @@ alpha_to_hyteg_level(const real_t alpha,                //
                      const real_t alpha_max_threshold,  //
                      const int    max_refinement_L) {      //
 
-    return 1;  ///// TODO
+    // return 1;  ///// TODO
 
     if (alpha < alpha_min_threshold) return 1;                           // No refinement
     if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
@@ -375,7 +375,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
     real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
     real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
-    int    max_refinement_L    = 10;   // Maximum refinement level
+    int    max_refinement_L    = 7;    // Maximum refinement level
 
     // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
     // If the alpha value is below the minimum threshold, no refinement is applied.
@@ -603,16 +603,16 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                               &fy0,   //
                               &fz0);  //
 
-            printf("px0: %g, py0: %g, pz0: %g => fx0: %g, fy0: %g, fz0: %g || x0_n: %g, y0_n: %g, z0_n: %g\n",
-                   px0,
-                   py0,
-                   pz0,
-                   fx0,
-                   fy0,
-                   fz0,
-                   x0_n,
-                   y0_n,
-                   z0_n);
+            // printf("px0: %g, py0: %g, pz0: %g => fx0: %g, fy0: %g, fz0: %g || x0_n: %g, y0_n: %g, z0_n: %g\n",
+            //        px0,
+            //        py0,
+            //        pz0,
+            //        fx0,
+            //        fy0,
+            //        fz0,
+            //        x0_n,
+            //        y0_n,
+            //        z0_n);
 
             tet4_transform_v2(x0_n,   // x-coordinates of the vertices
                               x1_n,   //
@@ -856,11 +856,11 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
-               element_i,
-               theta_volume_main,
-               theta_volume_acc,
-               (theta_volume_acc / theta_volume_main));
+        // printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
+        //        element_i,
+        //        theta_volume_main,
+        //        theta_volume_acc,
+        //        (theta_volume_acc / theta_volume_main));
     }
 
     RETURN_FROM_FUNCTION(ret);
