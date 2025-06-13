@@ -373,10 +373,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
     PRINT_CURRENT_FUNCTION;
     int ret = 0;
 
-    real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
-    real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
-    int    max_refinement_L    = 7;    // Maximum refinement level
-
     // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
     // If the alpha value is below the minimum threshold, no refinement is applied.
     // If the alpha value is above the maximum threshold, the maximum level of refinement is applied.
@@ -450,18 +446,18 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                     &vertex_b,      // Output
                                     edges_length);  // Output
 
-        real_t x0_n = x0_p;
-        real_t x1_n = x1_p;
-        real_t x2_n = x2_p;
-        real_t x3_n = x3_p;
-        real_t y0_n = y0_p;
-        real_t y1_n = y1_p;
-        real_t y2_n = y2_p;
-        real_t y3_n = y3_p;
-        real_t z0_n = z0_p;
-        real_t z1_n = z1_p;
-        real_t z2_n = z2_p;
-        real_t z3_n = z3_p;
+        const real_t x0_n = x0_p;
+        const real_t x1_n = x1_p;
+        const real_t x2_n = x2_p;
+        const real_t x3_n = x3_p;
+        const real_t y0_n = y0_p;
+        const real_t y1_n = y1_p;
+        const real_t y2_n = y2_p;
+        const real_t y3_n = y3_p;
+        const real_t z0_n = z0_p;
+        const real_t z1_n = z1_p;
+        const real_t z2_n = z2_p;
+        const real_t z3_n = z3_p;
 
         // const real_t scale_tet =                         //
         //         tet_normalize_by_edge(x0_p,              //
@@ -495,6 +491,10 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         // continue;
 
         const real_t alpha_tet = max_edges_length / d_min;
+
+        const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
+        const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
+        const int    max_refinement_L    = 3;    // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            //
                                            alpha_min_threshold,  //
@@ -539,6 +539,13 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         real_type theta_volume_acc = 0.0;
 
+        printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
+               hteg_num_tetrahedra,
+               L,
+               alpha_tet,
+               max_edges_length,
+               d_min);
+
         for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {  //
             //
             const int category = categories_hyteg[tet_i];
@@ -548,7 +555,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const int v2 = v2_array_hyteg[tet_i];
             const int v3 = v3_array_hyteg[tet_i];
 
-            // Coordinates of the tetrahedron in the reference space
+            // Coordinates of the HyTeg tetrahedron in the reference space
             const real_type px0 = x_hyteg[v0];
             const real_type px1 = x_hyteg[v1];
             const real_type px2 = x_hyteg[v2];
@@ -797,22 +804,22 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             theta_volume_acc += det_jacobian * (1.0 / 6.0);  // DEBUG code
 
-            // // Calculate the volume of the HyTeg tetrahedron
-            // // In the physical space
-            const real_type theta_volume = tet4_measure_v2(fx0,
-                                                           fx1,
-                                                           fx2,
-                                                           fx3,
-                                                           //
-                                                           fy0,
-                                                           fy1,
-                                                           fy2,
-                                                           fy3,
-                                                           //
-                                                           fz0,
-                                                           fz1,
-                                                           fz2,
-                                                           fz3);
+            // // // Calculate the volume of the HyTeg tetrahedron
+            // // // In the physical space
+            // const real_type theta_volume = tet4_measure_v2(fx0,
+            //                                                fx1,
+            //                                                fx2,
+            //                                                fx3,
+            //                                                //
+            //                                                fy0,
+            //                                                fy1,
+            //                                                fy2,
+            //                                                fy3,
+            //                                                //
+            //                                                fz0,
+            //                                                fz1,
+            //                                                fz2,
+            //                                                fz3);
 
             // printf("det_jacobian = %g, theta_volume = %g, det_jacobian / theta_volume = %g\n",
             //        det_jacobian,
@@ -856,11 +863,11 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        // printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
-        //        element_i,
-        //        theta_volume_main,
-        //        theta_volume_acc,
-        //        (theta_volume_acc / theta_volume_main));
+        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
+               element_i,
+               theta_volume_main,
+               theta_volume_acc,
+               (theta_volume_acc / theta_volume_main));
     }
 
     RETURN_FROM_FUNCTION(ret);
