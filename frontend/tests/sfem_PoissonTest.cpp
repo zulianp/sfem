@@ -18,6 +18,8 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     std::shared_ptr<sfem::Operator<real_t>> bjacobi;
     auto                                    diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
+    std::shared_ptr<sfem::Buffer<uint16_t>> count;
+
     if (fs->has_semi_structured_mesh()) {
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
 
@@ -28,12 +30,13 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
             SFEM_ERROR("Unable to create fff");
         }
 
-        auto count = sfem::create_buffer<uint16_t>(fs->semi_structured_mesh().n_nodes(), es);
+        count = sfem::create_buffer<uint16_t>(fs->semi_structured_mesh().n_nodes(), es);
         {
             auto buff     = count->data();
             auto elements = fs->semi_structured_mesh().element_data();
 
             const int nxe = fs->semi_structured_mesh().n_nodes_per_element();
+            printf("nxe = %d\n", nxe);
 
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < fs->semi_structured_mesh().n_elements(); ++i) {
@@ -41,6 +44,8 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                 }
             }
         }
+
+        // count->print(std::cout);
 
         f->hessian_diag(nullptr, diag->data());
         f->set_value_to_constrained_dofs(1, diag->data());
@@ -79,13 +84,16 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto solver         = sfem::create_cg(linear_op, es);
     auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
     preconditioner->set_max_it(1);
+    solver->set_preconditioner_op(preconditioner);
+
+    // auto solver = sfem::h_stationary(linear_op, bjacobi);
 
     int max_it = 4000;
 
-#if  0
+#if 1
     {
-        max_it = 20;
-        auto        output  = f->output();
+        max_it      = 40;
+        auto output = f->output();
         sfem::create_directory(output_dir.c_str());
         std::string dbg_dir = output_dir + "/dbg";
         sfem::create_directory(dbg_dir.c_str());
@@ -100,17 +108,13 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
 #endif
 
-    // preconditioner->apply(rhs->data(), x->data());
-    solver->set_preconditioner_op(preconditioner);
     solver->verbose = true;
+    // solver->set_max_it(2);
+    // solver->apply(rhs->data(), x->data());
+    // solver->set_preconditioner_op(sfem::h_shiftable_jacobi(diag));
+    // solver->interceptor = nullptr;
     solver->set_max_it(max_it);
     solver->apply(rhs->data(), x->data());
-
-    // auto solver = sfem::h_stationary(linear_op, bjacobi);
-    // solver->verbose = true;
-    // solver->set_max_it(1000);
-    // solver->apply(rhs->data(), x->data());
-
 
     double tock = MPI_Wtime();
 
@@ -143,8 +147,14 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     } else
 #endif
     {
+
         SFEM_TEST_ASSERT(output->write("x", x->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(output->write("rhs", rhs->data()) == SFEM_SUCCESS);
+
+        if (count) {
+            auto rcount = sfem::astype<real_t>(count);
+            SFEM_TEST_ASSERT(output->write("count", rcount->data()) == SFEM_SUCCESS);
+        }
     }
 #endif
 
@@ -421,8 +431,6 @@ int test_poisson_yaml() {
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-
-
 
     // SFEM_RUN_TEST(test_poisson);
     // SFEM_RUN_TEST(test_linear_elasticity);
