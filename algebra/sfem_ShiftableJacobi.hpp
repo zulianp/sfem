@@ -78,7 +78,7 @@ namespace sfem {
         std::shared_ptr<Buffer<T>>      diag;
         std::shared_ptr<Buffer<T>>      inv_diag;
         std::shared_ptr<Buffer<mask_t>> constraints_mask;
-        T                               relaxation_parameter{0.3};
+        T                               relaxation_parameter{1./3};
         int                             block_size{3};
         bool                            is_symmetric{true};
 
@@ -93,7 +93,7 @@ namespace sfem {
 
             assert(block_size == 3);
             assert(is_symmetric);
-            assert(execution_space_ == EXECUTION_SPACE_HOST);
+            assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
             const ptrdiff_t n_blocks = d->size() / 6;

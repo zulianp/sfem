@@ -109,31 +109,35 @@ MS := Milestone
    - [x] SSHEX8-Mesh online generation from HEX8
    - [x] Multilevel GMG on CPU
    - [x] Contact stresses post-processor for SSHEX8
+   - [x] BC mask
    - [ ] Provide boundary surface mask for adaptive coarsening
    - [x] Boundary mass-matrix
    - [x] MG with Support non-axis aligned normal fields for contact
    - [ ] Chebyshev smoother
-   - [X] Export facilities for Paper 1
-   - [ ] Nonlinear obstacle contact loop (Optional)
+   - [x] Export facilities for Paper 1
+   - [x] Nonlinear obstacle contact loop
+   - [x] Refactoring: multilevel constraints restriction
+   
 
 **MS 2: ()**
 
    - [ ] Drafting/Finalizing P1
-   - [ ] Nonlinear obstacle contact loop (if not done in MS 1)
 
 **MS 3: ()**
 
-   - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,)
-   - [ ] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
-   - [X] GPU: ShiftableBlockSymJacobi
-   - [ ] GPU: constraints_mask (minimal)
-   - [X] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
-   - [X] GPU: sshex8_restrict and sshex8_prolongate
-   - [X] GPU: ssquad4_restrict and ssquad4_prolongate
-   - [ ] GPU: SparseBlockVector
+   
+   - [x] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
+   - [x] GPU: ShiftableBlockSymJacobi
+   - [x] GPU: constraints_mask (minimal)
+   - [x] GPU: hessian_block_diag_sym for linear elasticity (HEX8 and SSHEX8)
+   - [x] GPU: sshex8_restrict and sshex8_prolongate
+   - [x] GPU: ssquad4_restrict and ssquad4_prolongate
+   - [x] GPU: SparseBlockVector
+   - [x] Test/Debug GPU porting
 
 **MS 4: ()**
-
+   - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,...)
+   - [x] SoA refactoring for facilitating zero-overhead ML representation
    - [ ] Optimize memory for shifted penalty multigrid
    - [ ] Optimizing operator applications for elasticity to compete with Laplacian perf
    
@@ -142,7 +146,8 @@ MS := Milestone
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
    - [ ] Explore high-order HEXA
    - [ ] Explore sum factorization algorithm for HEX8
-
+   - [ ] Contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
+   
 
 ### Hardik
 
@@ -188,6 +193,29 @@ MS := Milestone
 - [ ] Tracing and tuning
 - [ ] Vertical solution (redesign of some parts of the code)
 - [ ] Algorithmic Optimizations and parameter tuning
+
+### DD29 poster and ICCCM presentation
+
+- [ ] Formal presentation of method
+- [ ] Performance analysis on 
+      1. M1 Max (or M4 Gabriele?)
+      2. Shaheen
+      3. GH200 (Grace and Hopper)
+      4. AMD Mi300A?
+- [ ] Speed of light? Kernel performance with NCU
+- [ ] %TTS of different parts of the algorithm NSYS
+- [ ] Test cases Elastic / Fixed
+      1. Cuboid / sphere 
+      2. Cuboid / multiple spheres
+      3. Cylinder / stent
+- [ ] Algorithmic efficiency
+      1. Number of smoothing steps
+      2. Number of MG cycles
+      3. Number of shift update
+      4. Convergence rates
+- [ ] Levels [2, 4, 8, (16)]
+- [ ] Time dependent scenario: visco-elasticity?
+
 
 ## Paper 1: Shifted--Penalty Multigrid for Variational Inequalities
 

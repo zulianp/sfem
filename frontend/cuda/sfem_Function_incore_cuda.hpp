@@ -17,9 +17,9 @@ namespace sfem {
     void                        register_device_ops();
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
     std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
+    std::shared_ptr<Sideset>    to_device(const std::shared_ptr<Sideset> &ss);
 
-
-    std::shared_ptr<Buffer<idx_t>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
                                                           const enum ElemType                   element_type);
 
     template <typename T>
@@ -40,19 +40,6 @@ namespace sfem {
 
         return std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
     }
-
-    template <typename T>
-    std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
-        if (in->mem_space() == MEMORY_SPACE_DEVICE) {
-            return in;
-        }
-
-        auto ret = std::make_shared<SparseBlockVector<T>>();
-        ret->block_size_ = in->block_size_;
-        ret->idx_ = sfem::to_device(in->idx_);
-        ret->data_ = sfem::to_device(ret->data_);
-        return nullptr;
-    }    
 
     template <typename T>
     std::shared_ptr<Buffer<T *>> to_device(const std::shared_ptr<Buffer<T *>> &in) {
@@ -101,10 +88,62 @@ namespace sfem {
             return in;
         }
 
-        T *buff = static_cast<T *>(malloc(in->size() * sizeof(T)));
+        using NonConstT = typename std::remove_const<T>::type;
+
+        NonConstT *buff = static_cast<NonConstT *>(malloc(in->size() * sizeof(T)));
         // cudaMemcpy(buff, in->data(), in->size() * sizeof(T), cudaMemcpyDeviceToHost);
-        buffer_device_to_host(in->size() * sizeof(T), in->data(), buff);
+        buffer_device_to_host(in->size() * sizeof(NonConstT), in->data(), buff);
         return std::make_shared<Buffer<T>>(in->size(), buff, &free, MEMORY_SPACE_HOST);
+    }
+
+    template <typename T>
+    std::shared_ptr<Buffer<T *>> to_host(const std::shared_ptr<Buffer<T *>> &in) {
+        if (in->mem_space() == MEMORY_SPACE_HOST) {
+            return in;
+        }
+
+        const ptrdiff_t n0 = in->extent(0);
+        const ptrdiff_t n1 = in->extent(1);
+
+        auto buffer = create_host_buffer<T>(n0, n1);
+
+        T **dev_addr = static_cast<T **>(malloc(n0 * sizeof(T *)));
+
+        buffer_device_to_host(n0 * sizeof(T *), in->data(), dev_addr);
+
+        for (ptrdiff_t i = 0; i < n0; i++) {
+            buffer_device_to_host(n1 * sizeof(T), dev_addr[i], buffer->data()[i]);
+        }
+
+        free(dev_addr);
+
+        return buffer;
+    }
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
+        if (in->mem_space() == MEMORY_SPACE_DEVICE) {
+            return in;
+        }
+
+        auto ret         = std::make_shared<SparseBlockVector<T>>();
+        ret->block_size_ = in->block_size_;
+        ret->idx_        = sfem::to_device(in->idx_);
+        ret->data_       = sfem::to_device(in->data_);
+        return ret;
+    }
+
+    template <typename T>
+    std::shared_ptr<SparseBlockVector<T>> to_host(const std::shared_ptr<SparseBlockVector<T>> &in) {
+        if (in->mem_space() == MEMORY_SPACE_HOST) {
+            return in;
+        }
+
+        auto ret         = std::make_shared<SparseBlockVector<T>>();
+        ret->block_size_ = in->block_size_;
+        ret->idx_        = sfem::to_host(in->idx_);
+        ret->data_       = sfem::to_host(in->data_);
+        return ret;
     }
 
 }  // namespace sfem

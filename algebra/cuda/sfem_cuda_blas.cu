@@ -11,14 +11,18 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#define CHECK_CUDA(func)                                                                                              \
-    do {                                                                                                              \
-        cudaError_t status = (func);                                                                                  \
-        if (status != cudaSuccess) {                                                                                  \
-            printf("CUDA API failed at line %d with error: %s (%d)\n", __LINE__, cudaGetErrorString(status), status); \
-            assert(false);                                                                                            \
-            exit(EXIT_FAILURE);                                                                                       \
-        }                                                                                                             \
+#define CHECK_CUDA(func)                                                  \
+    do {                                                                  \
+        cudaError_t status = (func);                                      \
+        if (status != cudaSuccess) {                                      \
+            printf("CUDA API failed at line %s:%d with error: %s (%d)\n", \
+                   __FILE__,                                              \
+                   __LINE__,                                              \
+                   cudaGetErrorString(status),                            \
+                   status);                                               \
+            assert(false);                                                \
+            exit(EXIT_FAILURE);                                           \
+        }                                                                 \
     } while (0)
 
 #ifdef SFEM_ENABLE_CUBLAS
@@ -54,14 +58,18 @@ static const char *myCublasGetErrorString(cublasStatus_t error) {
     return "<unknown>";
 }
 
-#define CHECK_CUBLAS(func)                                                                                                  \
-    do {                                                                                                                    \
-        cublasStatus_t status = (func);                                                                                     \
-        if (status != CUBLAS_STATUS_SUCCESS) {                                                                              \
-            printf("CUBLAS API failed at line %d with error: %s (%d)\n", __LINE__, myCublasGetErrorString(status), status); \
-            assert(false);                                                                                                  \
-            exit(EXIT_FAILURE);                                                                                             \
-        }                                                                                                                   \
+#define CHECK_CUBLAS(func)                                                  \
+    do {                                                                    \
+        cublasStatus_t status = (func);                                     \
+        if (status != CUBLAS_STATUS_SUCCESS) {                              \
+            printf("CUBLAS API failed at line %s:%d with error: %s (%d)\n", \
+                   __FILE__,                                                \
+                   __LINE__,                                                \
+                   myCublasGetErrorString(status),                          \
+                   status);                                                 \
+            assert(false);                                                  \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
     } while (0)
 
 static bool           sfem_blas_initialized = false;
@@ -434,6 +442,13 @@ extern void *d_buffer_alloc(const size_t n) {
     return ptr;
 }
 
+extern void d_memcpy(const ptrdiff_t n, const void *const src, void *const dest) {
+    assert(sfem::is_ptr_device(src));
+    assert(sfem::is_ptr_device(dest));
+
+    cudaMemcpy(dest, src, n, cudaMemcpyDeviceToDevice);
+}
+
 extern void d_buffer_destroy(void *a) {
     cudaFree(a);
     SFEM_DEBUG_SYNCHRONIZE();
@@ -471,8 +486,19 @@ namespace sfem {
         tpl.allocate = [](const std::ptrdiff_t n) -> T * {
             T *ptr = nullptr;
             cudaMalloc((void **)&ptr, n * sizeof(T));
+
+            if (!ptr) {
+                size_t free, total;
+                cudaMemGetInfo(&free, &total);
+                SFEM_ERROR(
+                        "cudaMalloc failed to allocate %g [GB]\n"
+                        "%g [GB] free, %g [GB] total\n",
+                        n * sizeof(T) * 1e-9,
+                        free * 1e-9,
+                        total * 1e-9);
+            }
+
             cudaMemset(ptr, 0, n * sizeof(T));
-            assert(ptr);
             return ptr;
         };
 
@@ -520,5 +546,72 @@ namespace sfem {
         return attributes.memoryType == cudaMemoryTypeDevice;
 #endif
     }
+
+    template <typename T>
+    __global__ void sbv_mult3_kernel(const ptrdiff_t    n_blocks,
+                                     const idx_t *const idx,
+                                     const T *const     dd,
+                                     const T *const     s,
+                                     const T *const     x,
+                                     T *const           y) {
+        const int block_size = 3;
+
+        for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
+            auto di = &dd[i * 6];
+            auto si = s[i];
+
+            const ptrdiff_t b  = idx[i];
+            auto        xi = &x[b * block_size];
+            auto        yi = &y[b * block_size];
+
+            T buff[3] = {0, 0, 0};
+
+            int d_idx = 0;
+            for (int d1 = 0; d1 < block_size; d1++) {
+                const auto m = si * di[d_idx++];
+                buff[d1] += m * xi[d1];
+                for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                    const auto m = si * di[d_idx++];
+                    buff[d1] += m * xi[d2];
+                    buff[d2] += m * xi[d1];
+                }
+            }
+
+            yi[0] += buff[0];
+            yi[1] += buff[1];
+            yi[2] += buff[2];
+        }
+    }
+
+    template <typename T>
+    int sbv_mult3(const ptrdiff_t    n_blocks,
+                  const idx_t *const idx,
+                  const T *const     dd,
+                  const T *const     s,
+                  const T *const     x,
+                  T *const           y) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        int       kernel_block_size = 128;
+        ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_blocks + kernel_block_size - 1) / kernel_block_size);
+        sbv_mult3_kernel<T><<<kernel_n_blocks, kernel_block_size>>>(n_blocks, idx, dd, s, x, y);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    }
+
+    template int sbv_mult3<float>(const ptrdiff_t,
+                                  const idx_t *const,
+                                  const float *const,
+                                  const float *const,
+                                  const float *const,
+                                  float *const);
+
+    template int sbv_mult3<double>(const ptrdiff_t,
+                                   const idx_t *const,
+                                   const double *const,
+                                   const double *const,
+                                   const double *const,
+                                   double *const);
 
 }  // namespace sfem

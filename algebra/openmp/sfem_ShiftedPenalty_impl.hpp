@@ -38,7 +38,7 @@ namespace sfem {
                 calc_J_pen;
 
         bool good() const {
-            return ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
+            return sq_norm_ramp_p && sq_norm_ramp_m && ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
         }
     };
 
@@ -47,7 +47,7 @@ namespace sfem {
         static void build(struct ShiftedPenalty_Tpl<T>& tpl) {
             tpl.sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
                 T ret = 0;
-#pragma omp parallel for reduction(+ : ret)
+#pragma omp parallel for reduction(+: ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
                     const T diff = std::max(T(0), x[i] - ub[i]);
                     ret += diff * diff;
@@ -57,7 +57,7 @@ namespace sfem {
 
             tpl.sq_norm_ramp_m = [](const ptrdiff_t n, const T* const x, T* const lb) -> T {
                 T ret = 0;
-#pragma omp parallel for reduction(+ : ret)
+#pragma omp parallel for reduction(+: ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
                     const T diff = std::min(T(0), x[i] - lb[i]);
                     ret += diff * diff;
@@ -157,6 +157,8 @@ namespace sfem {
                     }
                 }
             };
+
+            assert(tpl.good());
         }
     };
 

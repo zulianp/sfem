@@ -16,6 +16,7 @@ void  d_buffer_destroy(void *a);
 void d_memset(void *ptr, int value, const size_t n);
 void buffer_device_to_host(const size_t n, const void *const d, void *h);
 void buffer_host_to_device(const size_t n, const void *const h, void *d);
+void d_memcpy(const ptrdiff_t n, const void *const src, void *const dest);
 
 void device_to_host(const size_t n, const real_t *const d, real_t *h);
 void host_to_device(const size_t n, const real_t *const h, real_t *d);

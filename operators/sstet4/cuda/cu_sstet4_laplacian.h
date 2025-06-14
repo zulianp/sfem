@@ -8,14 +8,14 @@
 extern "C" {
 #endif
 
-int cu_sstet4_laplacian_apply(const int level,
-                                    const ptrdiff_t nelements,
-                                    const ptrdiff_t stride,
-                                    const void *const SFEM_RESTRICT fff,
-                                    const enum RealType real_type_xy,
-                                    const void *const SFEM_RESTRICT x,
-                                    void *const SFEM_RESTRICT y,
-                                    void *stream);
+int cu_sstet4_laplacian_apply(const int                       level,
+                              const ptrdiff_t                 nelements,
+                              const ptrdiff_t                 stride,
+                              const void *const SFEM_RESTRICT fff,
+                              const enum RealType             real_type_xy,
+                              const void *const SFEM_RESTRICT x,
+                              void *const SFEM_RESTRICT       y,
+                              void                           *stream);
 
 #ifdef __cplusplus
 }

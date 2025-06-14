@@ -139,12 +139,11 @@ extern int cu_ssquad4_hierarchical_prolongation(const int                       
                     level, nelements, stride, elements, vec_size, from_stride, (double *)from, to_stride, (double *)to, stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type %s "
                     "(code %d)\n",
                     real_type_to_string(from_type),
                     from_type);
-            assert(0);
             return SFEM_FAILURE;
         }
     }
@@ -316,7 +315,7 @@ extern int cu_ssquad4_hierarchical_restriction(const int                        
                                                            stream);
         }
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type "
                     "%s "
                     "(code %d)\n",
@@ -328,6 +327,175 @@ extern int cu_ssquad4_hierarchical_restriction(const int                        
     }
 }
 
+template <typename From, typename To>
+__global__ void cu_ssquad4_hierarchical_restriction_SoA_kernel(const int                           level,
+                                                               const ptrdiff_t                     nelements,
+                                                               idx_t **const SFEM_RESTRICT         elements,
+                                                               const uint16_t *const SFEM_RESTRICT e2n_count,
+                                                               const int                           vec_size,
+                                                               const ptrdiff_t                     from_stride,
+                                                               const From *const SFEM_RESTRICT     from,
+                                                               const ptrdiff_t                     to_stride,
+                                                               To *const SFEM_RESTRICT             to) {
+    const int corners[4] = {// Bottom
+                            cu_ssquad4_lidx(level, 0, 0),
+                            cu_ssquad4_lidx(level, level, 0),
+                            cu_ssquad4_lidx(level, level, level),
+                            cu_ssquad4_lidx(level, 0, level)};
+
+    const scalar_t h = 1. / level;
+    scalar_t       acc[4];
+
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+        for (int d = 0; d < vec_size; d++) {
+            for (int i = 0; i < 4; i++) {
+                acc[i] = 0;
+            }
+
+            for (int yi = 0; yi < level + 1; yi++) {
+                for (int xi = 0; xi < level + 1; xi++) {
+                    const int       lidx = cu_ssquad4_lidx(level, xi, yi);
+                    const ptrdiff_t idx  = elements[lidx][e];
+
+                    const scalar_t x = xi * h;
+                    const scalar_t y = yi * h;
+
+                    // Evaluate Quad4 basis functions at x, y, z
+                    const scalar_t xm = (1 - x);
+                    const scalar_t ym = (1 - y);
+
+                    scalar_t f[4];
+                    f[0] = xm * ym;  // (0, 0, 0)
+                    f[1] = x * ym;   // (1, 0, 0)
+                    f[2] = x * y;    // (1, 1, 0)
+                    f[3] = xm * y;   // (0, 1, 0)
+
+                    const ptrdiff_t global_from_idx = (idx * vec_size + d) * from_stride;
+                    const scalar_t  val             = from[global_from_idx] / e2n_count[idx];
+
+                    assert(from[global_from_idx] == from[global_from_idx]);
+                    assert(e2n_count[idx] > 0);
+                    assert(val == val);
+
+                    for (int i = 0; i < 4; i++) {
+                        acc[i] += f[i] * val;
+                    }
+                }
+            }
+
+            for (int v = 0; v < 4; v++) {
+                const ptrdiff_t global_to_idx = (elements[corners[v]][e] * vec_size + d) * to_stride;
+                atomicAdd(&to[global_to_idx], acc[v]);
+            }
+        }
+    }
+}
+
+template <typename From, typename To>
+static int cu_ssquad4_hierarchical_restriction_SoA_tpl(const int                           level,
+                                                       const ptrdiff_t                     nelements,
+                                                       idx_t **const SFEM_RESTRICT         elements,
+                                                       const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                                       const int                           vec_size,
+                                                       const ptrdiff_t                     from_stride,
+                                                       const From *const SFEM_RESTRICT     from,
+                                                       const ptrdiff_t                     to_stride,
+                                                       To *const SFEM_RESTRICT             to,
+                                                       void                               *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    // Hand tuned
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(
+                &min_grid_size, &block_size, cu_ssquad4_hierarchical_restriction_SoA_kernel<From, To>, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+
+        cu_ssquad4_hierarchical_restriction_SoA_kernel<From, To><<<n_blocks, block_size, 0, s>>>(
+                level, nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
+    } else {
+        cu_ssquad4_hierarchical_restriction_SoA_kernel<From, To><<<n_blocks, block_size, 0>>>(
+                level, nelements, elements, element_to_node_incidence_count, vec_size, from_stride, from, to_stride, to);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+extern int cu_ssquad4_hierarchical_restriction_SoA(const int                           level,
+                                                   const ptrdiff_t                     nelements,
+                                                   idx_t **const SFEM_RESTRICT         elements,
+                                                   const uint16_t *const SFEM_RESTRICT element_to_node_incidence_count,
+                                                   const int                           vec_size,
+                                                   const enum RealType                 from_type,
+                                                   const ptrdiff_t                     from_stride,
+                                                   const void *const SFEM_RESTRICT     from,
+                                                   const enum RealType                 to_type,
+                                                   const ptrdiff_t                     to_stride,
+                                                   void *const SFEM_RESTRICT           to,
+                                                   void                               *stream) {
+    assert(from_type == to_type && "TODO mixed types!");
+    if (from_type != to_type) {
+        return SFEM_FAILURE;
+    }
+
+    switch (from_type) {
+        case SFEM_REAL_DEFAULT: {
+            return cu_ssquad4_hierarchical_restriction_SoA_tpl(level,
+                                                               nelements,
+                                                               elements,
+                                                               element_to_node_incidence_count,
+                                                               vec_size,
+                                                               from_stride,
+                                                               (real_t *)from,
+                                                               to_stride,
+                                                               (real_t *)to,
+                                                               stream);
+        }
+        case SFEM_FLOAT32: {
+            return cu_ssquad4_hierarchical_restriction_SoA_tpl(level,
+                                                               nelements,
+                                                               elements,
+                                                               element_to_node_incidence_count,
+                                                               vec_size,
+                                                               from_stride,
+                                                               (float *)from,
+                                                               to_stride,
+                                                               (float *)to,
+                                                               stream);
+        }
+        case SFEM_FLOAT64: {
+            return cu_ssquad4_hierarchical_restriction_SoA_tpl(level,
+                                                               nelements,
+                                                               elements,
+                                                               element_to_node_incidence_count,
+                                                               vec_size,
+                                                               from_stride,
+                                                               (double *)from,
+                                                               to_stride,
+                                                               (double *)to,
+                                                               stream);
+        }
+        default: {
+            SFEM_ERROR(
+                    "[Error]  cu_ssquad4_prolongation_tpl: not implemented for type "
+                    "%s "
+                    "(code %d)\n",
+                    real_type_to_string(from_type),
+                    from_type);
+            assert(0);
+            return SFEM_FAILURE;
+        }
+    }
+}
 
 static const int TILE_SIZE = 4;
 #define ROUND_ROBIN(val, shift) ((val + shift) & (TILE_SIZE - 1))
@@ -362,27 +530,24 @@ public:
     ~ShapeInterpolation() { cudaFree(data); }
 };
 
-
 template <typename From, typename To>
-__global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     nelements,
+__global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t nelements,
                                            // const ptrdiff_t                     stride,
                                            const int                           from_level,
                                            const int                           from_level_stride,
-                                           idx_t **const SFEM_RESTRICT          from_elements,
+                                           idx_t **const SFEM_RESTRICT         from_elements,
                                            const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                                            const int                           to_level,
                                            const int                           to_level_stride,
-                                           idx_t **const SFEM_RESTRICT          to_elements,
+                                           idx_t **const SFEM_RESTRICT         to_elements,
                                            const To *const SFEM_RESTRICT       S,
                                            const int                           vec_size,
-                                           const enum RealType                 from_type,
                                            const ptrdiff_t                     from_stride,
                                            const From *const SFEM_RESTRICT     from,
-                                           const enum RealType                 to_type,
                                            const ptrdiff_t                     to_stride,
                                            To *const SFEM_RESTRICT             to) {
     static_assert(TILE_SIZE == 4,
-                  "This only works with tile size 8 because the implementation assumes a fixed tile size for shared memory "
+                  "This only works with tile size 4 because the implementation assumes a fixed tile size for shared memory "
                   "layout and indexing.");
 
     // Unsigned char necessary for multiple template instantiations of this kernel
@@ -391,15 +556,15 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
     const int step_factor = from_level / to_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;   // same as threadIdx.x / 8
-    const int n_tiles = blockDim.x >> 4;    // same as blockDim.x / 8
-    const int sub_idx = threadIdx.x & 0x3;  // same as threadIdx.x % 8
+    const int tile    = threadIdx.x >> 2;
+    const int n_tiles = blockDim.x >> 2;
+    const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
     // hex8 idx
-    const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
-    const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
+    const int xi = sub_idx & 0x1;
+    const int yi = (sub_idx >> 1) & 0x1;
 
     assert(n_tiles * TILE_SIZE == blockDim.x);
 
@@ -433,7 +598,7 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
 
                 for (int from_yi = y_odd; from_yi < y_end; from_yi += 2) {
                     for (int from_xi = x_odd; from_xi < x_end; from_xi += 2) {
-                        // Parallel read from global mem on 8 fine nodes
+                        // Parallel read from global mem on 4 fine nodes
                         {
                             const int yy = y_start + from_yi;
                             const int xx = x_start + from_xi;
@@ -451,7 +616,7 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
                                                                      off_from_xi * from_level_stride,
                                                                      off_from_yi * from_level_stride);
 
-                                const idx_t     gidx = from_elements[idx_from][e];
+                                const ptrdiff_t gidx = from_elements[idx_from][e];
                                 const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                                 in[sub_idx]          = from[idx] / from_element_to_node_incidence_count[gidx];
                             } else {
@@ -478,7 +643,7 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
                     }
                 }
 
-                // Parallel accumulate on 8 coarse nodes
+                // Parallel accumulate on 4 coarse nodes
                 const int off_to_yi = to_yi + yi;
                 const int off_to_xi = to_xi + xi;
 
@@ -489,7 +654,10 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
                     const int idx_to =
                             cu_ssquad4_lidx(to_level * to_level_stride, off_to_xi * to_level_stride, off_to_yi * to_level_stride);
 
-                    atomicAdd(&to[(to_elements[idx_to][e] * vec_size + d) * to_stride], acc);
+                    const ptrdiff_t gidx = to_elements[idx_to][e];
+                    const ptrdiff_t idx  = (gidx * vec_size + d) * to_stride;
+                    // printf("[%d] tile=%d/%d sub_idx=%d e=%ld (%d %d) -> %ld) ::> %g\n", threadIdx.x, tile, n_tiles, sub_idx, e, xi, yi, idx, acc);
+                    atomicAdd(&to[idx], acc);
                 }
             }
         }
@@ -497,20 +665,18 @@ __global__ void cu_ssquad4_restrict_kernel(const ptrdiff_t                     n
 }
 
 template <typename From, typename To>
-int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
+int cu_ssquad4_restrict_tpl(const ptrdiff_t nelements,
                             // const ptrdiff_t                     stride,
                             const int                           from_level,
                             const int                           from_level_stride,
-                            idx_t **const SFEM_RESTRICT          from_elements,
+                            idx_t **const SFEM_RESTRICT         from_elements,
                             const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                             const int                           to_level,
                             const int                           to_level_stride,
-                            idx_t **const SFEM_RESTRICT          to_elements,
+                            idx_t **const SFEM_RESTRICT         to_elements,
                             const int                           vec_size,
-                            const enum RealType                 from_type,
                             const ptrdiff_t                     from_stride,
                             const From *const SFEM_RESTRICT     from,
-                            const enum RealType                 to_type,
                             const ptrdiff_t                     to_stride,
                             To *const SFEM_RESTRICT             to,
                             void                               *stream) {
@@ -545,10 +711,8 @@ int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
                                                                                            to_elements,
                                                                                            S.data,
                                                                                            vec_size,
-                                                                                           from_type,
                                                                                            from_stride,
                                                                                            from,
-                                                                                           to_type,
                                                                                            to_stride,
                                                                                            to);
     } else {
@@ -563,10 +727,8 @@ int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
                                                                                         to_elements,
                                                                                         S.data,
                                                                                         vec_size,
-                                                                                        from_type,
                                                                                         from_stride,
                                                                                         from,
-                                                                                        to_type,
                                                                                         to_stride,
                                                                                         to);
     }
@@ -575,15 +737,15 @@ int cu_ssquad4_restrict_tpl(const ptrdiff_t                     nelements,
     return SFEM_SUCCESS;
 }
 
-extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
+extern int cu_ssquad4_restrict(const ptrdiff_t nelements,
                                // const ptrdiff_t                     stride,
                                const int                           from_level,
                                const int                           from_level_stride,
-                               idx_t **const SFEM_RESTRICT          from_elements,
+                               idx_t **const SFEM_RESTRICT         from_elements,
                                const uint16_t *const SFEM_RESTRICT from_element_to_node_incidence_count,
                                const int                           to_level,
                                const int                           to_level_stride,
-                               idx_t **const SFEM_RESTRICT          to_elements,
+                               idx_t **const SFEM_RESTRICT         to_elements,
                                const int                           vec_size,
                                const enum RealType                 from_type,
                                const ptrdiff_t                     from_stride,
@@ -597,6 +759,21 @@ extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
         return SFEM_FAILURE;
     }
 
+    // if (to_level == 1) {
+    //     return cu_ssquad4_hierarchical_restriction_SoA(from_level,
+    //                                                    nelements,
+    //                                                    from_elements,
+    //                                                    from_element_to_node_incidence_count,
+    //                                                    vec_size,
+    //                                                    from_type,
+    //                                                    from_stride,
+    //                                                    from,
+    //                                                    to_type,
+    //                                                    to_stride,
+    //                                                    to,
+    //                                                    stream);
+    // }
+
     switch (from_type) {
         case SFEM_REAL_DEFAULT: {
             return cu_ssquad4_restrict_tpl<real_t, real_t>(nelements,
@@ -609,10 +786,8 @@ extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
                                                            to_level_stride,
                                                            to_elements,
                                                            vec_size,
-                                                           from_type,
                                                            from_stride,
                                                            (real_t *)from,
-                                                           to_type,
                                                            to_stride,
                                                            (real_t *)to,
                                                            stream);
@@ -628,10 +803,8 @@ extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
                                                          to_level_stride,
                                                          to_elements,
                                                          vec_size,
-                                                         from_type,
                                                          from_stride,
                                                          (float *)from,
-                                                         to_type,
                                                          to_stride,
                                                          (float *)to,
                                                          stream);
@@ -648,16 +821,14 @@ extern int cu_ssquad4_restrict(const ptrdiff_t                     nelements,
                                                            to_elements,
                                                            vec_size,
                                                            from_type,
-                                                           from_stride,
                                                            (double *)from,
                                                            to_type,
-                                                           to_stride,
                                                            (double *)to,
                                                            stream);
         }
 
         default: {
-            fprintf(stderr,
+            SFEM_ERROR(
                     "[Error]  cu_ssquad4_prolongate: not implemented for type "
                     "%s "
                     "(code %d)\n",
@@ -680,10 +851,8 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
                                              const int                       to_level_stride,
                                              idx_t *const SFEM_RESTRICT      to_elements,
                                              const int                       vec_size,
-                                             const enum RealType             from_type,
                                              const ptrdiff_t                 from_stride,
                                              const From *const SFEM_RESTRICT from,
-                                             const enum RealType             to_type,
                                              const ptrdiff_t                 to_stride,
                                              To *const SFEM_RESTRICT         to) {
     static_assert(TILE_SIZE == 4, "This only works with tile size 8!");
@@ -694,13 +863,13 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
     const int step_factor = to_level / from_level;
 
     // Tile number in group
-    const int tile    = threadIdx.x >> 4;   // same as threadIdx.x / 8
-    const int n_tiles = blockDim.x >> 4;    // same as blockDim.x / 8
-    const int sub_idx = threadIdx.x & 0x3;  // same as threadIdx.x % 8
+    const int tile    = threadIdx.x >> 2;
+    const int n_tiles = blockDim.x >> 2;
+    const int sub_idx = threadIdx.x & 0x3;
 
     From *in = (From *)&cu_buff[tile * TILE_SIZE * sizeof(From)];
 
-    // hex8 idx
+    // quad4 idx
     const int xi = sub_idx & 0x1;         // equivalent to sub_idx % 2
     const int yi = (sub_idx >> 1) & 0x1;  // equivalent to (sub_idx / 2) % 2
 
@@ -820,10 +989,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                               const int                       to_level_stride,
                               idx_t *const SFEM_RESTRICT      to_elements,
                               const int                       vec_size,
-                              const enum RealType             from_type,
                               const ptrdiff_t                 from_stride,
                               const From *const SFEM_RESTRICT from,
-                              const enum RealType             to_type,
                               const ptrdiff_t                 to_stride,
                               To *const SFEM_RESTRICT         to,
                               void                           *stream) {
@@ -845,10 +1012,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                                                                                              to_level_stride,
                                                                                              to_elements,
                                                                                              vec_size,
-                                                                                             from_type,
                                                                                              from_stride,
                                                                                              from,
-                                                                                             to_type,
                                                                                              to_stride,
                                                                                              to);
     } else {
@@ -861,10 +1026,8 @@ int cu_ssquad4_prolongate_tpl(const ptrdiff_t                 nelements,
                                                                                           to_level_stride,
                                                                                           to_elements,
                                                                                           vec_size,
-                                                                                          from_type,
                                                                                           from_stride,
                                                                                           from,
-                                                                                          to_type,
                                                                                           to_stride,
                                                                                           to);
     }
@@ -905,10 +1068,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                              to_level_stride,
                                                              to_elements,
                                                              vec_size,
-                                                             from_type,
                                                              from_stride,
                                                              (real_t *)from,
-                                                             to_type,
                                                              to_stride,
                                                              (real_t *)to,
                                                              stream);
@@ -923,10 +1084,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                            to_level_stride,
                                                            to_elements,
                                                            vec_size,
-                                                           from_type,
                                                            from_stride,
                                                            (float *)from,
-                                                           to_type,
                                                            to_stride,
                                                            (float *)to,
                                                            stream);
@@ -941,10 +1100,8 @@ extern int cu_ssquad4_prolongate(const ptrdiff_t                 nelements,
                                                              to_level_stride,
                                                              to_elements,
                                                              vec_size,
-                                                             from_type,
                                                              from_stride,
                                                              (double *)from,
-                                                             to_type,
                                                              to_stride,
                                                              (double *)to,
                                                              stream);
