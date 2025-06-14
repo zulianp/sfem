@@ -30,11 +30,13 @@ namespace sfem {
 
         BLAS_Tpl<T> blas;
 
+        std::function<void(T*)> interceptor;
+
         // Solver parameters
         T              rtol{1e-10};
         T              atol{1e-16};
         int            max_it{10000};
-        int            check_each{100};
+        int            check_each{1};
         ptrdiff_t      n_dofs{SFEM_PTRDIFF_INVALID};
         int            iterations_{0};
         bool           verbose{true};
@@ -115,12 +117,12 @@ namespace sfem {
 
         bool good() const { return blas.good() && apply_op; }
 
-        void monitor(const int iter, const T residual, const T relative_residual) {
+        void monitor(const int iter, const T residual, const T relative_residual, const T alpha) {
             if (!verbose) return;
 
             if (iter == max_it || iter == 0 || iter % check_each == 0 || relative_residual < rtol) {
                 std::cout << iter << ": residual abs: " << residual << ", rel: " << relative_residual << " (rtol = " << rtol
-                          << ", atol = " << atol << ")\n";
+                          << ", atol = " << atol << ", alpha = " << alpha << ")\n";
             }
         }
 
@@ -161,7 +163,7 @@ namespace sfem {
 
             const T rtr0    = blas.dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
-            monitor(0, r_norm0, 1);
+            monitor(0, r_norm0, 1, 0);
 
             T rtr = rtr0;
 
@@ -194,10 +196,14 @@ namespace sfem {
 
                 T r_norm = sqrt(rtr_new);
 
-                monitor(iterations_ + 1, r_norm, r_norm / r_norm0);
+                monitor(iterations_ + 1, r_norm, r_norm / r_norm0, alpha);
                 if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
                     info = SFEM_SUCCESS;
                     break;
+                }
+
+                if(interceptor) {
+                    interceptor(x);
                 }
             }
 
@@ -246,7 +252,7 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            monitor(0, sqrt(rtz), 1);
+            monitor(0, sqrt(rtz), 1, 0);
 
             {
                 const T ptAp = blas.dot(n, p, Ap);
@@ -283,10 +289,14 @@ namespace sfem {
                 auto anorm = sqrt(rtz);
                 auto rnorm = anorm / sqrt(rtz0);
 
-                monitor(iterations_ + 1, anorm, rnorm);
+                monitor(iterations_ + 1, anorm, rnorm, alpha);
                 if (anorm < atol || rnorm < rtol) {
                     info = SFEM_SUCCESS;
                     break;
+                }
+
+                if(interceptor) {
+                    interceptor(x);
                 }
             }
 

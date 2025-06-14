@@ -18,7 +18,7 @@ namespace sfem {
     }
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace execution_space) {
-        assert(es == sfem::EXECUTION_SPACE_HOST);
+        assert(execution_space == sfem::EXECUTION_SPACE_HOST);
         auto obs        = std::make_shared<SDFObstacle>();
         obs->impl_->sdf = sdf;
         obs->impl_->execution_space = execution_space;
