@@ -533,7 +533,7 @@ class GPULinearKVOp:
                 
     #     return expr
         
-    def apply_lhs(self):
+    def apply_lhs(self):  
         lhs = self.eval_lhs_matrix
         rows, cols = lhs.shape
         increment = self.increment
