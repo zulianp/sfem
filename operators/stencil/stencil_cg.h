@@ -427,8 +427,8 @@ static int sshex8_diag_plus_stencil_cg_constrained(const int      max_it,
                                                    // Out
                                                    scalar_t *const x) {
     const ptrdiff_t size = xc * yc * zc;
+
     memset(r, 0, size * sizeof(scalar_t));
-    
     sshex8_diag_plus_stencil_residual(xc, yc, zc, stencil, element_matrix, diag, constraints, b, x, r);
 
     scalar_t rtr0 = 0;
@@ -439,14 +439,13 @@ static int sshex8_diag_plus_stencil_cg_constrained(const int      max_it,
     assert(rtr0 == rtr0);
 
     const scalar_t r_norm0 = sqrt(rtr0);
+    assert(r_norm0 == r_norm0);
 
-    scalar_t rtr = rtr0;
     if (rtr0 == 0) {
         return SFEM_SUCCESS;
     }
 
-    assert(rtr == rtr);
-
+    scalar_t rtr = rtr0;
     for (ptrdiff_t i = 0; i < size; i++) {
         p[i] = r[i];
     }
@@ -456,6 +455,7 @@ static int sshex8_diag_plus_stencil_cg_constrained(const int      max_it,
     scalar_t r_norm     = 0;
 
     for (; iterations < max_it; iterations++) {
+        
         memset(Ap, 0, size * sizeof(scalar_t));
         sshex8_diag_plus_stencil_apply_op(xc, yc, zc, stencil, element_matrix, diag, p, Ap);
 
