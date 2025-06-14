@@ -366,4 +366,159 @@ static int sshex8_stencil_cg_constrained(const int      max_it,
     return info;
 }
 
+static void sshex8_diag_plus_stencil_apply_op(const ptrdiff_t                          xc,
+                                              const ptrdiff_t                          yc,
+                                              const ptrdiff_t                          zc,
+                                              const scalar_t *const SFEM_RESTRICT      stencil,
+                                              const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                              const scalar_t *const SFEM_RESTRICT      diag,
+                                              const scalar_t *const SFEM_RESTRICT      x,
+                                              scalar_t *const SFEM_RESTRICT            Ax) {
+    const ptrdiff_t size = xc * yc * zc;
+
+    sshex8_stencil(xc, yc, zc, stencil, x, Ax);
+    sshex8_surface_offdiag_stencil(xc, yc, zc, 1, xc, xc * yc, element_matrix, x, Ax);
+    for (ptrdiff_t i = 0; i < size; i++) {
+        Ax[i] += diag[i] * x[i];
+    }
+}
+
+static void sshex8_diag_plus_stencil_residual(const ptrdiff_t                          xc,
+                                              const ptrdiff_t                          yc,
+                                              const ptrdiff_t                          zc,
+                                              const scalar_t *const SFEM_RESTRICT      stencil,
+                                              const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                              const scalar_t *const SFEM_RESTRICT      diag,
+                                              const int *const                         constraints,
+                                              const scalar_t *const SFEM_RESTRICT      b,
+                                              const scalar_t *const SFEM_RESTRICT      x,
+                                              scalar_t *const SFEM_RESTRICT            r) {
+    const ptrdiff_t size = xc * yc * zc;
+
+    sshex8_diag_plus_stencil_apply_op(xc, yc, zc, stencil, element_matrix, diag, x, r);
+
+    for (ptrdiff_t i = 0; i < size; i++) {
+        if (constraints[i]) {
+            r[i] = x[i];
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < size; i++) {
+        r[i] = b[i] - r[i];
+    }
+}
+
+static int sshex8_diag_plus_stencil_cg_constrained(const int      max_it,
+                                                   const scalar_t rtol,
+                                                   const scalar_t atol,
+                                                   // Grid info
+                                                   const ptrdiff_t                          xc,
+                                                   const ptrdiff_t                          yc,
+                                                   const ptrdiff_t                          zc,
+                                                   const scalar_t *const SFEM_RESTRICT      stencil,
+                                                   const accumulator_t *const SFEM_RESTRICT element_matrix,
+                                                   const scalar_t *const SFEM_RESTRICT      diag,
+                                                   const int *const                         constraints,
+                                                   const scalar_t *const SFEM_RESTRICT      b,
+                                                   // Temps
+                                                   scalar_t *const SFEM_RESTRICT r,
+                                                   scalar_t *const SFEM_RESTRICT p,
+                                                   scalar_t *const SFEM_RESTRICT Ap,
+                                                   // Out
+                                                   scalar_t *const x) {
+    const ptrdiff_t size = xc * yc * zc;
+    memset(r, 0, size * sizeof(scalar_t));
+    
+    sshex8_diag_plus_stencil_residual(xc, yc, zc, stencil, element_matrix, diag, constraints, b, x, r);
+
+    scalar_t rtr0 = 0;
+    for (ptrdiff_t i = 0; i < size; i++) {
+        rtr0 += r[i] * r[i];
+    }
+
+    assert(rtr0 == rtr0);
+
+    const scalar_t r_norm0 = sqrt(rtr0);
+
+    scalar_t rtr = rtr0;
+    if (rtr0 == 0) {
+        return SFEM_SUCCESS;
+    }
+
+    assert(rtr == rtr);
+
+    for (ptrdiff_t i = 0; i < size; i++) {
+        p[i] = r[i];
+    }
+
+    int      info       = SFEM_FAILURE;
+    int      iterations = 0;
+    scalar_t r_norm     = 0;
+
+    for (; iterations < max_it; iterations++) {
+        memset(Ap, 0, size * sizeof(scalar_t));
+        sshex8_diag_plus_stencil_apply_op(xc, yc, zc, stencil, element_matrix, diag, p, Ap);
+
+        for (ptrdiff_t i = 0; i < size; i++) {
+            if (constraints[i]) {
+                Ap[i] = p[i];
+            }
+        }
+
+        scalar_t ptAp = 0;
+        for (ptrdiff_t i = 0; i < size; i++) {
+            ptAp += p[i] * Ap[i];
+        }
+
+        if (ptAp == 0) {
+            info = SFEM_FAILURE;
+            break;
+        }
+
+        const scalar_t alpha = rtr / ptAp;
+
+        for (ptrdiff_t i = 0; i < size; i++) {
+            x[i] += alpha * p[i];
+        }
+
+        for (ptrdiff_t i = 0; i < size; i++) {
+            r[i] -= alpha * Ap[i];
+        }
+
+        assert(rtr != 0);
+
+        scalar_t rtr_new = 0;
+        for (ptrdiff_t i = 0; i < size; i++) {
+            rtr_new += r[i] * r[i];
+        }
+        const scalar_t beta = rtr_new / rtr;
+        rtr                 = rtr_new;
+
+        for (ptrdiff_t i = 0; i < size; i++) {
+            p[i] = beta * p[i] + r[i];
+        }
+
+        r_norm = sqrt(rtr_new);
+
+        if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
+            info = SFEM_SUCCESS;
+            break;
+        }
+    }
+
+    if (info != SFEM_SUCCESS) {
+        memset(r, 0, size * sizeof(scalar_t));
+        sshex8_diag_plus_stencil_residual(xc, yc, zc, stencil, element_matrix, diag, constraints, b, x, r);
+
+        rtr = 0;
+        for (ptrdiff_t i = 0; i < size; i++) {
+            rtr += r[i] * r[i];
+        }
+
+        printf("%d rnorm  rel = %g, abs = %g\n", iterations, r_norm / r_norm0, r_norm);
+    }
+
+    return info;
+}
+
 #endif  // STENCIL_CG_H

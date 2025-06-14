@@ -16,6 +16,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
 
     std::shared_ptr<sfem::Operator<real_t>> bjacobi;
+    auto                                    diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
     if (fs->has_semi_structured_mesh()) {
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
@@ -41,33 +42,31 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
             }
         }
 
+        f->hessian_diag(nullptr, diag->data());
+        f->set_value_to_constrained_dofs(1, diag->data());
+
         auto constraints_mask = sfem::create_buffer<mask_t>(fs->n_dofs(), es);
         f->constaints_mask(constraints_mask->data());
-
-        auto           mesh  = fs->mesh_ptr();
-        const int      ns    = elem_num_sides(fs->element_type());
-        element_idx_t *table = 0;
-        create_element_adj_table(mesh->n_elements(), mesh->n_nodes(), mesh->element_type(), mesh->elements()->data(), &table);
-        auto adj_table = sfem::manage_host_buffer(fs->semi_structured_mesh().n_elements() * ns, table);
 
         bjacobi = sfem::make_op<real_t>(
                 fs->n_dofs(),
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
-                    SFEM_TRACE_SCOPE("affine_sshex8_laplacian_substructuring_inner_fff");
-
+                    SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
                     affine_sshex8_laplacian_bjacobi_fff(fs->semi_structured_mesh().level(),
                                                         fs->semi_structured_mesh().n_elements(),
                                                         fs->semi_structured_mesh().elements()->data(),
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
-                                                        adj_table->data(),
+                                                        diag->data(),
                                                         x,
                                                         y);
                 },
                 es);
     }
+
+    // bjacobi = sfem::h_shiftable_jacobi(diag);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -77,13 +76,41 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     double tick = MPI_Wtime();
 
-    auto solver = sfem::create_cg(linear_op, es);
-    solver->set_preconditioner_op(bjacobi);
+    auto solver         = sfem::create_cg(linear_op, es);
+    auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
+    preconditioner->set_max_it(1);
+
+    int max_it = 4000;
+
+#if  0
+    {
+        max_it = 20;
+        auto        output  = f->output();
+        sfem::create_directory(output_dir.c_str());
+        std::string dbg_dir = output_dir + "/dbg";
+        sfem::create_directory(dbg_dir.c_str());
+        output->set_output_dir(dbg_dir.c_str());
+
+        solver->interceptor = [=](real_t *x) {
+            static int iter = 0;
+            output->write_time_step("x", iter++, x);
+            output->log_time(iter);
+        };
+    }
+
+#endif
+
+    // preconditioner->apply(rhs->data(), x->data());
+    solver->set_preconditioner_op(preconditioner);
     solver->verbose = true;
-    solver->set_max_it(4);
+    solver->set_max_it(max_it);
     solver->apply(rhs->data(), x->data());
 
-    // bjacobi->apply(rhs->data(), x->data());
+    // auto solver = sfem::h_stationary(linear_op, bjacobi);
+    // solver->verbose = true;
+    // solver->set_max_it(1000);
+    // solver->apply(rhs->data(), x->data());
+
 
     double tock = MPI_Wtime();
 
@@ -285,7 +312,7 @@ int test_poisson_and_boundary_selector() {
     sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
 
     if (SFEM_BLOCK_SIZE == 1) {
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, right, top}, es);
         f->add_constraint(conds);
     } else {
         sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
