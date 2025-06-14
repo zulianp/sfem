@@ -2,10 +2,12 @@
 #define SFEM_TEST_H
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <exception>
-#include <math.h>
+#include <iostream>
 
+#include "sfem_Context.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_base.h"
 
@@ -50,10 +52,11 @@ static void sfem_print_test_info() {
     printf("=======================\n");
 }
 
-#define SFEM_UNIT_TEST_INIT(argc, argv) \
-    MPI_Init(&argc, &argv);             \
-    sfem_print_test_info();             \
+#define SFEM_UNIT_TEST_INIT(argc, argv)  \
+    sfem::Context context__(argc, argv); \
+    sfem_print_test_info();              \
     int err = 0;
+
 #define SFEM_RUN_TEST(test_)                                                                                    \
     do {                                                                                                        \
         SFEM_TRACE_SCOPE(#test_);                                                                               \
@@ -70,7 +73,6 @@ static void sfem_print_test_info() {
 #define SFEM_UNIT_TEST_FINALIZE()                                                     \
     do {                                                                              \
         if (err) fprintf(stderr, "The number of tests failed in unit is %d!\n", err); \
-        MPI_Finalize();                                                               \
     } while (0)
 #define SFEM_UNIT_TEST_ERR() (err)
 
@@ -84,13 +86,32 @@ static inline int sfem_test_assert(const int expr, const char *expr_string, cons
     return 0;
 }
 
-static inline int sfem_test_assert_approxeq(double      a,
-                                            double      b,
-                                            double      tol,
-                                            const char *file,
-                                            const int   line) {
+static inline int sfem_test_assert_approxeq(double a, double b, double tol, const char *file, const int line) {
     if (fabs(a - b) > tol) {
         fprintf(stderr, "\nAssertion failure: %g != %g (diff %g > %g) \nAt %s:%d\n\n", a, b, fabs(a - b), tol, file, line);
+        assert(0);
+        return SFEM_TEST_FAILURE;
+    }
+
+    return 0;
+}
+
+static inline int sfem_assert_array_approx_eq(const ptrdiff_t i,
+                                              double          a,
+                                              double          b,
+                                              double          tol,
+                                              const char     *file,
+                                              const int       line) {
+    if (fabs(a - b) > tol) {
+        fprintf(stderr,
+                "\nAssertion failure at entry %ld: %g != %g (diff %g > %g) \nAt %s:%d\n\n",
+                i,
+                a,
+                b,
+                fabs(a - b),
+                tol,
+                file,
+                line);
         assert(0);
         return SFEM_TEST_FAILURE;
     }
@@ -103,13 +124,45 @@ static inline int sfem_test_assert_approxeq(double      a,
         return SFEM_TEST_FAILURE;                                                 \
     }
 
-#define SFEM_TEST_APPROXEQ(a, b, tol)                                           \
+#define SFEM_TEST_APPROXEQ(a, b, tol)                                                    \
     if (sfem_test_assert_approxeq(a, b, tol, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
-        return SFEM_TEST_FAILURE;                                               \
+        return SFEM_TEST_FAILURE;                                                        \
     }
+
+#define SFEM_ASSERT_ARRAY_APPROX_EQ(n__, a__, b__, tol__)                                                               \
+    do {                                                                                                                \
+        ptrdiff_t nfails = 0;                                                                                           \
+        for (ptrdiff_t i__ = 0; i__ < (n__); i__++) {                                                                     \
+            if (sfem_assert_array_approx_eq(i__, (a__)[i__], (b__)[i__], tol__, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
+                nfails++;                                                                                                \
+            }                                                                                                           \
+        }                                                                                                               \
+        if (nfails) return SFEM_TEST_FAILURE;                                                                           \
+    } while (0)
 
 #ifdef __cplusplus
 }
 #endif
+
+template <typename T>
+int sfem_test_assert_equal(T a, T b, const char *file, const int line) {
+    if (a != b) {
+        std::cerr << "\nAssertion failure: " << a << "!= " << b << "  \nAt" << file << ":" << line << "\n";
+        assert(0);
+        return SFEM_TEST_FAILURE;
+    }
+
+    return 0;
+}
+
+#define SFEM_TEST_EQ(a, b)                                                       \
+    if (sfem_test_assert_equal(a, b, __FILE__, __LINE__) == SFEM_TEST_FAILURE) { \
+        return SFEM_TEST_FAILURE;                                                \
+    }
+
+#define SFEM_ASSERT_ARRAY_EQ(n__, a__, b__)     \
+    for (ptrdiff_t i__ = 0; i__ < n__; i__++) { \
+        SFEM_TEST_EQ(a__[i__], b__[i__]);       \
+    }
 
 #endif  // SFEM_TEST

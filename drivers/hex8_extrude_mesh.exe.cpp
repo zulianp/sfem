@@ -12,10 +12,10 @@ static SFEM_INLINE void normalize(real_t* const vec3) {
 static SFEM_INLINE void normal(const idx_t                  i0,
                                const idx_t                  i1,
                                const idx_t                  i2,
-                               geom_t** const SFEM_RESTRICT xyz,
+                               geom_t** const SFEM_RESTRICT points,
                                real_t* const SFEM_RESTRICT  n) {
-    real_t u[3] = {xyz[0][i1] - xyz[0][i0], xyz[1][i1] - xyz[1][i0], xyz[2][i1] - xyz[2][i0]};
-    real_t v[3] = {xyz[0][i2] - xyz[0][i0], xyz[1][i2] - xyz[1][i0], xyz[2][i2] - xyz[2][i0]};
+    real_t u[3] = {points[0][i1] - points[0][i0], points[1][i1] - points[1][i0], points[2][i1] - points[2][i0]};
+    real_t v[3] = {points[0][i2] - points[0][i0], points[1][i2] - points[1][i0], points[2][i2] - points[2][i0]};
 
     normalize(u);
     normalize(v);
@@ -30,11 +30,11 @@ static SFEM_INLINE void normal(const idx_t                  i0,
 void extrude(const ptrdiff_t              nsides,
              const ptrdiff_t              nnodes,
              idx_t** const SFEM_RESTRICT  sides,
-             geom_t** const SFEM_RESTRICT xyz,
+             geom_t** const SFEM_RESTRICT points,
              const ptrdiff_t              nlayers,
              const geom_t                 height,
              idx_t** const SFEM_RESTRICT  extruded_elements,
-             geom_t** const SFEM_RESTRICT extruded_xyz) {
+             geom_t** const SFEM_RESTRICT extruded_points) {
     double tick = MPI_Wtime();
 
     geom_t** pseudo_normals = (geom_t**)malloc(3 * sizeof(geom_t*));
@@ -48,7 +48,7 @@ void extrude(const ptrdiff_t              nsides,
         const idx_t i2 = sides[2][i];
 
         real_t n[3];
-        normal(i0, i1, i2, xyz, n);
+        normal(i0, i1, i2, points, n);
 
         for (int d = 0; d < 3; d++) {
             pseudo_normals[d][i0] += n[d];
@@ -89,13 +89,30 @@ void extrude(const ptrdiff_t              nsides,
     for (ptrdiff_t l = 0; l <= nlayers; l++) {
         for (ptrdiff_t i = 0; i < nnodes; ++i) {
             for (int dd = 0; dd < 3; dd++) {
-                extruded_xyz[dd][l * nnodes + i] = xyz[dd][i] + (l * dh * pseudo_normals[dd][i]);
+                extruded_points[dd][l * nnodes + i] = points[dd][i] + (l * dh * pseudo_normals[dd][i]);
             }
         }
     }
 
     double tock = MPI_Wtime();
     printf("extrude.c: extrude\t%g seconds\n", tock - tick);
+}
+
+void        translate3(const ptrdiff_t             nnodes,
+                       const geom_t                tx,
+                       const geom_t                ty,
+                       const geom_t                tz,
+                       geom_t* const SFEM_RESTRICT x,
+                       geom_t* const SFEM_RESTRICT y,
+                       geom_t* const SFEM_RESTRICT z) {
+    if(tx == 0 && ty == 0 && tz == 0) return;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nnodes; i++) {
+        x[i] += tx;
+        y[i] += ty;
+        z[i] += tz;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -134,8 +151,24 @@ int main(int argc, char* argv[]) {
             hex8_elements->data(),
             hex8_points->data());
 
+    geom_t SFEM_TRANSLATE_X = 0;
+    geom_t SFEM_TRANSLATE_Y = 0;
+    geom_t SFEM_TRANSLATE_Z = 0;
+
+    SFEM_READ_ENV(SFEM_TRANSLATE_X, atof);
+    SFEM_READ_ENV(SFEM_TRANSLATE_Y, atof);
+    SFEM_READ_ENV(SFEM_TRANSLATE_Z, atof);
+
+    translate3(hex8_points->extent(1),
+               SFEM_TRANSLATE_X,
+               SFEM_TRANSLATE_Y,
+               SFEM_TRANSLATE_Z,
+               hex8_points->data()[0],
+               hex8_points->data()[1],
+               hex8_points->data()[2]);
+
     sfem::create_directory(output_folder);
-    
+
     std::string path_output_format = output_folder;
     path_output_format += "/i%d.raw";
     hex8_elements->to_files(path_output_format.c_str());

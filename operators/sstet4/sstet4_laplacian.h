@@ -13,11 +13,11 @@ extern "C" {
 int sstet4_nxe(int level);
 int sstet4_txe(int level);
 
-int sstet4_laplacian_apply(const int level,
-                                 const ptrdiff_t nelements,
-                                 const jacobian_t *const SFEM_RESTRICT fff,
-                                 const real_t *const SFEM_RESTRICT u,
-                                 real_t *const SFEM_RESTRICT values);
+int sstet4_laplacian_apply(const int                             level,
+                           const ptrdiff_t                       nelements,
+                           const jacobian_t *const SFEM_RESTRICT fff,
+                           const real_t *const SFEM_RESTRICT     u,
+                           real_t *const SFEM_RESTRICT           values);
 
 #ifdef __cplusplus
 }

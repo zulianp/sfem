@@ -8,8 +8,8 @@ extern "C" {
 #endif
 
 int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
-                                  const ptrdiff_t                    stride,  // Stride for elements and coords
-                                  const idx_t *const SFEM_RESTRICT   elements,
+                                  idx_t **const SFEM_RESTRICT        elements,
+                                  const ptrdiff_t                    coords_stride,
                                   const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                                   const real_t                       value,
                                   const int                          block_size,
@@ -19,8 +19,8 @@ int cu_quadshell4_integrate_value(const ptrdiff_t                    nelements,
                                   void                              *stream);
 
 int cu_quadshell4_integrate_values(const ptrdiff_t                    nelements,
-                                   const ptrdiff_t                    stride,  // Stride for elements and coords
-                                   const idx_t *const SFEM_RESTRICT   elements,
+                                   idx_t **const SFEM_RESTRICT        elements,
+                                   const ptrdiff_t                    coords_stride,
                                    const geom_t **const SFEM_RESTRICT coords,  // coords are stored per element
                                    const enum RealType                real_type,
                                    void *const SFEM_RESTRICT          values,

@@ -455,6 +455,7 @@ if __name__ == "__main__":
     header += f"dx: {(pmax[0] - pmin[0])/(dims[0] - 1)}\n"
     header += f"dy: {(pmax[1] - pmin[1])/(dims[1] - 1)}\n"
     header += f"dz: {(pmax[2] - pmin[2])/(dims[2] - 1)}\n"
+    header += f'rpath: 0\n'
     header += f"path: {os.path.abspath(output_path)}\n"
 
     fname, fextension = os.path.splitext(output_path)

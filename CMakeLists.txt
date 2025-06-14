@@ -253,7 +253,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -325,13 +325,19 @@ if(SFEM_ENABLE_TESTING)
         amg/tests
     )
 
+    if(SFEM_ENABLE_CUDA)
+        list(APPEND SFEM_UNIT_TESTS
+            frontend/tests/cuda
+        )
+
+    endif()
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
     
-    file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
-    file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+        file(GLOB C_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.c")
+        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
 
-    list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
-    list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${C_UNIT_TESTS}")
+        list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
     endforeach(UNIT_TEST)
 
@@ -342,6 +348,7 @@ if(SFEM_ENABLE_TESTING)
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
+        list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
 endif()
 

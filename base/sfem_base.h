@@ -47,6 +47,8 @@
         sfem_abort();                                               \
     } while (0)
 
+#define SFEM_IMPLEMENT_ME() SFEM_ERROR("Implement me!\n")
+
 #ifdef NDEBUG
 #define SFEM_INLINE inline
 #else
