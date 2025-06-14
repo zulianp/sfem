@@ -872,11 +872,11 @@ int affine_sshex8_laplacian_bjacobi_fff_old(const int                           
                                             const ptrdiff_t                       nelements,
                                             idx_t **const SFEM_RESTRICT           elements,
                                             const jacobian_t *const SFEM_RESTRICT g_fff,
-                                        const uint16_t *const                 count,
-                                        const mask_t *const                   mask,
-                                        const element_idx_t *const            adjaciency_table,
-                                        const real_t *const SFEM_RESTRICT     rhs,
-                                        real_t *const SFEM_RESTRICT           u) {
+                                            const uint16_t *const                 count,
+                                            const mask_t *const                   mask,
+                                            const element_idx_t *const            adjaciency_table,
+                                            const real_t *const SFEM_RESTRICT     rhs,
+                                            real_t *const SFEM_RESTRICT           u) {
     const int nxe      = sshex8_nxe(level);
     const int txe      = sshex8_txe(level);
     const int nn       = level + 1;
@@ -934,7 +934,7 @@ int affine_sshex8_laplacian_bjacobi_fff_old(const int                           
 
             memset(r, 0, nxe * sizeof(scalar_t));
 
-            const element_idx_t * const neighs = &adjaciency_table[e * 6];
+            const element_idx_t *const neighs = &adjaciency_table[e * 6];
 
             sshex8_stencil(nn, nn, nn, laplacian_stencil, eu, r);
             sshex8_surface_stencil(nn, nn, nn, 1, nn, nn * nn, laplacian_matrix, eu, r);
@@ -1014,6 +1014,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
     const int lystride = nn;
     const int lzstride = lystride * lystride;
 
+    // const real_t over_relaxation = 1./(level+ 1);
     static const real_t over_relaxation = 1;
 
     real_t *correction = calloc(nelements * nxe, sizeof(real_t));
@@ -1061,6 +1062,8 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                 }
 
                 for (int d = 0; d < nxe; d++) {
+                    // Overrelaxation here
+                    // erhs[d] = over_relaxation * rhs[ev[d]];
                     erhs[d] = rhs[ev[d]];
                     assert(erhs[d] == erhs[d]);
                 }
@@ -1082,8 +1085,8 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
             for (int v = 0; v < nxe; v++) {
                 if (emask[v]) {
-                    erhs[v] = 0;
-                    eu[v]   = 0;
+                    // erhs[v] = 0;
+                    eu[v] = erhs[v];
                 }
             }
 
