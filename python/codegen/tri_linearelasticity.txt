@@ -1,0 +1,170 @@
+Material law
+Integrate
+--------------------------
+hessian
+--------------------------
+// optimizations=basic
+
+// mundane ops: 107 divs: 1 sqrts: 0 
+// total ops: 115
+
+const scalar_t x0 = adjugate[1]*mu;
+const scalar_t x1 = adjugate[3]*x0;
+const scalar_t x2 = 2*x1;
+const scalar_t x3 = adjugate[0]*lambda;
+const scalar_t x4 = adjugate[2]*x3;
+const scalar_t x5 = adjugate[0]*adjugate[2]*mu;
+const scalar_t x6 = POW2(adjugate[0]);
+const scalar_t x7 = POW2(adjugate[1]);
+const scalar_t x8 = mu*x7;
+const scalar_t x9 = mu*x6;
+const scalar_t x10 = lambda*x6 + x8 + 2*x9;
+const scalar_t x11 = POW2(adjugate[2]);
+const scalar_t x12 = POW2(adjugate[3]);
+const scalar_t x13 = mu*x12;
+const scalar_t x14 = mu*x11;
+const scalar_t x15 = lambda*x11 + x13 + 2*x14;
+const scalar_t x16 = (1.0/2.0)/jacobian_determinant;
+const scalar_t x17 = 2*x5;
+const scalar_t x18 = x1 + x17 + x4;
+const scalar_t x19 = -x16*(x10 + x18);
+const scalar_t x20 = -x16*(x15 + x18);
+const scalar_t x21 = adjugate[3]*mu;
+const scalar_t x22 = adjugate[2]*lambda;
+const scalar_t x23 = adjugate[0]*x21 + adjugate[1]*x22;
+const scalar_t x24 = adjugate[0]*x0 + adjugate[1]*x3;
+const scalar_t x25 = x23 + x24;
+const scalar_t x26 = adjugate[2]*x0 + adjugate[3]*x3;
+const scalar_t x27 = adjugate[2]*x21 + adjugate[3]*x22;
+const scalar_t x28 = x26 + x27;
+const scalar_t x29 = x16*(x25 + x28);
+const scalar_t x30 = -x16*x25;
+const scalar_t x31 = -x16*x28;
+const scalar_t x32 = x16*x18;
+const scalar_t x33 = -x16*(x24 + x26);
+const scalar_t x34 = x16*(lambda + mu);
+const scalar_t x35 = adjugate[0]*adjugate[1]*x34;
+const scalar_t x36 = x16*x26;
+const scalar_t x37 = -x16*(x23 + x27);
+const scalar_t x38 = x16*x23;
+const scalar_t x39 = adjugate[2]*adjugate[3]*x34;
+const scalar_t x40 = adjugate[1]*adjugate[3]*lambda;
+const scalar_t x41 = lambda*x7 + 2*x8 + x9;
+const scalar_t x42 = lambda*x12 + 2*x13 + x14;
+const scalar_t x43 = x2 + x40 + x5;
+const scalar_t x44 = -x16*(x41 + x43);
+const scalar_t x45 = -x16*(x42 + x43);
+const scalar_t x46 = x16*x43;
+element_matrix[0*stride] = x16*(x10 + x15 + x2 + 2*x4 + 4*x5);
+element_matrix[1*stride] = x19;
+element_matrix[2*stride] = x20;
+element_matrix[3*stride] = x29;
+element_matrix[4*stride] = x30;
+element_matrix[5*stride] = x31;
+element_matrix[6*stride] = x19;
+element_matrix[7*stride] = x10*x16;
+element_matrix[8*stride] = x32;
+element_matrix[9*stride] = x33;
+element_matrix[10*stride] = x35;
+element_matrix[11*stride] = x36;
+element_matrix[12*stride] = x20;
+element_matrix[13*stride] = x32;
+element_matrix[14*stride] = x15*x16;
+element_matrix[15*stride] = x37;
+element_matrix[16*stride] = x38;
+element_matrix[17*stride] = x39;
+element_matrix[18*stride] = x29;
+element_matrix[19*stride] = x33;
+element_matrix[20*stride] = x37;
+element_matrix[21*stride] = x16*(4*x1 + x17 + 2*x40 + x41 + x42);
+element_matrix[22*stride] = x44;
+element_matrix[23*stride] = x45;
+element_matrix[24*stride] = x30;
+element_matrix[25*stride] = x35;
+element_matrix[26*stride] = x38;
+element_matrix[27*stride] = x44;
+element_matrix[28*stride] = x16*x41;
+element_matrix[29*stride] = x46;
+element_matrix[30*stride] = x31;
+element_matrix[31*stride] = x36;
+element_matrix[32*stride] = x39;
+element_matrix[33*stride] = x45;
+element_matrix[34*stride] = x46;
+element_matrix[35*stride] = x16*x42;
+--------------------------
+apply
+--------------------------
+// optimizations=basic
+
+// mundane ops: 165 divs: 1 sqrts: 0 
+// total ops: 173
+
+const scalar_t x0 = adjugate[0]*adjugate[3];
+const scalar_t x1 = adjugate[1]*adjugate[2];
+const scalar_t x2 = lambda*x1 + mu*x0;
+const scalar_t x3 = adjugate[0]*adjugate[1];
+const scalar_t x4 = lambda*x3 + mu*x3;
+const scalar_t x5 = x2 + x4;
+const scalar_t x6 = lambda*x0 + mu*x1;
+const scalar_t x7 = adjugate[2]*adjugate[3];
+const scalar_t x8 = lambda*x7 + mu*x7;
+const scalar_t x9 = x6 + x8;
+const scalar_t x10 = POW2(adjugate[0]);
+const scalar_t x11 = POW2(adjugate[1]);
+const scalar_t x12 = mu*x11;
+const scalar_t x13 = mu*x10;
+const scalar_t x14 = lambda*x10 + x12 + 2*x13;
+const scalar_t x15 = adjugate[0]*adjugate[2];
+const scalar_t x16 = lambda*x15;
+const scalar_t x17 = adjugate[1]*adjugate[3];
+const scalar_t x18 = mu*x17;
+const scalar_t x19 = mu*x15;
+const scalar_t x20 = 2*x19;
+const scalar_t x21 = x16 + x18 + x20;
+const scalar_t x22 = x14 + x21;
+const scalar_t x23 = POW2(adjugate[2]);
+const scalar_t x24 = POW2(adjugate[3]);
+const scalar_t x25 = mu*x24;
+const scalar_t x26 = mu*x23;
+const scalar_t x27 = lambda*x23 + x25 + 2*x26;
+const scalar_t x28 = x21 + x27;
+const scalar_t x29 = x5 + x9;
+const scalar_t x30 = 2*x18;
+const scalar_t x31 = (1.0/2.0)/jacobian_determinant;
+const scalar_t x32 = lambda + mu;
+const scalar_t x33 = x3*x32;
+const scalar_t x34 = x4 + x6;
+const scalar_t x35 = x32*x7;
+const scalar_t x36 = x2 + x8;
+const scalar_t x37 = lambda*x11 + 2*x12 + x13;
+const scalar_t x38 = lambda*x17;
+const scalar_t x39 = x19 + x30 + x38;
+const scalar_t x40 = x37 + x39;
+const scalar_t x41 = lambda*x24 + 2*x25 + x26;
+const scalar_t x42 = x39 + x41;
+element_vector[0*stride] = x31*(increment[0]*(x14 + 2*x16 + 4*x19 + x27 + x30) - increment[1]*x22
+- increment[2]*x28 + increment[3]*x29 - increment[4]*x5 - increment[5]*x9);
+element_vector[1*stride] = x31*(-increment[0]*x22 + increment[1]*x14 + increment[2]*x21 - 
+increment[3]*x34 + increment[4]*x33 + increment[5]*x6);
+element_vector[2*stride] = x31*(-increment[0]*x28 + increment[1]*x21 + increment[2]*x27 - 
+increment[3]*x36 + increment[4]*x2 + increment[5]*x35);
+element_vector[3*stride] = x31*(increment[0]*x29 - increment[1]*x34 - increment[2]*x36 + 
+increment[3]*(4*x18 + x20 + x37 + 2*x38 + x41) - increment[4]*x40 - increment[5]*x42);
+element_vector[4*stride] = x31*(-increment[0]*x5 + increment[1]*x33 + increment[2]*x2 - 
+increment[3]*x40 + increment[4]*x37 + increment[5]*x39);
+element_vector[5*stride] = x31*(-increment[0]*x9 + increment[1]*x6 + increment[2]*x35 - 
+increment[3]*x42 + increment[4]*x39 + increment[5]*x41);
+--------------------------
+cauchy_stress
+--------------------------
+// optimizations=basic
+
+// mundane ops: 9 divs: 0 sqrts: 0 
+// total ops: 9
+
+const scalar_t x0 = 2*mu;
+const scalar_t x1 = lambda*(disp_grad[0] + disp_grad[3]);
+cauchy_stress[0] = disp_grad[0]*x0 + x1;
+cauchy_stress[1] = mu*(disp_grad[1] + disp_grad[2]);
+cauchy_stress[2] = disp_grad[3]*x0 + x1;
+Overall: 0.6450822920014616 seconds
