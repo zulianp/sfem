@@ -2,6 +2,10 @@
 
 #include "sfem_base.h"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
+
 namespace sfem {
 
     class Context::Impl {

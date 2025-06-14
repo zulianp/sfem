@@ -282,7 +282,7 @@ int test_newmark() {
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 0.2;
-    real_t T           = 3;
+    real_t T           = 4;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
 #endif
-    // SFEM_RUN_TEST(test_explicit_euler);
+    SFEM_RUN_TEST(test_explicit_euler);
     SFEM_RUN_TEST(test_newmark);
 
     SFEM_UNIT_TEST_FINALIZE();

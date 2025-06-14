@@ -37,6 +37,8 @@
 #include "sfem_cuda_blas.hpp"
 #endif
 
+static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
+
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
     public:
@@ -364,12 +366,12 @@ namespace sfem {
                                                                  const std::shared_ptr<Sideset>       &sideset,
                                                                  const enum ExecutionSpace             es) {
         auto cc = std::make_unique<ContactConditions>(space);
-        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es));
+        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es_to_be_ported));
 
         if (space->has_semi_structured_mesh()) {
-            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es);
+            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es_to_be_ported);
         } else {
-            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es);
+            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es_to_be_ported);
         }
 
         cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
@@ -533,6 +535,13 @@ namespace sfem {
 
         auto cs = impl_->contact_surface;
 
+        // FIXME
+#ifdef SFEM_ENABLE_CUDA
+        if (MEMORY_SPACE_DEVICE == impl_->normals->mem_space()) {
+            impl_->normals = sfem::to_host(impl_->normals);
+        }
+#endif
+
         int err = 0;
         for (auto &obs : impl_->obstacles) {
             // FIXME always sample gap and normals together
@@ -564,7 +573,7 @@ namespace sfem {
                 this->n_constrained_dofs(),
                 space->n_dofs(),
                 [=](const real_t *const h, real_t *const out) { normal_project(h, out); },
-                EXECUTION_SPACE_HOST);
+                impl_->execution_space);
     }
 
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op_transpose() {
@@ -573,7 +582,7 @@ namespace sfem {
                 space->n_dofs(),
                 this->n_constrained_dofs(),
                 [=](const real_t *const f, real_t *const out) { distribute_contact_forces(f, out); },
-                EXECUTION_SPACE_HOST);
+                impl_->execution_space);
     }
 
     int ContactConditions::signed_distance(real_t *const g) {
@@ -600,6 +609,14 @@ namespace sfem {
         }
 
         return err;
+    }
+
+    int ContactConditions::update_signed_distance(const real_t *const u, real_t *const g) {
+        SFEM_TRACE_SCOPE("ContactConditions::update_signed_distance");
+        signed_distance(g);
+
+        // Prepare for $n^T u^{k+1} \leq g + n^T u^k$
+        return normal_project(u, g);
     }
 
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {

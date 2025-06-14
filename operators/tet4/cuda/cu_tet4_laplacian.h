@@ -9,32 +9,32 @@
 extern "C" {
 #endif
 
-int cu_tet4_laplacian_apply(const ptrdiff_t nelements,
-                            const ptrdiff_t stride,  // Stride for elements and fff
-                            const idx_t *const SFEM_RESTRICT elements,
+int cu_tet4_laplacian_apply(const ptrdiff_t                 nelements,
+                            idx_t **const SFEM_RESTRICT     elements,
+                            const ptrdiff_t                 fff_stride,
                             const void *const SFEM_RESTRICT fff,
-                            const enum RealType real_type_xy,
+                            const enum RealType             real_type_xy,
                             const void *const SFEM_RESTRICT x,
-                            void *const SFEM_RESTRICT y,
-                            void *stream);
+                            void *const SFEM_RESTRICT       y,
+                            void                           *stream);
 
-int cu_tet4_laplacian_diag(const ptrdiff_t nelements,
-                           const ptrdiff_t stride,  // Stride for elements and fff
-                           const idx_t *const SFEM_RESTRICT elements,
+int cu_tet4_laplacian_diag(const ptrdiff_t                 nelements,
+                           idx_t **const SFEM_RESTRICT     elements,
+                           const ptrdiff_t                 fff_stride,
                            const void *const SFEM_RESTRICT fff,
-                           const enum RealType real_type_diag,
-                           void *const SFEM_RESTRICT diag,
-                           void *stream);
+                           const enum RealType             real_type_diag,
+                           void *const SFEM_RESTRICT       diag,
+                           void                           *stream);
 
-int cu_tet4_laplacian_crs(const ptrdiff_t nelements,
-                          const ptrdiff_t stride,  // Stride for elements and fff
-                          const idx_t *const SFEM_RESTRICT elements,
-                          const void *const SFEM_RESTRICT fff,
+int cu_tet4_laplacian_crs(const ptrdiff_t                    nelements,
+                          idx_t **const SFEM_RESTRICT        elements,
+                          const ptrdiff_t                    fff_stride,
+                          const void *const SFEM_RESTRICT    fff,
                           const count_t *const SFEM_RESTRICT rowptr,
-                          const idx_t *const SFEM_RESTRICT colidx,
-                          const enum RealType real_type,
-                          void *const SFEM_RESTRICT values,
-                          void *stream);
+                          const idx_t *const SFEM_RESTRICT   colidx,
+                          const enum RealType                real_type,
+                          void *const SFEM_RESTRICT          values,
+                          void                              *stream);
 
 #ifdef __cplusplus
 }

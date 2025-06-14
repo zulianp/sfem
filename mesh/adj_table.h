@@ -71,6 +71,13 @@ int extract_nodeset_from_sideset(const int                                elemen
                                  ptrdiff_t *n_nodes_out,
                                  idx_t **SFEM_RESTRICT                    nodes_out);
 
+int extract_sideset_from_adj_table(const enum ElemType                      element_type,
+                                   const ptrdiff_t                          n_elements,
+                                   const element_idx_t *const SFEM_RESTRICT table,
+                                   ptrdiff_t *SFEM_RESTRICT                 n_surf_elements,
+                                   element_idx_t **SFEM_RESTRICT            parent_element,
+                                   int16_t **SFEM_RESTRICT                  side_idx);
+
 #ifdef __cplusplus
 }
 #endif
