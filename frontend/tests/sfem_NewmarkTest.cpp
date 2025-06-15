@@ -4,9 +4,6 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
-#include "hex8_jacobian.h"
-#include "kelvin_voigt_newmark.h"
 
 std::shared_ptr<sfem::Function> create_elasticity_function() {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -77,85 +74,6 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     f->add_operator(linear_elasticity);
     return f;
 }
-
-
-
-
-
-std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
-
-    const char *SFEM_EXECUTION_SPACE{nullptr};
-    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
-
-    if (SFEM_EXECUTION_SPACE) {
-        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    }
-
-    int SFEM_BASE_RESOLUTION = 4;
-    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
-
-    int SFEM_ELEMENT_REFINE_LEVEL = 0;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    auto m = sfem::Mesh::create_hex8_cube(comm,
-                                          // Grid
-                                          SFEM_BASE_RESOLUTION * 2,
-                                          SFEM_BASE_RESOLUTION,
-                                          SFEM_BASE_RESOLUTION,
-                                          // Geometry
-                                          0.,
-                                          0.,
-                                          0.,
-                                          2.,
-                                          1.,
-                                          1.);
-
-    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-
-    // if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-    //     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    //     // fs->semi_structured_mesh().apply_hierarchical_renumbering();
-    // }
-
-    auto f = sfem::Function::create(fs);
-
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
-
-    auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 2 - 1e-5; });
-
-    sfem::DirichletConditions::Condition right0{.sideset = right_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 2};
-
-#if 1
-    auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
-    f->add_constraint(d_conds);
-
-    sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
-    auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
-    f->add_operator(n_conds);
-#else  // Test with Dirichlet only (in case diable test_newmark)
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0.2, .component = 0};
-    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0.2, .component = 1};
-    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0.2, .component = 2};
-    auto d_conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2, right0, right1, right2}, es);
-    f->add_constraint(d_conds);
-#endif
-
-    auto kelvin_voigt_newmark = sfem::create_op(fs, "KelvinVoigtNewmark", es);
-    kelvin_voigt_newmark->initialize();
-    f->add_operator(kelvin_voigt_newmark);
-    return f;
-}
-
-
-
-
-
 
 std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
     auto fs = f->space();
@@ -259,8 +177,6 @@ int test_explicit_euler() {
     return SFEM_TEST_SUCCESS;
 }
 
-
-
 int test_newmark() {
     auto f           = create_elasticity_function();
     auto mass_vector = create_mass_vector(f);
@@ -288,7 +204,7 @@ int test_newmark() {
     real_t t           = 0;
     int    nliter      = 1;
 
-    bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
+    bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
@@ -370,21 +286,12 @@ int test_newmark() {
     return SFEM_TEST_SUCCESS;
 }
 
-
-
-
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
-#ifdef SFEM_ENABLE_CUDA
-    sfem::register_device_ops();
-#endif
     SFEM_RUN_TEST(test_explicit_euler);
     SFEM_RUN_TEST(test_newmark);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-
-
-
