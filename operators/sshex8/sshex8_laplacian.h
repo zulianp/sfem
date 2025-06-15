@@ -60,16 +60,6 @@ int affine_sshex8_laplacian_substructuring_inner_fff(const int                  
                                                      const real_t *const SFEM_RESTRICT     rhs,
                                                      real_t *const SFEM_RESTRICT           u);
 
-int affine_sshex8_laplacian_bjacobi_fff_old(const int                             level,
-                                        const ptrdiff_t                       nelements,
-                                        idx_t **const SFEM_RESTRICT           elements,
-                                        const jacobian_t *const SFEM_RESTRICT g_fff,
-                                        const uint16_t *const                 count,
-                                        const mask_t *const                   mask,
-                                        const element_idx_t * const adjaciency_table,
-                                        const real_t *const SFEM_RESTRICT     rhs,
-                                        real_t *const SFEM_RESTRICT           u);
-
 int affine_sshex8_laplacian_bjacobi_fff(const int                             level,
                                         const ptrdiff_t                       nelements,
                                         idx_t **const SFEM_RESTRICT           elements,
