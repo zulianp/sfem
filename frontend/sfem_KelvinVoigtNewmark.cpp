@@ -6,6 +6,7 @@
 // C++ includes
 #include "sfem_Tracer.hpp"
 
+#include "hex8_jacobian.h"
 // HAOYU
 
 namespace sfem {
@@ -14,6 +15,8 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         enum ElemType                  element_type { INVALID };
+
+        real_t k{2.0}, K{5/3}, eta{1}, dt{0.2}, gamma{0.5}, beta{0.25};
 
         long   calls{0};
         double total_time{0};
@@ -38,14 +41,26 @@ namespace sfem {
 
             auto ret = std::make_unique<KelvinVoigtNewmark>(space);
 
-            // real_t SFEM_SHEAR_MODULUS        = 1;
-            // real_t SFEM_FIRST_LAME_PARAMETER = 1;
+            real_t SFEM_YOUNG_MODULUS        = 2.0;
+            real_t SFEM_BULK_MODULUS        = 5/3;
+            real_t SFEM_DAMPING_RATIO        = 1;
+            real_t SFEM_DT                = 0.2;
+            real_t SFEM_GAMMA            = 0.5;
+            real_t SFEM_BETA            = 0.25;
 
-            // SFEM_READ_ENV(SFEM_SHEAR_MODULUS, atof);
-            // SFEM_READ_ENV(SFEM_FIRST_LAME_PARAMETER, atof);
+            SFEM_READ_ENV(SFEM_YOUNG_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
+            SFEM_READ_ENV(SFEM_DT, atof);
+            SFEM_READ_ENV(SFEM_GAMMA, atof);
+            SFEM_READ_ENV(SFEM_BETA, atof);
 
-            // ret->mu           = SFEM_SHEAR_MODULUS;
-            // ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
+            ret->k           = SFEM_YOUNG_MODULUS;
+            ret->K           = SFEM_BULK_MODULUS;
+            ret->eta         = SFEM_DAMPING_RATIO;
+            ret->dt          = SFEM_DT;
+            ret->gamma       = SFEM_GAMMA;
+            ret->beta        = SFEM_BETA;
 
             ret->element_type = (enum ElemType)space->element_type();
 
@@ -57,8 +72,12 @@ namespace sfem {
 
             auto ret          = std::make_shared<KelvinVoigtNewmark>(space);
             ret->element_type = macro_type_variant(element_type);
-            // ret->mu           = mu;
-            // ret->lambda       = lambda;
+            ret->k           = k;
+            ret->K           = K;
+            ret->eta         = eta;   
+            ret->dt          = dt;
+            ret->gamma       = gamma;
+            ret->beta        = beta;
             return ret;
         }
 
@@ -67,8 +86,12 @@ namespace sfem {
 
             auto ret          = std::make_shared<KelvinVoigtNewmark>(space);
             ret->element_type = macro_base_elem(element_type);
-            // ret->mu           = mu;
-            // ret->lambda       = lambda;
+            ret->k           = k;
+            ret->K           = K;
+            ret->eta         = eta;
+            ret->dt          = dt;
+            ret->gamma       = gamma;
+            ret->beta        = beta;
             return ret;
         }
 
@@ -76,18 +99,18 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize() override {
-            // auto mesh = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
-            // if (element_type == HEX8) {
-            //     jacobians = std::make_shared<Jacobians>(mesh->n_elements(),
-            //                                             mesh->spatial_dimension() * elem_manifold_dim(element_type));
+            if (element_type == HEX8) {
+                jacobians = std::make_shared<Jacobians>(mesh->n_elements(),
+                                                        mesh->spatial_dimension() * elem_manifold_dim(element_type));
 
-            //     hex8_adjugate_and_det_fill(mesh->n_elements(),
-            //                                mesh->elements()->data(),
-            //                                mesh->points()->data(),
-            //                                jacobians->adjugate->data(),
-            //                                jacobians->determinant->data());
-            // }
+                hex8_adjugate_and_det_fill(mesh->n_elements(),
+                                           mesh->elements()->data(),
+                                           mesh->points()->data(),
+                                           jacobians->adjugate->data(),
+                                           jacobians->determinant->data());
+            }
 
             return SFEM_SUCCESS;
         }
@@ -109,6 +132,7 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_crs");
             SFEM_ERROR("Called unimplemented method!\n");
             // TODO
             return SFEM_FAILURE;
@@ -145,42 +169,75 @@ namespace sfem {
                              const ptrdiff_t      block_stride,
                              real_t **const       diag_values,
                              real_t **const       off_diag_values) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_bcrs_sym");
             SFEM_ERROR("Called unimplemented method!\n");
             // TODO
             return SFEM_FAILURE;
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_block_diag_sym");
             SFEM_ERROR("Called unimplemented method!\n");
             // TODO
             return SFEM_FAILURE;
         }
 
         int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_diag");
             SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
 
+
         int gradient(const real_t *const x, real_t *const out) override {
             SFEM_TRACE_SCOPE("KelvinVoigtNewmark::gradient");
             // TODO
-            return SFEM_FAILURE;
-        }
-
-        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
-            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::apply");
+            auto mesh = space->mesh_ptr();
+            const ptrdiff_t ndofs = mesh->n_nodes() * 3;
+            const real_t *u = x;
+            const real_t *v = x + ndofs;
 
             double tick = MPI_Wtime();
 
+            if (jacobians) {
+                SFEM_TRACE_SCOPE("kelvin_voigt_newmark_gradient_aos");
+                kelvin_voigt_newmark_gradient_aos(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), 
+                                jacobians->adjugate->data(), jacobians->determinant->data(), this->k, this->K, this->eta,
+                             u, v, out);
+            } else {
+                SFEM_ERROR("Jacobians not initialized for gradient!\n");
+                return SFEM_FAILURE;
+            }
+        
+            double tock = MPI_Wtime();
+            total_time += (tock - tick);
+            calls++;
+
+            return SFEM_SUCCESS;
+        }
+
+
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::apply");
             auto mesh = space->mesh_ptr();
-            kelvin_voigt_newmark_apply_aos(space->element_type(),
+            double tick = MPI_Wtime();
+
+            if (jacobians) {
+                SFEM_TRACE_SCOPE("kelvin_voigt_newmark_apply_adjugate_soa");
+                kelvin_voigt_newmark_apply_adjugate_aos(mesh->element_type(),
                                            mesh->n_elements(),
                                            mesh->n_nodes(),
-                                           // TODO pass material parameters
                                            mesh->elements()->data(),
-                                           mesh->points()->data(),
+                                           jacobians->adjugate->data(), jacobians->determinant->data(),
+                                           this->dt, this->gamma, this->beta,
+                                           this->k, this->K, this->eta,
                                            h,
                                            out);
+            } else {
+                SFEM_ERROR("Jacobians not initialized for apply!\n");
+                return SFEM_FAILURE;
+            }
 
             double tock = MPI_Wtime();
             total_time += (tock - tick);
@@ -190,6 +247,7 @@ namespace sfem {
         }
 
         int value(const real_t *x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("KelvinVoigtNewmark::value");
             SFEM_ERROR("Called unimplemented method!\n");
             return SFEM_FAILURE;
         }
@@ -200,5 +258,6 @@ namespace sfem {
     std::unique_ptr<Op> create_kelvin_voigt_newmark(const std::shared_ptr<FunctionSpace> &space) {
         return KelvinVoigtNewmark::create(space);
     }
+
 
 }  // namespace sfem
