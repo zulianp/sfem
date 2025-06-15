@@ -86,11 +86,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     preconditioner->set_max_it(1);
     solver->set_preconditioner_op(preconditioner);
 
-    // auto solver = sfem::h_stationary(linear_op, bjacobi);
-
     int max_it = 4000;
 
-#if 1
+#if 0
     {
         max_it      = 40;
         auto output = f->output();
@@ -109,10 +107,6 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 #endif
 
     solver->verbose = true;
-    // solver->set_max_it(2);
-    // solver->apply(rhs->data(), x->data());
-    // solver->set_preconditioner_op(sfem::h_shiftable_jacobi(diag));
-    // solver->interceptor = nullptr;
     solver->set_max_it(max_it);
     solver->apply(rhs->data(), x->data());
 
