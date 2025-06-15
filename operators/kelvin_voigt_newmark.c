@@ -186,7 +186,7 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
                                                                 &values[2]);
         }
         default: {
-            SFEM_ERROR("linear_elasticity_apply_adjugate_aos not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("kelvin_voigt_newmark_gradient_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
 
