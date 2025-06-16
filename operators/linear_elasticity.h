@@ -128,6 +128,15 @@ int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_ty
                                          const real_t                 lambda,
                                          real_t *const                out);
 
+int linear_elasticity_block_diag_sym_soa(const enum ElemType          element_type,
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t **const SFEM_RESTRICT out);
+
 // Block sparse row (BSR) https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-storage-formats
 int linear_elasticity_bsr(const enum ElemType                element_type,
                           const ptrdiff_t                    nelements,

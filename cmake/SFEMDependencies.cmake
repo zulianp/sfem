@@ -192,3 +192,13 @@ if(WIN32)
     FetchContent_MakeAvailable(Glob)
     list(APPEND SFEM_SUBMODULES Glob)
 endif()
+
+if(SFEM_ENABLE_LAPACK)
+    find_package(LAPACK REQUIRED)
+    list(APPEND SFEM_DEP_LIBRARIES  LAPACK::LAPACK)
+endif()
+
+# if(SFEM_ENABLE_HIP)
+# # TODO
+# endif()
+

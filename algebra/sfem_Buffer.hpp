@@ -286,6 +286,26 @@ namespace sfem {
         return manage_host_buffer<T>(local_size, data);
     }
 
+    template<typename O, typename I>
+    std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<I>> &in) 
+    {
+        if constexpr(std::is_same<O, I>::value) {
+            return in;
+        }
+
+        const ptrdiff_t size = in->size();
+        auto out = create_host_buffer<O>(size);
+
+        auto din = in->data();
+        auto dout = out->data();
+
+        for(ptrdiff_t i = 0; i < size; i++) {
+            dout[i] = din[i];
+        }
+
+        return out;
+    }
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP

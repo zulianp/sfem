@@ -1804,7 +1804,7 @@ namespace sfem {
                         real_t *const        values) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_crs");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             auto graph = space->node_to_node_graph();
 
@@ -1853,7 +1853,7 @@ namespace sfem {
                              real_t **const       off_diag_values) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_bcrs_sym");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             linear_elasticity_bcrs_sym(element_type,
                                        mesh->n_elements(),
@@ -1873,8 +1873,21 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
             return linear_elasticity_block_diag_sym_aos(element_type,
+                                                        mesh->n_elements(),
+                                                        mesh->n_nodes(),
+                                                        mesh->elements()->data(),
+                                                        mesh->points()->data(),
+                                                        this->mu,
+                                                        this->lambda,
+                                                        values);
+        }
+
+        int hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) override {
+            SFEM_TRACE_SCOPE("LinearElasticity::hessian_block_diag_sym_soa");
+            auto mesh = space->mesh_ptr();
+            return linear_elasticity_block_diag_sym_soa(element_type,
                                                         mesh->n_elements(),
                                                         mesh->n_nodes(),
                                                         mesh->elements()->data(),
@@ -1887,7 +1900,7 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override {
             SFEM_TRACE_SCOPE("LinearElasticity::hessian_diag");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             linear_elasticity_assemble_diag_aos(element_type,
                                                 mesh->n_elements(),
@@ -1903,7 +1916,7 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override {
             SFEM_TRACE_SCOPE("LinearElasticity::gradient");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             linear_elasticity_assemble_gradient_aos(element_type,
                                                     mesh->n_elements(),
@@ -1921,7 +1934,7 @@ namespace sfem {
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("LinearElasticity::apply");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             double tick = MPI_Wtime();
 
@@ -1960,7 +1973,7 @@ namespace sfem {
         int value(const real_t *x, real_t *const out) override {
             SFEM_TRACE_SCOPE("LinearElasticity::value");
 
-            auto mesh  = space->mesh_ptr();
+            auto mesh = space->mesh_ptr();
 
             linear_elasticity_assemble_value_aos(element_type,
                                                  mesh->n_elements(),
@@ -3557,7 +3570,7 @@ namespace sfem {
                         real_t *const        values) override {
             SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_crs");
 
-            auto mesh = space->mesh_ptr();
+            auto mesh  = space->mesh_ptr();
             auto graph = space->node_to_node_graph();
 
             return neohookean_ogden_hessian_aos(element_type,
@@ -3713,7 +3726,7 @@ namespace sfem {
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("BoundaryMass::apply");
-            
+
             auto mesh = space->mesh_ptr();
 
             int  block_size = space->block_size();
