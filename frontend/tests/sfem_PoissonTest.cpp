@@ -82,15 +82,18 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     double tick = MPI_Wtime();
 
     auto solver         = sfem::create_cg(linear_op, es);
-    auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
-    preconditioner->set_max_it(1);
+    // auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
+    // preconditioner->set_max_it(1);
+
+    auto preconditioner = bjacobi;
+    
     solver->set_preconditioner_op(preconditioner);
 
     int max_it = 4000;
 
-#if 0
+#if 1
     {
-        max_it      = 40;
+        max_it      = 80;
         auto output = f->output();
         sfem::create_directory(output_dir.c_str());
         std::string dbg_dir = output_dir + "/dbg";
@@ -112,12 +115,16 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     double tock = MPI_Wtime();
 
+    auto g = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    f->gradient(x->data(), g->data());
+    real_t rnorm = sfem::blas<real_t>(es)->norm2(g->size(), g->data());
+
     int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");
-        printf("%s #dofs %ld (%g seconds)\n", output_dir.c_str(), fs->n_dofs(), tock - tick);
+        printf("%s #dofs %ld (%g seconds), rnorm %g\n", output_dir.c_str(), fs->n_dofs(), tock - tick, rnorm);
         printf("---------------------\n");
     }
 
