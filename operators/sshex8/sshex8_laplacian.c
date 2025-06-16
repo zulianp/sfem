@@ -878,6 +878,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u) {
     const int           nxe             = sshex8_nxe(level);
+    const int           levelp2         = level + 2;
     const int           gnxe            = (level + 3) * (level + 3) * (level + 3);
     const int           txe             = sshex8_txe(level);
     const int           nn              = level + 3;
@@ -914,10 +915,10 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                     ev[d] = elements[d][e];
                 }
 
-                for (int zi = 1; zi < level + 2; zi++) {
-                    for (int yi = 1; yi < level + 2; yi++) {
-                        for (int xi = 1; xi < level + 2; xi++) {
-                            const int   glidx = sshex8_lidx(level + 2, xi, yi, zi);
+                for (int zi = 1; zi < levelp2; zi++) {
+                    for (int yi = 1; yi < levelp2; yi++) {
+                        for (int xi = 1; xi < levelp2; xi++) {
+                            const int   glidx = sshex8_lidx(levelp2, xi, yi, zi);
                             const int   lidx  = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
                             const idx_t gidx  = ev[lidx];
                             emask[glidx]      = mask_get(gidx, mask);
@@ -954,14 +955,14 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                 }
 
                 // Scatter elemental data
-                for (int zi = 1; zi < level + 2; zi++) {
-                    for (int yi = 1; yi < level + 2; yi++) {
-                        for (int xi = 1; xi < level + 2; xi++) {
-                            int glidx = sshex8_lidx(level + 2, xi, yi, zi);
+                for (int zi = 1; zi < levelp2; zi++) {
+                    for (int yi = 1; yi < levelp2; yi++) {
+                        for (int xi = 1; xi < levelp2; xi++) {
+                            int glidx = sshex8_lidx(levelp2, xi, yi, zi);
                             if (emask[glidx]) continue;
 
-                            int   lidx = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
-                            idx_t gidx = ev[lidx];
+                            const int   lidx = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
+                            const idx_t gidx = ev[lidx];
 
 #pragma omp atomic update
                             u[gidx] += over_relaxation * eu[glidx] / count[gidx];
