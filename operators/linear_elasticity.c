@@ -407,3 +407,23 @@ int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_ty
         }
     }
 }
+
+int linear_elasticity_block_diag_sym_soa(const enum ElemType          element_type,
+                                         const ptrdiff_t              nelements,
+                                         const ptrdiff_t              nnodes,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t **const SFEM_RESTRICT out) {
+    switch (element_type) {
+        case HEX8: {
+            return affine_hex8_linear_elasticity_block_diag_sym(
+                    nelements, nnodes, elements, points, mu, lambda, 1, out[0], out[1], out[2], out[3], out[4], out[5]);
+        }
+        default: {
+            SFEM_ERROR("linear_elasticity_block_diag_sym_soa not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
