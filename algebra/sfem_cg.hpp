@@ -10,8 +10,8 @@
 #include <memory>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
-#include "sfem_openmp_blas.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_openmp_blas.hpp"
 
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
 // Must check:
@@ -101,7 +101,7 @@ namespace sfem {
                 }
             }
 
-            return SFEM_SUCCESS; 
+            return SFEM_SUCCESS;
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override { preconditioner_op = op; }
@@ -202,7 +202,7 @@ namespace sfem {
                     break;
                 }
 
-                if(interceptor) {
+                if (interceptor) {
                     interceptor(x);
                 }
             }
@@ -224,15 +224,13 @@ namespace sfem {
             apply_op->apply(x, r);
             blas.axpby(n, 1, b, -1, r);
 
-            // const T rtr0 = blas.dot(n, r, r);
-            // T rtr = rtr0;
+            const T rtr0    = blas.dot(n, r, r);
+            const T r_norm0 = sqrt(rtr0);
+            monitor(0, r_norm0, 1, 0);
 
-            // monitor(0, sqrt(rtr), 1);
-
-            // if (sqrt(rtr) < rtol) {
-            //     blas.destroy(r);
-            //     return 0;
-            // }
+            if (rtr0 == 0) {
+                return SFEM_SUCCESS;
+            }
 
             T* z  = blas.allocate(n);
             T* Mz = blas.allocate(n);
@@ -248,11 +246,9 @@ namespace sfem {
             const T rtz0 = blas.dot(n, r, z);
             T       rtz  = rtz0;
 
-            if(rtz == 0) {
+            if (rtz == 0) {
                 return SFEM_SUCCESS;
             }
-
-            monitor(0, sqrt(rtz), 1, 0);
 
             {
                 const T ptAp = blas.dot(n, p, Ap);
@@ -295,7 +291,7 @@ namespace sfem {
                     break;
                 }
 
-                if(interceptor) {
+                if (interceptor) {
                     interceptor(x);
                 }
             }
