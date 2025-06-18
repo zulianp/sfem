@@ -37,7 +37,9 @@ namespace sfem {
         Sideset();
         ~Sideset();
 
-        static std::shared_ptr<Sideset> create(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
+        static std::shared_ptr<Sideset> create(MPI_Comm                                      comm,
+                                               const std::shared_ptr<Buffer<element_idx_t>> &parent,
+                                               const std::shared_ptr<Buffer<int16_t>>       &lfi);
 
         static std::shared_ptr<Sideset> create_from_selector(
                 const std::shared_ptr<Mesh>                                         &mesh,
@@ -146,6 +148,11 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        virtual int hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) {
+            SFEM_ERROR("Called unimplemented method!\n");
+            return SFEM_FAILURE;
+        }
+
         virtual int gradient(const real_t *const x, real_t *const out)                     = 0;
         virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
 
@@ -192,9 +199,7 @@ namespace sfem {
         int  value(const real_t  */*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
     };
 
-    inline std::shared_ptr<NoOp> no_op() {
-        return std::make_shared<NoOp>();
-    }
+    inline std::shared_ptr<NoOp> no_op() { return std::make_shared<NoOp>(); }
 
     class NeumannConditions final : public Op {
     public:

@@ -31,6 +31,8 @@ namespace sfem {
 
         int iterations_{0};
 
+        std::function<void(T*)> interceptor;
+
         int iterations() const override { return iterations_; }
 
         void ensure_workspace() {
@@ -68,6 +70,10 @@ namespace sfem {
                     printf("%d : %f\n", iterations_, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);
+
+                if(interceptor) {
+                    interceptor(x);
+                }
             }
 
             return SFEM_SUCCESS;
