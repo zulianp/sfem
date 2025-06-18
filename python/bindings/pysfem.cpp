@@ -223,7 +223,9 @@ NB_MODULE(pysfem, m) {
               size_t n = v.size();
               auto c_v = (real_t *)malloc(n * sizeof(real_t));
               memcpy(c_v, v.data(), n * sizeof(real_t));
-              op->set_field(name, component, c_v);
+
+
+              op->set_field(name, sfem::manage_host_buffer<real_t>(n, c_v), component);
           });
 
     m.def("hessian_diag",
