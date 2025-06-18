@@ -5,6 +5,7 @@
 
 #include "hex8_quadrature.h"
 #include "sfem_mask.h"
+#include "sshex8_skeleton_offdiag_stencil.h"
 #include "sshex8_skeleton_stencil.h"
 #include "stencil3.h"
 #include "stencil_cg.h"
@@ -873,28 +874,28 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const jacobian_t *const SFEM_RESTRICT g_fff,
                                         const uint16_t *const                 count,
                                         const mask_t *const                   mask,
-                                        const element_idx_t *const            adjaciency_table,
+                                        const real_t *const SFEM_RESTRICT     diag,
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u) {
-    const int nxe      = sshex8_nxe(level);
-    const int txe      = sshex8_txe(level);
-    const int nn       = level + 1;
-    const int lystride = nn;
-    const int lzstride = lystride * lystride;
+    const int           nxe             = sshex8_nxe(level);
+    const int           gnxe            = (level + 3) * (level + 3) * (level + 3);
+    const int           txe             = sshex8_txe(level);
+    const int           nn              = level + 3;
+    const int           lystride        = nn;
+    const int           lzstride        = lystride * lystride;
+    static const real_t over_relaxation = 1;
 
 #pragma omp parallel
     {
         // Allocation per thread
         idx_t    *ev    = malloc(nxe * sizeof(idx_t));
-        scalar_t *eu    = calloc(nxe, sizeof(scalar_t));
-        scalar_t *erhs  = calloc(nxe, sizeof(scalar_t));
-        scalar_t *r     = calloc(nxe, sizeof(scalar_t));
-        scalar_t *p     = calloc(nxe, sizeof(scalar_t));
-        scalar_t *Ap    = calloc(nxe, sizeof(scalar_t));
-        int      *emask = calloc(nxe, sizeof(int));
+        scalar_t *eu    = calloc(gnxe, sizeof(scalar_t));
+        scalar_t *erhs  = calloc(gnxe, sizeof(scalar_t));
+        scalar_t *r     = calloc(gnxe, sizeof(scalar_t));
+        scalar_t *p     = calloc(gnxe, sizeof(scalar_t));
+        scalar_t *Ap    = calloc(gnxe, sizeof(scalar_t));
+        int      *emask = calloc(gnxe, sizeof(int));
 
-        scalar_t      element_u[8];
-        accumulator_t element_vector[8];
         accumulator_t laplacian_matrix[8 * 8];
         scalar_t      laplacian_stencil[3 * 3 * 3];
 
@@ -903,85 +904,70 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
             {
+                scalar_t fff[6];
+                for (int d = 0; d < 6; d++) {
+                    fff[d] = g_fff[e * 6 + d] * h;
+                }
+
                 // Gather elemental data
                 for (int d = 0; d < nxe; d++) {
                     ev[d] = elements[d][e];
                 }
 
-                for (int d = 0; d < nxe; d++) {
-                    emask[d] = mask_get(ev[d], mask);
-                }
-
-                for (int d = 0; d < nxe; d++) {
-                    eu[d] = u[ev[d]];
-                    assert(eu[d] == eu[d]);
-                }
-
-                for (int d = 0; d < nxe; d++) {
-                    erhs[d] = rhs[ev[d]];
-                    assert(erhs[d] == erhs[d]);
-                }
-
-                scalar_t fff[6];
-                for (int d = 0; d < 6; d++) {
-                    fff[d] = g_fff[e * 6 + d] * h;
+                for (int zi = 1; zi < level + 2; zi++) {
+                    for (int yi = 1; yi < level + 2; yi++) {
+                        for (int xi = 1; xi < level + 2; xi++) {
+                            const int   glidx = sshex8_lidx(level + 2, xi, yi, zi);
+                            const int   lidx  = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
+                            const idx_t gidx  = ev[lidx];
+                            emask[glidx]      = mask_get(gidx, mask);
+                            erhs[glidx]       = rhs[gidx];
+                        }
+                    }
                 }
 
                 hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
                 hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
             }
 
-            memset(r, 0, nxe * sizeof(scalar_t));
-
-            const element_idx_t * const neighs = &adjaciency_table[e * 6];
-
-            sshex8_stencil(nn, nn, nn, laplacian_stencil, eu, r);
-            sshex8_surface_stencil(nn, nn, nn, 1, nn, nn * nn, laplacian_matrix, eu, r);
-
-            // FIXME Handle 0-neumann boundary conditions and inner boundaries
-
-            for (int v = 0; v < nxe; v++) {
-                if (emask[v]) {
-                    r[v] = eu[v];
+            memset(eu, 0, gnxe * sizeof(scalar_t));
+            int err = sshex8_stencil_c_cg(nxe,
+                                          1e-8,
+                                          1e-16,
+                                          // Grid info
+                                          nn,
+                                          nn,
+                                          nn,
+                                          laplacian_stencil,
+                                          emask,
+                                          erhs,
+                                          // Temps
+                                          r,
+                                          p,
+                                          Ap,
+                                          // Out
+                                          eu);
+            {
+                if (SFEM_SUCCESS != err) {
+                    SFEM_ERROR("FAILED to solve laplacian subsystem\n");
+                    continue;
                 }
-            }
 
-            for (int v = 0; v < nxe; v++) {
-                erhs[v] -= r[v];
-            }
+                // Scatter elemental data
+                for (int zi = 1; zi < level + 2; zi++) {
+                    for (int yi = 1; yi < level + 2; yi++) {
+                        for (int xi = 1; xi < level + 2; xi++) {
+                            int glidx = sshex8_lidx(level + 2, xi, yi, zi);
+                            if (emask[glidx]) continue;
 
-            // sshe8_print("RHS", nn, nn, nn, erhs);
-            memset(eu, 0, nxe * sizeof(scalar_t));
-            int err = sshex8_stencil_cg_constrained(nxe,
-                                                    1e-8,
-                                                    1e-16,
-                                                    // Grid info
-                                                    nn,
-                                                    nn,
-                                                    nn,
-                                                    laplacian_stencil,
-                                                    laplacian_matrix,
-                                                    emask,
-                                                    //
-                                                    erhs,
-                                                    //
-                                                    r,
-                                                    p,
-                                                    Ap,
-                                                    //
-                                                    eu);
+                            int   lidx = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
+                            idx_t gidx = ev[lidx];
 
-            if (SFEM_SUCCESS != err) {
-                SFEM_ERROR("FAILED to solve laplacian subsystem\n");
-                continue;
-            }
-
-            // Scatter elemental data
-            for (int d = 0; d < nxe; d++) {
-                if (emask[d]) continue;
-                const idx_t gidx = ev[d];
 #pragma omp atomic update
-                u[gidx] += (eu[d] / count[gidx]);
+                            u[gidx] += over_relaxation * eu[glidx] / count[gidx];
+                        }
+                    }
+                }
             }
         }
 
