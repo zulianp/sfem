@@ -66,7 +66,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const jacobian_t *const SFEM_RESTRICT g_fff,
                                         const uint16_t *const                 count,
                                         const mask_t *const                   mask,
-                                        const element_idx_t * const adjaciency_table,
+                                        const real_t *const SFEM_RESTRICT     diag,
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u);
 #ifdef __cplusplus
