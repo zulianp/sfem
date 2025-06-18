@@ -4,8 +4,13 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
+#include "hex8_jacobian.h"
+#include "kelvin_voigt_newmark.h"
 
-std::shared_ptr<sfem::Function> create_elasticity_function() {
+
+
+std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -37,10 +42,10 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        // fs->semi_structured_mesh().apply_hierarchical_renumbering();
-    }
+    // if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+    //     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    //     // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    // }
 
     auto f = sfem::Function::create(fs);
 
@@ -69,11 +74,16 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     f->add_constraint(d_conds);
 #endif
 
-    auto linear_elasticity = sfem::create_op(fs, "LinearElasticity", es);
-    linear_elasticity->initialize();
-    f->add_operator(linear_elasticity);
+    auto kelvin_voigt_newmark = sfem::create_op(fs, "KelvinVoigtNewmark", es);
+    kelvin_voigt_newmark->initialize();
+    f->add_operator(kelvin_voigt_newmark);
     return f;
 }
+
+
+
+
+
 
 std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
     auto fs = f->space();
@@ -120,67 +130,13 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     return output;
 }
 
-int test_explicit_euler() {
-    auto f               = create_elasticity_function();
-    auto inv_mass_vector = create_inverse_mass_vector(f);
-    auto output          = create_output(f, "explicit_euler");
 
-    auto fs = f->space();
-    auto m  = fs->mesh_ptr();
-    auto es = f->execution_space();
 
-    auto blas = sfem::blas<real_t>(es);
 
-    auto displacement = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-
-    real_t dt          = 0.0001;
-    real_t T           = 50 * dt;
-    size_t export_freq = 1;
-    size_t steps       = 0;
-    real_t t           = 0;
-
-    bool SFEM_EXPLICIT_EULER_ENABLE_OUTPUT = false;
-    SFEM_READ_ENV(SFEM_EXPLICIT_EULER_ENABLE_OUTPUT, atoi);
-
-    if (SFEM_EXPLICIT_EULER_ENABLE_OUTPUT) {
-        output->write_time_step("disp", t, displacement->data());
-
-        blas->zeros(g->size(), g->data());
-        f->gradient(displacement->data(), g->data());
-        output->write_time_step("g", t, g->data());
-
-        output->log_time(t);
-    }
-
-    while (t < T) {
-        blas->zeros(g->size(), g->data());
-        f->gradient(displacement->data(), g->data());
-        blas->scal(g->size(), -dt, g->data());
-        blas->xypaz(g->size(), g->data(), inv_mass_vector->data(), 1, displacement->data());
-
-        t += dt;
-
-        // Output
-        if (++steps % export_freq == 0 && SFEM_EXPLICIT_EULER_ENABLE_OUTPUT) {
-            // Write to disk
-            output->write_time_step("disp", t, displacement->data());
-
-            blas->zeros(g->size(), g->data());
-            f->gradient(displacement->data(), g->data());
-            output->write_time_step("g", t, g->data());
-
-            output->log_time(t);
-        }
-    }
-
-    return SFEM_TEST_SUCCESS;
-}
-
-int test_newmark() {
-    auto f           = create_elasticity_function();
+int test_newmark_kv() {
+    auto f           = create_kelvin_voigt_newmark_function();
     auto mass_vector = create_mass_vector(f);
-    auto output      = create_output(f, "test_newmark");
+    auto output      = create_output(f, "test_newmark_kv");
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();
@@ -192,19 +148,21 @@ int test_newmark() {
     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
     auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
     auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    auto            packed_data  = sfem::create_buffer<real_t>(2*ndofs, es);
 
     auto increment = sfem::create_buffer<real_t>(ndofs, es);
+    auto temp_vel = sfem::create_buffer<real_t>(ndofs, es);
     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 0.2;
-    real_t T           = 4;
+    real_t T           = 3;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
     int    nliter      = 1;
 
-    bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
+    bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
@@ -226,7 +184,7 @@ int test_newmark() {
                     material_op->cols(),
                     [=](const real_t *const x, real_t *const y) {
                         {
-                            SFEM_TRACE_SCOPE("Newmark::hessian_apply_integr");
+                            SFEM_TRACE_SCOPE("Newmark_KV::hessian_apply_integr");
                             blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
                             blas->scal(ndofs, 4 / (dt * dt), y);
                         }
@@ -245,8 +203,15 @@ int test_newmark() {
             blas->axpy(ndofs, -1, acceleration->data(), increment->data());
             blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
 
+            blas->zeros(ndofs, temp_vel->data());
+            blas->copy(ndofs, increment->data(), temp_vel->data());
+            blas->zaxpby(ndofs, dt/2, temp_vel->data(), dt/2, acceleration->data(), temp_vel->data());
+            blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+
+            blas->copy(ndofs, solution->data(), packed_data->data());
+            blas->copy(ndofs, temp_vel->data(), packed_data->data() + ndofs);
             // Adds material gradient computation to g
-            f->gradient(solution->data(), g->data());
+            f->gradient(packed_data->data(), g->data());
 
             blas->zeros(ndofs, increment->data());
             solver->apply(g->data(), increment->data());
@@ -286,12 +251,17 @@ int test_newmark() {
     return SFEM_TEST_SUCCESS;
 }
 
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
-    SFEM_RUN_TEST(test_explicit_euler);
-    SFEM_RUN_TEST(test_newmark);
-
+#ifdef SFEM_ENABLE_CUDA
+    sfem::register_device_ops();
+#endif
+    SFEM_RUN_TEST(test_newmark_kv);  
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+
+
+
