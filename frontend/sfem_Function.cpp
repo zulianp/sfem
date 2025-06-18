@@ -2751,8 +2751,8 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_ERROR("[Error] ss:Laplacian::gradient NOT IMPLEMENTED!\n");
-            return SFEM_FAILURE;
+            SFEM_TRACE_SCOPE("SemiStructuredLaplacian::gradient");
+            return apply(nullptr, x, out);
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
