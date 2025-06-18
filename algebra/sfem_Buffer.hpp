@@ -286,12 +286,17 @@ namespace sfem {
         return manage_host_buffer<T>(local_size, data);
     }
 
+    template<typename O>
+    std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<O>> &in) {
+        return in;
+    }
+
     template<typename O, typename I>
     std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<I>> &in) 
     {
-        if constexpr(std::is_same<O, I>::value) {
-            return in;
-        }
+        // if constexpr(std::is_same<O, I>::value) {
+        //     return in;
+        // }
 
         const ptrdiff_t size = in->size();
         auto out = create_host_buffer<O>(size);
