@@ -30,8 +30,8 @@ namespace sfem {
         std::shared_ptr<Buffer<element_idx_t>> parent();
         std::shared_ptr<Buffer<int16_t>>       lfi();
         static std::shared_ptr<Sideset>        create_from_file(MPI_Comm comm, const char *path);
-        ptrdiff_t size() const;
-        MPI_Comm comm() const;
+        ptrdiff_t                              size() const;
+        MPI_Comm                               comm() const;
 
         Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
         Sideset();
@@ -68,8 +68,8 @@ namespace sfem {
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
 
-        void                                 set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t*>> &elems);
-        std::shared_ptr<sfem::Buffer<idx_t*>> device_elements();
+        void                                   set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t *>> &elems);
+        std::shared_ptr<sfem::Buffer<idx_t *>> device_elements();
 
         Mesh                 &mesh();
         std::shared_ptr<Mesh> mesh_ptr() const;
@@ -160,7 +160,12 @@ namespace sfem {
         virtual int            report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
 
-        virtual void set_field(const char * /*name*/, const int /*component*/, real_t * /*x*/) { assert(0); }
+        virtual void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &x, const int component = 0) {
+            SFEM_UNUSED(name);
+            SFEM_UNUSED(x);
+            SFEM_UNUSED(component);
+            assert(false);
+        }
 
         /// Make low-order-refinement operator
         virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &) {
@@ -237,7 +242,7 @@ namespace sfem {
 
         inline bool is_linear() const override { return true; }
 
-        int n_conditions() const;
+        int                            n_conditions() const;
         std::shared_ptr<FunctionSpace> space();
         std::vector<struct Condition> &conditions();
 

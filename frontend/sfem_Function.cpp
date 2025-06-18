@@ -3372,17 +3372,13 @@ namespace sfem {
     class CVFEMUpwindConvection final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        real_t                        *vel[3];
+        std::shared_ptr<Buffer<real_t>> vel[3];
         enum ElemType                  element_type { INVALID };
 
         const char *name() const override { return "CVFEMUpwindConvection"; }
         inline bool is_linear() const override { return true; }
 
-        void set_field(const char * /* name  = velocity */, const int component, real_t *v) override {
-            if (vel[component]) {
-                free(vel[component]);
-            }
-
+        void set_field(const char * /* name  = velocity */, const std::shared_ptr<Buffer<real_t>> &v, const int component) override {
             vel[component] = v;
         }
 
@@ -3392,9 +3388,6 @@ namespace sfem {
             assert(1 == space->block_size());
 
             auto ret    = std::make_unique<CVFEMUpwindConvection>(space);
-            ret->vel[0] = nullptr;
-            ret->vel[1] = nullptr;
-            ret->vel[2] = nullptr;
 
             const char *SFEM_VELX = nullptr;
             const char *SFEM_VELY = nullptr;
@@ -3415,13 +3408,19 @@ namespace sfem {
             }
 
             ptrdiff_t nlocal, nglobal;
-            if (array_create_from_file(mesh->comm(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&ret->vel[0], &nlocal, &nglobal) ||
-                array_create_from_file(mesh->comm(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&ret->vel[1], &nlocal, &nglobal) ||
-                array_create_from_file(mesh->comm(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&ret->vel[2], &nlocal, &nglobal)) {
+
+            real_t *vel0, *vel1, *vel2;
+            if (array_create_from_file(mesh->comm(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
+                array_create_from_file(mesh->comm(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
+                array_create_from_file(mesh->comm(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
             }
+
+            ret->vel[0] = sfem::manage_host_buffer<real_t>(nlocal, vel0);
+            ret->vel[1] = sfem::manage_host_buffer<real_t>(nlocal, vel1);
+            ret->vel[2] = sfem::manage_host_buffer<real_t>(nlocal, vel2);
 
             return ret;
         }
@@ -3429,9 +3428,6 @@ namespace sfem {
         int initialize() override { return SFEM_SUCCESS; }
 
         CVFEMUpwindConvection(const std::shared_ptr<FunctionSpace> &space) : space(space) {
-            vel[0] = nullptr;
-            vel[1] = nullptr;
-            vel[2] = nullptr;
         }
 
         ~CVFEMUpwindConvection() {}
@@ -3462,14 +3458,16 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override {
             auto mesh = space->mesh_ptr();
 
-            cvfem_convection_apply(element_type,
-                                   mesh->n_elements(),
-                                   mesh->n_nodes(),
-                                   mesh->elements()->data(),
-                                   mesh->points()->data(),
-                                   vel,
-                                   x,
-                                   out);
+            // cvfem_convection_apply(element_type,
+            //                        mesh->n_elements(),
+            //                        mesh->n_nodes(),
+            //                        mesh->elements()->data(),
+            //                        mesh->points()->data(),
+            //                        vel,
+            //                        x,
+            //                        out);
+
+            SFEM_ERROR("IMPLEMENT ME");
 
             return SFEM_SUCCESS;
         }
@@ -3477,14 +3475,16 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
             auto mesh = space->mesh_ptr();
 
-            cvfem_convection_apply(element_type,
-                                   mesh->n_elements(),
-                                   mesh->n_nodes(),
-                                   mesh->elements()->data(),
-                                   mesh->points()->data(),
-                                   vel,
-                                   h,
-                                   out);
+            // cvfem_convection_apply(element_type,
+            //                        mesh->n_elements(),
+            //                        mesh->n_nodes(),
+            //                        mesh->elements()->data(),
+            //                        mesh->points()->data(),
+            //                        vel,
+            //                        h,
+            //                        out);
+
+            SFEM_ERROR("IMPLEMENT ME");
 
             return SFEM_SUCCESS;
         }
@@ -3502,7 +3502,7 @@ namespace sfem {
 
             // return SFEM_SUCCESS;
 
-            assert(0);
+            SFEM_ERROR("IMPLEMENT ME");
             return SFEM_FAILURE;
         }
 
