@@ -81,16 +81,19 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     double tick = MPI_Wtime();
 
-    auto solver         = sfem::create_cg(linear_op, es);
-    auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
-    preconditioner->set_max_it(1);
+    auto solver = sfem::create_cg(linear_op, es);
+    // auto preconditioner = sfem::h_stationary(linear_op, bjacobi);
+    // preconditioner->set_max_it(1);
+
+    auto preconditioner = bjacobi;
+
     solver->set_preconditioner_op(preconditioner);
 
     int max_it = 4000;
 
 #if 0
     {
-        max_it      = 40;
+        max_it      = 80;
         auto output = f->output();
         sfem::create_directory(output_dir.c_str());
         std::string dbg_dir = output_dir + "/dbg";
@@ -108,16 +111,22 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     solver->verbose = true;
     solver->set_max_it(max_it);
+    solver->set_rtol(0);
+    solver->set_atol(1e-8);
     solver->apply(rhs->data(), x->data());
 
     double tock = MPI_Wtime();
+
+    auto g = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    f->gradient(x->data(), g->data());
+    real_t rnorm = sfem::blas<real_t>(es)->norm2(g->size(), g->data());
 
     int SFEM_VERBOSE = 0;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");
-        printf("%s #dofs %ld (%g seconds)\n", output_dir.c_str(), fs->n_dofs(), tock - tick);
+        printf("%s #dofs %ld (%g seconds), rnorm %g\n", output_dir.c_str(), fs->n_dofs(), tock - tick, rnorm);
         printf("---------------------\n");
     }
 
@@ -164,7 +173,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->verbose    = true;
     cg->set_max_it(20000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-8);
+    cg->set_rtol(1e-9);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -311,12 +320,24 @@ int test_poisson_and_boundary_selector() {
     auto top_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
 
+    auto bottom_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > -1e-5 && z < 1e-5; });
+
+    auto front_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
+
+    auto back_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
     sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition bottom{.sideset = bottom_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition front{.sideset = front_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition back{.sideset = back_sideset, .value = -1, .component = 0};
 
     if (SFEM_BLOCK_SIZE == 1) {
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, right, top}, es);
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, right, bottom, top, front, back}, es);
         f->add_constraint(conds);
     } else {
         sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
