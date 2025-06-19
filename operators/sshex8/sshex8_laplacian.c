@@ -878,6 +878,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                         const real_t *const SFEM_RESTRICT     rhs,
                                         real_t *const SFEM_RESTRICT           u) {
     const int           nxe             = sshex8_nxe(level);
+    const int           levelp2         = level + 2;
     const int           gnxe            = (level + 3) * (level + 3) * (level + 3);
     const int           txe             = sshex8_txe(level);
     const int           nn              = level + 3;
@@ -903,7 +904,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
-            {
+            { // Gather elemental data
                 scalar_t fff[6];
                 for (int d = 0; d < 6; d++) {
                     fff[d] = g_fff[e * 6 + d] * h;
@@ -914,10 +915,10 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                     ev[d] = elements[d][e];
                 }
 
-                for (int zi = 1; zi < level + 2; zi++) {
-                    for (int yi = 1; yi < level + 2; yi++) {
-                        for (int xi = 1; xi < level + 2; xi++) {
-                            const int   glidx = sshex8_lidx(level + 2, xi, yi, zi);
+                for (int zi = 1; zi < levelp2; zi++) {
+                    for (int yi = 1; yi < levelp2; yi++) {
+                        for (int xi = 1; xi < levelp2; xi++) {
+                            const int   glidx = sshex8_lidx(levelp2, xi, yi, zi);
                             const int   lidx  = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
                             const idx_t gidx  = ev[lidx];
                             emask[glidx]      = mask_get(gidx, mask);
@@ -928,12 +929,14 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
                 hex8_laplacian_matrix_fff_integral(fff, laplacian_matrix);
                 hex8_matrix_to_stencil(laplacian_matrix, laplacian_stencil);
+                // FIXME Handle Neumann conditions
             }
 
             memset(eu, 0, gnxe * sizeof(scalar_t));
-            int err = sshex8_stencil_c_cg(nxe,
-                                          1e-8,
-                                          1e-16,
+
+            int err = sshex8_stencil_c_cg(10,
+                                          0,
+                                          0,
                                           // Grid info
                                           nn,
                                           nn,
@@ -947,25 +950,19 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
                                           Ap,
                                           // Out
                                           eu);
-            {
-                if (SFEM_SUCCESS != err) {
-                    SFEM_ERROR("FAILED to solve laplacian subsystem\n");
-                    continue;
-                }
 
-                // Scatter elemental data
-                for (int zi = 1; zi < level + 2; zi++) {
-                    for (int yi = 1; yi < level + 2; yi++) {
-                        for (int xi = 1; xi < level + 2; xi++) {
-                            int glidx = sshex8_lidx(level + 2, xi, yi, zi);
-                            if (emask[glidx]) continue;
+            // Scatter elemental data
+            for (int zi = 1; zi < levelp2; zi++) {
+                for (int yi = 1; yi < levelp2; yi++) {
+                    for (int xi = 1; xi < levelp2; xi++) {
+                        int glidx = sshex8_lidx(levelp2, xi, yi, zi);
+                        if (emask[glidx]) continue;
 
-                            int   lidx = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
-                            idx_t gidx = ev[lidx];
+                        const int   lidx = sshex8_lidx(level, xi - 1, yi - 1, zi - 1);
+                        const idx_t gidx = ev[lidx];
 
 #pragma omp atomic update
-                            u[gidx] += over_relaxation * eu[glidx] / count[gidx];
-                        }
+                        u[gidx] += over_relaxation * eu[glidx] / count[gidx];
                     }
                 }
             }
