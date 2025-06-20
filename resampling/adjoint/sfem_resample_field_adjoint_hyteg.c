@@ -539,12 +539,12 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         real_type theta_volume_acc = 0.0;
 
-        printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
-               hteg_num_tetrahedra,
-               L,
-               alpha_tet,
-               max_edges_length,
-               d_min);
+        // printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
+        //        hteg_num_tetrahedra,
+        //        L,
+        //        alpha_tet,
+        //        max_edges_length,
+        //        d_min);
 
         for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {  //
             //
@@ -784,23 +784,24 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             // real_t wf1 = tet4_eval_dual_basis_weighted_physical
 
-            int    error_flag   = 0;
-            real_t det_jacobian = calculate_det_Jacobian_for_category(category,      //
-                                                                      x0_n,          //
-                                                                      y0_n,          //
-                                                                      z0_n,          //
-                                                                      x1_n,          //
-                                                                      y1_n,          //
-                                                                      z1_n,          //
-                                                                      x2_n,          //
-                                                                      y2_n,          //
-                                                                      z2_n,          //
-                                                                      x3_n,          //
-                                                                      y3_n,          //
-                                                                      z3_n,          //
-                                                                      L,             //
-                                                                      tet_i,         //
-                                                                      &error_flag);  //
+            int          error_flag   = 0;                             //
+            const real_t det_jacobian =                                //
+                    calculate_det_Jacobian_for_category(category,      //
+                                                        x0_n,          //
+                                                        y0_n,          //
+                                                        z0_n,          //
+                                                        x1_n,          //
+                                                        y1_n,          //
+                                                        z1_n,          //
+                                                        x2_n,          //
+                                                        y2_n,          //
+                                                        z2_n,          //
+                                                        x3_n,          //
+                                                        y3_n,          //
+                                                        z3_n,          //
+                                                        L,             //
+                                                        tet_i,         //
+                                                        &error_flag);  //
 
             theta_volume_acc += det_jacobian * (1.0 / 6.0);  // DEBUG code
 
@@ -863,11 +864,11 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
-               element_i,
-               theta_volume_main,
-               theta_volume_acc,
-               (theta_volume_acc / theta_volume_main));
+        // printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
+        //        element_i,
+        //        theta_volume_main,
+        //        theta_volume_acc,
+        //        (theta_volume_acc / theta_volume_main));
     }
 
     RETURN_FROM_FUNCTION(ret);
