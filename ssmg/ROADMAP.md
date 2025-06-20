@@ -69,6 +69,11 @@ MS := Milestone
 ### Austen
 
 **MS 1: ()**
+   - [ ] Priority: 
+      1. [ ] Share current work on elasticity
+      2. [ ] Coarsening only interior (Boolean boundary mask, linear elasticity all 3 components of nodes on the contact boundary are involved in the contact)
+         - A_II A_IC 
+         - A_CI immutable(A_CC)
    - [x] Baseline piecewise constant prolongation
    - [ ] Try adding some smoothing steps on the near-null to see if it improves things
    - [ ] Try SSMG with MG preconditioned CG on the inner iteration
@@ -118,14 +123,12 @@ MS := Milestone
    - [x] Nonlinear obstacle contact loop
    - [x] Refactoring: multilevel constraints restriction
    
-
 **MS 2: ()**
 
    - [ ] Drafting/Finalizing P1
 
 **MS 3: ()**
 
-   
    - [x] Contact discretization is performed on CPU, handling of GPU-GPU two-way transfers (SDF, normals, ...)
    - [x] GPU: ShiftableBlockSymJacobi
    - [x] GPU: constraints_mask (minimal)
@@ -134,6 +137,7 @@ MS := Milestone
    - [x] GPU: ssquad4_restrict and ssquad4_prolongate
    - [x] GPU: SparseBlockVector
    - [x] Test/Debug GPU porting
+   - [ ] Resampling on GPU
 
 **MS 4: ()**
    - [ ] GPU porting of all missing discretization routines (Operators, Algebra, SDF sampling?,...)
@@ -146,7 +150,7 @@ MS := Milestone
    - [ ] (KPZ)[https://arxiv.org/pdf/1002.1859] which NVIDIA uses is a possible alternative
    - [ ] Explore high-order HEXA
    - [ ] Explore sum factorization algorithm for HEX8
-   - [ ] Contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
+   - [ ] Self contact: contact matrix B^T N N^T B = C = [D, O], D := diagonal, O: off-diagonal and structure preserving projection C_H = [D_H, O_H] = P^T D P + P^T O P
    
 
 ### Hardik
@@ -154,11 +158,9 @@ MS := Milestone
 **MS 1: ()**
 
    - [x] MatLab implementation of SPGMG in 2D (scalar problem)
-   - [ ] Update strategy of Lagrange multiplier
-   - [ ] MatLab implementations for Paper 1 (P1)
-   - [ ] Drafting P1
-
+   
 **MS 2:**
+
    - [ ] Finalizing P1
 
 **MS 3:**
@@ -167,6 +169,7 @@ MS := Milestone
    - [ ] Help drafting P2
 
 **MS 4:**
+
    - [ ] Proof-reading P3
 
 ### Gabriele
@@ -181,6 +184,9 @@ MS := Milestone
          2. Multi-sphere problem
          3. Complex surface problem
    - [ ] Show, contact stresses 
+   - [ ] Update strategy of Lagrange multiplier
+   - [ ] MatLab implementations for Paper 1 (P1)
+   - [ ] Drafting P1
 
 
 ### Nice to have (When there is time or requests)
