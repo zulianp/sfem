@@ -171,7 +171,11 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
-    cg->set_max_it(20000);
+
+    int SFEM_MAX_IT = 20000;
+    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+
+    cg->set_max_it(SFEM_MAX_IT);
     cg->set_op(linear_op);
     cg->set_rtol(1e-9);
 
@@ -352,7 +356,7 @@ int test_poisson_and_boundary_selector() {
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
-    return test_linear_function_0(f, "test_poisson_and_boundary_selector");
+    return test_linear_function(f, "test_poisson_and_boundary_selector");
 }
 
 int test_linear_elasticity() {
