@@ -65,22 +65,24 @@ if __name__ == '__main__':
 	# prec = 32
 	# prec = 16
 	prec = 8
+	offset = 1e-9
+	# offset = 0
 
 	if prec == 64:
 		quant_t = np.int64
-		max_quant_t = real_t(2)**(56-1e-9)
+		max_quant_t = real_t(2)**(56-offset)
 		M = 1
 	elif prec == 32:
 		quant_t = np.int32
-		max_quant_t = real_t(2)**(31-1e-9)
+		max_quant_t = real_t(2)**(31-offset)
 		M = 2
 	elif prec == 16:
-		quant_t = np.int32
-		max_quant_t = real_t(2)**(15-1e-9)
+		quant_t = np.int16
+		max_quant_t = real_t(2)**(15-offset)
 		M = 4
 	else:
 		quant_t = np.int8
-		max_quant_t = real_t(2)**(7-1e-9)
+		max_quant_t = real_t(2)**(7-offset)
 		M = 8
 
 	n = 1000090
