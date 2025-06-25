@@ -612,17 +612,17 @@ int tet4_resample_field_local_V(const ptrdiff_t                      nelements, 
                                               weighted_field);    //
 
     if (nelements_tail > 0) {
-        ret = ret || tet4_resample_field_local_v2(nelements_aligned,  // start_nelement: for the tail
-                                                  nelements,          // end_nelement:   for the tail
-                                                  nnodes,             //
-                                                  elems,              //
-                                                  xyz,                //
-                                                  n,                  //
-                                                  stride,             //
-                                                  origin,             //
-                                                  delta,              //
-                                                  data,               //
-                                                  weighted_field);    //
+        ret = ret || tet4_resample_field_local_v2(nelements_aligned,           // start_nelement: for the tail
+                                                  nelements,                   // end_nelement:   for the tail
+                                                  nnodes,                      //
+                                                  (const idx_t** const)elems,  //
+                                                  (const geom_t** const)xyz,   //
+                                                  n,                           //
+                                                  stride,                      //
+                                                  origin,                      //
+                                                  delta,                       //
+                                                  data,                        //
+                                                  weighted_field);             //
     }
 
     RETURN_FROM_FUNCTION(ret);

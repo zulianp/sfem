@@ -1720,16 +1720,16 @@ in_out_field_mesh_tet4(const int                            mpi_size,   // MPI s
     // set to zero the bit array
     to_zero(bit_array);
 
-    ret = tet4_field_in_out_mesh(0,                // Mesh
-                                 mesh->nelements,  //
-                                 mesh->nnodes,     //
-                                 mesh->elements,   //
-                                 mesh->points,     //
-                                 n,                // SDF
-                                 stride,           //
-                                 origin,           //
-                                 delta,            //
-                                 bit_array);       // Output
+    ret = tet4_field_in_out_mesh(0,                                    // Mesh
+                                 mesh->nelements,                      //
+                                 mesh->nnodes,                         //
+                                 (const idx_t** const)mesh->elements,  //
+                                 (const geom_t** const)mesh->points,   //
+                                 n,                                    // SDF
+                                 stride,                               //
+                                 origin,                               //
+                                 delta,                                //
+                                 bit_array);                           // Output
 
     RETURN_FROM_FUNCTION(ret);
 }

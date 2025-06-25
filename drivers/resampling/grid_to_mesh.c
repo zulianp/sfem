@@ -707,7 +707,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_ones,                //
+                              mesh_fun_trig,                //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
@@ -815,8 +815,8 @@ int main(int argc, char* argv[]) {
 
                     MPI_Barrier(MPI_COMM_WORLD);
 
-                    float_t min_field_tet4 = 0.0;
-                    float_t max_field_tet4 = 0.0;
+                    real_t min_field_tet4 = 0.0;
+                    real_t max_field_tet4 = 0.0;
 
                     normalize_field_and_find_min_max(field, n_zyx, delta, &min_field_tet4, &max_field_tet4);
 

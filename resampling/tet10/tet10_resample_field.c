@@ -1088,14 +1088,108 @@ tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
 }
 
 ///////////////////////////////////////////////////////////////////////
+// tet10_measure
+///////////////////////////////////////////////////////////////////////
+real_t                                                      //
+tet10_measure_real_t(const real_t* const SFEM_RESTRICT x,   //
+                     const real_t* const SFEM_RESTRICT y,   //
+                     const real_t* const SFEM_RESTRICT z,   //
+                     const real_t                      qx,  // Quadrature point
+                     const real_t                      qy,  //
+                     const real_t                      qz) {                     //
+
+    const real_t x0  = 4 * qz;
+    const real_t x1  = x0 - 1;
+    const real_t x2  = 4 * qy;
+    const real_t x3  = 4 * qx;
+    const real_t x4  = x3 - 4;
+    const real_t x5  = -8 * qz - x2 - x4;
+    const real_t x6  = -x3 * y[4];
+    const real_t x7  = x0 + x2;
+    const real_t x8  = x3 + x7 - 3;
+    const real_t x9  = x8 * y[0];
+    const real_t x10 = -x2 * y[6] + x9;
+    const real_t x11 = x1 * y[3] + x10 + x2 * y[9] + x3 * y[8] + x5 * y[7] + x6;
+    const real_t x12 = -x2 * z[6];
+    const real_t x13 = -x0 * z[7];
+    const real_t x14 = x3 - 1;
+    const real_t x15 = x8 * z[0];
+    const real_t x16 = -8 * qx - x7 + 4;
+    const real_t x17 = x0 * z[8] + x12 + x13 + x14 * z[1] + x15 + x16 * z[4] + x2 * z[5];
+    const real_t x18 = x2 - 1;
+    const real_t x19 = -8 * qy - x0 - x4;
+    const real_t x20 = -x3 * x[4];
+    const real_t x21 = x8 * x[0];
+    const real_t x22 = -x0 * x[7] + x21;
+    const real_t x23 = (1.0 / 6.0) * x0 * x[9] + (1.0 / 6.0) * x18 * x[2] + (1.0 / 6.0) * x19 * x[6] + (1.0 / 6.0) * x20 +
+                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x3 * x[5];
+    const real_t x24 = -x0 * y[7];
+    const real_t x25 = x0 * y[8] + x10 + x14 * y[1] + x16 * y[4] + x2 * y[5] + x24;
+    const real_t x26 = x15 - x3 * z[4];
+    const real_t x27 = x1 * z[3] + x12 + x2 * z[9] + x26 + x3 * z[8] + x5 * z[7];
+    const real_t x28 = x0 * y[9] + x18 * y[2] + x19 * y[6] + x24 + x3 * y[5] + x6 + x9;
+    const real_t x29 = -x2 * x[6];
+    const real_t x30 = (1.0 / 6.0) * x1 * x[3] + (1.0 / 6.0) * x2 * x[9] + (1.0 / 6.0) * x20 + (1.0 / 6.0) * x21 +
+                       (1.0 / 6.0) * x29 + (1.0 / 6.0) * x3 * x[8] + (1.0 / 6.0) * x5 * x[7];
+    const real_t x31 = x0 * z[9] + x13 + x18 * z[2] + x19 * z[6] + x26 + x3 * z[5];
+    const real_t x32 = (1.0 / 6.0) * x0 * x[8] + (1.0 / 6.0) * x14 * x[1] + (1.0 / 6.0) * x16 * x[4] + (1.0 / 6.0) * x2 * x[5] +
+                       (1.0 / 6.0) * x22 + (1.0 / 6.0) * x29;
+
+    return x11 * x17 * x23 - x11 * x31 * x32 - x17 * x28 * x30 - x23 * x25 * x27 + x25 * x30 * x31 + x27 * x28 * x32;
+}
+
+///////////////////////////////////////////////////////////////////////
 // tet10_transform
 ///////////////////////////////////////////////////////////////////////
-void  //
-tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RESTRICT y, const geom_t* const SFEM_RESTRICT z,
+void                                                  //
+tet10_transform(const geom_t* const SFEM_RESTRICT x,  //
+                const geom_t* const SFEM_RESTRICT y,  //
+                const geom_t* const SFEM_RESTRICT z,  //
                 // Quadrature point
-                const real_t qx, const real_t qy, const real_t qz,
+                const real_t qx,  //
+                const real_t qy,  //
+                const real_t qz,  //
                 // Output
                 real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z) {
+    //
+    const real_t x0  = 4 * qx;
+    const real_t x1  = qy * x0;
+    const real_t x2  = qz * x0;
+    const real_t x3  = 4 * qy;
+    const real_t x4  = qz * x3;
+    const real_t x5  = 2 * qx - 1;
+    const real_t x6  = qx * x5;
+    const real_t x7  = 2 * qy;
+    const real_t x8  = qy * (x7 - 1);
+    const real_t x9  = 2 * qz;
+    const real_t x10 = qz * (x9 - 1);
+    const real_t x11 = -4 * qz - x0 - x3 + 4;
+    const real_t x12 = qx * x11;
+    const real_t x13 = qy * x11;
+    const real_t x14 = qz * x11;
+    const real_t x15 = (-x5 - x7 - x9) * (-qx - qy - qz + 1);
+
+    *out_x = x[0] * x15 + x[1] * x6 + x[2] * x8 + x[3] * x10 + x[4] * x12 + x[5] * x1 + x[6] * x13 + x[7] * x14 + x[8] * x2 +
+             x[9] * x4;
+    *out_y = y[0] * x15 + y[1] * x6 + y[2] * x8 + y[3] * x10 + y[4] * x12 + y[5] * x1 + y[6] * x13 + y[7] * x14 + y[8] * x2 +
+             y[9] * x4;
+    *out_z = z[0] * x15 + z[1] * x6 + z[2] * x8 + z[3] * x10 + z[4] * x12 + z[5] * x1 + z[6] * x13 + z[7] * x14 + z[8] * x2 +
+             z[9] * x4;
+}
+
+///////////////////////////////////////////////////////////////////////
+// tet10_transform
+///////////////////////////////////////////////////////////////////////
+void                                                         //
+tet10_transform_real_t(const real_t* const SFEM_RESTRICT x,  //
+                       const real_t* const SFEM_RESTRICT y,  //
+                       const real_t* const SFEM_RESTRICT z,  //
+                       // Quadrature point
+                       const real_t qx,  //
+                       const real_t qy,  //
+                       const real_t qz,  //
+                       // Output
+                       real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z) {
     //
     const real_t x0  = 4 * qx;
     const real_t x1  = qy * x0;
@@ -1361,7 +1455,7 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
         idx_t ev[10];
 
         // ISOPARAMETRIC
-        real_t x[10], y[10], z[10];
+        geom_t x[10], y[10], z[10];
 
         real_t hex8_f[8];
         real_t coeffs[8];
@@ -1376,9 +1470,9 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
 
         // ISOPARAMETRIC
         for (int v = 0; v < 10; ++v) {
-            x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
-            y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
-            z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
+            x[v] = (geom_t)(xyz[0][ev[v]]);  // x-coordinates
+            y[v] = (geom_t)(xyz[1][ev[v]]);  // y-coordinates
+            z[v] = (geom_t)(xyz[2][ev[v]]);  // z-coordinates
         }
 
         // memset(element_field, 0, 10 * sizeof(real_t));
