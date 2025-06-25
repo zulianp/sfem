@@ -354,6 +354,17 @@ tet10_transform(const geom_t* const SFEM_RESTRICT x, const geom_t* const SFEM_RE
                 // Output
                 real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z);
 
+void                                                         //
+tet10_transform_real_t(const real_t* const SFEM_RESTRICT x,  //
+                       const real_t* const SFEM_RESTRICT y,  //
+                       const real_t* const SFEM_RESTRICT z,  //
+                       // Quadrature point
+                       const real_t qx,  //
+                       const real_t qy,  //
+                       const real_t qz,  //
+                       // Output
+                       real_t* const SFEM_RESTRICT out_x, real_t* const SFEM_RESTRICT out_y, real_t* const SFEM_RESTRICT out_z);
+
 void  //
 tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* const f);
 
@@ -383,6 +394,14 @@ tet10_measure(const geom_t* const SFEM_RESTRICT x,   //
               const real_t                      qx,  // Quadrature point
               const real_t                      qy,  //
               const real_t                      qz);
+
+real_t                                                      //
+tet10_measure_real_t(const real_t* const SFEM_RESTRICT x,   //
+                     const real_t* const SFEM_RESTRICT y,   //
+                     const real_t* const SFEM_RESTRICT z,   //
+                     const real_t                      qx,  // Quadrature point
+                     const real_t                      qy,  //
+                     const real_t                      qz);                      //
 
 #ifdef __cplusplus
 }

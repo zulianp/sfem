@@ -1473,18 +1473,18 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 
 #pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
 
-    hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(0,                //
-                                                                     mesh->nelements,  //
-                                                                     mesh->nnodes,     //
-                                                                     mesh->elements,   //
-                                                                     mesh->points,     //
-                                                                     n,                //
-                                                                     stride,           //
-                                                                     origin,           //
-                                                                     delta,            //
-                                                                     weighted_field,   //
-                                                                     alpha_th,         //
-                                                                     data);            //
+    hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(0,                                    //
+                                                                     mesh->nelements,                      //
+                                                                     mesh->nnodes,                         //
+                                                                     (const idx_t** const)mesh->elements,  //
+                                                                     (const geom_t** const)mesh->points,   //
+                                                                     n,                                    //
+                                                                     stride,                               //
+                                                                     origin,                               //
+                                                                     delta,                                //
+                                                                     weighted_field,                       //
+                                                                     alpha_th,                             //
+                                                                     data);                                //
 
 #else
 

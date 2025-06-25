@@ -366,7 +366,7 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
         real_t g_qy;
         real_t g_qz;
 
-        tet10_transform(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx, &g_qy, &g_qz);
+        tet10_transform_real_t(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q], &g_qx, &g_qy, &g_qz);
 
         // tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
         tet10_Lagrange_basis(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
@@ -397,7 +397,7 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
 
         hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
 
-        const real_t measure = tet10_measure(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]);
+        const real_t measure = tet10_measure_real_t(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]);
         const real_t dV      = measure * tet_qw[q];
 
         // if (dV < 0) {
