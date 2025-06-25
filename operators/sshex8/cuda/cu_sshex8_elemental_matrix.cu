@@ -569,7 +569,6 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
             //                   x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y, threadIdx.z + 1)],
             //                   x_block[cu_sshex8_lidx(LEVEL, threadIdx.x + 1, threadIdx.y + 1, threadIdx.z + 1)],
             //                   x_block[cu_sshex8_lidx(LEVEL, threadIdx.x, threadIdx.y + 1, threadIdx.z + 1)]};
-
 #else
             T element_u[8];
 #pragma unroll
@@ -624,101 +623,6 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
     }
 }
 
-#else
-
-template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const ptrdiff_t                  nelements,
-                                                                        const idx_t *const SFEM_RESTRICT elements,
-                                                                        const T *const SFEM_RESTRICT     elemental_matrix,
-                                                                        const T *const SFEM_RESTRICT     x,
-                                                                        T *const SFEM_RESTRICT           y) {
-    static const int BLOCK_SIZE   = LEVEL + 1;
-    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
-    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
-
-    assert(blockDim.x == BLOCK_SIZE);
-    assert(blockDim.y == BLOCK_SIZE);
-    assert(blockDim.z == BLOCK_SIZE);
-
-    __shared__ T x_block[BLOCK_SIZE_3];
-    __shared__ T y_block[BLOCK_SIZE_3];
-    __shared__ T emat[64];
-
-    const int lidx = threadIdx.x + blockDim.x * threadIdx.y + (blockDim.x * blockDim.y) * threadIdx.z;
-
-    assert(blockDim.x == 4); // 4 shape function in the x direction
-    assert(blockDim.y == 8); // 8 elements in the y directions
-    assert(blockDim.z == BLOCK_SIZE / (blockDim.x * blockDim.y)); // ceil(n_micro_elements / 8)
-
-    const int warp_id = lidx / SFEM_WARP_SIZE;
-    const int lane_id = lidx % SFEM_WARP_SIZE;
-    
-    const int mat_i = lane_id % 4;
-    const int mat_j = lane_id / 4;
-
-    const int offset_0 = mat_i * 4 + mat_j;
-    const int offset_1 = mat_i * 4 + 4 + mat_j;
-    
-    const int x_offset = (threadIdx.x & 1);
-    const int y_offset = (threadIdx.x & 2);
-    const int micro_element_offset = threadIdx.z / 8;
-
-    // y_elements * z_elements
-    const bool is_element = threadIdx.y + blockDim.y * threadIdx.z  < (LEVEL * LEVEL * LEVEL);
-
-    // Bottom or top
-    const int vertex_id = lidx % 4;
-    const int shape_id  = vertex_id == 3 ? 2 : (vertex_id == 2 ? 3 : vertex_id);
-
-    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
-        if (lidx < 64) {
-            emat[lidx] = elemental_matrix[e * 64 + lidx];
-        }
-
-        const ptrdiff_t idx = elements[e * BLOCK_SIZE_3 + lidx];
-
-        x_block[lidx] = x[idx];  // Copy coeffs to shared mem
-        y_block[lidx] = 0;       // Reset
-
-        __syncthreads();  //
-
-        // 8 elements at time
-        // for (int pack = warp_id * 8; pack < (LEVEL * LEVEL * LEVEL); pack += n_warps * 8) {
-        // C += [A0, A1] * [u0,u1]^T
-
-        // Assume Symmetric
-        const double A0 = emat[offset_0];
-        const double A1 = emat[offset_1];
-
-        double u0 = 0;
-        double u1 = 0;
-
-        double C[2] = {0, 0};
-
-        // A0 * u0
-        asm volatile(
-                "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
-                "{%0,%1},{%2},{%3},{%4,%5};\n"
-                : "=d"(C[0]), "=d"(C[1])
-                : "d"(A0), "d"(u0), "d"(C[0]), "d"(C[1]));
-
-        // A1 * u1
-        asm volatile(
-                "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
-                "{%0,%1},{%2},{%3},{%4,%5};\n"
-                : "=d"(C[0]), "=d"(C[1])
-                : "d"(A1), "d"(u1), "d"(C[0]), "d"(C[1]));
-
-        // atomicAdd(y_block[lidx], C[0]);
-        // atomicAdd(y_block[lidx], C[1]);
-        // }
-
-        __syncthreads();  //
-        atomicAdd(&y[idx], y_block[lidx]);
-    }
-
-#endif
-
 template <typename T, int LEVEL>
 int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t                  nelements,
                                                          const idx_t *const SFEM_RESTRICT elements,
@@ -745,6 +649,140 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
+
+#else
+
+template <typename T, int LEVEL>
+__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const ptrdiff_t                  nelements,
+                                                                        const idx_t *const SFEM_RESTRICT elements,
+                                                                        const T *const SFEM_RESTRICT     elemental_matrix,
+                                                                        const T *const SFEM_RESTRICT     x,
+                                                                        T *const SFEM_RESTRICT           y) {
+    static const int BLOCK_SIZE       = LEVEL + 1;
+    static const int BLOCK_SIZE_2     = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3     = BLOCK_SIZE_2 * BLOCK_SIZE;
+    static const int N_MICRO_ELEMENTS = LEVEL * LEVEL * LEVEL;
+
+    __shared__ T x_block[BLOCK_SIZE_3];
+    __shared__ T y_block[BLOCK_SIZE_3];
+    __shared__ T emat[64];
+
+    const int lidx = threadIdx.x + blockDim.x * threadIdx.y + (blockDim.x * blockDim.y) * threadIdx.z;
+
+    assert(blockDim.x == 4);  // 4 shape function in the x direction
+    assert(blockDim.y == 8);  // 8 elements in the y directions
+
+    const int lane_id = lidx % SFEM_WARP_SIZE;
+
+    const int mat_i = lane_id % 4;
+    const int mat_j = lane_id / 4;
+
+    const int offset_0 = mat_i * 4 + mat_j;
+    const int offset_1 = mat_i * 4 + 4 + mat_j;
+
+    const int x_offset   = (threadIdx.x & 1);
+    const int y_offset   = (threadIdx.x & 2);
+    const int batch_size = blockDim.y * blockDim.z;
+    const int n_rounds   = (N_MICRO_ELEMENTS + batch_size - 1) / batch_size;
+
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        if (lidx < 64) {
+            emat[lidx] = elemental_matrix[e * 64 + lidx];
+        }
+
+        if (lidx < BLOCK_SIZE_3) {
+            const ptrdiff_t idx = elements[e * BLOCK_SIZE_3 + lidx];
+            x_block[lidx]       = x[idx];  // Copy coeffs to shared mem
+        }
+
+        y_block[lidx] = 0;  // Reset
+
+        __syncthreads();
+
+        const double A0 = emat[offset_0];
+        const double A1 = emat[offset_1];
+
+        for (int r = 0; r < n_rounds; r++) {
+            const int micro_e = threadIdx.y + threadIdx.z * (N_MICRO_ELEMENTS / 8) + r * batch_size;
+            const int xe      = micro_e % LEVEL;
+            const int ye      = (micro_e / LEVEL) % LEVEL;
+            const int ze      = micro_e / (LEVEL * LEVEL);
+
+            const int x0 = xe + x_offset;
+            const int y0 = ye + y_offset;
+
+            // FIXME?
+            const int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, ze);
+            const int idx1 = cu_sshex8_lidx(LEVEL, x0, y0, ze + 1);
+
+            double u0 = 0;
+            double u1 = 0;
+
+            // Assume Symmetric??
+            if (micro_e < N_MICRO_ELEMENTS) {
+                u0 = x_block[idx0];
+                u1 = x_block[idx1];
+            }
+
+            double C[2] = {0, 0};
+
+            // C += A0 * u0
+            asm volatile(
+                    "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
+                    "{%0,%1},{%2},{%3},{%4,%5};\n"
+                    : "=d"(C[0]), "=d"(C[1])
+                    : "d"(A0), "d"(u0), "d"(C[0]), "d"(C[1]));
+
+            //  C += A1 * u1
+            asm volatile(
+                    "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
+                    "{%0,%1},{%2},{%3},{%4,%5};\n"
+                    : "=d"(C[0]), "=d"(C[1])
+                    : "d"(A1), "d"(u1), "d"(C[0]), "d"(C[1]));
+
+            if (micro_e < N_MICRO_ELEMENTS) {
+                atomicAdd(&y_block[idx0], C[0]);
+                atomicAdd(&y_block[idx1], C[1]);
+            }
+        }
+
+        __syncthreads();
+
+        if (lidx < BLOCK_SIZE_3) {
+            const ptrdiff_t idx = elements[e * BLOCK_SIZE_3 + lidx];
+            atomicAdd(&y[idx], y_block[lidx]);
+        }
+    }
+}
+
+template <typename T, int LEVEL>
+int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t                  nelements,
+                                                         const idx_t *const SFEM_RESTRICT elements,
+                                                         const T *const SFEM_RESTRICT     elemental_matrix,
+                                                         const T *const SFEM_RESTRICT     x,
+                                                         T *const SFEM_RESTRICT           y,
+                                                         void                            *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
+
+    dim3 block_size(4, 8, Z_SIZE);
+    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp<T, LEVEL>
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, elemental_matrix, x, y);
+    } else {
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp<T, LEVEL>
+                <<<n_blocks, block_size, 0>>>(nelements, elements, elemental_matrix, x, y);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+#endif
 
 template <typename T>
 int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                        level,
