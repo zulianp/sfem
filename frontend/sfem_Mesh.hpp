@@ -40,7 +40,7 @@ namespace sfem {
         int convert_to_macro_element_mesh();
 
         int           spatial_dimension() const;
-        int           n_nodes_per_elem() const;
+        int           n_nodes_per_element() const;
         ptrdiff_t     n_nodes() const;
         ptrdiff_t     n_elements() const;
         enum ElemType element_type() const;

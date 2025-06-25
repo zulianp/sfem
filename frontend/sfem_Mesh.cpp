@@ -88,7 +88,7 @@ namespace sfem {
     }
 
     int Mesh::spatial_dimension() const { return impl_->mesh.spatial_dim; }
-    int Mesh::n_nodes_per_elem() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
+    int Mesh::n_nodes_per_element() const { return elem_num_nodes((enum ElemType)impl_->mesh.element_type); }
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->mesh.nnodes; }
     ptrdiff_t Mesh::n_elements() const { return impl_->mesh.nelements; }
@@ -100,7 +100,7 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
-        return Buffer<idx_t *>::wrap(n_nodes_per_elem(), n_elements(), impl_->mesh.elements);
+        return Buffer<idx_t *>::wrap(n_nodes_per_element(), n_elements(), impl_->mesh.elements);
     }
 
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
@@ -151,7 +151,7 @@ namespace sfem {
     }
 
     const idx_t *const Mesh::idx(const int node_num) const {
-        assert(node_num < n_nodes_per_elem());
+        assert(node_num < n_nodes_per_element());
         assert(node_num >= 0);
         return impl_->mesh.elements[node_num];
     }
