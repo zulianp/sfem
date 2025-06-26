@@ -879,10 +879,6 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
                 return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 8>(
                         nelements, elements, elemental_matrix, x, y, stream);
             }
-            case 16: {
-                return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 16>(
-                        nelements, elements, elemental_matrix, x, y, stream);
-            }
             default:
                 break;
         }
