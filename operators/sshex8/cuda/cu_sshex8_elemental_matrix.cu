@@ -518,8 +518,6 @@ extern int cu_affine_sshex8_elemental_matrix_apply(const int                    
     }
 }
 
-#if 1
-
 #define USE_CARTESIAN_ORDERING
 
 template <typename T, int LEVEL>
@@ -650,14 +648,16 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
     return SFEM_SUCCESS;
 }
 
-#else
-
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const ptrdiff_t                  nelements,
-                                                                        const idx_t *const SFEM_RESTRICT elements,
-                                                                        const T *const SFEM_RESTRICT     elemental_matrix,
-                                                                        const T *const SFEM_RESTRICT     x,
-                                                                        T *const SFEM_RESTRICT           y) {
+__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC(const ptrdiff_t                  nelements,
+                                                                      const idx_t *const SFEM_RESTRICT elements,
+                                                                      const T *const SFEM_RESTRICT     elemental_matrix,
+                                                                      const T *const SFEM_RESTRICT     x,
+                                                                      T *const SFEM_RESTRICT           y) {
+    assert(blockDim.x == 4);  // 4 shape function in the x direction
+    assert(blockDim.y == 8);  // 8 elements in the y directions
+    assert(blockDim.x * blockDim.y * blockDim.z >= 64);
+
     static const int BLOCK_SIZE       = LEVEL + 1;
     static const int BLOCK_SIZE_2     = BLOCK_SIZE * BLOCK_SIZE;
     static const int BLOCK_SIZE_3     = BLOCK_SIZE_2 * BLOCK_SIZE;
@@ -667,35 +667,50 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
     __shared__ T y_block[BLOCK_SIZE_3];
     __shared__ T emat[64];
 
-    const int lidx = threadIdx.x + blockDim.x * threadIdx.y + (blockDim.x * blockDim.y) * threadIdx.z;
+    const int lane_id = threadIdx.x + blockDim.x * threadIdx.y;
+    const int lidx = lane_id + (blockDim.x * blockDim.y) * threadIdx.z;
 
-    assert(blockDim.x == 4);  // 4 shape function in the x direction
-    assert(blockDim.y == 8);  // 8 elements in the y directions
+    // Elemental matrix entries for this thread
+    const int offset_0 = threadIdx.y * 8 + threadIdx.x;
+    const int offset_1 = threadIdx.y * 8 + 4 + threadIdx.x;
 
-    const int lane_id = lidx % SFEM_WARP_SIZE;
+    assert(offset_0 < 64);
+    assert(offset_1 < 64);
 
-    const int mat_i = lane_id % 4;
-    const int mat_j = lane_id / 4;
+    // Nodes on quad input
+    const int in_x_offset = !!(threadIdx.x & 1);
+    const int in_y_offset = !!(threadIdx.x & 2);
 
-    const int offset_0 = mat_i * 4 + mat_j;
-    const int offset_1 = mat_i * 4 + 4 + mat_j;
+    assert(in_x_offset <= 1);
+    assert(in_y_offset <= 1);
 
-    const int x_offset   = (threadIdx.x & 1);
-    const int y_offset   = (threadIdx.x & 2);
+    const int out_x_offset = !!(threadIdx.y & 1);
+    const int out_y_offset = !!(threadIdx.y & 2);
+    const int out_z_offset = !!(threadIdx.y & 4);
+
+    assert(out_x_offset <= 1);
+    assert(out_y_offset <= 1);
+    assert(out_z_offset <= 1);
+
+    // Max number of elements per batch
     const int batch_size = blockDim.y * blockDim.z;
-    const int n_rounds   = (N_MICRO_ELEMENTS + batch_size - 1) / batch_size;
+
+    // Number of rounds/batches
+    const int n_rounds     = (N_MICRO_ELEMENTS + batch_size - 1) / batch_size;
+    const int batch_offset = threadIdx.z * (N_MICRO_ELEMENTS / 8);
 
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        // Copy elemental matrix from global memory to shared memory (Colaesced)
         if (lidx < 64) {
             emat[lidx] = elemental_matrix[e * 64 + lidx];
         }
 
+        // Copy coefficients from global memory to shared memory (Random Access)
         if (lidx < BLOCK_SIZE_3) {
             const ptrdiff_t idx = elements[e * BLOCK_SIZE_3 + lidx];
-            x_block[lidx]       = x[idx];  // Copy coeffs to shared mem
+            x_block[lidx]       = x[idx];
+            y_block[lidx]       = 0;  // Reset
         }
-
-        y_block[lidx] = 0;  // Reset
 
         __syncthreads();
 
@@ -703,23 +718,32 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
         const double A1 = emat[offset_1];
 
         for (int r = 0; r < n_rounds; r++) {
-            const int micro_e = threadIdx.y + threadIdx.z * (N_MICRO_ELEMENTS / 8) + r * batch_size;
-            const int xe      = micro_e % LEVEL;
-            const int ye      = (micro_e / LEVEL) % LEVEL;
-            const int ze      = micro_e / (LEVEL * LEVEL);
-
-            const int x0 = xe + x_offset;
-            const int y0 = ye + y_offset;
-
-            // FIXME?
-            const int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, ze);
-            const int idx1 = cu_sshex8_lidx(LEVEL, x0, y0, ze + 1);
+            const int in_micro_e  = threadIdx.y + batch_offset + r * batch_size;
+            const int out_micro_e = 2 * threadIdx.x + batch_offset + r * batch_size;
 
             double u0 = 0;
             double u1 = 0;
 
-            // Assume Symmetric??
-            if (micro_e < N_MICRO_ELEMENTS) {
+            if (in_micro_e < N_MICRO_ELEMENTS) {
+                // construct micro-element tensorial index
+                const int in_xe = in_micro_e % LEVEL;
+                const int in_ye = (in_micro_e / LEVEL) % LEVEL;
+                const int in_ze = in_micro_e / (LEVEL * LEVEL);
+                const int x0    = in_xe + in_x_offset;
+                const int y0    = in_ye + in_y_offset;
+
+                assert(x0 < LEVEL + 1);
+                assert(y0 < LEVEL + 1);
+                assert(in_ze < LEVEL);
+
+                // Bottom node
+                int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, in_ze);
+                assert(idx0 < BLOCK_SIZE_3);
+
+                // Top node
+                int idx1 = cu_sshex8_lidx(LEVEL, x0, y0, in_ze + 1);
+                assert(idx1 < BLOCK_SIZE_3);
+
                 u0 = x_block[idx0];
                 u1 = x_block[idx1];
             }
@@ -733,15 +757,48 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
                     : "=d"(C[0]), "=d"(C[1])
                     : "d"(A0), "d"(u0), "d"(C[0]), "d"(C[1]));
 
-            //  C += A1 * u1
+            // C += A1 * u1
             asm volatile(
                     "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
                     "{%0,%1},{%2},{%3},{%4,%5};\n"
                     : "=d"(C[0]), "=d"(C[1])
                     : "d"(A1), "d"(u1), "d"(C[0]), "d"(C[1]));
 
-            if (micro_e < N_MICRO_ELEMENTS) {
+            if (out_micro_e < N_MICRO_ELEMENTS) {
+                const int out_xe = out_micro_e % LEVEL;
+                const int out_ye = (out_micro_e / LEVEL) % LEVEL;
+                const int out_ze = out_micro_e / (LEVEL * LEVEL);
+
+                const int x0 = out_xe + out_x_offset;
+                const int y0 = out_ye + out_y_offset;
+                const int z0 = out_ze + out_z_offset;
+
+                assert(x0 < LEVEL + 1);
+                assert(y0 < LEVEL + 1);
+                assert(z0 < LEVEL + 1);
+
+                int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, z0);
+                assert(idx0 < BLOCK_SIZE_3);
+
                 atomicAdd(&y_block[idx0], C[0]);
+            }
+
+            if (out_micro_e + 1 < N_MICRO_ELEMENTS) {
+                const int out_xe = (out_micro_e + 1) % LEVEL;
+                const int out_ye = ((out_micro_e + 1) / LEVEL) % LEVEL;
+                const int out_ze = (out_micro_e + 1) / (LEVEL * LEVEL);
+
+                const int x1 = out_xe + out_x_offset;
+                const int y1 = out_ye + out_y_offset;
+                const int z1 = out_ze + out_z_offset;
+
+                assert(x1 < LEVEL + 1);
+                assert(y1 < LEVEL + 1);
+                assert(z1 < LEVEL + 1);
+
+                int idx1 = cu_sshex8_lidx(LEVEL, x1, y1, z1);
+                assert(idx1 < BLOCK_SIZE_3);
+
                 atomicAdd(&y_block[idx1], C[1]);
             }
         }
@@ -756,12 +813,12 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp(const pt
 }
 
 template <typename T, int LEVEL>
-int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t                  nelements,
-                                                         const idx_t *const SFEM_RESTRICT elements,
-                                                         const T *const SFEM_RESTRICT     elemental_matrix,
-                                                         const T *const SFEM_RESTRICT     x,
-                                                         T *const SFEM_RESTRICT           y,
-                                                         void                            *stream) {
+int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t                  nelements,
+                                                       const idx_t *const SFEM_RESTRICT elements,
+                                                       const T *const SFEM_RESTRICT     elemental_matrix,
+                                                       const T *const SFEM_RESTRICT     x,
+                                                       T *const SFEM_RESTRICT           y,
+                                                       void                            *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
@@ -771,18 +828,16 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
-        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp<T, LEVEL>
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>
                 <<<n_blocks, block_size, 0, s>>>(nelements, elements, elemental_matrix, x, y);
     } else {
-        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warp<T, LEVEL>
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>
                 <<<n_blocks, block_size, 0>>>(nelements, elements, elemental_matrix, x, y);
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
 }
-
-#endif
 
 template <typename T>
 int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                        level,
@@ -792,6 +847,28 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
                                                     const T *const SFEM_RESTRICT     x,
                                                     T *const SFEM_RESTRICT           y,
                                                     void                            *stream) {
+    int SFEM_ENABLE_TC = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
+
+    if (SFEM_ENABLE_TC) {
+        switch (level) {
+            case 4: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 4>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            case 6: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 6>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            case 8: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 8>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            default:
+                break;
+        }
+    }
+
     switch (level) {
         case 4: {
             return cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl<T, 4>(
@@ -806,9 +883,10 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
                     nelements, elements, elemental_matrix, x, y, stream);
         }
         default:
-            SFEM_ERROR("NOT implemented!\n");
             break;
     }
+
+    SFEM_ERROR("NOT implemented!\n");
 
     return SFEM_FAILURE;
 }
