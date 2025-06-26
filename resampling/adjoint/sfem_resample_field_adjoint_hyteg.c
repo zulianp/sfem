@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define real_t real_type
+// #define real_t  real_t
 
 #include "hyteg.h"
 #include "quadratures_rule.h"
@@ -45,26 +45,26 @@
  *
  * @return The weighted sum of the basis functions
  */
-static real_type tet4_eval_dual_basis_weighted_physical(
+static real_t tet4_eval_dual_basis_weighted_physical(
         // Point in physical space
-        const real_type x, const real_type y, const real_type z,
+        const real_t x, const real_t y, const real_t z,
 
         // Coordinates of tetrahedron vertices
-        const real_type x0, const real_type y0, const real_type z0,  // Vertex 0
-        const real_type x1, const real_type y1, const real_type z1,  // Vertex 1
-        const real_type x2, const real_type y2, const real_type z2,  // Vertex 2
-        const real_type x3, const real_type y3, const real_type z3,  // Vertex 3
+        const real_t x0, const real_t y0, const real_t z0,  // Vertex 0
+        const real_t x1, const real_t y1, const real_t z1,  // Vertex 1
+        const real_t x2, const real_t y2, const real_t z2,  // Vertex 2
+        const real_t x3, const real_t y3, const real_t z3,  // Vertex 3
 
         // Weights for vertices
-        const real_type wf0, const real_type wf1, const real_type wf2, const real_type wf3,
+        const real_t wf0, const real_t wf1, const real_t wf2, const real_t wf3,
 
         // Output basis function values (can be NULL)
-        real_type* f0_out, real_type* f1_out, real_type* f2_out, real_type* f3_out) {
+        real_t* f0_out, real_t* f1_out, real_t* f2_out, real_t* f3_out) {
     // Convert physical coordinates to local coordinates using barycentric coordinates
 
     // Matrix components for coordinate transformation
 
-    real_type X[3][3], b[3], det;
+    real_t X[3][3], b[3], det;
 
     // Set up the system matrix
     X[0][0] = x1 - x0;
@@ -96,7 +96,7 @@ static real_type tet4_eval_dual_basis_weighted_physical(
     }
 
     // Solve the system using Cramer's rule
-    real_type qx, qy, qz;
+    real_t qx, qy, qz;
 
     // Compute local coordinates using inverse mapping
     qx = ((b[0] * (X[1][1] * X[2][2] - X[1][2] * X[2][1]) - X[0][1] * (b[1] * X[2][2] - X[1][2] * b[2]) +
@@ -113,17 +113,17 @@ static real_type tet4_eval_dual_basis_weighted_physical(
 
     // Now compute basis functions using local coordinates
     // DUAL basis function (Shape functions for tetrahedral elements)
-    const real_type f0 = 1.0 - qx - qy - qz;
-    const real_type f1 = qx;
-    const real_type f2 = qy;
-    const real_type f3 = qz;
+    const real_t f0 = 1.0 - qx - qy - qz;
+    const real_t f1 = qx;
+    const real_t f2 = qy;
+    const real_t f3 = qz;
 
     // Values of the shape functions at the quadrature point
     // In the local coordinate system of the tetrahedral element
-    const real_type tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-    const real_type tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-    const real_type tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-    const real_type tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+    const real_t tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
+    const real_t tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
+    const real_t tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
+    const real_t tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
 
     // Store the basis function values if pointers are provided
     if (f0_out) *f0_out = tet4_f0;
@@ -165,7 +165,7 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
-        real_type g_qx, g_qy, g_qz;
+        real_t g_qx, g_qy, g_qz;
 
         tet4_transform_v2(x0,              // x-coordinates of the vertices
                           x1,              //
@@ -186,14 +186,14 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
                           &g_qy,           //
                           &g_qz);          //
 
-        real_type tet4_f0, tet4_f1, tet4_f2, tet4_f3;
+        real_t tet4_f0, tet4_f1, tet4_f2, tet4_f3;
         {
             // DUAL basis function (Shape functions for tetrahedral elements)
             // at the quadrature point
-            const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
-            const real_type f1 = tet_qx[quad_i];
-            const real_type f2 = tet_qy[quad_i];
-            const real_type f3 = tet_qz[quad_i];
+            const real_t f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
+            const real_t f1 = tet_qx[quad_i];
+            const real_t f2 = tet_qy[quad_i];
+            const real_t f3 = tet_qz[quad_i];
 
             // Values of the shape functions at the quadrature point
             // In the local coordinate system of the tetrahedral element
@@ -204,22 +204,22 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
             tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
         }
 
-        const real_type grid_x = (g_qx - ox) / dx;
-        const real_type grid_y = (g_qy - oy) / dy;
-        const real_type grid_z = (g_qz - oz) / dz;
+        const real_t grid_x = (g_qx - ox) / dx;
+        const real_t grid_y = (g_qy - oy) / dy;
+        const real_t grid_z = (g_qz - oz) / dz;
 
         const ptrdiff_t i = floor(grid_x);
         const ptrdiff_t j = floor(grid_y);
         const ptrdiff_t k = floor(grid_z);
 
-        real_type l_x = (grid_x - (real_type)i);
-        real_type l_y = (grid_y - (real_type)j);
-        real_type l_z = (grid_z - (real_type)k);
+        real_t l_x = (grid_x - (real_t)i);
+        real_t l_y = (grid_y - (real_t)j);
+        real_t l_z = (grid_z - (real_t)k);
 
         // Critical point
         // Compute the shape functions of the hexahedral (cubic) element
         // at the quadrature point
-        real_type hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
+        real_t hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
 
         hex_aa_8_eval_fun_V(l_x,        // Local coordinates
                             l_y,        //
@@ -249,17 +249,17 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
                                           &i7);    //
 
         // Integrate the values of the field at the vertices of the tetrahedral element
-        const real_type dV = (1.0 / 6.0) * det_jacobian * tet_qw[quad_i];
-        const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
+        const real_t dV = (1.0 / 6.0) * det_jacobian * tet_qw[quad_i];
+        const real_t It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
 
-        const real_type d0 = It * hex8_f0;
-        const real_type d1 = It * hex8_f1;
-        const real_type d2 = It * hex8_f2;
-        const real_type d3 = It * hex8_f3;
-        const real_type d4 = It * hex8_f4;
-        const real_type d5 = It * hex8_f5;
-        const real_type d6 = It * hex8_f6;
-        const real_type d7 = It * hex8_f7;
+        const real_t d0 = It * hex8_f0;
+        const real_t d1 = It * hex8_f1;
+        const real_t d2 = It * hex8_f2;
+        const real_t d3 = It * hex8_f3;
+        const real_t d4 = It * hex8_f4;
+        const real_t d5 = It * hex8_f5;
+        const real_t d6 = It * hex8_f6;
+        const real_t d7 = It * hex8_f7;
 
         // Update the data
         data[i0] += d0;
@@ -273,23 +273,23 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
     }
 }
 
-real_t                                                         //
-calculate_det_Jacobian_for_category(const int       category,  //
-                                    const real_type px0,       //
-                                    const real_type py0,       //
-                                    const real_type pz0,       //
-                                    const real_type px1,       //
-                                    const real_type py1,       //
-                                    const real_type pz1,       //
-                                    const real_type px2,       //
-                                    const real_type py2,       //
-                                    const real_type pz2,       //
-                                    const real_type px3,       //
-                                    const real_type py3,       //
-                                    const real_type pz3,       //
-                                    const real_t    L,         //
-                                    const int       tet_i,     //
-                                    int*            error_flag) {         //
+real_t                                                      //
+calculate_det_Jacobian_for_category(const int    category,  //
+                                    const real_t px0,       //
+                                    const real_t py0,       //
+                                    const real_t pz0,       //
+                                    const real_t px1,       //
+                                    const real_t py1,       //
+                                    const real_t pz1,       //
+                                    const real_t px2,       //
+                                    const real_t py2,       //
+                                    const real_t pz2,       //
+                                    const real_t px3,       //
+                                    const real_t py3,       //
+                                    const real_t pz3,       //
+                                    const real_t L,         //
+                                    const int    tet_i,     //
+                                    int*         error_flag) {      //
     real_t det_jacobian = 0.0;
     *error_flag         = 0;
 
@@ -377,16 +377,16 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
     // If the alpha value is below the minimum threshold, no refinement is applied.
     // If the alpha value is above the maximum threshold, the maximum level of refinement is applied.
 
-    const real_type ox = (real_type)origin[0];
-    const real_type oy = (real_type)origin[1];
-    const real_type oz = (real_type)origin[2];
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
 
-    const real_type dx = (real_type)delta[0];
-    const real_type dy = (real_type)delta[1];
-    const real_type dz = (real_type)delta[2];
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
 
-    const real_type d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
-    const real_type hexahedron_volume = dx * dy * dz;
+    const real_t d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+    const real_t hexahedron_volume = dx * dy * dz;
 
 #if SFEM_LOG_LEVEL >= 5
     printf("============================================================\n");
@@ -407,57 +407,57 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         // Read the coordinates of the vertices of the tetrahedron
         // In the physical space
-        const real_type x0_p = xyz[0][ev[0]];
-        const real_type x1_p = xyz[0][ev[1]];
-        const real_type x2_p = xyz[0][ev[2]];
-        const real_type x3_p = xyz[0][ev[3]];
+        const real_t x0_n = xyz[0][ev[0]];
+        const real_t x1_n = xyz[0][ev[1]];
+        const real_t x2_n = xyz[0][ev[2]];
+        const real_t x3_n = xyz[0][ev[3]];
 
-        const real_type y0_p = xyz[1][ev[0]];
-        const real_type y1_p = xyz[1][ev[1]];
-        const real_type y2_p = xyz[1][ev[2]];
-        const real_type y3_p = xyz[1][ev[3]];
+        const real_t y0_n = xyz[1][ev[0]];
+        const real_t y1_n = xyz[1][ev[1]];
+        const real_t y2_n = xyz[1][ev[2]];
+        const real_t y3_n = xyz[1][ev[3]];
 
-        const real_type z0_p = xyz[2][ev[0]];
-        const real_type z1_p = xyz[2][ev[1]];
-        const real_type z2_p = xyz[2][ev[2]];
-        const real_type z3_p = xyz[2][ev[3]];
+        const real_t z0_n = xyz[2][ev[0]];
+        const real_t z1_n = xyz[2][ev[1]];
+        const real_t z2_n = xyz[2][ev[2]];
+        const real_t z3_n = xyz[2][ev[3]];
 
         // Compute the alpha_tet to decide if the tetrahedron is refined
         // Sides of the tetrahedron
-        real_type edges_length[6];
+        real_t edges_length[6];
 
         int vertex_a = -1;
         int vertex_b = -1;
 
-        const real_type max_edges_length =          //
-                tet_edge_max_length(x0_p,           //
-                                    y0_p,           //
-                                    z0_p,           //
-                                    x1_p,           //
-                                    y1_p,           //
-                                    z1_p,           //
-                                    x2_p,           //
-                                    y2_p,           //
-                                    z2_p,           //
-                                    x3_p,           //
-                                    y3_p,           //
-                                    z3_p,           //
+        const real_t max_edges_length =             //
+                tet_edge_max_length(x0_n,           //
+                                    y0_n,           //
+                                    z0_n,           //
+                                    x1_n,           //
+                                    y1_n,           //
+                                    z1_n,           //
+                                    x2_n,           //
+                                    y2_n,           //
+                                    z2_n,           //
+                                    x3_n,           //
+                                    y3_n,           //
+                                    z3_n,           //
                                     &vertex_a,      // Output
                                     &vertex_b,      // Output
                                     edges_length);  // Output
 
-        const real_t x0_n = x0_p;
-        const real_t x1_n = x1_p;
-        const real_t x2_n = x2_p;
-        const real_t x3_n = x3_p;
-        const real_t y0_n = y0_p;
-        const real_t y1_n = y1_p;
-        const real_t y2_n = y2_p;
-        const real_t y3_n = y3_p;
-        const real_t z0_n = z0_p;
-        const real_t z1_n = z1_p;
-        const real_t z2_n = z2_p;
-        const real_t z3_n = z3_p;
+        // const real_t x0_n = x0_p;
+        // const real_t x1_n = x1_p;
+        // const real_t x2_n = x2_p;
+        // const real_t x3_n = x3_p;
+        // const real_t y0_n = y0_p;
+        // const real_t y1_n = y1_p;
+        // const real_t y2_n = y2_p;
+        // const real_t y3_n = y3_p;
+        // const real_t z0_n = z0_p;
+        // const real_t z1_n = z1_p;
+        // const real_t z2_n = z2_p;
+        // const real_t z3_n = z3_p;
 
         // const real_t scale_tet =                         //
         //         tet_normalize_by_edge(x0_p,              //
@@ -494,22 +494,22 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
-        const int    max_refinement_L    = 3;    // Maximum refinement level
+        const int    max_refinement_L    = 4;    // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            //
                                            alpha_min_threshold,  //
                                            alpha_max_threshold,  //
                                            max_refinement_L);    //
 
-        const int     hteg_num_tetrahedra = get_hyteg_num_tetrahedra(L);
-        const real_t* x_hyteg             = get_hyteg_x(L);
-        const real_t* y_hyteg             = get_hyteg_y(L);
-        const real_t* z_hyteg             = get_hyteg_z(L);
-        const int*    categories_hyteg    = get_hyteg_categories(L);
-        const int*    v0_array_hyteg      = get_hyteg_v0(L);
-        const int*    v1_array_hyteg      = get_hyteg_v1(L);
-        const int*    v2_array_hyteg      = get_hyteg_v2(L);
-        const int*    v3_array_hyteg      = get_hyteg_v3(L);
+        const int     hyteg_num_tetrahedra = get_hyteg_num_tetrahedra(L);
+        const real_t* x_hyteg              = get_hyteg_x(L);
+        const real_t* y_hyteg              = get_hyteg_y(L);
+        const real_t* z_hyteg              = get_hyteg_z(L);
+        const int*    categories_hyteg     = get_hyteg_categories(L);
+        const int*    v0_array_hyteg       = get_hyteg_v0(L);
+        const int*    v1_array_hyteg       = get_hyteg_v1(L);
+        const int*    v2_array_hyteg       = get_hyteg_v2(L);
+        const int*    v3_array_hyteg       = get_hyteg_v3(L);
 
         // if (L > 1 && alpha_tet > alpha_min_threshold) {
         //     printf("Refinement level for tetrahedron %ld: %d, alpha_tet = %g, max_edges_length = %g, d_min = %g, num tet:
@@ -522,22 +522,22 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         //            hteg_num_tetrahedra);
         // }
 
-        const real_type theta_volume_main = tet4_measure_v2(x0_n,  //
-                                                            x1_n,  //
-                                                            x2_n,  //
-                                                            x3_n,  //
-                                                            //
-                                                            y0_n,  //
-                                                            y1_n,  //
-                                                            y2_n,  //
-                                                            y3_n,  //
-                                                            //
-                                                            z0_n,   //
-                                                            z1_n,   //
-                                                            z2_n,   //
-                                                            z3_n);  //
+        const real_t theta_volume_main = tet4_measure_v2(x0_n,  //
+                                                         x1_n,  //
+                                                         x2_n,  //
+                                                         x3_n,  //
+                                                         //
+                                                         y0_n,  //
+                                                         y1_n,  //
+                                                         y2_n,  //
+                                                         y3_n,  //
+                                                         //
+                                                         z0_n,   //
+                                                         z1_n,   //
+                                                         z2_n,   //
+                                                         z3_n);  //
 
-        real_type theta_volume_acc = 0.0;
+        real_t theta_volume_acc = 0.0;
 
         // printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
         //        hteg_num_tetrahedra,
@@ -546,7 +546,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         //        max_edges_length,
         //        d_min);
 
-        for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++) {  //
+        for (int tet_i = 0; tet_i < hyteg_num_tetrahedra; tet_i++) {  //
             //
             const int category = categories_hyteg[tet_i];
 
@@ -556,20 +556,20 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             const int v3 = v3_array_hyteg[tet_i];
 
             // Coordinates of the HyTeg tetrahedron in the reference space
-            const real_type px0 = x_hyteg[v0];
-            const real_type px1 = x_hyteg[v1];
-            const real_type px2 = x_hyteg[v2];
-            const real_type px3 = x_hyteg[v3];
+            const real_t px0 = x_hyteg[v0];
+            const real_t px1 = x_hyteg[v1];
+            const real_t px2 = x_hyteg[v2];
+            const real_t px3 = x_hyteg[v3];
 
-            const real_type py0 = y_hyteg[v0];
-            const real_type py1 = y_hyteg[v1];
-            const real_type py2 = y_hyteg[v2];
-            const real_type py3 = y_hyteg[v3];
+            const real_t py0 = y_hyteg[v0];
+            const real_t py1 = y_hyteg[v1];
+            const real_t py2 = y_hyteg[v2];
+            const real_t py3 = y_hyteg[v3];
 
-            const real_type pz0 = z_hyteg[v0];
-            const real_type pz1 = z_hyteg[v1];
-            const real_type pz2 = z_hyteg[v2];
-            const real_type pz3 = z_hyteg[v3];
+            const real_t pz0 = z_hyteg[v0];
+            const real_t pz1 = z_hyteg[v1];
+            const real_t pz2 = z_hyteg[v2];
+            const real_t pz3 = z_hyteg[v3];
 
             // printf("Tet vertices: px0 = %g, py0 = %g, pz0 = %g || px1 = %g, py1 = %g, pz1 = %g || "
             //        "px2 = %g, py2 = %g, pz2 = %g || px3 = %g, py3 = %g, pz3 = %g\n",
@@ -586,9 +586,9 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             //        py3,
             //        pz3);
 
-            const real_t fx0, fx1, fx2, fx3;
-            const real_t fy0, fy1, fy2, fy3;
-            const real_t fz0, fz1, fz2, fz3;
+            real_t fx0, fx1, fx2, fx3;
+            real_t fy0, fy1, fy2, fy3;
+            real_t fz0, fz1, fz2, fz3;
 
             // Transform the vertices of the sub-tetrahedron to the physical space
             tet4_transform_v2(x0_n,   // x-coordinates of the vertices
@@ -807,7 +807,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
             // // // Calculate the volume of the HyTeg tetrahedron
             // // // In the physical space
-            // const real_type theta_volume = tet4_measure_v2(fx0,
+            // const  real_t  theta_volume = tet4_measure_v2(fx0,
             //                                                fx1,
             //                                                fx2,
             //                                                fx3,
@@ -835,32 +835,32 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             //        det_jacobian,
             //        theta_volume);
 
-            tet4_resample_tetrahedron_local_hyteg_adjoint(fx0,           // Tetrahedron vertices X-coordinates
-                                                          fx1,           //
-                                                          fx2,           //
-                                                          fx3,           //
-                                                          fy0,           // Tetrahedron vertices Y-coordinates
-                                                          fy1,           //
-                                                          fy2,           //
-                                                          fy3,           //
-                                                          fz0,           // Tetrahedron vertices Z-coordinates
-                                                          fz1,           //
-                                                          fz2,           //
-                                                          fz3,           //
-                                                          det_jacobian,  // Determinant of the Jacobian
-                                                          wf0,           // Weighted field at the vertices
-                                                          wf1,           //
-                                                          wf2,           //
-                                                          wf3,           //
-                                                          ox,            // Origin of the grid
-                                                          oy,            //
-                                                          oz,            //
-                                                          dx,            // Spacing of the grid
-                                                          dy,            //
-                                                          dz,            //
-                                                          stride,        // Stride
-                                                          n,             // Size of the grid
-                                                          data);         // Output
+            tet4_resample_tetrahedron_local_adjoint(fx0,                               // Tetrahedron vertices X-coordinates
+                                                    fx1,                               //
+                                                    fx2,                               //
+                                                    fx3,                               //
+                                                    fy0,                               // Tetrahedron vertices Y-coordinates
+                                                    fy1,                               //
+                                                    fy2,                               //
+                                                    fy3,                               //
+                                                    fz0,                               // Tetrahedron vertices Z-coordinates
+                                                    fz1,                               //
+                                                    fz2,                               //
+                                                    fz3,                               //
+                                                    fabs(det_jacobian) * (1.0 / 6.0),  // Determinant of the Jacobian
+                                                    wf0,                               // Weighted field at the vertices
+                                                    wf1,                               //
+                                                    wf2,                               //
+                                                    wf3,                               //
+                                                    ox,                                // Origin of the grid
+                                                    oy,                                //
+                                                    oz,                                //
+                                                    dx,                                // Spacing of the grid
+                                                    dy,                                //
+                                                    dz,                                //
+                                                    stride,                            // Stride
+                                                    n,                                 // Size of the grid
+                                                    data);                             // Output
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
