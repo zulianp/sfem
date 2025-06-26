@@ -4,49 +4,6 @@
 #include "sfem_cuda_base.h"
 #include "sfem_macros.h"
 
-#if 0
-
-template <typename T>
-__global__ void cu_affine_hex8_elemental_matrix_apply_kernel(const ptrdiff_t              nelements,
-                                                             idx_t **const SFEM_RESTRICT  elements,
-                                                             T **const SFEM_RESTRICT      elemental_matrix,
-                                                             const T *const SFEM_RESTRICT x,
-                                                             T *const SFEM_RESTRICT       y) {
-    idx_t ev[8];
-    T     mat[8 * 8];
-    T     in[8], out[8];
-
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
-        for (int v = 0; v < 8; v++) {
-            ev[v] = elements[v][e];
-        }
-
-        for (int v = 0; v < 64; v++) {
-            mat[v] = elemental_matrix[v][e];
-        }
-
-        for (int v = 0; v < 8; v++) {
-            in[v] = x[ev[v]];
-        }
-
-        for (int v = 0; v < 8; v++) {
-            out[v] = 0;
-        }
-
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                out[i] += mat[i * 8 + j] * in[j];
-            }
-        }
-
-        for (int v = 0; v < 8; v++) {
-            atomicAdd(&y[ev[v]], out[v]);
-        }
-    }
-}
-
-#else
-
 template <typename T>
 __global__ void cu_affine_hex8_elemental_matrix_apply_kernel(const ptrdiff_t              nelements,
                                                              idx_t **const SFEM_RESTRICT  elements,
@@ -70,74 +27,6 @@ __global__ void cu_affine_hex8_elemental_matrix_apply_kernel(const ptrdiff_t    
         atomicAdd(&y[ev[i]], out);
     }
 }
-
-#endif
-
-// template <int BLOCK_SIZE, typename T>
-// __global__ void cu_affine_hex8_elemental_matrix_apply_kernel_warp(const ptrdiff_t              nelements,
-//                                                                   idx_t **const SFEM_RESTRICT  elements,
-//                                                                   T **const SFEM_RESTRICT      elemental_matrix,
-//                                                                   const T *const SFEM_RESTRICT x,
-//                                                                   T *const SFEM_RESTRICT       y) {
-//     // Shared memory
-//     __shared__ T in[BLOCK_SIZE];
-//     __shared__ idx_t ev[BLOCK_SIZE];
-
-//     // Registers
-//     T row[8];
-//     T coeffs[8];
-
-//     // 8 threads per element
-//     const ptrdiff_t start    = blockIdx.x * blockDim.x / 8;
-//     const int       tile     = threadIdx.x / 8;
-//     const int       tile_idx = threadIdx.x % 8;
-//     const int       tilex8   = tile * 8;
-
-//     const ptrdiff_t nelements_padded = (nelements / 8) * 8;
-//     const ptrdiff_t stride           = blockDim.x * gridDim.x / 8;
-
-//     for (ptrdiff_t e = start + tile; e < nelements_padded; e += stride) {
-//         const bool exists = e < nelements;
-
-//         __syncwarp();
-
-//         idx_t lidx = SFEM_IDX_INVALID;
-//         if (exists) {
-//             // Copy element indices from global to shared mem
-//             lidx = elements[tile_idx][e];
-
-//             // Copy row of elemental matrix from global to possibly "registers"
-//             // Assume symmetry
-//             for (int v = 0; v < 8; v++) {
-//                 assert(tile_idx + v * 8 < 64);
-//                 row[v] = elemental_matrix[tile_idx + v * 8][e];
-//             }
-
-//             in[threadIdx.x] = x[lidx];
-//         }
-
-//         __syncwarp();
-
-//         if (exists) {
-//             T out = 0;
-
-//             // Round-robin to reduce bank conflicts
-//             for (int v = 0; v < 8; v++) {
-//                 const int circular = (tile_idx + v) % 8;
-//                 assert(tilex8 + circular < BLOCK_SIZE);
-//                 coeffs[circular] = in[tilex8 + circular];
-//             }
-
-// #pragma unroll
-//             for (int j = 0; j < 8; j++) {
-//                 out += row[j] * coeffs[j];
-//             }
-
-//             assert(SFEM_IDX_INVALID != lidx);
-//             atomicAdd(&y[lidx], out);
-//         }
-//     }
-// }
 
 template <int BLOCK_SIZE, typename T>
 __global__ void cu_affine_hex8_elemental_matrix_apply_kernel_warp(const ptrdiff_t              nelements,
