@@ -2,6 +2,7 @@
 
 #include "cu_sshex8_inline.hpp"
 #include "sfem_cuda_base.h"
+#include "sfem_macros.h"
 
 #if 0
 
@@ -663,6 +664,8 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC(const ptrd
     static const int BLOCK_SIZE_3     = BLOCK_SIZE_2 * BLOCK_SIZE;
     static const int N_MICRO_ELEMENTS = LEVEL * LEVEL * LEVEL;
 
+    assert(blockDim.x * blockDim.y * blockDim.z >= BLOCK_SIZE_3);
+
     __shared__ T x_block[BLOCK_SIZE_3];
     __shared__ T y_block[BLOCK_SIZE_3];
     __shared__ T emat[64];
@@ -697,7 +700,7 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC(const ptrd
 
     // Number of rounds/batches
     const int n_rounds     = (N_MICRO_ELEMENTS + batch_size - 1) / batch_size;
-    const int batch_offset = threadIdx.z * (N_MICRO_ELEMENTS / 8);
+    const int batch_offset = threadIdx.z * 8;
 
     for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
         // Copy elemental matrix from global memory to shared memory (Colaesced)
@@ -821,9 +824,21 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
                                                        void                            *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
+    int min_grid_size;
+    int max_z_size;
+    cudaOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC<T, LEVEL>, 0, 0);
+
+    max_z_size /= 32;
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
 
-    dim3 block_size(4, 8, Z_SIZE);
+    int z_block_size = MIN(max_z_size, Z_SIZE);
+    
+    if(z_block_size * 4 * 8 < POW3(LEVEL + 1)) {
+        SFEM_ERROR("Too large block size!\n");
+    }
+
+    dim3 block_size(4, 8, z_block_size);
     dim3 n_blocks(MIN(nelements, 65535), 1, 1);
 
     if (stream) {
@@ -862,6 +877,10 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
             }
             case 8: {
                 return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 8>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            case 16: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl<T, 16>(
                         nelements, elements, elemental_matrix, x, y, stream);
             }
             default:

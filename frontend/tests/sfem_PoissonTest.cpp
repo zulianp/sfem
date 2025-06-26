@@ -198,29 +198,36 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
         printf("---------------------\n");
     }
 
-#if 0
-    sfem::create_directory(output_dir.c_str());
+    int SFEM_ENABLE_OUTPUT = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
-    if (fs->has_semi_structured_mesh()) {
-        SFEM_TEST_ASSERT(m->write((output_dir + "/coarse_mesh").c_str()) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
-    } else {
-        SFEM_TEST_ASSERT(m->write((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
-    }
+    if (SFEM_ENABLE_OUTPUT) {
+        if (SFEM_VERBOSE) {
+            printf("Writing output in %s\n", output_dir.c_str());
+        }
 
-    auto output = f->output();
-    output->enable_AoS_to_SoA(fs->block_size() > 1);
-    output->set_output_dir(output_dir.c_str());
+        sfem::create_directory(output_dir.c_str());
+
+        if (fs->has_semi_structured_mesh()) {
+            SFEM_TEST_ASSERT(m->write((output_dir + "/coarse_mesh").c_str()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+        } else {
+            SFEM_TEST_ASSERT(m->write((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+        }
+
+        auto output = f->output();
+        output->enable_AoS_to_SoA(fs->block_size() > 1);
+        output->set_output_dir(output_dir.c_str());
 
 #ifdef SFEM_ENABLE_CUDA
-    if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
-        SFEM_TEST_ASSERT(output->write("x", sfem::to_host(x)->data()) == SFEM_SUCCESS);
-    } else
+        if (x->mem_space() == sfem::MEMORY_SPACE_DEVICE) {
+            SFEM_TEST_ASSERT(output->write("x", sfem::to_host(x)->data()) == SFEM_SUCCESS);
+        } else
 #endif
-    {
-        SFEM_TEST_ASSERT(output->write("x", x->data()) == SFEM_SUCCESS);
+        {
+            SFEM_TEST_ASSERT(output->write("x", x->data()) == SFEM_SUCCESS);
+        }
     }
-#endif
 
     return SFEM_TEST_SUCCESS;
 }
