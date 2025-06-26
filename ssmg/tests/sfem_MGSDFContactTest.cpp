@@ -91,9 +91,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
                                     return dd;
                                 });
 
-    int SFEM_ENABLE_OUPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
-    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUTPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
@@ -171,9 +171,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
                                     return obstacle - y;
                                 });
 
-    int SFEM_ENABLE_OUPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
-    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUTPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
@@ -252,9 +252,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                     return dd;
                                 });
 
-    int SFEM_ENABLE_OUPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
-    if (SFEM_ENABLE_OUPUT) sdf->to_file("test_contact/sdf");
+    int SFEM_ENABLE_OUTPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
@@ -274,8 +274,8 @@ int test_contact() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    int SFEM_ENABLE_OUPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUPUT, atoi);
+    int SFEM_ENABLE_OUTPUT = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(comm,
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
@@ -315,7 +315,7 @@ int test_contact() {
 
     f->add_operator(op);
 
-    if (SFEM_ENABLE_OUPUT) sfem::create_directory("test_contact");
+    if (SFEM_ENABLE_OUTPUT) sfem::create_directory("test_contact");
 
     const char *SFEM_CONTACT_CASE = "sphere";
     SFEM_READ_ENV(SFEM_CONTACT_CASE, );
@@ -362,7 +362,7 @@ int test_contact() {
         solver->apply(rhs->data(), x->data());
     }
 
-    if (SFEM_ENABLE_OUPUT) {
+    if (SFEM_ENABLE_OUTPUT) {
         fs->mesh_ptr()->write("test_contact/coarse_mesh");
         fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
 

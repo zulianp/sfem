@@ -2,14 +2,7 @@
 #define SFEM_SSHEX8_INLINE_HPP
 
 #include "sfem_base.h"
-
-#ifndef MAX
-#define MAX(a, b) ((a) >= (b) ? (a) : (b))
-#endif
-
-#ifndef MIN
-#define MIN(a, b) ((a) <= (b) ? (a) : (b))
-#endif
+#include "sfem_macros.h"
 
 template <typename scalar_t>
 static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t                          stride,
