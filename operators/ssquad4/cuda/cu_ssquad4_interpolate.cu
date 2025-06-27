@@ -970,7 +970,7 @@ __global__ void cu_ssquad4_prolongate_kernel(const ptrdiff_t                 nel
                             const int idx_to = cu_ssquad4_lidx(
                                     to_level * to_level_stride, off_to_xi * to_level_stride, off_to_yi * to_level_stride);
 
-                            to[(to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
+                            to[((ptrdiff_t)to_elements[idx_to * stride + e] * vec_size + d) * to_stride] = out;
                         }
                     }
                 }

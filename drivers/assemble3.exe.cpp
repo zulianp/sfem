@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     count_t *new_rowptr = (count_t *)malloc(((nnodes)*mesh.spatial_dim + 1) * sizeof(count_t));
-    idx_t *new_colidx = (idx_t *)malloc(nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(idx_t));
+    idx_t *new_colidx = (idx_t *)malloc((ptrdiff_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(idx_t));
     real_t *new_values =
             (real_t *)malloc(nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(real_t));
 
