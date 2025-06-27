@@ -802,7 +802,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
     struct tet_vertices* tets_ref                   = malloc(sizeof(struct tet_vertices) * 8);
     int                  degenerated_tetrahedra_cnt = 0;
 
-    struct sfem_stack* stack = sfem_stack_create(100);
+    struct sfem_stack* stack = sfem_stack_create(max_refined_tets);
 
     struct tet_vertices* first_tet = malloc(sizeof(struct tet_vertices));
     first_tet->x0                  = x0;
@@ -1048,6 +1048,8 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
         //            weighted_field[ev[3]]);
         // }
 
+        const int max_refined_tets = 100;  // Maximum number of refined tetrahedra
+
         n_tets = tet4_iterative_refinement(x0,                     // Tetrahedron vertices X-coordinates
                                            x1,                     //
                                            x2,                     //
@@ -1068,7 +1070,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
                                            weighted_field[ev[2]],  //
                                            weighted_field[ev[3]],  //
                                            alpha_th,               //
-                                           100,                    // Maximum number of tets
+                                           max_refined_tets,       // Maximum number of tets
                                            &tets_iter);            // Output
 
         for (int tet_id = 0; tet_id < n_tets; tet_id++) {
