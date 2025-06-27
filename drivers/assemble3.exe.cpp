@@ -80,8 +80,8 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nelements = mesh.nelements;
 
     // TODO read displacement from file
-    real_t *displacement = (real_t *)malloc(nnodes * mesh.spatial_dim * sizeof(real_t));
-    memset(displacement, 0, nnodes * mesh.spatial_dim * sizeof(real_t));
+    real_t *displacement = (real_t *)malloc((size_t)nnodes * mesh.spatial_dim * sizeof(real_t));
+    memset(displacement, 0, (size_t)nnodes * mesh.spatial_dim * sizeof(real_t));
 
     // TODO read params
     const real_t mu = 1;
@@ -102,8 +102,8 @@ int main(int argc, char *argv[]) {
     build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
-    values = (real_t *)malloc(nnz * 9 * sizeof(real_t));
-    memset(values, 0, nnz * 9 * sizeof(real_t));
+    values = (real_t *)malloc((size_t)nnz * 9 * sizeof(real_t));
+    memset(values, 0, (size_t)nnz * 9 * sizeof(real_t));
 
     double tock = MPI_Wtime();
     printf("assemble3.c: build crs\t\t%g seconds\n", tock - tack);
@@ -137,9 +137,9 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     count_t *new_rowptr = (count_t *)malloc(((nnodes)*mesh.spatial_dim + 1) * sizeof(count_t));
-    idx_t *new_colidx = (idx_t *)malloc((ptrdiff_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(idx_t));
+    idx_t *new_colidx = (idx_t *)malloc((size_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(idx_t));
     real_t *new_values =
-            (real_t *)malloc(nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(real_t));
+            (real_t *)malloc((size_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(real_t));
 
     block_crs_to_crs(nnodes,
                      mesh.spatial_dim,
