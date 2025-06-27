@@ -263,6 +263,13 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
 int test_contact() {
     MPI_Comm comm = MPI_COMM_WORLD;
 
+    int comm_size;
+    MPI_Comm_size(comm, &comm_size);
+
+    if(comm_size > 1) {
+        SFEM_ERROR("test_contact() can only be run in serial!\n");
+    }
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
