@@ -446,50 +446,6 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                     &vertex_b,      // Output
                                     edges_length);  // Output
 
-        // const real_t x0_n = x0_p;
-        // const real_t x1_n = x1_p;
-        // const real_t x2_n = x2_p;
-        // const real_t x3_n = x3_p;
-        // const real_t y0_n = y0_p;
-        // const real_t y1_n = y1_p;
-        // const real_t y2_n = y2_p;
-        // const real_t y3_n = y3_p;
-        // const real_t z0_n = z0_p;
-        // const real_t z1_n = z1_p;
-        // const real_t z2_n = z2_p;
-        // const real_t z3_n = z3_p;
-
-        // const real_t scale_tet =                         //
-        //         tet_normalize_by_edge(x0_p,              //
-        //                               y0_p,              //
-        //                               z0_p,              //
-        //                               x1_p,              //
-        //                               y1_p,              //
-        //                               z1_p,              //
-        //                               x2_p,              //
-        //                               y2_p,              //
-        //                               z2_p,              //
-        //                               x3_p,              //
-        //                               y3_p,              //
-        //                               z3_p,              //
-        //                               vertex_a,          // Vertices defining the edge to normalize
-        //                               vertex_b,          //
-        //                               max_edges_length,  // Current edge length
-        //                               &x0_n,             // Output normalized tetrahedron
-        //                               &y0_n,             //
-        //                               &z0_n,             //
-        //                               &x1_n,             //
-        //                               &y1_n,             //
-        //                               &z1_n,             //
-        //                               &x2_n,             //
-        //                               &y2_n,             //
-        //                               &z2_n,             //
-        //                               &x3_n,             //
-        //                               &y3_n,             //
-        //                               &z3_n);            //
-
-        // continue;
-
         const real_t alpha_tet = max_edges_length / d_min;
 
         const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
@@ -522,6 +478,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         //            hteg_num_tetrahedra);
         // }
 
+        // DEBUG: theta_volume_main
         const real_t theta_volume_main = tet4_measure_v2(x0_n,  //
                                                          x1_n,  //
                                                          x2_n,  //
@@ -537,7 +494,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                          z2_n,   //
                                                          z3_n);  //
 
-        real_t theta_volume_acc = 0.0;
+        real_t theta_volume_acc = 0.0;  // DEBUG: theta_volume_acc
 
         // printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
         //        hteg_num_tetrahedra,
@@ -835,32 +792,33 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
             //        det_jacobian,
             //        theta_volume);
 
-            tet4_resample_tetrahedron_local_adjoint(fx0,                               // Tetrahedron vertices X-coordinates
-                                                    fx1,                               //
-                                                    fx2,                               //
-                                                    fx3,                               //
-                                                    fy0,                               // Tetrahedron vertices Y-coordinates
-                                                    fy1,                               //
-                                                    fy2,                               //
-                                                    fy3,                               //
-                                                    fz0,                               // Tetrahedron vertices Z-coordinates
-                                                    fz1,                               //
-                                                    fz2,                               //
-                                                    fz3,                               //
-                                                    fabs(det_jacobian) * (1.0 / 6.0),  // Determinant of the Jacobian
-                                                    wf0,                               // Weighted field at the vertices
-                                                    wf1,                               //
-                                                    wf2,                               //
-                                                    wf3,                               //
-                                                    ox,                                // Origin of the grid
-                                                    oy,                                //
-                                                    oz,                                //
-                                                    dx,                                // Spacing of the grid
-                                                    dy,                                //
-                                                    dz,                                //
-                                                    stride,                            // Stride
-                                                    n,                                 // Size of the grid
-                                                    data);                             // Output
+            tet4_resample_tetrahedron_local_adjoint(   //
+                    fx0,                               // Tetrahedron vertices X-coordinates
+                    fx1,                               //
+                    fx2,                               //
+                    fx3,                               //
+                    fy0,                               // Tetrahedron vertices Y-coordinates
+                    fy1,                               //
+                    fy2,                               //
+                    fy3,                               //
+                    fz0,                               // Tetrahedron vertices Z-coordinates
+                    fz1,                               //
+                    fz2,                               //
+                    fz3,                               //
+                    fabs(det_jacobian) * (1.0 / 6.0),  // Determinant of the Jacobian (or volume of the tetrahedron)
+                    wf0,                               // Weighted field at the vertices
+                    wf1,                               //
+                    wf2,                               //
+                    wf3,                               //
+                    ox,                                // Origin of the grid
+                    oy,                                //
+                    oz,                                //
+                    dx,                                // Spacing of the grid
+                    dy,                                //
+                    dz,                                //
+                    stride,                            // Stride
+                    n,                                 // Size of the grid
+                    data);                             // Output
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
