@@ -123,12 +123,13 @@ namespace sfem {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; ++i) {
-                    x_s[i] = x[idx[i]] + disp[idx[i] * dim + d];
+                    const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
+                    x_s[i] = x[b] + disp[b * dim + d];
                 }
             }
         }
     };
-
+    
     MeshContactSurface::MeshContactSurface() : impl_(std::make_unique<Impl>()) {}
     MeshContactSurface::~MeshContactSurface() = default;
     std::shared_ptr<Buffer<geom_t *>> MeshContactSurface::points() { return impl_->surface_points; }
@@ -230,7 +231,8 @@ namespace sfem {
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; ++i) {
-                    x_s[i] = x[idx[i]] + disp[idx[i] * dim + d];
+                    const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
+                    x_s[i] = x[b] + disp[b * dim + d];
                 }
             }
         }

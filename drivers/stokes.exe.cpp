@@ -268,7 +268,7 @@ int main(int argc, char *argv[]) {
                                      rhs);
 
         count_t *b_rowptr = (count_t *)malloc((mesh.nnodes + 1) * n_vars * sizeof(count_t));
-        idx_t *b_colidx = (idx_t *)malloc(rowptr[mesh.nnodes] * n_vars * n_vars * sizeof(idx_t));
+        idx_t *b_colidx = (idx_t *)malloc((ptrdiff_t)rowptr[mesh.nnodes] * n_vars * n_vars * sizeof(idx_t));
         crs_graph_block_to_scalar(mesh.nnodes, n_vars, rowptr, colidx, b_rowptr, b_colidx);
 
         if (SFEM_DIRICHLET_NODES) {
