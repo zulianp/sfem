@@ -18,11 +18,6 @@
 
 #include <vector>
 
-#define OP_HEADERS() \
-    do {             \
-        printf();    \
-    } while (0)
-
 typedef struct OpDesc {
     std::string name;
     std::string type;
