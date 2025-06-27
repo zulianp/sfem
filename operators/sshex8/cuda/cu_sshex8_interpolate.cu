@@ -528,7 +528,7 @@ __global__ void cu_sshex8_restrict_kernel(const ptrdiff_t                     ne
                                                           off_to_yi * to_level_stride,
                                                           off_to_zi * to_level_stride);
 
-                        atomicAdd(&to[(to_elements[idx_to][e] * vec_size + d) * to_stride], acc);
+                        atomicAdd(&to[((ptrdiff_t)to_elements[idx_to][e] * vec_size + d) * to_stride], acc);
                     }
                 }
             }
@@ -914,22 +914,6 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
     const int from_nloops = from_level + to_even;
     const int to_nloops   = to_level + to_even;
 
-    // if (e == 0) {
-    //     printf("%d) %d %d %d\n", sub_idx, xi, yi, zi);
-    //     if (!sub_idx) {
-    //         printf("from_level %d, to_level %d, step_factor %d, to_even %d, from_nloops %d, to_nloops %d, tile %d, n_tiles
-    //         %d\n",
-    //                from_level,
-    //                to_level,
-    //                step_factor,
-    //                to_even,
-    //                from_nloops,
-    //                to_nloops,
-    //                tile,
-    //                n_tiles);
-    //     }
-    // }
-
     // Vector loop
     for (int d = 0; d < vec_size; d++) {
         // loop on all FROM micro elements
@@ -953,7 +937,7 @@ __global__ void cu_sshex8_prolongate_kernel(const ptrdiff_t                 nele
                                                             off_from_yi * from_level_stride,
                                                             off_from_xi * from_level_stride);
 
-                        const idx_t     gidx = from_elements[idx_from][e];
+                        const ptrdiff_t     gidx = from_elements[idx_from][e];
                         const ptrdiff_t idx  = (gidx * vec_size + d) * from_stride;
                         in[sub_idx]          = from[idx];
                     } else {

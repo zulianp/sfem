@@ -235,8 +235,7 @@ int ISOLVER_EXPORT isolver_function_create_crs_graph(const isolver_function_t *i
     }
 
     *rowptr = (count_t *)malloc((mesh->nnodes + 1) * problem->block_size * sizeof(count_t));
-    *colidx = (idx_t *)malloc(problem->n2n_rowptr[mesh->nnodes] * problem->block_size *
-                              problem->block_size * sizeof(idx_t));
+    *colidx = (idx_t *)malloc((ptrdiff_t)problem->n2n_rowptr[mesh->nnodes] * problem->block_size * problem->block_size * sizeof(idx_t));
 
     crs_graph_block_to_scalar(mesh->nnodes,
                               problem->block_size,
