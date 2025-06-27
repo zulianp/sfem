@@ -84,6 +84,8 @@
 
 #include <map>
 
+#define DUMP_THROUGHPUT 1
+
 namespace sfem {
 
     class Sideset::Impl final {
@@ -1788,7 +1790,7 @@ namespace sfem {
         LinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         ~LinearElasticity() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("LinearElasticity::apply called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        calls,
@@ -2002,7 +2004,7 @@ namespace sfem {
         double total_time{0};
 
         ~SemiStructuredLinearElasticity() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("SemiStructuredLinearElasticity[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
@@ -2258,7 +2260,7 @@ namespace sfem {
 
         Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         ~Laplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("Laplacian::apply called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        calls,
@@ -2405,7 +2407,7 @@ namespace sfem {
 
         VectorLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         ~VectorLaplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("VectorLaplacian::apply called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        calls,
@@ -2511,7 +2513,7 @@ namespace sfem {
         double total_time{0};
 
         ~SemiStructuredVectorLaplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("SemiStructuredVectorLaplacian[%d]::apply called %ld times. "
                        "Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
@@ -2651,7 +2653,7 @@ namespace sfem {
         double total_time{0};
 
         ~SemiStructuredLaplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
@@ -2807,7 +2809,7 @@ namespace sfem {
         double total_time{0};
 
         ~SpectralElementLaplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
@@ -2919,7 +2921,7 @@ namespace sfem {
         double total_time{0};
 
         ~SemiStructuredEMLaplacian() {
-            if (calls) {
+            if (DUMP_THROUGHPUT && calls) {
                 printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                        "Avg: %g [s], TP %g [MDOF/s]\n",
                        space->semi_structured_mesh().level(),
@@ -3293,22 +3295,22 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
-            assert(0);
+            SFEM_ERROR("IMEPLEMENT ME!\n");
             return SFEM_FAILURE;
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            assert(0);
+            SFEM_ERROR("IMEPLEMENT ME!\n");
             return SFEM_FAILURE;
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            assert(0);
+            SFEM_ERROR("IMEPLEMENT ME!\n");
             return SFEM_FAILURE;
         }
 
         int value(const real_t *x, real_t *const out) override {
-            assert(0);
+            SFEM_ERROR("IMEPLEMENT ME!\n");
             return SFEM_FAILURE;
         }
 
