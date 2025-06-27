@@ -270,7 +270,7 @@ namespace sfem {
         for (int i = 0; i < impl_->n_conditions; i++) {
             for (ptrdiff_t node = 0; node < impl_->conditions[i].local_size; node++) {
                 const ptrdiff_t idx =
-                        impl_->conditions[i].idx[node] * impl_->space->block_size() + impl_->conditions[i].component;
+                        static_cast<ptrdiff_t>(impl_->conditions[i].idx[node]) * impl_->space->block_size() + impl_->conditions[i].component;
                 mask_set(idx, mask);
             }
         }
@@ -451,8 +451,9 @@ namespace sfem {
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
             for (int d = 0; d < dim; d++) {
-                g[idx[i] * dim + d] = tt[i] * normals[d][i];
+                g[b * dim + d] = tt[i] * normals[d][i];
             }
         }
 
@@ -508,7 +509,7 @@ namespace sfem {
 
         if (impl_->debug) {
             for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC_t: %g = %g  * %g * %g\n", out[idx[i] * dim + 0], normals[0][i], f[i], m[i]);
+                printf("CC_t: %g = %g  * %g * %g\n", out[(ptrdiff_t)idx[i] * dim + 0], normals[0][i], f[i], m[i]);
             }
         }
 

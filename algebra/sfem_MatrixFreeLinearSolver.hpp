@@ -109,7 +109,7 @@ namespace sfem {
                     auto di = &dd[i * 6];
                     auto si = s[i];
 
-                    const idx_t b  = idx[i];
+                    const ptrdiff_t b  = idx[i];
                     auto        xi = &x[b * block_size];
                     auto        yi = &y[b * block_size];
 
