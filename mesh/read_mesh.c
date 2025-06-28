@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-//#include <unistd.h>
+// #include <unistd.h>
 #include <mpi.h>
 
 #include "sortreduce.h"
@@ -58,9 +58,9 @@ int mesh_node_ids(mesh_t *mesh, idx_t *const ids) {
     return 0;
 }
 
-static SFEM_INLINE int find_owner_rank(const idx_t idx,
-                                       const ptrdiff_t n_local_nodes,
-                                       const int size,
+static SFEM_INLINE int find_owner_rank(const idx_t                idx,
+                                       const ptrdiff_t            n_local_nodes,
+                                       const int                  size,
                                        const idx_t *SFEM_RESTRICT input_node_partitions) {
     int owner = MIN(size - 1, idx / n_local_nodes);
     int guess = owner;
@@ -91,7 +91,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
-    long n_gnodes = mesh->n_owned_nodes;
+    long n_gnodes           = mesh->n_owned_nodes;
     long global_node_offset = 0;
     MPI_Exscan(&n_gnodes, &global_node_offset, 1, MPI_LONG, MPI_SUM, comm);
 
@@ -99,30 +99,29 @@ int mesh_build_global_ids(mesh_t *mesh) {
     MPI_Bcast(&n_gnodes, 1, MPI_LONG, size - 1, comm);
 
     idx_t *node_offsets = malloc((size + 1) * sizeof(idx_t));
-    MPI_CATCH_ERROR(MPI_Allgather(
-        &global_node_offset, 1, SFEM_MPI_IDX_T, node_offsets, 1, SFEM_MPI_IDX_T, comm));
+    MPI_CATCH_ERROR(MPI_Allgather(&global_node_offset, 1, SFEM_MPI_IDX_T, node_offsets, 1, SFEM_MPI_IDX_T, comm));
 
     node_offsets[size] = n_gnodes;
 
     const ptrdiff_t n_lnodes_no_reminder = n_gnodes / size;
-    const ptrdiff_t begin = n_lnodes_no_reminder * rank;
+    const ptrdiff_t begin                = n_lnodes_no_reminder * rank;
 
     ptrdiff_t n_lnodes_temp = n_lnodes_no_reminder;
     if (rank == size - 1) {
         n_lnodes_temp = n_gnodes - begin;
     }
 
-    const ptrdiff_t begin_owned_with_ghosts = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts;
+    const ptrdiff_t begin_owned_with_ghosts  = mesh->n_owned_nodes - mesh->n_owned_nodes_with_ghosts;
     const ptrdiff_t extent_owned_with_ghosts = mesh->n_owned_nodes_with_ghosts;
-    const ptrdiff_t n_ghost_nodes = mesh->nnodes - mesh->n_owned_nodes;
+    const ptrdiff_t n_ghost_nodes            = mesh->nnodes - mesh->n_owned_nodes;
 
     idx_t *ghost_keys = &mesh->node_mapping[begin_owned_with_ghosts];
-    idx_t *ghost_ids = malloc(MAX(extent_owned_with_ghosts, n_ghost_nodes) * sizeof(idx_t));
+    idx_t *ghost_ids  = malloc(MAX(extent_owned_with_ghosts, n_ghost_nodes) * sizeof(idx_t));
 
     int *send_displs = (int *)malloc((size + 1) * sizeof(int));
     int *recv_displs = (int *)malloc((size + 1) * sizeof(int));
-    int *send_count = (int *)calloc(size, sizeof(int));
-    int *recv_count = (int *)malloc(size * sizeof(int));
+    int *send_count  = (int *)calloc(size, sizeof(int));
+    int *recv_count  = (int *)malloc(size * sizeof(int));
 
     for (ptrdiff_t i = 0; i < extent_owned_with_ghosts; i++) {
         ghost_ids[i] = global_node_offset + begin_owned_with_ghosts + i;
@@ -130,8 +129,8 @@ int mesh_build_global_ids(mesh_t *mesh) {
     }
 
     for (ptrdiff_t i = 0; i < extent_owned_with_ghosts; i++) {
-        const idx_t idx = ghost_keys[i];
-        int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+        const idx_t idx       = ghost_keys[i];
+        int         dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
         assert(dest_rank < size);
         assert(dest_rank >= 0);
 
@@ -184,11 +183,11 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     // Fill mapping
     for (int r = 0; r < size; r++) {
-        int proc_begin = recv_displs[r];
+        int proc_begin  = recv_displs[r];
         int proc_extent = recv_count[r];
 
         idx_t *keys = &recv_key_buff[proc_begin];
-        idx_t *ids = &recv_ids_buff[proc_begin];
+        idx_t *ids  = &recv_ids_buff[proc_begin];
 
         for (int k = 0; k < proc_extent; k++) {
             idx_t iii = keys[k] - begin;
@@ -230,12 +229,12 @@ int mesh_build_global_ids(mesh_t *mesh) {
     // Get the query nodes
     ghost_keys = &mesh->node_mapping[mesh->n_owned_nodes];
 
-    idx_t *recv_idx = (idx_t *)malloc(n_ghost_nodes * sizeof(idx_t));
+    idx_t *recv_idx      = (idx_t *)malloc(n_ghost_nodes * sizeof(idx_t));
     idx_t *exchange_buff = (idx_t *)malloc(n_ghost_nodes * sizeof(idx_t));
     {
         for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
-            const idx_t idx = ghost_keys[i];
-            int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+            const idx_t idx       = ghost_keys[i];
+            int         dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
 
             assert(dest_rank < size);
             assert(dest_rank >= 0);
@@ -251,15 +250,15 @@ int mesh_build_global_ids(mesh_t *mesh) {
         memset(send_count, 0, sizeof(int) * size);
 
         for (ptrdiff_t i = 0; i < n_ghost_nodes; i++) {
-            const idx_t idx = ghost_keys[i];
-            int dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
+            const idx_t idx       = ghost_keys[i];
+            int         dest_rank = MIN(idx / n_lnodes_no_reminder, size - 1);
 
             assert(dest_rank < size);
             assert(dest_rank >= 0);
 
-            const idx_t offset = send_displs[dest_rank] + send_count[dest_rank]++;
+            const idx_t offset    = send_displs[dest_rank] + send_count[dest_rank]++;
             exchange_buff[offset] = idx;
-            recv_idx[offset] = i;
+            recv_idx[offset]      = i;
         }
     }
 
@@ -284,7 +283,7 @@ int mesh_build_global_ids(mesh_t *mesh) {
 
     // Query mapping
     for (int r = 0; r < size; r++) {
-        int proc_begin = recv_displs[r];
+        int proc_begin  = recv_displs[r];
         int proc_extent = recv_count[r];
 
         idx_t *keys = &recv_key_buff[proc_begin];
@@ -360,13 +359,13 @@ int mesh_build_global_ids(mesh_t *mesh) {
     return 0;
 }
 
-int mesh_read_elements(MPI_Comm comm,
-                       const int nnodesxelem,
-                       const char *folder,
-                       idx_t **const elems,
+int mesh_read_elements(MPI_Comm         comm,
+                       const int        nnodesxelem,
+                       const char      *folder,
+                       idx_t **const    elems,
                        ptrdiff_t *const n_local_elements,
                        ptrdiff_t *const n_elements) {
-    char path[1024 * 10];
+    char         path[1024 * 10];
     MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
 
     // DO this outside
@@ -377,25 +376,19 @@ int mesh_read_elements(MPI_Comm comm,
         idx_t *idx = 0;
         for (int d = 0; d < nnodesxelem; ++d) {
             sprintf(path, "%s/i%d.raw", folder, d);
-            ret |= array_create_from_file(
-                comm, path, mpi_idx_t, (void **)&idx, n_local_elements, n_elements);
+            ret |= array_create_from_file(comm, path, mpi_idx_t, (void **)&idx, n_local_elements, n_elements);
             elems[d] = idx;
         }
     }
 
 #ifdef SFEM_ENABLE_MEM_DIAGNOSTICS
-    printf("mesh_read_elements: allocated %g GB\n",
-           nnodesxelem * *n_local_elements * sizeof(idx_t) * 1e-9);
+    printf("mesh_read_elements: allocated %g GB\n", nnodesxelem * *n_local_elements * sizeof(idx_t) * 1e-9);
 #endif
 
     return ret;
 }
 
-int mesh_read_generic(MPI_Comm comm,
-                      const int nnodesxelem,
-                      const int ndims,
-                      const char *folder,
-                      mesh_t *mesh) {
+int mesh_read_generic(MPI_Comm comm, const int nnodesxelem, const int ndims, const char *folder, mesh_t *mesh) {
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -408,7 +401,7 @@ int mesh_read_generic(MPI_Comm comm,
         ///////////////////////////////////////////////////////////////
 
         MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
-        MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
+        MPI_Datatype mpi_idx_t  = SFEM_MPI_IDX_T;
 
         // ///////////////////////////////////////////////////////////////
 
@@ -449,8 +442,7 @@ int mesh_read_generic(MPI_Comm comm,
 
         for (int d = 0; d < ndims; ++d) {
             sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
-            array_create_from_file(
-                comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+            array_create_from_file(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -459,8 +451,7 @@ int mesh_read_generic(MPI_Comm comm,
         memset(input_node_partitions, 0, sizeof(idx_t) * (size + 1));
         input_node_partitions[rank + 1] = n_local_nodes;
 
-        MPI_CATCH_ERROR(MPI_Allreduce(
-            MPI_IN_PLACE, &input_node_partitions[1], size, SFEM_MPI_IDX_T, MPI_SUM, comm));
+        MPI_CATCH_ERROR(MPI_Allreduce(MPI_IN_PLACE, &input_node_partitions[1], size, SFEM_MPI_IDX_T, MPI_SUM, comm));
 
         for (int r = 0; r < size; ++r) {
             input_node_partitions[r + 1] += input_node_partitions[r];
@@ -473,7 +464,7 @@ int mesh_read_generic(MPI_Comm comm,
         // memset(owner_rank, 0, n_unique * sizeof(int));
 
         for (ptrdiff_t i = 0; i < n_unique; ++i) {
-            idx_t idx = unique_idx[i];
+            idx_t     idx   = unique_idx[i];
             const int owner = find_owner_rank(idx, n_local_nodes, size, input_node_partitions);
 
             assert(owner < size);
@@ -489,13 +480,12 @@ int mesh_read_generic(MPI_Comm comm,
         int *scatter_node_count = malloc(size * sizeof(int));
         memset(scatter_node_count, 0, size * sizeof(int));
 
-        MPI_CATCH_ERROR(MPI_Alltoall(
-            gather_node_count, 1, SFEM_MPI_IDX_T, scatter_node_count, 1, SFEM_MPI_IDX_T, comm));
+        MPI_CATCH_ERROR(MPI_Alltoall(gather_node_count, 1, SFEM_MPI_IDX_T, scatter_node_count, 1, SFEM_MPI_IDX_T, comm));
 
-        int *gather_node_displs = malloc((size + 1) * sizeof(int));
+        int *gather_node_displs  = malloc((size + 1) * sizeof(int));
         int *scatter_node_displs = malloc((size + 1) * sizeof(int));
 
-        gather_node_displs[0] = 0;
+        gather_node_displs[0]  = 0;
         scatter_node_displs[0] = 0;
 
         for (int i = 0; i < size; i++) {
@@ -511,7 +501,7 @@ int mesh_read_generic(MPI_Comm comm,
         idx_t *send_list = malloc(sizeof(idx_t) * size_send_list);
         memset(send_list, 0, sizeof(idx_t) * size_send_list);
 
-        if(0) //
+        if (0)  //
         {
             for (int r = 0; r < size; r++) {
                 if (r == rank) {
@@ -522,17 +512,17 @@ int mesh_read_generic(MPI_Comm comm,
                         printf("%d ", gather_node_count[i]);
                     }
                     printf("\n");
-                     printf("[%d] gnd: ", rank);
+                    printf("[%d] gnd: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", gather_node_displs[i]);
                     }
                     printf("\n");
-                     printf("[%d] snc: ", rank);
+                    printf("[%d] snc: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", scatter_node_count[i]);
                     }
-                       printf("\n");
-                        printf("[%d] snd: ", rank);
+                    printf("\n");
+                    printf("[%d] snd: ", rank);
                     for (int i = 0; i < size; i++) {
                         printf("%d ", scatter_node_displs[i]);
                     }
@@ -565,7 +555,7 @@ int mesh_read_generic(MPI_Comm comm,
         ///////////////////////////////////////////////////////////////////////
         // Exchange points
 
-        geom_t *sendx = (geom_t *)malloc(size_send_list * sizeof(geom_t));
+        geom_t  *sendx    = (geom_t *)malloc(size_send_list * sizeof(geom_t));
         geom_t **part_xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
 
         for (int d = 0; d < ndims; ++d) {
@@ -594,15 +584,15 @@ int mesh_read_generic(MPI_Comm comm,
 
         ///////////////////////////////////////////////////////////////////////
         // Determine owners
-        int *node_owner = (int *)malloc(n_unique * sizeof(int));
+        int *node_owner       = (int *)malloc(n_unique * sizeof(int));
         int *node_share_count = (int *)calloc(n_unique, sizeof(int));
 
         {
             int *decide_node_owner = (int *)malloc(n_local_nodes * sizeof(int));
-            int *send_node_owner = (int *)malloc(size_send_list * sizeof(int));
+            int *send_node_owner   = (int *)malloc(size_send_list * sizeof(int));
 
             int *decide_share_count = (int *)calloc(n_local_nodes, sizeof(int));
-            int *send_share_count = (int *)malloc(size_send_list * sizeof(int));
+            int *send_share_count   = (int *)malloc(size_send_list * sizeof(int));
 
             for (ptrdiff_t i = 0; i < n_local_nodes; ++i) {
                 decide_node_owner[i] = size;
@@ -610,7 +600,7 @@ int mesh_read_generic(MPI_Comm comm,
 
             for (int r = 0; r < size; ++r) {
                 int begin = scatter_node_displs[r];
-                int end = scatter_node_displs[r + 1];
+                int end   = scatter_node_displs[r + 1];
 
                 for (int i = begin; i < end; ++i) {
                     decide_node_owner[send_list[i]] = MIN(decide_node_owner[send_list[i]], r);
@@ -623,7 +613,7 @@ int mesh_read_generic(MPI_Comm comm,
 
             for (int r = 0; r < size; ++r) {
                 int begin = scatter_node_displs[r];
-                int end = scatter_node_displs[r + 1];
+                int end   = scatter_node_displs[r + 1];
 
                 for (int i = begin; i < end; ++i) {
                     send_node_owner[i] = decide_node_owner[send_list[i]];
@@ -677,7 +667,7 @@ int mesh_read_generic(MPI_Comm comm,
         // 3) Shared, hence owned by a remote process
 
         idx_t *proc_ptr = (idx_t *)calloc((size + 1), sizeof(idx_t));
-        idx_t *offset = (idx_t *)calloc((size), sizeof(idx_t));
+        idx_t *offset   = (idx_t *)calloc((size), sizeof(idx_t));
 
         for (ptrdiff_t node = 0; node < n_unique; ++node) {
             proc_ptr[node_owner[node] + 1] += 1;
@@ -698,7 +688,7 @@ int mesh_read_generic(MPI_Comm comm,
         // Build local remap index
         idx_t *local_remap = (idx_t *)malloc((n_unique) * sizeof(idx_t));
         for (ptrdiff_t node = 0; node < n_unique; ++node) {
-            int owner = node_owner[node];
+            int owner         = node_owner[node];
             local_remap[node] = proc_ptr[owner] + offset[owner]++;
         }
 
@@ -718,14 +708,14 @@ int mesh_read_generic(MPI_Comm comm,
                 if (owner != rank) continue;
 
                 int owned_and_shared = node_share_count[node] > 1;
-                local_remap[node] = proc_ptr[owner] + owned_shared_offset[owned_and_shared]++;
+                local_remap[node]    = proc_ptr[owner] + owned_shared_offset[owned_and_shared]++;
             }
 
             mesh->n_owned_nodes_with_ghosts = owned_shared_count[1];
         }
 
-        const size_t max_sz = MAX(sizeof(int), MAX(sizeof(idx_t), sizeof(real_t)));
-        void *temp_buff = malloc(n_unique * max_sz);
+        const size_t max_sz    = MAX(sizeof(int), MAX(sizeof(idx_t), sizeof(real_t)));
+        void        *temp_buff = malloc(n_unique * max_sz);
 
         for (int d = 0; d < ndims; ++d) {
             geom_t *x = part_xyz[d];
@@ -756,11 +746,11 @@ int mesh_read_generic(MPI_Comm comm,
         // process
 
         if (remap_elements) {
-            idx_t *temp_buff = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
-            uint8_t *is_local = (uint8_t *)calloc(n_local_elements, sizeof(uint8_t));
+            idx_t   *temp_buff = (idx_t *)malloc(n_local_elements * sizeof(idx_t));
+            uint8_t *is_local  = (uint8_t *)calloc(n_local_elements, sizeof(uint8_t));
 
             for (ptrdiff_t e = 0; e < n_local_elements; ++e) {
-                int is_local_e = 1;
+                int is_local_e          = 1;
                 int is_owned_and_shared = 0;
 
                 for (int d = 0; d < nnodesxelem; ++d) {
@@ -813,8 +803,8 @@ int mesh_read_generic(MPI_Comm comm,
             free(temp_buff);
             free(is_local);
         } else {
-            mesh->element_mapping = 0;
-            mesh->n_shared_elements = 0;
+            mesh->element_mapping              = 0;
+            mesh->n_shared_elements            = 0;
             mesh->n_owned_elements_with_ghosts = 0;
         }
 
@@ -831,29 +821,29 @@ int mesh_read_generic(MPI_Comm comm,
         free(scatter_node_displs);
 
         ///////////////////////////////////////////////////////////////////////
-        mesh->comm = comm;
+        mesh->comm      = comm;
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
 
-        mesh->spatial_dim = ndims;
+        mesh->spatial_dim  = ndims;
         mesh->element_type = nnodesxelem;
 
-        if(nnodesxelem == 4 && ndims == 2) {
+        if (nnodesxelem == 4 && ndims == 2) {
             mesh->element_type = QUAD4;
         }
 
-        mesh->elements = elems;
-        mesh->points = part_xyz;
+        mesh->elements  = elems;
+        mesh->points    = part_xyz;
         mesh->nelements = n_local_elements;
-        mesh->nnodes = n_unique;
+        mesh->nnodes    = n_unique;
 
-        mesh->n_owned_nodes = n_owned_nodes;
+        mesh->n_owned_nodes    = n_owned_nodes;
         mesh->n_owned_elements = n_local_elements - mesh->n_shared_elements;
 
         // Original indexing
         mesh->node_mapping = unique_idx;
-        mesh->node_owner = node_owner;
+        mesh->node_owner   = node_owner;
 
-        mesh->ghosts = 0;
+        mesh->ghosts       = 0;
         mesh->node_offsets = 0;
 
         mesh_build_global_ids(mesh);
@@ -870,7 +860,7 @@ int mesh_read_generic(MPI_Comm comm,
         ///////////////////////////////////////////////////////////////
 
         MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
-        MPI_Datatype mpi_idx_t = SFEM_MPI_IDX_T;
+        MPI_Datatype mpi_idx_t  = SFEM_MPI_IDX_T;
 
         // ///////////////////////////////////////////////////////////////
 
@@ -890,13 +880,12 @@ int mesh_read_generic(MPI_Comm comm,
             ptrdiff_t n_local_elements0 = 0, n_elements0 = 0;
             for (int d = 0; d < nnodesxelem; ++d) {
                 sprintf(path, "%s/i%d.raw", folder, d);
-                array_create_from_file(
-                    comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
+                array_create_from_file(comm, path, mpi_idx_t, (void **)&idx, &n_local_elements, &n_elements);
                 elems[d] = idx;
 
                 if (d == 0) {
                     n_local_elements0 = n_local_elements;
-                    n_elements0 = n_elements;
+                    n_elements0       = n_elements;
                 } else {
                     assert(n_local_elements0 == n_local_elements);
                     assert(n_elements0 == n_elements);
@@ -925,40 +914,39 @@ int mesh_read_generic(MPI_Comm comm,
 
         for (int d = 0; d < ndims; ++d) {
             sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
-            array_create_from_file(
-                comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
+            array_create_from_file(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
         }
 
         mesh->comm = comm;
 
         mesh->mem_space = SFEM_MEM_SPACE_HOST;
 
-        mesh->spatial_dim = ndims;
+        mesh->spatial_dim  = ndims;
         mesh->element_type = nnodesxelem;
 
-        if(nnodesxelem == 4 && ndims == 2) {
+        if (nnodesxelem == 4 && ndims == 2) {
             mesh->element_type = QUAD4;
         }
 
         mesh->nelements = n_local_elements;
-        mesh->nnodes = n_local_nodes;
+        mesh->nnodes    = n_local_nodes;
 
         mesh->elements = elems;
-        mesh->points = xyz;
+        mesh->points   = xyz;
 
-        mesh->n_owned_nodes = n_local_nodes;
-        mesh->n_owned_elements = n_local_elements;
+        mesh->n_owned_nodes     = n_local_nodes;
+        mesh->n_owned_elements  = n_local_elements;
         mesh->n_shared_elements = 0;
 
         mesh->node_mapping = 0;
-        mesh->node_owner = 0;
+        mesh->node_owner   = 0;
 
         mesh->element_mapping = 0;
 
-        mesh->n_owned_nodes_with_ghosts = 0;
+        mesh->n_owned_nodes_with_ghosts    = 0;
         mesh->n_owned_elements_with_ghosts = 0;
 
-        mesh->ghosts = 0;
+        mesh->ghosts       = 0;
         mesh->node_offsets = 0;
         return 0;
     }
@@ -967,7 +955,7 @@ int mesh_read_generic(MPI_Comm comm,
 static ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
-    MPI_File file;
+    MPI_File   file;
     MPI_CATCH_ERROR(MPI_File_open(comm, path, MPI_MODE_RDONLY, MPI_INFO_NULL, &file));
     MPI_CATCH_ERROR(MPI_File_get_size(file, &nbytes));
     *data = malloc(nbytes);
@@ -976,11 +964,7 @@ static ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     return nbytes;
 }
 
-int serial_read_tet_mesh(const char *folder,
-                         ptrdiff_t *nelements,
-                         idx_t *elems[4],
-                         ptrdiff_t *nnodes,
-                         geom_t *xyz[3]) {
+int serial_read_tet_mesh(const char *folder, ptrdiff_t *nelements, idx_t *elems[4], ptrdiff_t *nnodes, geom_t *xyz[3]) {
     char path[1024 * 10];
 
     {
@@ -1036,7 +1020,7 @@ int serial_read_tet_mesh(const char *folder,
 
 int mesh_surf_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     int nnodesxelem = 3;
-    int ndims = 3;
+    int ndims       = 3;
     return mesh_read_generic(comm, nnodesxelem, ndims, folder, mesh);
 }
 
@@ -1077,10 +1061,112 @@ int mesh_read(MPI_Comm comm, const char *folder, mesh_t *mesh) {
     MPI_Bcast(counts, 2, MPI_INT, 0, comm);
 
     if (!counts[0] || !counts[1]) {
-        SFEM_ERROR( "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
+        SFEM_ERROR(
+                "Could not find any mesh files in directory %s (#i*.raw = %d, {x,y,z}.raw = %d)\n", folder, counts[0], counts[1]);
     }
 
     return mesh_read_generic(comm, counts[0], counts[1], folder, mesh);
+}
+
+int read_raw_array(const char *path, size_t type_size, void **data, ptrdiff_t *n_elements) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        fprintf(stderr, "Failed to open file %s\n", path);
+        return SFEM_FAILURE;
+    }
+    fseek(fp, 0, SEEK_END);
+    *n_elements = ftell(fp) / type_size;
+    fseek(fp, 0, SEEK_SET);
+    *data = malloc(*n_elements * type_size);
+    if (fread(*data, type_size, *n_elements, fp) != *n_elements) {
+        fprintf(stderr, "Failed to read file %s\n", path);
+        return SFEM_FAILURE;
+    }
+    fclose(fp);
+    return SFEM_SUCCESS;
+}
+
+int mesh_read_serial(const char *folder,
+                     int        *nnodesxelem_out,
+                     ptrdiff_t  *nelements_out,
+                     idx_t    ***elems_out,
+                     int        *spatial_dim_out,
+                     ptrdiff_t  *nnodes_out,
+                     geom_t   ***xyz_out) {
+    MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
+    MPI_Datatype mpi_idx_t  = SFEM_MPI_IDX_T;
+
+    ptrdiff_t n_local_elements = 0, n_elements = 0;
+    ptrdiff_t n_local_nodes = 0, n_nodes = 0;
+
+    char pattern[1024 * 10];
+    snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
+    int nnodesxelem = count_files(pattern);
+
+    snprintf(pattern, sizeof(pattern), "%s/x.raw", folder);
+    int ndims = count_files(pattern);
+
+    idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
+    for (int d = 0; d < nnodesxelem; d++) {
+        elems[d] = 0;
+    }
+
+    char path[1024 * 10];
+    {
+        ptrdiff_t n_local_elements0 = 0, n_elements0 = 0;
+        for (int d = 0; d < nnodesxelem; ++d) {
+            snprintf(path, sizeof(path), "%s/i%d.raw", folder, d);
+
+            idx_t *idx = 0;
+            if (read_raw_array(path, sizeof(idx_t), (void **)&idx, &n_elements) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            n_local_elements = n_elements;
+            // End of Selection
+            elems[d] = idx;
+
+            if (d == 0) {
+                n_local_elements0 = n_local_elements;
+                n_elements0       = n_elements;
+            } else {
+                assert(n_local_elements0 == n_local_elements);
+                assert(n_elements0 == n_elements);
+
+                if (n_elements0 != n_elements) {
+                    SFEM_ERROR("Inconsistent lenghts in input %ld != %ld\n", (long)n_local_elements0, (long)n_local_elements);
+                }
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Read coordinates
+    ////////////////////////////////////////////////////////////////////////////////
+
+    geom_t **xyz = (geom_t **)malloc(sizeof(geom_t *) * ndims);
+    for (int d = 0; d < ndims; d++) {
+        xyz[d] = 0;
+    }
+
+    static const char *str_xyz = "xyzt";
+    for (int d = 0; d < ndims; ++d) {
+        snprintf(path, sizeof(path), "%s/%c.raw", folder, str_xyz[d]);
+
+        geom_t *xyz_d = 0;
+        if (read_raw_array(path, sizeof(geom_t), (void **)&xyz_d, &n_elements) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        xyz[d] = xyz_d;
+    }
+
+    *nnodesxelem_out = nnodesxelem;
+    *spatial_dim_out = ndims;
+    *nelements_out   = n_local_elements;
+    *elems_out       = elems;
+    *nnodes_out      = n_local_nodes;
+    *xyz_out         = xyz;
+
+    return SFEM_SUCCESS;
 }
 
 #undef array_remap_scatter
