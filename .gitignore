@@ -245,3 +245,26 @@ heat_equation
 workflows/resample/data_5_tet10/metadata_sdf.float32.yml
 workflows/resample/data_5_tet10/metadata_sdf.float32.yml
 workflows/resample/data_5_tet4/metadata_sdf.float32.yml
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+# Environment variables
+.env
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
