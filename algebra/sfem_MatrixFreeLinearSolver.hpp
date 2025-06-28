@@ -35,12 +35,12 @@ namespace sfem {
     class SparseBlockVector /*: public Operator<T>*/ {
     public:
         int                            block_size_{0};
-        std::shared_ptr<Buffer<idx_t>> idx_;
-        std::shared_ptr<Buffer<T>>     data_;
+        SharedBuffer<idx_t> idx_;
+        SharedBuffer<T>     data_;
 
         inline int                            block_size() const { return block_size_; }
-        const std::shared_ptr<Buffer<idx_t>>& idx() const { return idx_; }
-        const std::shared_ptr<Buffer<T>>&     data() const { return data_; }
+        const SharedBuffer<idx_t>& idx() const { return idx_; }
+        const SharedBuffer<T>&     data() const { return data_; }
         ptrdiff_t                             n_blocks() const { return idx_->size(); }
 
         enum MemorySpace mem_space() const {
@@ -78,8 +78,8 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector(const std::shared_ptr<Buffer<idx_t>>& idx,
-                                                                     const std::shared_ptr<Buffer<T>>&     data) {
+    std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector(const SharedBuffer<idx_t>& idx,
+                                                                     const SharedBuffer<T>&     data) {
         auto ret         = std::make_shared<SparseBlockVector<T>>();
         ret->block_size_ = data->size() / idx->size();
         ret->idx_        = idx;
@@ -91,7 +91,7 @@ namespace sfem {
     class ScaledBlockVectorMult : public Operator<T> {
     public:
         std::shared_ptr<SparseBlockVector<T>>            sbv;
-        std::shared_ptr<Buffer<T>>                       scaling;
+        SharedBuffer<T>                       scaling;
         std::function<int(const T* const x, T* const y)> apply_;
 
         void default_init() {
@@ -173,7 +173,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<Operator<T>> create_sparse_block_vector_mult(const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                                                 const std::shared_ptr<Buffer<T>>&            scaling) {
+                                                                 const SharedBuffer<T>&            scaling) {
         auto ret     = std::make_shared<ScaledBlockVectorMult<T>>();
         ret->sbv     = sbv;
         ret->scaling = scaling;
@@ -185,8 +185,8 @@ namespace sfem {
     class ShiftableOperator : public Operator<T> {
     public:
         virtual ~ShiftableOperator()                              = default;
-        virtual int shift(const std::shared_ptr<Buffer<T>>& diag) = 0;
-        virtual int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) {
+        virtual int shift(const SharedBuffer<T>& diag) = 0;
+        virtual int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const SharedBuffer<T>& scaling) {
             assert(false);
             SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
             return SFEM_FAILURE;
@@ -248,7 +248,7 @@ namespace sfem {
         virtual void set_n_dofs(const ptrdiff_t n)                                 = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int  iterations() const = 0;
-        virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) {
+        virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                      "MatrixFreeLinearSolver!\n");
@@ -257,7 +257,7 @@ namespace sfem {
 
         virtual int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                           const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                          const std::shared_ptr<Buffer<T>>&            diag) {
+                                          const SharedBuffer<T>&            diag) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "
                     "MatrixFreeLinearSolver!\n");

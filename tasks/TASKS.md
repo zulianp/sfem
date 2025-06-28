@@ -29,15 +29,15 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 class Mesh::Impl {
 public:
     // Core mesh data using Buffers
-    std::shared_ptr<Buffer<idx_t *>> elements;      // Element connectivity
-    std::shared_ptr<Buffer<geom_t *>> points;       // Node coordinates
+    SharedBuffer<idx_t *> elements;      // Element connectivity
+    SharedBuffer<geom_t *> points;       // Node coordinates
     
     // MPI-related data using Buffers
-    std::shared_ptr<Buffer<idx_t>> node_mapping;
-    std::shared_ptr<Buffer<int>> node_owner;
-    std::shared_ptr<Buffer<idx_t>> element_mapping;
-    std::shared_ptr<Buffer<idx_t>> node_offsets;
-    std::shared_ptr<Buffer<idx_t>> ghosts;
+    SharedBuffer<idx_t> node_mapping;
+    SharedBuffer<int> node_owner;
+    SharedBuffer<idx_t> element_mapping;
+    SharedBuffer<idx_t> node_offsets;
+    SharedBuffer<idx_t> ghosts;
     
     // Metadata
     MPI_Comm comm;

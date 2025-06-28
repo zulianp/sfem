@@ -34,33 +34,34 @@ typedef struct {
 
 The `Mesh` class should organize `mesh_t` content using `Buffers`:
 
+**Proposed Mesh Class Structure**:
 ```cpp
-class Mesh {
-private:
+class Mesh::Impl {
+public:
     // Core mesh data using Buffers
-    std::shared_ptr<Buffer<idx_t *>> elements_;      // Element connectivity
-    std::shared_ptr<Buffer<geom_t *>> points_;       // Node coordinates
+    SharedBuffer<idx_t *> elements;      // Element connectivity
+    SharedBuffer<geom_t *> points;       // Node coordinates
     
     // MPI-related data using Buffers
-    std::shared_ptr<Buffer<idx_t>> node_mapping_;
-    std::shared_ptr<Buffer<int>> node_owner_;
-    std::shared_ptr<Buffer<idx_t>> element_mapping_;
-    std::shared_ptr<Buffer<idx_t>> node_offsets_;
-    std::shared_ptr<Buffer<idx_t>> ghosts_;
+    SharedBuffer<idx_t> node_mapping;
+    SharedBuffer<int> node_owner;
+    SharedBuffer<idx_t> element_mapping;
+    SharedBuffer<idx_t> node_offsets;
+    SharedBuffer<idx_t> ghosts;
     
     // Metadata
-    MPI_Comm comm_;
-    int spatial_dim_;
-    enum ElemType element_type_;
-    ptrdiff_t nelements_;
-    ptrdiff_t nnodes_;
+    MPI_Comm comm;
+    int spatial_dim;
+    enum ElemType element_type;
+    ptrdiff_t nelements;
+    ptrdiff_t nnodes;
     
     // MPI ownership info
-    ptrdiff_t n_owned_nodes_;
-    ptrdiff_t n_owned_nodes_with_ghosts_;
-    ptrdiff_t n_owned_elements_;
-    ptrdiff_t n_owned_elements_with_ghosts_;
-    ptrdiff_t n_shared_elements_;
+    ptrdiff_t n_owned_nodes;
+    ptrdiff_t n_owned_nodes_with_ghosts;
+    ptrdiff_t n_owned_elements;
+    ptrdiff_t n_owned_elements_with_ghosts;
+    ptrdiff_t n_shared_elements;
 };
 ```
 
@@ -79,8 +80,8 @@ private:
 ### 1. Use Buffers Instead of Raw Pointers
 ```cpp
 // ✅ Good - Buffer-based access
-std::shared_ptr<Buffer<idx_t *>> elements() const;
-std::shared_ptr<Buffer<geom_t *>> points() const;
+SharedBuffer<idx_t *> elements() const;
+SharedBuffer<geom_t *> points() const;
 
 // ❌ Avoid - Raw pointer access
 idx_t **elements() const;
@@ -94,8 +95,8 @@ std::shared_ptr<const Buffer<idx_t *>> elements() const;
 std::shared_ptr<const Buffer<geom_t *>> points() const;
 
 // Mutable access (for mesh modification)
-std::shared_ptr<Buffer<idx_t *>> elements();
-std::shared_ptr<Buffer<geom_t *>> points();
+SharedBuffer<idx_t *> elements();
+SharedBuffer<geom_t *> points();
 ```
 
 ### 3. Element-Wise Access Methods
@@ -140,8 +141,8 @@ All algorithms should be updated to accept Buffer parameters:
 int assemble_laplacian(const mesh_t *mesh, ...);
 
 // New Buffer-based interface
-int assemble_laplacian(const std::shared_ptr<Buffer<idx_t *>> &elements,
-                      const std::shared_ptr<Buffer<geom_t *>> &points,
+int assemble_laplacian(const SharedBuffer<idx_t *> &elements,
+                      const SharedBuffer<geom_t *> &points,
                       ptrdiff_t nelements,
                       ptrdiff_t nnodes,
                       enum ElemType element_type,
