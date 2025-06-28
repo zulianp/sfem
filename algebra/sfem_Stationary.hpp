@@ -13,7 +13,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T> &diagonal_scaling, const ExecutionSpace es);
 
     
     template <typename T>
@@ -22,7 +22,7 @@ namespace sfem {
         ExecutionSpace               execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t                    n_dofs{SFEM_PTRDIFF_INVALID};
         int                          max_it{3};
-        std::shared_ptr<Buffer<T>>   workspace;
+        SharedBuffer<T>              workspace;
         std::shared_ptr<Operator<T>> op;
         std::shared_ptr<Operator<T>> preconditioner;
         bool                         verbose{false};
@@ -91,7 +91,7 @@ namespace sfem {
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
-        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) override {
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
             this->op       = op + sfem::diag_op(diag, execution_space());
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {
@@ -104,7 +104,7 @@ namespace sfem {
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                  const std::shared_ptr<Buffer<T>>&            diag) override {
+                                  const SharedBuffer<T>&            diag) override {
             assert(sbv->n_blocks() == diag->size());
             
             this->op = op + sfem::create_sparse_block_vector_mult(sbv, diag);

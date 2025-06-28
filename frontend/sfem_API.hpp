@@ -81,7 +81,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>> &diagonal_scaling, const ExecutionSpace es) {
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T> &diagonal_scaling, const ExecutionSpace es) {
         const std::ptrdiff_t n = diagonal_scaling->size();
 
         // // FIXME make simpler version
@@ -97,7 +97,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
+    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
@@ -105,7 +105,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
+    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
 #endif  // SFEM_ENABLE_CUDA
@@ -138,8 +138,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const std::shared_ptr<Buffer<T>> &diag,
-                                                                       const ExecutionSpace              es) {
+    static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const SharedBuffer<T> &diag, const ExecutionSpace es) {
         auto ret = std::make_shared<sfem::ShiftableJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -158,10 +157,10 @@ namespace sfem {
 
     template <typename HP, typename LP>
     std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
-            const int                              dim,
-            const std::shared_ptr<Buffer<HP>>     &diag,
-            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
-            const ExecutionSpace                   es) {
+            const int                   dim,
+            const SharedBuffer<HP>     &diag,
+            const SharedBuffer<mask_t> &constraints_mask,
+            const ExecutionSpace        es) {
         auto ret = std::make_shared<sfem::MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -182,11 +181,10 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(
-            const int                              dim,
-            const std::shared_ptr<Buffer<T>>      &diag,
-            const std::shared_ptr<Buffer<mask_t>> &constraints_mask,
-            const ExecutionSpace                   es) {
+    std::shared_ptr<ShiftableBlockSymJacobi<T>> create_shiftable_block_sym_jacobi(const int                   dim,
+                                                                                  const SharedBuffer<T>      &diag,
+                                                                                  const SharedBuffer<mask_t> &constraints_mask,
+                                                                                  const ExecutionSpace        es) {
         auto ret = std::make_shared<sfem::ShiftableBlockSymJacobi<T>>();
 
 #ifdef SFEM_ENABLE_CUDA
@@ -353,7 +351,7 @@ namespace sfem {
         return conds;
     }
 
-    static std::shared_ptr<Buffer<idx_t>> create_edge_idx(CRSGraph &crs_graph) {
+    static SharedBuffer<idx_t> create_edge_idx(CRSGraph &crs_graph) {
         const ptrdiff_t rows        = crs_graph.n_nodes();
         auto            p2_vertices = create_host_buffer<idx_t>(crs_graph.nnz());
 
@@ -717,11 +715,11 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
-            const ptrdiff_t                       n_fine_nodes,
-            const int                             block_size,
-            const std::shared_ptr<CRSGraph>      &crs_graph,
-            const std::shared_ptr<Buffer<idx_t>> &edges,
-            const ExecutionSpace                  es) {
+            const ptrdiff_t                  n_fine_nodes,
+            const int                        block_size,
+            const std::shared_ptr<CRSGraph> &crs_graph,
+            const SharedBuffer<idx_t>       &edges,
+            const ExecutionSpace             es) {
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
 
         ptrdiff_t rows = n_coarse_nodes * block_size;
@@ -768,10 +766,10 @@ namespace sfem {
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation_from_graph(
-            const std::shared_ptr<Function>      &function,
-            const std::shared_ptr<CRSGraph>      &crs_graph,
-            const std::shared_ptr<Buffer<idx_t>> &edges,
-            const ExecutionSpace                  es) {
+            const std::shared_ptr<Function> &function,
+            const std::shared_ptr<CRSGraph> &crs_graph,
+            const SharedBuffer<idx_t>       &edges,
+            const ExecutionSpace             es) {
         const ptrdiff_t n_fine_nodes   = function->space()->mesh().n_nodes();
         int             block_size     = function->space()->block_size();
         const ptrdiff_t n_coarse_nodes = crs_graph->n_nodes();
@@ -825,8 +823,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(const std::shared_ptr<Buffer<T>> &diag,
-                                                                        const ExecutionSpace              es) {
+    static std::shared_ptr<Operator<T>> create_inverse_diagonal_scaling(const SharedBuffer<T> &diag, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             auto d_diag = to_device(diag);
@@ -900,7 +897,7 @@ namespace sfem {
     }
 
     static auto hessian_crs(const std::shared_ptr<sfem::Function> &f,
-                            const std::shared_ptr<Buffer<real_t>> &x,
+                            const SharedBuffer<real_t>            &x,
                             const sfem::ExecutionSpace             es) {
         auto crs_graph = f->crs_graph();
 
@@ -930,7 +927,7 @@ namespace sfem {
     }
 
     static auto hessian_bsr(const std::shared_ptr<sfem::Function> &f,
-                            const std::shared_ptr<Buffer<real_t>> &x,
+                            const SharedBuffer<real_t>            &x,
                             const sfem::ExecutionSpace             es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
         auto      crs_graph  = f->space()->node_to_node_graph();
@@ -989,7 +986,7 @@ namespace sfem {
     }
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
-                                 const std::shared_ptr<Buffer<real_t>> &x,
+                                 const SharedBuffer<real_t>            &x,
                                  const sfem::ExecutionSpace             es) {
         assert(es == sfem::EXECUTION_SPACE_HOST);
 
@@ -1002,8 +999,8 @@ namespace sfem {
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
 
-        std::shared_ptr<Buffer<real_t *>> diag_values;
-        std::shared_ptr<Buffer<real_t *>> off_diag_values;
+        SharedBuffer<real_t *> diag_values;
+        SharedBuffer<real_t *> off_diag_values;
 
         if (SFEM_BCRS_SYM_USE_AOS) {
             block_stride    = nblock_entries;
@@ -1022,15 +1019,15 @@ namespace sfem {
                             diag_values->data(),
                             off_diag_values->data());
 
-        auto spmv = sfem::h_bcrs_sym_spmv<count_t, idx_t, real_t>(crs_graph->n_nodes(),
-                                                                  crs_graph->n_nodes(),
-                                                                  block_size,
-                                                                  crs_graph->rowptr(),
-                                                                  crs_graph->colidx(),
-                                                                  block_stride,
-                                                                  diag_values,
-                                                                  off_diag_values,
-                                                                  (real_t)1);
+        auto spmv = sfem::h_bcrs_sym<count_t, idx_t, real_t>(crs_graph->n_nodes(),
+                                                             crs_graph->n_nodes(),
+                                                             block_size,
+                                                             crs_graph->rowptr(),
+                                                             crs_graph->colidx(),
+                                                             block_stride,
+                                                             diag_values,
+                                                             off_diag_values,
+                                                             (real_t)1);
         // Owns the pointers
         return sfem::make_op<real_t>(
                 f->space()->n_dofs(),
@@ -1043,7 +1040,7 @@ namespace sfem {
     }
 
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
-                                const std::shared_ptr<Buffer<real_t>> &x,
+                                const SharedBuffer<real_t>            &x,
                                 const sfem::ExecutionSpace             es) {
         auto fs        = f->space();
         auto crs_graph = fs->mesh_ptr()->node_to_node_graph_upper_triangular();
@@ -1135,13 +1132,13 @@ namespace sfem {
                                diag_values->data(),
                                off_diag_values->data());
 
-            spmv = sfem::h_crs_sym_spmv<count_t, idx_t, real_t>(fs->n_dofs(),
-                                                                fs->n_dofs(),
-                                                                crs_graph->rowptr(),
-                                                                crs_graph->colidx(),
-                                                                diag_values,
-                                                                off_diag_values,
-                                                                (real_t)1);
+            spmv = sfem::h_crs_sym<count_t, idx_t, real_t>(fs->n_dofs(),
+                                                           fs->n_dofs(),
+                                                           crs_graph->rowptr(),
+                                                           crs_graph->colidx(),
+                                                           diag_values,
+                                                           off_diag_values,
+                                                           (real_t)1);
         }
 
         // Owns the pointers
@@ -1225,10 +1222,9 @@ namespace sfem {
         return sfem::hessian_bcrs_sym(f, nullptr, es);
     }
 
-    static std::shared_ptr<Buffer<idx_t *>> sshex8_derefine_element_connectivity(
-            const int                               from_level,
-            const int                               to_level,
-            const std::shared_ptr<Buffer<idx_t *>> &elements) {
+    static SharedBuffer<idx_t *> sshex8_derefine_element_connectivity(const int                    from_level,
+                                                                      const int                    to_level,
+                                                                      const SharedBuffer<idx_t *> &elements) {
         const int       step_factor = from_level / to_level;
         const int       nxe         = (to_level + 1) * (to_level + 1) * (to_level + 1);
         const ptrdiff_t nelements   = elements->extent(1);
@@ -1290,10 +1286,9 @@ namespace sfem {
         return view;
     }
 
-    static std::shared_ptr<Buffer<idx_t *>> ssquad4_derefine_element_connectivity(
-            const int                               from_level,
-            const int                               to_level,
-            const std::shared_ptr<Buffer<idx_t *>> &elements) {
+    static SharedBuffer<idx_t *> ssquad4_derefine_element_connectivity(const int                    from_level,
+                                                                       const int                    to_level,
+                                                                       const SharedBuffer<idx_t *> &elements) {
         const int       step_factor = from_level / to_level;
         const int       nxe         = (to_level + 1) * (to_level + 1);
         const ptrdiff_t nelements   = elements->extent(1);
@@ -1319,7 +1314,7 @@ namespace sfem {
         return view;
     }
 
-    static ptrdiff_t ss_elements_max_node_id(const std::shared_ptr<Buffer<idx_t *>> &elements) {
+    static ptrdiff_t ss_elements_max_node_id(const SharedBuffer<idx_t *> &elements) {
         ptrdiff_t max_node_id{-1};
         {
             auto            vv        = elements->data();

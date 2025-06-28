@@ -311,6 +311,10 @@ namespace sfem {
         return out;
     }
 
+
+    template<typename T>
+    using SharedBuffer = std::shared_ptr<Buffer<T>>;
+
 }  // namespace sfem
 
 #endif  // SFEM_BUFFER_HPP

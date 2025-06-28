@@ -27,19 +27,19 @@ namespace sfem {
     class Sideset final {
     public:
         int                                    read(MPI_Comm comm, const char *path);
-        std::shared_ptr<Buffer<element_idx_t>> parent();
-        std::shared_ptr<Buffer<int16_t>>       lfi();
+        SharedBuffer<element_idx_t> parent();
+        SharedBuffer<int16_t>       lfi();
         static std::shared_ptr<Sideset>        create_from_file(MPI_Comm comm, const char *path);
         ptrdiff_t                              size() const;
         MPI_Comm                               comm() const;
 
-        Sideset(MPI_Comm comm, const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi);
+        Sideset(MPI_Comm comm, const SharedBuffer<element_idx_t>& parent, const SharedBuffer<int16_t>& lfi);
         Sideset();
         ~Sideset();
 
         static std::shared_ptr<Sideset> create(MPI_Comm                                      comm,
-                                               const std::shared_ptr<Buffer<element_idx_t>> &parent,
-                                               const std::shared_ptr<Buffer<int16_t>>       &lfi);
+                                               const SharedBuffer<element_idx_t>& parent,
+                                               const SharedBuffer<int16_t>&       lfi);
 
         static std::shared_ptr<Sideset> create_from_selector(
                 const std::shared_ptr<Mesh>                                         &mesh,
@@ -160,7 +160,7 @@ namespace sfem {
         virtual int            report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
         virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
 
-        virtual void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &x, const int component = 0) {
+        virtual void set_field(const char *name, const SharedBuffer<real_t>& x, const int component = 0) {
             SFEM_UNUSED(name);
             SFEM_UNUSED(x);
             SFEM_UNUSED(component);
@@ -211,8 +211,8 @@ namespace sfem {
         struct Condition {
             enum ElemType                    element_type { INVALID };
             std::shared_ptr<Sideset>         sideset;  /// Maybe undefined in certain cases
-            std::shared_ptr<Buffer<idx_t *>> surface;
-            std::shared_ptr<Buffer<real_t>>  values;
+            SharedBuffer<idx_t *>            surface;
+            SharedBuffer<real_t>             values;
             real_t                           value{0};
             int                              component{0};
         };
@@ -283,8 +283,8 @@ namespace sfem {
     public:
         struct Condition {
             std::shared_ptr<Sideset>        sideset;  /// Maybe undefined in certain cases
-            std::shared_ptr<Buffer<idx_t>>  nodeset;
-            std::shared_ptr<Buffer<real_t>> values;
+            SharedBuffer<idx_t>             nodeset;
+            SharedBuffer<real_t>            values;
             real_t                          value{0};
             int                             component{0};
         };
@@ -473,10 +473,10 @@ namespace sfem {
     };
 
     std::string                      d_op_str(const std::string &name);
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
+    SharedBuffer<idx_t *>            mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
 
-    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
-                                                               const std::shared_ptr<Sideset>       &sideset);
+    SharedBuffer<idx_t>               create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const std::shared_ptr<Sideset>       &sideset);
 }  // namespace sfem
 
 #endif  // SFEM_FUNCTION_HPP

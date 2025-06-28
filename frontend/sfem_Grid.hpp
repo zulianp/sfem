@@ -46,7 +46,7 @@ namespace sfem {
         const geom_t *const origin() const;
         const geom_t *const delta() const;
 
-        std::shared_ptr<Buffer<T>> buffer();
+        SharedBuffer<T> buffer();
         T                         *data();
 
         MPI_Datatype mpi_data_type() const;

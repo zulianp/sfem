@@ -95,11 +95,11 @@ namespace sfem {
 
     enum ElemType Mesh::element_type() const { return impl_->mesh.element_type; }
 
-    std::shared_ptr<Buffer<geom_t *>> Mesh::points() {
+    SharedBuffer<geom_t *> Mesh::points() {
         return Buffer<geom_t *>::wrap(spatial_dimension(), n_nodes(), impl_->mesh.points);
     }
 
-    std::shared_ptr<Buffer<idx_t *>> Mesh::elements() {
+    SharedBuffer<idx_t *> Mesh::elements() {
         return Buffer<idx_t *>::wrap(n_nodes_per_element(), n_elements(), impl_->mesh.elements);
     }
 
@@ -161,7 +161,7 @@ namespace sfem {
         return impl_->crs_graph;
     }
 
-    std::shared_ptr<Buffer<element_idx_t>> Mesh::half_face_table() {
+    SharedBuffer<element_idx_t> Mesh::half_face_table() {
         // FIXME it should be allocated outisde
         element_idx_t *table{nullptr};
         create_element_adj_table(n_elements(), n_nodes(), element_type(), elements()->data(), &table);
@@ -240,7 +240,7 @@ namespace sfem {
 
     void *Mesh::impl_mesh() { return (void *)&impl_->mesh; }
 
-    std::shared_ptr<Buffer<count_t>> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
-    std::shared_ptr<Buffer<idx_t>>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
+    SharedBuffer<count_t> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
+    SharedBuffer<idx_t>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
 }  // namespace sfem
