@@ -785,8 +785,9 @@ namespace sfem {
                                                               const bool                            as_zero) const {
         SFEM_TRACE_SCOPE("DirichletConditions::derefine");
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        auto et   = (enum ElemType)impl_->space->element_type();
+        auto space = impl_->space;
+        auto mesh  = space->mesh_ptr();
+        auto et    = (enum ElemType)space->element_type();
 
         ptrdiff_t max_coarse_idx = -1;
         auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
@@ -804,7 +805,7 @@ namespace sfem {
 
             if (!cdc.sideset) {
                 if (max_coarse_idx == -1)
-                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements()->data());
 
                 hierarchical_create_coarse_indices(
                         max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
@@ -1319,13 +1320,14 @@ namespace sfem {
     int Output::write_time_step(const char *name, const real_t t, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
-        auto      mesh       = (mesh_t *)impl_->space->mesh().impl_mesh();
-        const int block_size = impl_->space->block_size();
+        auto space      = impl_->space;
+        auto mesh       = space->mesh_ptr();
+        const int block_size = space->block_size();
 
         char path[2048];
 
         if (impl_->AoS_to_SoA && block_size > 1) {
-            ptrdiff_t n_blocks = impl_->space->n_dofs() / block_size;
+            ptrdiff_t n_blocks = space->n_dofs() / block_size;
 
             auto buff = create_host_buffer<real_t>(n_blocks);
             auto bb   = buff->data();
@@ -1343,7 +1345,7 @@ namespace sfem {
                         b_name,
                         impl_->export_counter++);
 
-                if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (array_write(mesh->comm(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
             }
@@ -1353,7 +1355,7 @@ namespace sfem {
 
             sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
 
-            if (array_write(mesh->comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
+            if (array_write(mesh->comm(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;
             }
         }
@@ -1648,7 +1650,6 @@ namespace sfem {
     int Function::report_solution(const real_t *const x) {
         SFEM_TRACE_SCOPE("Function::report_solution");
 
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
         return impl_->output->write("out", x);
     }
 
@@ -2235,8 +2236,6 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             SFEM_TRACE_SCOPE("Laplacian::create");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
             assert(1 == space->block_size());
 
             auto ret          = std::make_unique<Laplacian>(space);
@@ -2276,15 +2275,14 @@ namespace sfem {
                         real_t *const        values) override {
             SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
+            auto mesh = space->mesh_ptr();
             auto graph = space->dof_to_dof_graph();
 
             return laplacian_crs(element_type,
-                                 mesh->nelements,
-                                 mesh->nnodes,
-                                 mesh->elements,
-                                 mesh->points,
+                                 mesh->n_elements(),
+                                 mesh->n_nodes(),
+                                 mesh->elements()->data(),
+                                 mesh->points()->data(),
                                  graph->rowptr()->data(),
                                  graph->colidx()->data(),
                                  values);
@@ -2297,15 +2295,15 @@ namespace sfem {
                             real_t *const        off_diag_values) override {
             SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
-            auto mesh = (mesh_t *)space->mesh().impl_mesh();
-
             // auto graph = space->node_to_node_graph_upper_triangular();
 
+            auto mesh = space->mesh_ptr();
+
             return laplacian_crs_sym(element_type,
-                                     mesh->nelements,
-                                     mesh->nnodes,
-                                     mesh->elements,
-                                     mesh->points,
+                                     mesh->n_elements(),
+                                     mesh->n_nodes(),
+                                     mesh->elements()->data(),
+                                     mesh->points()->data(),
                                      rowptr,
                                      colidx,
                                      diag_values,

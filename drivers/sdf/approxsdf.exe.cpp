@@ -717,13 +717,8 @@ int main(int argc, char *argv[]) {
         d[bn[i]] = 0;
     }
 
-    auto boundary_surface = std::make_shared<sfem::Mesh>(mesh->spatial_dimension(),
-                                                         st,
-                                                         sides->extent(1),
-                                                         sides->data(),
-                                                         mesh->n_nodes(),
-                                                         mesh->points()->data(),
-                                                         [mesh, sides](void *) {});
+    auto boundary_surface = std::make_shared<sfem::Mesh>(
+            mesh->comm(), mesh->spatial_dimension(), st, sides->extent(1), sides, mesh->n_nodes(), mesh->points());
 
     boundary_surface->write((output_folder + "/surface").c_str());
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
