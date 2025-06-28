@@ -11,9 +11,6 @@ import os
 import numpy as np
 import pysfem as sfem
 
-# Initialize SFEM (MPI)
-sfem.init()
-
 def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary_path, output_path):
     """
     Solve obstacle problem using SFEM Python bindings.
@@ -25,8 +22,6 @@ def solve_obstacle_problem(mesh_path, sdf_path, dirichlet_path, contact_boundary
         contact_boundary_path: Path to contact boundary conditions
         output_path: Output directory path
     """
-    
-    # Initialize SFEM
     sfem.init()
     
     try:
@@ -329,6 +324,7 @@ def build_cuboid_multisphere_contact(base_resolution=2, element_refine_level=2, 
 
 # --- Test Problem Solver ---
 def solve_test_problem(problem="sphere", base_resolution=2, element_refine_level=2, es=None, n_spheres=2, output_path="test_contact"):
+    sfem.init()
     if problem == "sphere":
         fs, f, contact_conds = build_cuboid_sphere_contact(base_resolution, element_refine_level, es)
     elif problem == "hifreq":
@@ -341,16 +337,13 @@ def solve_test_problem(problem="sphere", base_resolution=2, element_refine_level
     x = sfem.create_real_buffer(ndofs)
     rhs = sfem.create_real_buffer(ndofs)
     gap = sfem.create_real_buffer(ndofs)
-    
-    # Initialize right-hand side to zero
-    blas = sfem.blas(es if es else sfem.ExecutionSpace.EXECUTION_SPACE_HOST)
-    blas.zeros(rhs)
-    
+        
     # Initialize contact conditions
     contact_conds.init()
     
     # Apply constraints to solution vector
     f.apply_constraints(x)
+    f.apply_constraints(rhs)
         
     use_spmg = int(os.environ.get('SFEM_USE_SPMG', '1'))
     ssmgc_yaml = os.environ.get('SFEM_SSMGC_YAML', None)
@@ -385,6 +378,7 @@ def solve_test_problem(problem="sphere", base_resolution=2, element_refine_level
         contact_conds.full_apply_boundary_mass_inverse(rhs, x)
         out.write("contact_stress", x)
     print(f"Test problem '{problem}' solved and output written to {output_path}")
+    sfem.finalize()
     return True
 
 # --- Main Entrypoint ---
@@ -393,6 +387,7 @@ def main():
         # No arguments: run default test problem (sphere)
         print("No arguments provided. Running default 'sphere' test problem...")
         solve_test_problem(problem="sphere")
+
         sys.exit(0)
     elif len(sys.argv) == 2:
         # One argument: use as test problem name
