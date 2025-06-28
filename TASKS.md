@@ -22,6 +22,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 1.1.2: Document minimal data requirements for each algorithm
 - [ ] 1.1.3: Identify algorithms that can be refactored immediately
 - [ ] 1.1.4: Create dependency graph for algorithm refactoring
+- [ ] 1.1.5: Identify MPI-dependent algorithms and their abstraction needs
 
 **Dependencies**: None
 **Estimated effort**: 2-3 days
@@ -38,6 +39,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 1.2.2: Refactor `mesh_create_*()` functions to return minimal data
 - [ ] 1.2.3: Refactor `mesh_read()` to populate individual buffers
 - [ ] 1.2.4: Update function signatures to use C types only
+- [ ] 1.2.5: Add `#ifdef SFEM_ENABLE_MPI` guards for MPI-dependent functions
 
 **Dependencies**: Task 1.1
 **Estimated effort**: 1 week
@@ -54,6 +56,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 1.3.2: Refactor `linear_elasticity_apply()` to accept individual arrays
 - [ ] 1.3.3: Refactor `mass_apply()` to accept individual arrays
 - [ ] 1.3.4: Update all operator function signatures
+- [ ] 1.3.5: Add MPI fallbacks for parallel operator implementations
 
 **Dependencies**: Task 1.2
 **Estimated effort**: 1 week
@@ -70,6 +73,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 1.4.2: Update driver programs to use new signatures
 - [ ] 1.4.3: Update plugin implementations
 - [ ] 1.4.4: Ensure backward compatibility during transition
+- [ ] 1.4.5: Update MPI-dependent calls to use new abstractions
 
 **Dependencies**: Task 1.3
 **Estimated effort**: 1 week
@@ -87,6 +91,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 2.1.2: Implement RAII for mesh block data
 - [ ] 2.1.3: Create `MeshData` container for multiple blocks
 - [ ] 2.1.4: Add thread-safe memory management
+- [ ] 2.1.5: Design MPI-agnostic memory management patterns
 
 **Dependencies**: Task 1.4
 **Estimated effort**: 1 week
@@ -102,6 +107,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 2.2.2: Implement shared points buffer across blocks
 - [ ] 2.2.3: Add block element connectivity management
 - [ ] 2.2.4: Ensure proper memory cleanup
+- [ ] 2.2.5: Add communicator support to Mesh class
 
 **Dependencies**: Task 2.1
 **Estimated effort**: 1 week
@@ -117,6 +123,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 2.3.2: Migrate mesh creation functions to use C++ allocation
 - [ ] 2.3.3: Remove C memory management functions
 - [ ] 2.3.4: Update Python bindings to use new C++ classes
+- [ ] 2.3.5: Add distributed memory allocation support
 
 **Dependencies**: Task 2.2
 **Estimated effort**: 1 week
@@ -131,6 +138,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 2.4.2: Add `MeshBlock` class bindings
 - [ ] 2.4.3: Update memory management in Python interface
 - [ ] 2.4.4: Test Python bindings with new memory model
+- [ ] 2.4.5: Add communicator bindings for Python interface
 
 **Dependencies**: Task 2.3
 **Estimated effort**: 3-4 days
@@ -148,6 +156,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 3.1.2: Add block identification and indexing
 - [ ] 3.1.3: Implement block property management
 - [ ] 3.1.4: Add block-level operations (refinement, coarsening)
+- [ ] 3.1.5: Add distributed block support with communicators
 
 **Dependencies**: Task 2.4
 **Estimated effort**: 1 week
@@ -163,6 +172,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 3.2.2: Create interface mesh generation and management
 - [ ] 3.2.3: Implement interface constraint handling
 - [ ] 3.2.4: Add interface data exchange protocols
+- [ ] 3.2.5: Add distributed interface handling
 
 **Dependencies**: Task 3.1
 **Estimated effort**: 1 week
@@ -177,6 +187,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 3.3.2: Extend `LinearElasticity` class with multi-block support
 - [ ] 3.3.3: Extend `FunctionSpace` class for multi-block
 - [ ] 3.3.4: Ensure backward compatibility with single-block
+- [ ] 3.3.5: Add distributed operator support
 
 **Dependencies**: Task 3.2
 **Estimated effort**: 1 week
@@ -192,9 +203,76 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 3.4.2: Implement parallel block processing
 - [ ] 3.4.3: Create comprehensive test suite for multi-block scenarios
 - [ ] 3.4.4: Validate performance within 2% of single-block implementation
+- [ ] 3.4.5: Test distributed multi-block performance
 
 **Dependencies**: Task 3.3
 **Estimated effort**: 1 week
+
+### Phase 4: MPI Implementation and Abstractions (Month 3 - Extended)
+
+#### Task 3.5: Create MPI Abstraction Layer
+**Objective**: Implement MPI abstractions and organize MPI code properly
+**Files to create**:
+- `mpi/sfem_communicator.hpp/cpp` - MPI communicator abstractions
+- `mpi/sfem_parallel_solver.hpp/cpp` - Parallel solver abstractions
+
+**Subtasks**:
+- [ ] 3.5.1: Create `sfem::Communicator` class wrapping MPI_Comm
+- [ ] 3.5.2: Implement default communicator for serial execution
+- [ ] 3.5.4: Implement `ParallelSolver` class for distributed solvers
+- [ ] 3.5.5: Add compile-time MPI detection and fallbacks
+
+**Dependencies**: Task 3.4
+**Estimated effort**: 1 week
+
+#### Task 3.6: Implement MPI Backend Functions
+**Objective**: Create MPI backend functions with proper fallbacks
+**Files to create**:
+- `parallel/parallel_operators.h/c` - Parallel operator implementations
+- `parallel/parallel_mesh_ops.h/c` - Parallel mesh operations
+- `parallel/parallel_solvers.h/c` - Parallel solver implementations
+
+**Subtasks**:
+- [ ] 3.6.1: Implement parallel operator functions with `#ifdef SFEM_ENABLE_MPI`
+- [ ] 3.6.2: Create serial fallbacks for all parallel functions
+- [ ] 3.6.3: Implement parallel mesh operations (partitioning, communication)
+- [ ] 3.6.4: Add parallel solver implementations
+- [ ] 3.6.5: Ensure no runtime MPI dependency checks
+
+**Dependencies**: Task 3.5
+**Estimated effort**: 1 week
+
+#### Task 3.7: Update Matrix I/O for MPI Support
+**Objective**: Update matrix I/O functionality to support MPI operations
+**Files to modify**:
+- `matrix/*.c` - Matrix I/O functions
+- `matrix/*.h` - Matrix I/O headers
+
+**Subtasks**:
+- [ ] 3.7.1: Add `#ifdef SFEM_ENABLE_MPI` guards to matrix I/O functions
+- [ ] 3.7.2: Implement parallel matrix read/write operations
+- [ ] 3.7.3: Create serial fallbacks for matrix I/O
+- [ ] 3.7.4: Add distributed matrix assembly support
+- [ ] 3.7.5: Test matrix I/O with and without MPI
+
+**Dependencies**: Task 3.6
+**Estimated effort**: 3-4 days
+
+#### Task 3.8: Update Python Bindings for MPI
+**Objective**: Add MPI support to Python bindings with proper abstractions
+**Files to modify**:
+- `python/bindings/pysfem.cpp` - Add MPI bindings
+- `python/sfem/mpi/` - Create MPI Python module
+
+**Subtasks**:
+- [ ] 3.8.1: Add `Communicator` class bindings to Python
+- [ ] 3.8.2: Create MPI Python module with proper abstractions
+- [ ] 3.8.3: Implement automatic fallback to serial execution
+- [ ] 3.8.4: Add mpi4py integration support
+- [ ] 3.8.5: Test Python MPI functionality
+
+**Dependencies**: Task 3.7
+**Estimated effort**: 3-4 days
 
 ---
 
@@ -215,8 +293,9 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 4.1.2: Create object-oriented design with proper Python classes
 - [ ] 4.1.3: Implement context managers for resource management
 - [ ] 4.1.4: Add type hints for better IDE support
+- [ ] 4.1.5: Design MPI-agnostic Python interface
 
-**Dependencies**: Task 3.4
+**Dependencies**: Task 3.8
 **Estimated effort**: 1 week
 
 #### Task 4.2: Implement Core Mesh Operations
@@ -230,6 +309,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 4.2.2: Add mesh generation utilities (structured, unstructured)
 - [ ] 4.2.3: Implement mesh I/O using raw data and meta.yaml
 - [ ] 4.2.4: Add mesh visualization and inspection capabilities
+- [ ] 4.2.5: Add distributed mesh support with communicators
 
 **Dependencies**: Task 4.1
 **Estimated effort**: 1 week
@@ -245,6 +325,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 4.3.2: Add element assembly and operator creation
 - [ ] 4.3.3: Implement boundary condition application
 - [ ] 4.3.4: Add contact condition handling
+- [ ] 4.3.5: Add distributed operator support
 
 **Dependencies**: Task 4.2
 **Estimated effort**: 1 week
@@ -260,6 +341,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 4.4.2: Implement meaningful Python exceptions
 - [ ] 4.4.3: Add error handling throughout Python API
 - [ ] 4.4.4: Create error recovery mechanisms
+- [ ] 4.4.5: Add MPI-specific error handling
 
 **Dependencies**: Task 4.3
 **Estimated effort**: 3-4 days
@@ -277,6 +359,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 5.1.2: Add nonlinear solver with convergence monitoring
 - [ ] 5.1.3: Implement time integration schemes
 - [ ] 5.1.4: Add solution post-processing and analysis
+- [ ] 5.1.5: Add distributed solver support
 
 **Dependencies**: Task 4.4
 **Estimated effort**: 1 week
@@ -292,6 +375,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 5.2.2: Implement SciPy sparse matrix integration
 - [ ] 5.2.3: Add seamless data conversion between SFEM and NumPy/SciPy
 - [ ] 5.2.4: Optimize performance for large array operations
+- [ ] 5.2.5: Add distributed array support
 
 **Dependencies**: Task 5.1
 **Estimated effort**: 1 week
@@ -307,6 +391,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 5.3.2: Add mesh visualization capabilities
 - [ ] 5.3.3: Create solution field plotting functions
 - [ ] 5.3.4: Add interactive visualization features
+- [ ] 5.3.5: Add distributed visualization support
 
 **Dependencies**: Task 5.2
 **Estimated effort**: 1 week
@@ -322,6 +407,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 5.4.2: Implement efficient data transfer between Python and C++
 - [ ] 5.4.3: Add performance monitoring and profiling
 - [ ] 5.4.4: Ensure performance within 5% of direct C++ usage
+- [ ] 5.4.5: Optimize distributed performance
 
 **Dependencies**: Task 5.3
 **Estimated effort**: 1 week
@@ -339,6 +425,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 6.1.2: Write user guide for common use cases
 - [ ] 6.1.3: Create developer guide for extending the API
 - [ ] 6.1.4: Add performance guide and best practices
+- [ ] 6.1.5: Add MPI usage documentation
 
 **Dependencies**: Task 5.4
 **Estimated effort**: 1 week
@@ -354,6 +441,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 6.2.2: Add finite element analysis examples
 - [ ] 6.2.3: Create multi-block mesh tutorial
 - [ ] 6.2.4: Add advanced solver examples
+- [ ] 6.2.5: Add distributed computing tutorials
 
 **Dependencies**: Task 6.1
 **Estimated effort**: 1 week
@@ -371,6 +459,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 6.3.2: Add integration tests for complete workflows
 - [ ] 6.3.3: Implement performance regression tests
 - [ ] 6.3.4: Achieve test coverage >90% for Python API
+- [ ] 6.3.5: Add distributed computing tests
 
 **Dependencies**: Task 6.2
 **Estimated effort**: 1 week
@@ -386,6 +475,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] 6.4.2: Finalize package setup and distribution
 - [ ] 6.4.3: Create comprehensive README and installation guide
 - [ ] 6.4.4: Validate all success criteria from PRD
+- [ ] 6.4.5: Test MPI integration and fallbacks
 
 **Dependencies**: Task 6.3
 **Estimated effort**: 1 week
@@ -404,6 +494,12 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] Memory usage optimization for large multi-block meshes
 - [ ] Comprehensive test suite for multi-block scenarios
 - [ ] Thread-safe memory management for parallel operations
+- [ ] MPI support implemented as optional dependency
+- [ ] All MPI code organized in dedicated `parallel/` folder
+- [ ] MPI abstractions hide explicit dependencies behind clean interfaces
+- [ ] Compile-time fallbacks using `#ifdef SFEM_ENABLE_MPI` guards
+- [ ] Matrix I/O functions support MPI operations with fallbacks
+- [ ] Python interface handles communicators with automatic serial fallback
 
 ### Milestone 2 Success Criteria
 - [ ] Complete C++ frontend functionality exposed
@@ -413,6 +509,9 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - [ ] Jupyter notebook tutorials for common use cases
 - [ ] Performance within 5% of direct C++ usage
 - [ ] Test coverage >90% for Python API
+- [ ] MPI support in Python with proper abstractions
+- [ ] Automatic fallback to serial execution when MPI not available
+- [ ] Seamless integration with mpi4py when available
 
 ---
 
@@ -425,12 +524,18 @@ This document breaks down the PRD requirements into granular, actionable tasks w
    - *Mitigation*: Prototype interface handling in Task 3.2
 3. **Python binding complexity for advanced C++ features**
    - *Mitigation*: Use nanobind and incremental development
+4. **MPI abstraction complexity**
+   - *Mitigation*: Start with simple communicator abstractions in Task 3.5
+5. **Compile-time MPI fallback complexity**
+   - *Mitigation*: Use consistent `#ifdef SFEM_ENABLE_MPI` pattern throughout
 
 ### Resource Risks
 1. **Development time for comprehensive Python API**
    - *Mitigation*: Prioritize core functionality in Phase 1
 2. **Testing complexity for multi-block scenarios**
    - *Mitigation*: Automated test generation in Task 6.3
+3. **MPI testing complexity**
+   - *Mitigation*: Separate MPI and non-MPI test suites
 
 ---
 
@@ -442,11 +547,18 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - **SciPy**: Sparse matrix and scientific computing
 - **Matplotlib**: Visualization capabilities
 - **Jupyter**: Interactive tutorials
+- **MPI**: Optional parallel computing support
+  - Must be organized in dedicated folder ( `parallel/`)
+  - Explicit MPI dependencies hidden behind abstractions
+  - Compile-time fallbacks for non-MPI builds
+  - Frontend communicator abstractions for Python interface
+- **mpi4py**: Optional Python MPI support (for distributed Python operations)
 
 ### Internal Dependencies
 - **Milestone 1 completion**: Python frontend depends on multi-block mesh
 - **C++ frontend stability**: Python API should be built on stable C++ API
 - **Testing infrastructure**: Comprehensive test suite for validation
+- **MPI abstraction layer**: Python MPI support depends on C++ MPI abstractions
 
 ---
 
@@ -456,4 +568,7 @@ This document breaks down the PRD requirements into granular, actionable tasks w
 - Performance benchmarks should be run regularly throughout development
 - Code reviews should focus on both functionality and performance
 - Documentation should be updated as features are implemented
-- Regular integration testing should be performed between phases 
+- Regular integration testing should be performed between phases
+- MPI functionality must be completely optional and not affect serial builds
+- All MPI code must use `#ifdef SFEM_ENABLE_MPI` guards consistently
+- Matrix I/O functions must support both serial and parallel operations 
