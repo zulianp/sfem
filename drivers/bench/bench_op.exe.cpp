@@ -35,7 +35,7 @@ typedef struct OpDesc {
         for (int r = 0; r < repeat; r++) {
             op->apply(x, y);
         }
-        
+
         sfem::device_synchronize();
         double stop = MPI_Wtime();
         rows        = op->rows();
@@ -115,9 +115,10 @@ int main(int argc, char *argv[]) {
             op->initialize();
             f->add_operator(op);
 
+            auto x         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto input     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto output    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto linear_op = sfem::create_linear_operator(op_desc.type, f, input, es);
+            auto linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
 
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }
