@@ -97,11 +97,6 @@ NB_MODULE(pysfem, m) {
             .def("data", &Grid<geom_t>::data);
 
     // Add Sideset class bindings with wrapper functions
-    nb::class_<Buffer<element_idx_t>>(m, "ElementIdxBuffer")
-            .def("size", &Buffer<element_idx_t>::size)
-            .def("data",
-                 [](const Buffer<element_idx_t> &buf) { return nb::ndarray<const element_idx_t>(buf.data(), {buf.size()}); });
-
     nb::class_<Buffer<int16_t>>(m, "Int16Buffer").def("size", &Buffer<int16_t>::size).def("data", [](const Buffer<int16_t> &buf) {
         return nb::ndarray<const int16_t>(buf.data(), {buf.size()});
     });
@@ -783,4 +778,15 @@ NB_MODULE(pysfem, m) {
             .def("__copy__", [](const SemiStructuredMesh &) { throw std::runtime_error("Copy not allowed"); })
             .def("__deepcopy__",
                  [](const SemiStructuredMesh &, nb::handle) { throw std::runtime_error("Deepcopy not allowed"); });
+
+    // Expose the C++ types as Python dtypes
+    try {
+        nb::module_ numpy = nb::module_::import_("numpy");
+        m.attr("real_t") = numpy.attr(dtype_REAL_T);
+        m.attr("idx_t") = numpy.attr(dtype_IDX_T);
+    } catch (const std::exception&) {
+        // If numpy is not available, use native nanobind dtypes
+        m.attr("real_t") = nb::dtype<real_t>();
+        m.attr("idx_t") = nb::dtype<idx_t>();
+    }
 }
