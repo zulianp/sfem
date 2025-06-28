@@ -42,8 +42,8 @@ namespace sfem {
         int iterations() const override { return iterations_; }
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        std::shared_ptr<Buffer<T>> upper_bound_;
-        std::shared_ptr<Buffer<T>> lower_bound_;
+        SharedBuffer<T> upper_bound_;
+        SharedBuffer<T> lower_bound_;
 
         std::function<void(const T* const, T* const)> apply_op;
 
@@ -71,8 +71,8 @@ namespace sfem {
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
-        void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
-        void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
+        void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
+        void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
 
         void ensure_power_method() {
             if (!power_method) {
