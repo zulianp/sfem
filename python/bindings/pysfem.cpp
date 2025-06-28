@@ -20,6 +20,12 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 #include "sfem_SSMultigrid.hpp"
 
+// Add missing includes
+#include "sfem_Grid.hpp"
+#include "sfem_Input.hpp"
+#include "sfem_ssmgc.hpp"
+#include "sfem_tpl_blas.hpp"
+#include "openmp/sfem_openmp_blas.hpp"
 
 namespace nb = nanobind;
 
@@ -52,6 +58,7 @@ NB_MODULE(pysfem, m) {
     using IdxBuffer2D = sfem::Buffer<idx_t *>;
     using IdxBuffer = sfem::Buffer<idx_t>;
     using CountBuffer = sfem::Buffer<count_t>;
+    using SSMGC_t = sfem::SSMGC<real_t>;
 
     m.def("init", &SFEM_init);
     m.def("finalize", &SFEM_finalize);
@@ -65,6 +72,87 @@ NB_MODULE(pysfem, m) {
             .value("MEMORY_SPACE_HOST", MEMORY_SPACE_HOST)
             .value("MEMORY_SPACE_DEVICE", MEMORY_SPACE_DEVICE)
             .value("MEMORY_SPACE_INVALID", MEMORY_SPACE_INVALID);
+
+    // Add Grid class bindings with wrapper functions
+    nb::class_<Grid<geom_t>>(m, "Grid")
+            .def("create_from_file", [](const std::string &path) {
+                return Grid<geom_t>::create_from_file(MPI_COMM_WORLD, path);
+            })
+            .def("create", [](const ptrdiff_t nx, const ptrdiff_t ny, const ptrdiff_t nz,
+                             const geom_t xmin, const geom_t ymin, const geom_t zmin,
+                             const geom_t xmax, const geom_t ymax, const geom_t zmax) {
+                return Grid<geom_t>::create(MPI_COMM_WORLD, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+            })
+            .def("to_file", &Grid<geom_t>::to_file)
+            .def("extent", &Grid<geom_t>::extent)
+            .def("size", &Grid<geom_t>::size)
+            .def("spatial_dimension", &Grid<geom_t>::spatial_dimension)
+            .def("block_size", &Grid<geom_t>::block_size)
+            .def("buffer", &Grid<geom_t>::buffer)
+            .def("data", &Grid<geom_t>::data);
+
+    // Add Sideset class bindings with wrapper functions
+    nb::class_<Sideset>(m, "Sideset")
+            .def("create_from_file", [](const std::string &path) {
+                return Sideset::create_from_file(MPI_COMM_WORLD, path.c_str());
+            })
+            .def("create", [](const std::shared_ptr<Buffer<element_idx_t>> &parent, 
+                             const std::shared_ptr<Buffer<int16_t>> &lfi) {
+                return Sideset::create(MPI_COMM_WORLD, parent, lfi);
+            });
+
+    // Add YAMLNoIndent class bindings
+    nb::class_<YAMLNoIndent>(m, "YAMLNoIndent")
+            .def("create_from_file", &YAMLNoIndent::create_from_file)
+            .def("parse", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &input) {
+                return yaml->parse(input);
+            })
+            .def("get", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, ptrdiff_t &val) {
+                return yaml->get(key, val);
+            })
+            .def("get", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, int &val) {
+                return yaml->get(key, val);
+            })
+            .def("get", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, double &val) {
+                return yaml->get(key, val);
+            })
+            .def("get", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, std::string &val) {
+                return yaml->get(key, val);
+            })
+            .def("require", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, ptrdiff_t &val) {
+                return yaml->require(key, val);
+            })
+            .def("require", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, int &val) {
+                return yaml->require(key, val);
+            })
+            .def("require", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, double &val) {
+                return yaml->require(key, val);
+            })
+            .def("require", [](std::shared_ptr<YAMLNoIndent> &yaml, const std::string &key, std::string &val) {
+                return yaml->require(key, val);
+            })
+            .def("key_exists", &YAMLNoIndent::key_exists);
+
+    // Add create_ssmgc function binding
+    m.def("create_ssmgc", [](const std::shared_ptr<Function> &f,
+                             const std::shared_ptr<ContactConditions> &contact_conds,
+                             const std::shared_ptr<Input> &in) -> std::shared_ptr<SSMGC_t> {
+        return sfem::create_ssmgc(f, contact_conds, in);
+    });
+
+    // Add create_shifted_penalty function binding
+    m.def("create_shifted_penalty", [](const std::shared_ptr<Function> &f,
+                                      const std::shared_ptr<ContactConditions> &contact_conds,
+                                      const std::shared_ptr<Input> &in) -> std::shared_ptr<ShiftedPenalty_t> {
+        return sfem::create_shifted_penalty(f, contact_conds, in);
+    });
+
+    // Add blas function binding
+    m.def("blas", [](const enum ExecutionSpace es) -> BLAS_Tpl<real_t> {
+        BLAS_Tpl<real_t> blas;
+        OpenMP_BLAS<real_t>::build_blas(blas);
+        return blas;
+    });
 
     nb::class_<Mesh>(m, "Mesh")  //
             .def(nb::init<>())
@@ -199,9 +287,11 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<Output>(m, "Output")
             .def("set_output_dir", &Output::set_output_dir)
-            .def("write", &Output::write)
-            .def("write_time_step", &Output::write_time_step)
-            .def("enable_AoS_to_SoA", &Output::enable_AoS_to_SoA);
+            .def("enable_AoS_to_SoA", &Output::enable_AoS_to_SoA)
+            .def("write", [](std::shared_ptr<Output> &out, const char *name, nb::ndarray<real_t> x) {
+                out->write(name, x.data());
+            })
+            .def("write_time_step", &Output::write_time_step);
 
     m.def("write_time_step",
           [](std::shared_ptr<Output> &out,
@@ -224,7 +314,6 @@ NB_MODULE(pysfem, m) {
               auto c_v = (real_t *)malloc(n * sizeof(real_t));
               memcpy(c_v, v.data(), n * sizeof(real_t));
 
-
               op->set_field(name, sfem::manage_host_buffer<real_t>(n, c_v), component);
           });
 
@@ -237,6 +326,8 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> d) {
               fun->hessian_diag(x.data(), d.data());
           });
+
+    m.def("apply", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> h, nb::ndarray<real_t> y) { fun->apply(x.data(), h.data(), y.data()); });
 
     m.def("hessian_crs",
           [](std::shared_ptr<Function> fun,
@@ -251,23 +342,17 @@ NB_MODULE(pysfem, m) {
               fun->hessian_crs(x->data(), rowptr->data(), colidx->data(), values->data());
           });
 
-    // m.def("crs_spmv",
-    //       [](nb::ndarray<count_t> rowptr,
-    //          nb::ndarray<idx_t> colidx,
-    //          nb::ndarray<real_t> values) -> std::shared_ptr<Operator_t> {
-    //           return sfem::h_crs_spmv(
-    //                   rowptr.size() - 1,
-    //                   rowptr.size() - 1,
-    //                   sfem::Buffer<count_t>::wrap(
-    //                           rowptr.size(), rowptr.data(), sfem::MEMORY_SPACE_HOST),
-    //                   sfem::Buffer<idx_t>::wrap(
-    //                           colidx.size(), colidx.data(), sfem::MEMORY_SPACE_HOST),
-    //                   sfem::Buffer<real_t>::wrap(
-    //                           values.size(), values.data(), sfem::MEMORY_SPACE_HOST),
-    //                   real_t(0));
-    //       });
-
     m.def("crs_spmv",
+          [](std::shared_ptr<sfem::Buffer<count_t>> rowptr,
+             std::shared_ptr<sfem::Buffer<idx_t>>
+                     colidx,
+             std::shared_ptr<sfem::Buffer<real_t>>
+                     values) -> std::shared_ptr<Operator_t> {
+              return sfem::h_crs_spmv(
+                      rowptr->size() - 1, rowptr->size() - 1, rowptr, colidx, values, real_t(0));
+          });
+
+    m.def("hessian_crs",
           [](std::shared_ptr<sfem::Buffer<count_t>> rowptr,
              std::shared_ptr<sfem::Buffer<idx_t>>
                      colidx,
@@ -310,15 +395,6 @@ NB_MODULE(pysfem, m) {
         return op;
     });
 
-    m.def("apply",
-          [](std::shared_ptr<Function> &fun,
-             nb::ndarray<real_t>
-                     x,
-             nb::ndarray<real_t>
-                     h,
-             nb::ndarray<real_t>
-                     y) { fun->apply(x.data(), h.data(), y.data()); });
-
     m.def("value", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) -> real_t {
         real_t value = 0;
         fun->value(x.data(), &value);
@@ -336,6 +412,10 @@ NB_MODULE(pysfem, m) {
 
     m.def("apply_zero_constraints", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x) {
         fun->apply_zero_constraints(x.data());
+    });
+
+    m.def("gradient", [](std::shared_ptr<Function> &fun, nb::ndarray<real_t> x, nb::ndarray<real_t> g) {
+        fun->gradient(x.data(), g.data());
     });
 
     m.def("copy_constrained_dofs",
@@ -377,20 +457,6 @@ NB_MODULE(pysfem, m) {
               dc->add_condition(n, n, c_idx, component, value);
           });
 
-    // m.def("gradient",
-    //       [](const std::shared_ptr<ContactConditions> &cc,
-    //          nb::ndarray<real_t>
-    //                  x,
-    //          nb::ndarray<real_t>
-    //                  y) { cc->gradient(x.data(), y.data()); });
-
-    m.def("signed_distance",
-          [](const std::shared_ptr<ContactConditions> &cc,
-             nb::ndarray<real_t>
-                     x,
-             nb::ndarray<real_t>
-                     y) { cc->signed_distance(x.data(), y.data()); });
-
     m.def("update", [](const std::shared_ptr<ContactConditions> &cc, nb::ndarray<real_t> x) {
         cc->update(x.data());
     });
@@ -400,7 +466,14 @@ NB_MODULE(pysfem, m) {
              nb::ndarray<real_t>
                      x,
              nb::ndarray<real_t>
-                     y) { cc->signed_distance_for_mesh_viz(x.data(), y.data()); });
+                     gap) { cc->signed_distance_for_mesh_viz(x.data(), gap.data()); });
+
+    m.def("signed_distance",
+          [](const std::shared_ptr<ContactConditions> &cc,
+             nb::ndarray<real_t>
+                     x,
+             nb::ndarray<real_t>
+                     y) { cc->signed_distance(x.data(), y.data()); });
 
     m.def("contact_conditions_from_file",
           [](const std::shared_ptr<FunctionSpace> &space,
@@ -428,20 +501,6 @@ NB_MODULE(pysfem, m) {
           [](std::shared_ptr<DirichletConditions> &dc, real_t value, nb::ndarray<real_t> y) {
               dc->apply_value(value, y.data());
           });
-
-    // FIXME
-    // m.def("add_condition",
-    //       [](std::shared_ptr<NeumannConditions> &nc,
-    //          nb::ndarray<idx_t>
-    //                  idx,
-    //          const int component,
-    //          const real_t value) {
-    //           size_t n = idx.size();
-    //           auto c_idx = (idx_t *)malloc(n * sizeof(idx_t));
-    //           memcpy(c_idx, idx.data(), n * sizeof(idx_t));
-
-    //           nc->add_condition(n, n, c_idx, component, value);
-    //       });
 
     nb::class_<Operator_t>(m, "Operator")
             .def("__add__",
@@ -477,6 +536,10 @@ NB_MODULE(pysfem, m) {
                              },
                              l->execution_space());
                  });
+
+    // Add SSMGC class bindings after Operator class
+    nb::class_<SSMGC_t, Operator_t>(m, "SSMGC")
+            .def("create", &SSMGC_t::create);
 
     m.def("make_op",
           [](const std::shared_ptr<Function> &fun, nb::ndarray<real_t> u)

@@ -167,3 +167,11 @@ for (int d = 0; d < 3; d++) {
 - Contact detection and resolution
 
 Remember: This is a high-performance computing codebase. Every optimization should be measured, and readability should not be sacrificed for premature optimization. 
+
+
+Consider the PRD.md file when making changes, prompt to improve the PRD.md file when new ideas come along.
+
+
+# Cursor behavior
+
+- Make sure to not accidentaly delete or modify functionalties that are not affecting the task.
