@@ -10,6 +10,11 @@ SFEM is a high-performance computing framework for finite element analysis, feat
 - **Data-oriented design**: Structure of Arrays (SoA) over Array of Structures (AoS)
 - **Memory management**: Manual allocation with clear ownership semantics
 - **Python bindings**: Basic C++ to Python interface via `sfem.cpp`
+- **MPI support**: Optional MPI dependency with proper abstractions
+  - MPI functionalities organized in dedicated folders (`mpi/`, `parallel/`)
+  - Explicit MPI dependencies hidden behind simple abstractions
+  - Backend functions have compile-time fallbacks for non-MPI builds
+  - Frontend provides proper abstractions to handle communicators
 
 ---
 
@@ -186,6 +191,27 @@ pysfem/
 
 pysfem should become sfem
 
+#### MPI Architecture Requirements
+- **Optional Dependency**: MPI support must be completely optional
+- **Folder Organization**: All MPI-related code must be organized in dedicated folders:
+  - `mpi/` - Core MPI abstractions and utilities
+  - `parallel/` - Parallel algorithms and data structures
+- **Abstraction Layer**: Explicit MPI dependencies must be hidden behind simple abstractions:
+  - `Communicator` class for MPI_Comm handling
+  - Current abstractions will have adapt their implementation internally
+- **Compile-time Fallbacks**: Backend functions must have compile-time fallbacks:
+  - `#ifdef SFEM_ENABLE_MPI` guards for MPI-specific code (including matrix.io functionalities)
+  - Serial implementations for non-MPI builds
+  - No runtime MPI dependency checks
+- **Frontend Abstractions**: C++ frontend must provide proper communicator abstractions:
+  - `sfem::Communicator` class wrapping MPI_Comm
+  - Default communicator for serial execution
+  - Python bindings for communicator management
+- **Python Interface**: Python frontend must handle communicators properly:
+  - `sfem.Communicator` class for Python users
+  - Automatic fallback to serial execution when MPI not available
+  - Seamless integration with mpi4py when available
+
 #### API Design Examples
 ```python
 # Mesh creation
@@ -276,6 +302,11 @@ u = solver.solve(f)
 - **NumPy**: Numerical array support
 - **SciPy**: Sparse matrix and scientific computing
 - **Matplotlib**: Visualization capabilities
+- **MPI**: Optional parallel computing support
+  - Must be organized in dedicated folders (`parallel/`)
+  - Explicit MPI dependencies hidden behind abstractions
+  - Compile-time fallbacks for non-MPI builds
+  - Frontend communicator abstractions for Python interface
 
 ### Internal Dependencies
 - **Milestone 1 completion**: Python frontend depends on multi-block mesh
