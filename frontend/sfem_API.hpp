@@ -505,11 +505,10 @@ namespace sfem {
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("hierarchical_prolongation");
 
-                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_prolongation(from_space->element_type(),
                                                       to_space->element_type(),
-                                                      mesh->nelements,
-                                                      mesh->elements,
+                                                      to_space->mesh().n_elements(),
+                                                      to_space->mesh().elements()->data(),
                                                       from_space->block_size(),
                                                       from,
                                                       to);
@@ -522,7 +521,6 @@ namespace sfem {
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(const std::shared_ptr<FunctionSpace> &from_space,
                                                                              const std::shared_ptr<FunctionSpace> &to_space,
                                                                              const ExecutionSpace                  es) {
-        auto      mesh         = (mesh_t *)from_space->mesh().impl_mesh();
         auto      from_element = (enum ElemType)from_space->element_type();
         auto      to_element   = (enum ElemType)to_space->element_type();
         const int block_size   = from_space->block_size();
@@ -537,8 +535,8 @@ namespace sfem {
             nnodes       = ssmesh.n_nodes();
         } else {
             nxe      = elem_num_nodes(from_element);
-            elements = mesh->elements;
-            nnodes   = mesh->nnodes;
+            elements = from_space->mesh().elements()->data();
+            nnodes   = from_space->mesh().n_nodes();
         }
 
         auto element_to_node_incidence_count = create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
@@ -546,8 +544,9 @@ namespace sfem {
             auto buff = element_to_node_incidence_count->data();
 
             // #pragma omp parallel for // BAD performance with parallel for
+            const ptrdiff_t nelements = from_space->mesh().n_elements();
             for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < mesh->nelements; ++i) {
+                for (ptrdiff_t i = 0; i < nelements; ++i) {
                     // #pragma omp atomic update
                     buff[elements[d][i]]++;
                 }
@@ -699,11 +698,10 @@ namespace sfem {
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("hierarchical_restriction_with_counting");
 
-                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
                             hierarchical_restriction_with_counting(from_element,
                                                                    to_element,
-                                                                   mesh->nelements,
-                                                                   mesh->elements,
+                                                                   from_space->mesh().n_elements(),
+                                                                   from_space->mesh().elements()->data(),
                                                                    element_to_node_incidence_count->data(),
                                                                    block_size,
                                                                    from,

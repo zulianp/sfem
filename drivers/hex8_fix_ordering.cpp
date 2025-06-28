@@ -28,21 +28,23 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     auto m = sfem::Mesh::create_from_file(comm, folder);
 
-    auto &mesh = *((mesh_t *)m->impl_mesh());
-    int nxe = elem_num_nodes((enum ElemType)mesh.element_type);
+    int nxe = elem_num_nodes((enum ElemType)m->element_type());
+    const auto elements = m->elements()->data();
+    const auto points = m->points()->data();
+    const ptrdiff_t nelements = m->n_elements();
 
     ptrdiff_t n_reorders = 0;
-    for (ptrdiff_t e = 0; e < mesh.nelements; e++) {
+    for (ptrdiff_t e = 0; e < nelements; e++) {
         idx_t ev[8];
         for (int v = 0; v < 8; v++) {
-            ev[v] = mesh.elements[v][e];
+            ev[v] = elements[v][e];
         }
 
         geom_t x[8], y[8], z[8];
         for (int v = 0; v < 8; v++) {
-            x[v] = mesh.points[0][ev[v]];
-            y[v] = mesh.points[1][ev[v]];
-            z[v] = mesh.points[2][ev[v]];
+            x[v] = points[0][ev[v]];
+            y[v] = points[1][ev[v]];
+            z[v] = points[2][ev[v]];
         }
 
         jacobian_t adjugate[9];
@@ -135,7 +137,7 @@ int main(int argc, char *argv[]) {
             }
 
             for (int v = 0; v < 8; v++) {
-                mesh.elements[v][e] = reordering[v];
+                elements[v][e] = reordering[v];
             }
         }
     }   

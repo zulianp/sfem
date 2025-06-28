@@ -22,13 +22,13 @@ namespace sfem {
         Mesh(MPI_Comm comm);
         ~Mesh();
 
-        Mesh(int                         spatial_dim,
+        Mesh(MPI_Comm                    comm,
+             int                         spatial_dim,
              enum ElemType               element_type,
              ptrdiff_t                   nelements,
-             idx_t                     **elements,
+             SharedBuffer<idx_t *>       elements,
              ptrdiff_t                   nnodes,
-             geom_t                    **points,
-             std::function<void(void *)> destroy = nullptr);
+             SharedBuffer<geom_t *>      points);
 
         friend class FunctionSpace;
         friend class Op;
@@ -59,7 +59,7 @@ namespace sfem {
         std::shared_ptr<Buffer<geom_t *>> points();
         std::shared_ptr<Buffer<idx_t *>>  elements();
 
-        void *impl_mesh();
+        // void *impl_mesh();
 
         MPI_Comm comm() const;
 
@@ -68,6 +68,8 @@ namespace sfem {
             ret->read(path);
             return ret;
         }
+
+        static std::shared_ptr<Mesh> create_hex8_reference_cube();
 
         static std::shared_ptr<Mesh> create_hex8_cube(MPI_Comm     comm,
                                                       const int    nx   = 1,

@@ -52,11 +52,10 @@ namespace sfem {
                 }
             }
 #endif
-            auto c_mesh = (mesh_t *)macro_mesh->impl_mesh();
             sshex8_generate_elements(level,
-                                     c_mesh->nelements,
-                                     c_mesh->nnodes,
-                                     c_mesh->elements,
+                                     macro_mesh->n_elements(),
+                                     macro_mesh->n_nodes(),
+                                     macro_mesh->elements()->data(),
                                      elements,
                                      &this->n_unique_nodes,
                                      &this->interior_start);
@@ -161,7 +160,7 @@ namespace sfem {
     std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
         if (!impl_->points) {
             auto p       = sfem::create_host_buffer<geom_t>(impl_->macro_mesh->spatial_dimension(), impl_->n_unique_nodes);
-            auto macro_p = ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points;
+            auto macro_p = impl_->macro_mesh->points()->data();
 
             SFEM_TRACE_SCOPE("sshex8_fill_points");
 
@@ -232,7 +231,7 @@ namespace sfem {
     int SemiStructuredMesh::n_nodes_per_element() const { return sshex8_nxe(impl_->level); }
 
     idx_t   **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
-    geom_t  **SemiStructuredMesh::point_data() { return ((mesh_t *)(impl_->macro_mesh->impl_mesh()))->points; }
+    geom_t  **SemiStructuredMesh::point_data() { return impl_->macro_mesh->points()->data(); }
     ptrdiff_t SemiStructuredMesh::interior_start() const { return impl_->interior_start; }
 
     SemiStructuredMesh::SemiStructuredMesh(const std::shared_ptr<Mesh> macro_mesh, const int level)

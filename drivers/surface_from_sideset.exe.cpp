@@ -38,12 +38,12 @@ int main(int argc, char *argv[]) {
     auto        m            = sfem::Mesh::create_from_file(comm, path_mesh);
     const char *path_sideset = argv[2];
     auto        s            = sfem::Sideset::create_from_file(comm, path_sideset);
-    auto       &mesh         = *((mesh_t *)m->impl_mesh());
+    const auto elements = m->elements()->data();
 
     // Make sure the folder exists
     sfem::create_directory(argv[3]);
 
-    enum ElemType element_type       = (enum ElemType)mesh.element_type;
+    enum ElemType element_type       = m->element_type();
     std::string   path_output_format = argv[3];
     path_output_format += "/i%d.raw";
 
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
         {
             SFEM_TRACE_SCOPE("extract_surface_from_sideset");
             if (extract_surface_from_sideset(element_type,
-                                             mesh.elements,
+                                             elements,
                                              s->parent()->size(),
                                              s->parent()->data(),
                                              s->lfi()->data(),
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
             {
                 SFEM_TRACE_SCOPE("extract_nodeset_from_sideset");
                 if (extract_nodeset_from_sideset(element_type,
-                                                 mesh.elements,
+                                                 elements,
                                                  s->parent()->size(),
                                                  s->parent()->data(),
                                                  s->lfi()->data(),

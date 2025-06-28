@@ -285,26 +285,26 @@ NB_MODULE(pysfem, m) {
               int       spatial_dimension = 3;  // Assuming 3D
               ptrdiff_t nnodes            = p->size() / spatial_dimension;
 
-              idx_t  **elements = (idx_t **)malloc(nnxe * sizeof(idx_t *));
-              geom_t **points   = (geom_t **)malloc(spatial_dimension * sizeof(geom_t *));
+              auto elements = sfem::create_host_buffer<idx_t>(nnxe, nelements);
+              auto points   = sfem::create_host_buffer<geom_t>(spatial_dimension, nnodes);
+
+              auto d_elements = elements->data();
+              auto d_points   = points->data();
 
               for (int d = 0; d < nnxe; d++) {
-                  elements[d] = (idx_t *)malloc(nelements * sizeof(idx_t));
-
                   for (ptrdiff_t i = 0; i < nelements; i++) {
-                      elements[d][i] = idx->data()[d * nelements + i];
+                      d_elements[d][i] = idx->data()[d * nelements + i];
                   }
               }
 
               for (int d = 0; d < spatial_dimension; d++) {
-                  points[d] = (geom_t *)malloc(nnodes * sizeof(geom_t));
                   for (ptrdiff_t i = 0; i < nnodes; i++) {
-                      points[d][i] = p->data()[d * nnodes + i];
+                      d_points[d][i] = p->data()[d * nnodes + i];
                   }
               }
 
               // Transfer ownership to mesh
-              return std::make_shared<Mesh>(spatial_dimension, element_type, nelements, elements, nnodes, points);
+              return std::make_shared<Mesh>(MPI_COMM_WORLD, spatial_dimension, element_type, nelements, elements, nnodes, points);
           });
 
     m.def("points", [](std::shared_ptr<Mesh> &mesh, int coord) -> nb::ndarray<nb::numpy, const geom_t> {
@@ -782,11 +782,11 @@ NB_MODULE(pysfem, m) {
     // Expose the C++ types as Python dtypes
     try {
         nb::module_ numpy = nb::module_::import_("numpy");
-        m.attr("real_t") = numpy.attr(dtype_REAL_T);
-        m.attr("idx_t") = numpy.attr(dtype_IDX_T);
-    } catch (const std::exception&) {
+        m.attr("real_t")  = numpy.attr(dtype_REAL_T);
+        m.attr("idx_t")   = numpy.attr(dtype_IDX_T);
+    } catch (const std::exception &) {
         // If numpy is not available, use native nanobind dtypes
         m.attr("real_t") = nb::dtype<real_t>();
-        m.attr("idx_t") = nb::dtype<idx_t>();
+        m.attr("idx_t")  = nb::dtype<idx_t>();
     }
 }
