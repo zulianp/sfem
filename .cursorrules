@@ -6,6 +6,41 @@
 - **Data-oriented design**: Prefer structs of arrays over arrays of structs
 - **Memory management**: Manual allocation with clear ownership semantics
 
+## PRD (Product Requirements Document) Integration
+
+### PRD-First Development Approach
+- **ALWAYS consult PRD.md** before making architectural decisions or suggesting next steps
+- **Reference specific PRD sections** when discussing implementation approaches
+- **Align all development work** with the PRD's milestone timeline and success criteria
+- **Consider PRD requirements** when evaluating trade-offs between different implementation approaches
+
+### PRD Review and Update Process
+- **Before starting any major feature**: Review relevant PRD sections to ensure alignment
+- **When encountering new requirements**: Check if they should be added to the PRD
+- **When suggesting architectural changes**: Prompt user to consider PRD updates
+- **When completing milestones**: Review PRD success criteria and suggest updates
+
+### PRD Modification Triggers
+**Prompt for PRD updates when:**
+- New architectural patterns emerge that aren't covered in the PRD
+- Performance requirements change or new constraints are discovered
+- Additional dependencies or technologies are identified
+- Timeline estimates need adjustment based on implementation experience
+- New use cases or requirements are discovered during development
+- Integration challenges reveal gaps in the PRD specifications
+
+### PRD Integration Guidelines
+- **Milestone awareness**: Always be aware of which PRD milestone is currently active
+- **Success criteria tracking**: Reference PRD success criteria when evaluating progress
+- **Risk assessment**: Consider PRD-identified risks when making implementation decisions
+- **Dependency management**: Ensure PRD dependencies are satisfied before proceeding
+
+### PRD Communication
+- **Explicit PRD references**: When suggesting changes, explicitly reference relevant PRD sections
+- **PRD gap identification**: Point out when current work reveals gaps in PRD coverage
+- **PRD update suggestions**: Proactively suggest PRD improvements when appropriate
+- **Milestone alignment**: Ensure all suggestions align with current PRD milestone priorities
+
 ## Code Style & Conventions
 
 ### General Principles
