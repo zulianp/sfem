@@ -30,6 +30,8 @@
 
 #include <fstream>
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -130,10 +132,11 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto            mesh        = sfem::Mesh::create_from_file(comm, folder);
+    auto            points      = mesh->points()->data();
+    const ptrdiff_t n_nodes     = mesh->n_nodes();
+    const ptrdiff_t n_elements  = mesh->n_elements();
+    const int       spatial_dim = mesh->spatial_dimension();
 
     const char *SFEM_ELEMENT_TYPE = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
@@ -153,45 +156,44 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        if (mesh.element_type == HEX8) {
+        if (mesh->element_type() == HEX8) {
             // Generate proteus mesh on the fly!
 
-            const int nxe      = sshex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
-            const int txe      = sshex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
-            idx_t   **elements = 0;
+            const int nxe = sshex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
+            const int txe = sshex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
 
-            elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            for (int d = 0; d < nxe; d++) {
-                elements[d] = (idx_t *)malloc(mesh.nelements * sizeof(idx_t));
-            }
+            auto elements   = sfem::create_host_buffer<idx_t>(nxe, n_elements);
+            auto d_elements = mesh->elements()->data();
 
             for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-                    elements[d][i] = SFEM_IDX_INVALID;
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    d_elements[d][i] = SFEM_IDX_INVALID;
                 }
             }
 
             ptrdiff_t n_unique_nodes, interior_start;
             sshex8_generate_elements(SFEM_ELEMENT_REFINE_LEVEL,
-                                     mesh.nelements,
-                                     mesh.nnodes,
-                                     mesh.elements,
-                                     elements,
+                                     n_elements,
+                                     n_nodes,
+                                     mesh->elements()->data(),
+                                     d_elements,
                                      &n_unique_nodes,
                                      &interior_start);
 
             const int nnxs = (SFEM_ELEMENT_REFINE_LEVEL + 1) * (SFEM_ELEMENT_REFINE_LEVEL + 1);
 
-            ptrdiff_t      n_surf_elements = 0;
-            idx_t        **surf_elems      = (idx_t **)calloc(nnxs, sizeof(idx_t *));
-            element_idx_t *parent          = 0;
+            ptrdiff_t n_surf_elements = 0;
+            idx_t   **d_surf_elems    = (idx_t **)calloc(nnxs, sizeof(idx_t *));
 
-            sshex8_skin(SFEM_ELEMENT_REFINE_LEVEL, mesh.nelements, elements, &n_surf_elements, surf_elems, &parent);
+            element_idx_t *parent = 0;
+            sshex8_skin(SFEM_ELEMENT_REFINE_LEVEL, n_elements, d_elements, &n_surf_elements, d_surf_elems, &parent);
+            auto surf_elements = sfem::manage_host_buffer<idx_t>(nnxs, n_surf_elements, d_surf_elems);
+            auto surf_parent   = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent);
 
             char path[2048];
             for (int d = 0; d < nnxs; d++) {
-                sprintf(path, "%s/i%d.raw", output_folder, d);
-                array_write(comm, path, SFEM_MPI_IDX_T, surf_elems[d], n_surf_elements, n_surf_elements);
+                snprintf(path, sizeof(path), "%s/i%d.raw", output_folder, d);
+                array_write(comm, path, SFEM_MPI_IDX_T, d_surf_elems[d], n_surf_elements, n_surf_elements);
             }
 
             // TODO
@@ -203,38 +205,39 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    enum ElemType st   = side_type(mesh.element_type);
+    enum ElemType st   = side_type(mesh->element_type());
     const int     nnxs = elem_num_nodes(st);
 
     ptrdiff_t      n_surf_elements = 0;
-    idx_t        **surf_elems      = (idx_t **)malloc(nnxs * sizeof(idx_t *));
+    idx_t        **d_surf_elems    = (idx_t **)malloc(nnxs * sizeof(idx_t *));
     element_idx_t *parent          = 0;
     int16_t       *side_idx        = 0;
 
     if (extract_skin_sideset(
-                mesh.nelements, mesh.nnodes, mesh.element_type, mesh.elements, &n_surf_elements, &parent, &side_idx) !=
+                n_elements, n_nodes, mesh->element_type(), mesh->elements()->data(), &n_surf_elements, &parent, &side_idx) !=
         SFEM_SUCCESS) {
         SFEM_ERROR("Failed to extract skin!\n");
     }
 
     for (int s = 0; s < nnxs; s++) {
-        surf_elems[s] = (idx_t *)malloc(n_surf_elements * sizeof(idx_t));
+        d_surf_elems[s] = (idx_t *)malloc(n_surf_elements * sizeof(idx_t));
     }
 
-    if (extract_surface_from_sideset(mesh.element_type, mesh.elements, n_surf_elements, parent, side_idx, surf_elems) !=
+    if (extract_surface_from_sideset(
+                mesh->element_type(), mesh->elements()->data(), n_surf_elements, parent, side_idx, d_surf_elems) !=
         SFEM_SUCCESS) {
         SFEM_ERROR("Unable to extract surface from sideset!\n");
     }
 
-    idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
-    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+    idx_t *vol2surf = (idx_t *)malloc(n_nodes * sizeof(idx_t));
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         vol2surf[i] = SFEM_IDX_INVALID;
     }
 
     ptrdiff_t next_id = 0;
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
         for (int d = 0; d < nnxs; ++d) {
-            idx_t idx = surf_elems[d][i];
+            idx_t idx = d_surf_elems[d][i];
             if (vol2surf[idx] == SFEM_IDX_INVALID) {
                 vol2surf[idx] = next_id++;
             }
@@ -242,92 +245,58 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_surf_nodes = next_id;
-    geom_t  **points       = (geom_t **)malloc(mesh.spatial_dim * sizeof(geom_t *));
-    for (int d = 0; d < mesh.spatial_dim; d++) {
-        points[d] = 0;
-    }
-
+    auto surf_points = sfem::create_host_buffer<geom_t>(spatial_dim, n_surf_nodes);
+    auto d_surf_points = surf_points->data();
+  
     idx_t *mapping = (idx_t *)malloc(n_surf_nodes * sizeof(idx_t));
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
-        points[d] = (geom_t *)malloc(n_surf_nodes * sizeof(geom_t));
-    }
-
-    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+ 
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         if (vol2surf[i] < 0) continue;
         mapping[vol2surf[i]] = i;
 
-        for (int d = 0; d < mesh.spatial_dim; ++d) {
-            points[d][vol2surf[i]] = mesh.points[d][i];
+        for (int d = 0; d < spatial_dim; ++d) {
+            d_surf_points[d][vol2surf[i]] = points[d][i];
         }
     }
 
     // Correct normal orientation using elements with orginal indexing (only with P1 for the moment)
-    if (mesh.element_type == TET4) {
-        correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
+    if (mesh->element_type() == TET4) {
+        correct_side_orientation(n_surf_elements, d_surf_elems, parent, mesh->elements()->data(), points);
     }
 
     // Re-index elements
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {
         for (int d = 0; d < nnxs; ++d) {
-            surf_elems[d][i] = vol2surf[surf_elems[d][i]];
+            d_surf_elems[d][i] = vol2surf[d_surf_elems[d][i]];
         }
     }
 
     free(vol2surf);
 
-    mesh_t surf;
-    mesh_init(&surf);
+    auto surf_elements = sfem::manage_host_buffer<idx_t>(nnxs, n_surf_elements, d_surf_elems);
+    auto surf_parent   = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent);
+    auto surf_side_idx = sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx);
 
-    surf.comm      = mesh.comm;
-    surf.mem_space = mesh.mem_space;
-
-    surf.spatial_dim  = mesh.spatial_dim;
-    surf.element_type = shell_type(side_type(mesh.element_type));
-
-    surf.nelements = n_surf_elements;
-    surf.nnodes    = n_surf_nodes;
-
-    surf.elements = surf_elems;
-    surf.points   = points;
-
-    surf.node_mapping    = mapping;
-    surf.element_mapping = 0;
-    surf.node_owner      = 0;
-
-    mesh_write(output_folder, &surf);
-
+    auto        sideset      = sfem::Sideset::create(mesh->comm(), surf_parent, surf_side_idx);
     std::string sideset_path = output_folder;
     sideset_path += "/sidesets";
     sfem::create_directory(sideset_path.c_str());
+    sideset->write(sideset_path.c_str());
 
-    std::string parent_path = sideset_path + "/parent.raw";
-    array_write(comm, parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
+    auto surf = std::make_shared<sfem::Mesh>(
+            comm, spatial_dim, shell_type(side_type(mesh->element_type())), n_surf_elements, surf_elements, n_surf_nodes, surf_points);
 
-    std::string lfi_path = sideset_path + "/lfi.int16.raw";
-    array_write(comm, lfi_path.c_str(), MPI_SHORT, side_idx, n_surf_elements, n_surf_elements);
-
-    std::ofstream os(sideset_path + "/meta.yaml");
-
-    if (os.good()) {
-        os << "# Automatically generated by skin.exe.cpp\n";
-        os << "parent: parent.raw\n";
-        os << "lfi: lfi.int16.raw\n";
-        os << "rpath: true\n";
-    }
-
-    os.close();
+    surf->write(output_folder);
 
     // Clean-up
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
-        printf("Surface: #elements %ld #nodes %ld\n", (long)surf.nelements, (long)surf.nnodes);
+        printf("Volume: #elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
+        printf("Surface: #elements %ld #nodes %ld\n", (long)n_surf_elements, (long)n_surf_nodes);
     }
 
-    mesh_destroy(&mesh);
-    mesh_destroy(&surf);
     free(parent);
     free(side_idx);
 

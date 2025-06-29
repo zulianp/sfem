@@ -19,6 +19,7 @@
 #include "extract_sharp_features.h"
 
 #include "mesh_utils.h"
+#include "sfem_API.hpp"
 
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
@@ -47,8 +48,8 @@ int main(int argc, char* argv[]) {
 
     const char* folder = argv[1];
     ptrdiff_t nglobal[3] = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
-    geom_t origin[3] = {atof(argv[5]), atof(argv[6]), atof(argv[7])};
-    geom_t delta[3] = {atof(argv[8]), atof(argv[9]), atof(argv[10])};
+    geom_t origin[3] = {(geom_t)atof(argv[5]), (geom_t)atof(argv[6]), (geom_t)atof(argv[7])};
+    geom_t delta[3] = {(geom_t)atof(argv[8]), (geom_t)atof(argv[9]), (geom_t)atof(argv[10])};
     const char* data_path = argv[11];
     const char* output_folder = argv[12];
 
@@ -57,8 +58,8 @@ int main(int argc, char* argv[]) {
         mkdir(output_folder, 0700);
     }
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    if (!mesh) {
         return EXIT_FAILURE;
     }
 
@@ -89,8 +90,8 @@ int main(int argc, char* argv[]) {
     if (size > 1) {
         geom_t* psdf;
         sdf_view(comm,
-                 mesh.nnodes,
-                 mesh.points[2],
+                 mesh->n_nodes(),
+                 mesh->points()->data()[2],
                  nlocal,
                  nglobal,
                  stride,
@@ -123,13 +124,13 @@ int main(int argc, char* argv[]) {
             count_t* rowptr = 0;
             idx_t* colidx = 0;
             build_crs_graph_for_elem_type(
-                mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+                mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), &rowptr, &colidx);
 
-            extract_sharp_edges(mesh.element_type,
-                                mesh.nelements,
-                                mesh.nnodes,
-                                mesh.elements,
-                                mesh.points,
+            extract_sharp_edges(mesh->element_type(),
+                                mesh->n_elements(),
+                                mesh->n_nodes(),
+                                mesh->elements()->data(),
+                                mesh->points()->data(),
                                 // CRS-graph (node to node)
                                 rowptr,
                                 colidx,
@@ -142,10 +143,10 @@ int main(int argc, char* argv[]) {
             free(colidx);
         }
 
-        extract_disconnected_faces(mesh.element_type,
-                                   mesh.nelements,
-                                   mesh.nnodes,
-                                   mesh.elements,
+        extract_disconnected_faces(mesh->element_type(),
+                                   mesh->n_elements(),
+                                   mesh->n_nodes(),
+                                   mesh->elements()->data(),
                                    n_sharp_edges,
                                    e0,
                                    e1,
@@ -153,15 +154,15 @@ int main(int argc, char* argv[]) {
                                    &disconnected_elements);
 
         n_sharp_edges = extract_sharp_corners(
-            mesh.nnodes, n_sharp_edges, e0, e1, &n_corners, &corners, !SFEM_SUPERIMPOSE);
+            mesh->n_nodes(), n_sharp_edges, e0, e1, &n_corners, &corners, !SFEM_SUPERIMPOSE);
     }
 
     // Quantities of interest
-    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* xnormal = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* ynormal = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* znormal = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* mass_vector = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* g = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t* xnormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t* ynormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t* znormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t* mass_vector = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
     {
         double resample_tick = MPI_Wtime();
 
@@ -171,9 +172,9 @@ int main(int argc, char* argv[]) {
                 // Mesh
                 BEAM2,
                 n_sharp_edges,
-                mesh.nnodes,
+                mesh->n_nodes(),
                 edges,
-                mesh.points,
+                mesh->points()->data(),
                 // SDF
                 nlocal,
                 stride,
@@ -187,17 +188,17 @@ int main(int argc, char* argv[]) {
                 znormal);
 
             assemble_lumped_mass(
-                BEAM2, n_sharp_edges, mesh.nnodes, edges, mesh.points, mass_vector);
+                BEAM2, n_sharp_edges, mesh->n_nodes(), edges, mesh->points()->data(), mass_vector);
         }
 
         if (SFEM_SUPERIMPOSE) {
             resample_gap_local(
                 // Mesh
-                shell_type(mesh.element_type),
-                mesh.nelements,
-                mesh.nnodes,
-                mesh.elements,
-                mesh.points,
+                shell_type(mesh->element_type()),
+                mesh->n_elements(),
+                mesh->n_nodes(),
+                mesh->elements()->data(),
+                mesh->points()->data(),
                 // SDF
                 nlocal,
                 stride,
@@ -210,30 +211,30 @@ int main(int argc, char* argv[]) {
                 ynormal,
                 znormal);
 
-            assemble_lumped_mass(shell_type(mesh.element_type),
-                                 mesh.nelements,
-                                 mesh.nnodes,
-                                 mesh.elements,
-                                 mesh.points,
+            assemble_lumped_mass(shell_type(mesh->element_type()),
+                                 mesh->n_elements(),
+                                 mesh->n_nodes(),
+                                 mesh->elements()->data(),
+                                 mesh->points()->data(),
                                  mass_vector);
 
         } else {
             if (n_disconnected_elements) {  // Faces
-                int nxe = elem_num_nodes(mesh.element_type);
+                int nxe = elem_num_nodes(mesh->element_type());
                 idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
                 select_elements(nxe,
                                 n_disconnected_elements,
                                 disconnected_elements,
-                                mesh.elements,
+                                mesh->elements()->data(),
                                 selected_elements);
 
                 resample_gap_local(
                     // Mesh
-                    shell_type(mesh.element_type),
+                    shell_type(mesh->element_type()),
                     n_disconnected_elements,
-                    mesh.nnodes,
+                    mesh->n_nodes(),
                     selected_elements,
-                    mesh.points,
+                    mesh->points()->data(),
                     // SDF
                     nlocal,
                     stride,
@@ -246,11 +247,11 @@ int main(int argc, char* argv[]) {
                     ynormal,
                     znormal);
 
-                assemble_lumped_mass(shell_type(mesh.element_type),
+                assemble_lumped_mass(shell_type(mesh->element_type()),
                                      n_disconnected_elements,
-                                     mesh.nnodes,
+                                     mesh->n_nodes(),
                                      selected_elements,
-                                     mesh.points,
+                                     mesh->points()->data(),
                                      mass_vector);
 
                 free_elements(nxe, selected_elements);
@@ -258,13 +259,13 @@ int main(int argc, char* argv[]) {
         }
 
         if (n_corners) {  // Nodes
-            geom_t** corner_points = allocate_points(mesh.spatial_dim, n_corners);
-            select_points(mesh.spatial_dim, n_corners, corners, mesh.points, corner_points);
+            geom_t** corner_points = allocate_points(mesh->spatial_dimension(), n_corners);
+            select_points(mesh->spatial_dimension(), n_corners, corners, mesh->points()->data(), corner_points);
 
-            real_t* p_g = calloc(n_corners, sizeof(real_t));
-            real_t* p_xnormal = calloc(n_corners, sizeof(real_t));
-            real_t* p_ynormal = calloc(n_corners, sizeof(real_t));
-            real_t* p_znormal = calloc(n_corners, sizeof(real_t));
+            real_t* p_g = (real_t*)calloc(n_corners, sizeof(real_t));
+            real_t* p_xnormal = (real_t*)calloc(n_corners, sizeof(real_t));
+            real_t* p_ynormal = (real_t*)calloc(n_corners, sizeof(real_t));
+            real_t* p_znormal = (real_t*)calloc(n_corners, sizeof(real_t));
 
             interpolate_gap(
                 // Mesh
@@ -291,7 +292,7 @@ int main(int argc, char* argv[]) {
                 mass_vector[corners[i]] += 1;
             }
 
-            free_points(mesh.spatial_dim, corner_points);
+            free_points(mesh->spatial_dimension(), corner_points);
             free(p_g);
             free(p_xnormal);
             free(p_ynormal);
@@ -301,35 +302,50 @@ int main(int argc, char* argv[]) {
         if (size > 1) {
             // // exchange ghost nodes and add contribution
             send_recv_t slave_to_master;
-            mesh_create_nodal_send_recv(&mesh, &slave_to_master);
+            mesh_create_nodal_send_recv(mesh->comm(),
+                                        mesh->n_nodes(),
+                                        mesh->n_owned_nodes(),
+                                        mesh->node_owner()->data(),
+                                        mesh->node_offsets()->data(),
+                                        mesh->ghosts()->data(),
+                                        &slave_to_master);
 
             ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
-            real_t* real_buffer = malloc(count * sizeof(real_t));
+            real_t* real_buffer = (real_t*)malloc(count * sizeof(real_t));
 
-            exchange_add(&mesh, &slave_to_master, mass_vector, real_buffer);
-            exchange_add(&mesh, &slave_to_master, g, real_buffer);
-            exchange_add(&mesh, &slave_to_master, xnormal, real_buffer);
-            exchange_add(&mesh, &slave_to_master, ynormal, real_buffer);
-            exchange_add(&mesh, &slave_to_master, znormal, real_buffer);
+            auto e_add = [&](real_t* const SFEM_RESTRICT inout) {
+                exchange_add(mesh->comm(),
+                             mesh->n_nodes(),
+                             mesh->n_owned_nodes(),
+                             &slave_to_master,
+                             inout,
+                             real_buffer);
+            };
+
+            e_add(mass_vector);
+            e_add(g);
+            e_add(xnormal);
+            e_add(ynormal);
+            e_add(znormal);
 
             free(real_buffer);
         }
 
         // divide by the mass vector
-        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+        for (ptrdiff_t i = 0; i < mesh->n_owned_nodes(); i++) {
             if (mass_vector[i] == 0) {
                 fprintf(stderr,
                         "Found 0 mass at %ld, info (%ld, %ld)\n",
                         i,
-                        mesh.n_owned_nodes,
-                        mesh.nnodes);
+                        mesh->n_owned_nodes(),
+                        mesh->n_nodes());
             }
 
             assert(mass_vector[i] != 0);
             g[i] /= mass_vector[i];
         }
 
-        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+        for (ptrdiff_t i = 0; i < mesh->n_owned_nodes(); i++) {
             const real_t xn = xnormal[i];
             const real_t yn = ynormal[i];
             const real_t zn = znormal[i];
@@ -354,25 +370,25 @@ int main(int argc, char* argv[]) {
         double io_tick = MPI_Wtime();
 
         char path[1024 * 10];
-        sprintf(path, "%s/gap.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, g);
+        snprintf(path, sizeof(path), "%s/gap.float64.raw", output_folder);
+        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
 
-        sprintf(path, "%s/xnormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, xnormal);
+        snprintf(path, sizeof(path), "%s/xnormal.float64.raw", output_folder);
+        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, xnormal);
 
-        sprintf(path, "%s/ynormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, ynormal);
+        snprintf(path, sizeof(path), "%s/ynormal.float64.raw", output_folder);
+        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, ynormal);
 
-        sprintf(path, "%s/znormal.float64.raw", output_folder);
-        mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, znormal);
+        snprintf(path, sizeof(path), "%s/znormal.float64.raw", output_folder);
+        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, znormal);
 
         if (0) {
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            for (ptrdiff_t i = 0; i < mesh->n_nodes(); i++) {
                 g[i] = rank;
             }
 
-            sprintf(path, "%s/rank.float64.raw", output_folder);
-            mesh_write_nodal_field(&mesh, path, SFEM_MPI_REAL_T, g);
+            snprintf(path, sizeof(path), "%s/rank.float64.raw", output_folder);
+            mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
         }
 
         double io_tock = MPI_Wtime();
@@ -382,8 +398,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+   
 
     // Free resources
     {
@@ -392,7 +407,6 @@ int main(int argc, char* argv[]) {
         free(xnormal);
         free(ynormal);
         free(znormal);
-        mesh_destroy(&mesh);
     }
 
     double tock = MPI_Wtime();
@@ -400,8 +414,8 @@ int main(int argc, char* argv[]) {
     if (!rank) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #grid (%ld x %ld x %ld)\n",
-               (long)nelements,
-               (long)nnodes,
+               (long)mesh->n_elements(),
+               (long)mesh->n_nodes(),
                nglobal[0],
                nglobal[1],
                nglobal[2]);

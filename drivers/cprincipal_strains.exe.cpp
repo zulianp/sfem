@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     for (int d = 0; d < 3; ++d) {
-        sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
+        snprintf(path, sizeof(path), "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
         array_write(comm, path, SFEM_MPI_REAL_T, principal_strains_3[d], n_elements, n_elements);
         free(principal_strains_3[d]);
     }
