@@ -69,6 +69,14 @@ void exchange_add(MPI_Comm comm,
                   real_t *const SFEM_RESTRICT inout,
                   real_t *const SFEM_RESTRICT real_buffer);
 
+void mesh_create_nodal_send_recv_deprecated(const mesh_t *const mesh,
+                                            send_recv_t *const slave_to_master);
+
+void exchange_add_deprecated(mesh_t *mesh,
+                             send_recv_t *slave_to_master,
+                             real_t *inout,
+                             real_t *real_buffer);
+
 #ifdef __cplusplus
 }
 #endif

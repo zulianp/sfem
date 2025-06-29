@@ -5,6 +5,9 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
+// Deprecated
+#include "sfem_mesh.h"
+
 // C++ includes
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
@@ -109,6 +112,8 @@ namespace sfem {
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(MPI_Comm comm);
         void set_element_type(const enum ElemType element_type);
+
+        void extract_depreacted(mesh_t* mesh);
 
     private:
         class Impl;
