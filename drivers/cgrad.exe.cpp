@@ -14,6 +14,8 @@
 #include "read_mesh.h"
 #include "tet4_grad.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -45,35 +47,32 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *f;
     ptrdiff_t u_n_local, u_n_global;
     array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&f, &u_n_local, &u_n_global);
 
-    ptrdiff_t nelements = mesh.nelements;
-
     real_t *df[3];
     for (int d = 0; d < 3; ++d) {
-        df[d] = (real_t *)malloc(nelements * sizeof(real_t));
-        memset(df[d], 0, nelements * sizeof(real_t));
+        df[d] = (real_t *)malloc(n_elements * sizeof(real_t));
+        memset(df[d], 0, n_elements * sizeof(real_t));
     }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Compute gradient coefficients
     ///////////////////////////////////////////////////////////////////////////////
 
-    tet4_grad(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, f, df[0], df[1], df[2]);
+    tet4_grad(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), f, df[0], df[1], df[2]);
 
     real_t SFEM_SCALE=1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
     if(SFEM_SCALE != 1.) {
         for (int d = 0; d < 3; ++d) {
-            for(ptrdiff_t i = 0; i < nelements; i++) {
+            for(ptrdiff_t i = 0; i < n_elements; i++) {
                 df[d][i] *= SFEM_SCALE;
             }
         }
@@ -84,7 +83,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     for (int d = 0; d < 3; ++d) {
-        array_write(comm, path_outputs[d], SFEM_MPI_REAL_T, df[d], nelements, nelements);
+        array_write(comm, path_outputs[d], SFEM_MPI_REAL_T, df[d], n_elements, n_elements);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -100,7 +99,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

@@ -10,6 +10,7 @@
 // C++ includes
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 // FIXME
 #include "sfem_prolongation_restriction.h"
@@ -293,6 +294,12 @@ namespace sfem {
 
     enum ElemType Mesh::element_type() const { return impl_->element_type; }
 
+    ptrdiff_t Mesh::n_owned_nodes() const { return impl_->n_owned_nodes; }
+    ptrdiff_t Mesh::n_owned_nodes_with_ghosts() const { return impl_->n_owned_nodes_with_ghosts; }
+    ptrdiff_t Mesh::n_owned_elements() const { return impl_->n_owned_elements; }
+    ptrdiff_t Mesh::n_owned_elements_with_ghosts() const { return impl_->n_owned_elements_with_ghosts; }
+    ptrdiff_t Mesh::n_shared_elements() const { return impl_->n_shared_elements; }
+
     SharedBuffer<geom_t *> Mesh::points() { return impl_->points; }
 
     SharedBuffer<idx_t *> Mesh::elements() { return impl_->elements; }
@@ -379,6 +386,14 @@ namespace sfem {
 
     int Mesh::write(const char *path) const {
         SFEM_TRACE_SCOPE("Mesh::write");
+
+        create_directory(path);
+
+        if (impl_->node_mapping) {
+            std::string path_node_mapping = std::string(path) + "/node_mapping.raw";
+            impl_->node_mapping->to_file(path_node_mapping.c_str());
+        }
+
         return mesh_write_serial(path,
                                  impl_->element_type,
                                  impl_->nelements,
@@ -524,6 +539,10 @@ namespace sfem {
         points[2][7] = 1;
 
         return ret;
+    }
+
+    void Mesh::set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping) {
+        impl_->node_mapping = node_mapping;
     }
 
 }  // namespace sfem

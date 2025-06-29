@@ -446,10 +446,10 @@ int main(int argc, char *argv[]) {
     solver->apply(rhs, u);
 
     char path[1024 * 10];
-    sprintf(path, "%s/u.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/u.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, u, ndofs, ndofs);
 
-    sprintf(path, "%s/rhs.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
     array_write(comm, path, SFEM_MPI_REAL_T, rhs, ndofs, ndofs);
 
     free(u);

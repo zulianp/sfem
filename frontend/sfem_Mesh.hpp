@@ -44,6 +44,11 @@ namespace sfem {
         ptrdiff_t     n_nodes() const;
         ptrdiff_t     n_elements() const;
         enum ElemType element_type() const;
+        ptrdiff_t     n_owned_nodes() const;
+        ptrdiff_t     n_owned_nodes_with_ghosts() const;
+        ptrdiff_t     n_owned_elements() const;
+        ptrdiff_t     n_owned_elements_with_ghosts() const;
+        ptrdiff_t     n_shared_elements() const;
 
         std::shared_ptr<CRSGraph>              node_to_node_graph();
         std::shared_ptr<CRSGraph>              node_to_node_graph_upper_triangular();
@@ -98,6 +103,7 @@ namespace sfem {
                                                          const geom_t xmax = 1,
                                                          const geom_t ymax = 1);
 
+        void set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping);
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

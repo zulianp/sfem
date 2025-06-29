@@ -15,6 +15,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -46,23 +48,22 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *u[3];
 
     ptrdiff_t u_n_local, u_n_global;
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
     }
 
     real_t *div_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(div_u, 0, u_n_local * sizeof(real_t));
 
-    div_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
+    div_apply(mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
 
     array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, u_n_local, u_n_global);
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         free(u[d]);
     }
 
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

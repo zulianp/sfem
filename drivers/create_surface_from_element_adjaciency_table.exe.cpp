@@ -23,6 +23,7 @@
 
 #include "adj_table.h"
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -125,13 +126,13 @@ int main(int argc, char *argv[]) {
     int  n_sides = files.size();
 
     element_idx_t **table            = (element_idx_t **)malloc(n_sides * sizeof(element_idx_t *));
-    ptrdiff_t       n_local_elements = 0, n_elements = 0;
+    ptrdiff_t       n_local_elements = 0, _dump_ = 0;
 
     printf("n_sides (%d):\n", n_sides);
     for (int s = 0; s < n_sides; s++) {
         printf("Reading %s\n", files[s].c_str());
         array_create_from_file(
-                comm, files[s].c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&table[s], &n_local_elements, &n_elements);
+                comm, files[s].c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&table[s], &n_local_elements, &_dump_);
     }
 
     // Compute vol surface map
@@ -167,25 +168,26 @@ int main(int argc, char *argv[]) {
     // Read mesh data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, mesh_folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, mesh_folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    enum ElemType st   = side_type(mesh.element_type);
+    enum ElemType st   = side_type(mesh->element_type());
     const int     nnxs = elem_num_nodes(st);
 
     idx_t **surf_elems = 0;
     {
         // Extract surface index
-        int  nnxs             = elem_num_nodes(side_type(mesh.element_type));
-        int *local_side_table = (int *)malloc(elem_num_sides(mesh.element_type) * nnxs * sizeof(int));
+        int  nnxs             = elem_num_nodes(side_type(mesh->element_type()));
+        int *local_side_table = (int *)malloc(elem_num_sides(mesh->element_type()) * nnxs * sizeof(int));
         surf_elems            = (idx_t **)malloc(nnxs * sizeof(idx_t *));
         for (int d = 0; d < nnxs; d++) {
             surf_elems[d] = (idx_t *)malloc(n_surf_elements * sizeof(idx_t));
         }
 
-        fill_local_side_table(mesh.element_type, local_side_table);
+        fill_local_side_table(mesh->element_type(), local_side_table);
+
+        auto elements = mesh->elements()->data();
 
         for (ptrdiff_t e = 0; e < n_surf_elements; e++) {
             const element_idx_t p = parent[e];
@@ -193,7 +195,7 @@ int main(int argc, char *argv[]) {
 
             for (int d = 0; d < nnxs; d++) {
                 int   node_num   = local_side_table[s * nnxs + d];
-                idx_t node       = mesh.elements[node_num][p];
+                idx_t node       = elements[node_num][p];
                 surf_elems[d][e] = node;
             }
         }
@@ -202,8 +204,8 @@ int main(int argc, char *argv[]) {
         free(local_side_idx);
     }
 
-    idx_t *vol2surf = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
-    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+    idx_t *vol2surf = (idx_t *)malloc(n_nodes * sizeof(idx_t));
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         vol2surf[i] = SFEM_IDX_INVALID;
     }
 
@@ -218,30 +220,31 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_surf_nodes = next_id;
-    geom_t  **points       = (geom_t **)malloc(mesh.spatial_dim * sizeof(geom_t *));
-    for (int d = 0; d < mesh.spatial_dim; d++) {
+    geom_t  **points       = (geom_t **)malloc(mesh->spatial_dimension() * sizeof(geom_t *));
+    for (int d = 0; d < mesh->spatial_dimension(); d++) {
         points[d] = 0;
     }
 
     idx_t *mapping = (idx_t *)malloc(n_surf_nodes * sizeof(idx_t));
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         points[d] = (geom_t *)malloc(n_surf_nodes * sizeof(geom_t));
     }
 
-    for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+    auto original_points = mesh->points()->data();
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
         if (vol2surf[i] < 0) continue;
 
         mapping[vol2surf[i]] = i;
 
-        for (int d = 0; d < mesh.spatial_dim; ++d) {
-            points[d][vol2surf[i]] = mesh.points[d][i];
+        for (int d = 0; d < mesh->spatial_dimension(); ++d) {
+            points[d][vol2surf[i]] = original_points[d][i];
         }
     }
 
     // Correct normal orientation using elements with orginal indexing (only with P1 for the moment)
-    if (mesh.element_type == TET4) {
-        correct_side_orientation(n_surf_elements, surf_elems, parent, mesh.elements, mesh.points);
+    if (mesh->element_type() == TET4) {
+        correct_side_orientation(n_surf_elements, surf_elems, parent, mesh->elements()->data(), mesh->points()->data());
     }
 
     // Re-index elements
@@ -256,11 +259,11 @@ int main(int argc, char *argv[]) {
     mesh_t surf;
     mesh_init(&surf);
 
-    surf.comm      = mesh.comm;
-    surf.mem_space = mesh.mem_space;
+    surf.comm      = mesh->comm();
+    // surf.mem_space = mesh->mem_space();
 
-    surf.spatial_dim  = mesh.spatial_dim;
-    surf.element_type = side_type(mesh.element_type);
+    surf.spatial_dim  = mesh->spatial_dimension();
+    surf.element_type = side_type(mesh->element_type());
 
     surf.nelements = n_surf_elements;
     surf.nnodes    = n_surf_nodes;
@@ -275,18 +278,17 @@ int main(int argc, char *argv[]) {
     mesh_write(output_folder, &surf);
 
     char path[2048];
-    sprintf(path, "%s/parent.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/parent.raw", output_folder);
     array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, parent, n_surf_elements, n_surf_elements);
 
     // Clean-up
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("Volume: #elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("Surface: #elements %ld #nodes %ld\n", (long)surf.nelements, (long)surf.nnodes);
     }
 
-    mesh_destroy(&mesh);
     mesh_destroy(&surf);
     free(parent);
 

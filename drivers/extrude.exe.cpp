@@ -24,6 +24,8 @@
 
 #include "sfem_glob.hpp"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void normalize(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
     vec3[0] /= len;
@@ -151,12 +153,11 @@ int main(int argc, char* argv[]) {
 
     const char* folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    if (mesh.element_type != TRI3) {
+    if (mesh->element_type() != TRI3) {
         fprintf(stderr, "This code only supports mesh with element type TRI3\n");
         return EXIT_FAILURE;
     }
@@ -164,14 +165,14 @@ int main(int argc, char* argv[]) {
     mesh_t extruded;
     mesh_init(&extruded);
 
-    extruded.comm = mesh.comm;
-    extruded.mem_space = mesh.mem_space;
+    extruded.comm = mesh->comm();
 
-    extruded.spatial_dim = mesh.spatial_dim;
+
+    extruded.spatial_dim = mesh->spatial_dimension();
     extruded.element_type = WEDGE6;
 
-    extruded.nelements = mesh.nelements;
-    extruded.nnodes = mesh.nnodes * 2;
+    extruded.nelements = n_elements;
+    extruded.nnodes = n_nodes * 2;
     extruded.n_owned_elements = extruded.nelements;
 
     extruded.node_mapping = 0;
@@ -189,10 +190,10 @@ int main(int argc, char* argv[]) {
         extruded.points[d] = (geom_t*)malloc(extruded.nnodes * sizeof(geom_t));
     }
 
-    extrude(mesh.nelements,
-            mesh.nnodes,
-            mesh.elements,
-            mesh.points,
+    extrude(n_elements,
+            n_nodes,
+            mesh->elements()->data(),
+            mesh->points()->data(),
             inner_thickness,
             outer_thickness,
             extruded.elements,
@@ -202,13 +203,12 @@ int main(int argc, char* argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("Volume: #elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf(
             "Surface: #elements %ld #nodes %ld\n", (long)extruded.nelements, (long)extruded.nnodes);
     }
 
     // Clean-up
-    mesh_destroy(&mesh);
     mesh_destroy(&extruded);
 
     double tock = MPI_Wtime();

@@ -1289,8 +1289,8 @@ namespace sfem {
                 }
 
                 char b_name[1024];
-                sprintf(b_name, "%s.%d", name, b);
-                sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
+                snprintf(b_name, sizeof(b_name), "%s.%d", name, b);
+                snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
                 if (array_write(comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
@@ -1298,7 +1298,7 @@ namespace sfem {
 
         } else {
             char path[2048];
-            sprintf(path, impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
+            snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
             if (array_write(comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
                 return SFEM_FAILURE;
             }
@@ -1310,7 +1310,7 @@ namespace sfem {
     void Output::log_time(const real_t t) {
         if (log_is_empty(&impl_->time_logger)) {
             char path[2048];
-            sprintf(path, "%s/time.txt", impl_->output_dir.c_str());
+            snprintf(path, sizeof(path), "%s/time.txt", impl_->output_dir.c_str());
             log_create_file(&impl_->time_logger, path, "w");
         }
 
@@ -1338,8 +1338,9 @@ namespace sfem {
                 }
 
                 char b_name[1024];
-                sprintf(b_name, "%s.%d", name, b);
-                sprintf(path,
+                snprintf(b_name, sizeof(b_name), "%s.%d", name, b);
+                snprintf(path,
+                        sizeof(path),
                         impl_->time_dependent_file_format.c_str(),
                         impl_->output_dir.c_str(),
                         b_name,
@@ -1353,7 +1354,12 @@ namespace sfem {
         } else {
             sfem::create_directory(impl_->output_dir.c_str());
 
-            sprintf(path, impl_->time_dependent_file_format.c_str(), impl_->output_dir.c_str(), name, impl_->export_counter++);
+            snprintf(path,
+                     sizeof(path),
+                     impl_->time_dependent_file_format.c_str(),
+                     impl_->output_dir.c_str(),
+                     name,
+                     impl_->export_counter++);
 
             if (array_write(mesh->comm(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;
@@ -3849,7 +3855,7 @@ namespace sfem {
 
     std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder) {
         char pattern[1024 * 10];
-        sprintf(pattern, "%s/i*.raw", folder);
+        snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
         std::shared_ptr<Buffer<idx_t *>> ret;
 
@@ -3867,7 +3873,7 @@ namespace sfem {
             printf("%s\n", files[np].c_str());
 
             char path[1024 * 10];
-            sprintf(path, "%s/i%d.raw", folder, np);
+            snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
 
             idx_t *idx = 0;
             err |= array_create_from_file(comm, path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
