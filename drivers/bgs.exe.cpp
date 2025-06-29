@@ -415,14 +415,14 @@ int main(int argc, char *argv[]) {
     char values_path[10240];
     char vec_path[10240];
 
-    sprintf(rowptr_path, "%s/rowptr.raw", crs_folder);
-    sprintf(colidx_path, "%s/colidx.raw", crs_folder);
-    sprintf(values_path, "%s/values.*.raw", crs_folder);
+    snprintf(rowptr_path, sizeof(rowptr_path), "%s/rowptr.raw", crs_folder);
+    snprintf(colidx_path, sizeof(colidx_path), "%s/colidx.raw", crs_folder);
+    snprintf(values_path, sizeof(values_path), "%s/values.*.raw", crs_folder);
 
     ptrdiff_t local_ndofs, ndofs;
     real_t  **rhs = (real_t **)malloc(block_rows * sizeof(real_t *));
     for (int d = 0; d < block_rows; d++) {
-        sprintf(vec_path, "%s.%d.raw", rhs_prefix, d);
+        snprintf(vec_path, sizeof(vec_path), "%s.%d.raw", rhs_prefix, d);
         array_create_from_file(comm, vec_path, SFEM_MPI_REAL_T, (void **)&rhs[d], &local_ndofs, &ndofs);
     }
 
@@ -493,7 +493,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     for (int d = 0; d < block_rows; d++) {
-        sprintf(vec_path, "%s.%d.raw", output_prefix, d);
+        snprintf(vec_path, sizeof(vec_path), "%s.%d.raw", output_prefix, d);
         array_write(comm, vec_path, SFEM_MPI_REAL_T, (void *)x[d], local_ndofs, ndofs);
     }
 
