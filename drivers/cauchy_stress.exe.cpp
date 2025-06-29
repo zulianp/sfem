@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     for (int d = 0; d < 6; ++d) {
-        sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
+        snprintf(path, sizeof(path), "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
         array_write(comm, path, SFEM_MPI_REAL_T, stress[d], mesh->n_elements(), mesh->n_elements());
         free(stress[d]);
     }

@@ -19,6 +19,8 @@
 
 #include "argsort.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void normal(real_t u[3], real_t v[3], real_t *n) {
     const real_t u_len = sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
     const real_t v_len = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
@@ -89,16 +91,14 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
-    const char* SFEM_ELEMENT_TYPE = type_to_string(mesh.element_type);
+
+    const char* SFEM_ELEMENT_TYPE = type_to_string(mesh->element_type());
     SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
-    mesh.element_type = type_from_string(SFEM_ELEMENT_TYPE);
+    mesh->set_element_type(type_from_string(SFEM_ELEMENT_TYPE));
 
-    int nxe = elem_num_nodes(mesh.element_type);
+    int nxe = mesh->n_nodes_per_element();
 
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -108,15 +108,19 @@ int main(int argc, char *argv[]) {
     idx_t closest_element = SFEM_IDX_INVALID;
     real_t closest_sq_dist = 1000000;
 
-    for (ptrdiff_t e = 0; e < mesh.nelements; ++e) {
+    auto elements = mesh->elements()->data();
+    auto points = mesh->points()->data();
+    const int spatial_dim = mesh->spatial_dimension();
+
+    for (ptrdiff_t e = 0; e < mesh->n_elements(); ++e) {
         geom_t element_sq_dist = 1000000;
 
         for (int n = 0; n < nxe; ++n) {
-            const idx_t node = mesh.elements[n][e];
+            const idx_t node = elements[n][e];
 
             geom_t sq_dist = 0.;
-            for (int d = 0; d < mesh.spatial_dim; ++d) {
-                const real_t m_x = mesh.points[d][node];
+            for (int d = 0; d < spatial_dim; ++d) {
+                const real_t m_x = points[d][node];
                 const real_t roi_x = roi[d];
                 const real_t diff = m_x - roi_x;
                 sq_dist += diff * diff;
@@ -132,31 +136,31 @@ int main(int argc, char *argv[]) {
     }
 
     if (closest_element == SFEM_IDX_INVALID) {
-        SFEM_ERROR("Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh.nelements, mesh.nnodes);
+        SFEM_ERROR("Invalid set up! for mesh #nelements %ld #nodes %ld\n", mesh->n_elements(), mesh->n_nodes());
     }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Create dual-graph for navigating neighboring elements
     ///////////////////////////////////////////////////////////////////////////////
 
-    int element_type_hack = mesh.element_type;
-    if (mesh.element_type == TRI6) {
+    int element_type_hack = mesh->element_type();
+    if (mesh->element_type() == TRI6) {
         element_type_hack = TRI3;
     }
 
-    if (mesh.element_type == EDGE3) {
+    if (mesh->element_type() == EDGE3) {
         element_type_hack = EDGE2;
     }
 
     count_t *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
     create_dual_graph(
-        mesh.nelements, mesh.nnodes, element_type_hack, mesh.elements, &adj_ptr, &adj_idx);
+        mesh->n_elements(), mesh->n_nodes(), element_type_hack, elements, &adj_ptr, &adj_idx);
 
-    uint8_t *selected = (uint8_t *)malloc(mesh.nelements * sizeof(uint8_t));
-    memset(selected, 0, mesh.nelements * sizeof(uint8_t));
+    uint8_t *selected = (uint8_t *)malloc(mesh->n_elements() * sizeof(uint8_t));
+    memset(selected, 0, mesh->n_elements() * sizeof(uint8_t));
 
-    ptrdiff_t size_queue = (mesh.nelements + 1);
+    ptrdiff_t size_queue = (mesh->n_elements() + 1);
     ptrdiff_t *elem_queue = (ptrdiff_t *)malloc(size_queue * sizeof(ptrdiff_t));
 
     elem_queue[0] = closest_element;
@@ -179,14 +183,14 @@ int main(int argc, char *argv[]) {
 
             real_t n[2];
             {
-                const idx_t idx0 = mesh.elements[0][e];
-                const idx_t idx1 = mesh.elements[1][e];
+                const idx_t idx0 = elements[0][e];
+                const idx_t idx1 = elements[1][e];
 
                 real_t p0[2];
                 real_t p1[2];
                 for (int d = 0; d < 2; ++d) {
-                    p0[d] = mesh.points[d][idx0];
-                    p1[d] = mesh.points[d][idx1];
+                    p0[d] = points[d][idx0];
+                    p1[d] = points[d][idx1];
                 }
 
                 normal2(p0, p1, n);
@@ -208,16 +212,16 @@ int main(int argc, char *argv[]) {
 
                 real_t cos_angle;
                 {
-                    const idx_t idx0 = mesh.elements[0][e_adj];
-                    const idx_t idx1 = mesh.elements[1][e_adj];
+                    const idx_t idx0 = elements[0][e_adj];
+                    const idx_t idx1 = elements[1][e_adj];
 
                     real_t p0a[2];
                     real_t p1a[2];
                     real_t na[2];
 
                     for (int d = 0; d < 2; ++d) {
-                        p0a[d] = mesh.points[d][idx0];
-                        p1a[d] = mesh.points[d][idx1];
+                        p0a[d] = points[d][idx0];
+                        p1a[d] = points[d][idx1];
                     }
 
                     normal2(p0a, p1a, na);
@@ -242,15 +246,15 @@ int main(int argc, char *argv[]) {
 
             real_t n[3];
             {
-                idx_t idx0 = mesh.elements[0][e];
-                idx_t idx1 = mesh.elements[1][e];
-                idx_t idx2 = mesh.elements[2][e];
+                idx_t idx0 = elements[0][e];
+                idx_t idx1 = elements[1][e];
+                idx_t idx2 = elements[2][e];
 
                 real_t u[3];
                 real_t v[3];
                 for (int d = 0; d < 3; ++d) {
-                    u[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
-                    v[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
+                    u[d] = points[d][idx1] - points[d][idx0];
+                    v[d] = points[d][idx2] - points[d][idx0];
                 }
 
                 normal(u, v, n);
@@ -270,17 +274,17 @@ int main(int argc, char *argv[]) {
 
                 real_t cos_angle;
                 {
-                    const idx_t idx0 = mesh.elements[0][e_adj];
-                    const idx_t idx1 = mesh.elements[1][e_adj];
-                    const idx_t idx2 = mesh.elements[2][e_adj];
+                    const idx_t idx0 = elements[0][e_adj];
+                    const idx_t idx1 = elements[1][e_adj];
+                    const idx_t idx2 = elements[2][e_adj];
 
                     real_t ua[3];
                     real_t va[3];
                     real_t na[3];
 
                     for (int d = 0; d < 3; ++d) {
-                        ua[d] = mesh.points[d][idx1] - mesh.points[d][idx0];
-                        va[d] = mesh.points[d][idx2] - mesh.points[d][idx0];
+                        ua[d] = points[d][idx1] - points[d][idx0];
+                        va[d] = points[d][idx2] - points[d][idx0];
                     }
 
                     normal(ua, va, na);
@@ -297,13 +301,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("num_selected = %ld / %ld\n", (long)next_slot, (long)mesh.nelements);
+    printf("num_selected = %ld / %ld\n", (long)next_slot, (long)mesh->n_elements());
 
     int SFEM_EXPORT_COLOR = 0;
     SFEM_READ_ENV(SFEM_EXPORT_COLOR, atoi);
 
     if (SFEM_EXPORT_COLOR) {
-        array_write(comm, "color.raw", MPI_CHAR, selected, mesh.nelements, mesh.nelements);
+        array_write(comm, "color.raw", MPI_CHAR, selected, mesh->n_elements(), mesh->n_elements());
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -311,12 +315,12 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     ptrdiff_t n_selected = 0;
-    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+    for (ptrdiff_t i = 0; i < mesh->n_elements(); i++) {
         n_selected += selected[i] == 1;
     }
 
     idx_t *indices = (idx_t *)malloc(n_selected * sizeof(idx_t));
-    for (ptrdiff_t i = 0, n_inserted = 0; i < mesh.nelements; i++) {
+    for (ptrdiff_t i = 0, n_inserted = 0; i < mesh->n_elements(); i++) {
         if (selected[i]) {
             indices[n_inserted++] = i;
         }
@@ -326,7 +330,7 @@ int main(int argc, char *argv[]) {
 
     free(selected);
     free(indices);
-    mesh_destroy(&mesh);
+
     double tock = MPI_Wtime();
 
     if (!rank) {

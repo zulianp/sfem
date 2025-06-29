@@ -277,8 +277,10 @@ int main(int argc, char *argv[]) {
     mesh_write(output_folder, &p2_mesh);
 
     // Make sure we do not delete the same array twice
-    p1_mesh->elements()->release();
-
+    for(int d = 0; d < p1_nxe; d++) {
+        p1_mesh->elements()->data()[d] = nullptr;
+    }
+   
     if (!rank) {
         printf("----------------------------------------\n");
         printf("mesh_p1_to_p2.c: #elements %ld, nodes #p1 %ld, #p2 %ld\n",

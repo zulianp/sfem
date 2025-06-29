@@ -263,11 +263,11 @@ int main(int argc, char *argv[]) {
     }
 
     {
-        sprintf(path, "%s/rhs.raw", output_folder);
+        snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
         array_write(comm, path, value_type, rhs, nnodes * block_size, nnodes * block_size);
     }
 
-    sprintf(path, "%s/value.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/value.raw", output_folder);
     if (!rank) {
         array_write(MPI_COMM_SELF, path, value_type, &energy, 1, 1);
     }

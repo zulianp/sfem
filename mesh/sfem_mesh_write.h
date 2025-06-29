@@ -27,7 +27,9 @@ int write_mapped_field(MPI_Comm comm,
                        MPI_Datatype data_type,
                        const void *const data);
 
-int mesh_write_nodal_field(const mesh_t *const mesh,
+int mesh_write_nodal_field(MPI_Comm comm,
+                           const ptrdiff_t n_owned_nodes,
+                           const idx_t *const node_mapping,
                            const char *path,
                            MPI_Datatype data_type,
                            const void *const data);

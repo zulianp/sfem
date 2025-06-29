@@ -27,11 +27,11 @@ int mesh_write_serial(const char     *path,
                       enum ElemType   element_type,
                       const ptrdiff_t n_elements,
                       idx_t **const   elements,
-                      const int spatial_dim,
+                      const int       spatial_dim,
                       const ptrdiff_t n_nodes,
                       geom_t **const  points) {
     static const char *str_xyz = "xyzt";
-    char output_path[2048];
+    char               output_path[2048];
 
     {
         struct stat st = {0};
@@ -178,29 +178,34 @@ int mesh_write(const char *path, const mesh_t *mesh) {
     // }
 }
 
-int mesh_write_nodal_field(const mesh_t *const mesh, const char *path, MPI_Datatype data_type, const void *const data) {
+int mesh_write_nodal_field(MPI_Comm           comm,
+                           const ptrdiff_t    n_owned_nodes,
+                           const idx_t *const node_mapping,
+                           const char        *path,
+                           MPI_Datatype       data_type,
+                           const void *const  data) {
     // get MPI rank
     int mpi_rank;
-    MPI_Comm_rank(mesh->comm, &mpi_rank);
+    MPI_Comm_rank(comm, &mpi_rank);
 
-    count_t n_global_nodes = mesh->n_owned_nodes;
-    MPI_CATCH_ERROR(MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
+    count_t n_global_nodes = n_owned_nodes;
+    MPI_CATCH_ERROR(MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, comm));
 
-    if (!mesh->node_mapping) {
+    if (!node_mapping) {
 #ifndef NDEBUG
         int size;
-        MPI_Comm_size(mesh->comm, &size);
+        MPI_Comm_size(comm, &size);
         assert(size == 1);
 #endif
 
         if (mpi_rank == 0) printf("%s:%d: Writing using array_write\n", __FILE__, __LINE__);
 
-        return array_write(mesh->comm, path, data_type, data, mesh->n_owned_nodes, n_global_nodes);
+        return array_write(comm, path, data_type, data, n_owned_nodes, n_global_nodes);
 
     } else {
         if (mpi_rank == 0) printf("%s:%d: Writing using write_mapped_field\n", __FILE__, __LINE__);
 
-        return write_mapped_field(mesh->comm, path, mesh->n_owned_nodes, n_global_nodes, mesh->node_mapping, data_type, data);
+        return write_mapped_field(comm, path, n_owned_nodes, n_global_nodes, node_mapping, data_type, data);
     }
 }
 
