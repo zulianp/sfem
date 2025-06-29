@@ -293,7 +293,7 @@ void assert_vec_real(const vec_real a, const vec_real b) {
     { _out = _in[0] + _in[1] + _in[2] + _in[3] + _in[4] + _in[5] + _in[6] + _in[7]; }
 
 //// SIMD floor for AVX512
-vec_indices floor_V(vec_real a) {
+static vec_indices floor_V(vec_real a) {
     // vec_indices r = (vec_indices){0, 0, 0, 0, 0, 0, 0, 0};
     // for(int ii = 0; ii < _VL_; ii++) {
     //     r[ii] = floor(a[ii]);
@@ -336,7 +336,7 @@ vec_indices floor_V(vec_real a) { return (vec_indices){(ptrdiff_t)a[0], (ptrdiff
                _in[12] + _in[13] + _in[14] + _in[15];                                                                        \
     }
 
-vec_indices floor_V(vec_real a) {
+static SFEM_INLINE vec_indices floor_V(vec_real a) {
     return (vec_indices){(ptrdiff_t)a[0],
                          (ptrdiff_t)a[1],
                          (ptrdiff_t)a[2],
