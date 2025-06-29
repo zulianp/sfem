@@ -34,6 +34,11 @@ int mesh_write_nodal_field(MPI_Comm comm,
                            MPI_Datatype data_type,
                            const void *const data);
 
+int mesh_write_nodal_field_deprecated(const mesh_t *mesh,
+                                      const char *path,
+                                      MPI_Datatype data_type,
+                                      const void *const data);
+
 #ifdef __cplusplus
 }
 #endif

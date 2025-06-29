@@ -390,13 +390,13 @@ namespace sfem {
             impl_->node_mapping    = manage_host_buffer<idx_t>(nnodes, node_mapping);
             impl_->node_owner      = manage_host_buffer<int>(nnodes, node_owner);
             impl_->element_mapping = manage_host_buffer<element_idx_t>(nelements, element_mapping);
-            
+
             int comm_size;
             MPI_Comm_size(impl_->comm, &comm_size);
             impl_->node_offsets = manage_host_buffer<idx_t>(comm_size + 1, node_offsets);
-            
+
             ptrdiff_t n_ghost_nodes = nnodes - n_owned_nodes;
-            impl_->ghosts = manage_host_buffer<idx_t>(n_ghost_nodes, ghosts);
+            impl_->ghosts           = manage_host_buffer<idx_t>(n_ghost_nodes, ghosts);
 
             impl_->n_owned_nodes                = n_owned_nodes;
             impl_->n_owned_nodes_with_ghosts    = n_owned_nodes_with_ghosts;
@@ -578,4 +578,31 @@ namespace sfem {
     void Mesh::set_comm(MPI_Comm comm) { impl_->comm = comm; }
 
     void Mesh::set_element_type(const enum ElemType element_type) { impl_->element_type = element_type; }
+
+    void Mesh::extract_depreacted(mesh_t *mesh) {
+        mesh->comm         = impl_->comm;
+        mesh->spatial_dim  = impl_->spatial_dim;
+        mesh->element_type = impl_->element_type;
+
+        mesh->nelements = impl_->nelements;
+        mesh->nnodes    = impl_->nnodes;
+
+        mesh->elements = impl_->elements->data();
+        mesh->points   = impl_->points->data();
+
+        mesh->n_owned_nodes             = impl_->n_owned_nodes;
+        mesh->n_owned_nodes_with_ghosts = impl_->n_owned_nodes_with_ghosts;
+
+        mesh->n_owned_elements             = impl_->n_owned_elements;
+        mesh->n_owned_elements_with_ghosts = impl_->n_owned_elements_with_ghosts;
+        mesh->n_shared_elements            = impl_->n_shared_elements;
+
+        mesh->node_mapping = impl_->node_mapping->data();
+        mesh->node_owner   = impl_->node_owner->data();
+
+        mesh->element_mapping = impl_->element_mapping->data();
+
+        mesh->node_offsets = impl_->node_offsets->data();
+        mesh->ghosts       = impl_->ghosts->data();
+    }
 }  // namespace sfem

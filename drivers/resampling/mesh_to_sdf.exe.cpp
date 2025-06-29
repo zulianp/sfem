@@ -18,6 +18,8 @@
 #define SDF_SQRT sqrtf
 #define SDF_CEIL ceilf
 
+#include "sfem_API.hpp"
+
 int write_metadata(const char* meta_data_path, const char* data_path, const ptrdiff_t* size, const geom_t* origin,
                    const geom_t* delta) {
     FILE* file = fopen(meta_data_path, "w");
@@ -358,7 +360,7 @@ compute_sdf(const ptrdiff_t                nelements,  // Number of elements
                 nbins *= grid_size[l][d];
             }
 
-            element_count[l] = calloc(nbins, sizeof(ptrdiff_t));
+            element_count[l] = (ptrdiff_t*)calloc(nbins, sizeof(ptrdiff_t));
         }
 
         g_finest_stride[1] = g_finest_size[0];
@@ -414,14 +416,14 @@ compute_sdf(const ptrdiff_t                nelements,  // Number of elements
     const ptrdiff_t g_finest_nnodes =
             grid_size[SUBDIVISION_LEVELS - 1][0] * grid_size[SUBDIVISION_LEVELS - 1][1] * grid_size[SUBDIVISION_LEVELS - 1][2];
 
-    ptrdiff_t* g_finest_cell_ptr = malloc((g_finest_nnodes + 1) * sizeof(ptrdiff_t));
+    ptrdiff_t* g_finest_cell_ptr = (ptrdiff_t*)malloc((g_finest_nnodes + 1) * sizeof(ptrdiff_t));
     g_finest_cell_ptr[0]         = 0;
 
     for (ptrdiff_t i = 0; i < g_finest_nnodes; i++) {
         g_finest_cell_ptr[i + 1] = g_finest_cell_ptr[i] + g_finest_el_count[i];
     }
 
-    ptrdiff_t* g_finest_cell_idx = calloc(g_finest_cell_ptr[g_finest_nnodes], sizeof(ptrdiff_t));
+    ptrdiff_t* g_finest_cell_idx = (ptrdiff_t*)calloc(g_finest_cell_ptr[g_finest_nnodes], sizeof(ptrdiff_t));
 
     {
         // FIll cell list
@@ -663,8 +665,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    if (!mesh) {
         return EXIT_FAILURE;
     }
 
@@ -673,31 +675,30 @@ int main(int argc, char* argv[]) {
     {  // AABB
         if (SFEM_BOXED_MESH) {
             // FIXME we do not actually need to read the mesh! only the points!
-            mesh_t boxed_mesh;
-            if (mesh_read(comm, SFEM_BOXED_MESH, &boxed_mesh)) {
+            auto boxed_mesh = sfem::Mesh::create_from_file(comm, SFEM_BOXED_MESH);
+            if (!boxed_mesh) {
                 return EXIT_FAILURE;
             }
 
-            for (int d = 0; d < mesh.spatial_dim; d++) {
-                minmax(boxed_mesh.nnodes, boxed_mesh.points[d], &origin[d], &box_max[d]);
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                minmax(boxed_mesh->n_nodes(), boxed_mesh->points(d), &origin[d], &box_max[d]);
             }
 
-            mesh_destroy(&boxed_mesh);
         } else {
-            for (int d = 0; d < mesh.spatial_dim; d++) {
-                minmax(mesh.nnodes, mesh.points[d], &origin[d], &box_max[d]);
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                minmax(mesh->n_nodes(), mesh->points(d), &origin[d], &box_max[d]);
             }
         }
 
         if (margin != 0) {
-            for (int d = 0; d < mesh.spatial_dim; d++) {
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
                 origin[d] -= margin;
                 box_max[d] += margin;
             }
         }
 
         if (SFEM_SCALE_BOX != 1) {
-            for (int d = 0; d < mesh.spatial_dim; d++) {
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
                 const geom_t pmean = (origin[d] + box_max[d]) / 2;
                 geom_t       ppmin = origin[d] - pmean;
                 geom_t       ppmax = box_max[d] - pmean;
@@ -710,23 +711,23 @@ int main(int argc, char* argv[]) {
     }
 
     // Remove elements we do not need!
-    mesh.nelements = select_submesh(mesh.nelements,                     //
-                                    elem_num_nodes(mesh.element_type),  //
-                                    mesh.nnodes,                        //
-                                    mesh.elements,                      //
-                                    mesh.points,                        //
+    ptrdiff_t nelements = select_submesh(mesh->n_elements(),                     //
+                                    elem_num_nodes(mesh->element_type()),  //
+                                    mesh->n_nodes(),                        //
+                                    mesh->elements()->data(),                      //
+                                    mesh->points()->data(),                        //
                                     origin,                             //
                                     box_max);                           //
 
-    geom_t** normals = malloc(mesh.spatial_dim * sizeof(geom_t*));
+    geom_t** normals = (geom_t**)malloc(mesh->spatial_dimension() * sizeof(geom_t*));
     for (int d = 0; d < 3; d++) {
-        normals[d] = malloc(mesh.nnodes * sizeof(geom_t));
+        normals[d] = (geom_t*)malloc(mesh->n_nodes() * sizeof(geom_t));
     }
 
-    compute_vertex_pseudo_normals_3(mesh.nelements,  //
-                                    mesh.nnodes,     //
-                                    mesh.elements,   //
-                                    mesh.points,     //
+    compute_vertex_pseudo_normals_3(nelements,  //
+                                    mesh->n_nodes(),     //
+                                    mesh->elements()->data(),   //
+                                    mesh->points()->data(),     //
                                     normals);        //
 
     const geom_t x_range = box_max[0] - origin[0];
@@ -740,15 +741,15 @@ int main(int argc, char* argv[]) {
     ptrdiff_t nglobal[3] = {nx, ny, nz};
     ptrdiff_t stride[3]  = {1, nx, nx * ny};
 
-    geom_t delta[3] = {x_range / (nx - 1.), y_range / (ny - 1.), z_range / (nz - 1.)};
+    geom_t delta[3] = {(geom_t)(x_range / (nx - 1.)), (geom_t)(y_range / (ny - 1.)), (geom_t)(z_range / (nz - 1.))};
 
     ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
-    geom_t*   sdf      = malloc(sdf_size * sizeof(geom_t));
+    geom_t*   sdf      = (geom_t*)malloc(sdf_size * sizeof(geom_t));
 
     // compute_sdf
-    compute_sdf_brute_force(mesh.nelements,  //
-                            mesh.elements,   //
-                            mesh.points,     //
+    compute_sdf_brute_force(nelements,  //
+                            mesh->elements()->data(),   //
+                            mesh->points()->data(),     //
                             normals,         //
                             nglobal,         //
                             stride,          //
@@ -756,8 +757,8 @@ int main(int argc, char* argv[]) {
                             delta,           //
                             sdf);            //
 
-    const ptrdiff_t nelements = mesh.nelements;
-    const ptrdiff_t nnodes    = mesh.nnodes;
+
+    const ptrdiff_t nnodes    = mesh->n_nodes();
 
     char data_path[2048];
     sprintf(data_path, "%s/sdf.float32.raw", output_folder);
@@ -773,7 +774,6 @@ int main(int argc, char* argv[]) {
     // Free resources
     {
         free(sdf);
-        mesh_destroy(&mesh);
     }
 
     double tock = MPI_Wtime();

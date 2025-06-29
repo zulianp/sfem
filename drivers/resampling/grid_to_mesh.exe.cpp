@@ -21,6 +21,8 @@
 #include "sfem_resample_field_tet4_math.h"
 #include "tet10_resample_field.h"
 
+#include "sfem_API.hpp"
+
 #define RED_TEXT "\x1b[31m"
 #define GREEN_TEXT "\x1b[32m"
 #define RESET_TEXT "\x1b[0m"
@@ -77,8 +79,12 @@ get_option_argument(int         argc,    //
  * @param mandatory
  */
 void  //
-handle_option_result(const int result, const char* option, const char* arg, const size_t arg_size, const int mandatory,
-                     const int print_result) {
+handle_option_result(const int    result,
+                     const char*  option,
+                     const char*  arg,
+                     const size_t arg_size,
+                     const int    mandatory,
+                     const int    print_result) {
     int mpi_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
@@ -442,8 +448,8 @@ int main(int argc, char* argv[]) {
     double tick = MPI_Wtime();
 
     ptrdiff_t nglobal[3] = {atol(argv[1]), atol(argv[2]), atol(argv[3])};
-    geom_t    origin[3]  = {atof(argv[4]), atof(argv[5]), atof(argv[6])};
-    geom_t    delta[3]   = {atof(argv[7]), atof(argv[8]), atof(argv[9])};
+    geom_t    origin[3]  = {(geom_t)atof(argv[4]), (geom_t)atof(argv[5]), (geom_t)atof(argv[6])};
+    geom_t    delta[3]   = {(geom_t)atof(argv[7]), (geom_t)atof(argv[8]), (geom_t)atof(argv[9])};
 
     const char* data_path   = argv[10];
     const char* folder      = argv[11];
@@ -495,10 +501,11 @@ int main(int argc, char* argv[]) {
 
     info.quad_nodes_cnt = TET_QUAD_NQP;
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+
+    // FIXME mesh_t will be removed in the future
+    mesh_t mesh_deprecated;
+    mesh->extract_depreacted(&mesh_deprecated);
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     real_t*       field        = NULL;
@@ -546,12 +553,12 @@ int main(int argc, char* argv[]) {
 
             printf("nlocal: %ld %ld %ld, %s:%d\n", nlocal[0], nlocal[1], nlocal[2], __FILE__, __LINE__);
 
-            field = malloc(n_zyx * sizeof(real_t));
+            field = (real_t*)malloc(n_zyx * sizeof(real_t));
 
             // TODO: are data to analyze the results
-            field_cnt    = calloc(n_zyx, sizeof(unsigned int));
-            field_alpha  = calloc(n_zyx, sizeof(real_t));
-            filed_volume = calloc(n_zyx, sizeof(real_t));
+            field_cnt    = (unsigned int*)calloc(n_zyx, sizeof(unsigned int));
+            field_alpha  = (real_t*)calloc(n_zyx, sizeof(real_t));
+            filed_volume = (real_t*)calloc(n_zyx, sizeof(real_t));
 
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
@@ -614,8 +621,8 @@ int main(int argc, char* argv[]) {
     if (mpi_size > 1) {
         real_t* pfield;
         field_view(comm,
-                   mesh.nnodes,
-                   mesh.points[2],
+                   mesh->n_nodes(),
+                   mesh->points()->data()[2],
                    nlocal,
                    nglobal,
                    stride,
@@ -633,7 +640,7 @@ int main(int argc, char* argv[]) {
         field = pfield;
     }
 
-    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* g = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
 
     {  // begin resample_field_mesh
         /////////////////////////////////
@@ -642,46 +649,47 @@ int main(int argc, char* argv[]) {
 
         if (SFEM_INTERPOLATE) {
             printf("SFEM_INTERPOLATE = 1, %s:%d\n", __FILE__, __LINE__);
-            interpolate_field(mesh.n_owned_nodes,  // Mesh:
-                              mesh.points,         // Mesh:
-                              nlocal,              // discrete field
-                              stride,              //
-                              origin,              //
-                              delta,               //
-                              field,               //
-                              g);                  // Output
+            interpolate_field(mesh->n_owned_nodes(),   // Mesh:
+                              mesh->points()->data(),  // Mesh:
+                              nlocal,                  // discrete field
+                              stride,                  //
+                              origin,                  //
+                              delta,                   //
+                              field,                   //
+                              g);                      // Output
         } else if (SFEM_ADJOINT == 0) {
             int ret_resample = 1;
 
-            switch (info.element_type) {                         //
-                case TET10:                                      // TET10 case
-                    ret_resample =                               //
-                            resample_field_mesh_tet10(mpi_size,  //
-                                                      mpi_rank,  //
-                                                      &mesh,     //
-                                                      nlocal,    //
-                                                      stride,    //
-                                                      origin,    //
-                                                      delta,     //
-                                                      field,     //
-                                                      g,         //
-                                                      &info);    //
-                    break;                                       //
+            switch (info.element_type) {                                 //
+                case TET10:                                              // TET10 case
+                    ret_resample =                                       //
+                            resample_field_mesh_tet10(mpi_size,          //
+                                                      mpi_rank,          //
+                                                      &mesh_deprecated,  //
+                                                      nlocal,            //
+                                                      stride,            //
+                                                      origin,            //
+                                                      delta,             //
+                                                      field,             //
+                                                      g,                 //
+                                                      &info);            //
+                    break;                                               //
 
-                case TET4:                                      // TET4 case
-                    ret_resample =                              //
-                            resample_field_mesh_tet4(mpi_size,  //
-                                                     mpi_rank,  //
-                                                     &mesh,     //
-                                                     nlocal,    //
-                                                     stride,    //
-                                                     origin,    //
-                                                     delta,     //
-                                                     field,     //
-                                                     g,         //
-                                                     &info);    //
+                case TET4:                                              // TET4 case
+                    ret_resample =                                      //
+                            resample_field_mesh_tet4(mpi_size,          //
+                                                     mpi_rank,          //
+                                                     &mesh_deprecated,  //
+                                                     nlocal,            //
+                                                     stride,            //
+                                                     origin,            //
+                                                     delta,             //
+                                                     field,             //
+                                                     g,                 //
+                                                     &info);            //
 
                     break;
+
                 default:
                     fprintf(stderr, "Error: Invalid element type: %s:%d\n", __FILE__, __LINE__);
                     exit(EXIT_FAILURE);
@@ -705,28 +713,27 @@ int main(int argc, char* argv[]) {
 
             // TESTING: apply mesh_fun_b to g
 
-            apply_fun_to_mesh(mesh.nnodes,                  //
-                              (const geom_t**)mesh.points,  //
-                              mesh_fun_ones,                //
-                              g);                           //
+            apply_fun_to_mesh(mesh->n_nodes(),                         //
+                              (const geom_t**)mesh->points()->data(),  //
+                              mesh_fun_ones,                           //
+                              g);                                      //
 
             const real_t alpha_th_tet10 = 2.5;
 
             switch (info.element_type) {
-                case TET10:
-
-                    ret_resample_adjoint =                                //
-                            resample_field_mesh_adjoint_tet10(mpi_size,   //
-                                                              mpi_rank,   //
-                                                              &mesh,      //
-                                                              nlocal,     //
-                                                              stride,     //
-                                                              origin,     //
-                                                              delta,      //
-                                                              g,          //
-                                                              field,      //
-                                                              field_cnt,  //
-                                                              &info);     //
+                case TET10: {
+                    ret_resample_adjoint =                                       //
+                            resample_field_mesh_adjoint_tet10(mpi_size,          //
+                                                              mpi_rank,          //
+                                                              &mesh_deprecated,  //
+                                                              nlocal,            //
+                                                              stride,            //
+                                                              origin,            //
+                                                              delta,             //
+                                                              g,                 //
+                                                              field,             //
+                                                              field_cnt,         //
+                                                              &info);            //
 
                     real_t max_field_tet10 = -(__DBL_MAX__);
                     real_t min_field_tet10 = (__DBL_MAX__);
@@ -744,8 +751,8 @@ int main(int argc, char* argv[]) {
                                   nglobal);
 
                     break;
-
-                case TET4:
+                }
+                case TET4: {
                     ///////////////////////////////////// Case TEt4 /////////////////////////////////////
 
                     // ret_resample_adjoint =                                //
@@ -780,20 +787,20 @@ int main(int argc, char* argv[]) {
                     }
 #endif
 
-                    ret_resample_adjoint =                             //
-                            resample_field_adjoint_tet4(mpi_size,      //
-                                                        mpi_rank,      //
-                                                        &mesh,         //
-                                                        nlocal,        //
-                                                        stride,        //
-                                                        origin,        //
-                                                        delta,         //
-                                                        g,             //
-                                                        field,         //
-                                                        field_cnt,     //
-                                                        field_alpha,   //
-                                                        filed_volume,  //
-                                                        &info);        //
+                    ret_resample_adjoint =                                 //
+                            resample_field_adjoint_tet4(mpi_size,          //
+                                                        mpi_rank,          //
+                                                        &mesh_deprecated,  //
+                                                        nlocal,            //
+                                                        stride,            //
+                                                        origin,            //
+                                                        delta,             //
+                                                        g,                 //
+                                                        field,             //
+                                                        field_cnt,         //
+                                                        field_alpha,       //
+                                                        filed_volume,      //
+                                                        &info);            //
 
                     // BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
 
@@ -885,11 +892,12 @@ int main(int argc, char* argv[]) {
                     field_cnt_real = NULL;
 
                     break;
-
-                default:
+                }
+                default: {
                     fprintf(stderr, "Error: Invalid element type: %s:%d\n", __FILE__, __LINE__);
                     exit(EXIT_FAILURE);
                     break;
+                }
             }
 
             if (ret_resample_adjoint) {
@@ -922,16 +930,16 @@ int main(int argc, char* argv[]) {
         // }
         // free(elements_v);
 
-        int tot_nelements = 0;
-        MPI_Reduce(&mesh.nelements, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
+        int tot_nelements = mesh->n_elements();
+        MPI_Reduce(MPI_IN_PLACE, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
-        int tot_nnodes = 0;
-        MPI_Reduce(&mesh.n_owned_nodes, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
+        int tot_nnodes = mesh->n_owned_nodes();
+        MPI_Reduce(MPI_IN_PLACE, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
         double* flops_v = NULL;
-        flops_v         = malloc(mpi_size * sizeof(double));
+        flops_v         = (double*)malloc(mpi_size * sizeof(double));
 
-        const double flops = calculate_flops(mesh.nelements,                    //
+        const double flops = calculate_flops(mesh->n_elements(),                //
                                              info.quad_nodes_cnt,               //
                                              (resample_tock - resample_tick));  //
 
@@ -956,9 +964,9 @@ int main(int argc, char* argv[]) {
                                              __FILE__,                       //
                                              __LINE__,                       //
                                              "grid_to_mesh",                 //
-                                             mesh.nnodes,                    //
+                                             mesh->n_nodes(),                //
                                              info.quad_nodes_cnt,            //
-                                             &mesh,                          //
+                                             &mesh_deprecated,               //
                                              1);                             //
 
     }  // end resample_field_mesh
@@ -996,7 +1004,7 @@ int main(int argc, char* argv[]) {
         // printf("SFEM_INTERPOLATE: %d\n\n", SFEM_INTERPOLATE);
         /// end DEBUG ///
 
-        mesh_write_nodal_field(&mesh, output_path, SFEM_MPI_REAL_T, g);
+        mesh_write_nodal_field_deprecated(&mesh_deprecated, output_path, SFEM_MPI_REAL_T, g);
 
         double io_tock = MPI_Wtime();
 
@@ -1005,14 +1013,13 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes    = mesh.nnodes;
+    ptrdiff_t nelements = mesh->n_elements();
+    ptrdiff_t nnodes    = mesh->n_nodes();
 
     // Free resources
     {
         free(field);
         free(g);
-        mesh_destroy(&mesh);
     }
 
     if (field_cnt != NULL) {

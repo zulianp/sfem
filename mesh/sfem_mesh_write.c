@@ -398,3 +398,7 @@ int write_mapped_field(MPI_Comm           comm,
     free(send_data_and_final_storage);
     return 0;
 }
+
+int mesh_write_nodal_field_deprecated(const mesh_t *mesh, const char *path, MPI_Datatype data_type, const void *const data) {
+    return mesh_write_nodal_field(mesh->comm, mesh->n_owned_nodes, mesh->node_mapping, path, data_type, data);
+}

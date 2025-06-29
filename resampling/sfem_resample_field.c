@@ -1029,13 +1029,13 @@ perform_exchange_operations(mesh_t* mesh,         //
                             real_t* g) {          //
 
     send_recv_t slave_to_master;
-    mesh_create_nodal_send_recv(mesh, &slave_to_master);
+    mesh_create_nodal_send_recv_deprecated(mesh, &slave_to_master);
 
     ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
     real_t*   real_buffer = (real_t*)calloc(count, sizeof(real_t));
 
-    exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
-    exchange_add(mesh, &slave_to_master, g, real_buffer);
+    exchange_add_deprecated(mesh, &slave_to_master, mass_vector, real_buffer);
+    exchange_add_deprecated(mesh, &slave_to_master, g, real_buffer);
 
     free(real_buffer);
     real_buffer = NULL;
