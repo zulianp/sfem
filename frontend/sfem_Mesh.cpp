@@ -347,37 +347,62 @@ namespace sfem {
         }
 #ifdef SFEM_ENABLE_MPI
         else {
-            // idx_t        **elements        = nullptr;
-            // geom_t       **points          = nullptr;
-            // element_idx_t *element_mapping = nullptr;
-            // idx_t         *node_mapping    = nullptr;
-            // int           *node_owner      = nullptr;
-            // idx_t         *node_offsets    = nullptr;
-            // idx_t         *ghosts          = nullptr;
+            int            nnodesxelem;
+            ptrdiff_t      nelements;
+            idx_t        **elements;
+            int            spatial_dim;
+            ptrdiff_t      nnodes;
+            geom_t       **points;
+            ptrdiff_t      n_owned_nodes;
+            ptrdiff_t      n_owned_elements;
+            element_idx_t *element_mapping;
+            idx_t         *node_mapping;
+            int           *node_owner;
+            idx_t         *node_offsets;
+            idx_t         *ghosts;
+            ptrdiff_t      n_owned_nodes_with_ghosts;
+            ptrdiff_t      n_shared_elements;
+            ptrdiff_t      n_owned_elements_with_ghosts;
 
-            // if (mesh_read_mpi(impl_->comm,
-            //                   path,
-            //                   &impl_->nelements,
-            //                   &elements,
-            //                   &impl_->nnodes,
-            //                   &points,
-            //                   &impl_->n_owned_nodes,
-            //                   &impl_->n_owned_elements,
-            //                   &element_mapping,
-            //                   &node_mapping,
-            //                   &node_owner,
-            //                   &node_offsets,
-            //                   &ghosts) != SFEM_SUCCESS) {
-            //     return SFEM_FAILURE;
-            // }
+            if (mesh_read_mpi(impl_->comm,
+                              path,
+                              &nnodesxelem,
+                              &nelements,
+                              &elements,
+                              &spatial_dim,
+                              &nnodes,
+                              &points,
+                              &n_owned_nodes,
+                              &n_owned_elements,
+                              &element_mapping,
+                              &node_mapping,
+                              &node_owner,
+                              &node_offsets,
+                              &ghosts,
+                              &n_owned_nodes_with_ghosts,
+                              &n_shared_elements,
+                              &n_owned_elements_with_ghosts) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
 
-            // impl_->node_mapping = manage_host_buffer<idx_t>(impl_->nnodes, node_mapping);
-            // impl_->node_owner   = manage_host_buffer<int>(impl_->nnodes, node_owner);
-            // impl_->node_offsets = manage_host_buffer<idx_t>(impl_->nnodes, node_offsets);
-            // impl_->ghosts       = manage_host_buffer<idx_t>(impl_->nnodes, ghosts);
+            impl_->elements        = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
+            impl_->points          = manage_host_buffer<geom_t>(spatial_dim, nnodes, points);
+            impl_->node_mapping    = manage_host_buffer<idx_t>(nnodes, node_mapping);
+            impl_->node_owner      = manage_host_buffer<int>(nnodes, node_owner);
+            impl_->element_mapping = manage_host_buffer<element_idx_t>(nelements, element_mapping);
+            
+            int comm_size;
+            MPI_Comm_size(impl_->comm, &comm_size);
+            impl_->node_offsets = manage_host_buffer<idx_t>(comm_size + 1, node_offsets);
+            
+            ptrdiff_t n_ghost_nodes = nnodes - n_owned_nodes;
+            impl_->ghosts = manage_host_buffer<idx_t>(n_ghost_nodes, ghosts);
 
-            // impl_->elements = manage_host_buffer<idx_t>(nnodesxelem, impl_->nelements, elements);
-            // impl_->points   = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
+            impl_->n_owned_nodes                = n_owned_nodes;
+            impl_->n_owned_nodes_with_ghosts    = n_owned_nodes_with_ghosts;
+            impl_->n_owned_elements             = n_owned_elements;
+            impl_->n_owned_elements_with_ghosts = n_owned_elements_with_ghosts;
+            impl_->n_shared_elements            = n_shared_elements;
         }
 #endif  // SFEM_ENABLE_MPI
 
@@ -548,15 +573,9 @@ namespace sfem {
         return ret;
     }
 
-    void Mesh::set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping) {
-        impl_->node_mapping = node_mapping;
-    }
+    void Mesh::set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping) { impl_->node_mapping = node_mapping; }
 
-    void Mesh::set_comm(MPI_Comm comm) {
-        impl_->comm = comm;
-    }
+    void Mesh::set_comm(MPI_Comm comm) { impl_->comm = comm; }
 
-    void Mesh::set_element_type(const enum ElemType element_type) {
-        impl_->element_type = element_type;
-    }
+    void Mesh::set_element_type(const enum ElemType element_type) { impl_->element_type = element_type; }
 }  // namespace sfem
