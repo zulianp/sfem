@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         }
 
         char output_path[SFEM_MAX_PATH_LENGTH];
-        sprintf(output_path, "%s.%d.raw", output_prefix, b);
+        snprintf(output_path, sizeof(output_path), "%s.%d.raw", output_prefix, b);
         array_write(comm, output_path, values_mpi_t, (void *)soa_data, n_bytes_soa, n_bytes_soa);
     }
 

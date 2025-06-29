@@ -22,13 +22,13 @@ namespace sfem {
         Mesh(MPI_Comm comm);
         ~Mesh();
 
-        Mesh(MPI_Comm                    comm,
-             int                         spatial_dim,
-             enum ElemType               element_type,
-             ptrdiff_t                   nelements,
-             SharedBuffer<idx_t *>       elements,
-             ptrdiff_t                   nnodes,
-             SharedBuffer<geom_t *>      points);
+        Mesh(MPI_Comm               comm,
+             int                    spatial_dim,
+             enum ElemType          element_type,
+             ptrdiff_t              nelements,
+             SharedBuffer<idx_t *>  elements,
+             ptrdiff_t              nnodes,
+             SharedBuffer<geom_t *> points);
 
         friend class FunctionSpace;
         friend class Op;
@@ -50,26 +50,24 @@ namespace sfem {
         ptrdiff_t     n_owned_elements_with_ghosts() const;
         ptrdiff_t     n_shared_elements() const;
 
-        std::shared_ptr<CRSGraph>              node_to_node_graph();
-        std::shared_ptr<CRSGraph>              node_to_node_graph_upper_triangular();
-        std::shared_ptr<Buffer<element_idx_t>> half_face_table();
-        std::shared_ptr<CRSGraph>              create_node_to_node_graph(const enum ElemType element_type);
+        std::shared_ptr<CRSGraph>   node_to_node_graph();
+        std::shared_ptr<CRSGraph>   node_to_node_graph_upper_triangular();
+        SharedBuffer<element_idx_t> half_face_table();
+        std::shared_ptr<CRSGraph>   create_node_to_node_graph(const enum ElemType element_type);
 
-        std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
-        std::shared_ptr<Buffer<idx_t>>   node_to_node_colidx() const;
-        std::shared_ptr<Buffer<idx_t>>   node_offsets() const;
-        std::shared_ptr<Buffer<idx_t>>   ghosts() const;
-        std::shared_ptr<Buffer<int>>     node_owner() const;
-        std::shared_ptr<Buffer<idx_t>>   node_mapping() const;
-        std::shared_ptr<Buffer<idx_t>>   element_mapping() const;
+        SharedBuffer<count_t> node_to_node_rowptr() const;
+        SharedBuffer<idx_t>   node_to_node_colidx() const;
+        SharedBuffer<idx_t>   node_offsets() const;
+        SharedBuffer<idx_t>   ghosts() const;
+        SharedBuffer<int>     node_owner() const;
+        SharedBuffer<idx_t>   node_mapping() const;
+        SharedBuffer<idx_t>   element_mapping() const;
 
         const geom_t *const points(const int coord) const;
         const idx_t *const  idx(const int node_num) const;
 
-        std::shared_ptr<Buffer<geom_t *>> points();
-        std::shared_ptr<Buffer<idx_t *>>  elements();
-
-        // void *impl_mesh();
+        SharedBuffer<geom_t *> points();
+        SharedBuffer<idx_t *>  elements();
 
         MPI_Comm comm() const;
 
@@ -108,9 +106,10 @@ namespace sfem {
                                                          const geom_t xmax = 1,
                                                          const geom_t ymax = 1);
 
-        void set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping);
+        void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(MPI_Comm comm);
         void set_element_type(const enum ElemType element_type);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

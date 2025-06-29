@@ -51,15 +51,15 @@ int main(int argc, char *argv[]) {
     char colidx_path[1024 * 10];
     char values_path[1024 * 10];
 
-    sprintf(rowptr_path, "%s/rowptr.raw", crs_folder);
-    sprintf(colidx_path, "%s/colidx.raw", crs_folder);
+    snprintf(rowptr_path, sizeof(rowptr_path), "%s/rowptr.raw", crs_folder);
+    snprintf(colidx_path, sizeof(colidx_path), "%s/colidx.raw", crs_folder);
 
     ptrdiff_t _nope_, ndirichlet;
     idx_t    *dirichlet_nodes = 0;
     array_create_from_file(comm, nodes_path, SFEM_MPI_IDX_T, (void **)&dirichlet_nodes, &_nope_, &ndirichlet);
 
     if (block_rows * block_cols > 1) {
-        sprintf(values_path, "%s/values.*.raw", crs_folder);
+        snprintf(values_path, sizeof(values_path), "%s/values.*.raw", crs_folder);
         block_crs_t crs;
 #ifdef _WIN32
         SFEM_ERROR("IMEPLEMET ME!");
@@ -113,14 +113,14 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        sprintf(rowptr_path, "%s/rowptr.raw", output_folder);
-        sprintf(colidx_path, "%s/colidx.raw", output_folder);
-        sprintf(values_path, "%s/values.%%d.raw", output_folder);
+        snprintf(rowptr_path, sizeof(rowptr_path), "%s/rowptr.raw", output_folder);
+        snprintf(colidx_path, sizeof(colidx_path), "%s/colidx.raw", output_folder);
+        snprintf(values_path, sizeof(values_path), "%s/values.%%d.raw", output_folder);
 
         block_crs_write(comm, rowptr_path, colidx_path, values_path, &crs);
         block_crs_free(&crs);
     } else {
-        sprintf(values_path, "%s/values.raw", crs_folder);
+        snprintf(values_path, sizeof(values_path), "%s/values.raw", crs_folder);
 
         crs_t crs;
         crs_read(comm, rowptr_path, colidx_path, values_path, SFEM_MPI_COUNT_T, SFEM_MPI_IDX_T, SFEM_MPI_REAL_T, &crs);
