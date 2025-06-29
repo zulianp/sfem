@@ -136,7 +136,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
     const int block_size = m->spatial_dimension();
 
