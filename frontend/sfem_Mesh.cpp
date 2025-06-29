@@ -337,6 +337,7 @@ namespace sfem {
             geom_t **points   = nullptr;
             int      nnodesxelem;
             int      spatial_dim;
+
             if (mesh_read_serial(path, &nnodesxelem, &impl_->nelements, &elements, &spatial_dim, &impl_->nnodes, &points) !=
                 SFEM_SUCCESS) {
                 return SFEM_FAILURE;
@@ -344,6 +345,8 @@ namespace sfem {
 
             impl_->elements = manage_host_buffer<idx_t>(nnodesxelem, impl_->nelements, elements);
             impl_->points   = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
+            impl_->spatial_dim = spatial_dim;
+            impl_->element_type = (enum ElemType)nnodesxelem;
         }
 #ifdef SFEM_ENABLE_MPI
         else {
@@ -390,6 +393,7 @@ namespace sfem {
             impl_->node_mapping    = manage_host_buffer<idx_t>(nnodes, node_mapping);
             impl_->node_owner      = manage_host_buffer<int>(nnodes, node_owner);
             impl_->element_mapping = manage_host_buffer<element_idx_t>(nelements, element_mapping);
+
 
             int comm_size;
             MPI_Comm_size(impl_->comm, &comm_size);
@@ -597,12 +601,12 @@ namespace sfem {
         mesh->n_owned_elements_with_ghosts = impl_->n_owned_elements_with_ghosts;
         mesh->n_shared_elements            = impl_->n_shared_elements;
 
-        mesh->node_mapping = impl_->node_mapping->data();
-        mesh->node_owner   = impl_->node_owner->data();
+        mesh->node_mapping = (impl_->node_mapping) ? impl_->node_mapping->data() : nullptr;
+        mesh->node_owner   = (impl_->node_owner) ? impl_->node_owner->data() : nullptr;
 
-        mesh->element_mapping = impl_->element_mapping->data();
+        mesh->element_mapping = (impl_->element_mapping) ? impl_->element_mapping->data() : nullptr;
 
-        mesh->node_offsets = impl_->node_offsets->data();
-        mesh->ghosts       = impl_->ghosts->data();
+        mesh->node_offsets = (impl_->node_offsets) ? impl_->node_offsets->data() : nullptr;
+        mesh->ghosts       = (impl_->ghosts) ? impl_->ghosts->data() : nullptr;
     }
 }  // namespace sfem

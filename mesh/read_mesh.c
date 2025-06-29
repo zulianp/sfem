@@ -900,6 +900,12 @@ int mesh_read_serial(const char *folder,
     snprintf(pattern, sizeof(pattern), "%s/x.raw", folder);
     int ndims = count_files(pattern);
 
+    snprintf(pattern, sizeof(pattern), "%s/y.raw", folder);
+    ndims += count_files(pattern);
+
+    snprintf(pattern, sizeof(pattern), "%s/z.raw", folder);
+    ndims += count_files(pattern);
+
     idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
     for (int d = 0; d < nnodesxelem; d++) {
         elems[d] = 0;
@@ -947,7 +953,7 @@ int mesh_read_serial(const char *folder,
         snprintf(path, sizeof(path), "%s/%c.raw", folder, str_xyz[d]);
 
         geom_t *xyz_d = 0;
-        if (read_raw_array(path, sizeof(geom_t), (void **)&xyz_d, &n_elements) != SFEM_SUCCESS) {
+        if (read_raw_array(path, sizeof(geom_t), (void **)&xyz_d, &n_local_nodes) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
         xyz[d] = xyz_d;

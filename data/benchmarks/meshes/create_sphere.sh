@@ -31,7 +31,7 @@ mkdir -p $folder
 
 idx_type_size=4
 
-if [[ -z SFEM_SPHERE_RADIUS ]]
+if [[ -z $SFEM_SPHERE_RADIUS ]]
 then
 	SFEM_SPHERE_RADIUS=0.5
 	echo "Setting SFEM_SPHERE_RADIUS=$SFEM_SPHERE_RADIUS"
