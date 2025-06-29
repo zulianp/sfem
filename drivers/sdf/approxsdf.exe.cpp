@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nx = 2000;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
-    auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(sfem::Communicator::wrap(comm), nx, nx, 0, 0, 1, 1);
 
     // FIXME implement 3D
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
@@ -778,7 +778,7 @@ int main(int argc, char *argv[]) {
         }
     } else {
         const std::string surface_path    = argv[1];
-        auto              surface         = sfem::Mesh::create_from_file(comm, surface_path.c_str());
+        auto              surface         = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), surface_path.c_str());
         auto              surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
         compute_pseudo_normals(surface->element_type(),
                                surface->n_elements(),

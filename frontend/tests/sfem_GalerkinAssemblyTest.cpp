@@ -94,7 +94,7 @@ int test_cube() {
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 

@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     real_t *vector_field[3];
     ptrdiff_t vector_field_size_local, vector_field_size_global;

@@ -75,7 +75,7 @@ NB_MODULE(pysfem, m) {
 
     // Add Grid class bindings with wrapper functions
     nb::class_<Grid<geom_t>>(m, "Grid")
-            .def("create_from_file", [](const std::string &path) { return Grid<geom_t>::create_from_file(MPI_COMM_WORLD, path); })
+            .def("create_from_file", [](const std::string &path) { return Grid<geom_t>::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), path); })
             .def("create",
                  [](const ptrdiff_t nx,
                     const ptrdiff_t ny,
@@ -86,7 +86,7 @@ NB_MODULE(pysfem, m) {
                     const geom_t    xmax,
                     const geom_t    ymax,
                     const geom_t    zmax) {
-                     return Grid<geom_t>::create(MPI_COMM_WORLD, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+                     return Grid<geom_t>::create(sfem::Communicator::wrap(MPI_COMM_WORLD), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
                  })
             .def("to_file", &Grid<geom_t>::to_file)
             .def("extent", &Grid<geom_t>::extent)
@@ -103,10 +103,10 @@ NB_MODULE(pysfem, m) {
 
     nb::class_<Sideset>(m, "Sideset")
             .def("create_from_file",
-                 [](const std::string &path) { return Sideset::create_from_file(MPI_COMM_WORLD, path.c_str()); })
+                 [](const std::string &path) { return Sideset::create_from_file(sfem::Communicator::wrap(MPI_COMM_WORLD), path.c_str()); })
             .def("create",
                  [](const std::shared_ptr<Buffer<element_idx_t>> &parent, const std::shared_ptr<Buffer<int16_t>> &lfi) {
-                     return Sideset::create(MPI_COMM_WORLD, parent, lfi);
+                     return Sideset::create(sfem::Communicator::wrap(MPI_COMM_WORLD), parent, lfi);
                  })
             .def_static("create_from_selector",
                         [](const std::shared_ptr<Mesh> &mesh, nb::callable selector) {
@@ -213,7 +213,7 @@ NB_MODULE(pysfem, m) {
             .def("spatial_dimension", &Mesh::spatial_dimension);
 
     m.def("mesh_connectivity_from_file", [](const char *folder) -> std::shared_ptr<IdxBuffer2D> {
-        return sfem::mesh_connectivity_from_file(MPI_COMM_WORLD, folder);
+        return sfem::mesh_connectivity_from_file(sfem::Communicator::world(), folder);
     });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
@@ -304,7 +304,7 @@ NB_MODULE(pysfem, m) {
               }
 
               // Transfer ownership to mesh
-              return std::make_shared<Mesh>(MPI_COMM_WORLD, spatial_dimension, element_type, nelements, elements, nnodes, points);
+              return std::make_shared<Mesh>(sfem::Communicator::world(), spatial_dimension, element_type, nelements, elements, nnodes, points);
           });
 
     m.def("points", [](std::shared_ptr<Mesh> &mesh, int coord) -> nb::ndarray<nb::numpy, const geom_t> {
@@ -749,7 +749,7 @@ NB_MODULE(pysfem, m) {
              const geom_t xmax = 1,
              const geom_t ymax = 1,
              const geom_t zmax = 1) {
-              return Mesh::create_hex8_cube(MPI_COMM_WORLD, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+              return Mesh::create_hex8_cube(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
           });
 
     // Add create_sdf function binding
@@ -767,7 +767,7 @@ NB_MODULE(pysfem, m) {
               auto cpp_sdf_func = [sdf_func](geom_t x, geom_t y, geom_t z) -> geom_t {
                   return nb::cast<geom_t>(sdf_func(x, y, z));
               };
-              return sfem::create_sdf(MPI_COMM_WORLD, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
+              return sfem::create_sdf(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
           });
 
     // Add SemiStructuredMesh class and export_as_standard binding

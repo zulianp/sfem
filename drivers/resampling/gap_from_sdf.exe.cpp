@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
         mkdir(output_folder, 0700);
     }
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     ptrdiff_t n   = nglobal[0] * nglobal[1] * nglobal[2];
     geom_t*   sdf = 0;

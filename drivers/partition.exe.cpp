@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto            mesh       = sfem::Mesh::create_from_file(comm, folder);
+    auto            mesh       = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes    = mesh->n_nodes();
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
     mesh_remote_connectivity_graph(comm, mesh->element_type(), mesh->n_elements(), mesh->elements()->data(), mesh->n_nodes(), mesh->n_owned_nodes(), mesh->n_owned_elements_with_ghosts(), mesh->n_shared_elements(), mesh->node_owner()->data(), mesh->node_offsets()->data(), mesh->ghosts()->data(), &rowptr, &colidx, &exchange);
 
     // Everyone independent
-    mesh->set_comm(MPI_COMM_SELF);
+    mesh->set_comm(sfem::Communicator::self());
     snprintf(output_path, sizeof(output_path), "%s/part_%0.5d", output_folder, rank);
     mesh->write(output_path);
 

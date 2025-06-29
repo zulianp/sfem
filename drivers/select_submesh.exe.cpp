@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     if (max_nodes > mesh->n_nodes()) {
         SFEM_ERROR("max_nodes > mesh.nnodes");

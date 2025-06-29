@@ -35,9 +35,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_CONVERT_TO_STD_MESH, atoi);
 
     const char *path_mesh    = argv[1];
-    auto        m            = sfem::Mesh::create_from_file(comm, path_mesh);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), path_mesh);
     const char *path_sideset = argv[2];
-    auto        s            = sfem::Sideset::create_from_file(comm, path_sideset);
+    auto s = sfem::Sideset::create_from_file(sfem::Communicator::wrap(comm), path_sideset);
     const auto elements = m->elements()->data();
 
     // Make sure the folder exists

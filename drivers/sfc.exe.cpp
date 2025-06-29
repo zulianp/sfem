@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     auto elements = mesh->elements()->data();
     auto points = mesh->points()->data();
     const ptrdiff_t n_owned_nodes = mesh->n_owned_nodes();

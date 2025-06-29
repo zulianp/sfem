@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +167,7 @@ int main(int argc, char *argv[]) {
     // Read mesh data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(comm, mesh_folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), mesh_folder);
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -259,7 +258,7 @@ int main(int argc, char *argv[]) {
     mesh_t surf;
     mesh_init(&surf);
 
-    surf.comm      = mesh->comm();
+    surf.comm      = mesh->comm()->comm();
     // surf.mem_space = mesh->mem_space();
 
     surf.spatial_dim  = mesh->spatial_dimension();

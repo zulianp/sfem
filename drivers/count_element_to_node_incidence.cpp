@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     const char *path_count = argv[2];
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     int *count = (int*)calloc(m->n_nodes(), sizeof(int));
 

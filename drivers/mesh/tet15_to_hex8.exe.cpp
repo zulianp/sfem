@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char     *output_folder  = argv[2];
-    auto            tet15_elements = sfem::mesh_connectivity_from_file(comm, argv[1]);
+    auto            tet15_elements = sfem::mesh_connectivity_from_file(sfem::Communicator::wrap(comm), argv[1]);
     const ptrdiff_t n_elements     = tet15_elements->extent(1);
     auto            hex8_elements  = sfem::create_host_buffer<idx_t>(8, n_elements * 4);
     auto            elems          = hex8_elements->data();

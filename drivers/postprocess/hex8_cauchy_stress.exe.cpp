@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        hex8_mesh     = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto        hex8_mesh     = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     real_t      mu            = atof(argv[2]);
     real_t      lambda        = atof(argv[3]);
     auto        ux            = sfem::create_buffer_from_file<real_t>(comm, argv[4]);

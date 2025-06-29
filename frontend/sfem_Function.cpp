@@ -90,12 +90,12 @@ namespace sfem {
 
     class Sideset::Impl final {
     public:
-        MPI_Comm                               comm;
+        std::shared_ptr<Communicator> comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
     };
 
-    Sideset::Sideset(MPI_Comm                                      comm,
+    Sideset::Sideset(const std::shared_ptr<Communicator>& comm,
                      const std::shared_ptr<Buffer<element_idx_t>> &parent,
                      const std::shared_ptr<Buffer<int16_t>>       &lfi)
         : impl_(std::make_unique<Impl>()) {
@@ -109,15 +109,15 @@ namespace sfem {
 
     ptrdiff_t Sideset::size() const { return impl_->parent->size(); }
 
-    MPI_Comm Sideset::comm() const { return impl_->comm; }
+    std::shared_ptr<Communicator> Sideset::comm() const { return impl_->comm; }
 
-    std::shared_ptr<Sideset> Sideset::create(MPI_Comm                                      comm,
+    std::shared_ptr<Sideset> Sideset::create(const std::shared_ptr<Communicator>& comm,
                                              const std::shared_ptr<Buffer<element_idx_t>> &parent,
                                              const std::shared_ptr<Buffer<int16_t>>       &lfi) {
         return std::make_shared<Sideset>(comm, parent, lfi);
     }
 
-    std::shared_ptr<Sideset> Sideset::create_from_file(MPI_Comm comm, const char *path) {
+    std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator>& comm, const char *path) {
         auto ret = std::make_shared<Sideset>();
         if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
         return ret;
@@ -128,10 +128,10 @@ namespace sfem {
         sfem::create_directory(sideset_path.c_str());
 
         std::string parent_path = sideset_path + "/parent.raw";
-        array_write(impl_->comm, parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, impl_->parent->data(), impl_->parent->size(), impl_->parent->size());
+        array_write(impl_->comm->comm(), parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, impl_->parent->data(), impl_->parent->size(), impl_->parent->size());
 
         std::string lfi_path = sideset_path + "/lfi.int16.raw";
-        array_write(impl_->comm, lfi_path.c_str(), MPI_SHORT, impl_->lfi->data(), impl_->lfi->size(), impl_->lfi->size());
+        array_write(impl_->comm->comm(), lfi_path.c_str(), MPI_SHORT, impl_->lfi->data(), impl_->lfi->size(), impl_->lfi->size());
 
         std::ofstream os(sideset_path + "/meta.yaml");
 
@@ -219,7 +219,7 @@ namespace sfem {
         return std::make_shared<Sideset>(mesh->comm(), parent, lfi);
     }
 
-    int Sideset::read(MPI_Comm comm, const char *folder) {
+    int Sideset::read(const std::shared_ptr<Communicator>& comm, const char *folder) {
         SFEM_TRACE_SCOPE("Sideset::read");
 
         impl_->comm = comm;
@@ -230,8 +230,8 @@ namespace sfem {
         int16_t       *lfi{nullptr};
 
         if (array_create_from_file(
-                    comm, (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
-            array_create_from_file(comm, (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
+                    comm->comm(), (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
+            array_create_from_file(comm->comm(), (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
             return SFEM_FAILURE;
         }
 
@@ -509,9 +509,8 @@ namespace sfem {
 
         if (!SFEM_NEUMANN_SURFACE && !SFEM_NEUMANN_SIDESET) return neumann_conditions;
 
-        MPI_Comm comm = space->mesh_ptr()->comm();
-        int      rank;
-        MPI_Comm_rank(comm, &rank);
+        auto comm = space->mesh_ptr()->comm();
+        int      rank = comm->rank();
 
         auto &conds = neumann_conditions->impl_->conditions;
 
@@ -559,7 +558,7 @@ namespace sfem {
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
                             ptrdiff_t lsize{0}, gsize{0};
-                            if (array_create_from_file(comm, pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
+                            if (array_create_from_file(comm->comm(), pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
                                 SFEM_ERROR("Failed to read file %s\n", pch);
                                 break;
                             }
@@ -619,7 +618,7 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm, pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->comm(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -918,9 +917,8 @@ namespace sfem {
 
         if (!SFEM_DIRICHLET_NODESET && !SFEM_DIRICHLET_SIDESET) return dc;
 
-        MPI_Comm comm = space->mesh_ptr()->comm();
-        int      rank;
-        MPI_Comm_rank(comm, &rank);
+        auto comm = space->mesh_ptr()->comm();
+        int      rank = comm->rank();
 
         auto &conds = dc->impl_->conditions;
 
@@ -950,7 +948,7 @@ namespace sfem {
                 if (SFEM_DIRICHLET_NODESET) {
                     idx_t    *this_set{nullptr};
                     ptrdiff_t lsize{0}, gsize{0};
-                    if (array_create_from_file(comm, pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->comm(), pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch);
                         break;
                     }
@@ -994,7 +992,7 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm, pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->comm(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -1031,7 +1029,7 @@ namespace sfem {
         ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
         auto       conds = tree["dirichlet_conditions"];
 
-        MPI_Comm comm = space->mesh_ptr()->comm();
+        MPI_Comm comm = space->mesh_ptr()->comm()->comm();
 
         for (auto c : conds.children()) {
             std::shared_ptr<Sideset>       sideset;
@@ -1299,7 +1297,7 @@ namespace sfem {
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
-        MPI_Comm comm = impl_->space->mesh_ptr()->comm();
+        MPI_Comm comm = impl_->space->mesh_ptr()->comm()->comm();
         sfem::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
@@ -1373,7 +1371,7 @@ namespace sfem {
                          b_name,
                          impl_->export_counter++);
 
-                if (array_write(mesh->comm(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (array_write(mesh->comm()->comm(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
             }
@@ -1388,7 +1386,7 @@ namespace sfem {
                      name,
                      impl_->export_counter++);
 
-            if (array_write(mesh->comm(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
+            if (array_write(mesh->comm()->comm(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;
             }
         }
@@ -3432,7 +3430,7 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_VELY, );
             SFEM_READ_ENV(SFEM_VELZ, );
 
-            if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && mesh->spatial_dimension() == 3)) {
+            if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && space->mesh_ptr()->spatial_dimension() == 3)) {
                 // fprintf(stderr,
                 //         "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
                 //         SFEM_VELX,
@@ -3445,9 +3443,9 @@ namespace sfem {
             ptrdiff_t nlocal, nglobal;
 
             real_t *vel0, *vel1, *vel2;
-            if (array_create_from_file(mesh->comm(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
-                array_create_from_file(mesh->comm(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
-                array_create_from_file(mesh->comm(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
+            if (array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
+                array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
+                array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
@@ -3878,7 +3876,7 @@ namespace sfem {
 
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(MPI_Comm comm, const char *folder) {
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder) {
         char pattern[1024 * 10];
         snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
@@ -3901,7 +3899,7 @@ namespace sfem {
             snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm, path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }

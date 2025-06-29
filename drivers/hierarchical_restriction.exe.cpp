@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_CRS_GRAPH_RESTRICT = 0;
     SFEM_READ_ENV(SFEM_USE_CRS_GRAPH_RESTRICT, atoi);
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 

@@ -132,8 +132,8 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto            mesh        = sfem::Mesh::create_from_file(comm, folder);
-    auto            points      = mesh->points()->data();
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto points      = mesh->points()->data();
     const ptrdiff_t n_nodes     = mesh->n_nodes();
     const ptrdiff_t n_elements  = mesh->n_elements();
     const int       spatial_dim = mesh->spatial_dimension();
@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
     sideset->write(sideset_path.c_str());
 
     auto surf = std::make_shared<sfem::Mesh>(
-            comm, spatial_dim, shell_type(side_type(mesh->element_type())), n_surf_elements, surf_elements, n_surf_nodes, surf_points);
+            sfem::Communicator::wrap(comm), spatial_dim, shell_type(side_type(mesh->element_type())), n_surf_elements, surf_elements, n_surf_nodes, surf_points);
 
     surf->write(output_folder);
 

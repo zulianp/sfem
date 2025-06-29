@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     const char *output_path = argv[2];
 
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {

@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
         mkdir(output_folder, 0700);
     }
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     if (!mesh) {
         return EXIT_FAILURE;
     }
@@ -302,7 +302,7 @@ int main(int argc, char* argv[]) {
         if (size > 1) {
             // // exchange ghost nodes and add contribution
             send_recv_t slave_to_master;
-            mesh_create_nodal_send_recv(mesh->comm(),
+            mesh_create_nodal_send_recv(mesh->comm()->comm(),
                                         mesh->n_nodes(),
                                         mesh->n_owned_nodes(),
                                         mesh->node_owner()->data(),
@@ -314,7 +314,7 @@ int main(int argc, char* argv[]) {
             real_t* real_buffer = (real_t*)malloc(count * sizeof(real_t));
 
             auto e_add = [&](real_t* const SFEM_RESTRICT inout) {
-                exchange_add(mesh->comm(),
+                exchange_add(mesh->comm()->comm(),
                              mesh->n_nodes(),
                              mesh->n_owned_nodes(),
                              &slave_to_master,
@@ -371,16 +371,16 @@ int main(int argc, char* argv[]) {
 
         char path[1024 * 10];
         snprintf(path, sizeof(path), "%s/gap.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
+        mesh_write_nodal_field(mesh->comm()->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
 
         snprintf(path, sizeof(path), "%s/xnormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, xnormal);
+        mesh_write_nodal_field(mesh->comm()->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, xnormal);
 
         snprintf(path, sizeof(path), "%s/ynormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, ynormal);
+        mesh_write_nodal_field(mesh->comm()->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, ynormal);
 
         snprintf(path, sizeof(path), "%s/znormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, znormal);
+        mesh_write_nodal_field(mesh->comm()->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, znormal);
 
         if (0) {
             for (ptrdiff_t i = 0; i < mesh->n_nodes(); i++) {
@@ -388,7 +388,7 @@ int main(int argc, char* argv[]) {
             }
 
             snprintf(path, sizeof(path), "%s/rank.float64.raw", output_folder);
-            mesh_write_nodal_field(mesh->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
+            mesh_write_nodal_field(mesh->comm()->comm(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
         }
 
         double io_tock = MPI_Wtime();

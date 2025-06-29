@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto p1_mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto p1_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     const ptrdiff_t n_elements = p1_mesh->n_elements();
     const ptrdiff_t n_nodes = p1_mesh->n_nodes();
     int p1_nxe = elem_num_nodes(p1_mesh->element_type());

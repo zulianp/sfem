@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     real_t *shear_6[6];
     ptrdiff_t shear_size_local, shear_size_global;

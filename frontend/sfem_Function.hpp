@@ -26,19 +26,19 @@ namespace sfem {
 
     class Sideset final {
     public:
-        int                             read(MPI_Comm comm, const char *path);
+        int                             read(const std::shared_ptr<Communicator>& comm, const char *path);
         SharedBuffer<element_idx_t>     parent();
         SharedBuffer<int16_t>           lfi();
-        static std::shared_ptr<Sideset> create_from_file(MPI_Comm comm, const char *path);
+        static std::shared_ptr<Sideset> create_from_file(const std::shared_ptr<Communicator>& comm, const char *path);
         ptrdiff_t                       size() const;
-        MPI_Comm                        comm() const;
+        std::shared_ptr<Communicator>   comm() const;
         int                             write(const char *path) const;
 
-        Sideset(MPI_Comm comm, const SharedBuffer<element_idx_t> &parent, const SharedBuffer<int16_t> &lfi);
+        Sideset(const std::shared_ptr<Communicator>& comm, const SharedBuffer<element_idx_t> &parent, const SharedBuffer<int16_t> &lfi);
         Sideset();
         ~Sideset();
 
-        static std::shared_ptr<Sideset> create(MPI_Comm                           comm,
+        static std::shared_ptr<Sideset> create(const std::shared_ptr<Communicator>& comm,
                                                const SharedBuffer<element_idx_t> &parent,
                                                const SharedBuffer<int16_t>       &lfi);
 
@@ -474,7 +474,7 @@ namespace sfem {
     };
 
     std::string           d_op_str(const std::string &name);
-    SharedBuffer<idx_t *> mesh_connectivity_from_file(MPI_Comm comm, const char *folder);
+    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder);
 
     SharedBuffer<idx_t> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
                                                     const std::shared_ptr<Sideset>       &sideset);
