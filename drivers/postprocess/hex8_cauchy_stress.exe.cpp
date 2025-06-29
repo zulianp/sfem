@@ -9,24 +9,20 @@
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
+    auto comm = sfem::Communicator::world();
 
     if (argc != 8) {
-        if (!rank) {
+        if (!comm->rank()) {
             fprintf(stderr, "usage: %s <hex8_mesh> <mu> <lambda> <ux> <uy> <uz> <output_prefix>\n", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    auto        hex8_mesh     = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto        hex8_mesh     = sfem::Mesh::create_from_file(comm, argv[1]);
     real_t      mu            = atof(argv[2]);
     real_t      lambda        = atof(argv[3]);
-    auto        ux            = sfem::create_buffer_from_file<real_t>(comm, argv[4]);
+    auto        ux            = sfem::create_buffer_from_file<real_t>(comm, argv[4]); 
     auto        uy            = sfem::create_buffer_from_file<real_t>(comm, argv[5]);
     auto        uz            = sfem::create_buffer_from_file<real_t>(comm, argv[6]);
     const char *output_prefix = argv[7];
