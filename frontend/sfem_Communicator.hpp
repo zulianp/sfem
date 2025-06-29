@@ -25,7 +25,7 @@ public:
 #ifdef SFEM_ENABLE_MPI
     static std::shared_ptr<Communicator> wrap(MPI_Comm comm);
     Communicator(MPI_Comm comm);
-    MPI_Comm &comm();
+    MPI_Comm &get();
 #endif
 
 private:

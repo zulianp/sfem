@@ -56,8 +56,8 @@ int main(int argc, char *argv[]) {
         auto comm = context.communicator();
 
         int rank, size;
-        MPI_Comm_rank(comm->comm(), &rank);
-        MPI_Comm_size(comm->comm(), &size);
+        MPI_Comm_rank(comm->get(), &rank);
+        MPI_Comm_size(comm->get(), &size);
 
         if (argc != 7) {
             if (!rank) {

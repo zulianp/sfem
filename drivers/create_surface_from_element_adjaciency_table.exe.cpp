@@ -258,7 +258,7 @@ int main(int argc, char *argv[]) {
     mesh_t surf;
     mesh_init(&surf);
 
-    surf.comm      = mesh->comm()->comm();
+    surf.comm      = mesh->comm()->get();
     // surf.mem_space = mesh->mem_space();
 
     surf.spatial_dim  = mesh->spatial_dimension();
