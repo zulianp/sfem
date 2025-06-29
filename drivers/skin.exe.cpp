@@ -296,10 +296,7 @@ int main(int argc, char *argv[]) {
         printf("Volume: #elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("Surface: #elements %ld #nodes %ld\n", (long)n_surf_elements, (long)n_surf_nodes);
     }
-
-    free(parent);
-    free(side_idx);
-
+    
     double tock = MPI_Wtime();
 
     if (!rank) {
