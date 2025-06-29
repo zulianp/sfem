@@ -19,7 +19,7 @@ namespace sfem {
 
     class Mesh::Impl {
     public:
-        MPI_Comm comm;
+        std::shared_ptr<Communicator> comm;
 
         SharedBuffer<idx_t *>  elements;  // Element connectivity
         SharedBuffer<geom_t *> points;    // Node coordinates
@@ -50,7 +50,7 @@ namespace sfem {
         ~Impl() {}
 
         void clear() {
-            comm                         = MPI_COMM_NULL;
+            comm                         = nullptr;
             spatial_dim                  = 0;
             element_type                 = INVALID;
             nelements                    = 0;
@@ -72,9 +72,9 @@ namespace sfem {
         }
     };
 
-    MPI_Comm Mesh::comm() const { return impl_->comm; }
+    std::shared_ptr<Communicator> Mesh::comm() const { return impl_->comm; }
 
-    Mesh::Mesh(MPI_Comm               comm,
+    Mesh::Mesh(const std::shared_ptr<Communicator>& comm,
                int                    spatial_dim,
                enum ElemType          element_type,
                ptrdiff_t              nelements,
@@ -91,233 +91,12 @@ namespace sfem {
         impl_->points       = points;
     }
 
-    std::shared_ptr<Mesh> Mesh::create_hex8_cube(MPI_Comm     comm,
-                                                 const int    nx,
-                                                 const int    ny,
-                                                 const int    nz,
-                                                 const geom_t xmin,
-                                                 const geom_t ymin,
-                                                 const geom_t zmin,
-                                                 const geom_t xmax,
-                                                 const geom_t ymax,
-                                                 const geom_t zmax) {
-        auto            ret       = std::make_shared<Mesh>(comm);
-        const ptrdiff_t nelements = nx * ny * nz;
-        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
-
-        ret->impl_->spatial_dim  = 3;
-        ret->impl_->element_type = HEX8;
-        ret->impl_->nelements    = nelements;
-        ret->impl_->nnodes       = nnodes;
-        ret->impl_->points       = create_host_buffer<geom_t>(3, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(8, nelements);
-
-        auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
-
-        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
-        const ptrdiff_t ldy = nx + 1;
-        const ptrdiff_t ldx = 1;
-
-        const double hx = (xmax - xmin) * 1. / nx;
-        const double hy = (ymax - ymin) * 1. / ny;
-        const double hz = (zmax - zmin) * 1. / nz;
-
-        assert(hx > 0);
-        assert(hy > 0);
-        assert(hz > 0);
-
-        for (ptrdiff_t zi = 0; zi < nz; zi++) {
-            for (ptrdiff_t yi = 0; yi < ny; yi++) {
-                for (ptrdiff_t xi = 0; xi < nx; xi++) {
-                    const ptrdiff_t e = zi * ny * nx + yi * nx + xi;
-
-                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
-                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
-                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
-                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
-
-                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
-                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
-                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
-                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
-
-                    elements[0][e] = i0;
-                    elements[1][e] = i1;
-                    elements[2][e] = i2;
-                    elements[3][e] = i3;
-
-                    elements[4][e] = i4;
-                    elements[5][e] = i5;
-                    elements[6][e] = i6;
-                    elements[7][e] = i7;
-                }
-            }
-        }
-
-        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
-            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
-                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
-                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
-                    points[0][node] = (double)xmin + xi * hx;
-                    points[1][node] = (double)ymin + yi * hy;
-                    points[2][node] = (double)zmin + zi * hz;
-                }
-            }
-        }
-
-        return ret;
-    }
-
-    std::shared_ptr<Mesh> Mesh::create_tri3_square(MPI_Comm     comm,
-                                                   const int    nx,
-                                                   const int    ny,
-                                                   const geom_t xmin,
-                                                   const geom_t ymin,
-                                                   const geom_t xmax,
-                                                   const geom_t ymax) {
-        auto            ret       = std::make_shared<Mesh>(comm);
-        const ptrdiff_t nelements = 2 * nx * ny;
-        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
-
-        ret->impl_->spatial_dim  = 2;
-        ret->impl_->element_type = TRI3;
-        ret->impl_->nelements    = nelements;
-        ret->impl_->nnodes       = nnodes;
-        ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(3, nelements);
-
-        auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
-
-        const ptrdiff_t ldy = nx + 1;
-        const ptrdiff_t ldx = 1;
-
-        const double hx = (xmax - xmin) * 1. / nx;
-        const double hy = (ymax - ymin) * 1. / ny;
-
-        assert(hx > 0);
-        assert(hy > 0);
-
-        for (ptrdiff_t yi = 0; yi < ny; yi++) {
-            for (ptrdiff_t xi = 0; xi < nx; xi++) {
-                const ptrdiff_t e = 2 * (yi * nx + xi);
-
-                const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy;
-                const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy;
-                const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy;
-                const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy;
-
-                elements[0][e] = i0;
-                elements[1][e] = i1;
-                elements[2][e] = i3;
-
-                elements[0][e + 1] = i1;
-                elements[1][e + 1] = i2;
-                elements[2][e + 1] = i3;
-            }
-        }
-
-        for (ptrdiff_t yi = 0; yi <= ny; yi++) {
-            for (ptrdiff_t xi = 0; xi <= nx; xi++) {
-                ptrdiff_t node  = xi * ldx + yi * ldy;
-                points[0][node] = (double)xmin + xi * hx;
-                points[1][node] = (double)ymin + yi * hy;
-            }
-        }
-
-        return ret;
-    }
-
-    std::shared_ptr<Mesh> Mesh::create_quad4_square(MPI_Comm     comm,
-                                                    const int    nx,
-                                                    const int    ny,
-                                                    const geom_t xmin,
-                                                    const geom_t ymin,
-                                                    const geom_t xmax,
-                                                    const geom_t ymax) {
-        auto            ret       = std::make_shared<Mesh>(comm);
-        const ptrdiff_t nelements = nx * ny;
-        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
-
-        ret->impl_->spatial_dim  = 2;
-        ret->impl_->element_type = QUAD4;
-        ret->impl_->nelements    = nelements;
-        ret->impl_->nnodes       = nnodes;
-        ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(4, nelements);
-
-        auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
-
-        const ptrdiff_t ldy = nx + 1;
-        const ptrdiff_t ldx = 1;
-
-        const double hx = (xmax - xmin) * 1. / nx;
-        const double hy = (ymax - ymin) * 1. / ny;
-
-        assert(hx > 0);
-        assert(hy > 0);
-
-        for (ptrdiff_t yi = 0; yi < ny; yi++) {
-            for (ptrdiff_t xi = 0; xi < nx; xi++) {
-                const ptrdiff_t e = yi * nx + xi;
-
-                const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy;
-                const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy;
-                const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy;
-                const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy;
-
-                elements[0][e] = i0;
-                elements[1][e] = i1;
-                elements[2][e] = i2;
-                elements[3][e] = i3;
-            }
-        }
-
-        for (ptrdiff_t yi = 0; yi <= ny; yi++) {
-            for (ptrdiff_t xi = 0; xi <= nx; xi++) {
-                ptrdiff_t node  = xi * ldx + yi * ldy;
-                points[0][node] = (double)xmin + xi * hx;
-                points[1][node] = (double)ymin + yi * hy;
-            }
-        }
-
-        return ret;
-    }
-
-    int Mesh::spatial_dimension() const { return impl_->spatial_dim; }
-    int Mesh::n_nodes_per_element() const { return elem_num_nodes((enum ElemType)impl_->element_type); }
-
-    ptrdiff_t Mesh::n_nodes() const { return impl_->nnodes; }
-    ptrdiff_t Mesh::n_elements() const { return impl_->nelements; }
-
-    enum ElemType Mesh::element_type() const { return impl_->element_type; }
-
-    ptrdiff_t Mesh::n_owned_nodes() const { return impl_->n_owned_nodes; }
-    ptrdiff_t Mesh::n_owned_nodes_with_ghosts() const { return impl_->n_owned_nodes_with_ghosts; }
-    ptrdiff_t Mesh::n_owned_elements() const { return impl_->n_owned_elements; }
-    ptrdiff_t Mesh::n_owned_elements_with_ghosts() const { return impl_->n_owned_elements_with_ghosts; }
-    ptrdiff_t Mesh::n_shared_elements() const { return impl_->n_shared_elements; }
-
-    SharedBuffer<idx_t> Mesh::node_mapping() const { return impl_->node_mapping; }
-    SharedBuffer<idx_t> Mesh::element_mapping() const { return impl_->element_mapping; }
-
-    SharedBuffer<idx_t> Mesh::node_offsets() const { return impl_->node_offsets; }
-    SharedBuffer<idx_t> Mesh::ghosts() const { return impl_->ghosts; }
-    SharedBuffer<int>   Mesh::node_owner() const { return impl_->node_owner; }
-
-    SharedBuffer<geom_t *> Mesh::points() { return impl_->points; }
-
-    SharedBuffer<idx_t *> Mesh::elements() { return impl_->elements; }
-
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
         impl_->clear();
-        impl_->comm = MPI_COMM_WORLD;
+        impl_->comm = Communicator::world();
     }
 
-    // FIXME MPI_Comm must be abstracted away
-    Mesh::Mesh(MPI_Comm comm) : impl_(std::make_unique<Impl>()) {
+    Mesh::Mesh(const std::shared_ptr<Communicator>& comm) : impl_(std::make_unique<Impl>()) {
         impl_->clear();
         impl_->comm = comm;
     }
@@ -329,7 +108,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_MPI
         int comm_size;
-        MPI_Comm_size(impl_->comm, &comm_size);
+        MPI_Comm_size(impl_->comm->comm(), &comm_size);
         if (comm_size == 1)
 #endif
         {
@@ -367,7 +146,7 @@ namespace sfem {
             ptrdiff_t      n_shared_elements;
             ptrdiff_t      n_owned_elements_with_ghosts;
 
-            if (mesh_read_mpi(impl_->comm,
+            if (mesh_read_mpi(impl_->comm->comm(),
                               path,
                               &nnodesxelem,
                               &nelements,
@@ -396,7 +175,7 @@ namespace sfem {
 
 
             int comm_size;
-            MPI_Comm_size(impl_->comm, &comm_size);
+            MPI_Comm_size(impl_->comm->comm(), &comm_size);
             impl_->node_offsets = manage_host_buffer<idx_t>(comm_size + 1, node_offsets);
 
             ptrdiff_t n_ghost_nodes = nnodes - n_owned_nodes;
@@ -526,8 +305,264 @@ namespace sfem {
     SharedBuffer<count_t> Mesh::node_to_node_rowptr() const { return impl_->crs_graph->rowptr(); }
     SharedBuffer<idx_t>   Mesh::node_to_node_colidx() const { return impl_->crs_graph->colidx(); }
 
+    std::shared_ptr<Mesh> Mesh::create_hex8_cube(const std::shared_ptr<Communicator>& comm,
+                                                 const int    nx,
+                                                 const int    ny,
+                                                 const int    nz,
+                                                 const geom_t xmin,
+                                                 const geom_t ymin,
+                                                 const geom_t zmin,
+                                                 const geom_t xmax,
+                                                 const geom_t ymax,
+                                                 const geom_t zmax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = nx * ny * nz;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
+
+        ret->impl_->spatial_dim  = 3;
+        ret->impl_->element_type = HEX8;
+        ret->impl_->nelements    = nelements;
+        ret->impl_->nnodes       = nnodes;
+        ret->impl_->points       = create_host_buffer<geom_t>(3, nnodes);
+        ret->impl_->elements     = create_host_buffer<idx_t>(8, nelements);
+
+        auto points   = ret->impl_->points->data();
+        auto elements = ret->impl_->elements->data();
+
+        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+        const double hz = (zmax - zmin) * 1. / nz;
+
+        assert(hx > 0);
+        assert(hy > 0);
+        assert(hz > 0);
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const ptrdiff_t e = zi * ny * nx + yi * nx + xi;
+
+                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+
+                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+
+                    elements[0][e] = i0;
+                    elements[1][e] = i1;
+                    elements[2][e] = i2;
+                    elements[3][e] = i3;
+
+                    elements[4][e] = i4;
+                    elements[5][e] = i5;
+                    elements[6][e] = i6;
+                    elements[7][e] = i7;
+                }
+            }
+        }
+
+        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
+            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
+                    points[0][node] = (double)xmin + xi * hx;
+                    points[1][node] = (double)ymin + yi * hy;
+                    points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    std::shared_ptr<Mesh> Mesh::create_tri3_square(const std::shared_ptr<Communicator>& comm,
+                                                   const int    nx,
+                                                   const int    ny,
+                                                   const geom_t xmin,
+                                                   const geom_t ymin,
+                                                   const geom_t xmax,
+                                                   const geom_t ymax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = 2 * nx * ny;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
+
+        ret->impl_->spatial_dim  = 2;
+        ret->impl_->element_type = TRI3;
+        ret->impl_->nelements    = nelements;
+        ret->impl_->nnodes       = nnodes;
+        ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
+        ret->impl_->elements     = create_host_buffer<idx_t>(3, nelements);
+
+        auto points   = ret->impl_->points->data();
+        auto elements = ret->impl_->elements->data();
+
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+
+        assert(hx > 0);
+        assert(hy > 0);
+
+        for (ptrdiff_t yi = 0; yi < ny; yi++) {
+            for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                const ptrdiff_t e = 2 * (yi * nx + xi);
+
+                const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy;
+                const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy;
+                const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy;
+                const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy;
+
+                elements[0][e] = i0;
+                elements[1][e] = i1;
+                elements[2][e] = i3;
+
+                elements[0][e + 1] = i1;
+                elements[1][e + 1] = i2;
+                elements[2][e + 1] = i3;
+            }
+        }
+
+        for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+            for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                ptrdiff_t node  = xi * ldx + yi * ldy;
+                points[0][node] = (double)xmin + xi * hx;
+                points[1][node] = (double)ymin + yi * hy;
+            }
+        }
+
+        return ret;
+    }
+
+    std::shared_ptr<Mesh> Mesh::create_quad4_square(const std::shared_ptr<Communicator>& comm,
+                                                    const int    nx,
+                                                    const int    ny,
+                                                    const geom_t xmin,
+                                                    const geom_t ymin,
+                                                    const geom_t xmax,
+                                                    const geom_t ymax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = nx * ny;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
+
+        ret->impl_->spatial_dim  = 2;
+        ret->impl_->element_type = QUAD4;
+        ret->impl_->nelements    = nelements;
+        ret->impl_->nnodes       = nnodes;
+        ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
+        ret->impl_->elements     = create_host_buffer<idx_t>(4, nelements);
+
+        auto points   = ret->impl_->points->data();
+        auto elements = ret->impl_->elements->data();
+
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+
+        assert(hx > 0);
+        assert(hy > 0);
+
+        for (ptrdiff_t yi = 0; yi < ny; yi++) {
+            for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                const ptrdiff_t e = yi * nx + xi;
+
+                const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy;
+                const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy;
+                const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy;
+                const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy;
+
+                elements[0][e] = i0;
+                elements[1][e] = i1;
+                elements[2][e] = i2;
+                elements[3][e] = i3;
+            }
+        }
+
+        for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+            for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                ptrdiff_t node  = xi * ldx + yi * ldy;
+                points[0][node] = (double)xmin + xi * hx;
+                points[1][node] = (double)ymin + yi * hy;
+            }
+        }
+
+        return ret;
+    }
+
+    int Mesh::spatial_dimension() const { return impl_->spatial_dim; }
+    int Mesh::n_nodes_per_element() const { return elem_num_nodes((enum ElemType)impl_->element_type); }
+
+    ptrdiff_t Mesh::n_nodes() const { return impl_->nnodes; }
+    ptrdiff_t Mesh::n_elements() const { return impl_->nelements; }
+
+    enum ElemType Mesh::element_type() const { return impl_->element_type; }
+
+    ptrdiff_t Mesh::n_owned_nodes() const { return impl_->n_owned_nodes; }
+    ptrdiff_t Mesh::n_owned_nodes_with_ghosts() const { return impl_->n_owned_nodes_with_ghosts; }
+    ptrdiff_t Mesh::n_owned_elements() const { return impl_->n_owned_elements; }
+    ptrdiff_t Mesh::n_owned_elements_with_ghosts() const { return impl_->n_owned_elements_with_ghosts; }
+    ptrdiff_t Mesh::n_shared_elements() const { return impl_->n_shared_elements; }
+
+    SharedBuffer<idx_t> Mesh::node_mapping() const { return impl_->node_mapping; }
+    SharedBuffer<idx_t> Mesh::element_mapping() const { return impl_->element_mapping; }
+
+    SharedBuffer<idx_t> Mesh::node_offsets() const { return impl_->node_offsets; }
+    SharedBuffer<idx_t> Mesh::ghosts() const { return impl_->ghosts; }
+    SharedBuffer<int>   Mesh::node_owner() const { return impl_->node_owner; }
+
+    SharedBuffer<geom_t *> Mesh::points() { return impl_->points; }
+
+    SharedBuffer<idx_t *> Mesh::elements() { return impl_->elements; }
+
+    void Mesh::set_node_mapping(const SharedBuffer<idx_t> &node_mapping) { impl_->node_mapping = node_mapping; }
+
+    void Mesh::set_comm(const std::shared_ptr<Communicator>& comm) { impl_->comm = comm; }
+
+    void Mesh::set_element_type(const enum ElemType element_type) { impl_->element_type = element_type; }
+
+    void Mesh::extract_depreacted(mesh_t *mesh) {
+#ifdef SFEM_ENABLE_MPI
+        mesh->comm = impl_->comm->comm();
+#else
+        mesh->comm = MPI_COMM_NULL;
+#endif
+        mesh->spatial_dim  = impl_->spatial_dim;
+        mesh->element_type = impl_->element_type;
+
+        mesh->nelements = impl_->nelements;
+        mesh->nnodes    = impl_->nnodes;
+
+        mesh->elements = impl_->elements->data();
+        mesh->points   = impl_->points->data();
+
+        mesh->n_owned_nodes             = impl_->n_owned_nodes;
+        mesh->n_owned_nodes_with_ghosts = impl_->n_owned_nodes_with_ghosts;
+
+        mesh->n_owned_elements             = impl_->n_owned_elements;
+        mesh->n_owned_elements_with_ghosts = impl_->n_owned_elements_with_ghosts;
+        mesh->n_shared_elements            = impl_->n_shared_elements;
+
+        mesh->node_mapping    = (impl_->node_mapping) ? impl_->node_mapping->data() : nullptr;
+        mesh->node_owner      = (impl_->node_owner) ? impl_->node_owner->data() : nullptr;
+        mesh->element_mapping = (impl_->element_mapping) ? impl_->element_mapping->data() : nullptr;
+
+        mesh->node_offsets = (impl_->node_offsets) ? impl_->node_offsets->data() : nullptr;
+        mesh->ghosts       = (impl_->ghosts) ? impl_->ghosts->data() : nullptr;
+    }
+
     std::shared_ptr<Mesh> Mesh::create_hex8_reference_cube() {
-        auto ret                 = std::make_shared<Mesh>(MPI_COMM_SELF);
+        auto ret = std::make_shared<Mesh>(Communicator::null());
         ret->impl_->spatial_dim  = 3;
         ret->impl_->element_type = HEX8;
         ret->impl_->nelements    = 1;
@@ -575,38 +610,5 @@ namespace sfem {
         points[2][7] = 1;
 
         return ret;
-    }
-
-    void Mesh::set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping) { impl_->node_mapping = node_mapping; }
-
-    void Mesh::set_comm(MPI_Comm comm) { impl_->comm = comm; }
-
-    void Mesh::set_element_type(const enum ElemType element_type) { impl_->element_type = element_type; }
-
-    void Mesh::extract_depreacted(mesh_t *mesh) {
-        mesh->comm         = impl_->comm;
-        mesh->spatial_dim  = impl_->spatial_dim;
-        mesh->element_type = impl_->element_type;
-
-        mesh->nelements = impl_->nelements;
-        mesh->nnodes    = impl_->nnodes;
-
-        mesh->elements = impl_->elements->data();
-        mesh->points   = impl_->points->data();
-
-        mesh->n_owned_nodes             = impl_->n_owned_nodes;
-        mesh->n_owned_nodes_with_ghosts = impl_->n_owned_nodes_with_ghosts;
-
-        mesh->n_owned_elements             = impl_->n_owned_elements;
-        mesh->n_owned_elements_with_ghosts = impl_->n_owned_elements_with_ghosts;
-        mesh->n_shared_elements            = impl_->n_shared_elements;
-
-        mesh->node_mapping = (impl_->node_mapping) ? impl_->node_mapping->data() : nullptr;
-        mesh->node_owner   = (impl_->node_owner) ? impl_->node_owner->data() : nullptr;
-
-        mesh->element_mapping = (impl_->element_mapping) ? impl_->element_mapping->data() : nullptr;
-
-        mesh->node_offsets = (impl_->node_offsets) ? impl_->node_offsets->data() : nullptr;
-        mesh->ghosts       = (impl_->ghosts) ? impl_->ghosts->data() : nullptr;
     }
 }  // namespace sfem

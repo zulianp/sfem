@@ -665,7 +665,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     if (!mesh) {
         return EXIT_FAILURE;
     }
@@ -675,7 +675,7 @@ int main(int argc, char* argv[]) {
     {  // AABB
         if (SFEM_BOXED_MESH) {
             // FIXME we do not actually need to read the mesh! only the points!
-            auto boxed_mesh = sfem::Mesh::create_from_file(comm, SFEM_BOXED_MESH);
+            auto boxed_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), SFEM_BOXED_MESH);
             if (!boxed_mesh) {
                 return EXIT_FAILURE;
             }

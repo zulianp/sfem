@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
 
     const char *output_folder = argv[2];
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     int nxe = elem_num_nodes((enum ElemType)m->element_type());
     const auto elements = m->elements()->data();

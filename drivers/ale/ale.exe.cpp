@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nx   = 2;
     int       L    = 4;
     int       H    = 1;
-    auto      mesh = sfem::Mesh::create_quad4_square(comm, L * nx, H * nx, 0, 0, L, H);
+    auto      mesh = sfem::Mesh::create_quad4_square(sfem::Communicator::wrap(comm), L * nx, H * nx, 0, 0, L, H);
 
     auto sideset_inlet = sfem::Sideset::create_from_selector(
             mesh, [L](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });

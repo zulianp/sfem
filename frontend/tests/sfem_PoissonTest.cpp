@@ -249,8 +249,7 @@ int test_poisson() {
     int SFEM_BASE_RESOLUTION = 1;
     // SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, 1);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
@@ -267,8 +266,8 @@ int test_poisson() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(comm, left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(comm, right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
     sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
     sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
@@ -312,8 +311,7 @@ int test_poisson_and_boundary_selector() {
 
     int x_dim = 1;
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
@@ -380,7 +378,7 @@ int test_linear_elasticity() {
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m  = sfem::Mesh::create_hex8_cube(comm);
+    auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
     auto fs = sfem::FunctionSpace::create(m, 3);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
@@ -396,8 +394,8 @@ int test_linear_elasticity() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(comm, left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(comm, right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
     sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = -2, .component = 0};
     sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
@@ -439,7 +437,7 @@ int test_poisson_yaml() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    auto m  = sfem::Mesh::create_hex8_cube(comm);
+    auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(16);
     auto f = sfem::Function::create(fs);

@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto            coarse_mesh         = sfem::Mesh::create_from_file(comm, folder);
+    auto            coarse_mesh         = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     const ptrdiff_t n_elements          = coarse_mesh->n_elements();
     const ptrdiff_t n_nodes             = coarse_mesh->n_nodes();
     const int       n_nodes_per_element = coarse_mesh->n_nodes_per_element();
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
             sfem::create_host_buffer<idx_t>(n_nodes_per_element, n_elements * (coarse_mesh->element_type() == TET4 ? 8 : 4));
     auto refined_points_buffer = sfem::create_host_buffer<geom_t>(spatial_dim, coarse_mesh->n_nodes() + fine_nodes);
 
-    auto refined_mesh = std::make_shared<sfem::Mesh>(comm,
+    auto refined_mesh = std::make_shared<sfem::Mesh>(sfem::Communicator::wrap(comm),
                                                      spatial_dim,
                                                      coarse_mesh->element_type(),
                                                      refined_elements_buffer->extent(1),

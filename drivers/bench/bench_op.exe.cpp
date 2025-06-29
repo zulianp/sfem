@@ -70,7 +70,7 @@ typedef struct OpDesc {
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
     {
-        auto comm = context.comm();
+        auto comm = context.communicator();
 
         int SFEM_BASE_RESOLUTION = 50;
         SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);

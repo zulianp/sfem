@@ -11,7 +11,7 @@ namespace sfem {
         enum ExecutionSpace execution_space{EXECUTION_SPACE_HOST};
     };
 
-    std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(MPI_Comm                  comm,
+    std::shared_ptr<SDFObstacle> SDFObstacle::create_from_file(const std::shared_ptr<Communicator>& comm,
                                                                const std::string        &path,
                                                                const enum ExecutionSpace es) {
         return create(Grid<geom_t>::create_from_file(comm, path.c_str()), es);

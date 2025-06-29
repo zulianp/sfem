@@ -2,6 +2,7 @@
 #define SFEM_GRID_HPP
 
 #include "sfem_Buffer.hpp"
+#include "sfem_Communicator.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -15,9 +16,9 @@ namespace sfem {
     template <class T>
     class Grid {
     public:
-        static std::shared_ptr<Grid> create_from_file(MPI_Comm comm, const std::string &path);
+        static std::shared_ptr<Grid> create_from_file(const std::shared_ptr<Communicator>& comm, const std::string &path);
 
-        static std::shared_ptr<Grid> create(MPI_Comm        comm,
+        static std::shared_ptr<Grid> create(const std::shared_ptr<Communicator>& comm,
                                             const ptrdiff_t nx,
                                             const ptrdiff_t ny,
                                             const ptrdiff_t nz,
@@ -30,7 +31,7 @@ namespace sfem {
 
         int to_file(const std::string &folder);
 
-        Grid(MPI_Comm comm);
+        Grid(const std::shared_ptr<Communicator>& comm);
         ~Grid();
 
         ptrdiff_t stride(int dim) const;
@@ -56,7 +57,7 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
+    std::shared_ptr<Grid<geom_t>> create_sdf(const std::shared_ptr<Communicator>& comm,
                                              const ptrdiff_t                                                 nx,
                                              const ptrdiff_t                                                 ny,
                                              const ptrdiff_t                                                 nz,

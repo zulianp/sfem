@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     // Set-up (read and init)
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     const ptrdiff_t n_elements = mesh->n_elements();
 
     const int nxe = sshex8_nxe(level);

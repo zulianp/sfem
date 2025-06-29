@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     if (mesh->element_type() != TRI3) {
         fprintf(stderr, "element_type must be TRI3\n");

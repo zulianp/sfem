@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     if (elem_num_nodes(mesh->element_type()) != elem_num_nodes(WEDGE6)) {
         fprintf(stderr, "This code only supports mesh with element type WEDGE6 (or compatible)\n");

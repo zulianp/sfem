@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     double tick = MPI_Wtime();
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
