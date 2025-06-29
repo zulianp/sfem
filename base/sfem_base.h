@@ -12,10 +12,6 @@
 #define SFEM_SUCCESS 0
 #define SFEM_FAILURE 1
 
-#define PRINT_CURRENT_FUNCTION \
-    printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
-
-
 // #define SFEM_LOG_LEVEL 4
 
 #if SFEM_LOG_LEVEL >= 5
