@@ -18,6 +18,7 @@
 
 #include "mesh_aura.h"
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -55,10 +56,9 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     MPI_Barrier(comm);
 
@@ -69,13 +69,13 @@ int main(int argc, char *argv[]) {
                 "[%d] #elements %ld #nodes %ld #owned_nodes %ld (with ghosts %ld) "
                 "#owned_elements %ld (with ghosts %ld) #shared_elements %ld\n",
                 rank,
-                (long)mesh.nelements,
-                (long)mesh.nnodes,
-                (long)mesh.n_owned_nodes,
-                (long)mesh.n_owned_nodes_with_ghosts,
-                (long)mesh.n_owned_elements,
-                (long)mesh.n_owned_elements_with_ghosts,
-                (long)mesh.n_shared_elements);
+                (long)n_elements,
+                (long)n_nodes,
+                (long)mesh->n_owned_nodes(),
+                (long)mesh->n_owned_nodes_with_ghosts(),
+                (long)mesh->n_owned_elements(),
+                (long)mesh->n_owned_elements_with_ghosts(),
+                (long)mesh->n_shared_elements());
         }
 
         fflush(stdout);
@@ -83,21 +83,21 @@ int main(int argc, char *argv[]) {
     }
 
     // float for visualization
-    float *neigh_count = (float *)calloc(mesh.nnodes, sizeof(float));
+    float *neigh_count = (float *)calloc(n_nodes, sizeof(float));
 
-    idx_t *nodeids = (idx_t *)malloc(mesh.nnodes * sizeof(idx_t));
+    idx_t *nodeids = (idx_t *)malloc(n_nodes * sizeof(idx_t));
     mesh_node_ids(&mesh, nodeids);
 
-    float *fnodeids = (float *)malloc(mesh.nnodes * sizeof(float));
+    float *fnodeids = (float *)malloc(n_nodes * sizeof(float));
 
-    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+    for (ptrdiff_t i = 0; i < n_nodes; i++) {
         fnodeids[i] = nodeids[i];
     }
 
     send_recv_t slave_to_master;
     mesh_create_nodal_send_recv(&mesh, &slave_to_master);
-    float *frank = (float *)malloc(mesh.nnodes * sizeof(float));
-    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+    float *frank = (float *)malloc(n_nodes * sizeof(float));
+    for (ptrdiff_t i = 0; i < n_nodes; i++) {
         frank[i] = rank;
     }
 
@@ -140,16 +140,16 @@ int main(int argc, char *argv[]) {
 
     // Everyone independent
     mesh.comm = MPI_COMM_SELF;
-    sprintf(output_path, "%s/part_%0.5d", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d", output_folder, rank);
     mesh_write(output_path, &mesh);
 
-    sprintf(output_path, "%s/part_%0.5d/frank.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/frank.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, frank, mesh.nnodes, mesh.nnodes);
 
-    sprintf(output_path, "%s/part_%0.5d/neigh_count.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/neigh_count.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, neigh_count, mesh.nnodes, mesh.nnodes);
 
-    sprintf(output_path, "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
+    snprintf(output_path, sizeof(output_path), "%s/part_%0.5d/fnodeids.raw", output_folder, rank);
     array_write(MPI_COMM_SELF, output_path, MPI_FLOAT, fnodeids, mesh.nnodes, mesh.nnodes);
 
     MPI_Barrier(comm);

@@ -10,6 +10,8 @@
 
 #include "matrixio_array.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -39,15 +41,16 @@ int main(int argc, char *argv[]) {
     int SFEM_USE_CRS_GRAPH_RESTRICT = 0;
     SFEM_READ_ENV(SFEM_USE_CRS_GRAPH_RESTRICT, atoi);
 
-    mesh_t mesh;
-    mesh_read(comm, folder, &mesh);
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    ptrdiff_t n_coarse_nodes = max_node_id(to_element, mesh.nelements, mesh.elements) + 1;
+    ptrdiff_t n_coarse_nodes = max_node_id(to_element, n_elements, mesh->elements()->data()) + 1;
 
-    real_t *from = (real_t*)malloc(mesh.nnodes * sizeof(real_t));
+    real_t *from = (real_t*)malloc(n_nodes * sizeof(real_t));
     real_t *to = (real_t*)calloc(n_coarse_nodes, sizeof(real_t));
 
-    int err = array_read(comm, path_input, SFEM_MPI_REAL_T, from, mesh.nnodes, mesh.nnodes);
+    int err = array_read(comm, path_input, SFEM_MPI_REAL_T, from, n_nodes, n_nodes);
     if (err) return EXIT_FAILURE;
 
     double tick = MPI_Wtime();
@@ -58,13 +61,13 @@ int main(int argc, char *argv[]) {
 
         double tack = MPI_Wtime();
 
-        int nxe = elem_num_nodes((enum ElemType)mesh.element_type);
-        uint16_t *element_to_node_incidence_count = (uint16_t *)calloc(mesh.nnodes, sizeof(int));
+        int nxe = elem_num_nodes(mesh->element_type());
+        uint16_t *element_to_node_incidence_count = (uint16_t *)calloc(n_nodes, sizeof(int));
         for (int d = 0; d < nxe; d++) {
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
+            for (ptrdiff_t i = 0; i < n_elements; ++i) {
 #pragma omp atomic update
-                element_to_node_incidence_count[mesh.elements[d][i]]++;
+                element_to_node_incidence_count[mesh->elements()->data()[d][i]]++;
             }
         }
 
@@ -73,8 +76,8 @@ int main(int argc, char *argv[]) {
 
         err = hierarchical_restriction_with_counting(from_element,
                                                      to_element,
-                                                     mesh.nelements,
-                                                     mesh.elements,
+                                                     n_elements,
+                                                     mesh->elements()->data(),
                                                      element_to_node_incidence_count,
                                                      1,
                                                      from,
@@ -93,7 +96,7 @@ int main(int argc, char *argv[]) {
         double tack = MPI_Wtime();
 
         err = build_crs_graph_for_elem_type(
-                to_element, mesh.nelements, n_coarse_nodes, mesh.elements, &rowptr, &colidx);
+                to_element, n_elements, n_coarse_nodes, mesh->elements()->data(), &rowptr, &colidx);
 
         setup_elapsed = MPI_Wtime() - tack;
 

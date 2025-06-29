@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
                        values->data());
 
         char path[2048];
-        sprintf(path, "%s/crs_matrix", output_path);
+        snprintf(path, sizeof(path), "%s/crs_matrix", output_path);
         write_crs(path, *crs_graph, *values);
     }
 
@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     char path[2048];
-    sprintf(path, "%s/upper_bound.raw", output_path);
+    snprintf(path, sizeof(path), "%s/upper_bound.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
@@ -274,12 +274,12 @@ int main(int argc, char *argv[]) {
     auto h_rhs = rhs;
 #endif
 
-    sprintf(path, "%s/u.raw", output_path);
+    snprintf(path, sizeof(path), "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
-    sprintf(path, "%s/rhs.raw", output_path);
+    snprintf(path, sizeof(path), "%s/rhs.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }

@@ -16,6 +16,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -66,22 +68,20 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
+    auto element_type = mesh->element_type();
     if(SFEM_USE_MACRO) {
-        mesh.element_type = macro_type_variant(mesh.element_type);
+        element_type = macro_type_variant(element_type);
     }
 
 
-    ptrdiff_t nnodes = mesh.nnodes;
-    ptrdiff_t nelements = mesh.nelements;
+    const ptrdiff_t nnodes = mesh->n_nodes();
+    const ptrdiff_t nelements = mesh->n_elements();
 
     // TODO read displacement from file
-    real_t *displacement = (real_t *)malloc((size_t)nnodes * mesh.spatial_dim * sizeof(real_t));
-    memset(displacement, 0, (size_t)nnodes * mesh.spatial_dim * sizeof(real_t));
+    real_t *displacement = (real_t *)malloc((size_t)nnodes * mesh->spatial_dimension() * sizeof(real_t));
+    memset(displacement, 0, (size_t)nnodes * mesh->spatial_dimension() * sizeof(real_t));
 
     // TODO read params
     const real_t mu = 1;
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+    build_crs_graph_for_elem_type(element_type, nelements, nnodes, mesh->elements()->data(), &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
     values = (real_t *)malloc((size_t)nnz * 9 * sizeof(real_t));
@@ -114,12 +114,12 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     // neohookean_assemble_hessian(
-    linear_elasticity_crs_aos(mesh.element_type,
+    linear_elasticity_crs_aos(element_type,
                                            // Mesh
-                                           mesh.nelements,
-                                           mesh.nnodes,
-                                           mesh.elements,
-                                           mesh.points,
+                                           nelements,
+                                           nnodes,
+                                           mesh->elements()->data(),
+                                           mesh->points()->data(),
                                            // Material
                                            mu,
                                            lambda,
@@ -136,13 +136,13 @@ int main(int argc, char *argv[]) {
     // Block to scalar operator
     ///////////////////////////////////////////////////////////////////////////////
 
-    count_t *new_rowptr = (count_t *)malloc(((nnodes)*mesh.spatial_dim + 1) * sizeof(count_t));
-    idx_t *new_colidx = (idx_t *)malloc((size_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(idx_t));
+    count_t *new_rowptr = (count_t *)malloc(((nnodes)*mesh->spatial_dimension() + 1) * sizeof(count_t));
+    idx_t *new_colidx = (idx_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(idx_t));
     real_t *new_values =
-            (real_t *)malloc((size_t)nnz * mesh.spatial_dim * mesh.spatial_dim * sizeof(real_t));
+            (real_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(real_t));
 
     block_crs_to_crs(nnodes,
-                     mesh.spatial_dim,
+                     mesh->spatial_dimension(),
                      // Block matrix
                      rowptr,
                      colidx,
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_EXPORT_FP32) {
         array_dtof(
-                nnz * mesh.spatial_dim * mesh.spatial_dim, (const real_t *)values, (float *)values);
+                nnz * mesh->spatial_dimension() * mesh->spatial_dimension(), (const real_t *)values, (float *)values);
         // array_dtof(nnodes, (const real_t *)rhs, (float*)rhs);
     }
 
@@ -229,10 +229,10 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = (nnodes * mesh.spatial_dim);
-        crs_out.lrows = (nnodes * mesh.spatial_dim);
-        crs_out.lnnz = nnz * mesh.spatial_dim * mesh.spatial_dim;
-        crs_out.gnnz = nnz * mesh.spatial_dim * mesh.spatial_dim;
+        crs_out.grows = (nnodes * mesh->spatial_dimension());
+        crs_out.lrows = (nnodes * mesh->spatial_dimension());
+        crs_out.lnnz = nnz * mesh->spatial_dimension() * mesh->spatial_dimension();
+        crs_out.gnnz = nnz * mesh->spatial_dimension() * mesh->spatial_dimension();
         crs_out.start = 0;
         crs_out.rowoffset = 0;
         crs_out.rowptr_type = SFEM_MPI_COUNT_T;
@@ -257,8 +257,6 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
     free(values);
-
-    mesh_destroy(&mesh);
 
     tock = MPI_Wtime();
 

@@ -172,6 +172,11 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        void release() {
+            destroy_ = nullptr;
+            ptr_ = nullptr;
+        }
+
     private:
         size_t                              extent_[2];
         T                                 **ptr_{nullptr};
