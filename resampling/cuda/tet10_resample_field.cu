@@ -209,13 +209,13 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
             if (mpi_size > 1) {
                 printf("MPI:    Launching the exchange, %s:%d\n", __FILE__, __LINE__);
                 send_recv_t slave_to_master;
-                mesh_create_nodal_send_recv(mesh, &slave_to_master);
+                mesh_create_nodal_send_recv_deprecated(mesh, &slave_to_master);
 
                 ptrdiff_t count       = mesh_exchange_master_buffer_count(&slave_to_master);
                 real_t*   real_buffer = (real_t*)malloc(count * sizeof(real_t));
 
-                exchange_add(mesh, &slave_to_master, mass_vector, real_buffer);
-                exchange_add(mesh, &slave_to_master, g_device, real_buffer);
+                exchange_add_deprecated(mesh, &slave_to_master, mass_vector, real_buffer);
+                exchange_add_deprecated(mesh, &slave_to_master, g_device, real_buffer);
 
                 free(real_buffer);
                 send_recv_destroy(&slave_to_master);
