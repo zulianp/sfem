@@ -501,7 +501,7 @@ int main(int argc, char* argv[]) {
 
     info.quad_nodes_cnt = TET_QUAD_NQP;
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     // FIXME mesh_t will be removed in the future
     mesh_t mesh_deprecated;

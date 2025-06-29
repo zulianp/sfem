@@ -9,12 +9,18 @@
 
 #include <memory>
 
+namespace sfem {
+
 class Communicator {
 public:
     Communicator();
     ~Communicator();
     static std::shared_ptr<Communicator> world();
     static std::shared_ptr<Communicator> null();
+    static std::shared_ptr<Communicator> self();
+
+    int rank() const;
+    int size() const;
 
 #ifdef SFEM_ENABLE_MPI
     static std::shared_ptr<Communicator> wrap(MPI_Comm comm);
@@ -26,5 +32,7 @@ private:
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
+
+}  // namespace sfem
 
 #endif  // SFEM_COMMUNICATOR_HPP

@@ -5,6 +5,8 @@
 #include <memory>
 
 namespace sfem {
+    class Communicator;
+    
     class Context {
     public:
  
@@ -12,6 +14,7 @@ namespace sfem {
         Context(int argc, char *argv[], MPI_Comm comm);
         ~Context();
         MPI_Comm comm();
+        std::shared_ptr<Communicator> communicator();
 
         class Impl;
         std::unique_ptr<Impl> impl_;

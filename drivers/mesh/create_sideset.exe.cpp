@@ -53,11 +53,11 @@ static SFEM_INLINE void normal2(real_t p0[2], real_t p1[2], real_t *n) {
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
     {
-        MPI_Comm comm = context.comm();
+        auto comm = context.communicator();
 
         int rank, size;
-        MPI_Comm_rank(comm, &rank);
-        MPI_Comm_size(comm, &size);
+        MPI_Comm_rank(comm->comm(), &rank);
+        MPI_Comm_size(comm->comm(), &size);
 
         if (argc != 7) {
             if (!rank) {
