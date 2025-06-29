@@ -280,7 +280,6 @@ if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
 endif()
 
 if(NOT ${SFEM_ENABLE_ISOLVER})
-    message(WARNING "ISOLVER is disabled!")
      list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
 endif()
 
