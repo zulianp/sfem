@@ -108,7 +108,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_MPI
         int comm_size;
-        MPI_Comm_size(impl_->comm->comm(), &comm_size);
+        MPI_Comm_size(impl_->comm->get(), &comm_size);
         if (comm_size == 1)
 #endif
         {
@@ -146,7 +146,7 @@ namespace sfem {
             ptrdiff_t      n_shared_elements;
             ptrdiff_t      n_owned_elements_with_ghosts;
 
-            if (mesh_read_mpi(impl_->comm->comm(),
+            if (mesh_read_mpi(impl_->comm->get(),
                               path,
                               &nnodesxelem,
                               &nelements,
@@ -175,7 +175,7 @@ namespace sfem {
 
 
             int comm_size;
-            MPI_Comm_size(impl_->comm->comm(), &comm_size);
+            MPI_Comm_size(impl_->comm->get(), &comm_size);
             impl_->node_offsets = manage_host_buffer<idx_t>(comm_size + 1, node_offsets);
 
             ptrdiff_t n_ghost_nodes = nnodes - n_owned_nodes;
@@ -533,7 +533,7 @@ namespace sfem {
 
     void Mesh::extract_depreacted(mesh_t *mesh) {
 #ifdef SFEM_ENABLE_MPI
-        mesh->comm = impl_->comm->comm();
+        mesh->comm = impl_->comm->get();
 #else
         mesh->comm = MPI_COMM_NULL;
 #endif

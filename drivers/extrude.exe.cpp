@@ -165,7 +165,7 @@ int main(int argc, char* argv[]) {
     mesh_t extruded;
     mesh_init(&extruded);
 
-    extruded.comm = mesh->comm()->comm();
+    extruded.comm = mesh->comm()->get();
 
 
     extruded.spatial_dim = mesh->spatial_dimension();

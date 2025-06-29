@@ -92,7 +92,7 @@ namespace sfem {
         in->get("block_size", ret->impl_->block_size);
 
         T *data;
-        if (ndarray_create_from_file(ret->impl_->comm->comm(),
+        if (ndarray_create_from_file(ret->impl_->comm->get(),
                                      field_path.c_str(),
                                      ret->mpi_data_type(),
                                      ret->impl_->spatial_dimension,

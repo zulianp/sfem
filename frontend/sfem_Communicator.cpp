@@ -43,7 +43,7 @@ std::shared_ptr<Communicator> Communicator::self() {
 
 #ifdef SFEM_ENABLE_MPI
 Communicator::Communicator(MPI_Comm comm) : impl_(std::make_unique<Impl>(comm)) {}
-MPI_Comm &Communicator::comm() { return impl_->comm; }
+MPI_Comm &Communicator::get() { return impl_->comm; }
 std::shared_ptr<Communicator> Communicator::wrap(MPI_Comm comm) {
     return std::make_shared<Communicator>(comm);
 }
