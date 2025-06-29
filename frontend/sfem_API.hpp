@@ -442,8 +442,7 @@ namespace sfem {
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_prolongation_element_based");
 
-                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                            cu_macrotet4_to_tet4_prolongation_element_based(mesh->nelements,
+                            cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
                                                                             elements->data(),
                                                                             from_space->block_size(),
                                                                             SFEM_REAL_DEFAULT,
@@ -631,8 +630,7 @@ namespace sfem {
                         [=](const real_t *const from, real_t *const to) {
                             SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_restriction_element_based");
 
-                            auto mesh = (mesh_t *)from_space->mesh().impl_mesh();
-                            cu_macrotet4_to_tet4_restriction_element_based(mesh->nelements,
+                            cu_macrotet4_to_tet4_restriction_element_based(from_space->mesh().n_elements(),
                                                                            elements->data(),
                                                                            dbuff->data(),
                                                                            block_size,
