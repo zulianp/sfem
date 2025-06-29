@@ -128,10 +128,10 @@ namespace sfem {
         sfem::create_directory(sideset_path.c_str());
 
         std::string parent_path = sideset_path + "/parent.raw";
-        array_write(impl_->comm->comm(), parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, impl_->parent->data(), impl_->parent->size(), impl_->parent->size());
+        array_write(impl_->comm->get(), parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, impl_->parent->data(), impl_->parent->size(), impl_->parent->size());
 
         std::string lfi_path = sideset_path + "/lfi.int16.raw";
-        array_write(impl_->comm->comm(), lfi_path.c_str(), MPI_SHORT, impl_->lfi->data(), impl_->lfi->size(), impl_->lfi->size());
+        array_write(impl_->comm->get(), lfi_path.c_str(), MPI_SHORT, impl_->lfi->data(), impl_->lfi->size(), impl_->lfi->size());
 
         std::ofstream os(sideset_path + "/meta.yaml");
 
@@ -230,8 +230,8 @@ namespace sfem {
         int16_t       *lfi{nullptr};
 
         if (array_create_from_file(
-                    comm->comm(), (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
-            array_create_from_file(comm->comm(), (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
+                    comm->get(), (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
+            array_create_from_file(comm->get(), (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
             return SFEM_FAILURE;
         }
 
@@ -558,7 +558,7 @@ namespace sfem {
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
                             ptrdiff_t lsize{0}, gsize{0};
-                            if (array_create_from_file(comm->comm(), pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
+                            if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
                                 SFEM_ERROR("Failed to read file %s\n", pch);
                                 break;
                             }
@@ -577,7 +577,7 @@ namespace sfem {
                     cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
-                    auto sideset                = Sideset::create_from_file(comm, pch);
+                    auto sideset                = Sideset::create_from_file(space->mesh_ptr()->comm(), pch);
                     cneumann_conditions.sideset = sideset;
 
                     auto surface                     = create_surface_from_sideset(space, sideset);
@@ -618,7 +618,7 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm->comm(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -948,7 +948,7 @@ namespace sfem {
                 if (SFEM_DIRICHLET_NODESET) {
                     idx_t    *this_set{nullptr};
                     ptrdiff_t lsize{0}, gsize{0};
-                    if (array_create_from_file(comm->comm(), pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch);
                         break;
                     }
@@ -992,7 +992,7 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm->comm(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -1029,7 +1029,7 @@ namespace sfem {
         ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
         auto       conds = tree["dirichlet_conditions"];
 
-        MPI_Comm comm = space->mesh_ptr()->comm()->comm();
+        MPI_Comm comm = space->mesh_ptr()->comm()->get();
 
         for (auto c : conds.children()) {
             std::shared_ptr<Sideset>       sideset;
@@ -1101,7 +1101,7 @@ namespace sfem {
                     c["path"] >> path;
                     idx_t    *arr{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                    if (!array_create_from_file(comm->get(), path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
                     }
 
@@ -1297,7 +1297,7 @@ namespace sfem {
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
-        MPI_Comm comm = impl_->space->mesh_ptr()->comm()->comm();
+        MPI_Comm comm = impl_->space->mesh_ptr()->comm()->get();
         sfem::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
@@ -1371,7 +1371,7 @@ namespace sfem {
                          b_name,
                          impl_->export_counter++);
 
-                if (array_write(mesh->comm()->comm(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
             }
@@ -1386,7 +1386,7 @@ namespace sfem {
                      name,
                      impl_->export_counter++);
 
-            if (array_write(mesh->comm()->comm(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
+            if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;
             }
         }
@@ -3443,9 +3443,9 @@ namespace sfem {
             ptrdiff_t nlocal, nglobal;
 
             real_t *vel0, *vel1, *vel2;
-            if (array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
-                array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
-                array_create_from_file(space->mesh_ptr()->comm()->comm(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
+            if (array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
+                array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
+                array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
                 fprintf(stderr, "Unable to read input velocity\n");
                 assert(0);
                 return nullptr;
@@ -3899,7 +3899,7 @@ namespace sfem {
             snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm->comm(), path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= array_create_from_file(comm->get(), path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
 
             data[np] = idx;
         }
