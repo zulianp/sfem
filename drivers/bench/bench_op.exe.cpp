@@ -93,7 +93,10 @@ int main(int argc, char *argv[]) {
                                    {.name = "LinearElasticity", .type = "MF", .block_size = 3},
                                    {.name = "LinearElasticity", .type = "BSR", .block_size = 3}});
 
+        std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+            ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
+
             ops.push_back({.name = "em:Laplacian", .type = "MF", .block_size = 1});
         } else {
             ops.push_back({.name = "Laplacian", .type = "CRS", .block_size = 1});
@@ -102,11 +105,11 @@ int main(int argc, char *argv[]) {
         }
 
         for (auto &op_desc : ops) {
-            // FIXME: It should be possible to construct by passing semistructured mesh
-            auto fs = sfem::FunctionSpace::create(m, op_desc.block_size);
-
-            if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-                fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+            std::shared_ptr<sfem::FunctionSpace> fs;
+            if (ssmesh) {
+                fs = sfem::FunctionSpace::create(ssmesh, op_desc.block_size);
+            } else {
+                fs = sfem::FunctionSpace::create(m, op_desc.block_size);
             }
 
             auto f = sfem::Function::create(fs);
