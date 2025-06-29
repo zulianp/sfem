@@ -410,7 +410,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
         if (SFEM_USE_MACRO) {
-            impl_->element_type = macro_type_variant((enum ElemType)impl_->element_type);
+            impl_->element_type = macro_type_variant(impl_->element_type);
         }
 
         return SFEM_SUCCESS;
