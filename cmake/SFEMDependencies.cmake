@@ -169,6 +169,7 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 
+
 if(SFEM_ENABLE_RYAML)
     set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
     set(RYML_BRANCH_NAME master CACHE STRING "")
@@ -203,4 +204,8 @@ endif()
 # if(SFEM_ENABLE_HIP)
 # # TODO
 # endif()
+
+if(SFEM_ENABLE_AVX512_SORT)
+	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
+endif()
 

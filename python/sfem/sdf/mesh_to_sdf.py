@@ -2,59 +2,51 @@
 
 import sys
 import os
-
 # import smesh
 from time import perf_counter
 
 import numpy as np
 import meshio
 import taichi as ti
+import inspect
 
 ti.init(arch=ti.gpu)
 # ti.init(arch=ti.cpu)
 vec3 = ti.math.vec3
 
-try:
+try: 
     from sfem_config import *
-except ModuleNotFoundError:
-    print("mesh_to_sdf: self contained mode")
+except ModuleNotFoundError: 
+    print('mesh_to_sdf: self contained mode')
     from distance_point_to_triangle import *
     import smesh
-
     geom_t = np.float32
     idx_t = np.int32
 
 sdf_t = geom_t
 
-
 @ti.func
 def cross(u, v):
     return -ti.math.cross(u, v)
 
-
 def read_mesh(input_path):
     fname, fextension = os.path.splitext(input_path)
 
-    print(f"file extension {fextension}")
-    if fextension in [".e", ".exo", ".vtk"]:
+    print(f'mesh_to_sdf: file extension {fextension}')
+    if fextension in ['.e', '.exo', '.vtk']:
         mesh = meshio.read(input_path)
     else:
         # Use sfem mesh format here
         mesh = smesh.read(input_path)
     return mesh
 
-
 def select_submesh(mesh, pmin, pmax):
-    x = mesh.points[:, 0].astype(geom_t)
-    y = mesh.points[:, 1].astype(geom_t)
-    z = mesh.points[:, 2].astype(geom_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
-    is_node_inside_min = np.logical_and(
-        np.logical_and(x > pmin[0], y > pmin[1]), z > pmin[2]
-    )
-    is_node_inside_max = np.logical_and(
-        np.logical_and(x < pmax[0], y < pmax[1]), z < pmax[2]
-    )
+    is_node_inside_min = np.logical_and(np.logical_and(x > pmin[0], y > pmin[1]), z > pmin[2])
+    is_node_inside_max = np.logical_and(np.logical_and(x < pmax[0], y < pmax[1]), z < pmax[2])
     is_node_inside = np.logical_and(is_node_inside_min, is_node_inside_max)
 
     submesh = smesh.Mesh()
@@ -62,26 +54,23 @@ def select_submesh(mesh, pmin, pmax):
     selected_cells = None
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f"{ncells} x {nnodesxelem}")
+        print(f'mesh_to_sdf: ncells x nnodesxelem = {ncells} x {nnodesxelem}, line: {inspect.currentframe().f_lineno}')
 
         i0 = b.data[:, 0].astype(np.int32)
         i1 = b.data[:, 1].astype(np.int32)
         i2 = b.data[:, 2].astype(np.int32)
 
-        keep_cells = np.logical_or(
-            np.logical_or(is_node_inside[i0], is_node_inside[i1]), is_node_inside[i2]
-        )
+        keep_cells = np.logical_or(np.logical_or(is_node_inside[i0], is_node_inside[i1]), is_node_inside[i2])
 
         selected_cells = b.data[keep_cells, :]
         submesh.add_cells(selected_cells)
-        print(f"cells {selected_cells.shape[0]}/{ncells}")
+        print(f'cells {selected_cells.shape[0]}/{ncells}')
     return submesh
 
-
 def compute_aabb(mesh, margin=0):
-    x = mesh.points[:, 0].astype(geom_t)
-    y = mesh.points[:, 1].astype(geom_t)
-    z = mesh.points[:, 2].astype(geom_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
     pmin = [0, 0, 0]
     pmax = [0, 0, 0]
@@ -96,13 +85,12 @@ def compute_aabb(mesh, margin=0):
     pmax[2] = np.max(z).astype(geom_t) + margin
     return np.array(pmin), np.array(pmax)
 
-
 def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     t1_start = perf_counter()
 
-    x = mesh.points[:, 0].astype(geom_t)
-    y = mesh.points[:, 1].astype(geom_t)
-    z = mesh.points[:, 2].astype(geom_t)
+    x =  mesh.points[:,0].astype(geom_t)
+    y =  mesh.points[:,1].astype(geom_t)
+    z =  mesh.points[:,2].astype(geom_t)
 
     xmin = pmin[0]
     xmax = pmax[0]
@@ -117,23 +105,23 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     y_range = ymax - ymin
     z_range = zmax - zmin
 
-    nx = np.int64(np.ceil((x_range) / hmax)) + 1
-    ny = np.int64(np.ceil((y_range) / hmax)) + 1
-    nz = np.int64(np.ceil((z_range) / hmax)) + 1
+    nx = np.int64(np.ceil((x_range)/hmax)) + 1
+    ny = np.int64(np.ceil((y_range)/hmax)) + 1
+    nz = np.int64(np.ceil((z_range)/hmax)) + 1
 
-    print(f"hmax={hmax} margin={margin}")
-    print(f"hmax={x_range} y_range={y_range} z_range={z_range}")
+    print(f'mesh_to_sdf.py: hmax={hmax} margin={margin}')
+    print(f'mesh_to_sdf.py: hmax={x_range} y_range={y_range} z_range={z_range}')
 
     num_points = len(x)
 
-    print(f"grid    {nx} x {ny} x {nz}")
-    print(f"grid    [{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ")
-    print(f"points  {num_points}")
+    print(f'mesh_to_sdf.py: grid    {nx} x {ny} x {nz}')
+    print(f'mesh_to_sdf.py: grid    [{xmin}, {xmax}] x [{ymin}, {ymax}] x [{zmin}, {zmax}] ')
+    print(f'mesh_to_sdf.py: points  {num_points}')
 
     infty = sdf_t(np.max([x_range, y_range, z_range]) * 1000)
     edt = np.zeros((nz, ny, nx)).astype(sdf_t)
 
-    print(f"shape {edt.shape}")
+    print(f'mesh_to_sdf.py: shape {edt.shape}')
 
     edt = ti.field(ti.f32, shape=edt.shape)
     tix = ti.field(ti.f32, shape=x.shape)
@@ -144,17 +132,18 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     tiy.from_numpy(y)
     tiz.from_numpy(z)
 
-    hx = x_range / (nx - 1)
-    hy = y_range / (ny - 1)
-    hz = z_range / (nz - 1)
+    hx = x_range/(nx - 1)
+    hy = y_range/(ny - 1)
+    hz = z_range/(nz - 1)
 
     tinx = ti.field(ti.f32, shape=x.shape)
     tiny = ti.field(ti.f32, shape=y.shape)
     tinz = ti.field(ti.f32, shape=z.shape)
-
+    
+    print(f'mesh_to_sdf.py: mesh.cells shape {len(mesh.cells)}')
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f"{ncells} x {nnodesxelem}")
+        print(f'mesh_to_sdf.py: ncells x nnodesxelem = {ncells} x {nnodesxelem}')
 
         ii0 = b.data[:, 0]
         ii1 = b.data[:, 1]
@@ -183,19 +172,11 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
             z2 = p2[2]
             z3 = p3[2]
 
-            num = (x2 - x1) * (x3 - x1) + (y2 - y1) * (y3 - y1) + (z2 - z1) * (z3 - z1)
-            den = ti.math.sqrt(
-                ti.math.pow((x2 - x1), 2)
-                + ti.math.pow((y2 - y1), 2)
-                + ti.math.pow((z2 - z1), 2)
-            ) * ti.math.sqrt(
-                ti.math.pow((x3 - x1), 2)
-                + ti.math.pow((y3 - y1), 2)
-                + pow((z3 - z1), 2)
-            )
+            num = (x2-x1)*(x3-x1)+(y2-y1)*(y3-y1)+(z2-z1)*(z3-z1)
+            den = ti.math.sqrt(ti.math.pow((x2-x1),2)+ti.math.pow((y2-y1),2)+ti.math.pow((z2-z1),2))* ti.math.sqrt(ti.math.pow((x3-x1),2)+ti.math.pow((y3-y1),2)+pow((z3-z1),2))
             angle = ti.math.acos(num / den)
-            return angle
-
+            return angle ;
+            
         @ti.kernel
         def compute_vertex_normals():
             for e in range(0, ncells):
@@ -207,7 +188,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
                 p1 = vec3(tix[i1], tiy[i1], tiz[i1])
                 p2 = vec3(tix[i2], tiy[i2], tiz[i2])
 
-                n = cross(p1 - p0, p2 - p0)
+                n = cross(p1 - p0,  p2 - p0)
                 n = ti.math.normalize(n)
 
                 ti.atomic_add(tinx[i0], n[0])
@@ -237,7 +218,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
 
     for b in mesh.cells:
         ncells, nnodesxelem = b.data.shape
-        print(f"{ncells} x {nnodesxelem}")
+        print(f'mesh_to_sdf.py: ncells x nnodesxelem = {ncells} x {nnodesxelem}')
 
         ii0 = b.data[:, 0]
         ii1 = b.data[:, 1]
@@ -260,11 +241,7 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
 
         @ti.kernel
         def compute_sdf():
-            for (
-                k,
-                j,
-                i,
-            ) in ti.ndrange(nz, ny, nx):
+            for k, j, i, in ti.ndrange(nz, ny, nx):
                 e_min = infty
                 e_sign = 1
 
@@ -275,17 +252,17 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
                     i1 = idx1[e]
                     i2 = idx2[e]
 
-                    gpx = xmin + i * hx
-                    gpy = ymin + j * hy
-                    gpz = zmin + k * hz
+                    gpx = xmin + i  * hx
+                    gpy = ymin + j  * hy
+                    gpz = zmin + k  * hz
 
                     p0 = vec3(tix[i0], tiy[i0], tiz[i0])
                     p1 = vec3(tix[i1], tiy[i1], tiz[i1])
                     p2 = vec3(tix[i2], tiy[i2], tiz[i2])
-                    n = vec3(0, 0, 0)
+                    n  = vec3(0, 0, 0)
 
-                    p = [gpx, gpy, gpz]
-                    t = [p0, p1, p2]
+                    p = [ gpx, gpy, gpz ]
+                    t = [ p0, p1, p2 ]
                     q, phi1, phi2, entity = point_to_triangle(p, t)
                     d = ti.math.distance(p, q)
 
@@ -310,55 +287,38 @@ def mesh_to_sdf(mesh, pmin, pmax, hmax, export_normals=False):
     ti.sync()
 
     t1_stop = perf_counter()
-    print("TTS:", t1_stop - t1_start)
+    print("mesh_to_sdf: TTS:", t1_stop - t1_start)
 
     if export_normals:
-        tinx.to_numpy().astype(geom_t).tofile("nx.float32.raw")
-        tiny.to_numpy().astype(geom_t).tofile("ny.float32.raw")
-        tinz.to_numpy().astype(geom_t).tofile("nz.float32.raw")
+        tinx.to_numpy().astype(geom_t).tofile('nx.float32.raw')
+        tiny.to_numpy().astype(geom_t).tofile('ny.float32.raw')
+        tinz.to_numpy().astype(geom_t).tofile('nz.float32.raw')
 
     nedt = edt.to_numpy().astype(sdf_t)
-    print(f"d in [{np.min(nedt[:])}, {np.max(nedt[:])}]")
+    print(f'mesh_to_sdf: d in [{np.min(nedt[:])}, {np.max(nedt[:])}]')
     return nedt, [nx, ny, nz]
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     import sys, getopt
 
-    usage = f"{sys.argv[0]}.py <mesh> <out>"
+    usage = f'{sys.argv[0]}.py <mesh> <out>'
 
     infty = 1e8
-    pmin = [infty, infty, infty]
+    pmin = [ infty,  infty,  infty]
     pmax = [-infty, -infty, -infty]
 
     hmax = 1
     margin = 0
-    scale_box = 1
+    scale_box=1
     box_from_mesh = None
     export_normals = False
 
-    if len(sys.argv) < 3:
+    if(len(sys.argv) < 3):
         print(usage)
-        exit(1)
     try:
         opts, args = getopt.getopt(
-            sys.argv[3 : len(sys.argv)],
-            "h",
-            [
-                "help",
-                "xmin=",
-                "ymin=",
-                "zmin=",
-                "xmax=",
-                "ymax=",
-                "zmax=",
-                "hmax=",
-                "margin=",
-                "box_from_mesh=",
-                "scale_box=",
-                "export_normals",
-            ],
-        )
+            sys.argv[3:len(sys.argv)], "h",
+            ["help",  "xmin=", "ymin=", "zmin=", "xmax=", "ymax=", "zmax=", "hmax=", "margin=", "box_from_mesh=", "scale_box=", "export_normals"])
 
     except getopt.GetoptError as err:
         print(err)
@@ -368,30 +328,30 @@ if __name__ == "__main__":
     defined_bounds = False
 
     for opt, arg in opts:
-        if opt in ("-h", "--help"):
+        if opt in ('-h', '--help'):
             print(usage)
             sys.exit()
         elif opt in ("--xmin"):
-            pmin[0] = float(arg)
+            pmin[0] = float(arg) 
             defined_bounds = True
         elif opt in ("-ymin"):
-            pmin[1] = float(arg)
+            pmin[1] = float(arg) 
             defined_bounds = True
         elif opt in ("--zmin"):
-            pmin[2] = float(arg)
+            pmin[2] = float(arg) 
             defined_bounds = True
         elif opt in ("--xmax"):
-            pmax[0] = float(arg)
+            pmax[0] = float(arg) 
             defined_bounds = True
         elif opt in ("-ymax"):
-            pmax[1] = float(arg)
+            pmax[1] = float(arg) 
             defined_bounds = True
         elif opt in ("--zmax"):
-            pmax[2] = float(arg)
+            pmax[2] = float(arg)  
         elif opt in ("--hmax"):
-            hmax = float(arg)
+            hmax = float(arg)  
         elif opt in ("--margin"):
-            margin = float(arg)
+            margin = float(arg)  
         elif opt in ("--box_from_mesh"):
             box_from_mesh = arg
         elif opt in ("--scale_box"):
@@ -400,7 +360,7 @@ if __name__ == "__main__":
             export_normals = True
 
     if box_from_mesh != None:
-        aux_mesh = read_mesh(box_from_mesh)
+        aux_mesh = read_mesh(arg)
         pmin, pmax = compute_aabb(aux_mesh, margin)
         defined_bounds = True
         aux_mesh = None
@@ -408,7 +368,7 @@ if __name__ == "__main__":
     if defined_bounds:
         found_error = False
         diagonstic = ""
-        coord = ["x", "y", "z"]
+        coord = ['x', 'y', 'z']
         for d in range(0, 3):
             if pmin[d] == -infty:
                 found_error = True
@@ -419,8 +379,8 @@ if __name__ == "__main__":
         if found_error:
             print(diagonstic)
             sys.exit(1)
-
-    input_path = sys.argv[1]
+   
+    input_path  = sys.argv[1]
     output_path = sys.argv[2]
 
     mesh = read_mesh(input_path)
@@ -439,24 +399,22 @@ if __name__ == "__main__":
 
     submesh = select_submesh(mesh, pmin, pmax)
     print(submesh)
-    submesh.write("submesh.vtk")
+    submesh.write('submesh.vtk')
     nedt, dims = mesh_to_sdf(submesh, pmin, pmax, hmax, export_normals)
     nedt.tofile(output_path)
 
-    header = f"spatial_dimension: 3\n"
-    header += f"nx: {dims[0]}\n"
-    header += f"ny: {dims[1]}\n"
-    header += f"nz: {dims[2]}\n"
-    header += f"block_size: 1\n"
-    header += f"type: float\n"
-    header += f"ox: {pmin[0]}\n"
-    header += f"oy: {pmin[1]}\n"
-    header += f"oz: {pmin[2]}\n"
-    header += f"dx: {(pmax[0] - pmin[0])/(dims[0] - 1)}\n"
-    header += f"dy: {(pmax[1] - pmin[1])/(dims[1] - 1)}\n"
-    header += f"dz: {(pmax[2] - pmin[2])/(dims[2] - 1)}\n"
-    header += f'rpath: 0\n'
-    header += f"path: {os.path.abspath(output_path)}\n"
+    header =    f'nx: {dims[0]}\n'
+    header +=   f'ny: {dims[1]}\n'
+    header +=   f'nz: {dims[2]}\n'
+    header +=   f'block_size: 1\n'
+    header +=   f'type: float\n'
+    header +=   f'ox: {pmin[0]}\n'
+    header +=   f'oy: {pmin[1]}\n'
+    header +=   f'oz: {pmin[2]}\n'
+    header +=   f'dx: {(pmax[0] - pmin[0])/(dims[0] - 1)}\n'
+    header +=   f'dy: {(pmax[1] - pmin[1])/(dims[1] - 1)}\n'
+    header +=   f'dz: {(pmax[2] - pmin[2])/(dims[2] - 1)}\n'
+    header +=   f'path: {os.path.abspath(output_path)}\n'
 
     fname, fextension = os.path.splitext(output_path)
     pdir = os.path.dirname(fname)
@@ -466,5 +424,6 @@ if __name__ == "__main__":
 
     fname = os.path.basename(fname)
 
-    with open(f"{pdir}/metadata_{fname}.yml", "w") as f:
+    with open(f'{pdir}/metadata_{fname}.yml', 'w') as f:
         f.write(header)
+

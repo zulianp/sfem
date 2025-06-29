@@ -18,10 +18,7 @@
 #define SDF_SQRT sqrtf
 #define SDF_CEIL ceilf
 
-int write_metadata(const char* meta_data_path,
-                   const char* data_path,
-                   const ptrdiff_t* size,
-                   const geom_t* origin,
+int write_metadata(const char* meta_data_path, const char* data_path, const ptrdiff_t* size, const geom_t* origin,
                    const geom_t* delta) {
     FILE* file = fopen(meta_data_path, "w");
     if (!file) return EXIT_FAILURE;
@@ -41,10 +38,7 @@ int write_metadata(const char* meta_data_path,
     return EXIT_SUCCESS;
 }
 
-static SFEM_INLINE void minmax(const ptrdiff_t n,
-                               const geom_t* const SFEM_RESTRICT x,
-                               geom_t* xmin,
-                               geom_t* xmax) {
+static SFEM_INLINE void minmax(const ptrdiff_t n, const geom_t* const SFEM_RESTRICT x, geom_t* xmin, geom_t* xmax) {
     *xmin = x[0];
     *xmax = x[0];
     for (ptrdiff_t i = 1; i < n; i++) {
@@ -62,16 +56,14 @@ static ptrdiff_t array_sum_ptrdiff_t(const ptrdiff_t n, const ptrdiff_t* const S
     return tot;
 }
 
-static SFEM_INLINE void cross3(const geom_t* const SFEM_RESTRICT u,
-                               const geom_t* const SFEM_RESTRICT v,
+static SFEM_INLINE void cross3(const geom_t* const SFEM_RESTRICT u, const geom_t* const SFEM_RESTRICT v,
                                geom_t* const SFEM_RESTRICT n) {
     n[0] = u[1] * v[2] - u[2] * v[1];
     n[1] = u[2] * v[0] - u[0] * v[2];
     n[2] = u[0] * v[1] - u[1] * v[0];
 }
 
-static SFEM_INLINE void diff3(const geom_t* const SFEM_RESTRICT p,
-                              const geom_t* const SFEM_RESTRICT q,
+static SFEM_INLINE void diff3(const geom_t* const SFEM_RESTRICT p, const geom_t* const SFEM_RESTRICT q,
                               geom_t* const SFEM_RESTRICT diff) {
     diff[0] = p[0] - q[0];
     diff[1] = p[1] - q[1];
@@ -85,10 +77,8 @@ static SFEM_INLINE void normalize(geom_t* const vec3) {
     vec3[2] /= len;
 }
 
-static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
-                                            const ptrdiff_t nnodes,
-                                            idx_t** const SFEM_RESTRICT elements,
-                                            geom_t** const SFEM_RESTRICT points,
+static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements, const ptrdiff_t nnodes,
+                                            idx_t** const SFEM_RESTRICT elements, geom_t** const SFEM_RESTRICT points,
                                             geom_t** const SFEM_RESTRICT normals) {
     const double tick = MPI_Wtime();
 
@@ -104,14 +94,10 @@ static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
             const idx_t i1 = elements[1][e];
             const idx_t i2 = elements[2][e];
 
-            const geom_t u[3] = {points[0][i1] - points[0][i0],
-                                 points[1][i1] - points[1][i0],
-                                 points[2][i1] - points[2][i0]};
+            const geom_t u[3] = {points[0][i1] - points[0][i0], points[1][i1] - points[1][i0], points[2][i1] - points[2][i0]};
 
-            const geom_t v[3] = {points[0][i2] - points[0][i0],
-                                 points[1][i2] - points[1][i0],
-                                 points[2][i2] - points[2][i0]};
-            geom_t n[3];
+            const geom_t v[3] = {points[0][i2] - points[0][i0], points[1][i2] - points[1][i0], points[2][i2] - points[2][i0]};
+            geom_t       n[3];
             cross3(u, v, n);
             normalize(n);
 
@@ -133,9 +119,9 @@ static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
 #pragma omp for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
             geom_t n[3] = {
-                normals[0][i],
-                normals[1][i],
-                normals[2][i],
+                    normals[0][i],
+                    normals[1][i],
+                    normals[2][i],
             };
 
             normalize(n);
@@ -149,13 +135,9 @@ static void compute_vertex_pseudo_normals_3(const ptrdiff_t nelements,
     printf("mesh_to_sdf.c: compute_vertex_pseudo_normals_3:\t\t\t%g seconds\n", tock - tick);
 }
 
-ptrdiff_t select_submesh(const ptrdiff_t nelements,
-                         const int nodesxelem,
-                         const ptrdiff_t nnodes,
-                         idx_t** const SFEM_RESTRICT elements,
-                         geom_t** const SFEM_RESTRICT points,
-                         const geom_t* SFEM_RESTRICT box_min,
-                         const geom_t* SFEM_RESTRICT box_max) {
+ptrdiff_t select_submesh(const ptrdiff_t nelements, const int nodesxelem, const ptrdiff_t nnodes,
+                         idx_t** const SFEM_RESTRICT elements, geom_t** const SFEM_RESTRICT points,
+                         const geom_t* SFEM_RESTRICT box_min, const geom_t* SFEM_RESTRICT box_max) {
     const double tick = MPI_Wtime();
 
     short* is_node_inside = (short*)malloc(nnodes * sizeof(short));
@@ -164,8 +146,8 @@ ptrdiff_t select_submesh(const ptrdiff_t nelements,
         const geom_t y = points[1][i];
         const geom_t z = points[2][i];
 
-        is_node_inside[i] = x > box_min[0] && y > box_min[1] && z > box_min[2] && x < box_max[0] &&
-                            y < box_max[1] && z < box_max[2];
+        is_node_inside[i] =
+                x > box_min[0] && y > box_min[1] && z > box_min[2] && x < box_max[0] && y < box_max[1] && z < box_max[2];
     }
 
     ptrdiff_t removed_elements = 0;
@@ -203,15 +185,30 @@ ptrdiff_t select_submesh(const ptrdiff_t nelements,
     return nelements - removed_elements;
 }
 
-void compute_sdf_brute_force(const ptrdiff_t nelements,
-                             idx_t** const SFEM_RESTRICT elements,
-                             geom_t** const SFEM_RESTRICT points,
-                             geom_t** const SFEM_RESTRICT normals,
-                             const ptrdiff_t* SFEM_RESTRICT size,
-                             const ptrdiff_t* SFEM_RESTRICT stride,
-                             const geom_t* SFEM_RESTRICT origin,
-                             const geom_t* SFEM_RESTRICT delta,
-                             geom_t* const SFEM_RESTRICT sdf) {
+/**
+ * @brief Compute signed distance field (SDF) using brute force method
+ *
+ * @param nelements
+ * @param elements
+ * @param points
+ * @param normals
+ * @param size
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param sdf
+ */
+void                                                               //
+compute_sdf_brute_force(const ptrdiff_t                nelements,  //
+                        idx_t** const SFEM_RESTRICT    elements,   //
+                        geom_t** const SFEM_RESTRICT   points,     //
+                        geom_t** const SFEM_RESTRICT   normals,    //
+                        const ptrdiff_t* SFEM_RESTRICT size,       //
+                        const ptrdiff_t* SFEM_RESTRICT stride,     //
+                        const geom_t* SFEM_RESTRICT    origin,     //
+                        const geom_t* SFEM_RESTRICT    delta,      //
+                        geom_t* const SFEM_RESTRICT    sdf) {         //
+
     static const geom_t infty = 1e8;
 
     const double tick = MPI_Wtime();
@@ -222,7 +219,7 @@ void compute_sdf_brute_force(const ptrdiff_t nelements,
         for (ptrdiff_t k = 0; k < size[2]; k++) {
             for (ptrdiff_t j = 0; j < size[1]; j++) {
                 for (ptrdiff_t i = 0; i < size[0]; i++) {
-                    geom_t e_min = infty;
+                    geom_t e_min  = infty;
                     geom_t e_sign = 1;
 
                     // Brute force
@@ -233,9 +230,7 @@ void compute_sdf_brute_force(const ptrdiff_t nelements,
                         const idx_t i1 = elements[1][e];
                         const idx_t i2 = elements[2][e];
 
-                        const geom_t p[3] = {origin[0] + i * delta[0],
-                                             origin[1] + j * delta[1],
-                                             origin[2] + k * delta[2]};
+                        const geom_t p[3] = {origin[0] + i * delta[0], origin[1] + j * delta[1], origin[2] + k * delta[2]};
 
                         const geom_t x[3] = {points[0][i0], points[0][i1], points[0][i2]};
                         const geom_t y[3] = {points[1][i0], points[1][i1], points[1][i2]};
@@ -248,8 +243,7 @@ void compute_sdf_brute_force(const ptrdiff_t nelements,
 
                         geom_t diff[3];
                         diff3(p, result.point, diff);
-                        const geom_t d =
-                            SDF_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
+                        const geom_t d = SDF_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
 
                         if (d < e_min) {
                             e_min = d;
@@ -261,14 +255,11 @@ void compute_sdf_brute_force(const ptrdiff_t nelements,
                                 const geom_t phi2 = result.t;
                                 const geom_t phi0 = 1.0 - phi1 - phi2;
 
-                                n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] +
-                                       phi2 * normals[0][i2];
+                                n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] + phi2 * normals[0][i2];
 
-                                n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] +
-                                       phi2 * normals[1][i2];
+                                n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] + phi2 * normals[1][i2];
 
-                                n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] +
-                                       phi2 * normals[2][i2];
+                                n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] + phi2 * normals[2][i2];
 
                                 normalize(n);
                                 e_sign = signbit(dot3(diff, n)) ? -1 : 1;
@@ -286,15 +277,30 @@ void compute_sdf_brute_force(const ptrdiff_t nelements,
     printf("mesh_to_sdf.c: compute_sdf:\t\t\t%g seconds\n", tock - tick);
 }
 
-void compute_sdf(const ptrdiff_t nelements,
-                 idx_t** const SFEM_RESTRICT elements,
-                 geom_t** const SFEM_RESTRICT points,
-                 geom_t** const SFEM_RESTRICT normals,
-                 const ptrdiff_t* SFEM_RESTRICT size,
-                 const ptrdiff_t* SFEM_RESTRICT stride,
-                 const geom_t* SFEM_RESTRICT origin,
-                 const geom_t* SFEM_RESTRICT delta,
-                 geom_t* const SFEM_RESTRICT sdf) {
+/**
+ * @brief Compute signed distance field (SDF) using grid method
+ *
+ * @param nelements
+ * @param elements
+ * @param points
+ * @param normals
+ * @param size
+ * @param stride
+ * @param origin
+ * @param delta
+ * @param sdf
+ */
+void                                                   //
+compute_sdf(const ptrdiff_t                nelements,  // Number of elements
+            idx_t** const SFEM_RESTRICT    elements,   //
+            geom_t** const SFEM_RESTRICT   points,     //
+            geom_t** const SFEM_RESTRICT   normals,    //
+            const ptrdiff_t* SFEM_RESTRICT size,       //
+            const ptrdiff_t* SFEM_RESTRICT stride,     //
+            const geom_t* SFEM_RESTRICT    origin,     //
+            const geom_t* SFEM_RESTRICT    delta,      //
+            geom_t* const SFEM_RESTRICT    sdf) {         //
+
     static const geom_t infty = 1e8;
 
     const double tick = MPI_Wtime();
@@ -330,24 +336,24 @@ void compute_sdf(const ptrdiff_t nelements,
     }
 
 #define SUBDIVISION_LEVELS 1
-    geom_t grid_spacing[SUBDIVISION_LEVELS][3];
-    int grid_size[SUBDIVISION_LEVELS][3];
+    geom_t     grid_spacing[SUBDIVISION_LEVELS][3];
+    int        grid_size[SUBDIVISION_LEVELS][3];
     ptrdiff_t* element_count[SUBDIVISION_LEVELS];
 
     // Fine level arrays!
-    int* g_finest_size = grid_size[SUBDIVISION_LEVELS - 1];
-    geom_t* g_finest_spacing = grid_spacing[SUBDIVISION_LEVELS - 1];
+    int*       g_finest_size    = grid_size[SUBDIVISION_LEVELS - 1];
+    geom_t*    g_finest_spacing = grid_spacing[SUBDIVISION_LEVELS - 1];
     ptrdiff_t* g_finest_el_count;
-    ptrdiff_t g_finest_stride[3] = {1, -1, -1};
+    ptrdiff_t  g_finest_stride[3] = {1, -1, -1};
 
     geom_t multiple = 2;
-    geom_t H = multiple * hmax * pow(2, SUBDIVISION_LEVELS - 1);
+    geom_t H        = multiple * hmax * pow(2, SUBDIVISION_LEVELS - 1);
 
     {  // Construct grids
         for (int l = 0; l < SUBDIVISION_LEVELS; l++) {
             ptrdiff_t nbins = 1;
             for (int d = 0; d < 3; d++) {
-                grid_size[l][d] = MAX(1, ((box_max[d] - box_min[d]) / H) * pow(2, l)) + 1;
+                grid_size[l][d]    = MAX(1, ((box_max[d] - box_min[d]) / H) * pow(2, l)) + 1;
                 grid_spacing[l][d] = (box_max[d] - box_min[d]) / (grid_size[l][d] - 1);
                 nbins *= grid_size[l][d];
             }
@@ -357,18 +363,18 @@ void compute_sdf(const ptrdiff_t nelements,
 
         g_finest_stride[1] = g_finest_size[0];
         g_finest_stride[2] = g_finest_size[0] * g_finest_size[1];
-        g_finest_el_count = element_count[SUBDIVISION_LEVELS - 1];
+        g_finest_el_count  = element_count[SUBDIVISION_LEVELS - 1];
     }
 
     {
         // Count element contained in cells
         for (ptrdiff_t e = 0; e < nelements; e++) {
             int start[3] = {0, 0, 0};
-            int end[3] = {g_finest_size[0], g_finest_size[1], g_finest_size[2]};
+            int end[3]   = {g_finest_size[0], g_finest_size[1], g_finest_size[2]};
 
-            const idx_t i0 = elements[0][e];
-            geom_t e_box_min[3] = {points[0][i0], points[1][i0], points[2][i0]};
-            geom_t e_box_max[3] = {points[0][i0], points[1][i0], points[2][i0]};
+            const idx_t i0           = elements[0][e];
+            geom_t      e_box_min[3] = {points[0][i0], points[1][i0], points[2][i0]};
+            geom_t      e_box_max[3] = {points[0][i0], points[1][i0], points[2][i0]};
 
             for (int d = 0; d < 3; d++) {
                 for (int ni = 1; ni < 3; ni++) {
@@ -378,19 +384,18 @@ void compute_sdf(const ptrdiff_t nelements,
             }
 
             for (int d = 0; d < 3; d++) {
-                const geom_t h = g_finest_spacing[d];
-                ptrdiff_t i_begin = (e_box_min[d] - box_min[d]) / h;
-                start[d] = MAX(start[d], i_begin);
+                const geom_t h       = g_finest_spacing[d];
+                ptrdiff_t    i_begin = (e_box_min[d] - box_min[d]) / h;
+                start[d]             = MAX(start[d], i_begin);
 
                 ptrdiff_t i_end = floorf((e_box_max[d] - box_min[d]) / h) + 1;
-                end[d] = MIN(end[d], i_end);
+                end[d]          = MIN(end[d], i_end);
             }
 
             for (int k = start[2]; k < end[2]; k++) {
                 for (int j = start[1]; j < end[1]; j++) {
                     for (int i = start[0]; i < end[0]; i++) {
-                        ptrdiff_t cell_idx = i * g_finest_stride[0] + j * g_finest_stride[1] +
-                                             k * g_finest_stride[2];
+                        ptrdiff_t cell_idx = i * g_finest_stride[0] + j * g_finest_stride[1] + k * g_finest_stride[2];
 
                         g_finest_el_count[cell_idx]++;
                     }
@@ -406,12 +411,11 @@ void compute_sdf(const ptrdiff_t nelements,
         }
     }
 
-    const ptrdiff_t g_finest_nnodes = grid_size[SUBDIVISION_LEVELS - 1][0] *
-                                      grid_size[SUBDIVISION_LEVELS - 1][1] *
-                                      grid_size[SUBDIVISION_LEVELS - 1][2];
+    const ptrdiff_t g_finest_nnodes =
+            grid_size[SUBDIVISION_LEVELS - 1][0] * grid_size[SUBDIVISION_LEVELS - 1][1] * grid_size[SUBDIVISION_LEVELS - 1][2];
 
     ptrdiff_t* g_finest_cell_ptr = malloc((g_finest_nnodes + 1) * sizeof(ptrdiff_t));
-    g_finest_cell_ptr[0] = 0;
+    g_finest_cell_ptr[0]         = 0;
 
     for (ptrdiff_t i = 0; i < g_finest_nnodes; i++) {
         g_finest_cell_ptr[i + 1] = g_finest_cell_ptr[i] + g_finest_el_count[i];
@@ -423,13 +427,11 @@ void compute_sdf(const ptrdiff_t nelements,
         // FIll cell list
         for (ptrdiff_t e = 0; e < nelements; e++) {
             int start[3] = {0, 0, 0};
-            int end[3] = {g_finest_size[0], g_finest_size[1], g_finest_size[2]};
+            int end[3]   = {g_finest_size[0], g_finest_size[1], g_finest_size[2]};
 
-            geom_t e_box_min[3] = {
-                points[0][elements[0][e]], points[1][elements[0][e]], points[2][elements[0][e]]};
+            geom_t e_box_min[3] = {points[0][elements[0][e]], points[1][elements[0][e]], points[2][elements[0][e]]};
 
-            geom_t e_box_max[3] = {
-                points[0][elements[0][e]], points[1][elements[0][e]], points[2][elements[0][e]]};
+            geom_t e_box_max[3] = {points[0][elements[0][e]], points[1][elements[0][e]], points[2][elements[0][e]]};
 
             for (int d = 0; d < 3; d++) {
                 for (int ni = 1; ni < 3; ni++) {
@@ -439,19 +441,18 @@ void compute_sdf(const ptrdiff_t nelements,
             }
 
             for (int d = 0; d < 3; d++) {
-                const geom_t h = g_finest_spacing[d];
-                ptrdiff_t i_begin = (e_box_min[d] - box_min[d]) / h;
-                start[d] = MAX(start[d], i_begin);
+                const geom_t h       = g_finest_spacing[d];
+                ptrdiff_t    i_begin = (e_box_min[d] - box_min[d]) / h;
+                start[d]             = MAX(start[d], i_begin);
 
                 ptrdiff_t i_end = floorf((e_box_max[d] - box_min[d]) / h) + 1;
-                end[d] = MIN(end[d], i_end);
+                end[d]          = MIN(end[d], i_end);
             }
 
             for (int k = start[2]; k < end[2]; k++) {
                 for (int j = start[1]; j < end[1]; j++) {
                     for (int i = start[0]; i < end[0]; i++) {
-                        ptrdiff_t cell_idx = i * g_finest_stride[0] + j * g_finest_stride[1] +
-                                             k * g_finest_stride[2];
+                        ptrdiff_t cell_idx = i * g_finest_stride[0] + j * g_finest_stride[1] + k * g_finest_stride[2];
 
                         g_finest_cell_idx[g_finest_cell_ptr[cell_idx]++] = e;
                     }
@@ -495,17 +496,15 @@ void compute_sdf(const ptrdiff_t nelements,
         for (ptrdiff_t k = 0; k < size[2]; k++) {
             for (ptrdiff_t j = 0; j < size[1]; j++) {
                 for (ptrdiff_t i = 0; i < size[0]; i++) {
-                    const geom_t p[3] = {origin[0] + i * delta[0],
-                                         origin[1] + j * delta[1],
-                                         origin[2] + k * delta[2]};
+                    const geom_t p[3] = {origin[0] + i * delta[0], origin[1] + j * delta[1], origin[2] + k * delta[2]};
 
                     int start[3] = {0, 0, 0};
-                    int end[3] = {0, 0, 0};
+                    int end[3]   = {0, 0, 0};
 
                     for (int d = 0; d < 3; d++) {
                         geom_t xi = (p[d] - box_min[d]) / (g_finest_spacing[d]);
-                        start[d] = MAX(0, floorf(xi));
-                        end[d] = MIN(g_finest_size[d], ceilf(xi) + 1);
+                        start[d]  = MAX(0, floorf(xi));
+                        end[d]    = MIN(g_finest_size[d], ceilf(xi) + 1);
                     }
 
                     int search_radius = 1000000;
@@ -514,14 +513,12 @@ void compute_sdf(const ptrdiff_t nelements,
                         {
                             int extent[3] = {0, 0, 0};
                             while (start[d] - extent[d] > 0) {
-                                const ptrdiff_t cell_idx =
-                                    (start[0] - extent[0]) * g_finest_stride[0] +
-                                    (start[1] - extent[1]) * g_finest_stride[1] +
-                                    (start[2] - extent[2]) * g_finest_stride[2];
+                                const ptrdiff_t cell_idx = (start[0] - extent[0]) * g_finest_stride[0] +
+                                                           (start[1] - extent[1]) * g_finest_stride[1] +
+                                                           (start[2] - extent[2]) * g_finest_stride[2];
 
                                 extent[d]++;
-                                if (g_finest_el_count[cell_idx] != 0 ||
-                                    extent[d] >= search_radius) {
+                                if (g_finest_el_count[cell_idx] != 0 || extent[d] >= search_radius) {
                                     search_radius = MIN(extent[d], search_radius);
                                     break;
                                 }
@@ -532,13 +529,11 @@ void compute_sdf(const ptrdiff_t nelements,
                         {
                             int extent[3] = {0, 0, 0};
                             while (end[d] + extent[d] < g_finest_size[d] - 1) {
-                                const ptrdiff_t cell_idx =
-                                    (end[0] + extent[0]) * g_finest_stride[0] +
-                                    (end[1] + extent[1]) * g_finest_stride[1] +
-                                    (end[2] + extent[2]) * g_finest_stride[2];
+                                const ptrdiff_t cell_idx = (end[0] + extent[0]) * g_finest_stride[0] +
+                                                           (end[1] + extent[1]) * g_finest_stride[1] +
+                                                           (end[2] + extent[2]) * g_finest_stride[2];
                                 extent[d] += 1;
-                                if (g_finest_el_count[cell_idx] != 0 ||
-                                    extent[d] >= search_radius) {
+                                if (g_finest_el_count[cell_idx] != 0 || extent[d] >= search_radius) {
                                     search_radius = MIN(extent[d], search_radius);
                                     break;
                                 }
@@ -548,23 +543,19 @@ void compute_sdf(const ptrdiff_t nelements,
 
                     for (int d = 0; d < 3; d++) {
                         start[d] = MAX(0, start[d] - search_radius);
-                        end[d] = MIN(end[d] + search_radius, g_finest_size[d]);
+                        end[d]   = MIN(end[d] + search_radius, g_finest_size[d]);
                         assert(end[d] - start[d] >= 1);
                     }
 
-                    geom_t e_min = infty;
+                    geom_t e_min  = infty;
                     geom_t e_sign = 1;
 
                     for (int kk = start[2]; kk < end[2]; ++kk) {
                         for (int jj = start[1]; jj < end[1]; ++jj) {
                             for (int ii = start[0]; ii < end[0]; ++ii) {
-                                ptrdiff_t cell_idx = ii * g_finest_stride[0] +
-                                                     jj * g_finest_stride[1] +
-                                                     kk * g_finest_stride[2];
+                                ptrdiff_t cell_idx = ii * g_finest_stride[0] + jj * g_finest_stride[1] + kk * g_finest_stride[2];
 
-                                for (ptrdiff_t m = g_finest_cell_ptr[cell_idx];
-                                     m < g_finest_cell_ptr[cell_idx + 1];
-                                     m++) {
+                                for (ptrdiff_t m = g_finest_cell_ptr[cell_idx]; m < g_finest_cell_ptr[cell_idx + 1]; m++) {
                                     ptrdiff_t e = g_finest_cell_idx[m];
 
                                     geom_t temp = infty;
@@ -573,12 +564,9 @@ void compute_sdf(const ptrdiff_t nelements,
                                     const idx_t i1 = elements[1][e];
                                     const idx_t i2 = elements[2][e];
 
-                                    const geom_t x[3] = {
-                                        points[0][i0], points[0][i1], points[0][i2]};
-                                    const geom_t y[3] = {
-                                        points[1][i0], points[1][i1], points[1][i2]};
-                                    const geom_t z[3] = {
-                                        points[2][i0], points[2][i1], points[2][i2]};
+                                    const geom_t x[3] = {points[0][i0], points[0][i1], points[0][i2]};
+                                    const geom_t y[3] = {points[1][i0], points[1][i1], points[1][i2]};
+                                    const geom_t z[3] = {points[2][i0], points[2][i1], points[2][i2]};
 
                                     geom_t n[3] = {0., 0., 0.};
 
@@ -587,8 +575,7 @@ void compute_sdf(const ptrdiff_t nelements,
 
                                     geom_t diff[3];
                                     diff3(p, result.point, diff);
-                                    const geom_t d = SDF_SQRT(
-                                        diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
+                                    const geom_t d = SDF_SQRT(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
 
                                     if (d < e_min) {
                                         e_min = d;
@@ -600,14 +587,11 @@ void compute_sdf(const ptrdiff_t nelements,
                                             const geom_t phi2 = result.t;
                                             const geom_t phi0 = 1.0 - phi1 - phi2;
 
-                                            n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] +
-                                                   phi2 * normals[0][i2];
+                                            n[0] = phi0 * normals[0][i0] + phi1 * normals[0][i1] + phi2 * normals[0][i2];
 
-                                            n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] +
-                                                   phi2 * normals[1][i2];
+                                            n[1] = phi0 * normals[1][i0] + phi1 * normals[1][i1] + phi2 * normals[1][i2];
 
-                                            n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] +
-                                                   phi2 * normals[2][i2];
+                                            n[2] = phi0 * normals[2][i0] + phi1 * normals[2][i1] + phi2 * normals[2][i2];
 
                                             normalize(n);
                                             e_sign = signbit(dot3(diff, n)) ? -1 : 1;
@@ -634,6 +618,10 @@ void compute_sdf(const ptrdiff_t nelements,
     printf("mesh_to_sdf.c: compute_sdf:\t\t\t%g seconds\n", tock - tick);
 }
 
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+// MAIN
+////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -654,20 +642,19 @@ int main(int argc, char* argv[]) {
     geom_t SFEM_SCALE_BOX = 1;
     SFEM_READ_ENV(SFEM_SCALE_BOX, atof);
 
-    if (!rank) {
-        printf(
-            "SFEM_BOXED_MESH=%s\n"
-            "SFEM_SCALE_BOX=%f\n",
-            SFEM_BOXED_MESH,
-            SFEM_SCALE_BOX);
+    if (rank == 0) {
+        printf("SFEM_BOXED_MESH=%s\n"
+               "SFEM_SCALE_BOX=%f\n",
+               SFEM_BOXED_MESH,
+               SFEM_SCALE_BOX);
     }
 
     double tick = MPI_Wtime();
 
-    const char* folder = argv[1];
-    const geom_t hmax = atof(argv[2]);
-    const geom_t margin = atof(argv[3]);
-    const char* output_folder = argv[4];
+    const char*  folder        = argv[1];
+    const geom_t hmax          = atof(argv[2]);
+    const geom_t margin        = atof(argv[3]);
+    const char*  output_folder = argv[4];
 
     {
         struct stat st = {0};
@@ -712,32 +699,35 @@ int main(int argc, char* argv[]) {
         if (SFEM_SCALE_BOX != 1) {
             for (int d = 0; d < mesh.spatial_dim; d++) {
                 const geom_t pmean = (origin[d] + box_max[d]) / 2;
-                geom_t ppmin = origin[d] - pmean;
-                geom_t ppmax = box_max[d] - pmean;
+                geom_t       ppmin = origin[d] - pmean;
+                geom_t       ppmax = box_max[d] - pmean;
                 ppmin *= SFEM_SCALE_BOX;
                 ppmax *= SFEM_SCALE_BOX;
-                origin[d] = ppmin + pmean;
+                origin[d]  = ppmin + pmean;
                 box_max[d] = ppmax + pmean;
             }
         }
     }
 
     // Remove elements we do not need!
-    mesh.nelements = select_submesh(mesh.nelements,
-                                    elem_num_nodes(mesh.element_type),
-                                    mesh.nnodes,
-                                    mesh.elements,
-                                    mesh.points,
-                                    origin,
-                                    box_max);
+    mesh.nelements = select_submesh(mesh.nelements,                     //
+                                    elem_num_nodes(mesh.element_type),  //
+                                    mesh.nnodes,                        //
+                                    mesh.elements,                      //
+                                    mesh.points,                        //
+                                    origin,                             //
+                                    box_max);                           //
 
     geom_t** normals = malloc(mesh.spatial_dim * sizeof(geom_t*));
     for (int d = 0; d < 3; d++) {
         normals[d] = malloc(mesh.nnodes * sizeof(geom_t));
     }
 
-    compute_vertex_pseudo_normals_3(
-        mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, normals);
+    compute_vertex_pseudo_normals_3(mesh.nelements,  //
+                                    mesh.nnodes,     //
+                                    mesh.elements,   //
+                                    mesh.points,     //
+                                    normals);        //
 
     const geom_t x_range = box_max[0] - origin[0];
     const geom_t y_range = box_max[1] - origin[1];
@@ -748,20 +738,26 @@ int main(int argc, char* argv[]) {
     ptrdiff_t nz = SDF_CEIL((z_range) / hmax) + 1;
 
     ptrdiff_t nglobal[3] = {nx, ny, nz};
-    ptrdiff_t stride[3] = {1, nx, nx * ny};
+    ptrdiff_t stride[3]  = {1, nx, nx * ny};
 
     geom_t delta[3] = {x_range / (nx - 1.), y_range / (ny - 1.), z_range / (nz - 1.)};
 
     ptrdiff_t sdf_size = nglobal[0] * nglobal[1] * nglobal[2];
-    geom_t* sdf = malloc(sdf_size * sizeof(geom_t));
+    geom_t*   sdf      = malloc(sdf_size * sizeof(geom_t));
 
     // compute_sdf
-        compute_sdf_brute_force
-        //
-        (mesh.nelements, mesh.elements, mesh.points, normals, nglobal, stride, origin, delta, sdf);
+    compute_sdf_brute_force(mesh.nelements,  //
+                            mesh.elements,   //
+                            mesh.points,     //
+                            normals,         //
+                            nglobal,         //
+                            stride,          //
+                            origin,          //
+                            delta,           //
+                            sdf);            //
 
     const ptrdiff_t nelements = mesh.nelements;
-    const ptrdiff_t nnodes = mesh.nnodes;
+    const ptrdiff_t nnodes    = mesh.nnodes;
 
     char data_path[2048];
     sprintf(data_path, "%s/sdf.float32.raw", output_folder);
