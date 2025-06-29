@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
 
         {
             char path[1024 * 10];
-            sprintf(path, "%s/rhs.raw", output_folder);
+            snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
             array_write(comm, path, value_type, rhs->data(), rhs->size(), rhs->size());
         }
     }

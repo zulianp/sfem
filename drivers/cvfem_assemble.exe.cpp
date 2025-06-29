@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
         char path[1024 * 10];
-        sprintf(path, "%s/zd.raw", folder);
+        snprintf(path, sizeof(path), "%s/zd.raw", folder);
 
         const char *SFEM_DIRICHLET_NODES = 0;
         SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
 
         {
             char path[1024 * 10];
-            sprintf(path, "%s/rhs.raw", output_folder);
+            snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
             array_write(comm, path, value_type, rhs, n_nodes, n_nodes);
         }
     }

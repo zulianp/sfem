@@ -15,6 +15,8 @@
 
 #include "tet4_grad.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE real_t area3(const real_t left[3], const real_t right[3]) {
     real_t a = (left[1] * right[2]) - (right[1] * left[2]);
     real_t b = (left[2] * right[0]) - (right[2] * left[0]);
@@ -287,10 +289,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_surf_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
     real_t *vector_field[3];
     ptrdiff_t vector_field_size_local, vector_field_size_global;
@@ -306,18 +305,18 @@ int main(int argc, char *argv[]) {
 
     geom_t *normals_xyz[3];
     for (int d = 0; d < 3; ++d) {
-        normals_xyz[d] = (geom_t *)malloc(mesh.nelements * sizeof(geom_t));
+        normals_xyz[d] = (geom_t *)malloc(mesh->n_elements() * sizeof(geom_t));
     }
 
-    normals(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, normals_xyz);
+    normals(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), normals_xyz);
 
-    real_t *outflux = (real_t *)malloc(mesh.nelements * sizeof(real_t));
-    memset(outflux, 0, mesh.nelements * sizeof(real_t));
+    real_t *outflux = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
+    memset(outflux, 0, mesh->n_elements() * sizeof(real_t));
 
-    surface_outflux(mesh.nelements,
-                    mesh.nnodes,
-                    mesh.elements,
-                    mesh.points,
+    surface_outflux(mesh->n_elements(),
+                    mesh->n_nodes(),
+                    mesh->elements()->data(),
+                    mesh->points()->data(),
                     normals_xyz,
                     vector_field[0],
                     vector_field[1],
@@ -325,11 +324,11 @@ int main(int argc, char *argv[]) {
                     outflux);
 
     real_t value = 0;
-    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
+    for (ptrdiff_t i = 0; i < mesh->n_elements(); i++) {
         value += outflux[i];
     }
 
-    surf_cell_values_remove_scaling(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux);
+    surf_cell_values_remove_scaling(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), outflux);
 
     // surf_cell_values_integrate(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
 
@@ -339,12 +338,12 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_EXPORT_NORMALS, atoi);
 
     if (SFEM_EXPORT_NORMALS) {
-        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh.nelements, mesh.nelements);
-        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
-        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
+        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh->n_elements(), mesh->n_elements());
+        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh->n_elements(), mesh->n_elements());
+        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh->n_elements(), mesh->n_elements());
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nelements, mesh.nelements);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh->n_elements(), mesh->n_elements());
 
     free(outflux);
 
@@ -357,7 +356,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

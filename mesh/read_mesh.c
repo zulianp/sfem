@@ -42,17 +42,23 @@ size_t count_files(const char *pattern);
         }                                                      \
     } while (0)
 
-int mesh_node_ids(mesh_t *mesh, idx_t *const ids) {
-    int rank, size;
-    MPI_Comm_rank(mesh->comm, &rank);
-    MPI_Comm_size(mesh->comm, &size);
+int mesh_node_ids(MPI_Comm           comm,
+                  const ptrdiff_t    n_nodes,
+                  const ptrdiff_t    n_owned_nodes,
+                  const idx_t *const node_offsets,
+                  const idx_t *const ghosts,
+                  idx_t *const       ids) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
 
-    for (ptrdiff_t i = 0; i < mesh->n_owned_nodes; i++) {
-        ids[i] = mesh->node_offsets[rank] + i;
+    ptrdiff_t n_owned_nodes_with_ghosts = node_offsets[rank + 1] - node_offsets[rank];
+
+    for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
+        ids[i] = node_offsets[rank] + i;
     }
 
-    for (ptrdiff_t i = mesh->n_owned_nodes; i < mesh->nnodes; i++) {
-        ids[i] = mesh->ghosts[i - mesh->n_owned_nodes];
+    for (ptrdiff_t i = n_owned_nodes; i < n_nodes; i++) {
+        ids[i] = ghosts[i - n_owned_nodes];
     }
 
     return 0;
@@ -843,7 +849,6 @@ int mesh_read_mpi(const MPI_Comm  comm,
                               ghosts_out,
                               n_owned_nodes_with_ghosts_out);
 
-    
         // MPI_Barrier(comm);
         double tock = MPI_Wtime();
         if (!rank) {

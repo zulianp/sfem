@@ -300,6 +300,13 @@ namespace sfem {
     ptrdiff_t Mesh::n_owned_elements_with_ghosts() const { return impl_->n_owned_elements_with_ghosts; }
     ptrdiff_t Mesh::n_shared_elements() const { return impl_->n_shared_elements; }
 
+    SharedBuffer<idx_t> Mesh::node_mapping() const { return impl_->node_mapping; }
+    SharedBuffer<idx_t> Mesh::element_mapping() const { return impl_->element_mapping; }
+
+    SharedBuffer<idx_t> Mesh::node_offsets() const { return impl_->node_offsets; }
+    SharedBuffer<idx_t> Mesh::ghosts() const { return impl_->ghosts; }
+    SharedBuffer<int>   Mesh::node_owner() const { return impl_->node_owner; }
+
     SharedBuffer<geom_t *> Mesh::points() { return impl_->points; }
 
     SharedBuffer<idx_t *> Mesh::elements() { return impl_->elements; }
@@ -545,4 +552,11 @@ namespace sfem {
         impl_->node_mapping = node_mapping;
     }
 
+    void Mesh::set_comm(MPI_Comm comm) {
+        impl_->comm = comm;
+    }
+
+    void Mesh::set_element_type(const enum ElemType element_type) {
+        impl_->element_type = element_type;
+    }
 }  // namespace sfem

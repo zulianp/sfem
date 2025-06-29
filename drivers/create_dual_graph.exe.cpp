@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
     char        path[SFEM_MAX_PATH_LENGTH];
-    sprintf(path, "%s/i*.raw", folder);
+    snprintf(path, sizeof(path), "%s/i*.raw", folder);
     int nnxe = sfem::count_files(path);
     // FIXME
     enum ElemType element_type          = (enum ElemType)nnxe;
@@ -94,10 +94,10 @@ int main(int argc, char *argv[]) {
         printf("Dual graph %ld elements, %ld nnz\n", (long)n_elements, (long)adj_ptr[n_elements]);
     }
 
-    sprintf(path, "%s/adj_ptr.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/adj_ptr.raw", output_folder);
     array_write(comm, path, SFEM_MPI_COUNT_T, adj_ptr, n_elements + 1, n_elements + 1);
 
-    sprintf(path, "%s/adj_idx.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/adj_idx.raw", output_folder);
     array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, adj_idx, adj_ptr[n_elements], adj_ptr[n_elements]);
 
     for (int d = 0; d < nnxe; d++) {

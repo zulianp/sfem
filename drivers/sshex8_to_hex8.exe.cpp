@@ -22,6 +22,8 @@
 #include "sshex8_mesh.h"
 #include "sfem_glob.hpp"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -54,96 +56,58 @@ int main(int argc, char *argv[]) {
     // Set-up (read and init)
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
 
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
-    idx_t **elements = 0;
-
-    elements = (idx_t**)malloc(nxe * sizeof(idx_t *));
-    for (int d = 0; d < nxe; d++) {
-        elements[d] = (idx_t*)malloc(mesh.nelements * sizeof(idx_t));
-    }
+    auto sshex8_elements = sfem::create_host_buffer<idx_t>(nxe, mesh->n_elements());
+    auto d_sshex8_elements = sshex8_elements->data();
+ 
 
     for (int d = 0; d < nxe; d++) {
-        for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-            elements[d][i] = SFEM_IDX_INVALID;
+        for (ptrdiff_t i = 0; i < n_elements; i++) {
+            d_sshex8_elements[d][i] = SFEM_IDX_INVALID;
         }
     }
 
     ptrdiff_t n_unique_nodes, interior_start;
-    sshex8_generate_elements(level, mesh.nelements, mesh.nnodes, mesh.elements, elements, &n_unique_nodes, &interior_start);
+    sshex8_generate_elements(level, n_elements, mesh->n_nodes(), mesh->elements()->data(), d_sshex8_elements, &n_unique_nodes, &interior_start);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // Generate explicit hex8 micro-mesh
     // ///////////////////////////////////////////////////////////////////////////////
-    ptrdiff_t n_micro_elements = mesh.nelements * txe;
-
-    idx_t **hex8_elements = (idx_t**)malloc(8 * sizeof(idx_t *));
-    for (int d = 0; d < 8; d++) {
-        hex8_elements[d] = (idx_t*)malloc(n_micro_elements * sizeof(idx_t));
-    }
+    ptrdiff_t n_micro_elements = n_elements * txe;
+    auto hex8_elements = sfem::create_host_buffer<idx_t>(8, n_micro_elements);
+    auto d_hex8_elements = hex8_elements->data();
 
     // Elements
-    sshex8_to_standard_hex8_mesh(level, mesh.nelements, elements, hex8_elements);
+    sshex8_to_standard_hex8_mesh(level, n_elements, d_sshex8_elements, d_hex8_elements);
 
-    geom_t **hex8_points = (geom_t**)malloc(3 * sizeof(geom_t *));
-    for (int d = 0; d < 3; d++) {
-        hex8_points[d] = (geom_t*)calloc(n_unique_nodes, sizeof(geom_t));
-    }
+    auto hex8_points = sfem::create_host_buffer<geom_t>(3, n_unique_nodes);
+    auto d_hex8_points = hex8_points->data();
 
-    sshex8_fill_points(level, mesh.nelements, elements, mesh.points, hex8_points);
+
+    sshex8_fill_points(level, n_elements, d_sshex8_elements, mesh->points()->data(), d_hex8_points);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // Write to disk
     // ///////////////////////////////////////////////////////////////////////////////
 
-
     sfem::create_directory(path_output);
 
     char path[1024 * 10];
     for (int lnode = 0; lnode < 8; lnode++) {
-        sprintf(path, "%s/i%d.raw", path_output, lnode);
-        array_write(comm, path, SFEM_MPI_IDX_T, hex8_elements[lnode], mesh.nelements * txe, mesh.nelements * txe);
+        snprintf(path, sizeof(path), "%s/i%d.raw", path_output, lnode);
+        array_write(comm, path, SFEM_MPI_IDX_T, d_hex8_elements[lnode], n_elements * txe, n_elements * txe);
     }
 
     const char *tags[3] = {"x", "y", "z"};
     for (int d = 0; d < 3; d++) {
-        sprintf(path, "%s/%s.raw", path_output, tags[d]);
-        array_write(comm, path, SFEM_MPI_GEOM_T, hex8_points[d], n_unique_nodes, n_unique_nodes);
+        snprintf(path, sizeof(path), "%s/%s.raw", path_output, tags[d]);
+        array_write(comm, path, SFEM_MPI_GEOM_T, d_hex8_points[d], n_unique_nodes, n_unique_nodes);
     }
-
-    // ///////////////////////////////////////////////////////////////////////////////
-    // Free resources
-    // ///////////////////////////////////////////////////////////////////////////////
-
-    mesh_destroy(&mesh);
-
-    for (int d = 0; d < nxe; d++) {
-        free(elements[d]);
-    }
-
-    free(elements);
-
-    // --
-
-    for (int d = 0; d < 8; d++) {
-        free(hex8_elements[d]);
-    }
-
-    free(hex8_elements);
-
-    // --
-
-    for (int d = 0; d < 3; d++) {
-        free(hex8_points[d]);
-    }
-
-    free(hex8_points);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // Stats

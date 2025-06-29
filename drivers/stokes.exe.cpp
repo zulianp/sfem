@@ -30,6 +30,7 @@
 #include "stokes_mini.h"
 
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // The MINI mixed finite element for the Stokes problem: An experimental
@@ -146,10 +147,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
     // Optional params
     real_t SFEM_MU = 1;
@@ -187,51 +185,51 @@ int main(int argc, char *argv[]) {
     count_t *rowptr = 0;
     idx_t *colidx = 0;
     build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
-    nnz = rowptr[mesh.nnodes];
+        mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), &rowptr, &colidx);
+    nnz = rowptr[mesh->n_nodes()];
 
     double tock = MPI_Wtime();
     printf("stokes.c: build crs graph\t\t%g seconds\n", tock - tack);
     tack = tock;
 
-    const int sdim = elem_manifold_dim(mesh.element_type);
+    const int sdim = elem_manifold_dim(mesh->element_type());
     const int n_vars = sdim + 1;
 
     real_t *rhs_values[4] = {0, 0, 0, 0};
     switch (SFEM_PROBLEM_TYPE) {
         case 1: {
-            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs1_x, rhs_values[0]);
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs1_y, rhs_values[1]);
+            rhs_values[0] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs1_x, rhs_values[0]);
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs1_y, rhs_values[1]);
             break;
         }
         case 2: {
-            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs2_x, rhs_values[0]);
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs2_y, rhs_values[1]);
+            rhs_values[0] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs2_x, rhs_values[0]);
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs2_y, rhs_values[1]);
             break;
         }
         case 3: {
-            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_x, rhs_values[0]);
-            node_eval_f2D(mesh.nnodes, mesh.points, SFEM_MU, &rhs3_y, rhs_values[1]);
+            rhs_values[0] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs3_x, rhs_values[0]);
+            node_eval_f2D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs3_y, rhs_values[1]);
             break;
         }
         case 4: {
-            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[1] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            rhs_values[2] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_x, rhs_values[0]);
-            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_y, rhs_values[1]);
-            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs4_z, rhs_values[2]);
+            rhs_values[0] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            rhs_values[1] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            rhs_values[2] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            node_eval_f3D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs4_x, rhs_values[0]);
+            node_eval_f3D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs4_y, rhs_values[1]);
+            node_eval_f3D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs4_z, rhs_values[2]);
             break;
         }
         case 5: {
-            rhs_values[0] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
-            node_eval_f3D(mesh.nnodes, mesh.points, SFEM_MU, &rhs5_x, rhs_values[0]);
+            rhs_values[0] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
+            node_eval_f3D(mesh->n_nodes(), mesh->points()->data(), SFEM_MU, &rhs5_x, rhs_values[0]);
             break;
         }
         default: {
@@ -241,35 +239,35 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_AOS) {
         real_t *values = (real_t*)calloc(n_vars * n_vars * nnz, sizeof(real_t));
-        real_t *rhs = (real_t*)calloc(n_vars * mesh.nnodes, sizeof(real_t));
+        real_t *rhs = (real_t*)calloc(n_vars * mesh->n_nodes(), sizeof(real_t));
 
         ///////////////////////////////////////////////////////////////////////////////
         // Operator assembly
         ///////////////////////////////////////////////////////////////////////////////
 
-        stokes_mini_assemble_hessian_aos(mesh.element_type,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
+        stokes_mini_assemble_hessian_aos(mesh->element_type(),
+                                         mesh->n_elements(),
+                                         mesh->n_nodes(),
+                                         mesh->elements()->data(),
+                                         mesh->points()->data(),
                                          SFEM_MU,
                                          rowptr,
                                          colidx,
                                          values);
 
-        stokes_mini_assemble_rhs_aos(mesh.element_type,
-                                     mesh.nelements,
-                                     mesh.nnodes,
-                                     mesh.elements,
-                                     mesh.points,
+        stokes_mini_assemble_rhs_aos(mesh->element_type(),
+                                     mesh->n_elements(),
+                                     mesh->n_nodes(),
+                                     mesh->elements()->data(),
+                                     mesh->points()->data(),
                                      SFEM_MU,
                                      SFEM_RHO,
                                      rhs_values,
                                      rhs);
 
-        count_t *b_rowptr = (count_t *)malloc((mesh.nnodes + 1) * n_vars * sizeof(count_t));
-        idx_t *b_colidx = (idx_t *)malloc((ptrdiff_t)rowptr[mesh.nnodes] * n_vars * n_vars * sizeof(idx_t));
-        crs_graph_block_to_scalar(mesh.nnodes, n_vars, rowptr, colidx, b_rowptr, b_colidx);
+        count_t *b_rowptr = (count_t *)malloc((mesh->n_nodes() + 1) * n_vars * sizeof(count_t));
+        idx_t *b_colidx = (idx_t *)malloc((ptrdiff_t)rowptr[mesh->n_nodes()] * n_vars * n_vars * sizeof(idx_t));
+        crs_graph_block_to_scalar(mesh->n_nodes(), n_vars, rowptr, colidx, b_rowptr, b_colidx);
 
         if (SFEM_DIRICHLET_NODES) {
             idx_t *dirichlet_nodes = 0;
@@ -310,10 +308,10 @@ int main(int argc, char *argv[]) {
             crs_out.rowptr = (char *)b_rowptr;
             crs_out.colidx = (char *)b_colidx;
             crs_out.values = (char *)values;
-            crs_out.grows = mesh.nnodes * n_vars;
-            crs_out.lrows = mesh.nnodes * n_vars;
-            crs_out.lnnz = b_rowptr[mesh.nnodes * n_vars];
-            crs_out.gnnz = b_rowptr[mesh.nnodes * n_vars];
+            crs_out.grows = mesh->n_nodes() * n_vars;
+            crs_out.lrows = mesh->n_nodes() * n_vars;
+            crs_out.lnnz = b_rowptr[mesh->n_nodes() * n_vars];
+            crs_out.gnnz = b_rowptr[mesh->n_nodes() * n_vars];
             crs_out.start = 0;
             crs_out.rowoffset = 0;
             crs_out.rowptr_type = SFEM_MPI_COUNT_T;
@@ -326,9 +324,9 @@ int main(int argc, char *argv[]) {
         {
             char path[1024 * 10];
             // Write rhs vectors
-            sprintf(path, "%s/rhs.raw", output_folder);
+            snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
             array_write(
-                comm, path, SFEM_MPI_REAL_T, rhs, mesh.nnodes * n_vars, mesh.nnodes * n_vars);
+                comm, path, SFEM_MPI_REAL_T, rhs, mesh->n_nodes() * n_vars, mesh->n_nodes() * n_vars);
         }
 
         free(b_rowptr);
@@ -345,18 +343,18 @@ int main(int argc, char *argv[]) {
         real_t **rhs = 0;
         rhs = (real_t **)malloc((n_vars) * sizeof(real_t *));
         for (int d = 0; d < n_vars; d++) {
-            rhs[d] = (real_t*)calloc(mesh.nnodes, sizeof(real_t));
+            rhs[d] = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
         }
 
         ///////////////////////////////////////////////////////////////////////////////
         // Operator assembly
         ///////////////////////////////////////////////////////////////////////////////
 
-        stokes_mini_assemble_hessian_soa(mesh.element_type,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
+        stokes_mini_assemble_hessian_soa(mesh->element_type(),
+                                         mesh->n_elements(),
+                                         mesh->n_nodes(),
+                                         mesh->elements()->data(),
+                                         mesh->points()->data(),
                                          SFEM_MU,
                                          rowptr,
                                          colidx,
@@ -366,11 +364,11 @@ int main(int argc, char *argv[]) {
             // No static condensation contribution on RHS
             for (int i = 0; i < n_vars; i++) {
                 if (rhs_values[i]) {
-                    apply_mass(mesh.element_type,
-                               mesh.nelements,
-                               mesh.nnodes,
-                               mesh.elements,
-                               mesh.points,
+                    apply_mass(mesh->element_type(),
+                               mesh->n_elements(),
+                               mesh->n_nodes(),
+                               mesh->elements()->data(),
+                               mesh->points()->data(),
                                1,
                                rhs_values[i],
                                1,
@@ -378,11 +376,11 @@ int main(int argc, char *argv[]) {
                 }
             }
         } else {
-            stokes_mini_assemble_rhs_soa(mesh.element_type,
-                                         mesh.nelements,
-                                         mesh.nnodes,
-                                         mesh.elements,
-                                         mesh.points,
+            stokes_mini_assemble_rhs_soa(mesh->element_type(),
+                                         mesh->n_elements(),
+                                         mesh->n_nodes(),
+                                         mesh->elements()->data(),
+                                         mesh->points()->data(),
                                          SFEM_MU,
                                          SFEM_RHO,
                                          rhs_values,
@@ -454,8 +452,8 @@ int main(int argc, char *argv[]) {
 
             crs_out.block_size = n_vars * n_vars;
             crs_out.values = (char **)values;
-            crs_out.grows = mesh.nnodes;
-            crs_out.lrows = mesh.nnodes;
+            crs_out.grows = mesh->n_nodes();
+            crs_out.lrows = mesh->n_nodes();
             crs_out.lnnz = nnz;
             crs_out.gnnz = nnz;
             crs_out.start = 0;
@@ -465,13 +463,13 @@ int main(int argc, char *argv[]) {
             crs_out.values_type = SFEM_MPI_REAL_T;
 
             char path_rowptr[1024 * 10];
-            sprintf(path_rowptr, "%s/rowptr.raw", output_folder);
+            snprintf(path_rowptr, sizeof(path_rowptr), "%s/rowptr.raw", output_folder);
 
             char path_colidx[1024 * 10];
-            sprintf(path_colidx, "%s/colidx.raw", output_folder);
+            snprintf(path_colidx, sizeof(path_colidx), "%s/colidx.raw", output_folder);
 
             char format_values[1024 * 10];
-            sprintf(format_values, "%s/values.%%d.raw", output_folder);
+            snprintf(format_values, sizeof(format_values), "%s/values.%%d.raw", output_folder);
             block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
         }
 
@@ -479,8 +477,8 @@ int main(int argc, char *argv[]) {
             char path[1024 * 10];
             // Write rhs vectors
             for (int d = 0; d < n_vars; d++) {
-                sprintf(path, "%s/rhs.%d.raw", output_folder, d);
-                array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh.nnodes, mesh.nnodes);
+                snprintf(path, sizeof(path), "%s/rhs.%d.raw", output_folder, d);
+                array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh->n_nodes(), mesh->n_nodes());
             }
         }
 
@@ -515,10 +513,10 @@ int main(int argc, char *argv[]) {
     free(rowptr);
     free(colidx);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    ptrdiff_t nelements = mesh->n_elements();
+    ptrdiff_t nnodes = mesh->n_nodes();
 
-    mesh_destroy(&mesh);
+
 
     tock = MPI_Wtime();
     if (!rank) {

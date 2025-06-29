@@ -15,6 +15,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void volume(const real_t px0,
                           const real_t px1,
                           const real_t px2,
@@ -73,21 +75,19 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
-    real_t *volumes = (real_t *)malloc(mesh.nelements * sizeof(real_t));
-    memset(volumes, 0, mesh.nelements * sizeof(real_t));
+    real_t *volumes = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
+    memset(volumes, 0, mesh->n_elements() * sizeof(real_t));
 
-    geom_t ** xyz = mesh.points;
+    geom_t ** xyz = mesh->points()->data();
+    auto elements = mesh->elements()->data();
 
-    for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
-        const idx_t i0 = mesh.elements[0][i];
-        const idx_t i1 = mesh.elements[1][i];
-        const idx_t i2 = mesh.elements[2][i];
-        const idx_t i3 = mesh.elements[3][i];
+    for (ptrdiff_t i = 0; i < mesh->n_elements(); ++i) {
+        const idx_t i0 = elements[0][i];
+        const idx_t i1 = elements[1][i];
+        const idx_t i2 = elements[2][i];
+        const idx_t i3 = elements[3][i];
 
         real_t vol = 0;
         volume(
@@ -113,14 +113,14 @@ int main(int argc, char *argv[]) {
 
     int SFEM_VERBOSE = 1;
     SFEM_READ_ENV(SFEM_VERBOSE, atoi);
-    array_write(comm, path_output, SFEM_MPI_REAL_T, volumes, mesh.nelements, mesh.nelements);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, volumes, mesh->n_elements(), mesh->n_elements());
     free(volumes);
 
     double tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

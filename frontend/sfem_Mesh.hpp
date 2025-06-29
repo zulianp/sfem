@@ -57,6 +57,11 @@ namespace sfem {
 
         std::shared_ptr<Buffer<count_t>> node_to_node_rowptr() const;
         std::shared_ptr<Buffer<idx_t>>   node_to_node_colidx() const;
+        std::shared_ptr<Buffer<idx_t>>   node_offsets() const;
+        std::shared_ptr<Buffer<idx_t>>   ghosts() const;
+        std::shared_ptr<Buffer<int>>     node_owner() const;
+        std::shared_ptr<Buffer<idx_t>>   node_mapping() const;
+        std::shared_ptr<Buffer<idx_t>>   element_mapping() const;
 
         const geom_t *const points(const int coord) const;
         const idx_t *const  idx(const int node_num) const;
@@ -104,6 +109,8 @@ namespace sfem {
                                                          const geom_t ymax = 1);
 
         void set_node_mapping(const std::shared_ptr<Buffer<idx_t>> &node_mapping);
+        void set_comm(MPI_Comm comm);
+        void set_element_type(const enum ElemType element_type);
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

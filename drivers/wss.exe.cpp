@@ -15,6 +15,8 @@
 
 #include "tet4_grad.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void wss_mag_kernel(const real_t px0,
                                        const real_t px1,
                                        const real_t px2,
@@ -151,10 +153,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_surf_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
 
     real_t *shear_6[6];
     ptrdiff_t shear_size_local, shear_size_global;
@@ -163,18 +162,18 @@ int main(int argc, char *argv[]) {
 
     // P0
     for (int d = 0; d < 6; ++d) {
-        sprintf(path, "%s.%d.raw", shear_prefix, d);
+        snprintf(path, sizeof(path), "%s.%d.raw", shear_prefix, d);
         array_create_from_file(comm, path, SFEM_MPI_REAL_T, (void **)&shear_6[d], &shear_size_local, &shear_size_global);
     }
 
     // P0
-    real_t *wss_mag = (real_t *)malloc(mesh.nelements * sizeof(real_t));
-    memset(wss_mag, 0, mesh.nelements * sizeof(real_t));
+    real_t *wss_mag = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
+    memset(wss_mag, 0, mesh->n_elements() * sizeof(real_t));
 
-    wss_mag_3(mesh.nelements,
-              mesh.nnodes,
-              mesh.elements,
-              mesh.points,
+    wss_mag_3(mesh->n_elements(),
+              mesh->n_nodes(),
+              mesh->elements()->data(),
+              mesh->points()->data(),
               shear_6[0],
               shear_6[1],
               shear_6[2],
@@ -183,7 +182,7 @@ int main(int argc, char *argv[]) {
               shear_6[5],
               wss_mag);
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, wss_mag, mesh.nelements, mesh.nelements);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, wss_mag, mesh->n_elements(), mesh->n_elements());
 
     for (int d = 0; d < 6; ++d) {
         free(shear_6[d]);
@@ -195,7 +194,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
