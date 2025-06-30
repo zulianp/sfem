@@ -135,6 +135,33 @@ static real_t tet4_eval_dual_basis_weighted_physical(
     return tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3;
 }
 
+real_t                                         //
+tet4_quad_volume(const real_t x0,              // Tetrahedron vertices X-coordinates
+                 const real_t x1,              //
+                 const real_t x2,              //
+                 const real_t x3,              //
+                 const real_t y0,              // Tetrahedron vertices Y-coordinates
+                 const real_t y1,              //
+                 const real_t y2,              //
+                 const real_t y3,              //
+                 const real_t z0,              // Tetrahedron vertices Z-coordinates
+                 const real_t z1,              //
+                 const real_t z2,              //
+                 const real_t z3,              //
+                 const real_t det_jacobian) {  // Tetrahedron vertices Z-coordinates
+
+    real_t volume = 0.0;
+
+    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+
+        real_t g_qx, g_qy, g_qz;
+
+        volume += tet_qw[quad_i] * det_jacobian * (1.0 / 6.0);
+    }
+
+    return volume;  // Return the total volume of the tetrahedron
+}
+
 int                                                                                     //
 tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                         x0,  // Tetrahedron vertices X-coordinates
                                               const real_t                         x1,  //
@@ -494,7 +521,8 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                          z2_n,   //
                                                          z3_n);  //
 
-        real_t theta_volume_acc = 0.0;  // DEBUG: theta_volume_acc
+        real_t theta_volume_acc  = 0.0;  // DEBUG: theta_volume_acc
+        real_t theta_quad_volume = 0.0;  // DEBUG: theta_quad_volume
 
         // printf("Num tet = %d, L = %d, alpha_tet = %g, max_edges_length = %g, d_min = %g\n",
         //        hteg_num_tetrahedra,
@@ -820,13 +848,31 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                     n,                                 // Size of the grid
                     data);                             // Output
 
+            /// DEBUG code
+            theta_quad_volume += tet4_quad_volume(fx0,              // X-coordinates of the vertices
+                                                  fx1,              //
+                                                  fx2,              //
+                                                  fx3,              //
+                                                  fy0,              // Y-coordinates of the vertices
+                                                  fy1,              //
+                                                  fy2,              //
+                                                  fy3,              //
+                                                  fz0,              // Z-coordinates of the vertices
+                                                  fz1,              //
+                                                  fz2,              //
+                                                  fz3,              //
+                                                  (det_jacobian));  //
+
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        // printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e\n",
-        //        element_i,
-        //        theta_volume_main,
-        //        theta_volume_acc,
-        //        (theta_volume_acc / theta_volume_main));
+        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e, theta_quad_volume: %1.16e, "
+               "ratio %1.15f\n",                          //
+               element_i,                                 //
+               theta_volume_main,                         //
+               theta_volume_acc,                          //
+               (theta_volume_acc / theta_volume_main),    //
+               theta_quad_volume,                         //
+               (theta_quad_volume / theta_volume_main));  //
     }
 
     RETURN_FROM_FUNCTION(ret);
