@@ -128,4 +128,14 @@ namespace sfem {
                 element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), x, out);
     }
 
+    int Laplacian::report(const real_t *const) {
+        return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Op> Laplacian::clone() const {
+        auto ret = std::make_shared<Laplacian>(space);
+        *ret     = *this;
+        return ret;
+    }
+
 } // namespace sfem 

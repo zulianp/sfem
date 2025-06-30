@@ -144,10 +144,14 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    // std::shared_ptr<Op> VectorLaplacian::clone() const {
-    //     auto ret = std::make_shared<VectorLaplacian>(space);
-    //     *ret     = *this;
-    //     return ret;
-    // }
+    int VectorLaplacian::report(const real_t *const) {
+        return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Op> VectorLaplacian::clone() const {
+        auto ret = std::make_shared<VectorLaplacian>(space);
+        *ret     = *this;
+        return ret;
+    }
 
 } // namespace sfem 

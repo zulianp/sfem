@@ -109,7 +109,8 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;
-        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        int report(const real_t *const) override;
+        std::shared_ptr<Op> clone() const override;
     };
 
 } // namespace sfem 

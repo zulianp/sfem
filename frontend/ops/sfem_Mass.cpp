@@ -81,12 +81,14 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    // int Mass::report(const real_t *const) { return SFEM_SUCCESS; }
+    int Mass::report(const real_t *const) {
+        return SFEM_SUCCESS;
+    }
 
-    // std::shared_ptr<Op> Mass::clone() const {
-    //     auto ret = std::make_shared<Mass>(space);
-    //     *ret     = *this;
-    //     return ret;
-    // }
+    std::shared_ptr<Op> Mass::clone() const {
+        auto ret = std::make_shared<Mass>(space);
+        *ret     = *this;
+        return ret;
+    }
 
 } // namespace sfem 
