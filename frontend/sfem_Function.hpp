@@ -24,6 +24,10 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_glob.hpp"
 
+// Operator includes
+#include "sfem_Op.hpp"
+#include "sfem_OpFactory.hpp"
+
 namespace sfem {
 
     class Sideset final {
@@ -52,114 +56,6 @@ namespace sfem {
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
-
-    class Op {
-    public:
-        virtual ~Op() = default;
-
-        virtual const char *name() const = 0;
-
-        virtual bool is_linear() const = 0;
-        virtual int  initialize() { return SFEM_SUCCESS; }
-        virtual int  hessian_crs(const real_t *const  x,
-                                 const count_t *const rowptr,
-                                 const idx_t *const   colidx,
-                                 real_t *const        values) = 0;
-
-        virtual int hessian_bsr(const real_t *const /*x*/,
-                                const count_t *const /*rowptr*/,
-                                const idx_t *const /*colidx*/,
-                                real_t *const /*values*/) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int hessian_bcrs_sym(const real_t *const /*x*/,
-                                     const count_t *const /*rowidx*/,
-                                     const idx_t *const /*colidx*/,
-                                     const ptrdiff_t /*block_stride*/,
-                                     real_t **const /*diag_values*/,
-                                     real_t **const /*off_diag_values*/) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int hessian_crs_sym(const real_t *const  x,
-                                    const count_t *const rowptr,
-                                    const idx_t *const   colidx,
-                                    real_t *const        diag_values,
-                                    real_t *const        off_diag_values) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int hessian_block_diag_sym(const real_t *const x, real_t *const values) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int hessian_block_diag_sym_soa(const real_t *const x, real_t **const values) {
-            SFEM_ERROR("Called unimplemented method!\n");
-            return SFEM_FAILURE;
-        }
-
-        virtual int gradient(const real_t *const x, real_t *const out)                     = 0;
-        virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
-
-        virtual int            value(const real_t *x, real_t *const out) = 0;
-        virtual int            report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
-        virtual ExecutionSpace execution_space() const { return EXECUTION_SPACE_HOST; }
-
-        virtual void set_field(const char *name, const SharedBuffer<real_t> &x, const int component = 0) {
-            SFEM_UNUSED(name);
-            SFEM_UNUSED(x);
-            SFEM_UNUSED(component);
-            assert(false);
-        }
-
-        /// Make low-order-refinement operator
-        virtual std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &) {
-            assert(false);
-            return nullptr;
-        }
-
-        virtual std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &) {
-            assert(false);
-            return nullptr;
-        }
-
-        virtual bool is_no_op() const { return false; }
-
-        virtual void                set_option(const std::string                &/*name*/, bool /*val*/) {}
-        virtual std::shared_ptr<Op> clone() const {
-            assert(false);
-            return nullptr;
-        }
-    };
-
-    class NoOp final : public Op {
-    public:
-        const char *name() const override { return "NoOp"; }
-
-        bool is_linear() const override { return true; }
-        int  hessian_crs(const real_t *const /*x*/,
-                         const count_t *const /*rowptr*/,
-                         const idx_t *const /*colidx*/,
-                         real_t *const /*values*/) override {
-            return SFEM_SUCCESS;
-        }
-        int  gradient(const real_t *const x, real_t *const out) override { return SFEM_SUCCESS; }
-        int  apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
-        bool is_no_op() const override { return true; }
-        int  value(const real_t  */*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
-    };
-
-    inline std::shared_ptr<NoOp> no_op() { return std::make_shared<NoOp>(); }
 
     class NeumannConditions final : public Op {
     public:
@@ -389,34 +285,14 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    class Factory {
-    public:
-        using FactoryFunction = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
-        using FactoryFunctionBoundary = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
-        ~Factory();
-        static Factory &instance();
-        static void register_op(const std::string &name, FactoryFunction factory_function);
-        static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
-        static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name);
-        static std::shared_ptr<Op> create_boundary_op(const std::shared_ptr<FunctionSpace>   &space,
-                                                      const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
-                                                      const char                             *name);
-    private:
-        Factory();
-        class Impl;
-        std::unique_ptr<Impl> impl_;
-        void private_register_op(const std::string &name, FactoryFunction factory_function);
-    };
-
-    std::string           d_op_str(const std::string &name);
-    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder);
-
     SharedBuffer<idx_t> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
                                                     const std::shared_ptr<Sideset>       &sideset);
 
     std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset);
+
+    SharedBuffer<idx_t *> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder);
 
 } // namespace sfem
 

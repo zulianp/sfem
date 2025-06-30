@@ -19,6 +19,9 @@ namespace sfem {
         int                   block_size{1};
         enum ElemType         element_type { INVALID };
 
+        // TODO: have a dedicated element type for each block
+        std::vector<enum ElemType> element_types;
+
         // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
         ptrdiff_t nglobal{0};
@@ -78,7 +81,7 @@ namespace sfem {
         return impl_->node_to_node_graph;
     }
 
-    enum ElemType FunctionSpace::element_type() const {
+    enum ElemType FunctionSpace::element_type(const int block) const {
         assert(impl_->element_type != INVALID);
         return impl_->element_type;
     }
