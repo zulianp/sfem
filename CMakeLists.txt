@@ -108,7 +108,10 @@ list(APPEND SFEM_MODULES
     resampling/surface
     )
 
-list(APPEND SFEM_MODULES frontend)
+list(APPEND SFEM_MODULES 
+    frontend
+    frontend/ops
+)
 
 if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
@@ -192,6 +195,9 @@ message(STATUS "SFEM_TET10_CUDA: ${SFEM_TET10_CUDA}")
 
 option(SFEM_TET10_WENO "Use WENO for TET10" ON)
 message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
+
+# Add the Op base implementation to the build
+list(APPEND SFEM_SOURCES frontend/ops/sfem_Op.cpp)
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
