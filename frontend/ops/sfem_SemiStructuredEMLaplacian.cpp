@@ -121,22 +121,19 @@ namespace sfem {
         return err;
     }
 
-    // int SemiStructuredEMLaplacian::value(const real_t *x, real_t *const out) {
-    //     SFEM_ERROR("[Error] ss:em:Laplacian::value NOT IMPLEMENTED!\n");
-    //     return SFEM_FAILURE;
-    // }
-
-    // int SemiStructuredEMLaplacian::report(const real_t *const) { return SFEM_SUCCESS; }
-
-    // std::shared_ptr<Op> SemiStructuredEMLaplacian::clone() const {
-    //     auto ret = std::make_shared<SemiStructuredEMLaplacian>(space);
-    //     *ret     = *this;
-    //     return ret;
-    // }
-
     int SemiStructuredEMLaplacian::value(const real_t *x, real_t *const out) {
         SFEM_ERROR("[Error] ss:em:Laplacian::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
+    }
+
+    int SemiStructuredEMLaplacian::report(const real_t *const) { 
+        return SFEM_SUCCESS; 
+    }
+
+    std::shared_ptr<Op> SemiStructuredEMLaplacian::clone() const {
+        auto ret = std::make_shared<SemiStructuredEMLaplacian>(space);
+        *ret     = *this;
+        return ret;
     }
 
 } // namespace sfem 
