@@ -9,7 +9,7 @@
 
 int test_mesh_blocks_basic() {
     // Create a mesh with default block
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     
     // Test basic block functionality
     SFEM_TEST_EQ(mesh->n_blocks(), (size_t)1);
@@ -26,7 +26,7 @@ int test_mesh_blocks_basic() {
 
 int test_mesh_blocks_add_remove() {
     // Create a mesh with default block
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
     
     // Add a second block
     auto elements_buffer = sfem::create_host_buffer<idx_t>(4, 1); // One quad4 element
@@ -53,7 +53,7 @@ int test_mesh_blocks_add_remove() {
 
 int test_mesh_blocks_checkerboard() {
     // Create a checkerboard cube with 2x2x2 elements (must be even dimensions)
-    auto mesh = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::world(), 2, 2, 2);
+    auto mesh = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2);
     
     // Test that it creates exactly 2 blocks
     SFEM_TEST_EQ(mesh->n_blocks(), (size_t)2);
