@@ -267,10 +267,10 @@ namespace sfem {
 
     int LinearElasticity::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    // std::shared_ptr<Op> LinearElasticity::clone() const {
-    //     auto ret = std::make_shared<LinearElasticity>(space);
-    //     *ret     = *this;
-    //     return ret;
-    // }
+    std::shared_ptr<Op> LinearElasticity::clone() const {
+        auto ret = std::make_shared<LinearElasticity>(space);
+        *ret     = *this;
+        return ret;
+    }
 
 } // namespace sfem 

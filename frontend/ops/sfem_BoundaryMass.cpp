@@ -109,4 +109,8 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
+    int BoundaryMass::report(const real_t *const) {
+        return SFEM_SUCCESS;
+    }
+
 } // namespace sfem 
