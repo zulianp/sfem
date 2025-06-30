@@ -146,6 +146,12 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<Op> NeoHookeanOgden::clone() const {
+        auto ret = std::make_shared<NeoHookeanOgden>(space);
+        *ret     = *this;
+        return ret;
+    }
+
     NeoHookeanOgden::~NeoHookeanOgden() = default;
 
 } // namespace sfem 
