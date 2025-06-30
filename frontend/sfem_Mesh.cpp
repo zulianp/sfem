@@ -17,9 +17,25 @@
 
 namespace sfem {
 
+    class Mesh::Block::Impl {
+    public:
+        std::string name;
+        enum ElemType element_type;
+        SharedBuffer<idx_t *> elements;
+    };
+
+    Mesh::Block::Block() : impl_(std::make_unique<Impl>()) {}
+
+    Mesh::Block::~Block() = default;
+
+    const std::string &Mesh::Block::name() const { return impl_->name; }
+    enum ElemType Mesh::Block::element_type() const { return impl_->element_type; }
+    const SharedBuffer<idx_t *> &Mesh::Block::elements() const { return impl_->elements; }
+
     class Mesh::Impl {
     public:
         std::shared_ptr<Communicator> comm;
+        std::vector<std::shared_ptr<Block>> blocks;
 
         SharedBuffer<idx_t *>  elements;  // Element connectivity
         SharedBuffer<geom_t *> points;    // Node coordinates

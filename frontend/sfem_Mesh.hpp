@@ -22,6 +22,19 @@
 namespace sfem {
     class Mesh final {
     public:
+        class Block {
+            public:
+            Block();
+            ~Block();
+
+            const std::string &name() const;
+            enum ElemType element_type() const;
+            const SharedBuffer<idx_t *> &elements() const;
+        private:
+            class Impl;
+            std::unique_ptr<Impl> impl_;
+        };
+
         Mesh();
         Mesh(const std::shared_ptr<Communicator>& comm);
         ~Mesh();
