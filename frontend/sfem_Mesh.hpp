@@ -30,6 +30,11 @@ namespace sfem {
             const std::string &name() const;
             enum ElemType element_type() const;
             const SharedBuffer<idx_t *> &elements() const;
+            
+            // Setters for internal use
+            void set_name(const std::string& name);
+            void set_element_type(enum ElemType element_type);
+            void set_elements(SharedBuffer<idx_t *> elements);
         private:
             class Impl;
             std::unique_ptr<Impl> impl_;
@@ -55,6 +60,14 @@ namespace sfem {
         int write(const char *path) const;
         int initialize_node_to_node_graph();
         int convert_to_macro_element_mesh();
+        const std::vector<std::shared_ptr<Block>> & blocks() const;
+
+        // Block-related methods
+        size_t n_blocks() const;
+        std::shared_ptr<const Block> block(size_t index) const;
+        std::shared_ptr<Block> block(size_t index);
+        void add_block(const std::string& name, enum ElemType element_type, SharedBuffer<idx_t *> elements);
+        void remove_block(size_t index);
 
         int           spatial_dimension() const;
         int           n_nodes_per_element() const;
@@ -85,6 +98,7 @@ namespace sfem {
 
         SharedBuffer<geom_t *> points();
         SharedBuffer<idx_t *>  elements();
+        SharedBuffer<idx_t *>  default_elements(); // For backward compatibility
 
         std::shared_ptr<Communicator> comm() const;
 
@@ -127,7 +141,7 @@ namespace sfem {
         void set_comm(const std::shared_ptr<Communicator>& comm);
         void set_element_type(const enum ElemType element_type);
 
-        void extract_depreacted(mesh_t* mesh);
+        void extract_deprecated(mesh_t* mesh);
 
     private:
         class Impl;

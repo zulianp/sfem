@@ -505,7 +505,7 @@ int main(int argc, char* argv[]) {
 
     // FIXME mesh_t will be removed in the future
     mesh_t mesh_deprecated;
-    mesh->extract_depreacted(&mesh_deprecated);
+    mesh->extract_deprecated(&mesh_deprecated);
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     real_t*       field        = NULL;
