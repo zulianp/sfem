@@ -19,6 +19,8 @@
 #cmakedefine SFEM_ENABLE_MPI
 #cmakedefine SFEM_ENABLE_AVX512_SORT
 
+#cmakedefine01 SFEM_PRINT_THROUGHPUT
+
 #ifdef SFEM_ENABLE_CUDA
 #define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
 #endif

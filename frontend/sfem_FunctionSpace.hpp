@@ -39,7 +39,7 @@ namespace sfem {
         int       block_size() const;
         ptrdiff_t n_dofs() const;
 
-        enum ElemType element_type() const;
+        enum ElemType element_type(const int block = 0) const;
 
         std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
         std::shared_ptr<FunctionSpace> lor() const;
