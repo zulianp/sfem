@@ -865,8 +865,8 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
         }  // END: for (int tet_i = 0; tet_i < hteg_num_tetrahedra; tet_i++)
 
-        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e, theta_quad_volume: %1.16e, "
-               "ratio %1.15f\n",                          //
+        printf("Theta volume for tetrahedron %ld: %g, theta_volume_acc = %g, volume ratio = %.12e, theta_quad_volume: %1.12e, "
+               "ratio %1.12f\n",                          //
                element_i,                                 //
                theta_volume_main,                         //
                theta_volume_acc,                          //

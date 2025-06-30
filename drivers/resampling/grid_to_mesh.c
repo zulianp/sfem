@@ -17,6 +17,7 @@
 #include "quadratures_rule.h"
 #include "read_mesh.h"
 #include "sfem_mesh_write.h"
+#include "sfem_queue.h"
 #include "sfem_resample_field.h"
 #include "sfem_resample_field_tet4_math.h"
 #include "tet10_resample_field.h"
@@ -400,6 +401,9 @@ int main(int argc, char* argv[]) {
     PRINT_CURRENT_FUNCTION;
 
     // return test_field_mpi_domain(argc, argv);
+
+    // sfem_queue_test();
+    // return EXIT_SUCCESS;
 
     sfem_resample_field_info info;
 
