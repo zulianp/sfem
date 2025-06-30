@@ -12,8 +12,9 @@ sfem_stack_create(size_t capacity) {  //
         free(stack);
         return NULL;
     }
-    stack->size     = 0;
-    stack->capacity = capacity;
+    stack->size           = 0;
+    stack->capacity       = capacity;
+    stack->delta_capacity = capacity;  // Default delta capacity is the same as initial capacity
     return stack;
 }
 
