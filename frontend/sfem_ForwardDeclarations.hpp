@@ -12,6 +12,9 @@ namespace sfem {
 
     class DirichletConditions;
     class NeumannConditions;
+
+    template<typename T>
+    class Buffer;
 }
 
 #endif //SFEM_FORWARD_DECLARATIONS_HPP

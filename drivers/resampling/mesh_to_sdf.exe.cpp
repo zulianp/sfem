@@ -761,13 +761,13 @@ int main(int argc, char* argv[]) {
     const ptrdiff_t nnodes    = mesh->n_nodes();
 
     char data_path[2048];
-    sprintf(data_path, "%s/sdf.float32.raw", output_folder);
+    snprintf(data_path, sizeof(data_path), "%s/sdf.float32.raw", output_folder);
 
     array_write(comm, data_path, SFEM_MPI_GEOM_T, sdf, sdf_size, sdf_size);
 
     if (!rank) {
         char meta_data_path[2048];
-        sprintf(meta_data_path, "%s/metadata_sdf.float32.yml", output_folder);
+        snprintf(meta_data_path, sizeof(meta_data_path), "%s/metadata_sdf.float32.yml", output_folder);
         write_metadata(meta_data_path, data_path, nglobal, origin, delta);
     }
 
