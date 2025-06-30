@@ -26,5 +26,6 @@ public:
     int value(const real_t *x, real_t *const out) override;
     int report(const real_t *const) override;
     std::shared_ptr<Op> clone() const override;
+    void set_option(const std::string &name, bool val) override;
 };
 } // namespace sfem 

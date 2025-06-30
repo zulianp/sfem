@@ -103,8 +103,11 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int SemiStructuredLaplacian::hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) {
-        assert(false);
+    int SemiStructuredLaplacian::hessian_crs(const real_t *const  x,
+                                            const count_t *const rowptr,
+                                            const idx_t *const   colidx,
+                                            real_t *const        values) {
+        SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -142,37 +145,37 @@ namespace sfem {
     }
 
     int SemiStructuredLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::apply", ssm.level());
+        SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
 
         assert(element_type == SSHEX8);  // REMOVEME once generalized approach
 
-        calls++;
+        auto &ssm = space->semi_structured_mesh();
 
         double tick = MPI_Wtime();
-        int    err;
-        if (use_affine_approximation) {
-            err = affine_sshex8_laplacian_apply(ssm.level(),
-                                                ssm.n_elements(),
-                                                ssm.interior_start(),
-                                                ssm.element_data(),
-                                                ssm.point_data(),
-                                                h,
-                                                out);
 
+        int err = 0;
+
+        if (this->fff) {
+            SFEM_TRACE_SCOPE("affine_sshex8_laplacian_stencil_apply_fff");
+            affine_sshex8_laplacian_stencil_apply_fff(
+                    ssm.level(), ssm.n_elements(), ssm.element_data(), this->fff->data(), h, out);
         } else {
-            err = sshex8_laplacian_apply(ssm.level(),
-                                         ssm.n_elements(),
-                                         ssm.interior_start(),
-                                         ssm.element_data(),
-                                         ssm.point_data(),
-                                         h,
-                                         out);
+            if (use_stencil) {
+                err = affine_sshex8_laplacian_stencil_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+            } else if (use_affine_approximation) {
+                err = affine_sshex8_laplacian_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+
+            } else {
+                err = sshex8_laplacian_apply(
+                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+            }
         }
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);
-
+        calls++;
         return err;
     }
 
@@ -187,6 +190,12 @@ namespace sfem {
         auto ret = std::make_shared<SemiStructuredLaplacian>(space);
         *ret     = *this;
         return ret;
+    }
+
+    void SemiStructuredLaplacian::set_option(const std::string &name, bool val) {
+        if (name == "use_affine_approximation") {
+            use_affine_approximation = val;
+        }
     }
 
 } // namespace sfem 

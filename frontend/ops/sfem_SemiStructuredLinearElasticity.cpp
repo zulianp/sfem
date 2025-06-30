@@ -198,19 +198,19 @@ namespace sfem {
         assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
 
         if (space->has_semi_structured_mesh()) {
-            auto ret                      = std::make_shared<SemiStructuredLinearElasticity>(space);
-            ret->element_type             = element_type;
+            auto ret = std::make_shared<SemiStructuredLinearElasticity>(space);
+            ret->element_type = element_type;
             ret->use_affine_approximation = use_affine_approximation;
-            ret->mu                       = mu;
-            ret->lambda                   = lambda;
+            ret->mu = mu;
+            ret->lambda = lambda;
             // ret->initialize();
             return ret;
         } else {
             assert(space->element_type() == macro_base_elem(element_type));
-            auto ret          = std::make_shared<LinearElasticity>(space);
+            auto ret = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
-            ret->mu           = mu;
-            ret->lambda       = lambda;
+            ret->mu = mu;
+            ret->lambda = lambda;
             ret->initialize();
             return ret;
         }
@@ -252,4 +252,8 @@ namespace sfem {
                                                             SFEM_ERROR("[Error] ss:LinearElasticity::hessian_bcrs_sym NOT IMPLEMENTED!\n");
                                                             return SFEM_FAILURE;
                                                         }   
+
+    int SemiStructuredLinearElasticity::report(const real_t *const) {
+        return SFEM_SUCCESS;
+    }
 } // namespace sfem 
