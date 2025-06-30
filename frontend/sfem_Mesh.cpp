@@ -32,12 +32,15 @@ namespace sfem {
     enum ElemType Mesh::Block::element_type() const { return impl_->element_type; }
     const SharedBuffer<idx_t *> &Mesh::Block::elements() const { return impl_->elements; }
 
+    void Mesh::Block::set_name(const std::string& name) { impl_->name = name; }
+    void Mesh::Block::set_element_type(enum ElemType element_type) { impl_->element_type = element_type; }
+    void Mesh::Block::set_elements(SharedBuffer<idx_t *> elements) { impl_->elements = elements; }
+
     class Mesh::Impl {
     public:
         std::shared_ptr<Communicator> comm;
         std::vector<std::shared_ptr<Block>> blocks;
 
-        SharedBuffer<idx_t *>  elements;  // Element connectivity
         SharedBuffer<geom_t *> points;    // Node coordinates
 
         // MPI-related data using Buffers
@@ -49,8 +52,6 @@ namespace sfem {
 
         // Metadata
         int           spatial_dim;
-        enum ElemType element_type;
-        ptrdiff_t     nelements;
         ptrdiff_t     nnodes;
 
         // MPI ownership info
@@ -67,11 +68,9 @@ namespace sfem {
 
         void clear() {
             comm                         = nullptr;
+            blocks.clear();
             spatial_dim                  = 0;
-            element_type                 = INVALID;
-            nelements                    = 0;
             nnodes                       = 0;
-            elements                     = nullptr;
             points                       = nullptr;
             node_mapping                 = nullptr;
             node_owner                   = nullptr;
@@ -85,6 +84,32 @@ namespace sfem {
             n_shared_elements            = 0;
             crs_graph                    = nullptr;
             crs_graph_upper_triangular   = nullptr;
+        }
+
+        // Helper methods for backward compatibility
+        ptrdiff_t total_elements() const {
+            ptrdiff_t total = 0;
+            for (const auto& block : blocks) {
+                if (block && block->elements()) {
+                    // For Buffer<T*>, extent(1) gives the number of elements
+                    total += block->elements()->extent(1);
+                }
+            }
+            return total;
+        }
+
+        enum ElemType default_element_type() const {
+            if (blocks.empty() || !blocks[0]) {
+                return INVALID;
+            }
+            return blocks[0]->element_type();
+        }
+
+        SharedBuffer<idx_t *> default_elements() const {
+            if (blocks.empty() || !blocks[0]) {
+                return nullptr;
+            }
+            return blocks[0]->elements();
         }
     };
 
@@ -100,11 +125,15 @@ namespace sfem {
         : impl_(std::make_unique<Impl>()) {
         impl_->comm         = comm;
         impl_->spatial_dim  = spatial_dim;
-        impl_->element_type = element_type;
-        impl_->nelements    = nelements;
         impl_->nnodes       = nnodes;
-        impl_->elements     = elements;
         impl_->points       = points;
+        
+        // Create default block
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(element_type);
+        default_block->set_elements(elements);
+        impl_->blocks.push_back(default_block);
     }
 
     Mesh::Mesh() : impl_(std::make_unique<Impl>()) {
@@ -119,6 +148,41 @@ namespace sfem {
 
     Mesh::~Mesh() = default;
 
+    // Block-related methods
+    size_t Mesh::n_blocks() const { return impl_->blocks.size(); }
+
+    std::shared_ptr<const Mesh::Block> Mesh::block(size_t index) const {
+        if (index >= impl_->blocks.size() || !impl_->blocks[index]) {
+            SFEM_ERROR("Block index out of range");
+        }
+        return impl_->blocks[index];
+    }
+
+    std::shared_ptr<Mesh::Block> Mesh::block(size_t index) {
+        if (index >= impl_->blocks.size() || !impl_->blocks[index]) {
+            SFEM_ERROR("Block index out of range");
+        }
+        return impl_->blocks[index];
+    }
+
+    void Mesh::add_block(const std::string& name, enum ElemType element_type, SharedBuffer<idx_t *> elements) {
+        auto new_block = std::make_shared<Block>();
+        new_block->set_name(name);
+        new_block->set_element_type(element_type);
+        new_block->set_elements(elements);
+        impl_->blocks.push_back(new_block);
+    }
+
+    void Mesh::remove_block(size_t index) {
+        if (index >= impl_->blocks.size()) {
+            SFEM_ERROR("Block index out of range");
+        }
+        if (impl_->blocks.size() <= 1) {
+            SFEM_ERROR("Cannot remove the last block");
+        }
+        impl_->blocks.erase(impl_->blocks.begin() + index);
+    }
+
     int Mesh::read(const char *path) {
         SFEM_TRACE_SCOPE("Mesh::read");
 
@@ -132,16 +196,23 @@ namespace sfem {
             geom_t **points   = nullptr;
             int      nnodesxelem;
             int      spatial_dim;
+            ptrdiff_t nelements;
 
-            if (mesh_read_serial(path, &nnodesxelem, &impl_->nelements, &elements, &spatial_dim, &impl_->nnodes, &points) !=
+            if (mesh_read_serial(path, &nnodesxelem, &nelements, &elements, &spatial_dim, &impl_->nnodes, &points) !=
                 SFEM_SUCCESS) {
                 return SFEM_FAILURE;
             }
 
-            impl_->elements = manage_host_buffer<idx_t>(nnodesxelem, impl_->nelements, elements);
+            auto elements_buffer = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
             impl_->points   = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
             impl_->spatial_dim = spatial_dim;
-            impl_->element_type = (enum ElemType)nnodesxelem;
+            
+            // Create default block
+            auto default_block = std::make_shared<Block>();
+            default_block->set_name("default");
+            default_block->set_element_type((enum ElemType)nnodesxelem);
+            default_block->set_elements(elements_buffer);
+            impl_->blocks.push_back(default_block);
         }
 #ifdef SFEM_ENABLE_MPI
         else {
@@ -183,12 +254,11 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            impl_->elements        = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
+            auto elements_buffer = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
             impl_->points          = manage_host_buffer<geom_t>(spatial_dim, nnodes, points);
             impl_->node_mapping    = manage_host_buffer<idx_t>(nnodes, node_mapping);
             impl_->node_owner      = manage_host_buffer<int>(nnodes, node_owner);
             impl_->element_mapping = manage_host_buffer<element_idx_t>(nelements, element_mapping);
-
 
             int comm_size;
             MPI_Comm_size(impl_->comm->get(), &comm_size);
@@ -202,6 +272,13 @@ namespace sfem {
             impl_->n_owned_elements             = n_owned_elements;
             impl_->n_owned_elements_with_ghosts = n_owned_elements_with_ghosts;
             impl_->n_shared_elements            = n_shared_elements;
+            
+            // Create default block
+            auto default_block = std::make_shared<Block>();
+            default_block->set_name("default");
+            default_block->set_element_type((enum ElemType)nnodesxelem);
+            default_block->set_elements(elements_buffer);
+            impl_->blocks.push_back(default_block);
         }
 #endif  // SFEM_ENABLE_MPI
 
@@ -209,11 +286,15 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_USE_MACRO, atoi);
 
         if (SFEM_USE_MACRO) {
-            impl_->element_type = macro_type_variant(impl_->element_type);
+            for(auto& block : blocks()) {
+            if (block) {
+                block->set_element_type(macro_type_variant(block->element_type()));
+            }
         }
 
         return SFEM_SUCCESS;
     }
+    const std::vector<std::shared_ptr<Block>> & Mesh::blocks() const { return impl_->blocks; }
 
     int Mesh::write(const char *path) const {
         SFEM_TRACE_SCOPE("Mesh::write");
@@ -225,10 +306,15 @@ namespace sfem {
             impl_->node_mapping->to_file(path_node_mapping.c_str());
         }
 
+        // Write the default block (block 0)
+        if (impl_->blocks.empty() || !impl_->blocks[0]) {
+            return SFEM_FAILURE;
+        }
+
         return mesh_write_serial(path,
-                                 impl_->element_type,
-                                 impl_->nelements,
-                                 impl_->elements->data(),
+                                 impl_->blocks[0]->element_type(),
+                                 impl_->blocks[0]->elements()->extent(1),
+                                 impl_->blocks[0]->elements()->data(),
                                  impl_->spatial_dim,
                                  impl_->nnodes,
                                  impl_->points->data());
@@ -243,7 +329,7 @@ namespace sfem {
     const idx_t *const Mesh::idx(const int node_num) const {
         assert(node_num < n_nodes_per_element());
         assert(node_num >= 0);
-        return impl_->elements->data()[node_num];
+        return impl_->default_elements()->data()[node_num];
     }
 
     std::shared_ptr<CRSGraph> Mesh::node_to_node_graph() {
@@ -254,22 +340,22 @@ namespace sfem {
     SharedBuffer<element_idx_t> Mesh::half_face_table() {
         // FIXME it should be allocated outisde
         element_idx_t *table{nullptr};
-        create_element_adj_table(n_elements(), n_nodes(), element_type(), elements()->data(), &table);
+        create_element_adj_table(n_elements(), n_nodes(), element_type(), default_elements()->data(), &table);
 
         int nsxe = elem_num_sides(element_type());
         return manage_host_buffer<element_idx_t>(n_elements() * nsxe, table);
     }
 
     std::shared_ptr<CRSGraph> Mesh::create_node_to_node_graph(const enum ElemType element_type) {
-        if (impl_->element_type == element_type) {
+        if (impl_->default_element_type() == element_type) {
             return node_to_node_graph();
         }
 
-        const ptrdiff_t n_nodes = max_node_id(element_type, impl_->nelements, impl_->elements->data()) + 1;
+        const ptrdiff_t n_nodes = max_node_id(element_type, impl_->total_elements(), impl_->default_elements()->data()) + 1;
 
         count_t *rowptr{nullptr};
         idx_t   *colidx{nullptr};
-        build_crs_graph_for_elem_type(element_type, impl_->nelements, n_nodes, impl_->elements->data(), &rowptr, &colidx);
+        build_crs_graph_for_elem_type(element_type, impl_->total_elements(), n_nodes, impl_->default_elements()->data(), &rowptr, &colidx);
 
         auto crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(n_nodes + 1, rowptr, free, MEMORY_SPACE_HOST),
                                                     Buffer<idx_t>::own(rowptr[n_nodes], colidx, free, MEMORY_SPACE_HOST));
@@ -289,7 +375,7 @@ namespace sfem {
         count_t *rowptr{nullptr};
         idx_t   *colidx{nullptr};
         build_crs_graph_for_elem_type(
-                impl_->element_type, impl_->nelements, impl_->nnodes, impl_->elements->data(), &rowptr, &colidx);
+                impl_->default_element_type(), impl_->total_elements(), impl_->nnodes, impl_->default_elements()->data(), &rowptr, &colidx);
 
         impl_->crs_graph = std::make_shared<CRSGraph>(Buffer<count_t>::own(impl_->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
                                                       Buffer<idx_t>::own(rowptr[impl_->nnodes], colidx, free, MEMORY_SPACE_HOST));
@@ -304,7 +390,7 @@ namespace sfem {
         count_t *rowptr{nullptr};
         idx_t   *colidx{nullptr};
         build_crs_graph_upper_triangular_from_element(
-                impl_->nelements, impl_->nnodes, elem_num_nodes(impl_->element_type), impl_->elements->data(), &rowptr, &colidx);
+                impl_->total_elements(), impl_->nnodes, elem_num_nodes(impl_->default_element_type()), impl_->default_elements()->data(), &rowptr, &colidx);
 
         impl_->crs_graph_upper_triangular =
                 std::make_shared<CRSGraph>(Buffer<count_t>::own(impl_->nnodes + 1, rowptr, free, MEMORY_SPACE_HOST),
@@ -314,7 +400,9 @@ namespace sfem {
     }
 
     int Mesh::convert_to_macro_element_mesh() {
-        impl_->element_type = macro_type_variant(impl_->element_type);
+        if (!impl_->blocks.empty() && impl_->blocks[0]) {
+            impl_->blocks[0]->set_element_type(macro_type_variant(impl_->blocks[0]->element_type()));
+        }
         return SFEM_SUCCESS;
     }
 
@@ -336,14 +424,12 @@ namespace sfem {
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
 
         ret->impl_->spatial_dim  = 3;
-        ret->impl_->element_type = HEX8;
-        ret->impl_->nelements    = nelements;
         ret->impl_->nnodes       = nnodes;
         ret->impl_->points       = create_host_buffer<geom_t>(3, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(8, nelements);
+        auto elements_buffer     = create_host_buffer<idx_t>(8, nelements);
 
         auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
+        auto elements = elements_buffer->data();
 
         const ptrdiff_t ldz = (ny + 1) * (nx + 1);
         const ptrdiff_t ldy = nx + 1;
@@ -396,6 +482,13 @@ namespace sfem {
             }
         }
 
+        // Create default block
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(HEX8);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
+
         return ret;
     }
 
@@ -411,14 +504,12 @@ namespace sfem {
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
 
         ret->impl_->spatial_dim  = 2;
-        ret->impl_->element_type = TRI3;
-        ret->impl_->nelements    = nelements;
         ret->impl_->nnodes       = nnodes;
         ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(3, nelements);
+        auto elements_buffer     = create_host_buffer<idx_t>(3, nelements);
 
         auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
+        auto elements = elements_buffer->data();
 
         const ptrdiff_t ldy = nx + 1;
         const ptrdiff_t ldx = 1;
@@ -456,6 +547,13 @@ namespace sfem {
             }
         }
 
+        // Create default block
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(TRI3);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
+
         return ret;
     }
 
@@ -471,14 +569,12 @@ namespace sfem {
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1);
 
         ret->impl_->spatial_dim  = 2;
-        ret->impl_->element_type = QUAD4;
-        ret->impl_->nelements    = nelements;
         ret->impl_->nnodes       = nnodes;
         ret->impl_->points       = create_host_buffer<geom_t>(2, nnodes);
-        ret->impl_->elements     = create_host_buffer<idx_t>(4, nelements);
+        auto elements_buffer     = create_host_buffer<idx_t>(4, nelements);
 
         auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
+        auto elements = elements_buffer->data();
 
         const ptrdiff_t ldy = nx + 1;
         const ptrdiff_t ldx = 1;
@@ -513,16 +609,23 @@ namespace sfem {
             }
         }
 
+        // Create default block
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(QUAD4);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
+
         return ret;
     }
 
     int Mesh::spatial_dimension() const { return impl_->spatial_dim; }
-    int Mesh::n_nodes_per_element() const { return elem_num_nodes((enum ElemType)impl_->element_type); }
+    int Mesh::n_nodes_per_element() const { return elem_num_nodes(impl_->default_element_type()); }
 
     ptrdiff_t Mesh::n_nodes() const { return impl_->nnodes; }
-    ptrdiff_t Mesh::n_elements() const { return impl_->nelements; }
+    ptrdiff_t Mesh::n_elements() const { return impl_->total_elements(); }
 
-    enum ElemType Mesh::element_type() const { return impl_->element_type; }
+    enum ElemType Mesh::element_type() const { return impl_->default_element_type(); }
 
     ptrdiff_t Mesh::n_owned_nodes() const { return impl_->n_owned_nodes; }
     ptrdiff_t Mesh::n_owned_nodes_with_ghosts() const { return impl_->n_owned_nodes_with_ghosts; }
@@ -539,27 +642,30 @@ namespace sfem {
 
     SharedBuffer<geom_t *> Mesh::points() { return impl_->points; }
 
-    SharedBuffer<idx_t *> Mesh::elements() { return impl_->elements; }
+    SharedBuffer<idx_t *> Mesh::elements() { return impl_->default_elements(); }
+    SharedBuffer<idx_t *> Mesh::default_elements() { return impl_->default_elements(); }
 
     void Mesh::set_node_mapping(const SharedBuffer<idx_t> &node_mapping) { impl_->node_mapping = node_mapping; }
 
     void Mesh::set_comm(const std::shared_ptr<Communicator>& comm) { impl_->comm = comm; }
 
-    void Mesh::set_element_type(const enum ElemType element_type) { impl_->element_type = element_type; }
+    void Mesh::set_element_type(const enum ElemType element_type) { 
+        if (!impl_->blocks.empty() && impl_->blocks[0]) {
+            impl_->blocks[0]->set_element_type(element_type);
+        }
+    }
 
-    void Mesh::extract_depreacted(mesh_t *mesh) {
+    void Mesh::extract_deprecated(mesh_t *mesh) {
 #ifdef SFEM_ENABLE_MPI
         mesh->comm = impl_->comm->get();
-#else
-        mesh->comm = MPI_COMM_NULL;
 #endif
         mesh->spatial_dim  = impl_->spatial_dim;
-        mesh->element_type = impl_->element_type;
+        mesh->element_type = impl_->default_element_type();
 
-        mesh->nelements = impl_->nelements;
+        mesh->nelements = impl_->total_elements();
         mesh->nnodes    = impl_->nnodes;
 
-        mesh->elements = impl_->elements->data();
+        mesh->elements = impl_->default_elements()->data();
         mesh->points   = impl_->points->data();
 
         mesh->n_owned_nodes             = impl_->n_owned_nodes;
@@ -580,14 +686,12 @@ namespace sfem {
     std::shared_ptr<Mesh> Mesh::create_hex8_reference_cube() {
         auto ret = std::make_shared<Mesh>(Communicator::null());
         ret->impl_->spatial_dim  = 3;
-        ret->impl_->element_type = HEX8;
-        ret->impl_->nelements    = 1;
         ret->impl_->nnodes       = 8;
         ret->impl_->points       = create_host_buffer<geom_t>(3, 8);
-        ret->impl_->elements     = create_host_buffer<idx_t>(8, 1);
+        auto elements_buffer     = create_host_buffer<idx_t>(8, 1);
 
         auto points   = ret->impl_->points->data();
-        auto elements = ret->impl_->elements->data();
+        auto elements = elements_buffer->data();
 
         for (int i = 0; i < 8; i++) {
             elements[i][0] = i;
@@ -624,6 +728,13 @@ namespace sfem {
         points[0][7] = 0;
         points[1][7] = 1;
         points[2][7] = 1;
+
+        // Create default block
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(HEX8);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
 
         return ret;
     }
