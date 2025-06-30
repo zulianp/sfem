@@ -35,6 +35,7 @@ namespace sfem {
             void set_name(const std::string &name);
             void set_element_type(enum ElemType element_type);
             void set_elements(SharedBuffer<idx_t *> elements);
+            ptrdiff_t n_elements() const;
 
         private:
             class Impl;
