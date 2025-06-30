@@ -16,8 +16,6 @@ namespace sfem {
     std::unique_ptr<Op> LumpedMass::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LumpedMass::create");
 
-        assert(1 == space->block_size());
-
         auto ret          = std::make_unique<LumpedMass>(space);
         ret->element_type = (enum ElemType)space->element_type();
         return ret;
