@@ -14,6 +14,7 @@
 #include "boundary_condition_io.h"
 
 #include "dirichlet.h"
+#include "integrate_values.h"
 #include "neumann.h"
 
 #include <sys/stat.h>
@@ -28,23 +29,6 @@
 #include <sstream>
 #include <vector>
 
-// Ops
-
-#include "cvfem_operators.h"
-#include "hex8_laplacian.h"
-#include "hex8_vector_laplacian.h"
-#include "integrate_values.h"
-#include "laplacian.h"
-#include "linear_elasticity.h"
-#include "mass.h"
-#include "neohookean_ogden.h"
-#include "spectral_hex_laplacian.h"
-#include "sshex8_laplacian.h"
-#include "sshex8_linear_elasticity.h"
-#include "sshex8_mass.h"
-#include "sshex8_stencil_element_matrix_apply.h"
-#include "sshex8_vector_laplacian.h"
-
 // Mesh
 #include "adj_table.h"
 #include "hex8_fff.h"
@@ -58,7 +42,6 @@
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
