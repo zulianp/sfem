@@ -21,6 +21,8 @@
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Mesh.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -45,54 +47,6 @@ namespace sfem {
         static std::shared_ptr<Sideset> create_from_selector(
                 const std::shared_ptr<Mesh>                                         &mesh,
                 const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector);
-
-    private:
-        class Impl;
-        std::unique_ptr<Impl> impl_;
-    };
-
-    class FunctionSpace final {
-    public:
-        FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const enum ElemType element_type = INVALID);
-        ~FunctionSpace();
-
-        int promote_to_semi_structured(const int level);
-
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<Mesh> &mesh,
-                                                     const int                    block_size   = 1,
-                                                     const enum ElemType          element_type = INVALID) {
-            return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
-        }
-
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
-
-        int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
-        int destroy_vector(real_t *values);
-
-        void                                   set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t *>> &elems);
-        std::shared_ptr<sfem::Buffer<idx_t *>> device_elements();
-
-        Mesh                 &mesh();
-        std::shared_ptr<Mesh> mesh_ptr() const;
-
-        bool                has_semi_structured_mesh() const;
-        SemiStructuredMesh &semi_structured_mesh();
-
-        int       block_size() const;
-        ptrdiff_t n_dofs() const;
-
-        enum ElemType element_type() const;
-
-        std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
-        std::shared_ptr<FunctionSpace> lor() const;
-
-        std::shared_ptr<CRSGraph> dof_to_dof_graph();
-        std::shared_ptr<CRSGraph> node_to_node_graph();
-
-        friend class Op;
-
-        // private
-        FunctionSpace();
 
     private:
         class Impl;
@@ -298,8 +252,7 @@ namespace sfem {
 
         static std::shared_ptr<DirichletConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
         static std::shared_ptr<DirichletConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
-                                                                     const std::string                    &path);
-
+                                                                     const std::string &path);
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                                      std::string                           yaml);
 
@@ -327,16 +280,15 @@ namespace sfem {
                            const ptrdiff_t global_size,
                            idx_t *const    idx,
                            const int       component,
-                           real_t *const   values);
+                           const real_t    value);
 
         void add_condition(const ptrdiff_t local_size,
                            const ptrdiff_t global_size,
                            idx_t *const    idx,
                            const int       component,
-                           const real_t    value);
+                           real_t *const   values);
 
         int   n_conditions() const;
-        void *impl_conditions();
 
         std::shared_ptr<Constraint> derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                              const bool                            as_zero) const override;
@@ -387,14 +339,6 @@ namespace sfem {
         void add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c);
 
         std::shared_ptr<CRSGraph> crs_graph() const;
-
-        // int create_crs_graph(ptrdiff_t *nlocal,
-        //                      ptrdiff_t *nglobal,
-        //                      ptrdiff_t *nnz,
-        //                      count_t **rowptr,
-        //                      idx_t **colidx);
-
-        // int destroy_crs_graph(count_t *rowptr, idx_t *colidx);
 
         int hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
 
@@ -448,28 +392,19 @@ namespace sfem {
     class Factory {
     public:
         using FactoryFunction = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &)>;
-
-        using FactoryFunctionBoundary = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &,
-                                                                          const std::shared_ptr<Buffer<idx_t *>> &)>;
-
-        static void                register_op(const std::string &name, FactoryFunction factory_function);
+        using FactoryFunctionBoundary = std::function<std::unique_ptr<Op>(const std::shared_ptr<FunctionSpace> &, const std::shared_ptr<Buffer<idx_t *>> &)>;
+        ~Factory();
+        static Factory &instance();
+        static void register_op(const std::string &name, FactoryFunction factory_function);
         static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name);
-
         static std::shared_ptr<Op> create_op_gpu(const std::shared_ptr<FunctionSpace> &space, const char *name);
-
         static std::shared_ptr<Op> create_boundary_op(const std::shared_ptr<FunctionSpace>   &space,
                                                       const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
                                                       const char                             *name);
-
     private:
-        static Factory &instance();
-
         Factory();
-        ~Factory();
-
         class Impl;
         std::unique_ptr<Impl> impl_;
-
         void private_register_op(const std::string &name, FactoryFunction factory_function);
     };
 
@@ -478,6 +413,11 @@ namespace sfem {
 
     SharedBuffer<idx_t> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
                                                     const std::shared_ptr<Sideset>       &sideset);
-}  // namespace sfem
 
-#endif  // SFEM_FUNCTION_HPP
+    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::shared_ptr<Sideset>       &sideset);
+
+} // namespace sfem
+
+#endif //SFEM_FUNCTION_HPP
