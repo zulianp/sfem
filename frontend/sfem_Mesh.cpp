@@ -37,6 +37,8 @@ namespace sfem {
     void Mesh::Block::set_element_type(enum ElemType element_type) { impl_->element_type = element_type; }
     void Mesh::Block::set_elements(SharedBuffer<idx_t *> elements) { impl_->elements = elements; }
 
+    ptrdiff_t Mesh::Block::n_elements() const { return impl_->elements->extent(1); }
+
     class Mesh::Impl {
     public:
         std::shared_ptr<Communicator>       comm;

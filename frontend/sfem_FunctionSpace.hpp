@@ -27,6 +27,10 @@ namespace sfem {
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
 
+        // Multi-block support methods (for internal use)
+        size_t n_blocks() const;
+        bool is_multi_block() const;
+
         void                                   set_device_elements(const std::shared_ptr<sfem::Buffer<idx_t *>> &elems);
         std::shared_ptr<sfem::Buffer<idx_t *>> device_elements();
 

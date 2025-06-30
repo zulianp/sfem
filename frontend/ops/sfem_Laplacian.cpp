@@ -7,9 +7,9 @@
 
 #include "laplacian.h"
 
-#include "sfem_Mesh.hpp"
-#include "sfem_FunctionSpace.hpp"
 #include "sfem_CRSGraph.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_Mesh.hpp"
 
 namespace sfem {
 
@@ -36,7 +36,7 @@ namespace sfem {
     }
 
     Laplacian::Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
-    
+
     Laplacian::~Laplacian() {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("Laplacian::apply called %ld times. Total: %g [s], "
@@ -56,15 +56,20 @@ namespace sfem {
 
         auto mesh  = space->mesh_ptr();
         auto graph = space->dof_to_dof_graph();
+        int  err   = SFEM_SUCCESS;
 
-        return laplacian_crs(element_type,
-                             mesh->n_elements(),
-                             mesh->n_nodes(),
-                             mesh->elements()->data(),
-                             mesh->points()->data(),
-                             graph->rowptr()->data(),
-                             graph->colidx()->data(),
-                             values);
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_crs(space->element_type(block),
+                                 mesh->n_elements(),
+                                 mesh->n_nodes(),
+                                 mesh->block(block)->elements()->data(),
+                                 mesh->points()->data(),
+                                 graph->rowptr()->data(),
+                                 graph->colidx()->data(),
+                                 values);
+        }
+
+        return err;
     }
 
     int Laplacian::hessian_crs_sym(const real_t *const  x,
@@ -74,35 +79,60 @@ namespace sfem {
                                    real_t *const        off_diag_values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
-        // auto graph = space->node_to_node_graph_upper_triangular();
-
         auto mesh = space->mesh_ptr();
+        int  err  = SFEM_SUCCESS;
 
-        return laplacian_crs_sym(element_type,
-                                 mesh->n_elements(),
-                                 mesh->n_nodes(),
-                                 mesh->elements()->data(),
-                                 mesh->points()->data(),
-                                 rowptr,
-                                 colidx,
-                                 diag_values,
-                                 off_diag_values);
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_crs_sym(space->element_type(block),
+                                     mesh->block(block)->n_elements(),
+                                     mesh->n_nodes(),
+                                     mesh->block(block)->elements()->data(),
+                                     mesh->points()->data(),
+                                     rowptr,
+                                     colidx,
+                                     diag_values,
+                                     off_diag_values);
+        }
+
+        return err;
     }
 
     int Laplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
         auto mesh = space->mesh_ptr();
-        return laplacian_diag(
-                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), values);
+        int  err  = SFEM_SUCCESS;
+
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_diag(space->element_type(block),
+                                  mesh->block(block)->n_elements(),
+                                  mesh->n_nodes(),
+                                  mesh->block(block)->elements()->data(),
+                                  mesh->points()->data(),
+                                  values);
+        }
+
+        return err;
     }
 
     int Laplacian::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("Laplacian::gradient");
 
         auto mesh = space->mesh_ptr();
-        return laplacian_assemble_gradient(
-                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), x, out);
+
+        int err = SFEM_SUCCESS;
+
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_assemble_gradient(space->element_type(block),
+                                               mesh->block(block)->n_elements(),
+                                               mesh->n_nodes(),
+                                               mesh->block(block)->elements()->data(),
+                                               mesh->points()->data(),
+                                               x,
+                                               out);
+        }
+
+        return err;
     }
 
     int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
@@ -111,8 +141,16 @@ namespace sfem {
         auto   mesh = space->mesh_ptr();
         double tick = MPI_Wtime();
 
-        int err = laplacian_apply(
-                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), h, out);
+        int err = SFEM_SUCCESS;
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_apply(space->element_type(block),
+                                   mesh->block(block)->n_elements(),
+                                   mesh->n_nodes(),
+                                   mesh->block(block)->elements()->data(),
+                                   mesh->points()->data(),
+                                   h,
+                                   out);
+        }
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);
@@ -124,13 +162,22 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Laplacian::value");
 
         auto mesh = space->mesh_ptr();
-        return laplacian_assemble_value(
-                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), x, out);
+
+        int err = SFEM_SUCCESS;
+        for (int block = 0; block < space->n_blocks(); block++) {
+            err |= laplacian_assemble_value(space->element_type(block),
+                                            mesh->block(block)->n_elements(),
+                                            mesh->n_nodes(),
+                                            mesh->block(block)->elements()->data(),
+                                            mesh->points()->data(),
+                                            x,
+                                            out);
+        }
+
+        return err;
     }
 
-    int Laplacian::report(const real_t *const) {
-        return SFEM_SUCCESS;
-    }
+    int Laplacian::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> Laplacian::clone() const {
         auto ret = std::make_shared<Laplacian>(space);
@@ -138,4 +185,4 @@ namespace sfem {
         return ret;
     }
 
-} // namespace sfem 
+}  // namespace sfem
