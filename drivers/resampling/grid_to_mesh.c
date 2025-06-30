@@ -764,7 +764,7 @@ int main(int argc, char* argv[]) {
                     info.alpha_th            = 2.5;
                     info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                     // info.adjoint_refine_type = ADJOINT_BASE;
-                    // info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
+                    info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 
 #if SFEM_LOG_LEVEL >= 5
                     printf("info.adjoint_refine_type = %d, %s:%d\n", info.adjoint_refine_type, __FILE__, __LINE__);
