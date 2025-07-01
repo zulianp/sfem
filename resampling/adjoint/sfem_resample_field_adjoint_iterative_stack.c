@@ -307,7 +307,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
         free(tet_head);
         tet_head = NULL;
-    } // END while loop (flag_loop == 1 && sfem_stack_size(stack) > 0)
+    }  // END while loop (flag_loop == 1 && sfem_stack_size(stack) > 0)
 
     //////////////////////////////////////////////
 
@@ -482,7 +482,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
                                                     stride,        // Stride
                                                     n,             // Size of the grid
                                                     data);         // Output
-        }
+        }  // END for loop over refined tetrahedra (tet_id = 0; tet_id < n_tets; tet_id++)
 
         if (tets_iter != NULL) {
             free(tets_iter);
@@ -490,7 +490,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
         }
 
         // printf("Number of refined tetrahedra = %d\n", n_tets);
-    }
+    }  // END for loop over elements (element_i = start_element; element_i < end_element; element_i++)
 
     RETURN_FROM_FUNCTION(ret);
 }

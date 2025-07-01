@@ -304,3 +304,166 @@ tet4_iterative_refinement_queue(const real_type       x0,                // Tetr
 
     return tets_size;
 }
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_ref_iterative_adjoint ///////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                                    //
+tet4_resample_field_local_ref_queue_iter_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                 const ptrdiff_t                      end_element,     //
+                                                 const ptrdiff_t                      nnodes,          //
+                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                 const real_t                         alpha_th,        // Threshold for alpha
+                                                 real_t* const SFEM_RESTRICT          data) {                   // Output
+                                                                                                       //
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    const real_type ox = (real_type)origin[0];
+    const real_type oy = (real_type)origin[1];
+    const real_type oz = (real_type)origin[2];
+
+    const real_type dx = (real_type)delta[0];
+    const real_type dy = (real_type)delta[1];
+    const real_type dz = (real_type)delta[2];
+
+    const real_type hexahedron_volume = dx * dy * dz;
+
+    int degenerated_tetrahedra_cnt = 0;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("Start: %s: \n in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+    printf("Heaxahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // Read the coordinates of the vertices of the tetrahedron
+        const real_type x0 = xyz[0][ev[0]];
+        const real_type x1 = xyz[0][ev[1]];
+        const real_type x2 = xyz[0][ev[2]];
+        const real_type x3 = xyz[0][ev[3]];
+
+        const real_type y0 = xyz[1][ev[0]];
+        const real_type y1 = xyz[1][ev[1]];
+        const real_type y2 = xyz[1][ev[2]];
+        const real_type y3 = xyz[1][ev[3]];
+
+        const real_type z0 = xyz[2][ev[0]];
+        const real_type z1 = xyz[2][ev[1]];
+        const real_type z2 = xyz[2][ev[2]];
+        const real_type z3 = xyz[2][ev[3]];
+
+        struct tet_vertices* tets_iter = NULL;
+        int                  n_tets    = 0;
+
+        const int max_refined_tets = 100;  // Maximum number of refined tetrahedra
+
+        n_tets = tet4_iterative_refinement_queue(x0,                     // Tetrahedron vertices X-coordinates
+                                                 x1,                     //
+                                                 x2,                     //
+                                                 x3,                     //
+                                                 y0,                     // Tetrahedron vertices Y-coordinates
+                                                 y1,                     //
+                                                 y2,                     //
+                                                 y3,                     //
+                                                 z0,                     // Tetrahedron vertices Z-coordinates
+                                                 z1,                     //
+                                                 z2,                     //
+                                                 z3,                     //
+                                                 dx,                     // Spacing of the grid
+                                                 dy,                     //
+                                                 dz,                     //
+                                                 weighted_field[ev[0]],  // Weighted field at the vertices
+                                                 weighted_field[ev[1]],  //
+                                                 weighted_field[ev[2]],  //
+                                                 weighted_field[ev[3]],  //
+                                                 alpha_th,               //
+                                                 max_refined_tets,       // Maximum number of tets
+                                                 &tets_iter);            // Output
+
+        for (int tet_id = 0; tet_id < n_tets; tet_id++) {
+            // Volume of the tetrahedron
+            const real_type theta_volume = tet4_measure_v2(tets_iter[tet_id].x0,
+                                                           tets_iter[tet_id].x1,
+                                                           tets_iter[tet_id].x2,
+                                                           tets_iter[tet_id].x3,
+                                                           //
+                                                           tets_iter[tet_id].y0,
+                                                           tets_iter[tet_id].y1,
+                                                           tets_iter[tet_id].y2,
+                                                           tets_iter[tet_id].y3,
+                                                           //
+                                                           tets_iter[tet_id].z0,
+                                                           tets_iter[tet_id].z1,
+                                                           tets_iter[tet_id].z2,
+                                                           tets_iter[tet_id].z3);
+
+            // printf("theta_volume = %g\n", theta_volume);
+
+            const real_type wf0 = tets_iter[tet_id].w0;
+            const real_type wf1 = tets_iter[tet_id].w1;
+            const real_type wf2 = tets_iter[tet_id].w2;
+            const real_type wf3 = tets_iter[tet_id].w3;
+
+            // if (wf0 > 1.001 || wf1 > 1.001 || wf2 > 1.001 || wf3 > 1.001) {
+            //     printf("tet_id = %d, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g\n", tet_id, wf0, wf1, wf2, wf3);
+            // }
+
+            // const real_type sampled_volume = hexahedron_volume * (real_type)(TET_QUAD_NQP);
+
+            tet4_resample_tetrahedron_local_adjoint(tets_iter[tet_id].x0,
+                                                    tets_iter[tet_id].x1,
+                                                    tets_iter[tet_id].x2,
+                                                    tets_iter[tet_id].x3,
+                                                    //
+                                                    tets_iter[tet_id].y0,
+                                                    tets_iter[tet_id].y1,
+                                                    tets_iter[tet_id].y2,
+                                                    tets_iter[tet_id].y3,
+                                                    //
+                                                    tets_iter[tet_id].z0,
+                                                    tets_iter[tet_id].z1,
+                                                    tets_iter[tet_id].z2,
+                                                    tets_iter[tet_id].z3,
+                                                    theta_volume,  // Volume of the tetrahedron
+                                                    wf0,           // Weighted field at the vertices
+                                                    wf1,           //
+                                                    wf2,           //
+                                                    wf3,           //
+                                                    ox,            // Origin of the grid
+                                                    oy,            //
+                                                    oz,            //
+                                                    dx,            // Spacing of the grid
+                                                    dy,            //
+                                                    dz,            //
+                                                    stride,        // Stride
+                                                    n,             // Size of the grid
+                                                    data);         // Output
+        }  // END for loop over refined tetrahedra (tet_id = 0; tet_id < n_tets; tet_id++)
+
+        if (tets_iter != NULL) {
+            free(tets_iter);
+            tets_iter = NULL;
+        }
+
+    }  // END for loop over elements (element_i = start_element; element_i < end_element; element_i++)
+
+    return ret;
+}
