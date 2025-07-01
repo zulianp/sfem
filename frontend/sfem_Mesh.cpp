@@ -316,13 +316,37 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        return mesh_write_serial(path,
+        if (impl_->blocks.size() == 1) {
+
+            return mesh_write_serial(path,
                                  impl_->blocks[0]->element_type(),
                                  impl_->blocks[0]->elements()->extent(1),
                                  impl_->blocks[0]->elements()->data(),
                                  impl_->spatial_dim,
                                  impl_->nnodes,
                                  impl_->points->data());
+        } else {
+            std::vector<ptrdiff_t> n_elements;
+            std::vector<enum ElemType> element_types;
+            std::vector<idx_t **> elements;
+            std::vector<const char *> block_names;
+
+            for (auto &block : impl_->blocks) {
+                n_elements.push_back(block->elements()->extent(1));
+                element_types.push_back(block->element_type());
+                elements.push_back(block->elements()->data());
+                block_names.push_back(block->name().c_str());
+            }
+            return mesh_multiblock_write_serial(path,
+                                                 impl_->blocks.size(),
+                                                 block_names.data(),
+                                                 element_types.data(),
+                                                 n_elements.data(),
+                                                 elements.data(),
+                                                 impl_->spatial_dim,
+                                                 impl_->nnodes,
+                                                 impl_->points->data());
+        }
     }
 
     const geom_t *const Mesh::points(const int coord) const {
