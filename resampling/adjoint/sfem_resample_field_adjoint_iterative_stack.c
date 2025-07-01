@@ -307,7 +307,7 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
         free(tet_head);
         tet_head = NULL;
-    }
+    } // END while loop (flag_loop == 1 && sfem_stack_size(stack) > 0)
 
     //////////////////////////////////////////////
 

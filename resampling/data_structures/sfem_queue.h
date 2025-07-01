@@ -18,6 +18,8 @@ sfem_queue_t* sfem_queue_create(const size_t capacity);
 
 void* sfem_queue_destroy(sfem_queue_t* queue);
 
+void sfem_queue_clear(sfem_queue_t* queue);
+
 size_t sfem_queue_size(sfem_queue_t* queue);
 
 void sfem_queue_realloc(sfem_queue_t* queue, const size_t new_capacity);
