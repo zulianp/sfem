@@ -1,21 +1,12 @@
 #include "sfem_Sideset.hpp"
 
-#include <stddef.h>
-
+// C includes
 #include "matrixio_array.h"
 #include "utils.h"
 
 #include "sfem_defs.h"
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
-#include "sfem_Tracer.hpp"
-
-#include <sys/stat.h>
-#include <cstddef>
-#include <fstream>
-#include <iostream>
-#include <list>
-#include <vector>
 
 // Mesh
 #include "adj_table.h"
@@ -26,18 +17,30 @@
 #include "sshex8_mesh.h"
 
 // C++ includes
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
+
+#include <stddef.h>
+#include <sys/stat.h>
+
+#include <cstddef>
+#include <fstream>
+#include <iostream>
+#include <list>
+#include <vector>
 
 namespace sfem {
 
     class Sideset::Impl final {
     public:
-        std::shared_ptr<Communicator> comm;
+        std::shared_ptr<Communicator>          comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
     };
 
-    Sideset::Sideset(const std::shared_ptr<Communicator>& comm,
+    Sideset::Sideset(const std::shared_ptr<Communicator>          &comm,
                      const std::shared_ptr<Buffer<element_idx_t>> &parent,
                      const std::shared_ptr<Buffer<int16_t>>       &lfi)
         : impl_(std::make_unique<Impl>()) {
@@ -53,13 +56,13 @@ namespace sfem {
 
     std::shared_ptr<Communicator> Sideset::comm() const { return impl_->comm; }
 
-    std::shared_ptr<Sideset> Sideset::create(const std::shared_ptr<Communicator>& comm,
+    std::shared_ptr<Sideset> Sideset::create(const std::shared_ptr<Communicator>          &comm,
                                              const std::shared_ptr<Buffer<element_idx_t>> &parent,
                                              const std::shared_ptr<Buffer<int16_t>>       &lfi) {
         return std::make_shared<Sideset>(comm, parent, lfi);
     }
 
-    std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator>& comm, const char *path) {
+    std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator> &comm, const char *path) {
         auto ret = std::make_shared<Sideset>();
         if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
         return ret;
@@ -70,7 +73,12 @@ namespace sfem {
         sfem::create_directory(sideset_path.c_str());
 
         std::string parent_path = sideset_path + "/parent.raw";
-        array_write(impl_->comm->get(), parent_path.c_str(), SFEM_MPI_ELEMENT_IDX_T, impl_->parent->data(), impl_->parent->size(), impl_->parent->size());
+        array_write(impl_->comm->get(),
+                    parent_path.c_str(),
+                    SFEM_MPI_ELEMENT_IDX_T,
+                    impl_->parent->data(),
+                    impl_->parent->size(),
+                    impl_->parent->size());
 
         std::string lfi_path = sideset_path + "/lfi.int16.raw";
         array_write(impl_->comm->get(), lfi_path.c_str(), MPI_SHORT, impl_->lfi->data(), impl_->lfi->size(), impl_->lfi->size());
@@ -161,7 +169,7 @@ namespace sfem {
         return std::make_shared<Sideset>(mesh->comm(), parent, lfi);
     }
 
-    int Sideset::read(const std::shared_ptr<Communicator>& comm, const char *folder) {
+    int Sideset::read(const std::shared_ptr<Communicator> &comm, const char *folder) {
         SFEM_TRACE_SCOPE("Sideset::read");
 
         impl_->comm = comm;
@@ -171,9 +179,14 @@ namespace sfem {
         element_idx_t *parent{nullptr};
         int16_t       *lfi{nullptr};
 
-        if (array_create_from_file(
-                    comm->get(), (folder_ + "/parent.raw").c_str(), SFEM_MPI_ELEMENT_IDX_T, (void **)&parent, &nlocal, &nglobal) ||
-            array_create_from_file(comm->get(), (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
+        if (array_create_from_file(comm->get(),
+                                   (folder_ + "/parent.raw").c_str(),
+                                   SFEM_MPI_ELEMENT_IDX_T,
+                                   (void **)&parent,
+                                   &nlocal,
+                                   &nglobal) ||
+            array_create_from_file(
+                    comm->get(), (folder_ + "/lfi.int16.raw").c_str(), MPI_SHORT, (void **)&lfi, &ncheck, &nglobal)) {
             return SFEM_FAILURE;
         }
 
@@ -191,4 +204,82 @@ namespace sfem {
     std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
     std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
 
-}  // namespace sfem 
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
+                                                               const std::shared_ptr<Sideset>       &sideset) {
+        ptrdiff_t n_nodes{0};
+        idx_t    *nodes{nullptr};
+        if (space->has_semi_structured_mesh()) {
+            auto &&ss = space->semi_structured_mesh();
+            SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
+            if (sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                    ss.element_data(),
+                                                    sideset->parent()->size(),
+                                                    sideset->parent()->data(),
+                                                    sideset->lfi()->data(),
+                                                    &n_nodes,
+                                                    &nodes) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+            }
+        } else {
+            if (extract_nodeset_from_sideset(space->element_type(),
+                                             space->mesh_ptr()->elements()->data(),
+                                             sideset->parent()->size(),
+                                             sideset->parent()->data(),
+                                             sideset->lfi()->data(),
+                                             &n_nodes,
+                                             &nodes) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+            }
+        }
+
+        return sfem::manage_host_buffer(n_nodes, nodes);
+    }
+
+    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::shared_ptr<Sideset>       &sideset) {
+        if (space->has_semi_structured_mesh()) {
+            auto &&ssmesh = space->semi_structured_mesh();
+            auto   ss_sides =
+                    sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sideset->parent()->size());
+
+            if (sshex8_extract_surface_from_sideset(ssmesh.level(),
+                                                    ssmesh.element_data(),
+                                                    sideset->parent()->size(),
+                                                    sideset->parent()->data(),
+                                                    sideset->lfi()->data(),
+                                                    ss_sides->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract surface from sideset!\n");
+            }
+
+            idx_t           *idx          = nullptr;
+            ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
+            std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+
+            // FiXME harcoded for sshex8
+            sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+
+            const int nnxs    = 4;
+            const int nexs    = ssmesh.level() * ssmesh.level();
+            auto      surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size() * nexs);
+
+            ssquad4_to_standard_quad4_mesh(ssmesh.level(), sideset->parent()->size(), ss_sides->data(), surface->data());
+            return {QUADSHELL4, surface};
+        } else {
+            auto st   = shell_type(side_type(space->element_type()));
+            int  nnxs = elem_num_nodes(st);
+
+            auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
+            auto mesh    = space->mesh_ptr();
+            if (extract_surface_from_sideset(space->element_type(),
+                                             mesh->elements()->data(),
+                                             sideset->parent()->size(),
+                                             sideset->parent()->data(),
+                                             sideset->lfi()->data(),
+                                             surface->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to create surface from sideset!");
+            }
+            return {st, surface};
+        }
+    }
+}  // namespace sfem
