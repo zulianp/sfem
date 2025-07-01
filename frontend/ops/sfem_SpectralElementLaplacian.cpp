@@ -1,16 +1,16 @@
 #include "sfem_SpectralElementLaplacian.hpp"
 
-// C includes   
+// C includes
 #include "spectral_hex_laplacian.h"
 
 // C++ includes
-#include "sfem_Laplacian.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
+#include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -61,24 +61,23 @@ namespace sfem {
             ret->element_type = element_type;
             return ret;
         } else {
-            auto ret          = std::make_shared<Laplacian>(space);
-            ret->element_type = macro_base_elem(element_type);
+            auto ret = std::make_shared<Laplacian>(space);
+            // ret->element_type = macro_base_elem(element_type);
+            assert(space->n_blocks() == 1);  // FIXME
+            ret->element_types.clear();
+            ret->element_types.push_back(macro_base_elem(element_type));
             return ret;
         }
     }
 
-    const char *SpectralElementLaplacian::name() const {
-        return "ss:SpectralElementLaplacian";
-    }
+    const char *SpectralElementLaplacian::name() const { return "ss:SpectralElementLaplacian"; }
 
-    int SpectralElementLaplacian::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int SpectralElementLaplacian::initialize() { return SFEM_SUCCESS; }
 
     int SpectralElementLaplacian::hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) {
+                                              const count_t *const rowptr,
+                                              const idx_t *const   colidx,
+                                              real_t *const        values) {
         SFEM_ERROR("[Error] SpectralElementLaplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -123,4 +122,4 @@ namespace sfem {
         return ret;
     }
 
-} // namespace sfem 
+}  // namespace sfem
