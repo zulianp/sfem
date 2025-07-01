@@ -25,6 +25,7 @@ typedef enum {
     ADJOINT_BASE = 0,                //
     ADJOINT_REFINE_ONE_STEP,         //
     ADJOINT_REFINE_ITERATIVE,        //
+    ADJOINT_REFINE_ITERATIVE_QUEUE,  //
     ADJOINT_REFINE_HYTEG_REFINEMENT  //
 } AdjointRefineType;                 //
 
