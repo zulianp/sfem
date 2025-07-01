@@ -33,6 +33,17 @@ void* sfem_queue_destroy(sfem_queue_t* queue) {
     return NULL;  // Return NULL to indicate the queue has been destroyed
 }
 
+void sfem_queue_clear(sfem_queue_t* queue) {
+    for (size_t i = queue->tail; i < queue->head; i++) {
+        free(queue->queue[i]);  // Free each object in the queue
+    }
+    queue->head = 0;  // Reset head to 0
+    queue->tail = 0;  // Reset tail to 0
+    // Note: The queue memory is not freed here, just the objects within it
+    // The queue itself can still be used after clearing
+    // If you want to free the queue memory, call sfem_queue_destroy(queue) instead
+}
+
 void sfem_queue_realloc(sfem_queue_t* queue, const size_t new_capacity) {
     if (queue->head >= queue->capacity) {
         void* new_queue = (void**)calloc(new_capacity, sizeof(void*));
