@@ -18,20 +18,29 @@ namespace sfem {
 
         assert(1 == space->block_size());
 
-        auto ret          = std::make_unique<Laplacian>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        auto ret           = std::make_unique<Laplacian>(space);
+        ret->element_types = space->element_types();
         return ret;
     }
 
     std::shared_ptr<Op> Laplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret          = std::make_shared<Laplacian>(space);
-        ret->element_type = macro_type_variant(element_type);
+        auto ret = std::make_shared<Laplacian>(space);
+
+        ret->element_types.reserve(space->n_blocks());
+        for (auto et : space->element_types()) {
+            ret->element_types.push_back(macro_type_variant(et));
+        }
+
         return ret;
     }
 
     std::shared_ptr<Op> Laplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret          = std::make_shared<Laplacian>(space);
-        ret->element_type = macro_base_elem(element_type);
+        auto ret = std::make_shared<Laplacian>(space);
+        
+        ret->element_types.reserve(space->n_blocks());
+        for (auto et : space->element_types()) {
+            ret->element_types.push_back(macro_base_elem(et));
+        }
         return ret;
     }
 
@@ -59,7 +68,7 @@ namespace sfem {
         int  err   = SFEM_SUCCESS;
 
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_crs(space->element_type(block),
+            err |= laplacian_crs(element_types[block],
                                  mesh->n_elements(),
                                  mesh->n_nodes(),
                                  mesh->block(block)->elements()->data(),
@@ -83,7 +92,7 @@ namespace sfem {
         int  err  = SFEM_SUCCESS;
 
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_crs_sym(space->element_type(block),
+            err |= laplacian_crs_sym(element_types[block],
                                      mesh->block(block)->n_elements(),
                                      mesh->n_nodes(),
                                      mesh->block(block)->elements()->data(),
@@ -104,7 +113,7 @@ namespace sfem {
         int  err  = SFEM_SUCCESS;
 
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_diag(space->element_type(block),
+            err |= laplacian_diag(element_types[block],
                                   mesh->block(block)->n_elements(),
                                   mesh->n_nodes(),
                                   mesh->block(block)->elements()->data(),
@@ -123,7 +132,7 @@ namespace sfem {
         int err = SFEM_SUCCESS;
 
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_assemble_gradient(space->element_type(block),
+            err |= laplacian_assemble_gradient(element_types[block],
                                                mesh->block(block)->n_elements(),
                                                mesh->n_nodes(),
                                                mesh->block(block)->elements()->data(),
@@ -143,7 +152,7 @@ namespace sfem {
 
         int err = SFEM_SUCCESS;
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_apply(space->element_type(block),
+            err |= laplacian_apply(element_types[block],
                                    mesh->block(block)->n_elements(),
                                    mesh->n_nodes(),
                                    mesh->block(block)->elements()->data(),
@@ -165,7 +174,7 @@ namespace sfem {
 
         int err = SFEM_SUCCESS;
         for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_assemble_value(space->element_type(block),
+            err |= laplacian_assemble_value(element_types[block],
                                             mesh->block(block)->n_elements(),
                                             mesh->n_nodes(),
                                             mesh->block(block)->elements()->data(),

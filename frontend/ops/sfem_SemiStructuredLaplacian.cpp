@@ -1,18 +1,17 @@
 #include "sfem_SemiStructuredLaplacian.hpp"
 
 // C includes
-#include "sshex8_laplacian.h"
 #include "hex8_fff.h"
+#include "sshex8_laplacian.h"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
+#include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
-#include "sfem_Laplacian.hpp"
-
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -89,24 +88,23 @@ namespace sfem {
             ret->use_stencil              = use_stencil;
             return ret;
         } else {
-            auto ret          = std::make_shared<Laplacian>(space);
-            ret->element_type = macro_base_elem(element_type);
+            auto ret = std::make_shared<Laplacian>(space);
+            // ret->element_type = macro_base_elem(element_type);
+            assert(space->n_blocks() == 1);  // FIXME
+            ret->element_types.clear();
+            ret->element_types.push_back(macro_base_elem(element_type));
             return ret;
         }
     }
 
-    const char *SemiStructuredLaplacian::name() const {
-        return "ss:Laplacian";
-    }
+    const char *SemiStructuredLaplacian::name() const { return "ss:Laplacian"; }
 
-    int SemiStructuredLaplacian::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int SemiStructuredLaplacian::initialize() { return SFEM_SUCCESS; }
 
     int SemiStructuredLaplacian::hessian_crs(const real_t *const  x,
-                                            const count_t *const rowptr,
-                                            const idx_t *const   colidx,
-                                            real_t *const        values) {
+                                             const count_t *const rowptr,
+                                             const idx_t *const   colidx,
+                                             real_t *const        values) {
         SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -132,17 +130,11 @@ namespace sfem {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", ssm.level());
 
-        return affine_sshex8_laplacian_diag(ssm.level(),
-                                            ssm.n_elements(),
-                                            ssm.interior_start(),
-                                            ssm.element_data(),
-                                            ssm.point_data(),
-                                            values);
+        return affine_sshex8_laplacian_diag(
+                ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), values);
     }
 
-    int SemiStructuredLaplacian::gradient(const real_t *const x, real_t *const out) {
-        return apply(nullptr, x, out);
-    }
+    int SemiStructuredLaplacian::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
 
     int SemiStructuredLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredLaplacian::apply");
@@ -198,4 +190,4 @@ namespace sfem {
         }
     }
 
-} // namespace sfem 
+}  // namespace sfem

@@ -1,12 +1,15 @@
-#include "sfem_Mesh.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
-#include "sfem_Laplacian.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_Tracer.hpp"
+
+// C includes
 #include "sshex8_laplacian.h"
 #include "sshex8_stencil_element_matrix_apply.h"
-#include <mpi.h>
+
+// C++ includes
+#include "sfem_Laplacian.hpp"
+#include "sfem_Mesh.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -60,15 +63,15 @@ namespace sfem {
             ret->initialize();
             return ret;
         } else {
-            auto ret          = std::make_shared<Laplacian>(space);
-            ret->element_type = macro_base_elem(element_type);
+            auto ret = std::make_shared<Laplacian>(space);
+            assert(space->n_blocks() == 1);  // FIXME
+            ret->element_types.clear();
+            ret->element_types.push_back(macro_base_elem(element_type));
             return ret;
         }
     }
 
-    const char *SemiStructuredEMLaplacian::name() const {
-        return "ss:em:Laplacian";
-    }
+    const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize() {
         auto &ssm      = space->semi_structured_mesh();
@@ -83,9 +86,9 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::hessian_crs(const real_t *const  x,
-                        const count_t *const rowptr,
-                        const idx_t *const   colidx,
-                        real_t *const        values) {
+                                               const count_t *const rowptr,
+                                               const idx_t *const   colidx,
+                                               real_t *const        values) {
         SFEM_ERROR("[Error] ss:em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -126,9 +129,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int SemiStructuredEMLaplacian::report(const real_t *const) { 
-        return SFEM_SUCCESS; 
-    }
+    int SemiStructuredEMLaplacian::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> SemiStructuredEMLaplacian::clone() const {
         auto ret = std::make_shared<SemiStructuredEMLaplacian>(space);
@@ -136,4 +137,4 @@ namespace sfem {
         return ret;
     }
 
-} // namespace sfem 
+}  // namespace sfem

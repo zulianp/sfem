@@ -39,7 +39,7 @@ namespace sfem {
     class Laplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
+        std::vector<enum ElemType> element_types; ///< Element type
 
         long   calls{0};      ///< Number of apply() calls for performance tracking
         double total_time{0}; ///< Total time spent in apply() for performance tracking

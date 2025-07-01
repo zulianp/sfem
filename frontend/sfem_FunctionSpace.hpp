@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace sfem {
 
@@ -44,6 +45,7 @@ namespace sfem {
         ptrdiff_t n_dofs() const;
 
         enum ElemType element_type(const int block = 0) const;
+        std::vector<enum ElemType> element_types() const;
 
         std::shared_ptr<FunctionSpace> derefine(const int to_level = 1);
         std::shared_ptr<FunctionSpace> lor() const;
