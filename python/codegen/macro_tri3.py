@@ -130,7 +130,7 @@ class MacroTri3:
 # for f in fff:
 # 	print(f)
 
-nl = 1
+nl = 2
 fffl = MacroTri3().fff_level_n(nl)
 
 for l in range(0, nl):
