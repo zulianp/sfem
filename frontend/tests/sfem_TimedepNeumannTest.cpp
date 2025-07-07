@@ -170,6 +170,7 @@ int test_newmark() {
         return (t < 0.01) ? -1 : 0.0;
     };
 
+    std::shared_ptr<sfem::Op> current_neumann_op = nullptr;
 
     bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
@@ -185,10 +186,13 @@ int test_newmark() {
 
     while (t < T) {
 
+        if (current_neumann_op) {
+            f->remove_operator(current_neumann_op);
+        }
         real_t load_mag = time_load();
         sfem::NeumannConditions::Condition nc_top{.sideset = top_load_sideset, .value = load_mag, .component = 2};
-        auto n_conds = sfem::create_neumann_conditions(fs, {nc_top}, es);
-        f->add_operator(n_conds);
+        current_neumann_op = sfem::create_neumann_conditions(fs, {nc_top}, es);
+        f->add_operator(current_neumann_op);
         
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
