@@ -115,7 +115,7 @@ def sub_fff_generic(micro_ref, FFFs):
 
     # print("------------------")
     # print(Aminv)
-    # print(detAm)
+    print(detAm)
     # print(FFAms)
     return FFAms
 
@@ -331,7 +331,7 @@ class MacroSimplex:
             assert diff == 0
 
 
-nl = 1
+nl = 2
 ms = MacroSimplex()
 fffl = ms.fff_level_n(nl)
 ms.plot_test()
