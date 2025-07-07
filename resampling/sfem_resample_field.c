@@ -1194,7 +1194,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                 // printf("mass_vector[%ld] = %g\n", i, mass_vector[i]);
 
                 // DEBUG: - to be removed
-                mass_vector[i] = g[i];
+                mass_vector[i] = g[i];  // DEBUG: - to be removed: it directly pass the weighted field
+
             }  // end for i < mesh.n_owned_nodes
         }
 
@@ -1204,23 +1205,23 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
     switch (info->adjoint_refine_type) {
         case ADJOINT_REFINE_ITERATIVE:
-            ret = tet4_resample_field_local_ref_iterative_adjoint(0,                              //
-                                                                  mesh->nelements,                //
-                                                                  mesh->nnodes,                   //
-                                                                  (const idx_t**)mesh->elements,  //
-                                                                  (const geom_t**)mesh->points,   //
-                                                                  n,                              //
-                                                                  stride,                         //
-                                                                  origin,                         //
-                                                                  delta,                          //
-                                                                  mass_vector,                    //
-                                                                  alpha_th,                       //
-                                                                  data);                          //
+            ret = tet4_resample_field_local_ref_iter_adjoint_stack(0,                              //
+                                                                   mesh->nelements,                //
+                                                                   mesh->nnodes,                   //
+                                                                   (const idx_t**)mesh->elements,  //
+                                                                   (const geom_t**)mesh->points,   //
+                                                                   n,                              //
+                                                                   stride,                         //
+                                                                   origin,                         //
+                                                                   delta,                          //
+                                                                   mass_vector,                    //
+                                                                   alpha_th,                       //
+                                                                   data);                          //
 
             break;
 
         case ADJOINT_REFINE_ITERATIVE_QUEUE:
-            ret = tet4_resample_field_local_ref_queue_iter_adjoint(0,                              //
+            ret = tet4_resample_field_local_ref_iter_adjoint_queue(0,                              //
                                                                    mesh->nelements,                //
                                                                    mesh->nnodes,                   //
                                                                    (const idx_t**)mesh->elements,  //

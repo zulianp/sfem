@@ -307,11 +307,11 @@ tet4_iterative_refinement_queue(const real_type       x0,                // Tetr
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-// tet4_resample_field_local_ref_iterative_adjoint ///////
+// tet4_resample_field_local_ref_iter_adjoint_stack ///////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 int                                                                                                    //
-tet4_resample_field_local_ref_queue_iter_adjoint(const ptrdiff_t                      start_element,   // Mesh
+tet4_resample_field_local_ref_iter_adjoint_queue(const ptrdiff_t                      start_element,   // Mesh
                                                  const ptrdiff_t                      end_element,     //
                                                  const ptrdiff_t                      nnodes,          //
                                                  const idx_t** const SFEM_RESTRICT    elems,           //

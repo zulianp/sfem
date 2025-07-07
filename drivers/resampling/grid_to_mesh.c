@@ -769,7 +769,7 @@ int main(int argc, char* argv[]) {
                     info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                     info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                     // info.adjoint_refine_type = ADJOINT_BASE;
-                    // info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
+                    info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 
 #if SFEM_LOG_LEVEL >= 5
                     printf("info.adjoint_refine_type = %d, %s:%d\n", info.adjoint_refine_type, __FILE__, __LINE__);
@@ -825,9 +825,21 @@ int main(int argc, char* argv[]) {
                     real_t min_field_tet4 = 0.0;
                     real_t max_field_tet4 = 0.0;
 
-                    normalize_field_and_find_min_max(field, n_zyx, delta, &min_field_tet4, &max_field_tet4);
+                    normalize_field_and_find_min_max(field,             //
+                                                     n_zyx,             //
+                                                     delta,             //
+                                                     &min_field_tet4,   //
+                                                     &max_field_tet4);  //
 
-                    print_rank_info(mpi_rank, mpi_size, max_field_tet4, min_field_tet4, n_zyx, nlocal, origin, delta, nglobal);
+                    print_rank_info(mpi_rank,        //
+                                    mpi_size,        //
+                                    max_field_tet4,  //
+                                    min_field_tet4,  //
+                                    n_zyx,           //
+                                    nlocal,          //
+                                    origin,          //
+                                    delta,           //
+                                    nglobal);        //
 
                     // printf("max_field = %1.14e\n", max_field);
                     // printf("min_field = %1.14e\n", min_field);
