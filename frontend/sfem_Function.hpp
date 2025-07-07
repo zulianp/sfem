@@ -69,6 +69,7 @@ namespace sfem {
         std::shared_ptr<Function> lor();
         std::shared_ptr<Function> lor(const std::shared_ptr<FunctionSpace> &space);
 
+        void remove_operator(const std::shared_ptr<Op> &op);
         void add_operator(const std::shared_ptr<Op> &op);
         void add_constraint(const std::shared_ptr<Constraint> &c);
         void clear_constraints();
