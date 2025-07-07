@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh          = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     const char *output_folder = argv[2];
 
     if (smooth(mesh) != SFEM_SUCCESS) {

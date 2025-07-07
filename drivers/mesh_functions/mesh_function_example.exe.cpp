@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh   = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto        mesh   = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     const char *output = argv[2];
 
     const ptrdiff_t n_elements = mesh->n_elements();

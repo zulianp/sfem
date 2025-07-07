@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
     char        path[SFEM_MAX_PATH_LENGTH];
-    sprintf(path, "%s/i*.raw", folder);
+    snprintf(path, sizeof(path), "%s/i*.raw", folder);
     int nnxe = sfem::count_files(path);
 
     // FIXME
@@ -89,11 +89,11 @@ int main(int argc, char *argv[]) {
     count_t       *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
 
-    sprintf(path, "%s/adj_ptr.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/adj_ptr.raw", output_folder);
     ptrdiff_t adj_ptr_size_local, adj_ptr_size;
     array_create_from_file(comm, path, SFEM_MPI_COUNT_T, (void **)&adj_ptr, &adj_ptr_size_local, &adj_ptr_size);
 
-    sprintf(path, "%s/adj_idx.raw", output_folder);
+    snprintf(path, sizeof(path), "%s/adj_idx.raw", output_folder);
     ptrdiff_t ennz_local, ennz;
     array_create_from_file(comm, path, SFEM_MPI_ELEMENT_IDX_T, (void **)&adj_idx, &ennz_local, &ennz);
 
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
     create_element_adj_table_from_dual_graph_soa(n_elements, n_nodes, element_type, elems, adj_ptr, adj_idx, table);
 
     for (int s = 0; s < ns; s++) {
-        sprintf(path, "%s/a.%d.raw", output_folder, s);
+        snprintf(path, sizeof(path), "%s/a.%d.raw", output_folder, s);
         array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, table[s], n_elements, n_elements);
     }
 

@@ -17,6 +17,8 @@
 #include "laplacian.h"
 #include "tet4_fff.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -56,27 +58,27 @@ int main(int argc, char *argv[]) {
     // Set-up (read and init)
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
+    auto element_type = mesh->element_type();
     if (SFEM_USE_MACRO) {
-        mesh.element_type = macro_type_variant(mesh.element_type);
+        element_type = macro_type_variant(element_type);
     }
 
     ptrdiff_t u_n_local, u_n_global;
 
     real_t *x = 0;
     if (strcmp("gen:ones", path_f) == 0) {
-        x = (real_t*)malloc(mesh.nnodes * sizeof(real_t));
+        x = (real_t*)malloc(n_nodes * sizeof(real_t));
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
             x[i] = 1;
         }
 
-        u_n_local = mesh.nnodes;
-        u_n_global = mesh.nnodes;
+        u_n_local = n_nodes;
+        u_n_global = n_nodes;
 
     } else {
         array_create_from_file(comm, path_f, SFEM_MPI_REAL_T, (void **)&x, &u_n_local, &u_n_global);
@@ -84,14 +86,14 @@ int main(int argc, char *argv[]) {
 
     real_t *y = (real_t*)calloc(u_n_local, sizeof(real_t));
 
-    if (!laplacian_is_opt(mesh.element_type)) {
+    if (!laplacian_is_opt(element_type)) {
         SFEM_USE_OPT = 0;
     }
 
     fff_t fff;
     if (SFEM_USE_OPT) {
         // FIXME!
-        tet4_fff_create(&fff, mesh.nelements, mesh.elements, mesh.points);
+        tet4_fff_create(&fff, n_elements, mesh->elements()->data(), mesh->points()->data());
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -102,22 +104,21 @@ int main(int argc, char *argv[]) {
 
     for (int repeat = 0; repeat < SFEM_REPEAT; repeat++) {
         if (SFEM_USE_OPT) {
-            laplacian_apply_opt(mesh.element_type, fff.nelements, fff.elements, fff.data, x, y);
+            laplacian_apply_opt(element_type, fff.nelements, fff.elements, fff.data, x, y);
         } else {
-            laplacian_apply(mesh.element_type,
-                            mesh.nelements,
-                            mesh.nnodes,
-                            mesh.elements,
-                            mesh.points,
+            laplacian_apply(element_type,
+                            n_elements,
+                            n_nodes,
+                            mesh->elements()->data(),
+                            mesh->points()->data(),
                             x,
                             y);
         }
     }
 
     double spmv_tock = MPI_Wtime();
-    long nelements = mesh.nelements;
-    long nnodes = mesh.nnodes;
-    enum ElemType element_type = mesh.element_type;
+    long nelements = n_elements;
+    long nnodes = n_nodes;
 
     ///////////////////////////////////////////////////////////////////////////////
     // Output for testing
@@ -135,7 +136,6 @@ int main(int argc, char *argv[]) {
 
     free(x);
     free(y);
-    mesh_destroy(&mesh);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Stats

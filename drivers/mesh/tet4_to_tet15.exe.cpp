@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        tet4_mesh     = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto tet4_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     const char *output_folder = argv[2];
 
     const ptrdiff_t n_elements = tet4_mesh->n_elements();

@@ -18,6 +18,8 @@
 #include "sortreduce.h"
 #include "sfem_glob.hpp"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -52,10 +54,10 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    mesh_t p1_mesh;
-    if (mesh_read(comm, folder, &p1_mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto p1_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = p1_mesh->n_elements();
+    const ptrdiff_t n_nodes = p1_mesh->n_nodes();
+    int p1_nxe = elem_num_nodes(p1_mesh->element_type());
 
     ///////////////////////////////////////////////////////////////////////////////
     // Build CRS graph of P1 mesh
@@ -65,10 +67,10 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
 
     // This only works for TET4 or TRI3
-    build_crs_graph_for_elem_type(p1_mesh.element_type,
-                                  p1_mesh.nelements,
-                                  p1_mesh.nnodes,
-                                  p1_mesh.elements,
+    build_crs_graph_for_elem_type(p1_mesh->element_type(),
+                                  n_elements,
+                                  n_nodes,
+                                  p1_mesh->elements()->data(),
                                   &rowptr,
                                   &colidx);
 
@@ -77,13 +79,13 @@ int main(int argc, char *argv[]) {
     mesh_t p2_mesh;
     mesh_init(&p2_mesh);
 
-    const count_t nnz = rowptr[p1_mesh.nnodes];
+    const count_t nnz = rowptr[n_nodes];
     idx_t *p2idx = (idx_t *)malloc(nnz * sizeof(idx_t));
     memset(p2idx, 0, nnz * sizeof(idx_t));
 
     ptrdiff_t p2_nodes = 0;
-    idx_t next_id = p1_mesh.nnodes;
-    for (ptrdiff_t i = 0; i < p1_mesh.nnodes; i++) {
+    idx_t next_id = n_nodes;
+    for (ptrdiff_t i = 0; i < n_nodes; i++) {
         const count_t begin = rowptr[i];
         const count_t end = rowptr[i + 1];
 
@@ -101,13 +103,12 @@ int main(int argc, char *argv[]) {
     // Create P2 mesh
     ///////////////////////////////////////////////////////////////////////////////
 
-    const int n_p2_node_x_element = (p1_mesh.element_type == TET4 ? 6 : 3);
+    const int n_p2_node_x_element = (p1_mesh->element_type() == TET4 ? 6 : 3);
 
     p2_mesh.comm = comm;
-    p2_mesh.mem_space = p1_mesh.mem_space;
-    p2_mesh.nelements = p1_mesh.nelements;
-    p2_mesh.nnodes = p1_mesh.nnodes + p2_nodes;
-    p2_mesh.spatial_dim = p1_mesh.spatial_dim;
+    p2_mesh.nelements = n_elements;
+    p2_mesh.nnodes = n_nodes + p2_nodes;
+    p2_mesh.spatial_dim = p1_mesh->spatial_dimension();
 
     p2_mesh.n_owned_nodes = p2_mesh.nnodes;
     p2_mesh.n_owned_elements = p2_mesh.nelements;
@@ -117,15 +118,14 @@ int main(int argc, char *argv[]) {
     p2_mesh.node_owner = 0;
     p2_mesh.element_mapping = 0;
 
-    p2_mesh.element_type = elem_higher_order(p1_mesh.element_type);
+    p2_mesh.element_type = elem_higher_order(p1_mesh->element_type());
     p2_mesh.elements = (idx_t **)malloc(p2_mesh.element_type * sizeof(idx_t *));
     p2_mesh.points = (geom_t **)malloc(p2_mesh.spatial_dim * sizeof(geom_t *));
 
-    const int p1_nxe = elem_num_nodes(p1_mesh.element_type);
     const int p2_nxe = elem_num_nodes(p2_mesh.element_type);
 
     for (int d = 0; d < p1_nxe; d++) {
-        p2_mesh.elements[d] = p1_mesh.elements[d];
+        p2_mesh.elements[d] = p1_mesh->elements()->data()[d];
     }
 
     // Allocate space for p2 nodes
@@ -137,10 +137,10 @@ int main(int argc, char *argv[]) {
         p2_mesh.points[d] = (geom_t *)malloc(p2_mesh.nnodes * sizeof(geom_t));
 
         // Copy p1 portion
-        memcpy(p2_mesh.points[d], p1_mesh.points[d], p1_mesh.nnodes * sizeof(geom_t));
+        memcpy(p2_mesh.points[d], p1_mesh->points()->data()[d], n_nodes * sizeof(geom_t));
     }
 
-    if (p1_mesh.element_type == TET4) {
+    if (p1_mesh->element_type() == TET4) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < p2_mesh.nelements; e++) {
             // Ordering of edges compliant to exodusII spec
@@ -166,11 +166,11 @@ int main(int argc, char *argv[]) {
                 const count_t len_row = rowptr[r + 1] - row_begin;
                 const idx_t *cols = &colidx[row_begin];
                 const idx_t k = find_idx_binary_search(key[l], cols, len_row);
-                p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[row_begin + k];
+                p2_mesh.elements[l + p1_nxe][e] = p2idx[row_begin + k];
             }
         }
 
-    } else if (p1_mesh.element_type == TRI3) {
+    } else if (p1_mesh->element_type() == TRI3) {
         for (ptrdiff_t e = 0; e < p2_mesh.nelements; e++) {
             // Ordering of edges compliant to exodusII spec
             idx_t row[3];
@@ -189,16 +189,16 @@ int main(int argc, char *argv[]) {
                 const count_t len_row = rowptr[r + 1] - row_begin;
                 const idx_t *cols = &colidx[row_begin];
                 const idx_t k = find_idx_binary_search(key[l], cols, len_row);
-                p2_mesh.elements[l + p1_mesh.element_type][e] = p2idx[row_begin + k];
+                p2_mesh.elements[l + p1_nxe][e] = p2idx[row_begin + k];
             }
         }
     } else {
-        fprintf(stderr, "Implement for element_type %d\n!", p1_mesh.element_type);
+        fprintf(stderr, "Implement for element_type %d\n!", p1_mesh->element_type());
         return EXIT_FAILURE;
     }
 
     // Generate p2 coordinates
-    for (ptrdiff_t i = 0; i < p1_mesh.nnodes; i++) {
+    for (ptrdiff_t i = 0; i < n_nodes; i++) {
         const count_t begin = rowptr[i];
         const count_t end = rowptr[i + 1];
 
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
             double SFEM_SPERE_TOL = 1e-8;
             SFEM_READ_ENV(SFEM_SPERE_TOL, atof);
 
-            for (ptrdiff_t i = 0; i < p1_mesh.nnodes; i++) {
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 const count_t begin = rowptr[i];
                 const count_t end = rowptr[i + 1];
 
@@ -277,20 +277,19 @@ int main(int argc, char *argv[]) {
     mesh_write(output_folder, &p2_mesh);
 
     // Make sure we do not delete the same array twice
-    for (int d = 0; d < p1_nxe; d++) {
-        p1_mesh.elements[d] = 0;
+    for(int d = 0; d < p1_nxe; d++) {
+        p1_mesh->elements()->data()[d] = nullptr;
     }
-
+   
     if (!rank) {
         printf("----------------------------------------\n");
         printf("mesh_p1_to_p2.c: #elements %ld, nodes #p1 %ld, #p2 %ld\n",
-               (long)p1_mesh.nelements,
-               (long)p1_mesh.nnodes,
+               (long)n_elements,
+               (long)n_nodes,
                (long)p2_mesh.nnodes);
         printf("----------------------------------------\n");
     }
 
-    mesh_destroy(&p1_mesh);
     mesh_destroy(&p2_mesh);
 
     double tock = MPI_Wtime();

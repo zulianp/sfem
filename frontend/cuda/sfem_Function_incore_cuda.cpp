@@ -5,23 +5,72 @@
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
 
+// CPU
+#include "sshex8_laplacian.h"
+
+// GPU
 #include "cu_boundary_condition.h"
 #include "cu_hex8_adjugate.h"
 #include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
 #include "cu_mask.h"
+#include "cu_sshex8_elemental_matrix.h"
 #include "cu_sshex8_laplacian.h"
 #include "cu_sshex8_linear_elasticity.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
 // C++ includes
+#include "sfem_API.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
-#include "sfem_API.hpp"
 
 namespace sfem {
+    template <typename T>
+    static std::shared_ptr<Buffer<T *>> aos_to_soa(const ptrdiff_t                   n0,
+                                                   const ptrdiff_t                   n1,
+                                                   const ptrdiff_t                   in_stride0,
+                                                   const ptrdiff_t                   in_stride1,
+                                                   const std::shared_ptr<Buffer<T>> &in) {
+        auto out = sfem::create_host_buffer<T>(n0, n1);
+
+        {
+            auto d_in  = in->data();
+            auto d_out = out->data();
+
+            for (ptrdiff_t i = 0; i < n0; i++) {
+                for (ptrdiff_t j = 0; j < n1; j++) {
+                    d_out[i][j] = d_in[i * in_stride0 + j * in_stride1];
+                }
+            }
+        }
+
+        return out;
+    }
+
+    template <typename T>
+    static std::shared_ptr<Buffer<T>> soa_to_aos(const ptrdiff_t                     in_stride0,
+                                                 const ptrdiff_t                     in_stride1,
+                                                 const std::shared_ptr<Buffer<T *>> &in) {
+        auto n0 = in->extent(0);
+        auto n1 = in->extent(1);
+
+        auto out = sfem::create_host_buffer<T>(n0 * n1);
+
+        {
+            auto d_in  = in->data();
+            auto d_out = out->data();
+
+            for (ptrdiff_t i = 0; i < n0; i++) {
+                for (ptrdiff_t j = 0; j < n1; j++) {
+                    d_out[i * in_stride0 + j * in_stride1] = d_in[i][j];
+                }
+            }
+        }
+
+        return out;
+    }
 
     std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
                                                             const enum ElemType                   element_type) {
@@ -30,6 +79,18 @@ namespace sfem {
 
         } else {
             return to_device(space->mesh().elements());
+        }
+    }
+
+    std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
+                                                              const enum ElemType                   element_type) {
+        if (space->has_semi_structured_mesh()) {
+            auto nxe = space->semi_structured_mesh().n_nodes_per_element();
+            return to_device(soa_to_aos(1, nxe, space->semi_structured_mesh().elements()));
+
+        } else {
+            auto nxe = space->mesh().n_nodes_per_element();
+            return to_device(soa_to_aos(1, nxe, space->mesh().elements()));
         }
     }
 
@@ -302,7 +363,6 @@ namespace sfem {
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
 
             auto ret = std::make_shared<GPULaplacian>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
@@ -431,9 +491,9 @@ namespace sfem {
                         sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
                                                              derefined_space->semi_structured_mesh().level(),
                                                              fff->elements()),
-                                                             fff->fff());
+                        fff->fff());
                 ret->real_type = real_type;
-                ret->stream = stream;
+                ret->stream    = stream;
                 return ret;
             } else {
                 auto ret = std::make_shared<GPULaplacian>(derefined_space);
@@ -685,9 +745,8 @@ namespace sfem {
                         sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
                                                              derefined_space->semi_structured_mesh().level(),
                                                              adjugate->elements()),
-                                                             adjugate->jacobian_adjugate(),
-                                                             adjugate->jacobian_determinant());
-
+                        adjugate->jacobian_adjugate(),
+                        adjugate->jacobian_determinant());
 
                 ret->mu     = mu;
                 ret->lambda = lambda;
@@ -710,7 +769,7 @@ namespace sfem {
 
         int initialize() override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
-            
+
             real_t SFEM_SHEAR_MODULUS        = mu;
             real_t SFEM_FIRST_LAME_PARAMETER = lambda;
 
@@ -729,8 +788,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space)
-            : space(space) {}
+        SemiStructuredGPULinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
@@ -854,11 +912,230 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
+    class GPUEMOp : public Op {
+    public:
+        std::shared_ptr<FunctionSpace>    space;
+        enum RealType                     real_type { SFEM_REAL_DEFAULT };
+        std::shared_ptr<Buffer<idx_t *>>  elements;
+        std::shared_ptr<Buffer<real_t *>> element_matrix;
+
+        GPUEMOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("GPUEMOp::create");
+            auto ret = std::make_unique<GPUEMOp>(space);
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        int initialize() override {
+            auto mesh             = space->mesh_ptr();
+            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+
+            int err = 0;
+            if (space->has_semi_structured_mesh()) {
+                auto &ssm = space->semi_structured_mesh();
+                err       = sshex8_laplacian_element_matrix(ssm.level(),
+                                                      mesh->n_elements(),
+                                                      mesh->n_nodes(),
+                                                      mesh->elements()->data(),
+                                                      mesh->points()->data(),
+                                                      h_element_matrix->data());
+            } else {
+                err = sshex8_laplacian_element_matrix(1,
+                                                      mesh->n_elements(),
+                                                      mesh->n_nodes(),
+                                                      mesh->elements()->data(),
+                                                      mesh->points()->data(),
+                                                      h_element_matrix->data());
+            }
+
+            auto soa       = sfem::aos_to_soa(64, mesh->n_elements(), 1, 64, h_element_matrix);
+            element_matrix = sfem::to_device(soa);
+
+            elements = create_device_elements(space, space->element_type());
+            return err;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("GPUEMOp::apply");
+
+            int err = 0;
+            if (space->has_semi_structured_mesh()) {
+                auto &ssm = space->semi_structured_mesh();
+                err       = cu_affine_sshex8_elemental_matrix_apply(ssm.level(),
+                                                              ssm.n_elements(),
+                                                              elements->data(),
+                                                              real_type,
+                                                              (void **)element_matrix->data(),
+                                                              h,
+                                                              out,
+                                                              SFEM_DEFAULT_STREAM);
+            } else {
+                err = cu_affine_hex8_elemental_matrix_apply(space->mesh_ptr()->n_elements(),
+                                                            elements->data(),
+                                                            real_type,
+                                                            (void **)element_matrix->data(),
+                                                            h,
+                                                            out,
+                                                            SFEM_DEFAULT_STREAM);
+            }
+
+            return err;
+        }
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_ERROR("[Error] GPUEMOp::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMOp::gradient NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
+
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMOp::value NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int            report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+        const char *name() const override { return "ss::gpu::EMOp"; }
+        inline bool is_linear() const override { return true; }
+    };
+
+    class GPUEMWarpOp : public Op {
+    public:
+        std::shared_ptr<FunctionSpace>  space;
+        enum RealType                   real_type { SFEM_REAL_DEFAULT };
+        std::shared_ptr<Buffer<idx_t>>  elements;
+        std::shared_ptr<Buffer<real_t>> element_matrix;
+        bool                            cartesian_ordering{true};
+
+        GPUEMWarpOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("GPUEMWarpOp::create");
+            auto ret = std::make_unique<GPUEMWarpOp>(space);
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        int initialize() override {
+            auto mesh             = space->mesh_ptr();
+            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+
+            int err = 0;
+            if (space->has_semi_structured_mesh()) {
+                auto &ssm = space->semi_structured_mesh();
+                if (cartesian_ordering) {
+                    err = sshex8_laplacian_element_matrix_cartesian(ssm.level(),
+                                                                    mesh->n_elements(),
+                                                                    mesh->n_nodes(),
+                                                                    mesh->elements()->data(),
+                                                                    mesh->points()->data(),
+                                                                    h_element_matrix->data());
+                } else {
+                    err = sshex8_laplacian_element_matrix(ssm.level(),
+                                                          mesh->n_elements(),
+                                                          mesh->n_nodes(),
+                                                          mesh->elements()->data(),
+                                                          mesh->points()->data(),
+                                                          h_element_matrix->data());
+                }
+
+            } else {
+                SFEM_ERROR("Only works with SSMesh!\n");
+            }
+
+            elements       = create_device_elements_AoS(space, space->element_type());
+            element_matrix = sfem::to_device(h_element_matrix);
+
+            // h_element_matrix->print(std::cout);
+            return err;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("GPUEMWarpOp::apply");
+
+            int err = 0;
+            if (space->has_semi_structured_mesh()) {
+                auto &ssm = space->semi_structured_mesh();
+                err       = cu_affine_sshex8_elemental_matrix_apply_AoS(ssm.level(),
+                                                                  ssm.n_elements(),
+                                                                  elements->data(),
+                                                                  real_type,
+                                                                  (void *)element_matrix->data(),
+                                                                  h,
+                                                                  out,
+                                                                  SFEM_DEFAULT_STREAM);
+            } else {
+                SFEM_ERROR("Only works with SSMesh!\n");
+            }
+
+            return err;
+        }
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_ERROR("[Error] GPUEMWarpOp::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMWarpOp::gradient NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
+
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMWarpOp::value NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int            report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+        const char *name() const override { return "ss::gpu::EMWarpOp"; }
+        inline bool is_linear() const override { return true; }
+    };
+
     void register_device_ops() {
         Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
         Factory::register_op("ss:gpu:Laplacian", &SemiStructuredGPULaplacian::create);
         Factory::register_op("ss:gpu:LinearElasticity", &SemiStructuredGPULinearElasticity::create);
+        Factory::register_op("ss:gpu:EMOp", &GPUEMOp::create);
+        Factory::register_op("ss:gpu:EMWarpOp", &GPUEMWarpOp::create);
+        Factory::register_op("gpu:EMOp", &GPUEMOp::create);
     }
 
 }  // namespace sfem

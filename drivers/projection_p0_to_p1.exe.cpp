@@ -15,6 +15,8 @@
 
 #include "tet4_l2_projection_p0_p1.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -46,22 +48,18 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
     real_t *p0;
     ptrdiff_t p0_n_local, p0_n_global;
     array_create_from_file(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    assert(p0_n_local == n_elements);
 
-    assert(p0_n_local == nelements);
-
-    real_t *p1 = (real_t *)malloc(nnodes * sizeof(real_t));
-    memset(p1, 0, nnodes * sizeof(real_t));
+    real_t *p1 = (real_t *)malloc(n_nodes * sizeof(real_t));
+    memset(p1, 0, n_nodes * sizeof(real_t));
 
     ///////////////////////////////////////////////////////////////////////////////
     // Compute projection
@@ -72,16 +70,16 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        tet4_p0_p1_projection_coeffs(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        tet4_p0_p1_projection_coeffs(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), p0, p1);
     } else {
-        tet4_p0_p1_l2_projection_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        tet4_p0_p1_l2_projection_apply(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), p0, p1);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write cell data
     ///////////////////////////////////////////////////////////////////////////////
 
-    array_write(comm, path_p1, SFEM_MPI_REAL_T, p1, nnodes, nnodes);
+    array_write(comm, path_p1, SFEM_MPI_REAL_T, p1, n_nodes, n_nodes);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
@@ -94,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

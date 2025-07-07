@@ -6,9 +6,9 @@ search_name_number_in_args() {
     shift
     for arg in "$@"
     do
-        if [[ "$arg" =~ ^${name}[0-9]+$ ]]
+        if [[ "$arg" =~ ^${name}([0-9]+)$ ]]
         then
-            echo "${BASH_REMATCH[0]}"
+            echo "${BASH_REMATCH[1]}"
             return 0
         fi
     done
@@ -28,11 +28,23 @@ search_string_in_args() {
     return 1
 }
 
-n_procs=4
+
+if search_name_number_in_args "np" "$@"
+then
+	n_procs=${BASH_REMATCH[1]}
+else
+	n_procs=1
+fi
+
+echo "example_p2.sh: n_procs=$n_procs"
 
 export USE_MPI=0
 export USE_MPI_GH200=0
 export USE_MPI_NORMAL=0
+export USE_NSIGNT=0
+
+export FLOAT_64=0
+
 export PERF="no"
 
 if search_string_in_args "mpi" "$@"
@@ -53,6 +65,17 @@ fi
 if search_string_in_args "perf" "$@"
 then
 	export PERF="yes"
+fi
+
+if search_string_in_args "nsight" "$@"
+then
+	export USE_NSIGNT=1
+fi
+
+if search_string_in_args "f64" "$@"
+then
+	export FLOAT_64=1
+	echo "example_p2.sh: Using float64"
 fi
 
 # launcher
@@ -97,10 +120,11 @@ else
 	# create_sphere.sh 5
 	export SFEM_ORDER_WITH_COORDINATE=2
 	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	sfc $mesh $mesh_sorted
+	sfc $mesh temp_mesh
+	SFEM_ORDER_WITH_COORDINATE=2 sfc temp_mesh $mesh_sorted
 	
 	# Project p2 nodes to sphere isosurfaces (to check if nonlinear map are creating errors)
-	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=1 mesh_p1_to_p2 $mesh_sorted $p2_mesh
+	SFEM_SPERE_TOL=1e-5 SFEM_MAP_TO_SPHERE=0 mesh_p1_to_p2 $mesh_sorted $p2_mesh
 
 	raw_to_db.py $p2_mesh test_mapping.vtk 
 fi
@@ -116,12 +140,12 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf
+sdf_test.py $sdf 900
 # raw_to_xdmf.py $sdf
 
-sizes=`head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' '`
-origins=`head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
-scaling=`head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' '`
+sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
+origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
+scaling=$(head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
 
 echo $sizes
 echo $origins
@@ -131,7 +155,11 @@ echo $scaling
 # export OMP_PROC_BIND=true
 # export OMP_NUM_THREADS=8
 
+Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
+Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
+# Nsight_PATH=""
+# Nsight_OUTPUT="/capstor/scratch/cscs/sriva/prof/grid_to_mesh"
 
 if [[ "$USE_MPI" == "1" ]]
 then
@@ -139,12 +167,21 @@ then
 elif [[ "$USE_MPI_NORMAL" == "1" ]]
 then
 	LAUNCH="srun -n $n_procs -p debug "
+
 elif [[ "$USE_MPI_GH200" == "1" ]]
 then
-	LAUNCH="srun -n $n_procs -p gh200 "
+	# LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs -N 1 ./mps-wrapper.sh nsys profile --trace=mpi --mpi-impl=mpich -o /capstor/scratch/cscs/sriva/prof/grid_to_mesh_%h_%p  "
+ 	LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs -N 1 ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o  /capstor/scratch/cscs/sriva/prof/grid_to_mesh_ncu  "
+#	LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
+
+elif [[ "$USE_NSIGNT" == "1" ]]
+then
+	LAUNCH="${Nsight_PATH}/ncu --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
 else
 	LAUNCH=""
 fi
+
+echo Launching: $LAUNCH
 
 # GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 GRID_TO_MESH="grid_to_mesh"
@@ -164,7 +201,36 @@ fi
 export SFEM_ENABLE_ISOPARAMETRIC=1
 
 set -x
-time SFEM_INTERPOLATE=0 SFEM_READ_FP32=1 $LAUNCH  $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10
+export SFEM_INTERPOLATE=0
+export SFEM_READ_FP32=1
+export SFEM_ADJOINT=0
+
+set -x
+time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
+
+if [[ "$FLOAT_64" == "1" ]]
+then
+	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64
+else
+	raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float32
+fi
+
+# Function to create metadata and convert raw files to XDMF format
+# Usage: process_raw_file filename
+# Example: process_raw_file field_cnt
+function process_raw_file() {
+    local file_base=$1
+    local raw_file="${file_base}.raw"
+    local metadata_file="metadata_${file_base}.yml"
+    
+    if [[ $SFEM_ADJOINT -eq 1 && -f $raw_file ]]; then
+        echo "Processing $raw_file..."
+        head -11 metadata_sdf.float32.yml > $metadata_file
+        echo "path: $PWD/$raw_file" >> $metadata_file
+        raw_to_xdmf.py $raw_file
+    fi
+}
+
+process_raw_file test_field_t10
 
 
-raw_to_db.py $resample_target out.vtk --point_data=$field --point_data_type=float64

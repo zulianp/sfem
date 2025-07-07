@@ -39,10 +39,11 @@ namespace sfem {
 
         class Memory {
         public:
-            std::shared_ptr<Buffer<T>> rhs;
-            std::shared_ptr<Buffer<T>> solution;
-            std::shared_ptr<Buffer<T>> work;
-            inline ptrdiff_t           size() const { return solution->size(); }
+            SharedBuffer<T> rhs;
+            SharedBuffer<T> solution;
+            SharedBuffer<T> work;
+            SharedBuffer<T> diag;
+            inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
 
