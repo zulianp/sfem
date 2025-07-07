@@ -100,7 +100,7 @@ void        constraint_nodes_to_value_vec(const ptrdiff_t n_dirichlet_nodes,
                                           real_t         *values) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i   = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i   = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
         values[i] = value;
     }
 }
@@ -114,7 +114,7 @@ void        constraint_gradient_nodes_to_value_vec(const ptrdiff_t              
                                                    real_t *const SFEM_RESTRICT       g) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
         g[i]    = x[i] - value;
     }
 }
@@ -127,7 +127,7 @@ void        constraint_nodes_to_values_vec(const ptrdiff_t n_dirichlet_nodes,
                                            real_t         *values) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i   = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i   = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
         values[i] = dirichlet_values[node];
     }
 }
@@ -141,7 +141,7 @@ void        constraint_gradient_nodes_to_values_vec(const ptrdiff_t             
                                                     real_t *const SFEM_RESTRICT       g) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
         g[i]    = x[i] - dirichlet_values[node];
     }
 }
@@ -154,7 +154,7 @@ void        constraint_nodes_copy_vec(const ptrdiff_t n_dirichlet_nodes,
                                       real_t         *dest) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
         dest[i] = source[i];
     }
 }
@@ -169,7 +169,7 @@ void        crs_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nod
                                                  real_t         *values) {
 #pragma omp parallel for
     for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
-        idx_t i = dirichlet_nodes[node] * block_size + component;
+        ptrdiff_t i = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
 
         const count_t begin  = rowptr[i];
         const count_t end    = rowptr[i + 1];

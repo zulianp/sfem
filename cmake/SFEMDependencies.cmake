@@ -55,41 +55,43 @@ endif()
 
 # ##############################################################################
 
-find_package(MPI REQUIRED)
+if(SFEM_ENABLE_MPI)
+    find_package(MPI REQUIRED)
 
-if(MPI_FOUND)
-    set(SFEM_HAVE_MPI TRUE)
+    if(MPI_FOUND)
+        set(SFEM_HAVE_MPI TRUE)
 
-    if(MPI_C_INCLUDE_PATH)
-        set(SFEM_DEP_INCLUDES
-            "${SFEM_DEP_INCLUDES};${MPI_C_INCLUDE_PATH}")
+        if(MPI_C_INCLUDE_PATH)
+            set(SFEM_DEP_INCLUDES
+                "${SFEM_DEP_INCLUDES};${MPI_C_INCLUDE_PATH}")
+        endif()
+
+        if(MPI_CXX_INCLUDE_PATH)
+            set(SFEM_DEP_INCLUDES
+                "${SFEM_DEP_INCLUDES};${MPI_CXX_INCLUDE_PATH}")
+        endif()
+
+        if(MPI_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_LIBRARIES}")
+        endif()
+
+        if(MPI_C_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_C_LIBRARIES}")
+        endif()
+
+        if(MPI_CXX_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
+        endif()
+        
+    else()
+        message(
+            FATAL_ERROR
+                "We should never end up here, because find_package above is REQUIRED"
+        )
     endif()
-
-    if(MPI_CXX_INCLUDE_PATH)
-        set(SFEM_DEP_INCLUDES
-            "${SFEM_DEP_INCLUDES};${MPI_CXX_INCLUDE_PATH}")
-    endif()
-
-    if(MPI_LIBRARIES)
-        set(SFEM_DEP_LIBRARIES
-            "${SFEM_DEP_LIBRARIES};${MPI_LIBRARIES}")
-    endif()
-
-    if(MPI_C_LIBRARIES)
-        set(SFEM_DEP_LIBRARIES
-            "${SFEM_DEP_LIBRARIES};${MPI_C_LIBRARIES}")
-    endif()
-
-    if(MPI_CXX_LIBRARIES)
-        set(SFEM_DEP_LIBRARIES
-            "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
-    endif()
-    
-else()
-    message(
-        FATAL_ERROR
-            "We should never end up here, because find_package above is REQUIRED"
-    )
 endif()
 
 # ##############################################################################
@@ -167,6 +169,7 @@ if(SFEM_ENABLE_CUDA)
 endif()
 
 
+
 if(SFEM_ENABLE_RYAML)
     set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
     set(RYML_BRANCH_NAME master CACHE STRING "")
@@ -201,4 +204,8 @@ endif()
 # if(SFEM_ENABLE_HIP)
 # # TODO
 # endif()
+
+if(SFEM_ENABLE_AVX512_SORT)
+	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
+endif()
 

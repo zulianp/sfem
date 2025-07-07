@@ -15,6 +15,21 @@ enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_D
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
 
+typedef enum {
+    SFEM_ACCELERATOR_TYPE_CPU     = 0,  // CPU
+    SFEM_ACCELERATOR_TYPE_CUDA    = 1,  // CUDA
+    SFEM_ACCELERATOR_TYPE_OPENCL  = 2,  // OpenCL Not supported
+    SFEM_ACCELERATOR_TYPE_OPENACC = 3,  // OpenACC Not supported
+    SFEM_ACCELERATOR_TYPE_HIP     = 4   // HIP Not supported
+} AcceleratorsType;                     //
+
+typedef enum {
+    ADJOINT_BASE = 0,                //
+    ADJOINT_REFINE_ONE_STEP,         //
+    ADJOINT_REFINE_ITERATIVE,        //
+    ADJOINT_REFINE_HYTEG_REFINEMENT  //
+} AdjointRefineType;                 //
+
 static void* SFEM_DEFAULT_STREAM = 0;
 
 SFEM_INLINE static int real_type_size(enum RealType type) {

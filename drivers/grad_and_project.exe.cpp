@@ -23,6 +23,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 void tet4_p1_p1_grad_and_project(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,
@@ -234,20 +236,19 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *u;
 
     ptrdiff_t u_n_local, u_n_global;
     array_create_from_file(comm, path_u, SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
 
-    assert(u_n_local == mesh.nnodes);
+    assert(u_n_local == n_nodes);
 
     real_t *grad_u[3];
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         grad_u[d] = (real_t *)malloc(u_n_local * sizeof(real_t));
         memset(grad_u[d], 0, u_n_local * sizeof(real_t));
     }
@@ -257,22 +258,22 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        grad_and_project_coeffs(mesh.element_type,
-                                mesh.nelements,
-                                mesh.nnodes,
-                                mesh.elements,
-                                mesh.points,
+        grad_and_project_coeffs(mesh->element_type(),
+                                n_elements,
+                                n_nodes,
+                                mesh->elements()->data(),
+                                mesh->points()->data(),
                                 u,
                                 grad_u[0],
                                 grad_u[1],
                                 grad_u[2]);
 
     } else {
-        grad_and_project(mesh.element_type,
-                         mesh.nelements,
-                         mesh.nnodes,
-                         mesh.elements,
-                         mesh.points,
+        grad_and_project(mesh->element_type(),
+                         n_elements,
+                         n_nodes,
+                         mesh->elements()->data(),
+                         mesh->points()->data(),
                          u,
                          grad_u[0],
                          grad_u[1],
@@ -283,7 +284,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
     if (SFEM_SCALE != 1) {
-        for (int d = 0; d < mesh.spatial_dim; ++d) {
+        for (int d = 0; d < mesh->spatial_dimension(); ++d) {
             for (ptrdiff_t i = 0; i < u_n_local; ++i) {
                 grad_u[d][i] *= SFEM_SCALE;
             }
@@ -292,7 +293,7 @@ int main(int argc, char *argv[]) {
 
     free(u);
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         array_write(comm, path_output[d], SFEM_MPI_REAL_T, grad_u[d], u_n_local, u_n_global);
         free(grad_u[d]);
     }
@@ -301,7 +302,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

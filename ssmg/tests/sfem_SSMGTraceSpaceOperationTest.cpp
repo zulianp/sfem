@@ -151,8 +151,7 @@ int test_trace_space_prolongation_restriction() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
 
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);

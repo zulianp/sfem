@@ -1,5 +1,6 @@
 #include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
+#include "sfem_Communicator.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
@@ -15,7 +16,7 @@ namespace sfem {
     template <class T>
     class Grid<T>::Impl {
     public:
-        MPI_Comm                   comm;
+        std::shared_ptr<Communicator> comm;
         std::shared_ptr<Buffer<T>> field;
         int                        block_size{1};
         int                        spatial_dimension{3};
@@ -52,7 +53,7 @@ namespace sfem {
     }
 
     template <class T>
-    Grid<T>::Grid(MPI_Comm comm) : impl_(std::make_unique<Impl>()) {
+    Grid<T>::Grid(const std::shared_ptr<Communicator>& comm) : impl_(std::make_unique<Impl>()) {
         impl_->comm = comm;
     }
 
@@ -60,7 +61,7 @@ namespace sfem {
     Grid<T>::~Grid() = default;
 
     template <class T>
-    std::shared_ptr<Grid<T>> Grid<T>::create_from_file(MPI_Comm comm, const std::string &path) {
+    std::shared_ptr<Grid<T>> Grid<T>::create_from_file(const std::shared_ptr<Communicator>& comm, const std::string &path) {
         auto ret = std::make_unique<Grid<T>>(comm);
         auto in  = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
@@ -91,7 +92,7 @@ namespace sfem {
         in->get("block_size", ret->impl_->block_size);
 
         T *data;
-        if (ndarray_create_from_file(ret->impl_->comm,
+        if (ndarray_create_from_file(ret->impl_->comm->get(),
                                      field_path.c_str(),
                                      ret->mpi_data_type(),
                                      ret->impl_->spatial_dimension,
@@ -217,7 +218,7 @@ namespace sfem {
     }
 
     template <class T>
-    std::shared_ptr<Grid<T>> Grid<T>::create(MPI_Comm        comm,
+    std::shared_ptr<Grid<T>> Grid<T>::create(const std::shared_ptr<Communicator>& comm,
                                              const ptrdiff_t nx,
                                              const ptrdiff_t ny,
                                              const ptrdiff_t nz,
@@ -266,7 +267,7 @@ namespace sfem {
     template class Grid<float>;
     template class Grid<double>;
 
-    std::shared_ptr<Grid<geom_t>> create_sdf(MPI_Comm                                                        comm,
+    std::shared_ptr<Grid<geom_t>> create_sdf(const std::shared_ptr<Communicator>& comm,
                                              const ptrdiff_t                                                 nx,
                                              const ptrdiff_t                                                 ny,
                                              const ptrdiff_t                                                 nz,

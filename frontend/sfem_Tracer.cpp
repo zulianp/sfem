@@ -12,8 +12,8 @@
 #include <map>
 
 #ifdef SFEM_ENABLE_CUDA
-#include <nvToolsExt.h>
 #include <cuda_runtime.h>
+#include <nvToolsExt.h>
 #endif
 
 // #define SFEM_ENABLE_BLOCK_KERNELS
@@ -66,8 +66,12 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
             size_t free, total;
             cudaMemGetInfo(&free, &total);
-            printf("-- LOG: %s (%g)\n"
+
+            int rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            printf("-- LOG[%d]: %s (%g)\n"
                    "   MEMORY: free %g [GB] (total %g [GB])\n",
+                   rank,
                    name.c_str(),
                    duration,
                    free * 1e-9,

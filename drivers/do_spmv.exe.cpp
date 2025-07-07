@@ -48,9 +48,9 @@ int main(int argc, char *argv[]) {
     char colidx_path[1024 * 10];
     char values_path[1024 * 10];
 
-    sprintf(rowptr_path, "%s/rowptr.raw", crs_folder);
-    sprintf(colidx_path, "%s/colidx.raw", crs_folder);
-    sprintf(values_path, "%s/values.raw", crs_folder);
+    snprintf(rowptr_path, sizeof(rowptr_path), "%s/rowptr.raw", crs_folder);
+    snprintf(colidx_path, sizeof(colidx_path), "%s/colidx.raw", crs_folder);
+    snprintf(values_path, sizeof(values_path), "%s/values.raw", crs_folder);
 
     crs_t crs;
     crs_read(comm,

@@ -23,6 +23,7 @@
 #include "adj_table.h"
 
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 SFEM_INLINE static void wedge6_to_3Xtet4(const ptrdiff_t wedge_idx,
                                          idx_t **const SFEM_RESTRICT wedges,
@@ -87,58 +88,35 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    if (elem_num_nodes(mesh.element_type) != elem_num_nodes(WEDGE6)) {
+    if (elem_num_nodes(mesh->element_type()) != elem_num_nodes(WEDGE6)) {
         fprintf(stderr, "This code only supports mesh with element type WEDGE6 (or compatible)\n");
         return EXIT_FAILURE;
     }
 
-    mesh_t tet4_mesh;
-    mesh_init(&tet4_mesh);
+    auto tet4_elements = sfem::create_host_buffer<idx_t>(4, 3 * mesh->n_elements());
+    auto tet4_mesh = std::make_shared<sfem::Mesh>(
+        mesh->comm(), mesh->spatial_dimension(), 
+        TET4, 3 * mesh->n_elements(), tet4_elements, mesh->n_nodes(), mesh->points());
 
-    tet4_mesh.comm = mesh.comm;
-    tet4_mesh.mem_space = mesh.mem_space;
 
-    tet4_mesh.spatial_dim = mesh.spatial_dim;
-    tet4_mesh.element_type = TET4;
-
-    tet4_mesh.nelements = 3 * mesh.nelements;
-    tet4_mesh.nnodes = mesh.nnodes;
-    tet4_mesh.n_owned_elements = tet4_mesh.nelements;
-
-    tet4_mesh.node_mapping = 0;
-    tet4_mesh.element_mapping = 0;
-    tet4_mesh.node_owner = 0;
-    tet4_mesh.points = mesh.points;
-
-    int nnxe_tet4_mesh = 4;
-    tet4_mesh.elements = (idx_t**)malloc(nnxe_tet4_mesh * sizeof(idx_t*));
-    for (int d = 0; d < nnxe_tet4_mesh; d++) {
-        tet4_mesh.elements[d] = (idx_t*)malloc(tet4_mesh.nelements * sizeof(idx_t));
+    auto elements = mesh->elements()->data();
+    const ptrdiff_t n_elements = mesh->n_elements();
+  
+    for (ptrdiff_t i = 0; i < n_elements; i++) {
+        wedge6_to_3Xtet4(i, elements, i * 3, tet4_elements->data());
     }
 
-    for (ptrdiff_t i = 0; i < mesh.nelements; i++) {
-        wedge6_to_3Xtet4(i, mesh.elements, i * 3, tet4_mesh.elements);
-    }
-
-    mesh_write(output_folder, &tet4_mesh);
+    tet4_mesh->write(output_folder);
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("Surface: #elements %ld #nodes %ld\n",
-               (long)tet4_mesh.nelements,
-               (long)tet4_mesh.nnodes);
+               (long)tet4_mesh->n_elements(),
+               (long)tet4_mesh->n_nodes());
     }
-
-    // Clean-up
-    mesh.points = 0;
-    mesh_destroy(&mesh);
-    mesh_destroy(&tet4_mesh);
 
     double tock = MPI_Wtime();
 

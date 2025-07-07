@@ -15,6 +15,8 @@
 
 #include "tet4_grad.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE void shear_kernel(const real_t px0,
                                      const real_t px1,
                                      const real_t px2,
@@ -190,10 +192,9 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *u[3];
 
@@ -205,13 +206,13 @@ int main(int argc, char *argv[]) {
     
     real_t *shear_6[6];
     for (int d = 0; d < 6; ++d) {
-        shear_6[d] = (real_t *)malloc(mesh.nelements * sizeof(real_t));
+        shear_6[d] = (real_t *)malloc(n_elements * sizeof(real_t));
     }
 
-    shear(mesh.nelements,
-          mesh.nnodes,
-          mesh.elements,
-          mesh.points,
+    shear(n_elements,
+          n_nodes,
+          mesh->elements()->data(),
+          mesh->points()->data(),
           u[0],
           u[1],
           u[2],
@@ -224,8 +225,8 @@ int main(int argc, char *argv[]) {
 
     char path[2048];
     for (int d = 0; d < 6; ++d) {
-        sprintf(path, "%s.%d.raw", output_prefix, d);
-        array_write(comm, path, SFEM_MPI_REAL_T, shear_6[d], mesh.nelements, mesh.nelements);
+        snprintf(path, sizeof(path), "%s.%d.raw", output_prefix, d);
+        array_write(comm, path, SFEM_MPI_REAL_T, shear_6[d], n_elements, n_elements);
         free(shear_6[d]);
     }
 
@@ -233,7 +234,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
