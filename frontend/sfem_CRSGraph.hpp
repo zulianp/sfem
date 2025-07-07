@@ -12,14 +12,14 @@ namespace sfem {
 	    CRSGraph();
 	    ~CRSGraph();
 
-	    CRSGraph(const std::shared_ptr<Buffer<count_t>> &rowptr, const std::shared_ptr<Buffer<idx_t>> &colidx);
+	    CRSGraph(const SharedBuffer<count_t>& rowptr, const SharedBuffer<idx_t>& colidx);
 
 	    friend class Mesh;
 
 	    ptrdiff_t                        n_nodes() const;
 	    ptrdiff_t                        nnz() const;
-	    std::shared_ptr<Buffer<count_t>> rowptr() const;
-	    std::shared_ptr<Buffer<idx_t>>   colidx() const;
+	    SharedBuffer<count_t>            rowptr() const;
+	    SharedBuffer<idx_t>              colidx() const;
 	    std::shared_ptr<CRSGraph>        block_to_scalar(const int block_size);
 
 	    void print(std::ostream &os) const;

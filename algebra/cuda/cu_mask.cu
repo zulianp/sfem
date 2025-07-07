@@ -10,7 +10,7 @@ __global__ void cu_mask_nodes_kernel(const ptrdiff_t                  nnodes,
                                      const int                        component,
                                      mask_t *const SFEM_RESTRICT      inout) {
     for (ptrdiff_t node = blockIdx.x * blockDim.x + threadIdx.x; node < nnodes; node += blockDim.x * gridDim.x) {
-        idx_t idx = nodes[node] * block_size + component;
+        ptrdiff_t idx = (ptrdiff_t)nodes[node] * block_size + component;
         cu_mask_atomic_set(idx, inout);
     }
 }

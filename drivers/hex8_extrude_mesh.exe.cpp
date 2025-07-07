@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
     const ptrdiff_t nlayers       = atol(argv[3]);
     const char*     output_folder = argv[4];
 
-    auto quad_mesh = sfem::Mesh::create_from_file(comm, input_folder);
+    auto quad_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), input_folder);
 
     auto hex8_elements = sfem::create_host_buffer<idx_t>(8, quad_mesh->n_elements() * nlayers);
     auto hex8_points   = sfem::create_host_buffer<geom_t>(3, quad_mesh->n_nodes() * (nlayers + 1));

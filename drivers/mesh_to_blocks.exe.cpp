@@ -20,6 +20,7 @@
 
 #include "sortreduce.h"
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -54,17 +55,14 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    int nnxe = elem_num_nodes(mesh.element_type);
+    int nnxe = elem_num_nodes(mesh->element_type());
 
     local_idx_t **lelements = (local_idx_t**)malloc(nnxe * sizeof(local_idx_t *));
 
     for (int d = 0; d < nnxe; d++) {
-        lelements[d] = (local_idx_t*)calloc(mesh.nelements, sizeof(local_idx_t));
+        lelements[d] = (local_idx_t*)calloc(mesh->n_elements(), sizeof(local_idx_t));
     }
 
     ptrdiff_t max_rep_limit = 1 << (8 * sizeof(local_idx_t) - 1);
@@ -72,24 +70,25 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_ELEMENT_BLOCK_SIZE, atol);
 
     // max_block_size <= 32'768
-    ptrdiff_t max_block_size = MIN(SFEM_ELEMENT_BLOCK_SIZE, mesh.nelements);
-    ptrdiff_t num_blocks = MAX((mesh.nelements + max_block_size - 1) / max_block_size, 1);
+    ptrdiff_t max_block_size = MIN(SFEM_ELEMENT_BLOCK_SIZE, mesh->n_elements());
+    ptrdiff_t num_blocks = MAX((mesh->n_elements() + max_block_size - 1) / max_block_size, 1);
 
-    local_idx_t *node_lidx = (local_idx_t*)malloc(mesh.nnodes * sizeof(local_idx_t));
+    local_idx_t *node_lidx = (local_idx_t*)malloc(mesh->n_nodes() * sizeof(local_idx_t));
     int *nodes_in_block = (int*)calloc(num_blocks, sizeof(int));
 
-    for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); i++) {
         node_lidx[i] = SFEM_LOCAL_IDX_INVALID;
     }
 
-    for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
+    auto elements = mesh->elements()->data();
+    for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh->n_elements();
          e_offset += max_block_size, block_num++) {
-        const ptrdiff_t next_offset = e_offset + MIN(max_block_size, mesh.nelements - e_offset);
+        const ptrdiff_t next_offset = e_offset + MIN(max_block_size, mesh->n_elements() - e_offset);
 
         local_idx_t last_index = 0;
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
             for (int d = 0; d < nnxe; d++) {
-                const idx_t node = mesh.elements[d][e];
+                const idx_t node = elements[d][e];
 
                 if (node_lidx[node] == SFEM_LOCAL_IDX_INVALID) {
                     // Create index
@@ -105,7 +104,7 @@ int main(int argc, char *argv[]) {
 
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
             for (int d = 0; d < nnxe; d++) {
-                const idx_t node = mesh.elements[d][e];
+                const idx_t node = elements[d][e];
                 node_lidx[node] = SFEM_LOCAL_IDX_INVALID;
             }
         }
@@ -130,9 +129,9 @@ int main(int argc, char *argv[]) {
     idx_t *node_mapping = (idx_t *)calloc(new_num_nodes, sizeof(idx_t));
 
     ptrdiff_t lnode_offset = 0;
-    for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
+    for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh->n_elements();
          e_offset += max_block_size, block_num++) {
-        const ptrdiff_t block_size = MIN(max_block_size, mesh.nelements - e_offset);
+        const ptrdiff_t block_size = MIN(max_block_size, mesh->n_elements() - e_offset);
         const ptrdiff_t next_offset = e_offset + block_size;
 
         for (ptrdiff_t e = e_offset; e < next_offset; e++) {
@@ -143,7 +142,7 @@ int main(int argc, char *argv[]) {
 
                 const ptrdiff_t offset = lnode_offset + lnode;
                 assert(offset < new_num_nodes);
-                node_mapping[offset] = mesh.elements[d][e];
+                node_mapping[offset] = elements[d][e];
             }
         }
 
@@ -152,9 +151,9 @@ int main(int argc, char *argv[]) {
 
     if (0) {
         lnode_offset = 0;
-        for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh.nelements;
+        for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh->n_elements();
              e_offset += max_block_size, block_num++) {
-            ptrdiff_t block_size = MIN(max_block_size, mesh.nelements - e_offset);
+            ptrdiff_t block_size = MIN(max_block_size, mesh->n_elements() - e_offset);
             ptrdiff_t next_offset = e_offset + block_size;
 
             printf("block %ld) [%ld, %ld) #elements %ld #nodes %d\n",
@@ -190,16 +189,14 @@ int main(int argc, char *argv[]) {
     if (!rank) {
         printf("----------------------------------------\n");
         printf("mesh_to_blocks.c: #elements %ld #nodes %ld #blocks %ld #node_mapping %ld\n",
-               (long)mesh.nelements,
-               (long)mesh.nnodes,
+               (long)mesh->n_elements(),
+               (long)mesh->n_nodes(),
                (long)num_blocks,
                (long)new_num_nodes);
         printf("----------------------------------------\n");
     }
 
     // Clean up
-
-    mesh_destroy(&mesh);
 
     for (int d = 0; d < nnxe; d++) {
         free(lelements[d]);

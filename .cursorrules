@@ -1,0 +1,216 @@
+# SFEM - Semi-structured Finite Element Method Codebase Rules
+
+IMPORTANT: Be precise and careful with the changes! I am not here to clean-up you mess. Always reason that changes make sense before applying them and compile to make sure they are correct!
+
+EVERY TIME: After changes, you always have to compile the code and run the tests yourself!
+
+## Project Architecture
+- **Frontend**: C++ with OOP patterns (classes, templates, RAII)
+- **Backend**: Procedural C and CUDA for performance-critical code
+- **Data-oriented design**: Prefer structs of arrays over arrays of structs
+- **Memory management**: Manual allocation with clear ownership semantics
+
+## PRD (Product Requirements Document) Integration
+
+### PRD-First Development Approach
+- **ALWAYS consult PRD.md** before making architectural decisions or suggesting next steps
+- **Reference specific PRD sections** when discussing implementation approaches
+- **Align all development work** with the PRD's milestone timeline and success criteria
+- **Consider PRD requirements** when evaluating trade-offs between different implementation approaches
+
+### PRD Review and Update Process
+- **Before starting any major feature**: Review relevant PRD sections to ensure alignment
+- **When encountering new requirements**: Check if they should be added to the PRD
+- **When suggesting architectural changes**: Prompt user to consider PRD updates
+- **When completing milestones**: Review PRD success criteria and suggest updates
+
+### PRD Modification Triggers
+**Prompt for PRD updates when:**
+- New architectural patterns emerge that aren't covered in the PRD
+- Performance requirements change or new constraints are discovered
+- Additional dependencies or technologies are identified
+- Timeline estimates need adjustment based on implementation experience
+- New use cases or requirements are discovered during development
+- Integration challenges reveal gaps in the PRD specifications
+
+### PRD Integration Guidelines
+- **Milestone awareness**: Always be aware of which PRD milestone is currently active
+- **Success criteria tracking**: Reference PRD success criteria when evaluating progress
+- **Risk assessment**: Consider PRD-identified risks when making implementation decisions
+- **Dependency management**: Ensure PRD dependencies are satisfied before proceeding
+
+### PRD Communication
+- **Explicit PRD references**: When suggesting changes, explicitly reference relevant PRD sections
+- **PRD gap identification**: Point out when current work reveals gaps in PRD coverage
+- **PRD update suggestions**: Proactively suggest PRD improvements when appropriate
+- **Milestone alignment**: Ensure all suggestions align with current PRD milestone priorities
+
+## Code Style & Conventions
+
+### General Principles
+- **Performance first**: Optimize for speed and memory efficiency
+- **Concise code**: Prefer clarity over verbosity, but maintain readability
+- **Explicit over implicit**: Avoid hidden costs, prefer explicit memory management
+
+### C++ Frontend (frontend/, algebra/ headers)
+- Use RAII for resource management
+- Prefer templates over inheritance for performance
+- Use `const` references for large data structures
+- Return by value for small objects, by reference for large ones
+- Use `std::function` for callbacks, lambdas for simple cases
+- Prefer `auto` for complex template types, explicit types for simple cases
+
+### C Backend (operators/, mesh/, algebra/ .c files)
+- Use `ptrdiff_t` for array indices and sizes that aren't stored in arrays (64-bit on 64-bit systems)
+- Use `idx_t` for small indices (32-bit, aliased to int)
+- Cast to `ptrdiff_t` before multiplication with `idx_t` to prevent overflow
+- Use `SFEM_RESTRICT` for pointer aliasing hints
+- Prefer stack allocation over heap for small arrays
+- Use `malloc`/`free` with clear ownership patterns
+
+### CUDA Code (.cu files)
+- Use `__restrict__` for pointer aliasing
+- Prefer shared memory for frequently accessed data
+- Use `__launch_bounds__` for kernel optimization
+- Check CUDA errors with `SFEM_CUDA_CHECK`
+- Use `__device__` and `__host__` qualifiers appropriately
+
+## Memory Management Rules
+- **Critical**: Always cast `idx_t` to `size_t` before multiplication in malloc/calloc
+- Use `size_t` for memory allocation sizes
+- Use `ptrdiff_t` for array indices and loop counters
+- Check for integer overflow in large-scale problems (>600M DOFs)
+- Prefer `calloc` over `malloc` + `memset` for large allocations
+
+## Code Quality & Validation
+
+### Linting and Static Analysis
+- **Always run linters** before committing code changes
+- Use `clang-tidy` for C++ code with custom rules for HPC patterns
+- Use `cppcheck` for additional static analysis
+- Configure linters to catch integer overflow, memory leaks, and undefined behavior
+- Set up pre-commit hooks to run linters automatically
+
+### Compilation and Build Validation
+- **Compile with multiple configurations** to catch platform-specific issues:
+  - Debug builds with `-Wall -Wextra -Werror`
+  - Release builds with optimization flags
+  - AddressSanitizer builds for memory error detection
+  - UndefinedBehaviorSanitizer for integer overflow detection
+- Use `-Wconversion` to catch implicit type conversions
+- Use `-Wsign-compare` to catch signed/unsigned comparison issues
+- Enable `-Werror` in CI/CD to treat warnings as errors
+
+### Automatic Error Detection
+- **Always compile and test** generated code before suggesting it
+- Use build systems (CMake) to validate compilation across different configurations
+- Run unit tests to verify correctness of changes
+- Use memory checkers (Valgrind, AddressSanitizer) for C/C++ code
+- Check CUDA code with `cuda-memcheck` for GPU memory issues
+
+### Fixing Common Issues
+- **Integer overflow**: Always cast before multiplication, use appropriate types
+- **Memory leaks**: Use RAII in C++, clear ownership patterns in C
+- **Type mismatches**: Use explicit casts, avoid implicit conversions
+- **Unused variables**: Remove or mark with `(void)` for intentional unused variables
+- **Missing includes**: Include necessary headers, avoid forward declarations when possible
+
+## Performance Guidelines
+- **Block operations**: exploit block structures for vectorization
+- **Memory layout**: Structure of Arrays (SoA) over Array of Structures (AoS)
+- **Cache efficiency**: Minimize cache misses, use blocking for large matrices
+- **SIMD**: Leverage vectorization, use aligned memory when possible
+- **GPU**: Use coalesced memory access patterns
+
+## Common Patterns
+
+### Memory Allocation
+```c
+// ✅ Correct - cast to prevent overflow
+idx_t *data = malloc(n_elements * sizeof(idx_t));
+real_t *values = malloc((size_t)nnz * block_size * sizeof(real_t));
+
+// ❌ Wrong - potential overflow
+idx_t *data = malloc(nnz * block_size * sizeof(idx_t));
+```
+
+### Index Calculations
+```c
+// ✅ Correct - cast before multiplication
+const ptrdiff_t idx = (ptrdiff_t)block_idx * block_size + local_idx;
+
+// ❌ Wrong - potential overflow
+const idx_t idx = block_idx * block_size + local_idx;
+```
+
+### Loop Patterns
+```c
+// ✅ Correct - use ptrdiff_t for large loops
+for (ptrdiff_t i = 0; i < n_elements; i++) {
+    // ...
+}
+
+// For small loops, int is fine
+for (int d = 0; d < 3; d++) {
+    // ...
+}
+```
+
+## File Organization
+- **frontend/**: C++ API and high-level abstractions
+- **operators/**: Element-specific assembly and operators
+- **algebra/**: Linear algebra and solvers
+- **mesh/**: Mesh generation and manipulation
+- **drivers/**: Standalone executables and examples
+- **tests/**: Unit tests and validation
+- **python/bindings/**: Python frontend
+
+## Naming Conventions
+- **Functions**: `snake_case`
+- **Variables**: `snake_case` for both C and C++
+- **Constants**: `UPPER_SNAKE_CASE`
+- **Types**: `snake_case_t` for C, `PascalCase` for C++
+- **Files**: `snake_case.c/.cpp/.cu`
+
+## Error Handling
+- Use return codes for C functions
+- Do not use exceptions in C++, use nothrow where appropriate
+- Check for integer overflow in large-scale computations
+- Validate input parameters, especially array sizes
+- Use assert to test preconditions, postconditions, and invariants
+
+## Documentation
+- Use Doxygen comments for public APIs
+- Keep comments focused on "why" not "what"
+- Document performance characteristics and memory requirements
+- Include examples for complex algorithms
+
+## Testing
+- Write tests for critical numerical algorithms
+- Test with both small and large problem sizes
+- Validate against known analytical solutions
+- Test overflow conditions for large-scale problems
+
+## Common Pitfalls to Avoid
+1. **Integer overflow**: Always cast `idx_t` to `ptrdiff_t` before multiplication
+2. **Memory leaks**: Use RAII in C++, clear ownership in C
+3. **Cache misses**: Use appropriate memory layouts
+4. **GPU synchronization**: Minimize host-device transfers
+5. **Type confusion**: Use appropriate integer types for different purposes
+
+## Performance Critical Areas
+- Matrix-vector operations (SpMV)
+- Element assembly loops
+- Mesh generation and refinement
+- Linear solver kernels
+- Contact detection and resolution
+
+Remember: This is a high-performance computing codebase. Every optimization should be measured, and readability should not be sacrificed for premature optimization. 
+
+
+Consider the PRD.md file when making changes, prompt to improve the PRD.md file when new ideas come along.
+
+
+# Cursor behavior
+
+- Make sure to not accidentaly delete or modify functionalties that are not affecting the task.

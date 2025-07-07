@@ -19,7 +19,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     template <typename T>
     class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
@@ -60,7 +60,7 @@ namespace sfem {
             n_dofs   = op->rows();
         }
 
-        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Buffer<T>>& diag) override {
+        int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
             assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
             auto J         = op + sfem::diag_op(diag, execution_space());
             this->apply_op = J;
@@ -83,7 +83,7 @@ namespace sfem {
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                  const std::shared_ptr<Buffer<T>>&            diag) override {
+                                  const SharedBuffer<T>&            diag) override {
             assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
             this->apply_op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
 

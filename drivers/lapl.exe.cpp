@@ -15,6 +15,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -46,10 +48,9 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *u;
 
@@ -58,10 +59,10 @@ int main(int argc, char *argv[]) {
 
     assert(u_n_global != 0);
 
-    if (u_n_global != mesh.nnodes) {
+    if (u_n_global != n_nodes) {
         fprintf(stderr,
                 "Input field does not have correct size. Expected %ld, actual = %ld",
-                (long)mesh.nnodes,
+                (long)n_nodes,
                 (long)u_n_global);
         return EXIT_FAILURE;
     }
@@ -69,7 +70,7 @@ int main(int argc, char *argv[]) {
     real_t *lapl_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(lapl_u, 0, u_n_local * sizeof(real_t));
 
-    laplacian_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u, lapl_u);
+    laplacian_apply(mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), u, lapl_u);
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

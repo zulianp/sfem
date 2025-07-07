@@ -17,7 +17,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     // From Active set expansion strategies in ShiftedPenalty algorithm, Kruzik et al. 2020
     template <typename T>
@@ -39,8 +39,8 @@ namespace sfem {
         int       iterations() const override { return iterations_; }
 
         ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
-        std::shared_ptr<Buffer<T>>            upper_bound_;
-        std::shared_ptr<Buffer<T>>            lower_bound_;
+        SharedBuffer<T>            upper_bound_;
+        SharedBuffer<T>            lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
         std::shared_ptr<Operator<T>>          constraints_op_transpose_;
         std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
@@ -50,7 +50,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
-        std::shared_ptr<Buffer<T>> lagr_lb, lagr_ub;
+        SharedBuffer<T> lagr_lb, lagr_ub;
 
         ExecutionSpace        execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -85,8 +85,8 @@ namespace sfem {
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
         void set_penalty_param(const T penalty_param) { penalty_param_ = penalty_param; }
 
-        void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
-        void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
+        void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
+        void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
 
         bool good() const {
             assert(apply_op);
@@ -100,7 +100,7 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
         }
         int apply(const T* const b, T* const x) override {

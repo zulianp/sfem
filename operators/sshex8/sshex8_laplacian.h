@@ -53,6 +53,13 @@ int sshex8_laplacian_element_matrix(int                           level,
                                     geom_t **const SFEM_RESTRICT  points,
                                     scalar_t *const SFEM_RESTRICT values);
 
+int sshex8_laplacian_element_matrix_cartesian(int                           level,
+                                              const ptrdiff_t               nelements,
+                                              const ptrdiff_t               nnodes,
+                                              idx_t **const SFEM_RESTRICT   elements,
+                                              geom_t **const SFEM_RESTRICT  points,
+                                              scalar_t *const SFEM_RESTRICT values);
+
 int affine_sshex8_laplacian_substructuring_inner_fff(const int                             level,
                                                      const ptrdiff_t                       nelements,
                                                      idx_t **const SFEM_RESTRICT           elements,

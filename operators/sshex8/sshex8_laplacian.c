@@ -637,6 +637,68 @@ int sshex8_laplacian_element_matrix(int                           level,
     return SFEM_SUCCESS;
 }
 
+int sshex8_laplacian_element_matrix_cartesian(int                           level,
+                                              const ptrdiff_t               nelements,
+                                              const ptrdiff_t               nnodes,
+                                              idx_t **const SFEM_RESTRICT   elements,
+                                              geom_t **const SFEM_RESTRICT  points,
+                                              scalar_t *const SFEM_RESTRICT values) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+    const scalar_t      h = 1. / level;
+
+    static const int hex8_to_cartesian[8] = {
+            0,
+            1,
+            3,
+            2,  // Bottom
+            4,
+            5,
+            7,
+            6  // Top
+    };
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t m_fff[6];
+        scalar_t fff[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_fff(lx, ly, lz, 0.5, 0.5, 0.5, m_fff);
+        hex8_sub_fff_0(m_fff, h, fff);
+
+        accumulator_t element_matrix[8 * 8];
+        hex8_laplacian_matrix_fff_integral(fff, element_matrix);
+
+        // Convert to cartesian matrix
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                const int idx  = row * 8 + col;
+                const int lidx = hex8_to_cartesian[row] * 8 + hex8_to_cartesian[col];
+                // Convert to cartesian matrix
+                values[i * 64 + lidx] = element_matrix[idx];
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
                                               const ptrdiff_t                       nelements,
                                               idx_t **const SFEM_RESTRICT           elements,
@@ -904,7 +966,7 @@ int affine_sshex8_laplacian_bjacobi_fff(const int                             le
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
-            { // Gather elemental data
+            {  // Gather elemental data
                 scalar_t fff[6];
                 for (int d = 0; d < 6; d++) {
                     fff[d] = g_fff[e * 6 + d] * h;
