@@ -24,6 +24,7 @@
 #include "adj_table.h"
 
 #include "sfem_glob.hpp"
+#include "sfem_API.hpp"
 
 static SFEM_INLINE void normalize3(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -321,12 +322,9 @@ int main(int argc, char* argv[]) {
 
     const char* folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    if (mesh.element_type != TRI3 || mesh.element_type == TET4) {
+    if (mesh->element_type() != TRI3 || mesh->element_type() == TET4) {
         fprintf(stderr, "This code only supports mesh with element type TRI3 or TET4\n");
         return EXIT_FAILURE;
     }
@@ -334,14 +332,14 @@ int main(int argc, char* argv[]) {
     mesh_t intersection_mesh;
     mesh_init(&intersection_mesh);
 
-    intersection_mesh.comm = mesh.comm;
-    intersection_mesh.mem_space = mesh.mem_space;
+    intersection_mesh.comm = comm;
 
-    intersection_mesh.spatial_dim = mesh.spatial_dim;
+
+    intersection_mesh.spatial_dim = mesh->spatial_dimension();
     intersection_mesh.element_type = WEDGE6;
 
-    intersection_mesh.nelements = mesh.nelements;
-    intersection_mesh.nnodes = mesh.nnodes * 2;
+    intersection_mesh.nelements = mesh->n_elements();
+    intersection_mesh.nnodes = mesh->n_nodes() * 2;
     intersection_mesh.n_owned_elements = intersection_mesh.nelements;
 
     intersection_mesh.node_mapping = 0;
@@ -359,10 +357,10 @@ int main(int argc, char* argv[]) {
         intersection_mesh.points[d] = (geom_t*)malloc(intersection_mesh.nnodes * sizeof(geom_t));
     }
 
-    mesh_self_intersect(mesh.nelements,
-                        mesh.nnodes,
-                        mesh.elements,
-                        mesh.points,
+    mesh_self_intersect(mesh->n_elements(),
+                        mesh->n_nodes(),
+                        mesh->elements()->data(),
+                        mesh->points()->data(),
                         intersection_mesh.elements,
                         intersection_mesh.points);
 
@@ -370,14 +368,13 @@ int main(int argc, char* argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("Volume: #elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("Surface: #elements %ld #nodes %ld\n",
                (long)intersection_mesh.nelements,
                (long)intersection_mesh.nnodes);
     }
 
     // Clean-up
-    mesh_destroy(&mesh);
     mesh_destroy(&intersection_mesh);
 
     double tock = MPI_Wtime();

@@ -16,8 +16,9 @@
 #include "tet4_grad.h"
 
 #include "sfem_defs.h"
+#include "sfem_macros.h"
 
-#define POW2(a) ((a) * (a))
+#include "sfem_API.hpp"
 
 static SFEM_INLINE void normalize(real_t *const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -445,15 +446,14 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *vector_field[3];
     ptrdiff_t vector_field_size_local, vector_field_size_global;
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         array_create_from_file(comm,
                                path_vector_field[d],
                                SFEM_MPI_REAL_T,
@@ -463,20 +463,20 @@ int main(int argc, char *argv[]) {
     }
 
     geom_t *normals_xyz[3];
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
-        normals_xyz[d] = (geom_t *)malloc(mesh.nelements * sizeof(geom_t));
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
+        normals_xyz[d] = (geom_t *)malloc(n_elements * sizeof(geom_t));
     }
 
-    normals(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, normals_xyz);
+    normals(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), normals_xyz);
 
-    real_t *outflux = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
-    memset(outflux, 0, mesh.nnodes * sizeof(real_t));
+    real_t *outflux = (real_t *)malloc(n_nodes * sizeof(real_t));
+    memset(outflux, 0, n_nodes * sizeof(real_t));
 
-    surface_outflux(mesh.element_type,
-                    mesh.nelements,
-                    mesh.nnodes,
-                    mesh.elements,
-                    mesh.points,
+    surface_outflux(mesh->element_type(),
+                    n_elements,
+                    n_nodes,
+                    mesh->elements()->data(),
+                    mesh->points()->data(),
                     normals_xyz,
                     vector_field[0],
                     vector_field[1],
@@ -487,16 +487,16 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_EXPORT_NORMALS, atoi);
 
     if (SFEM_EXPORT_NORMALS) {
-        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], mesh.nelements, mesh.nelements);
-        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], mesh.nelements, mesh.nelements);
-        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], mesh.nelements, mesh.nelements);
+        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], n_elements, n_elements);
+        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], n_elements, n_elements);
+        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], n_elements, n_elements);
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, mesh.nnodes, mesh.nnodes);
+    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, n_nodes, n_nodes);
 
     free(outflux);
 
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         free(normals_xyz[d]);
         free(vector_field[d]);
     }
@@ -505,9 +505,10 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
     return MPI_Finalize();
 }
+

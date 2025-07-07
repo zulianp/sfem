@@ -14,6 +14,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -45,17 +47,16 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *input;
     ptrdiff_t input_n_local, input_n_global;
     array_create_from_file(comm, path_input, SFEM_MPI_REAL_T, (void **)&input, &input_n_local, &input_n_global);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    ptrdiff_t nelements = n_elements;
+    ptrdiff_t nnodes = n_nodes;
 
     assert(input_n_local == nnodes);
 
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     // Apply inverse lumped-mass matrix and store result into output buffer
-    apply_inv_lumped_mass(mesh.element_type, nelements, nnodes, mesh.elements, mesh.points, input, output);
+    apply_inv_lumped_mass(mesh->element_type(), nelements, nnodes, mesh->elements()->data(), mesh->points()->data(), input, output);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write cell data
@@ -86,7 +87,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

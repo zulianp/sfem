@@ -14,6 +14,7 @@
 #include "read_mesh.h"
 
 #include "tet4_neohookean.h"
+#include "sfem_API.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -86,12 +87,9 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    real_t *stress = (real_t *)malloc(mesh.nelements * sizeof(real_t));
+    real_t *stress = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
 
     // TODO
     // if(strcmp(material, "neohookean") == 0) { }
@@ -101,7 +99,7 @@ int main(int argc, char *argv[]) {
         // real_t *u;
         // ptrdiff_t u_n_local, u_n_global;
         // array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        // neohookean_vonmisneohookean_vonmises_aos(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
+        // neohookean_vonmisneohookean_vonmises_aos(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
         // free(u);
     } else {
         real_t *u[3];
@@ -112,21 +110,21 @@ int main(int argc, char *argv[]) {
             array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
         }
 
-        neohookean_vonmises_soa(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
+        neohookean_vonmises_soa(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
         
         for (int d = 0; d < 3; d++) {
             free(u[d]);
         }
     }
 
-    array_write(comm, output_path, SFEM_MPI_REAL_T, stress, mesh.nelements, mesh.nelements);
+    array_write(comm, output_path, SFEM_MPI_REAL_T, stress, mesh->n_elements(), mesh->n_elements());
     free(stress);
 
     double tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

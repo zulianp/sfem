@@ -3,6 +3,7 @@
 
 #include "sfem_base.h"
 #include "sfem_macros.h"
+#include "sfem_cuda_base.h"
 
 template <typename scalar_t>
 static inline __device__ __host__ void cu_hex8_sub_fff_0(const ptrdiff_t                          stride,

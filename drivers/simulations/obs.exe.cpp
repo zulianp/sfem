@@ -22,7 +22,7 @@
 #include "sfem_ssmgc.hpp"
 
 int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
-    MPI_Comm comm = context.comm();
+    auto comm = context.communicator();
 
     if (argc != 6) {
         fprintf(stderr, "usage: %s <mesh> <sdf> <dirichlet_conditions> <contact_boundary> <output>\n", argv[0]);
@@ -52,9 +52,9 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
         }
     }
 
-    auto      m          = sfem::Mesh::create_from_file(comm, mesh_path);
-    const int block_size = m->spatial_dimension();
-    auto      fs         = sfem::FunctionSpace::create(m, block_size);
+    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
+    const int block_size = mesh->spatial_dimension();
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     fs->semi_structured_mesh().apply_hierarchical_renumbering();

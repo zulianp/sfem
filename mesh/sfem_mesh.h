@@ -11,9 +11,11 @@
 extern "C" {
 #endif
 
-static const int SFEM_MEM_SPACE_HOST = 0;
-static const int SFEM_MEM_SPACE_CUDA = 1;
-static const int SFEM_MEM_SPACE_NONE = -1;
+static const int SFEM_MEM_SPACE_NONE    = -1;
+static const int SFEM_MEM_SPACE_HOST    = 0;
+static const int SFEM_MEM_SPACE_CUDA    = 1;
+static const int SFEM_MEM_SPACE_MANAGED = 2;
+static const int SFEM_MEM_SPACE_UNIFIED = 3;
 
 typedef struct {
     MPI_Comm comm;
@@ -62,6 +64,7 @@ void mesh_init(mesh_t *mesh);
  */
 void mesh_destroy(mesh_t *mesh);
 
+
 void mesh_create_reference_hex8_cube(mesh_t *mesh);
 void mesh_create_hex8_cube(mesh_t      *mesh,
                            const int    nx,
@@ -105,6 +108,7 @@ void mesh_create_serial(mesh_t       *mesh,
                         idx_t       **elements,
                         ptrdiff_t     nnodes,
                         geom_t      **points);
+
 
 void mesh_minmax_edge_length(const mesh_t *const mesh, real_t *emin, real_t *emax);
 

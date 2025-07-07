@@ -263,6 +263,13 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
 int test_contact() {
     MPI_Comm comm = MPI_COMM_WORLD;
 
+    int comm_size;
+    MPI_Comm_size(comm, &comm_size);
+
+    if(comm_size > 1) {
+        SFEM_ERROR("test_contact() can only be run in serial!\n");
+    }
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -277,7 +284,7 @@ int test_contact() {
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
@@ -288,9 +295,9 @@ int test_contact() {
                                           y_top,
                                           1);
 
-    const int block_size = m->spatial_dimension();
+    const int block_size = mesh->spatial_dimension();
 
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -363,7 +370,7 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        fs->mesh_ptr()->write("test_contact/coarse_mesh");
+        mesh->write("test_contact/coarse_mesh");
         fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
 
         auto out = f->output();

@@ -24,8 +24,7 @@ namespace sfem {
         BLAS_Tpl<T> blas;
         std::shared_ptr<PowerMethod<T>> power_method;
 
-        std::shared_ptr<Buffer<T>> p_, temp_;
-        // std::shared_ptr<Buffer<T>> diag_;
+        SharedBuffer<T> p_, temp_;
 
         // Solver parameters
         T atol{1e-10};
@@ -45,12 +44,6 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
-
-        // int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op,
-        //                           const std::shared_ptr<Buffer<T>>& diag) override {
-        //     // TODO
-        //     return SFEM_SUCCESS;
-        // }
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }

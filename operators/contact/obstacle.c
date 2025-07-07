@@ -27,7 +27,7 @@ int         obstacle_distribute_contact_forces(const int                        
                                                real_t *const                     out) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; ++i) {
-        const ptrdiff_t ii  = idx[i] * dim;
+        const ptrdiff_t ii  = (ptrdiff_t)idx[i] * dim;
         real_t *const   oii = &out[ii];
         const real_t    fi  = f[i] * m[i];
         for (int d = 0; d < dim; d++) {
@@ -69,8 +69,9 @@ int         obstacle_contact_stress(const int                         dim,
                                     real_t *const                     s) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; ++i) {
+        const ptrdiff_t b = (ptrdiff_t)idx[i];
         for (int d = 0; d < dim; d++) {
-            const real_t ri = r[idx[i] * dim + d] / m[i];
+            const real_t ri = r[b * dim + d] / m[i];
             s[idx[i] * dim] += normals[d][i] * ri;
         }
     }

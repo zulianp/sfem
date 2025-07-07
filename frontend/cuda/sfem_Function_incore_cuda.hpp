@@ -19,17 +19,16 @@ namespace sfem {
     std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
     std::shared_ptr<Sideset>    to_device(const std::shared_ptr<Sideset> &ss);
 
-    std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
-                                                          const enum ElemType                   element_type);
+    SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const enum ElemType element_type);
 
-    template <typename T>
-    std::shared_ptr<Buffer<T>> create_device_buffer(const std::ptrdiff_t n) {
+    template<typename T>
+    SharedBuffer<T> create_device_buffer(const std::ptrdiff_t n) {
         auto ret = std::make_shared<Buffer<T>>(n, (T *)d_buffer_alloc(n * sizeof(T)), &d_buffer_destroy, MEMORY_SPACE_DEVICE);
         return ret;
     }
 
-    template <typename T>
-    std::shared_ptr<Buffer<T>> to_device(const std::shared_ptr<Buffer<T>> &in) {
+    template<typename T>
+    SharedBuffer<T> to_device(const SharedBuffer<T> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
         }
@@ -42,7 +41,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T *>> to_device(const std::shared_ptr<Buffer<T *>> &in) {
+    SharedBuffer<T *> to_device(const SharedBuffer<T *> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
         }
@@ -83,7 +82,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> to_host(const std::shared_ptr<Buffer<T>> &in) {
+    SharedBuffer<T> to_host(const SharedBuffer<T> &in) {
         if (in->mem_space() == MEMORY_SPACE_HOST) {
             return in;
         }

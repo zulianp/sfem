@@ -20,6 +20,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
@@ -90,10 +92,9 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_elements = mesh->n_elements();
 
     double tack = MPI_Wtime();
     printf("assemble.c: read\t\t%g seconds\n", tack - tick);
@@ -108,19 +109,19 @@ int main(int argc, char *argv[]) {
     real_t *values = 0;
 
     build_crs_graph_for_elem_type(
-        mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+        mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), &rowptr, &colidx);
 
-    nnz = rowptr[mesh.nnodes];
+    nnz = rowptr[n_nodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
 
     if (SFEM_DIRECTED) {
         printf("SFEM_DIRECTED\n");
-        for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+        for (ptrdiff_t i = 0; i < n_nodes; i++) {
             for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                 idx_t col = colidx[k];
                 if (col != i) {
-                    idx_t ii = (i + mesh.nnodes / 2) % mesh.nnodes;
-                    idx_t jj = (col + mesh.nnodes / 2) % mesh.nnodes;
+                    idx_t ii = (i + n_nodes / 2) % n_nodes;
+                    idx_t jj = (col + n_nodes / 2) % n_nodes;
 
                     if (col < i) {
                         values[k] = 1;
@@ -137,7 +138,7 @@ int main(int argc, char *argv[]) {
                 values[i] = 1;
             }
 
-            for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 real_t row_sum = 0;
                 for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                     row_sum += values[k];
@@ -157,7 +158,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (SFEM_REMOVE_DIAGONAL) {
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < n_nodes; i++) {
                     for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                         idx_t col = colidx[k];
 
@@ -169,7 +170,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (SFEM_REMOVE_LOWER_TRIANGULAR) {
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < n_nodes; i++) {
                     for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                         idx_t col = colidx[k];
                         if (col < i) {
@@ -180,7 +181,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (SFEM_NEGATE_LOWER_TRIANGULAR) {
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < n_nodes; i++) {
                     for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                         idx_t col = colidx[k];
                         if (col < i) {
@@ -191,7 +192,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (SFEM_NORMALIZE_ROWS) {
-                for (ptrdiff_t i = 0; i < mesh.nnodes; i++) {
+                for (ptrdiff_t i = 0; i < n_nodes; i++) {
                     real_t row_sum = 0;
                     for (count_t k = rowptr[i]; k < rowptr[i + 1]; k++) {
                         row_sum += values[k];
@@ -218,8 +219,8 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = mesh.nnodes;
-        crs_out.lrows = mesh.nnodes;
+        crs_out.grows = n_nodes;
+        crs_out.lrows = n_nodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
         crs_out.start = 0;
@@ -242,16 +243,11 @@ int main(int argc, char *argv[]) {
     free(colidx);
     free(values);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
-
-    mesh_destroy(&mesh);
-
     tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
+        printf("#elements %ld #nodes %ld #nz %ld\n", (long)n_elements, (long)n_nodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

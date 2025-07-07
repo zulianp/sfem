@@ -59,7 +59,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space();
 
-        const std::shared_ptr<Buffer<idx_t>> node_mapping();
+        const SharedBuffer<idx_t> node_mapping();
 
         static std::shared_ptr<ContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space,
                                                                   const enum ExecutionSpace             es);
@@ -101,7 +101,7 @@ namespace sfem {
 
         int full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s);
 
-        std::shared_ptr<Buffer<idx_t *>> ss_sides();
+        SharedBuffer<idx_t *> ss_sides();
         // std::shared_ptr<Sideset>         sideset();
 
     private:

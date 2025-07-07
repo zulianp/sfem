@@ -1,17 +1,14 @@
-#ifndef SFEM_MIXED_PRECISION_SHIFTABLE_JACOBI_HPP
-#define SFEM_MIXED_PRECISION_SHIFTABLE_JACOBI_HPP
+#ifndef SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
+#define SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
 
-#include <cstddef>
-#include <memory>
+#include "sfem_base.h"
 
+#include "sfem_Buffer.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
-
-#include "sfem_Buffer.hpp"
-
-#include "sfem_ShiftableJacobi.hpp"
 #include "sfem_openmp_ShiftableJacobi.hpp"
+#include "sfem_ShiftableJacobi.hpp"
 
 namespace sfem {
 
@@ -22,10 +19,10 @@ namespace sfem {
         BLAS_Tpl<LP>                    blas;
         ShiftableBlockSymJacobi_Tpl<HP, LP> impl;
 
-        std::shared_ptr<Buffer<HP>>     diag;
-        std::shared_ptr<Buffer<LP>>     inv_diag;
-        std::shared_ptr<Buffer<mask_t>> constraints_mask;
-        LP                              relaxation_parameter{0.3};
+        SharedBuffer<HP>     diag;
+        SharedBuffer<LP>     inv_diag;
+        SharedBuffer<mask_t> constraints_mask;
+        HP                               relaxation_parameter{1./3};
         int                             block_size{3};
         bool                            is_symmetric{true};
 
@@ -35,7 +32,7 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void set_diag(const std::shared_ptr<Buffer<HP>>& d) {
+        void set_diag(const SharedBuffer<HP>& d) {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::set_diag");
 
             assert(block_size == 3);
@@ -51,7 +48,7 @@ namespace sfem {
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
-        int shift(const std::shared_ptr<Buffer<HP>>& d) override {
+        int shift(const SharedBuffer<HP>& d) override {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::shift");
 
             assert(d->size() == diag->size());
@@ -65,7 +62,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int shift(const std::shared_ptr<SparseBlockVector<HP>>& block_diag, const std::shared_ptr<Buffer<HP>>& scaling) override {
+        int shift(const std::shared_ptr<SparseBlockVector<HP>>& block_diag, const SharedBuffer<HP>& scaling) override {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::shift");
 
             const ptrdiff_t n_blocks = inv_diag->size() / 9;
@@ -98,8 +95,8 @@ namespace sfem {
 
     template <typename HP, typename LP>
     std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> h_mixed_precision_shiftable_block_sym_jacobi(
-            const std::shared_ptr<Buffer<HP>>& diag,
-            const std::shared_ptr<Buffer<mask_t>>& constraints_mask) {
+            const SharedBuffer<HP>&     diag,
+            const SharedBuffer<mask_t>& constraints_mask) {
         auto ret = std::make_shared<MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
         ret->default_init();
         ret->constraints_mask = constraints_mask;
@@ -109,4 +106,4 @@ namespace sfem {
 
 }  // namespace sfem
 
-#endif  // SFEM_MIXED_PRECISION_SHIFTABLE_JACOBI_HPP
+#endif  // SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP

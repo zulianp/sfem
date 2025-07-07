@@ -1,5 +1,5 @@
-#ifndef SFEM_SHIFABLE_JACOBI_HPP
-#define SFEM_SHIFABLE_JACOBI_HPP
+#ifndef SFEM_SHIFTABLE_JACOBI_HPP
+#define SFEM_SHIFTABLE_JACOBI_HPP
 
 #include <cstddef>
 #include <memory>
@@ -14,7 +14,7 @@
 
 namespace sfem {
     template <typename T>
-    static std::shared_ptr<Buffer<T>> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
+    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
 
     template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
@@ -22,8 +22,8 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         BLAS_Tpl<T>    blas;
 
-        std::shared_ptr<Buffer<T>> diag;
-        std::shared_ptr<Buffer<T>> inv_diag;
+        SharedBuffer<T> diag;
+        SharedBuffer<T> inv_diag;
         T                          relaxation_parameter{0.3};
 
         void default_init() {
@@ -31,14 +31,14 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void set_diag(const std::shared_ptr<Buffer<T>>& d) {
+        void set_diag(const SharedBuffer<T>& d) {
             diag     = d;
             inv_diag = create_buffer<T>(d->size(), execution_space());
             blas.copy(diag->size(), diag->data(), inv_diag->data());
             blas.reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
-        int shift(const std::shared_ptr<Buffer<T>>& d) override {
+        int shift(const SharedBuffer<T>& d) override {
             assert(d->size() == diag->size());
 
             blas.copy(diag->size(), diag->data(), inv_diag->data());
@@ -61,7 +61,7 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<ShiftableJacobi<T>> h_shiftable_jacobi(const std::shared_ptr<Buffer<T>>& diag) {
+    std::shared_ptr<ShiftableJacobi<T>> h_shiftable_jacobi(const SharedBuffer<T>& diag) {
         auto ret = std::make_shared<ShiftableJacobi<T>>();
         ret->default_init();
         ret->set_diag(diag);
@@ -75,9 +75,9 @@ namespace sfem {
         BLAS_Tpl<T>                    blas;
         ShiftableBlockSymJacobi_Tpl<T> impl;
 
-        std::shared_ptr<Buffer<T>>      diag;
-        std::shared_ptr<Buffer<T>>      inv_diag;
-        std::shared_ptr<Buffer<mask_t>> constraints_mask;
+        SharedBuffer<T>      diag;
+        SharedBuffer<T>      inv_diag;
+        SharedBuffer<mask_t> constraints_mask;
         T                               relaxation_parameter{1./3};
         int                             block_size{3};
         bool                            is_symmetric{true};
@@ -88,7 +88,7 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void set_diag(const std::shared_ptr<Buffer<T>>& d) {
+        void set_diag(const SharedBuffer<T>& d) {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::set_diag");
 
             assert(block_size == 3);
@@ -104,7 +104,7 @@ namespace sfem {
             blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
-        int shift(const std::shared_ptr<Buffer<T>>& d) override {
+        int shift(const SharedBuffer<T>& d) override {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::shift");
 
             assert(d->size() == diag->size());
@@ -118,7 +118,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const std::shared_ptr<Buffer<T>>& scaling) override {
+        int shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const SharedBuffer<T>& scaling) override {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::shift");
 
             const ptrdiff_t n_blocks = inv_diag->size() / 9;
@@ -148,8 +148,8 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<ShiftableBlockSymJacobi<T>> h_shiftable_block_sym_jacobi(
-            const std::shared_ptr<Buffer<T>>&      diag,
-            const std::shared_ptr<Buffer<mask_t>>& constraints_mask) {
+            const SharedBuffer<T>&      diag,
+            const SharedBuffer<mask_t>& constraints_mask) {
         auto ret = std::make_shared<ShiftableBlockSymJacobi<T>>();
         ret->default_init();
         ret->constraints_mask = constraints_mask;
@@ -158,4 +158,4 @@ namespace sfem {
     }
 }  // namespace sfem
 
-#endif  // SFEM_SHIFABLE_JACOBI_HPP
+#endif  // SFEM_SHIFTABLE_JACOBI_HPP

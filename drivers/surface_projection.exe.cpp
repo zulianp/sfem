@@ -15,6 +15,8 @@
 
 #include "surface_l2_projection.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -46,17 +48,14 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     real_t *p0;
     ptrdiff_t p0_n_local, p0_n_global;
     array_create_from_file(comm, path_p0, SFEM_MPI_REAL_T, (void **)&p0, &p0_n_local, &p0_n_global);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    ptrdiff_t nelements = mesh->n_elements();
+    ptrdiff_t nnodes = mesh->n_nodes();
 
     assert(p0_n_local == nelements);
 
@@ -72,9 +71,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        surface_e_projection_coeffs(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        surface_e_projection_coeffs(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), p0, p1);
     } else {
-        surface_e_projection_apply(mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, p0, p1);
+        surface_e_projection_apply(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), p0, p1);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -94,7 +93,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

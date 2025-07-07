@@ -70,10 +70,11 @@ namespace sfem {
 
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                                        const bool                            as_zero) const {
-        auto mesh = (mesh_t *)impl_->space->mesh().impl_mesh();
-        auto et   = (enum ElemType)impl_->space->element_type();
+        
+        auto space = impl_->space;
+        auto et   = (enum ElemType)space->element_type();
 
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->nelements, mesh->elements);
+        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements()->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -173,14 +174,14 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_CONTACT_NODESET, );
         SFEM_READ_ENV(SFEM_CONTACT_VALUE, );
         SFEM_READ_ENV(SFEM_CONTACT_COMPONENT, );
+        SFEM_ERROR("REFACTOR ME!\n");
 
-        auto mesh = (mesh_t *)space->mesh().impl_mesh();
-        read_dirichlet_conditions(mesh,
-                                  SFEM_CONTACT_NODESET,
-                                  SFEM_CONTACT_VALUE,
-                                  SFEM_CONTACT_COMPONENT,
-                                  &dc->impl_->conditions,
-                                  &dc->impl_->n_conditions);
+        // read_dirichlet_conditions(space->mesh_ptr(),
+        //                           SFEM_CONTACT_NODESET,
+        //                           SFEM_CONTACT_VALUE,
+        //                           SFEM_CONTACT_COMPONENT,
+        //                           &dc->impl_->conditions,
+        //                           &dc->impl_->n_conditions);
 
         return dc;
     }
@@ -269,8 +270,8 @@ namespace sfem {
     int AxisAlignedContactConditions::mask(mask_t *mask) {
         for (int i = 0; i < impl_->n_conditions; i++) {
             for (ptrdiff_t node = 0; node < impl_->conditions[i].local_size; node++) {
-                const ptrdiff_t idx =
-                        impl_->conditions[i].idx[node] * impl_->space->block_size() + impl_->conditions[i].component;
+                const ptrdiff_t idx = static_cast<ptrdiff_t>(impl_->conditions[i].idx[node]) * impl_->space->block_size() +
+                                      impl_->conditions[i].component;
                 mask_set(idx, mask);
             }
         }
@@ -299,13 +300,13 @@ namespace sfem {
             contact_surface->collect_points();
 
             auto st           = contact_surface->element_type();
-            auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->spatial_dimension(),
+            auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->comm(),
+                                                       space->mesh_ptr()->spatial_dimension(),
                                                        st,
                                                        contact_surface->elements()->extent(1),
-                                                       contact_surface->elements()->data(),
+                                                       contact_surface->elements(),
                                                        contact_surface->points()->extent(1),
-                                                       contact_surface->points()->data(),
-                                                       [](const void *) {});
+                                                       contact_surface->points());
 
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");
@@ -401,7 +402,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path_surface.c_str());
+        auto sideset = Sideset::create_from_file(mesh->comm(), path_surface.c_str());
 
         std::string path_sdf;
         in->require("sdf", path_sdf);
@@ -451,8 +452,9 @@ namespace sfem {
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
+            const ptrdiff_t b = static_cast<ptrdiff_t>(idx[i]);
             for (int d = 0; d < dim; d++) {
-                g[idx[i] * dim + d] = tt[i] * normals[d][i];
+                g[b * dim + d] = tt[i] * normals[d][i];
             }
         }
 
@@ -508,7 +510,7 @@ namespace sfem {
 
         if (impl_->debug) {
             for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC_t: %g = %g  * %g * %g\n", out[idx[i] * dim + 0], normals[0][i], f[i], m[i]);
+                printf("CC_t: %g = %g  * %g * %g\n", out[(ptrdiff_t)idx[i] * dim + 0], normals[0][i], f[i], m[i]);
             }
         }
 

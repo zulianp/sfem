@@ -28,8 +28,8 @@ namespace sfem {
 
         void transpose() { transposed = !transposed; }
         bool is_transposed() { return transposed; }
-        void set_weights(const std::shared_ptr<Buffer<T>>& weights) { weights_ = weights; }
-        void set_partition(const std::shared_ptr<Buffer<R>>& partition) { partition_ = partition; }
+        void set_weights(const SharedBuffer<T>& weights) { weights_ = weights; }
+        void set_partition(const SharedBuffer<R>& partition) { partition_ = partition; }
 
         // Internally allocates a workspace with same memory requirement as `a`
         // (this could be passed in as arg...)
@@ -73,14 +73,14 @@ namespace sfem {
 
     private:
         // Length of `fine_dim` and values indicate coarse grid indices
-        std::shared_ptr<Buffer<R>> partition_;
+        SharedBuffer<R> partition_;
         // Length of `fine_dim` and values weight the PWC gridfunction
-        std::shared_ptr<Buffer<T>> weights_;
+        SharedBuffer<T> weights_;
     };
 
     template <typename R, typename T>
     std::shared_ptr<PiecewiseConstantInterpolator<R, T>> h_pwc_interp(
-            const std::shared_ptr<Buffer<T>>& weights, const std::shared_ptr<Buffer<R>>& partition,
+            const SharedBuffer<T>& weights, const SharedBuffer<R>& partition,
             const ptrdiff_t coarse_dim) {
         auto ret = std::make_shared<PiecewiseConstantInterpolator<R, T>>();
         ret->coarse_dim = coarse_dim;

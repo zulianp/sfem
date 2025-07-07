@@ -22,7 +22,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION,

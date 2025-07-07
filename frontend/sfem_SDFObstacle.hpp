@@ -4,6 +4,7 @@
 #include "sfem_defs.h"
 
 #include "sfem_Buffer.hpp"
+#include "sfem_Communicator.hpp"
 #include "sfem_Grid.hpp"
 
 #include <mpi.h>
@@ -64,7 +65,7 @@ namespace sfem {
                          geom_t **const SFEM_RESTRICT points,
                          real_t *const SFEM_RESTRICT  gap) override;
 
-        static std::shared_ptr<SDFObstacle> create_from_file(MPI_Comm                  comm,
+        static std::shared_ptr<SDFObstacle> create_from_file(const std::shared_ptr<Communicator>& comm,
                                                              const std::string        &path,
                                                              const enum ExecutionSpace es);
         static std::shared_ptr<SDFObstacle> create(const std::shared_ptr<Grid<geom_t>> &sdf, const enum ExecutionSpace es);
