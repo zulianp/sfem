@@ -237,6 +237,17 @@ namespace sfem {
 
     Function::~Function() {}
 
+    void Function::remove_operator(const std::shared_ptr<Op> &op)
+    {
+        auto it = std::find(impl_->ops.begin(), impl_->ops.end(), op);
+
+        if(it == impl_->ops.end()) {
+            SFEM_ERROR("remove_operator: op does not exist!");
+        }
+
+        impl_->ops.erase(it);
+    }
+
     void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
