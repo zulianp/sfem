@@ -323,11 +323,11 @@ tet4_iterative_refinement(const real_type       x0,                // Tetrahedro
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-// tet4_resample_field_local_ref_iterative_adjoint ///////
+// tet4_resample_field_local_ref_iter_adjoint_stack ///////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 int                                                                                                   //
-tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                      start_element,   // Mesh
+tet4_resample_field_local_ref_iter_adjoint_stack(const ptrdiff_t                      start_element,   // Mesh
                                                 const ptrdiff_t                      end_element,     //
                                                 const ptrdiff_t                      nnodes,          //
                                                 const idx_t** const SFEM_RESTRICT    elems,           //

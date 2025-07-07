@@ -685,7 +685,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
  * @return int
  */
 int                                                                                                   //
-tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                      start_element,   // Mesh
+tet4_resample_field_local_ref_iter_adjoint_stack(const ptrdiff_t                      start_element,   // Mesh
                                                 const ptrdiff_t                      end_element,     //
                                                 const ptrdiff_t                      nnodes,          //
                                                 const idx_t** const SFEM_RESTRICT    elems,           //
@@ -716,7 +716,7 @@ tet4_resample_field_local_ref_iterative_adjoint(const ptrdiff_t                 
  * @return int
  */
 int                                                                                                    //
-tet4_resample_field_local_ref_queue_iter_adjoint(const ptrdiff_t                      start_element,   // Mesh
+tet4_resample_field_local_ref_iter_adjoint_queue(const ptrdiff_t                      start_element,   // Mesh
                                                  const ptrdiff_t                      end_element,     //
                                                  const ptrdiff_t                      nnodes,          //
                                                  const idx_t** const SFEM_RESTRICT    elems,           //
