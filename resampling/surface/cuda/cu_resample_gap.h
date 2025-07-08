@@ -108,6 +108,11 @@ int cu_resample_weight_local(
         // Output
         real_t* const SFEM_RESTRICT w);
 
+int cu_normalize(const ptrdiff_t             nnodes,
+                 real_t* const SFEM_RESTRICT xnormal,
+                 real_t* const SFEM_RESTRICT ynormal,
+                 real_t* const SFEM_RESTRICT znormal);
+
 #ifdef __cplusplus
 }
 #endif
