@@ -60,8 +60,6 @@
 
 namespace sfem {
 
-    int Constraint::apply_zero(real_t *const x) { return apply_value(0, x); }
-
     class DirichletConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
