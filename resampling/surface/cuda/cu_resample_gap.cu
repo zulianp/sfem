@@ -4,7 +4,7 @@
 #include "sfem_cuda_base.h"
 #include "sfem_macros.h"
 
-int resample_gap_local(
+extern "C" int cu_resample_gap_local(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
@@ -44,7 +44,7 @@ int resample_gap_local(
     }
 }
 
-int cu_resample_weight_local(
+extern "C" int cu_resample_weight_local(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
@@ -101,7 +101,7 @@ static int rescale_with_weight(const enum ElemType          element_type,
     return SFEM_SUCCESS;
 }
 
-int cu_resample_gap(
+extern "C" int cu_resample_gap(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
@@ -132,7 +132,7 @@ int cu_resample_gap(
     return err;
 }
 
-int cu_resample_gap_value_local(
+extern "C" int cu_resample_gap_value_local(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
@@ -162,7 +162,7 @@ int cu_resample_gap_value_local(
     }
 }
 
-int cu_resample_gap_value(
+extern "C" int cu_resample_gap_value(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
@@ -185,7 +185,7 @@ int cu_resample_gap_value(
            rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
 }
 
-int cu_resample_gap_normals_local(
+extern "C" int cu_resample_gap_normals_local(
         // Mesh
         const enum ElemType          element_type,
         const ptrdiff_t              nelements,
