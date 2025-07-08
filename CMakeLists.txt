@@ -135,7 +135,9 @@ if(SFEM_ENABLE_CUDA)
         operators/tet10/cuda
         operators/tet4/cuda
         resampling/cuda
-        )
+        resampling/surface/cuda
+        resampling/quadshell4/cuda
+    )
 
     if(SFEM_ENABLE_AMG)
         list(APPEND SFEM_MODULES amg/cuda)
