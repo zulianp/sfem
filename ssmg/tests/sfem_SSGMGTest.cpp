@@ -92,8 +92,8 @@ int test_ssgmg_poisson_cube() {
     auto right_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
 
-    sfem::DirichletConditions::Condition left{.sideset = bottom_ss, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = bottom_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = right_ss, .value = 1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
@@ -144,10 +144,10 @@ int test_ssgmg_linear_elasticity_cube() {
     auto right_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t /*y*/, const geom_t z) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
 
-    sfem::DirichletConditions::Condition left{.sideset = left_ss, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right0{.sideset = right_ss, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition right1{.sideset = right_ss, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition right2{.sideset = right_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition left{.sidesets = left_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right0{.sidesets = right_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition right1{.sidesets = right_ss, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition right2{.sidesets = right_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right0, right1, right2}, es);
     f->add_constraint(conds);

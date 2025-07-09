@@ -514,7 +514,7 @@ NB_MODULE(pysfem, m) {
     // Add DirichletConditions::Condition binding
     nb::class_<DirichletConditions::Condition>(m, "DirichletCondition")
             .def(nb::init<>())
-            .def_rw("sideset", &DirichletConditions::Condition::sideset)
+            .def_rw("sidesets", &DirichletConditions::Condition::sidesets)
             .def_rw("nodeset", &DirichletConditions::Condition::nodeset)
             .def_rw("values", &DirichletConditions::Condition::values)
             .def_rw("value", &DirichletConditions::Condition::value)
@@ -541,8 +541,8 @@ NB_MODULE(pysfem, m) {
             .def_static("create",
                         [](const std::shared_ptr<FunctionSpace> &fs,
                            const std::shared_ptr<Grid<geom_t>>  &sdf,
-                           const std::shared_ptr<Sideset>       &sideset,
-                           const enum ExecutionSpace             es) { return ContactConditions::create(fs, sdf, sideset, es); });
+                           const std::vector<std::shared_ptr<Sideset>> &sidesets,
+                           const enum ExecutionSpace             es) { return ContactConditions::create(fs, sdf, sidesets, es); });
 
     m.def("signed_distance_for_mesh_viz",
           [](const std::shared_ptr<ContactConditions> &cc,

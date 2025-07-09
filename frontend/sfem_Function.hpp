@@ -126,9 +126,6 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    SharedBuffer<idx_t> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
-                                                    const std::shared_ptr<Sideset>       &sideset);
-
     std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset);

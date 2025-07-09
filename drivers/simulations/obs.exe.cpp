@@ -77,7 +77,7 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 
     auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
     auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
-    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, contact_boundary, es);
+    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            x     = sfem::create_buffer<real_t>(ndofs, es);

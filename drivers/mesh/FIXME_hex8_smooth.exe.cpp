@@ -133,9 +133,9 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
         sz->data()[i] = points[2][idx[i]];
     }
 
-    sfem::DirichletConditions::Condition s0{.sideset = sideset, .nodeset = nodeset, .values = sx, .component = 0};
-    sfem::DirichletConditions::Condition s1{.sideset = sideset, .nodeset = nodeset, .values = sy, .component = 1};
-    sfem::DirichletConditions::Condition s2{.sideset = sideset, .nodeset = nodeset, .values = sz, .component = 2};
+    sfem::DirichletConditions::Condition s0{.sidesets = {sideset}, .nodeset = nodeset, .values = sx, .component = 0};
+    sfem::DirichletConditions::Condition s1{.sidesets = {sideset}, .nodeset = nodeset, .values = sy, .component = 1};
+    sfem::DirichletConditions::Condition s2{.sidesets = {sideset}, .nodeset = nodeset, .values = sz, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {s0, s1, s2}, es);
     auto f     = sfem::Function::create(fs);
