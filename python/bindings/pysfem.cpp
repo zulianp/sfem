@@ -215,6 +215,12 @@ NB_MODULE(pysfem, m) {
     m.def("mesh_connectivity_from_file", [](const char *folder) -> std::shared_ptr<IdxBuffer2D> {
         return sfem::mesh_connectivity_from_file(sfem::Communicator::world(), folder);
     });
+    
+    // Add vector<Sideset> binding  
+    nb::class_<std::vector<std::shared_ptr<Sideset>>>(m, "vector<Sideset>")
+            .def("__getitem__", [](const std::vector<std::shared_ptr<Sideset>> &self, size_t index) -> std::shared_ptr<Sideset> {
+                return self[index];
+            });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
     nb::class_<sfem::Buffer<int>>(m, "Buffer<int>")

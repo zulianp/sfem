@@ -168,7 +168,7 @@ def build_cuboid_sphere_contact(base_resolution=2, element_refine_level=2, es=No
     conds = []
     for i, val in enumerate([0, -0.1, 0]):
         cond = sfem.DirichletCondition()
-        cond.sideset = left_right
+        cond.sidesets = left_right
         cond.component = i
         cond.value = val
         print(f"Dirichlet condition {i}: component={cond.component}, value={cond.value}")
@@ -222,7 +222,7 @@ def build_cuboid_highfreq_contact(base_resolution=2, element_refine_level=2, es=
     conds = []
     for i, val in enumerate([0, -0.1, 0]):
         cond = sfem.DirichletCondition()
-        cond.sideset = left_right
+        cond.sidesets = left_right
         cond.component = i
         cond.value = val
         print(f"Dirichlet condition {i}: component={cond.component}, value={cond.value}")
@@ -286,7 +286,7 @@ def build_cuboid_multisphere_contact(base_resolution=2, element_refine_level=2, 
     conds = []
     for i, val in enumerate([0, -0.1, 0]):
         cond = sfem.DirichletCondition()
-        cond.sideset = left_right
+        cond.sidesets = left_right
         cond.component = i
         cond.value = val
         print(f"Dirichlet condition {i}: component={cond.component}, value={cond.value}")
