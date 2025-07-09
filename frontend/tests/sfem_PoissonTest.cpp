@@ -281,6 +281,85 @@ int test_poisson() {
     return test_linear_function(f, "test_poisson");
 }
 
+int test_poisson_and_boundary_selector_aux(const char *test_name,
+                                          const std::shared_ptr<sfem::Mesh> &m, 
+                                          const char *operator_name,
+                                          int block_size,
+                                          sfem::ExecutionSpace es) {
+    auto fs = sfem::FunctionSpace::create(m, block_size);
+
+    int SFEM_ELEMENT_REFINE_LEVEL = 1;
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+
+    auto f = sfem::Function::create(fs);
+
+    auto aabb = m->compute_bounding_box();
+    
+    const geom_t x_min = aabb.first->data()[0];   
+    const geom_t y_min = aabb.first->data()[1];
+    const geom_t z_min = aabb.first->data()[2];
+    const geom_t x_max = aabb.second->data()[0];
+    const geom_t y_max = aabb.second->data()[1];
+    const geom_t z_max = aabb.second->data()[2];
+    
+    auto left_sideset = sfem::Sideset::create_from_selector(
+            m, [x_min](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { 
+                return x > (x_min - 1e-5) && x < (x_min + 1e-5); 
+            });
+
+    auto right_sideset = sfem::Sideset::create_from_selector(
+            m, [x_max](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+                return x > (x_max - 1e-5) && x < (x_max + 1e-5);
+            });
+
+    auto top_sideset = sfem::Sideset::create_from_selector(
+            m, [z_max](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { 
+                return z > (z_max - 1e-5) && z < (z_max + 1e-5); 
+            });
+
+    auto bottom_sideset = sfem::Sideset::create_from_selector(
+            m, [z_min](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { 
+                return z > (z_min - 1e-5) && z < (z_min + 1e-5); 
+            });
+
+    auto front_sideset = sfem::Sideset::create_from_selector(
+            m, [y_max](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { 
+                return y > (y_max - 1e-5) && y < (y_max + 1e-5); 
+            });
+
+    auto back_sideset = sfem::Sideset::create_from_selector(
+            m, [y_min](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { 
+                return y > (y_min - 1e-5) && y < (y_min + 1e-5); 
+            });
+
+    sfem::DirichletConditions::Condition left{.sidesets = left_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition bottom{.sidesets = bottom_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition front{.sidesets = front_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition back{.sidesets = back_sideset, .value = -1, .component = 0};
+
+    if (block_size == 1) {
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, right, bottom, top, front, back}, es);
+        f->add_constraint(conds);
+    } else {
+        sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = -1, .component = 1};
+        sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 1, .component = 1};
+        sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = -1, .component = 2};
+        sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 1, .component = 2};
+
+        auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, top, right1, right2}, es);
+        f->add_constraint(conds);
+    }
+
+    auto op = sfem::create_op(fs, operator_name, es);
+    op->initialize();
+    f->add_operator(op);
+    return test_linear_function(f, test_name);
+}
+
 int test_poisson_and_boundary_selector() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
@@ -295,73 +374,59 @@ int test_poisson_and_boundary_selector() {
     const char *SFEM_OPERATOR = "Laplacian";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 1;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
     int SFEM_BLOCK_SIZE = 1;
     if (strcmp(SFEM_OPERATOR, "VectorLaplacian") == 0) {
+        int SFEM_ELEMENT_REFINE_LEVEL = 1;
+        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
-
-    // SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
     int SFEM_BASE_RESOLUTION = 6;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     int x_dim = 1;
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
-    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 
+                                          SFEM_BASE_RESOLUTION * x_dim, 
+                                          SFEM_BASE_RESOLUTION * 1, 
+                                          SFEM_BASE_RESOLUTION * 1, 
+                                          0, 0, 0, x_dim, 1, 1);
+    
+    return test_poisson_and_boundary_selector_aux("test_poisson_and_boundary_selector", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
+}
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+int test_poisson_and_boundary_selector_checkerboard() {
+    MPI_Comm comm = MPI_COMM_WORLD;
+    auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    auto f = sfem::Function::create(fs);
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
 
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
-
-    auto right_sideset =
-            sfem::Sideset::create_from_selector(m, [x_dim](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
-                return x > (x_dim - 1e-5) && x < (x_dim + 1e-5);
-            });
-
-    auto top_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
-
-    auto bottom_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > -1e-5 && z < 1e-5; });
-
-    auto front_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
-
-    auto back_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
-
-    sfem::DirichletConditions::Condition left{.sidesets = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sidesets = right_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition top{.sidesets = top_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition bottom{.sidesets = bottom_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition front{.sidesets = front_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition back{.sidesets = back_sideset, .value = -1, .component = 0};
-
-    if (SFEM_BLOCK_SIZE == 1) {
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, right, bottom, top, front, back}, es);
-        f->add_constraint(conds);
-    } else {
-        sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = -1, .component = 1};
-        sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 1, .component = 1};
-        sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = -1, .component = 2};
-        sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 1, .component = 2};
-
-        auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, top, right1, right2}, es);
-        f->add_constraint(conds);
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
-    op->initialize();
-    f->add_operator(op);
-    return test_linear_function(f, "test_poisson_and_boundary_selector");
+    const char *SFEM_OPERATOR = "Laplacian";
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (strcmp(SFEM_OPERATOR, "VectorLaplacian") == 0) {
+        int SFEM_ELEMENT_REFINE_LEVEL = 1;
+        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int SFEM_BASE_RESOLUTION = 6;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+    auto m = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::wrap(comm), 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       0, 0, 0, 2, 2, 2);
+    
+    return test_poisson_and_boundary_selector_aux("test_poisson_and_boundary_selector_checkerboard", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
 }
 
 int test_linear_elasticity() {
@@ -459,7 +524,7 @@ int main(int argc, char *argv[]) {
     // SFEM_RUN_TEST(test_poisson);
     // SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector);
-
+    SFEM_RUN_TEST(test_poisson_and_boundary_selector_checkerboard);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_poisson_yaml);
 #endif

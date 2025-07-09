@@ -156,6 +156,8 @@ namespace sfem {
 
         void extract_deprecated(mesh_t *mesh);
 
+        std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> compute_bounding_box();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
