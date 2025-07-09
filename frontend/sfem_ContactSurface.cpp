@@ -170,6 +170,11 @@ namespace sfem {
         ret->impl_->node_mapping   = node_mapping;
         ret->impl_->surface_points = create_host_buffer<geom_t>(mesh->spatial_dimension(), node_mapping->size());
         ret->impl_->element_type   = shell_type(side_type(space->element_type()));
+
+        if(es == EXECUTION_SPACE_DEVICE) {
+            SFEM_ERROR("IMEPLEMENT ME!\n");
+        }
+
         return ret;
     }
 
@@ -299,6 +304,11 @@ namespace sfem {
         ret->impl_->node_mapping          = node_mapping;
         ret->impl_->surface_points = create_host_buffer<geom_t>(space->mesh_ptr()->spatial_dimension(), node_mapping->size());
         ret->impl_->element_type   = shell_type(side_type(macro_base_elem(space->element_type())));
+
+        if(es == EXECUTION_SPACE_DEVICE) {
+            SFEM_ERROR("IMEPLEMENT ME!\n");
+        }
+
         return ret;
     }
 
