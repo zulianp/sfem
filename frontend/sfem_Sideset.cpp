@@ -228,8 +228,7 @@ namespace sfem {
     std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
     uint16_t                               Sideset::block_id() const { return impl_->block_id; }
 
-
-    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sidesets(const std::shared_ptr<FunctionSpace> &space,
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sidesets(const std::shared_ptr<FunctionSpace>        &space,
                                                                 const std::vector<std::shared_ptr<Sideset>> &sidesets) {
         if (sidesets.empty()) {
             return nullptr;
@@ -239,7 +238,41 @@ namespace sfem {
             return create_nodeset_from_sideset(space, sidesets[0]);
         }
 
-        SFEM_ERROR("IMPLEMENT ME\n");
+        if (space->has_semi_structured_mesh()) {
+            SFEM_ERROR("IMPLEMENT ME\n");
+        } else {
+            uint16_t                     n_sidesets = sidesets.size();
+            std::vector<enum ElemType>   element_type(n_sidesets);
+            std::vector<idx_t **>        elems(n_sidesets);
+            std::vector<ptrdiff_t>       n_surf_elements(n_sidesets);
+            std::vector<element_idx_t *> parent_element(n_sidesets);
+            std::vector<int16_t *>       side_idx(n_sidesets);
+
+            for (uint16_t k = 0; k < n_sidesets; k++) {
+                auto ss              = sidesets[k];
+                auto block           = space->mesh_ptr()->block(ss->block_id());
+
+                element_type[k]    = block->element_type();
+                elems[k]           = block->elements()->data();
+                n_surf_elements[k] = ss->parent()->size();
+                parent_element[k]  =  ss->parent()->data();
+                side_idx[k]        = ss->lfi()->data();
+            }
+
+            ptrdiff_t n_nodes_out{0};
+            idx_t   *nodes_out{nullptr};
+
+            extract_nodeset_from_sidesets(n_sidesets,
+                                          element_type.data(),
+                                          elems.data(),
+                                          n_surf_elements.data(),
+                                          parent_element.data(),
+                                          side_idx.data(),
+                                          &n_nodes_out,
+                                          &nodes_out);
+
+            return sfem::manage_host_buffer(n_nodes_out, nodes_out);
+        }
         return nullptr;
     }
 
@@ -323,7 +356,7 @@ namespace sfem {
     }
 
     std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
-            const std::shared_ptr<FunctionSpace> &space,
+            const std::shared_ptr<FunctionSpace>        &space,
             const std::vector<std::shared_ptr<Sideset>> &sidesets) {
         if (sidesets.empty()) {
             return {INVALID, nullptr};

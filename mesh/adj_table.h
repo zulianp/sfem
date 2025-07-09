@@ -68,8 +68,17 @@ int extract_nodeset_from_sideset(const int                                elemen
                                  const ptrdiff_t                          n_surf_elements,
                                  const element_idx_t *const SFEM_RESTRICT parent_element,
                                  const int16_t *const SFEM_RESTRICT       side_idx,
-                                 ptrdiff_t *n_nodes_out,
+                                 ptrdiff_t                               *n_nodes_out,
                                  idx_t **SFEM_RESTRICT                    nodes_out);
+
+int extract_nodeset_from_sidesets(uint16_t                                 n_sidesets,
+                                  const enum ElemType                      element_type[],
+                                  idx_t **const SFEM_RESTRICT              elems[],
+                                  const ptrdiff_t                          n_surf_elements[],
+                                  const element_idx_t *const SFEM_RESTRICT parent_element[],
+                                  const int16_t *const SFEM_RESTRICT       side_idx[],
+                                  ptrdiff_t                               *n_nodes_out,
+                                  idx_t **SFEM_RESTRICT                    nodes_out);
 
 int extract_sideset_from_adj_table(const enum ElemType                      element_type,
                                    const ptrdiff_t                          n_elements,
