@@ -73,7 +73,7 @@ namespace sfem {
 
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
-                c.nodeset = create_nodeset_from_sideset(space, c.sideset);
+                c.nodeset = create_nodeset_from_sidesets(space, c.sidesets);
             }
         }
 
@@ -107,11 +107,11 @@ namespace sfem {
             idx_t    *coarse_nodeset   = nullptr;
 
             struct Condition cdc;
-            cdc.sideset   = conds[i].sideset;
+            cdc.sidesets   = conds[i].sidesets;
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
-            if (!cdc.sideset) {
+            if (cdc.sidesets.empty()) {
                 if (max_coarse_idx == -1)
                     max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements()->data());
 
@@ -130,12 +130,12 @@ namespace sfem {
 
             } else {
                 assert(as_zero);
-
-                auto it = sideset_to_nodeset.find(conds[i].sideset);
+                // Use first sideset to find nodeset
+                auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
                 if (it == sideset_to_nodeset.end()) {
-                    auto nodeset                         = create_nodeset_from_sideset(coarse_space, cdc.sideset);
+                    auto nodeset                         = create_nodeset_from_sidesets(coarse_space, cdc.sidesets);
                     cdc.nodeset                          = nodeset;
-                    sideset_to_nodeset[conds[i].sideset] = nodeset;
+                    sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
 
                 } else {
                     cdc.nodeset = it->second;
@@ -237,8 +237,8 @@ namespace sfem {
 
                     cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
-                    cdc.sideset = Sideset::create_from_file(comm, pch);
-                    cdc.nodeset = create_nodeset_from_sideset(space, cdc.sideset);
+                    cdc.sidesets.push_back(Sideset::create_from_file(comm, pch));
+                    cdc.nodeset = create_nodeset_from_sidesets(space, cdc.sidesets);
                 }
 
                 conds.push_back(cdc);
@@ -428,7 +428,7 @@ namespace sfem {
                 struct Condition cdc;
                 cdc.component = component[i];
                 cdc.value     = value[i];
-                cdc.sideset   = sideset;
+                cdc.sidesets.push_back(sideset);
                 cdc.nodeset   = nodeset;
                 dc->impl_->conditions.push_back(cdc);
             }

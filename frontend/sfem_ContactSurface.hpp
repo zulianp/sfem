@@ -34,7 +34,7 @@ namespace sfem {
         ~MeshContactSurface();
 
         static std::unique_ptr<MeshContactSurface> create(const std::shared_ptr<FunctionSpace> &space,
-                                                          const std::shared_ptr<Sideset>       &sideset,
+                                                          const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                           const enum ExecutionSpace             es);
 
         static std::unique_ptr<MeshContactSurface> create_from_file(const std::shared_ptr<FunctionSpace> &space,
@@ -65,7 +65,7 @@ namespace sfem {
         enum ElemType                     element_type() const override;
 
         static std::unique_ptr<SSMeshContactSurface> create(const std::shared_ptr<FunctionSpace> &space,
-                                                            const std::shared_ptr<Sideset>       &sideset,
+                                                            const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                             const enum ExecutionSpace             es);
 
         static std::unique_ptr<SSMeshContactSurface> create_from_file(const std::shared_ptr<FunctionSpace> &space,
@@ -81,7 +81,7 @@ namespace sfem {
     };
 
     std::shared_ptr<ContactSurface> create_contact_surface(const std::shared_ptr<FunctionSpace> &space,
-                                                           const std::shared_ptr<Sideset>       &sideset,
+                                                           const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                            const enum ExecutionSpace             es);
 }  // namespace sfem
 

@@ -364,15 +364,15 @@ namespace sfem {
 
     std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace> &space,
                                                                  const std::shared_ptr<Grid<geom_t>>  &sdf,
-                                                                 const std::shared_ptr<Sideset>       &sideset,
+                                                                 const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace             es) {
         auto cc = std::make_unique<ContactConditions>(space);
         cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es_to_be_ported));
 
         if (space->has_semi_structured_mesh()) {
-            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es_to_be_ported);
+            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sidesets, es_to_be_ported);
         } else {
-            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es_to_be_ported);
+            cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es_to_be_ported);
         }
 
         cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
@@ -413,7 +413,7 @@ namespace sfem {
 
         auto sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
-        return create(space, std::move(sdf), sideset, es);
+        return create(space, std::move(sdf), {sideset}, es);
     }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space,

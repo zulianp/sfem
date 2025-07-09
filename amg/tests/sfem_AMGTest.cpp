@@ -40,8 +40,8 @@ int test_amg_poisson() {
     auto left_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
-    sfem::DirichletConditions::Condition top{.sideset = top_ss, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition left{.sideset = left_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = left_ss, .value = -1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {top, left}, es);
 
@@ -96,7 +96,7 @@ int test_amg_sqp() {
     auto top_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    sfem::DirichletConditions::Condition top{.sideset = top_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_ss, .value = 1, .component = 0};
     auto                                 conds = sfem::create_dirichlet_conditions(fs, {top}, es);
 
     auto f  = sfem::Function::create(fs);
@@ -114,7 +114,7 @@ int test_amg_sqp() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     // Indices of potential contact boundary nodes
-    auto bottom = sfem::create_nodeset_from_sideset(fs, bottom_ss);
+    auto bottom = sfem::create_nodeset_from_sidesets(fs, {bottom_ss});
 
     // FIXME not GPU ready
     {
