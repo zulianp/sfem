@@ -317,19 +317,18 @@ namespace sfem {
         }
 
         if (impl_->blocks.size() == 1) {
-
             return mesh_write_serial(path,
-                                 impl_->blocks[0]->element_type(),
-                                 impl_->blocks[0]->elements()->extent(1),
-                                 impl_->blocks[0]->elements()->data(),
-                                 impl_->spatial_dim,
-                                 impl_->nnodes,
-                                 impl_->points->data());
+                                     impl_->blocks[0]->element_type(),
+                                     impl_->blocks[0]->elements()->extent(1),
+                                     impl_->blocks[0]->elements()->data(),
+                                     impl_->spatial_dim,
+                                     impl_->nnodes,
+                                     impl_->points->data());
         } else {
-            std::vector<ptrdiff_t> n_elements;
+            std::vector<ptrdiff_t>     n_elements;
             std::vector<enum ElemType> element_types;
-            std::vector<idx_t **> elements;
-            std::vector<const char *> block_names;
+            std::vector<idx_t **>      elements;
+            std::vector<const char *>  block_names;
 
             for (auto &block : impl_->blocks) {
                 n_elements.push_back(block->elements()->extent(1));
@@ -338,14 +337,14 @@ namespace sfem {
                 block_names.push_back(block->name().c_str());
             }
             return mesh_multiblock_write_serial(path,
-                                                 impl_->blocks.size(),
-                                                 block_names.data(),
-                                                 element_types.data(),
-                                                 n_elements.data(),
-                                                 elements.data(),
-                                                 impl_->spatial_dim,
-                                                 impl_->nnodes,
-                                                 impl_->points->data());
+                                                impl_->blocks.size(),
+                                                block_names.data(),
+                                                element_types.data(),
+                                                n_elements.data(),
+                                                elements.data(),
+                                                impl_->spatial_dim,
+                                                impl_->nnodes,
+                                                impl_->points->data());
         }
     }
 
@@ -715,18 +714,18 @@ namespace sfem {
         const ptrdiff_t nelements = nx * ny * nz;
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
 
-        if(nx % 2 != 0 || ny % 2 != 0 || nz % 2 != 0) {
+        if (nx % 2 != 0 || ny % 2 != 0 || nz % 2 != 0) {
             SFEM_ERROR("nx, ny, and nz must be even");
         }
 
-        ret->impl_->spatial_dim = 3;
-        ret->impl_->nnodes      = nnodes;
-        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
+        ret->impl_->spatial_dim    = 3;
+        ret->impl_->nnodes         = nnodes;
+        ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
         auto white_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
         auto black_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
-        auto points   = ret->impl_->points->data();
-        auto white_elements = white_elements_buffer->data(); 
+        auto points         = ret->impl_->points->data();
+        auto white_elements = white_elements_buffer->data();
         auto black_elements = black_elements_buffer->data();
 
         const ptrdiff_t ldz = (ny + 1) * (nx + 1);
@@ -759,7 +758,7 @@ namespace sfem {
                     const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
                     const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
 
-                    if((xi + yi + zi) % 2 == 0) {
+                    if ((xi + yi + zi) % 2 == 0) {
                         white_elements[0][white_elements_count] = i0;
                         white_elements[1][white_elements_count] = i1;
                         white_elements[2][white_elements_count] = i2;
@@ -935,5 +934,33 @@ namespace sfem {
         ret->impl_->blocks.push_back(default_block);
 
         return ret;
+    }
+
+    std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
+        auto points = impl_->points->data();
+
+        int  dim = spatial_dimension();
+        auto min = create_host_buffer<geom_t>(dim);
+        auto max = create_host_buffer<geom_t>(dim);
+
+        auto d_min = min->data();
+        auto d_max = max->data();
+
+        for (int d = 0; d < dim; d++) {
+            d_min[d] = points[d][0];
+            d_max[d] = points[d][0];
+        }
+
+        ptrdiff_t n_nodes = this->n_nodes();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_nodes; i++) {
+            for (int d = 0; d < dim; d++) {
+                d_min[d] = std::min(d_min[d], points[d][i]);
+                d_max[d] = std::max(d_max[d], points[d][i]);
+            }
+        }
+
+        return {min, max};
     }
 }  // namespace sfem
