@@ -38,15 +38,18 @@ namespace sfem {
         std::shared_ptr<Communicator>          comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
+        uint16_t                               block_id{0};
     };
 
     Sideset::Sideset(const std::shared_ptr<Communicator>          &comm,
                      const std::shared_ptr<Buffer<element_idx_t>> &parent,
-                     const std::shared_ptr<Buffer<int16_t>>       &lfi)
+                     const std::shared_ptr<Buffer<int16_t>>       &lfi,
+                     uint16_t                                      block_id)
         : impl_(std::make_unique<Impl>()) {
-        impl_->comm   = comm;
-        impl_->parent = parent;
-        impl_->lfi    = lfi;
+        impl_->comm     = comm;
+        impl_->parent   = parent;
+        impl_->lfi      = lfi;
+        impl_->block_id = block_id;
     }
 
     Sideset::Sideset() : impl_(std::make_unique<Impl>()) {}
@@ -58,13 +61,16 @@ namespace sfem {
 
     std::shared_ptr<Sideset> Sideset::create(const std::shared_ptr<Communicator>          &comm,
                                              const std::shared_ptr<Buffer<element_idx_t>> &parent,
-                                             const std::shared_ptr<Buffer<int16_t>>       &lfi) {
-        return std::make_shared<Sideset>(comm, parent, lfi);
+                                             const std::shared_ptr<Buffer<int16_t>>       &lfi,
+                                             uint16_t                                      block_id) {
+        return std::make_shared<Sideset>(comm, parent, lfi, block_id);
     }
 
-    std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator> &comm, const char *path) {
+    std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator> &comm,
+                                                       const char                          *path,
+                                                       uint16_t                             block_id) {
         auto ret = std::make_shared<Sideset>();
-        if (ret->read(comm, path) != SFEM_SUCCESS) return nullptr;
+        if (ret->read(comm, path, block_id) != SFEM_SUCCESS) return nullptr;
         return ret;
     }
 
@@ -100,17 +106,17 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Sideset> Sideset::create_from_selector(
+    std::vector<std::shared_ptr<Sideset>> Sideset::create_from_selector(
             const std::shared_ptr<Mesh>                                         &mesh,
-            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector) {
+            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
+            const std::vector<std::string>                                      &block_names) {
         SFEM_TRACE_SCOPE("Sideset::create_from_selector");
 
-        const ptrdiff_t nelements = mesh->n_elements();
-        const ptrdiff_t nnodes    = mesh->n_nodes();
-        const int       dim       = mesh->spatial_dimension();
+        // const ptrdiff_t nelements = mesh->n_elements();
+        const ptrdiff_t nnodes = mesh->n_nodes();
+        const int       dim    = mesh->spatial_dimension();
 
-        auto elements = mesh->elements()->data();
-        auto points   = mesh->points()->data();
+        auto points = mesh->points()->data();
 
         enum ElemType element_type = mesh->element_type();
 
@@ -121,55 +127,70 @@ namespace sfem {
         std::vector<int> local_side_table(ns * nnxs);
         fill_local_side_table(mesh->element_type(), local_side_table.data());
 
-        std::list<element_idx_t> parent_list;
-        std::list<int16_t>       lfi_list;
+        size_t                                n_blocks = mesh->n_blocks();
+        std::vector<std::shared_ptr<Sideset>> sidesets;
 
-        for (ptrdiff_t e = 0; e < nelements; e++) {
-            for (int s = 0; s < ns; s++) {
-                // Barycenter of face
-                double p[3] = {0, 0, 0};
+        for (size_t b = 0; b < n_blocks; b++) {
+            auto block = mesh->block(b);
+            if (!block_names.empty() &&  //
+                std::find(block_names.begin(), block_names.end(), block->name()) == block_names.end()) {
+                continue;
+            }
 
-                for (int ln = 0; ln < nnxs; ln++) {
-                    const idx_t node = elements[local_side_table[s * nnxs + ln]][e];
+            const ptrdiff_t nelements = block->n_elements();
+            auto            elements  = block->elements()->data();
+
+            std::list<element_idx_t> parent_list;
+            std::list<int16_t>       lfi_list;
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                for (int s = 0; s < ns; s++) {
+                    // Barycenter of face
+                    double p[3] = {0, 0, 0};
+
+                    for (int ln = 0; ln < nnxs; ln++) {
+                        const idx_t node = elements[local_side_table[s * nnxs + ln]][e];
+
+                        for (int d = 0; d < dim; d++) {
+                            p[d] += points[d][node];
+                        }
+                    }
 
                     for (int d = 0; d < dim; d++) {
-                        p[d] += points[d][node];
+                        p[d] /= nnxs;
+                    }
+
+                    if (selector(p[0], p[1], p[2])) {
+                        parent_list.push_back(e);
+                        lfi_list.push_back(s);
                     }
                 }
+            }
 
-                for (int d = 0; d < dim; d++) {
-                    p[d] /= nnxs;
+            const ptrdiff_t nparents = parent_list.size();
+            auto            parent   = create_host_buffer<element_idx_t>(nparents);
+            auto            lfi      = create_host_buffer<int16_t>(nparents);
+
+            {
+                ptrdiff_t idx = 0;
+                for (auto p : parent_list) {
+                    parent->data()[idx++] = p;
                 }
+            }
 
-                if (selector(p[0], p[1], p[2])) {
-                    parent_list.push_back(e);
-                    lfi_list.push_back(s);
+            {
+                ptrdiff_t idx = 0;
+                for (auto l : lfi_list) {
+                    lfi->data()[idx++] = l;
                 }
             }
+
+            sidesets.push_back(std::make_shared<Sideset>(mesh->comm(), parent, lfi, b));
         }
 
-        const ptrdiff_t nparents = parent_list.size();
-        auto            parent   = create_host_buffer<element_idx_t>(nparents);
-        auto            lfi      = create_host_buffer<int16_t>(nparents);
-
-        {
-            ptrdiff_t idx = 0;
-            for (auto p : parent_list) {
-                parent->data()[idx++] = p;
-            }
-        }
-
-        {
-            ptrdiff_t idx = 0;
-            for (auto l : lfi_list) {
-                lfi->data()[idx++] = l;
-            }
-        }
-
-        return std::make_shared<Sideset>(mesh->comm(), parent, lfi);
+        return sidesets;
     }
 
-    int Sideset::read(const std::shared_ptr<Communicator> &comm, const char *folder) {
+    int Sideset::read(const std::shared_ptr<Communicator> &comm, const char *folder, uint16_t block_id) {
         SFEM_TRACE_SCOPE("Sideset::read");
 
         impl_->comm = comm;
@@ -198,11 +219,29 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        impl_->block_id = block_id;
+
         return SFEM_SUCCESS;
     }
 
     std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
     std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
+    uint16_t                               Sideset::block_id() const { return impl_->block_id; }
+
+
+    std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sidesets(const std::shared_ptr<FunctionSpace> &space,
+                                                                const std::vector<std::shared_ptr<Sideset>> &sidesets) {
+        if (sidesets.empty()) {
+            return nullptr;
+        }
+
+        if (sidesets.size() == 1) {
+            return create_nodeset_from_sideset(space, sidesets[0]);
+        }
+
+        SFEM_ERROR("IMPLEMENT ME\n");
+        return nullptr;
+    }
 
     std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sideset(const std::shared_ptr<FunctionSpace> &space,
                                                                const std::shared_ptr<Sideset>       &sideset) {
@@ -281,5 +320,20 @@ namespace sfem {
             }
             return {st, surface};
         }
+    }
+
+    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
+            const std::shared_ptr<FunctionSpace> &space,
+            const std::vector<std::shared_ptr<Sideset>> &sidesets) {
+        if (sidesets.empty()) {
+            return {INVALID, nullptr};
+        }
+
+        if (sidesets.size() == 1) {
+            return create_surface_from_sideset(space, sidesets[0]);
+        }
+
+        SFEM_ERROR("IMPLEMENT ME\n");
+        return {INVALID, nullptr};
     }
 }  // namespace sfem

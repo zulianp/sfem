@@ -22,7 +22,7 @@ namespace sfem {
     class DirichletConditions final : public Constraint {
     public:
         struct Condition {
-            std::shared_ptr<Sideset> sideset;  /// Maybe undefined in certain cases
+            std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe undefined in certain cases
             SharedBuffer<idx_t>      nodeset;
             SharedBuffer<real_t>     values;
             real_t                   value{0};

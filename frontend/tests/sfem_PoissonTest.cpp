@@ -269,8 +269,8 @@ int test_poisson() {
     auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
-    sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = {left_sideset}, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = {right_sideset}, .value = 1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
@@ -338,21 +338,21 @@ int test_poisson_and_boundary_selector() {
     auto back_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition bottom{.sideset = bottom_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition front{.sideset = front_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition back{.sideset = back_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = left_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition bottom{.sidesets = bottom_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition front{.sidesets = front_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition back{.sidesets = back_sideset, .value = -1, .component = 0};
 
     if (SFEM_BLOCK_SIZE == 1) {
         auto conds = sfem::create_dirichlet_conditions(fs, {left, right, bottom, top, front, back}, es);
         f->add_constraint(conds);
     } else {
-        sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
-        sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 1, .component = 1};
-        sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = -1, .component = 2};
-        sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 1, .component = 2};
+        sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = -1, .component = 1};
+        sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 1, .component = 1};
+        sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = -1, .component = 2};
+        sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 1, .component = 2};
 
         auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, top, right1, right2}, es);
         f->add_constraint(conds);
@@ -397,11 +397,11 @@ int test_linear_elasticity() {
     auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = -2, .component = 0};
-    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition left0{.sidesets = {left_sideset}, .value = -2, .component = 0};
+    sfem::DirichletConditions::Condition left1{.sidesets = {left_sideset}, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition left2{.sidesets = {left_sideset}, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = {right_sideset}, .value = 1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2, right}, es);
     f->add_constraint(conds);
