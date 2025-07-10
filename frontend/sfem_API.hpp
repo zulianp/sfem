@@ -112,11 +112,11 @@ namespace sfem {
         return sfem::create_host_buffer<T>(n);
     }
 
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const char *name, const ExecutionSpace es) {
+    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const std::string& name, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name);
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
 #endif  // SFEM_ENABLE_CUDA
-        return sfem::Factory::create_op(space, name);
+        return sfem::Factory::create_op(space, name.c_str());
     }
 
     template <typename T>
@@ -136,6 +136,7 @@ namespace sfem {
         cg->set_op(op);
         return cg;
     }
+    
 
     template <typename T>
     static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const SharedBuffer<T> &diag, const ExecutionSpace es) {
