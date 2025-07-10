@@ -5,18 +5,16 @@
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
 
-#include "linear_elasticity.h"
 #include "hex8_jacobian.h"
+#include "linear_elasticity.h"
 
-#include "sfem_Mesh.hpp"
-#include "sfem_FunctionSpace.hpp"
 #include "sfem_CRSGraph.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_Mesh.hpp"
 
 namespace sfem {
 
-    int LinearElasticity::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int LinearElasticity::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     std::unique_ptr<Op> LinearElasticity::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LinearElasticity::create");
@@ -91,15 +89,15 @@ namespace sfem {
         auto graph = space->node_to_node_graph();
 
         return linear_elasticity_crs_aos(element_type,
-                                        mesh->n_elements(),
-                                        mesh->n_nodes(),
-                                        mesh->elements()->data(),
-                                        mesh->points()->data(),
-                                        this->mu,
-                                        this->lambda,
-                                        graph->rowptr()->data(),
-                                        graph->colidx()->data(),
-                                        values);
+                                         mesh->n_elements(),
+                                         mesh->n_nodes(),
+                                         mesh->elements()->data(),
+                                         mesh->points()->data(),
+                                         this->mu,
+                                         this->lambda,
+                                         graph->rowptr()->data(),
+                                         graph->colidx()->data(),
+                                         values);
     }
 
     int LinearElasticity::hessian_bsr(const real_t *const  x,
@@ -112,15 +110,15 @@ namespace sfem {
         auto graph = space->node_to_node_graph();
 
         return linear_elasticity_bsr(element_type,
-                                    mesh->n_elements(),
-                                    mesh->n_nodes(),
-                                    mesh->elements()->data(),
-                                    mesh->points()->data(),
-                                    this->mu,
-                                    this->lambda,
-                                    graph->rowptr()->data(),
-                                    graph->colidx()->data(),
-                                    values);
+                                     mesh->n_elements(),
+                                     mesh->n_nodes(),
+                                     mesh->elements()->data(),
+                                     mesh->points()->data(),
+                                     this->mu,
+                                     this->lambda,
+                                     graph->rowptr()->data(),
+                                     graph->colidx()->data(),
+                                     values);
     }
 
     int LinearElasticity::hessian_bcrs_sym(const real_t *const  x,
@@ -231,14 +229,14 @@ namespace sfem {
                                                        out);
         } else {
             err = linear_elasticity_apply_aos(element_type,
-                                             mesh->n_elements(),
-                                             mesh->n_nodes(),
-                                             mesh->elements()->data(),
-                                             mesh->points()->data(),
-                                             this->mu,
-                                             this->lambda,
-                                             h,
-                                             out);
+                                              mesh->n_elements(),
+                                              mesh->n_nodes(),
+                                              mesh->elements()->data(),
+                                              mesh->points()->data(),
+                                              this->mu,
+                                              this->lambda,
+                                              h,
+                                              out);
         }
 
         double tock = MPI_Wtime();
@@ -273,4 +271,4 @@ namespace sfem {
         return ret;
     }
 
-} // namespace sfem 
+}  // namespace sfem

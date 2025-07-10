@@ -3,17 +3,16 @@
 #include "sshex8_mass.h"
 
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_LinearElasticity.hpp"
+#include "sfem_LumpedMass.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
-#include "sfem_LumpedMass.hpp"
-
+#include "sfem_glob.hpp"
 
 namespace sfem {
-// ... Implementation copied from sfem_Function.cpp ...
-// (I will fill in the full implementation after creating all headers)
+    // ... Implementation copied from sfem_Function.cpp ...
+    // (I will fill in the full implementation after creating all headers)
 
     std::unique_ptr<Op> SemiStructuredLumpedMass::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::create");
@@ -46,7 +45,7 @@ namespace sfem {
         }
     }
 
-    int SemiStructuredLumpedMass::initialize() { return SFEM_SUCCESS; }
+    int SemiStructuredLumpedMass::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     SemiStructuredLumpedMass::SemiStructuredLumpedMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -111,4 +110,4 @@ namespace sfem {
     }
 
     SemiStructuredLumpedMass::~SemiStructuredLumpedMass() = default;
-} // namespace sfem 
+}  // namespace sfem

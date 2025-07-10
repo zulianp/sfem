@@ -103,7 +103,7 @@ namespace sfem {
          * For HEX8 elements, this precomputes Jacobian determinants and adjugates
          * to optimize matrix-vector products.
          */
-        int initialize() override;
+        int initialize(const std::vector<std::string> &block_names = {}) override;
 
         /**
          * @brief Constructor
