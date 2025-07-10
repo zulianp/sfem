@@ -348,7 +348,7 @@ namespace sfem {
         const char *name() const override { return "gpu:Laplacian"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULaplacian:initialize");
             auto elements = space->device_elements();
             if (!elements) {
@@ -363,7 +363,6 @@ namespace sfem {
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-
             auto ret = std::make_shared<GPULaplacian>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
             assert(ret->element_type == macro_base_elem(fff->element_type()));
@@ -465,7 +464,7 @@ namespace sfem {
         const char *name() const override { return "ss:gpu::Laplacian"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULaplacian:initialize");
 
             auto elements = space->device_elements();
@@ -592,7 +591,7 @@ namespace sfem {
         const char *name() const override { return "gpu:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULinearElasticity:initialize");
 
             real_t SFEM_SHEAR_MODULUS        = 1;
@@ -767,7 +766,7 @@ namespace sfem {
         const char *name() const override { return "ss::gpu::LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
 
             real_t SFEM_SHEAR_MODULUS        = mu;
@@ -937,7 +936,7 @@ namespace sfem {
             return nullptr;
         }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             auto mesh             = space->mesh_ptr();
             auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
 
@@ -1046,7 +1045,7 @@ namespace sfem {
             return nullptr;
         }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             auto mesh             = space->mesh_ptr();
             auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
 

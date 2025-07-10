@@ -91,15 +91,14 @@ namespace sfem {
             auto ret = std::make_shared<Laplacian>(space);
             // ret->element_type = macro_base_elem(element_type);
             assert(space->n_blocks() == 1);  // FIXME
-            ret->element_types.clear();
-            ret->element_types.push_back(macro_base_elem(element_type));
+            ret->override_element_types({macro_base_elem(element_type)});
             return ret;
         }
     }
 
     const char *SemiStructuredLaplacian::name() const { return "ss:Laplacian"; }
 
-    int SemiStructuredLaplacian::initialize() { return SFEM_SUCCESS; }
+    int SemiStructuredLaplacian::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     int SemiStructuredLaplacian::hessian_crs(const real_t *const  x,
                                              const count_t *const rowptr,
