@@ -31,6 +31,7 @@ namespace sfem {
         enum ElemType    element_type;  ///< Element type for this domain
         SharedBlock      block;         ///< Reference to the mesh block
         SharedParameters parameters;     ///< Domain-specific parameters
+        std::shared_ptr<void> user_data; ///< User data for the domain
     };
 
     /**
@@ -98,6 +99,7 @@ namespace sfem {
          * @return Reference to the domains map
          */
         const std::map<std::string, OpDomain>& domains() const { return domains_; }
+         std::map<std::string, OpDomain>& domains()  { return domains_; }
 
         /**
          * @brief Set a value in a block

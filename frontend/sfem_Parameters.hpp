@@ -31,6 +31,7 @@ namespace sfem {
         void set_value(const std::string &var_name, const real_t value);
         void set_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value);
         std::shared_ptr<Value> find_value(const std::string &var_name) const;
+        real_t get_real_value(const std::string &var_name, const real_t default_value) const;
 
     private:
         class Impl;
