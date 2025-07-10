@@ -5,11 +5,13 @@
 #include "crs_graph.h"
 #include "multiblock_crs_graph.h"
 #include "read_mesh.h"
+#include "sfem_mask.h"
 #include "sfem_mesh.h"
 #include "sfem_mesh_write.h"
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
+#include "sfem_Sideset.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -180,9 +182,7 @@ namespace sfem {
         if (index >= impl_->blocks.size()) {
             SFEM_ERROR("Block index out of range");
         }
-        if (impl_->blocks.size() <= 1) {
-            SFEM_ERROR("Cannot remove the last block");
-        }
+
         impl_->blocks.erase(impl_->blocks.begin() + index);
     }
 
@@ -1085,4 +1085,112 @@ namespace sfem {
         }
         return nullptr;
     }
+
+    int Mesh::split_boundary_layer() {
+        if (n_blocks() != 1) {
+            SFEM_ERROR("Mesh must have exactly one block to split boundary layer!\n");
+            return SFEM_FAILURE;
+        }
+
+        std::shared_ptr<Sideset> sideset;
+
+        {
+            ptrdiff_t      n_surf_elements = 0;
+            element_idx_t *parent          = 0;
+            int16_t       *side_idx        = 0;
+
+            if (extract_skin_sideset(this->n_elements(),
+                                     this->n_nodes(),
+                                     this->element_type(),
+                                     this->elements()->data(),
+                                     &n_surf_elements,
+                                     &parent,
+                                     &side_idx) != SFEM_SUCCESS) {
+                SFEM_ERROR("Failed to extract skin!\n");
+            }
+
+            sideset = std::make_shared<sfem::Sideset>(this->comm(),
+                                                      sfem::manage_host_buffer(n_surf_elements, parent),
+                                                      sfem::manage_host_buffer(n_surf_elements, side_idx));
+        }
+
+        {
+            const int       nxe        = n_nodes_per_element();
+            const ptrdiff_t n_elements = this->n_elements();
+
+            auto parent    = sideset->parent();
+            auto lfi       = sideset->lfi();
+            auto bdry_mask = create_host_buffer<mask_t>(mask_count(n_elements));
+
+            auto            d_parent     = parent->data();
+            auto            d_lfi        = lfi->data();
+            auto            d_bdry_mask  = bdry_mask->data();
+            const ptrdiff_t size_sideset = parent->size();
+
+            auto default_block = impl_->blocks[0];
+
+            auto d_elements = default_block->elements()->data();
+
+            ptrdiff_t n_bdry_elements = 0;
+            for (ptrdiff_t i = 0; i < size_sideset; i++) {
+                if (mask_get(d_parent[i], d_bdry_mask) == 0) {
+                    n_bdry_elements++;
+                    mask_set(d_parent[i], d_bdry_mask);
+                }
+            }
+
+            memset(d_bdry_mask, 0, mask_count(n_elements) * sizeof(mask_t));
+
+            auto      bdry_elements         = create_host_buffer<idx_t>(nxe, n_bdry_elements);
+            ptrdiff_t n_bdry_elements_count = 0;
+
+            auto d_bdry_elements = bdry_elements->data();
+
+            for (int e = 0; e < size_sideset; e++) {
+                if (mask_get(d_parent[e], d_bdry_mask) == 0) {
+                    for (int v = 0; v < nxe; v++) {
+                        d_bdry_elements[v][n_bdry_elements_count] = d_elements[v][d_parent[e]];
+                    }
+                    mask_set(d_parent[e], d_bdry_mask);
+                    n_bdry_elements_count++;
+                }
+            }
+
+            auto      interior_elements         = create_host_buffer<idx_t>(nxe, n_elements - n_bdry_elements);
+            ptrdiff_t n_interior_elements_count = 0;
+            auto      d_interior_elements       = interior_elements->data();
+
+            for (ptrdiff_t i = 0; i < n_elements; i++) {
+                if (mask_get(i, d_bdry_mask) == 0) {
+                    for (int v = 0; v < nxe; v++) {
+                        assert(n_interior_elements_count < interior_elements->extent(1));
+                        d_interior_elements[v][n_interior_elements_count] = d_elements[v][i];
+                    }
+                    n_interior_elements_count++;
+                
+            }
+        }
+
+        // !!!!
+        remove_block(0);
+
+        {  // Boundary block
+            auto block = std::make_shared<Block>();
+            block->set_name("boundary_layer");
+            block->set_element_type(default_block->element_type());
+            block->set_elements(bdry_elements);
+            impl_->blocks.push_back(block);
+        }
+
+        {  // Interior block
+            auto block = std::make_shared<Block>();
+            block->set_name("interior");
+            block->set_element_type(default_block->element_type());
+            block->set_elements(interior_elements);
+            impl_->blocks.push_back(block);
+        }
+    }
+
+    return SFEM_FAILURE;
+}
 }  // namespace sfem
