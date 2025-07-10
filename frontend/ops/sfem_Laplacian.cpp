@@ -12,51 +12,10 @@
 #include "sfem_Mesh.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 
 namespace sfem {
-
-class OpTracer {
-    public:
-        std::shared_ptr<FunctionSpace> space;
-        std::string                    name;
-        long                           calls{0};
-        double                         total_time{0};
-
-        OpTracer(const std::shared_ptr<FunctionSpace> &space, const std::string &name) : space(space), name(name) {}
-        ~OpTracer() {
-            if (calls) {
-                printf("%s called %ld times. Total: %g [s], "
-                       "Avg: %g [s], TP %g [MDOF/s]\n",
-                       name.c_str(),
-                       calls,
-                       total_time,
-                       total_time / calls,
-                       1e-6 * space->n_dofs() / (total_time / calls));
-            }
-        }
-
-        class ScopedCapture {
-        public:
-            OpTracer &profiler;
-            ScopedCapture(OpTracer &profiler) : profiler(profiler) { start_time = MPI_Wtime(); }
-
-            ~ScopedCapture() {
-                double end_time = MPI_Wtime();
-                profiler.calls++;
-                profiler.total_time += end_time - start_time;
-            }
-
-        private:
-            double start_time;
-        };
-    };
-
-#if SFEM_PRINT_THROUGHPUT
-#define SFEM_OP_CAPTURE() OpTracer::ScopedCapture __sfem_op_capture(*impl_->op_profiler);
-#else
-#define SFEM_OP_CAPTURE()
-#endif
 
     class Laplacian::Impl {
     public:
@@ -229,16 +188,7 @@ class OpTracer {
     }
 
     void Laplacian::set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) {
-        auto mesh  = impl_->space->mesh_ptr();
-        auto block = mesh->find_block(block_name);
-        if (!block) {
-            SFEM_ERROR("Block %s not found", block_name.c_str());
-            return;
-        }
-
-        // TODO: Implement block-specific value setting
-        // This would typically involve setting material properties or boundary conditions
-        // specific to the named block and variable
+        impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
     void Laplacian::override_element_types(const std::vector<enum ElemType> &element_types) {

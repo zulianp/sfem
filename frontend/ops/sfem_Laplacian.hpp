@@ -81,8 +81,6 @@ namespace sfem {
 
         /**
          * @brief Destructor
-         * 
-         * Prints performance statistics if SFEM_PRINT_THROUGHPUT is enabled.
          */
         ~Laplacian();
 

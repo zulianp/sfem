@@ -69,4 +69,13 @@ namespace sfem {
         }
     }
 
-} // namespace sfem 
+    void MultiDomainOp::set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) {
+        auto block = domains_.find(block_name);
+        if (block == domains_.end()) {
+            SFEM_ERROR("Block %s not found", block_name.c_str());
+        }
+        block->second.parameters->set_value(var_name, value);
+    }
+
+}
+ // namespace sfem 

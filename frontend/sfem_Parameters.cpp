@@ -12,11 +12,11 @@ namespace sfem {
 
     Parameters::~Parameters() {}
 
-    void Parameters::set_scalar_value(const std::string &var_name, const real_t value) {
+    void Parameters::set_value(const std::string &var_name, const real_t value) {
         impl_->values[var_name] = std::make_shared<ScalarValue>(value);
     }
 
-    void Parameters::set_scalar_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value) {
+    void Parameters::set_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value) {
         impl_->values[var_name] = value;
     }
 
