@@ -42,7 +42,7 @@ namespace sfem {
     }
 
     std::shared_ptr<MultiDomainOp> MultiDomainOp::lor_op(const std::shared_ptr<FunctionSpace> &space,
-                                                          const std::vector<std::string> &block_names) {
+                                                         const std::vector<std::string>       &block_names) {
         auto ret = std::make_shared<MultiDomainOp>(space, block_names);
 
         for (auto &domain : ret->domains_) {
@@ -53,7 +53,7 @@ namespace sfem {
     }
 
     std::shared_ptr<MultiDomainOp> MultiDomainOp::derefine_op(const std::shared_ptr<FunctionSpace> &space,
-                                                               const std::vector<std::string> &block_names) {
+                                                              const std::vector<std::string>       &block_names) {
         auto ret = std::make_shared<MultiDomainOp>(space, block_names);
 
         for (auto &domain : ret->domains_) {
@@ -77,5 +77,4 @@ namespace sfem {
         block->second.parameters->set_value(var_name, value);
     }
 
-}
- // namespace sfem 
+}  // namespace sfem
