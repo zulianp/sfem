@@ -35,12 +35,10 @@ namespace sfem {
      * - CRS matrix format for assembly
      * - Matrix-vector products for application
      * - Scalar function spaces only (block_size == 1)
+     * - Multi-domain operations via MultiDomainOp
      */
     class Mass final : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
-
         const char *name() const override { return "Mass"; }
         inline bool is_linear() const override { return true; }
 
@@ -55,17 +53,23 @@ namespace sfem {
 
         /**
          * @brief Initialize the operator
+         * @param block_names Optional list of block names to initialize
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          * 
-         * Currently a no-op, but may be extended for future optimizations.
+         * Sets up the MultiDomainOp for multi-block operations.
          */
-        int initialize(const std::vector<std::string> &block_names = {}) override { return SFEM_SUCCESS; }
+        int initialize(const std::vector<std::string> &block_names = {}) override;
 
         /**
          * @brief Constructor
          * @param space Function space
          */
         Mass(const std::shared_ptr<FunctionSpace> &space);
+
+        /**
+         * @brief Destructor
+         */
+        ~Mass();
 
         // Matrix assembly methods
         int hessian_crs(const real_t *const  x,
@@ -79,6 +83,13 @@ namespace sfem {
         int value(const real_t *x, real_t *const out) override;
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
+
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 
 } // namespace sfem 
