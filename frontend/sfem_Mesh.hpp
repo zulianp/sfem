@@ -162,6 +162,8 @@ namespace sfem {
                                                                const geom_t                         ymax = 1,
                                                                const geom_t                         zmax = 1);
 
+        int split_boundary_layer();
+
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(const std::shared_ptr<Communicator> &comm);
         void set_element_type(const enum ElemType element_type);

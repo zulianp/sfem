@@ -174,9 +174,18 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     cg->verbose    = true;
 
     int SFEM_MAX_IT = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
+    bool SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
 
     cg->set_max_it(SFEM_MAX_IT);
     cg->set_op(linear_op);
+
+    if (SFEM_USE_PRECONDITIONER) {
+        auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        f->hessian_diag(nullptr, diag->data());
+        auto preconditioner = sfem::create_shiftable_jacobi(diag, es);
+        cg->set_preconditioner_op(preconditioner);
+    }
+
     cg->set_rtol(1e-9);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -422,7 +431,6 @@ int test_poisson_and_boundary_selector_bidomain() {
 int test_generic_operator_with_boundary_conditions(const std::string                                       &test_name,
                                                    const std::shared_ptr<sfem::FunctionSpace>              &fs,
                                                    std::shared_ptr<sfem::Op>                                op,
-                                                   int                                                      block_size,
                                                    const std::vector<sfem::DirichletConditions::Condition> &boundary_conditions,
                                                    int                                                      refine_level = 1) {
     if (refine_level > 1) {
@@ -476,7 +484,6 @@ int test_linear_elasticity() {
     return test_generic_operator_with_boundary_conditions("test_linear_elasticity",
                                                           fs,
                                                           op,
-                                                          3,  // block_size for 3D elasticity
                                                           boundary_conditions,
                                                           SFEM_ELEMENT_REFINE_LEVEL);
 }
@@ -515,7 +522,6 @@ int test_poisson_simple() {
     return test_generic_operator_with_boundary_conditions("test_poisson_simple",
                                                           fs,
                                                           op,
-                                                          1,  // block_size for scalar Poisson
                                                           boundary_conditions,
                                                           1  // no refinement
     );
@@ -541,16 +547,16 @@ int test_bidomain_elasticity() {
 
     auto op = sfem::create_op(fs, "LinearElasticity", es);
     op->initialize();
-    op->set_value_in_block("left", "mu", 10);
+    op->set_value_in_block("left", "mu", 1);
     op->set_value_in_block("left", "lambda", 1);
 
     op->set_value_in_block("right", "mu", 10);
-    op->set_value_in_block("right", "lambda", 1);
-
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+    op->set_value_in_block("right", "lambda", 10);
 
     auto right_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+
+    auto left_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
 
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
@@ -565,7 +571,59 @@ int test_bidomain_elasticity() {
     return test_generic_operator_with_boundary_conditions("test_bidomain_elasticity",
                                                           fs,
                                                           op,
-                                                          4,  // block_size for scalar Poisson
+                                                          boundary_conditions,
+                                                          1  // no refinement
+    );
+}
+
+int test_boundary_layer_elasticity() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    auto m                    = sfem::Mesh::create_hex8_cube(
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+
+    m->split_boundary_layer();
+
+    auto fs = sfem::FunctionSpace::create(m, 3);
+
+    auto op = sfem::create_op(fs, "LinearElasticity", es);
+    op->initialize();
+    op->set_value_in_block("boundary_layer", "mu", 10);
+    op->set_value_in_block("boundary_layer", "lambda", 10);
+
+    op->set_value_in_block("interior", "mu", 1);
+    op->set_value_in_block("interior", "lambda", 1);
+
+    auto left_sideset = sfem::Sideset::create_from_selector(
+        m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
+
+
+    auto right_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+
+  
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
+            {.sidesets = left_sideset, .value = 0.2, .component = 0},
+            {.sidesets = left_sideset, .value = 0, .component = 1},
+            {.sidesets = left_sideset, .value = 0, .component = 2},
+            {.sidesets = right_sideset, .value = -0.2, .component = 0},
+            {.sidesets = right_sideset, .value = 0, .component = 1},
+            {.sidesets = right_sideset, .value = 0, .component = 2},
+    };
+
+    return test_generic_operator_with_boundary_conditions("test_boundary_layer_elasticity",
+                                                          fs,
+                                                          op,
                                                           boundary_conditions,
                                                           1  // no refinement
     );
@@ -622,8 +680,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_poisson_and_boundary_selector_checkerboard);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector_bidomain);
     SFEM_RUN_TEST(test_bidomain_elasticity);
+    SFEM_RUN_TEST(test_boundary_layer_elasticity);
 #ifdef SFEM_ENABLE_RYAML
-            SFEM_RUN_TEST(test_poisson_yaml);
+    SFEM_RUN_TEST(test_poisson_yaml);
 #endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
