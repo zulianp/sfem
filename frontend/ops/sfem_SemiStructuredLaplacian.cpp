@@ -89,8 +89,8 @@ namespace sfem {
             return ret;
         } else {
             auto ret = std::make_shared<Laplacian>(space);
-            // ret->element_type = macro_base_elem(element_type);
             assert(space->n_blocks() == 1);  // FIXME
+            ret->initialize({});
             ret->override_element_types({macro_base_elem(element_type)});
             return ret;
         }
