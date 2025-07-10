@@ -5,6 +5,7 @@ IMPORTANT: Be precise and careful with the changes! I am not here to clean-up yo
 EVERY TIME: 
 - After changes, you always have to compile the code and run the tests yourself with `make test`!
 - Always ensure an empty line at the end of .cpp and .c files!
+- LOR means Low-Order-Refinement!
 
 
 

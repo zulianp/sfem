@@ -206,11 +206,12 @@ namespace sfem {
             return ret;
         } else {
             assert(space->element_type() == macro_base_elem(element_type));
-            auto ret          = std::make_shared<LinearElasticity>(space);
-            ret->element_type = macro_base_elem(element_type);
-            ret->mu           = mu;
-            ret->lambda       = lambda;
+            auto ret = std::make_shared<LinearElasticity>(space);
             ret->initialize();
+            ret->set_mu(mu);
+            ret->set_lambda(lambda);
+            ret->override_element_types({macro_base_elem(element_type)});
+
             return ret;
         }
     }
