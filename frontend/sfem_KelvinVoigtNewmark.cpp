@@ -75,7 +75,7 @@ namespace sfem {
         const char *name() const override { return "KelvinVoigtNewmark"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             // auto mesh = space->mesh_ptr();
 
             // if (element_type == HEX8) {

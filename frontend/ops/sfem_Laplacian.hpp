@@ -33,17 +33,11 @@ namespace sfem {
      * The operator supports:
      * - Various element types (HEX8, TET4, etc.)
      * - Multiple matrix formats (CRS, diagonal)
-     * - Level-of-refinement (LOR) and derefinement
+     * - Low-order-refinement (LOR) and derefinement
      * - Performance tracking
      */
     class Laplacian final : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        std::vector<enum ElemType> element_types; ///< Element type
-
-        long   calls{0};      ///< Number of apply() calls for performance tracking
-        double total_time{0}; ///< Total time spent in apply() for performance tracking
-
         const char *name() const override { return "Laplacian"; }
         inline bool is_linear() const override { return true; }
 
@@ -72,11 +66,12 @@ namespace sfem {
 
         /**
          * @brief Initialize the operator
+         * @param block_names Optional list of block names to initialize
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          * 
          * Currently a no-op, but may be extended for future optimizations.
          */
-        int initialize() override { return SFEM_SUCCESS; }
+        int initialize(const std::vector<std::string> &block_names = {}) override;
 
         /**
          * @brief Constructor
@@ -111,6 +106,13 @@ namespace sfem {
         int value(const real_t *x, real_t *const out) override;
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
+
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 
 } // namespace sfem 

@@ -81,7 +81,7 @@ namespace sfem {
          * 
          * Currently a no-op, but may be extended for future optimizations.
          */
-        int initialize() override { return SFEM_SUCCESS; }
+        int initialize(const std::vector<std::string> &block_names = {}) override { return SFEM_SUCCESS; }
 
         /**
          * @brief Constructor

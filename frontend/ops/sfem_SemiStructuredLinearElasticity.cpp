@@ -5,11 +5,11 @@
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 #include <mpi.h>
 
@@ -48,15 +48,18 @@ namespace sfem {
 
     SemiStructuredLinearElasticity::SemiStructuredLinearElasticity(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-    int SemiStructuredLinearElasticity::hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) {
+    int SemiStructuredLinearElasticity::hessian_crs(const real_t *const  x,
+                                                    const count_t *const rowptr,
+                                                    const idx_t *const   colidx,
+                                                    real_t *const        values) {
         assert(false);
         return SFEM_FAILURE;
     }
 
-    int SemiStructuredLinearElasticity::hessian_bsr(const real_t *const x,
+    int SemiStructuredLinearElasticity::hessian_bsr(const real_t *const  x,
                                                     const count_t *const rowptr,
-                                                    const idx_t *const colidx,
-                                                    real_t *const values) {
+                                                    const idx_t *const   colidx,
+                                                    real_t *const        values) {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_bsr", ssm.level());
 
@@ -109,9 +112,7 @@ namespace sfem {
                                                               &values[5]);
     }
 
-    int SemiStructuredLinearElasticity::gradient(const real_t *const x, real_t *const out) {
-        return apply(nullptr, x, out);
-    }
+    int SemiStructuredLinearElasticity::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
 
     int SemiStructuredLinearElasticity::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         auto &ssm = space->semi_structured_mesh();
@@ -188,9 +189,7 @@ namespace sfem {
         }
     }
 
-    int SemiStructuredLinearElasticity::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int SemiStructuredLinearElasticity::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> SemiStructuredLinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::derefine_op");
@@ -198,19 +197,19 @@ namespace sfem {
         assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
 
         if (space->has_semi_structured_mesh()) {
-            auto ret = std::make_shared<SemiStructuredLinearElasticity>(space);
-            ret->element_type = element_type;
+            auto ret                      = std::make_shared<SemiStructuredLinearElasticity>(space);
+            ret->element_type             = element_type;
             ret->use_affine_approximation = use_affine_approximation;
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu                       = mu;
+            ret->lambda                   = lambda;
             // ret->initialize();
             return ret;
         } else {
             assert(space->element_type() == macro_base_elem(element_type));
-            auto ret = std::make_shared<LinearElasticity>(space);
+            auto ret          = std::make_shared<LinearElasticity>(space);
             ret->element_type = macro_base_elem(element_type);
-            ret->mu = mu;
-            ret->lambda = lambda;
+            ret->mu           = mu;
+            ret->lambda       = lambda;
             ret->initialize();
             return ret;
         }
@@ -222,9 +221,7 @@ namespace sfem {
         return nullptr;
     }
 
-    const char *SemiStructuredLinearElasticity::name() const {
-        return "ss:LinearElasticity";
-    }
+    const char *SemiStructuredLinearElasticity::name() const { return "ss:LinearElasticity"; }
 
     void SemiStructuredLinearElasticity::set_option(const std::string &name, bool val) {
         if (name == "ASSUME_AFFINE") {
@@ -232,28 +229,24 @@ namespace sfem {
         }
     }
 
-      int SemiStructuredLinearElasticity::hessian_crs_sym(const real_t *const  x,
-                            const count_t *const rowptr,
-                            const idx_t *const   colidx,
-                            real_t *const        diag_values,
-                            real_t *const        off_diag_values)
-                            {
-                                SFEM_ERROR("[Error] ss:LinearElasticity::hessian_crs_sym NOT IMPLEMENTED!\n");
-                                return SFEM_FAILURE;
-                            }
-
-    int SemiStructuredLinearElasticity::hessian_bcrs_sym(const real_t *const x,
-                                                        const count_t *const rowidx,
-                                                        const idx_t *const colidx,
-                                                        const ptrdiff_t block_stride,
-                                                        real_t **const diag_values,
-                                                        real_t **const off_diag_values)
-                                                        {
-                                                            SFEM_ERROR("[Error] ss:LinearElasticity::hessian_bcrs_sym NOT IMPLEMENTED!\n");
-                                                            return SFEM_FAILURE;
-                                                        }   
-
-    int SemiStructuredLinearElasticity::report(const real_t *const) {
-        return SFEM_SUCCESS;
+    int SemiStructuredLinearElasticity::hessian_crs_sym(const real_t *const  x,
+                                                        const count_t *const rowptr,
+                                                        const idx_t *const   colidx,
+                                                        real_t *const        diag_values,
+                                                        real_t *const        off_diag_values) {
+        SFEM_ERROR("[Error] ss:LinearElasticity::hessian_crs_sym NOT IMPLEMENTED!\n");
+        return SFEM_FAILURE;
     }
-} // namespace sfem 
+
+    int SemiStructuredLinearElasticity::hessian_bcrs_sym(const real_t *const  x,
+                                                         const count_t *const rowidx,
+                                                         const idx_t *const   colidx,
+                                                         const ptrdiff_t      block_stride,
+                                                         real_t **const       diag_values,
+                                                         real_t **const       off_diag_values) {
+        SFEM_ERROR("[Error] ss:LinearElasticity::hessian_bcrs_sym NOT IMPLEMENTED!\n");
+        return SFEM_FAILURE;
+    }
+
+    int SemiStructuredLinearElasticity::report(const real_t *const) { return SFEM_SUCCESS; }
+}  // namespace sfem

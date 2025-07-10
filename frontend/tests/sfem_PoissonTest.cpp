@@ -285,7 +285,8 @@ int test_poisson_and_boundary_selector_aux(const char *test_name,
                                           const std::shared_ptr<sfem::Mesh> &m, 
                                           const char *operator_name,
                                           int block_size,
-                                          sfem::ExecutionSpace es) {
+                                          sfem::ExecutionSpace es,
+                                          std::vector<std::string> block_names = {}) {
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 1;
@@ -355,7 +356,7 @@ int test_poisson_and_boundary_selector_aux(const char *test_name,
     }
 
     auto op = sfem::create_op(fs, operator_name, es);
-    op->initialize();
+    op->initialize(block_names);
     f->add_operator(op);
     return test_linear_function(f, test_name);
 }
@@ -427,6 +428,39 @@ int test_poisson_and_boundary_selector_checkerboard() {
                                                        0, 0, 0, 2, 2, 2);
     
     return test_poisson_and_boundary_selector_aux("test_poisson_and_boundary_selector_checkerboard", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
+}
+
+int test_poisson_and_boundary_selector_bidomain() {
+    MPI_Comm comm = MPI_COMM_WORLD;
+    auto     es   = sfem::EXECUTION_SPACE_HOST;
+
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+    }
+
+    const char *SFEM_OPERATOR = "Laplacian";
+    SFEM_READ_ENV(SFEM_OPERATOR, );
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (strcmp(SFEM_OPERATOR, "VectorLaplacian") == 0) {
+        int SFEM_ELEMENT_REFINE_LEVEL = 1;
+        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int SFEM_BASE_RESOLUTION = 6;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+    auto m = sfem::Mesh::create_hex8_bidomain_cube(sfem::Communicator::wrap(comm), 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       SFEM_BASE_RESOLUTION, 
+                                                       0, 0, 0, 2, 2, 2);
+    
+    return test_poisson_and_boundary_selector_aux("test_poisson_and_boundary_selector_bidomain", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es, {"left"});
 }
 
 int test_linear_elasticity() {
@@ -525,6 +559,7 @@ int main(int argc, char *argv[]) {
     // SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector_checkerboard);
+    SFEM_RUN_TEST(test_poisson_and_boundary_selector_bidomain);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_poisson_yaml);
 #endif

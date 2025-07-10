@@ -1,17 +1,17 @@
-#include "sfem_Mesh.hpp"
-#include "sfem_CRSGraph.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_glob.hpp"
-#include "neohookean_ogden.h"
-#include <mpi.h>
 
+#include "neohookean_ogden.h"
 #include "sfem_defs.h"
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
 
-#include "neohookean_ogden.h"
+#include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_glob.hpp"
+#include "sfem_Mesh.hpp"
+#include "sfem_Tracer.hpp"
+
+#include <mpi.h>
 
 namespace sfem {
 
@@ -36,7 +36,10 @@ namespace sfem {
 
     NeoHookeanOgden::NeoHookeanOgden(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-    int NeoHookeanOgden::hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) {
+    int NeoHookeanOgden::hessian_crs(const real_t *const  x,
+                                     const count_t *const rowptr,
+                                     const idx_t *const   colidx,
+                                     real_t *const        values) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_crs");
 
         auto mesh  = space->mesh_ptr();
@@ -120,9 +123,7 @@ namespace sfem {
                                           out);
     }
 
-    int NeoHookeanOgden::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }
 
@@ -154,4 +155,4 @@ namespace sfem {
 
     NeoHookeanOgden::~NeoHookeanOgden() = default;
 
-} // namespace sfem 
+}  // namespace sfem

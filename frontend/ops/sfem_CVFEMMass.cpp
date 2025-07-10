@@ -1,9 +1,9 @@
 #include "sfem_CVFEMMass.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_Mesh.hpp"
-#include "cvfem_operators.h"
 #include <mpi.h>
+#include "cvfem_operators.h"
+#include "sfem_Mesh.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -15,7 +15,7 @@ namespace sfem {
         return ret;
     }
 
-    int CVFEMMass::initialize() { return SFEM_SUCCESS; }
+    int CVFEMMass::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     CVFEMMass::CVFEMMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -60,4 +60,4 @@ namespace sfem {
 
     CVFEMMass::~CVFEMMass() = default;
 
-} // namespace sfem 
+}  // namespace sfem

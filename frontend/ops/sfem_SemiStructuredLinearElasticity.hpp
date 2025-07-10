@@ -1,7 +1,7 @@
 /**
  * @file sfem_SemiStructuredLinearElasticity.hpp
  * @brief Semi-structured linear elasticity operator for finite element analysis
- * 
+ *
  * This file defines the SemiStructuredLinearElasticity operator, which implements
  * the discrete linear elasticity equations optimized for semi-structured meshes.
  * Semi-structured meshes are regular Cartesian grids with local refinements,
@@ -15,25 +15,25 @@ namespace sfem {
 
     /**
      * @brief Semi-structured linear elasticity operator for solid mechanics
-     * 
+     *
      * The SemiStructuredLinearElasticity operator implements the discrete form of the
      * linear elasticity equations optimized for semi-structured meshes:
-     * 
+     *
      * -∇·σ = f
      * σ = λ(∇·u)I + 2μ(∇u + ∇u^T)/2
-     * 
+     *
      * where:
      * - σ is the Cauchy stress tensor
      * - u is the displacement field
      * - λ and μ are the Lamé parameters
      * - f is the body force
-     * 
+     *
      * Semi-structured meshes provide several advantages:
      * - Regular connectivity patterns enable efficient matrix-free operations
      * - Reduced memory bandwidth requirements
      * - Better cache utilization
      * - Simplified parallelization
-     * 
+     *
      * The operator supports:
      * - Affine approximation for performance optimization
      * - Level-of-refinement (LOR) and derefinement
@@ -43,16 +43,16 @@ namespace sfem {
      */
     class SemiStructuredLinearElasticity : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
-        real_t mu{1}, lambda{1};               ///< Lamé parameters
-        bool use_affine_approximation{true};   ///< Use affine approximation for performance
-        long calls{0};                         ///< Number of apply() calls for performance tracking
-        double total_time{0};                  ///< Total time spent in apply() for performance tracking
+        std::shared_ptr<FunctionSpace> space;                           ///< Function space for the operator
+        enum ElemType                  element_type { INVALID };        ///< Element type
+        real_t                         mu{1}, lambda{1};                ///< Lamé parameters
+        bool                           use_affine_approximation{true};  ///< Use affine approximation for performance
+        long                           calls{0};                        ///< Number of apply() calls for performance tracking
+        double                         total_time{0};                   ///< Total time spent in apply() for performance tracking
 
         /**
          * @brief Destructor
-         * 
+         *
          * Prints performance statistics if SFEM_PRINT_THROUGHPUT is enabled.
          */
         ~SemiStructuredLinearElasticity();
@@ -68,7 +68,7 @@ namespace sfem {
          * @brief Set operator options
          * @param name Option name
          * @param val Option value
-         * 
+         *
          * Supported options:
          * - "use_affine_approximation": Enable/disable affine approximation
          */
@@ -101,7 +101,7 @@ namespace sfem {
          * @brief Initialize the operator
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          */
-        int initialize() override;
+        int initialize(const std::vector<std::string> &block_names = {}) override;
 
         /**
          * @brief Constructor
@@ -121,17 +121,17 @@ namespace sfem {
                             real_t *const        diag_values,
                             real_t *const        off_diag_values) override;
 
-        int hessian_bsr(const real_t *const x,
+        int hessian_bsr(const real_t *const  x,
                         const count_t *const rowptr,
-                        const idx_t *const colidx,
-                        real_t *const values) override;
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
 
-       int hessian_bcrs_sym(const real_t *const x,
-                                     const count_t *const rowidx,
-                                     const idx_t *const colidx,
-                                     const ptrdiff_t block_stride,
-                                     real_t **const diag_values,
-                                     real_t **const off_diag_values) override;
+        int hessian_bcrs_sym(const real_t *const  x,
+                             const count_t *const rowidx,
+                             const idx_t *const   colidx,
+                             const ptrdiff_t      block_stride,
+                             real_t **const       diag_values,
+                             real_t **const       off_diag_values) override;
 
         virtual int hessian_block_diag_sym(const real_t *const x, real_t *const values) override;
 
@@ -145,4 +145,4 @@ namespace sfem {
         int report(const real_t *const) override;
     };
 
-} // namespace sfem 
+}  // namespace sfem

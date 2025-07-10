@@ -816,6 +816,119 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<Mesh> Mesh::create_hex8_bidomain_cube(const std::shared_ptr<Communicator> &comm,
+                                                          const int                            nx,
+                                                          const int                            ny,
+                                                          const int                            nz,
+                                                          const geom_t                         xmin,
+                                                          const geom_t                         ymin,
+                                                          const geom_t                         zmin,
+                                                          const geom_t                         xmax,
+                                                          const geom_t                         ymax,
+                                                          const geom_t                         zmax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = nx * ny * nz;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
+
+        ret->impl_->spatial_dim    = 3;
+        ret->impl_->nnodes         = nnodes;
+        ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
+        auto left_elements_buffer  = create_host_buffer<idx_t>(8, nelements / 2);
+        auto right_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
+
+        auto points         = ret->impl_->points->data();
+        auto left_elements  = left_elements_buffer->data();
+        auto right_elements = right_elements_buffer->data();
+
+        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+        const double hz = (zmax - zmin) * 1. / nz;
+
+        assert(hx > 0);
+        assert(hy > 0);
+        assert(hz > 0);
+
+        ptrdiff_t left_elements_count  = 0;
+        ptrdiff_t right_elements_count = 0;
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const ptrdiff_t e = zi * ny * nx + yi * nx + xi;
+
+                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+
+                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+
+                    if (xi < nx / 2) {
+                        left_elements[0][left_elements_count] = i0;
+                        left_elements[1][left_elements_count] = i1;
+                        left_elements[2][left_elements_count] = i2;
+                        left_elements[3][left_elements_count] = i3;
+
+                        left_elements[4][left_elements_count] = i4;
+                        left_elements[5][left_elements_count] = i5;
+                        left_elements[6][left_elements_count] = i6;
+                        left_elements[7][left_elements_count] = i7;
+
+                        left_elements_count++;
+                    } else {
+                        right_elements[0][right_elements_count] = i0;
+                        right_elements[1][right_elements_count] = i1;
+                        right_elements[2][right_elements_count] = i2;
+                        right_elements[3][right_elements_count] = i3;
+
+                        right_elements[4][right_elements_count] = i4;
+                        right_elements[5][right_elements_count] = i5;
+                        right_elements[6][right_elements_count] = i6;
+                        right_elements[7][right_elements_count] = i7;
+
+                        right_elements_count++;
+                    }
+                }
+            }
+        }
+
+        assert(left_elements_count == nelements / 2);
+        assert(right_elements_count == nelements / 2);
+
+        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
+            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
+                    points[0][node] = (double)xmin + xi * hx;
+                    points[1][node] = (double)ymin + yi * hy;
+                    points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        // Create left and right blocks
+        auto left_block = std::make_shared<Block>();
+        left_block->set_name("left");
+        left_block->set_element_type(HEX8);
+        left_block->set_elements(left_elements_buffer);
+        ret->impl_->blocks.push_back(left_block);
+
+        auto right_block = std::make_shared<Block>();
+        right_block->set_name("right");
+        right_block->set_element_type(HEX8);
+        right_block->set_elements(right_elements_buffer);
+        ret->impl_->blocks.push_back(right_block);
+
+        return ret;
+    }
+
     int Mesh::spatial_dimension() const { return impl_->spatial_dim; }
     int Mesh::n_nodes_per_element() const { return elem_num_nodes(impl_->default_element_type()); }
 
@@ -962,5 +1075,14 @@ namespace sfem {
         }
 
         return {min, max};
+    }
+
+    std::shared_ptr<Mesh::Block> Mesh::find_block(const std::string &name) const {
+        for (auto &block : impl_->blocks) {
+            if (block->name() == name) {
+                return block;
+            }
+        }
+        return nullptr;
     }
 }  // namespace sfem

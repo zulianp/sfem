@@ -19,7 +19,7 @@ namespace sfem {
         const char *name() const override { return "HEX8Smooth"; }
 
         bool is_linear() const override { return true; }
-        int  initialize() override { return SFEM_SUCCESS; }
+        int  initialize(const std::vector<std::string> &block_names = {}) override { return SFEM_SUCCESS; }
 
         int gradient(const real_t *const x, real_t *const out) override {
             SFEM_ERROR("IMPLEMENT ME!");
