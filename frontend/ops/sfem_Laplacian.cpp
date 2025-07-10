@@ -93,30 +93,30 @@ namespace sfem {
         }
     };
 
-    class OpProfiler {
+    class OpTracer {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::string                    name;
         long                           calls{0};
         double                         total_time{0};
 
-        OpProfiler(const std::shared_ptr<FunctionSpace> &space, const std::string &name) : space(space), name(name) {}
-        ~OpProfiler() {
+        OpTracer(const std::shared_ptr<FunctionSpace> &space, const std::string &name) : space(space), name(name) {}
+        ~OpTracer() {
             if (calls) {
                 printf("%s called %ld times. Total: %g [s], "
-                       "Avg: %g [s], TP %g [GDOF/s]\n",
+                       "Avg: %g [s], TP %g [MDOF/s]\n",
                        name.c_str(),
                        calls,
                        total_time,
                        total_time / calls,
-                       1e-9 * space->n_dofs() / (total_time / calls));
+                       1e-6 * space->n_dofs() / (total_time / calls));
             }
         }
 
         class ScopedCapture {
         public:
-            OpProfiler &profiler;
-            ScopedCapture(OpProfiler &profiler) : profiler(profiler) { start_time = MPI_Wtime(); }
+            OpTracer &profiler;
+            ScopedCapture(OpTracer &profiler) : profiler(profiler) { start_time = MPI_Wtime(); }
 
             ~ScopedCapture() {
                 double end_time = MPI_Wtime();
@@ -130,7 +130,7 @@ namespace sfem {
     };
 
 #if SFEM_PRINT_THROUGHPUT
-#define SFEM_OP_CAPTURE() OpProfiler::ScopedCapture __sfem_op_capture(*impl_->op_profiler);
+#define SFEM_OP_CAPTURE() OpTracer::ScopedCapture __sfem_op_capture(*impl_->op_profiler);
 #else
 #define SFEM_OP_CAPTURE()
 #endif
@@ -139,9 +139,14 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp> domains;
-        std::unique_ptr<OpProfiler>    op_profiler;
-        Impl(const std::shared_ptr<FunctionSpace> &space)
-            : space(space), op_profiler(std::make_unique<OpProfiler>(space, "Laplacian::apply")) {}
+#if SFEM_PRINT_THROUGHPUT
+        std::unique_ptr<OpTracer> op_profiler;
+#endif
+        Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+#if SFEM_PRINT_THROUGHPUT
+            op_profiler = std::make_unique<OpTracer>(space, "Laplacian::apply");
+#endif
+        }
         ~Impl() {}
 
         void print_info() { domains->print_info(); }
