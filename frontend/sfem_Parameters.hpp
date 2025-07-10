@@ -28,8 +28,8 @@ namespace sfem {
         Parameters();
         ~Parameters();
 
-        void set_scalar_value(const std::string &var_name, const real_t value);
-        void set_scalar_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value);
+        void set_value(const std::string &var_name, const real_t value);
+        void set_value(const std::string &var_name, const std::shared_ptr<ScalarValue> &value);
         std::shared_ptr<Value> find_value(const std::string &var_name) const;
 
     private:

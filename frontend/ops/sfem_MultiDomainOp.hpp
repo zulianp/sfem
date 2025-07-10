@@ -99,6 +99,14 @@ namespace sfem {
          */
         const std::map<std::string, OpDomain>& domains() const { return domains_; }
 
+        /**
+         * @brief Set a value in a block
+         * @param block_name Name of the block
+         * @param var_name Name of the variable
+         * @param value Value to set
+         */
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value);
+
     private:
         std::map<std::string, OpDomain> domains_;  ///< Map of domain name to domain info
     };
