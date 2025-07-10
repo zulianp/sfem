@@ -33,4 +33,12 @@ namespace sfem {
     ScalarValue::~ScalarValue() {}
 
     real_t ScalarValue::value() const { return value_; }
+
+    real_t Parameters::get_real_value(const std::string &var_name, const real_t default_value) const {
+        auto value = dynamic_cast<ScalarValue*>(find_value(var_name).get());
+        if (value) {
+            return value->value();
+        }
+        return default_value;
+    }
 }  // namespace sfem
