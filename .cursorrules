@@ -2,7 +2,11 @@
 
 IMPORTANT: Be precise and careful with the changes! I am not here to clean-up you mess. Always reason that changes make sense before applying them and compile to make sure they are correct!
 
-EVERY TIME: After changes, you always have to compile the code and run the tests yourself!
+EVERY TIME: 
+- After changes, you always have to compile the code and run the tests yourself with `make test`!
+- Always ensure an empty line at the end of .cpp and .c files!
+
+
 
 ## Project Architecture
 - **Frontend**: C++ with OOP patterns (classes, templates, RAII)

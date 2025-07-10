@@ -11,89 +11,12 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Mesh.hpp"
 
+#include "sfem_MultiDomainOp.hpp"
 #include "sfem_Parameters.hpp"
-
-#include <map>
-#include <string>
 
 namespace sfem {
 
-    struct OpDomain {
-    public:
-        enum ElemType    element_type;
-        SharedBlock      block;
-        SharedParameters parameters;
-    };
-
-    class MultiDomainOp {
-    public:
-        std::map<std::string, OpDomain> domains;
-
-        MultiDomainOp(const std::shared_ptr<FunctionSpace> &space, const std::vector<std::string> &block_names) {
-            if (block_names.empty()) {
-                for (auto &block : space->mesh_ptr()->blocks()) {
-                    domains[block->name()] = OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
-                }
-            } else {
-                for (auto &block_name : block_names) {
-                    auto block = space->mesh_ptr()->find_block(block_name);
-                    if (!block) {
-                        SFEM_ERROR("Block %s not found", block_name.c_str());
-                    }
-                    domains[block_name] = OpDomain{block->element_type(), block, std::make_shared<Parameters>()};
-                }
-            }
-        }
-
-        int iterate(const std::function<int(const OpDomain &)> &func) {
-            for (auto &domain : domains) {
-                int err = func(domain.second);
-                if (err != SFEM_SUCCESS) {
-                    return err;
-                }
-            }
-            return SFEM_SUCCESS;
-        }
-
-        void override_element_types(const std::vector<enum ElemType> &element_types) {
-            size_t i = 0;
-            for (auto &domain : domains) {
-                assert(i < element_types.size());
-                domain.second.element_type = element_types[i];
-                i++;
-            }
-        }
-
-        std::shared_ptr<MultiDomainOp> lor_op(const std::shared_ptr<FunctionSpace> &space,
-                                              const std::vector<std::string>       &block_names) {
-            auto ret = std::make_shared<MultiDomainOp>(space, block_names);
-
-            for (auto &domain : ret->domains) {
-                domain.second.element_type = macro_type_variant(domain.second.element_type);
-            }
-
-            return ret;
-        }
-
-        std::shared_ptr<MultiDomainOp> derefine_op(const std::shared_ptr<FunctionSpace> &space,
-                                                   const std::vector<std::string>       &block_names) {
-            auto ret = std::make_shared<MultiDomainOp>(space, block_names);
-
-            for (auto &domain : ret->domains) {
-                domain.second.element_type = macro_base_elem(domain.second.element_type);
-            }
-
-            return ret;
-        }
-
-        void print_info() {
-            for (auto &domain : domains) {
-                printf("Domain %s: %s\n", domain.first.c_str(), domain.second.block->name().c_str());
-            }
-        }
-    };
-
-    class OpTracer {
+class OpTracer {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::string                    name;
