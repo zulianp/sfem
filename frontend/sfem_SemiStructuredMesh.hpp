@@ -5,8 +5,8 @@
 #include "sfem_base.h"
 
 // C++ Includes
-#include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Buffer.hpp"
+#include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Mesh.hpp"
 
 #include <memory>
@@ -49,6 +49,10 @@ namespace sfem {
         int write(const char *path);
 
         std::shared_ptr<Mesh> macro_mesh();
+
+        size_t n_blocks() const;
+        std::vector<std::shared_ptr<Block>> &blocks();
+        std::shared_ptr<Block>               block(const block_idx_t block_id);
 
     private:
         class Impl;
