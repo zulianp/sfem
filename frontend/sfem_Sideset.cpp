@@ -38,13 +38,13 @@ namespace sfem {
         std::shared_ptr<Communicator>          comm;
         std::shared_ptr<Buffer<element_idx_t>> parent;
         std::shared_ptr<Buffer<int16_t>>       lfi;
-        uint16_t                               block_id{0};
+        block_idx_t                            block_id{0};
     };
 
     Sideset::Sideset(const std::shared_ptr<Communicator>          &comm,
                      const std::shared_ptr<Buffer<element_idx_t>> &parent,
                      const std::shared_ptr<Buffer<int16_t>>       &lfi,
-                     uint16_t                                      block_id)
+                     block_idx_t                                   block_id)
         : impl_(std::make_unique<Impl>()) {
         impl_->comm     = comm;
         impl_->parent   = parent;
@@ -62,13 +62,13 @@ namespace sfem {
     std::shared_ptr<Sideset> Sideset::create(const std::shared_ptr<Communicator>          &comm,
                                              const std::shared_ptr<Buffer<element_idx_t>> &parent,
                                              const std::shared_ptr<Buffer<int16_t>>       &lfi,
-                                             uint16_t                                      block_id) {
+                                             block_idx_t                                   block_id) {
         return std::make_shared<Sideset>(comm, parent, lfi, block_id);
     }
 
     std::shared_ptr<Sideset> Sideset::create_from_file(const std::shared_ptr<Communicator> &comm,
                                                        const char                          *path,
-                                                       uint16_t                             block_id) {
+                                                       block_idx_t                          block_id) {
         auto ret = std::make_shared<Sideset>();
         if (ret->read(comm, path, block_id) != SFEM_SUCCESS) return nullptr;
         return ret;
@@ -190,7 +190,7 @@ namespace sfem {
         return sidesets;
     }
 
-    int Sideset::read(const std::shared_ptr<Communicator> &comm, const char *folder, uint16_t block_id) {
+    int Sideset::read(const std::shared_ptr<Communicator> &comm, const char *folder, block_idx_t block_id) {
         SFEM_TRACE_SCOPE("Sideset::read");
 
         impl_->comm = comm;
@@ -226,7 +226,7 @@ namespace sfem {
 
     std::shared_ptr<Buffer<element_idx_t>> Sideset::parent() { return impl_->parent; }
     std::shared_ptr<Buffer<int16_t>>       Sideset::lfi() { return impl_->lfi; }
-    uint16_t                               Sideset::block_id() const { return impl_->block_id; }
+    block_idx_t                            Sideset::block_id() const { return impl_->block_id; }
 
     std::shared_ptr<Buffer<idx_t>> create_nodeset_from_sidesets(const std::shared_ptr<FunctionSpace>        &space,
                                                                 const std::vector<std::shared_ptr<Sideset>> &sidesets) {
@@ -241,26 +241,26 @@ namespace sfem {
         if (space->has_semi_structured_mesh()) {
             SFEM_ERROR("IMPLEMENT ME\n");
         } else {
-            uint16_t                     n_sidesets = sidesets.size();
+            block_idx_t                  n_sidesets = sidesets.size();
             std::vector<enum ElemType>   element_type(n_sidesets);
             std::vector<idx_t **>        elems(n_sidesets);
             std::vector<ptrdiff_t>       n_surf_elements(n_sidesets);
             std::vector<element_idx_t *> parent_element(n_sidesets);
             std::vector<int16_t *>       side_idx(n_sidesets);
 
-            for (uint16_t k = 0; k < n_sidesets; k++) {
-                auto ss              = sidesets[k];
-                auto block           = space->mesh_ptr()->block(ss->block_id());
+            for (block_idx_t k = 0; k < n_sidesets; k++) {
+                auto ss    = sidesets[k];
+                auto block = space->mesh_ptr()->block(ss->block_id());
 
                 element_type[k]    = block->element_type();
                 elems[k]           = block->elements()->data();
                 n_surf_elements[k] = ss->parent()->size();
-                parent_element[k]  =  ss->parent()->data();
+                parent_element[k]  = ss->parent()->data();
                 side_idx[k]        = ss->lfi()->data();
             }
 
             ptrdiff_t n_nodes_out{0};
-            idx_t   *nodes_out{nullptr};
+            idx_t    *nodes_out{nullptr};
 
             extract_nodeset_from_sidesets(n_sidesets,
                                           element_type.data(),

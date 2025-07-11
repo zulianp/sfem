@@ -480,7 +480,7 @@ int extract_nodeset_from_sideset(const int                                elemen
     return SFEM_SUCCESS;
 }
 
-int extract_nodeset_from_sidesets(uint16_t                                 n_sidesets,
+int extract_nodeset_from_sidesets(ptrdiff_t                                n_sidesets,
                                   const enum ElemType                      element_type[],
                                   idx_t **const SFEM_RESTRICT              elems[],
                                   const ptrdiff_t                          n_surf_elements[],
@@ -489,7 +489,7 @@ int extract_nodeset_from_sidesets(uint16_t                                 n_sid
                                   ptrdiff_t                               *n_nodes_out,
                                   idx_t **SFEM_RESTRICT                    nodes_out) {
     ptrdiff_t n_nodes = 0;
-    for (uint16_t ss = 0; ss < n_sidesets; ss++) {
+    for (ptrdiff_t ss = 0; ss < n_sidesets; ss++) {
         const enum ElemType st = side_type(element_type[ss]);
         const int           nn = elem_num_nodes(st);
         n_nodes += n_surf_elements[ss] * nn;
@@ -498,7 +498,7 @@ int extract_nodeset_from_sidesets(uint16_t                                 n_sid
     idx_t    *nodes       = malloc(n_nodes * sizeof(idx_t));
     ptrdiff_t node_offset = 0;
 
-    for (uint16_t ss = 0; ss < n_sidesets; ss++) {
+    for (ptrdiff_t ss = 0; ss < n_sidesets; ss++) {
         const enum ElemType st = side_type(element_type[ss]);
         const int           nn = elem_num_nodes(st);
 
