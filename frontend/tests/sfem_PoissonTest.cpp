@@ -601,8 +601,8 @@ int test_boundary_layer_elasticity() {
     op->set_value_in_block("boundary_layer", "mu", 10);
     op->set_value_in_block("boundary_layer", "lambda", 10);
 
-    op->set_value_in_block("interior", "mu", 1);
-    op->set_value_in_block("interior", "lambda", 1);
+    op->set_value_in_block("default", "mu", 1);
+    op->set_value_in_block("default", "lambda", 1);
 
     auto left_sideset = sfem::Sideset::create_from_selector(
         m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
