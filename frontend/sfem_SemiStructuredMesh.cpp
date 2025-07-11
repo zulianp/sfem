@@ -27,58 +27,59 @@ namespace sfem {
         std::shared_ptr<Mesh> macro_mesh;
         int                   level;
 
-        std::shared_ptr<Buffer<idx_t *>> elements;
-        ptrdiff_t                        n_unique_nodes{-1}, interior_start{-1};
-        std::shared_ptr<CRSGraph>        node_to_node_graph;
+        ptrdiff_t                 n_unique_nodes{-1}, interior_start{-1};
+        std::shared_ptr<CRSGraph> node_to_node_graph;
 
-        std::shared_ptr<Buffer<geom_t *>> points;
+        std::shared_ptr<Buffer<geom_t *>>   points;
+        std::vector<std::shared_ptr<Block>> blocks;
 
         void init(const std::shared_ptr<Mesh> macro_mesh, const int level) {
             SFEM_TRACE_SCOPE("SemiStructuredMesh::init");
 
             this->macro_mesh = macro_mesh;
             this->level      = level;
+            blocks.clear();
+            points.reset();
 
-            const int nxe      = sshex8_nxe(level);
-            auto      elements = (idx_t **)malloc(nxe * sizeof(idx_t *));
-            for (int d = 0; d < nxe; d++) {
-                elements[d] = (idx_t *)malloc(macro_mesh->n_elements() * sizeof(idx_t));
+            if (macro_mesh->n_blocks() == 1) {
+                auto block = macro_mesh->block(0);
+
+                auto default_block = std::make_shared<Block>();
+                default_block->set_name(block->name());
+
+                // FIXME hardcoded for sshex8
+                default_block->set_element_type(SSHEX8);
+
+                const int nxe            = sshex8_nxe(level);
+                auto      micro_elements = create_host_buffer<idx_t>(nxe, macro_mesh->n_elements());
+                default_block->set_elements(micro_elements);
+
+                auto elements = micro_elements->data();
+                sshex8_generate_elements(level,
+                                         macro_mesh->n_elements(),
+                                         macro_mesh->n_nodes(),
+                                         macro_mesh->elements()->data(),
+                                         elements,
+                                         &this->n_unique_nodes,
+                                         &this->interior_start);
+
+                blocks.push_back(default_block);
+
+            } else {
+                SFEM_ERROR("SemiStructuredMesh is not supported for multi-block meshes");
             }
-
-#ifndef NDEBUG
-            for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < macro_mesh->n_elements(); i++) {
-                    elements[d][i] = SFEM_IDX_INVALID;
-                }
-            }
-#endif
-            sshex8_generate_elements(level,
-                                     macro_mesh->n_elements(),
-                                     macro_mesh->n_nodes(),
-                                     macro_mesh->elements()->data(),
-                                     elements,
-                                     &this->n_unique_nodes,
-                                     &this->interior_start);
-
-            this->elements = std::make_shared<Buffer<idx_t *>>(
-                    nxe,
-                    macro_mesh->n_elements(),
-                    elements,
-                    [](int n, void **data) {
-                        for (int i = 0; i < n; i++) {
-                            free(data[i]);
-                        }
-
-                        free(data);
-                    },
-                    MEMORY_SPACE_HOST);
         }
 
-        Impl() {}
-        ~Impl() {}
+        const SharedBuffer<idx_t *> &default_elements() const { return blocks[0]->elements(); }
     };
 
     std::shared_ptr<Mesh> SemiStructuredMesh::macro_mesh() { return impl_->macro_mesh; }
+
+    size_t SemiStructuredMesh::n_blocks() const { return impl_->blocks.size(); }
+    std::vector<std::shared_ptr<SemiStructuredMesh ::Block>> &SemiStructuredMesh::blocks() { return impl_->blocks; }
+    std::shared_ptr<SemiStructuredMesh::Block>                SemiStructuredMesh::block(const block_idx_t block_id) {
+        return impl_->blocks[block_id];
+    }
 
     std::vector<int> SemiStructuredMesh::derefinement_levels() {
         const int        L       = level();
@@ -93,45 +94,53 @@ namespace sfem {
         const int step_factor = from_level / to_level;
         const int nxe         = (to_level + 1) * (to_level + 1) * (to_level + 1);
 
-        auto elements = this->impl_->elements;
-
-        auto view = std::make_shared<Buffer<idx_t *>>(
-                nxe,
-                n_elements(),
-                (idx_t **)malloc(nxe * sizeof(idx_t *)),
-                [keep_alive = elements](int, void **v) {
-                    (void)keep_alive;
-                    free(v);
-                },
-                elements->mem_space());
-
-        for (int zi = 0; zi <= to_level; zi++) {
-            for (int yi = 0; yi <= to_level; yi++) {
-                for (int xi = 0; xi <= to_level; xi++) {
-                    const int from_lidx   = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
-                    const int to_lidx     = sshex8_lidx(to_level, xi, yi, zi);
-                    view->data()[to_lidx] = elements->data()[from_lidx];
-                }
-            }
-        }
+        auto ret               = std::make_shared<SemiStructuredMesh>();
+        ret->impl_->macro_mesh = this->impl_->macro_mesh;
+        ret->impl_->level      = to_level;
 
         ptrdiff_t n_unique_nodes{-1};
-        {
-            auto            vv        = view->data();
-            const ptrdiff_t nelements = this->n_elements();
-            for (int v = 0; v < view->extent(0); v++) {
-                for (ptrdiff_t e = 0; e < nelements; e++) {
-                    n_unique_nodes = MAX(vv[v][e], n_unique_nodes);
+        for (auto &block : this->blocks()) {
+            auto elements = block->elements();
+            auto view     = std::make_shared<Buffer<idx_t *>>(
+                    nxe,
+                    n_elements(),
+                    (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                    [keep_alive = elements](int, void **v) {
+                        (void)keep_alive;
+                        free(v);
+                    },
+                    elements->mem_space());
+
+            for (int zi = 0; zi <= to_level; zi++) {
+                for (int yi = 0; yi <= to_level; yi++) {
+                    for (int xi = 0; xi <= to_level; xi++) {
+                        const int from_lidx   = sshex8_lidx(from_level, xi * step_factor, yi * step_factor, zi * step_factor);
+                        const int to_lidx     = sshex8_lidx(to_level, xi, yi, zi);
+                        view->data()[to_lidx] = elements->data()[from_lidx];
+                    }
                 }
             }
 
-            n_unique_nodes += 1;
+            auto derefined_block = std::make_shared<Block>();
+            derefined_block->set_name(block->name());
+            derefined_block->set_element_type(block->element_type());
+            derefined_block->set_elements(view);
+            ret->impl_->blocks.push_back(derefined_block);
+
+            // Find max node id
+            {
+                auto            vv        = view->data();
+                const ptrdiff_t nelements = block->n_elements();
+                for (int v = 0; v < view->extent(0); v++) {
+                    for (ptrdiff_t e = 0; e < nelements; e++) {
+                        n_unique_nodes = MAX(vv[v][e], n_unique_nodes);
+                    }
+                }
+            }
         }
 
-        auto ret                   = std::make_shared<SemiStructuredMesh>();
-        ret->impl_->macro_mesh     = this->impl_->macro_mesh;
-        ret->impl_->level          = to_level;
-        ret->impl_->elements       = view;
+        n_unique_nodes += 1;
+
         ret->impl_->n_unique_nodes = n_unique_nodes;
         ret->impl_->interior_start = this->impl_->interior_start;
 
@@ -144,6 +153,10 @@ namespace sfem {
     }
 
     int SemiStructuredMesh::apply_hierarchical_renumbering() {
+        if (n_blocks() > 1) {
+            SFEM_ERROR("Applying hierarchical renumbering is not supported for multi-block meshes");
+        }
+
         const int L = level();
 
         const int nlevels = sshex8_hierarchical_n_levels(L);
@@ -153,8 +166,12 @@ namespace sfem {
         // FiXME harcoded for sshex8
         sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
 
-        return sshex8_hierarchical_renumbering(
-                L, nlevels, levels.data(), this->n_elements(), this->impl_->n_unique_nodes, this->impl_->elements->data());
+        return sshex8_hierarchical_renumbering(L,
+                                               nlevels,
+                                               levels.data(),
+                                               this->n_elements(),
+                                               this->impl_->n_unique_nodes,
+                                               this->impl_->default_elements()->data());
     }
 
     std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
@@ -206,12 +223,16 @@ namespace sfem {
         return impl_->points;
     }
 
-    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements() { return impl_->elements; }
+    std::shared_ptr<Buffer<idx_t *>> SemiStructuredMesh::elements() { return impl_->default_elements(); }
 
     std::shared_ptr<CRSGraph> SemiStructuredMesh::node_to_node_graph() {
         // printf("SemiStructuredMesh::node_to_node_graph\n");
         if (impl_->node_to_node_graph) {
             return impl_->node_to_node_graph;
+        }
+
+        if (n_blocks() > 1) {
+            SFEM_ERROR("Node-to-node graph is not supported for multi-block meshes");
         }
 
         SFEM_TRACE_SCOPE("SemiStructuredMesh::node_to_node_graph");
@@ -230,7 +251,7 @@ namespace sfem {
 
     int SemiStructuredMesh::n_nodes_per_element() const { return sshex8_nxe(impl_->level); }
 
-    idx_t   **SemiStructuredMesh::element_data() { return impl_->elements->data(); }
+    idx_t   **SemiStructuredMesh::element_data() { return impl_->default_elements()->data(); }
     geom_t  **SemiStructuredMesh::point_data() { return impl_->macro_mesh->points()->data(); }
     ptrdiff_t SemiStructuredMesh::interior_start() const { return impl_->interior_start; }
 
@@ -250,10 +271,14 @@ namespace sfem {
     int SemiStructuredMesh::export_as_standard(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::export_as_standard");
 
+        if (n_blocks() > 1) {
+            SFEM_ERROR("Exporting multi-block meshes is not supported");
+        }
+
         sfem::create_directory(path);
 
         std::string folder   = path;
-        auto        elements = impl_->elements;
+        auto        elements = impl_->default_elements();
         auto        points   = this->points();
 
         const int txe              = sshex8_txe(this->level());
@@ -313,10 +338,15 @@ namespace sfem {
 
     int SemiStructuredMesh::write(const char *path) {
         SFEM_TRACE_SCOPE("SemiStructuredMesh::write");
+
+        if (n_blocks() > 1) {
+            SFEM_ERROR("Writing multi-block meshes is not supported");
+        }
+
         sfem::create_directory(path);
 
         std::string folder   = path;
-        auto        elements = impl_->elements;
+        auto        elements = impl_->default_elements();
         auto        points   = this->points();
 
         std::string points_path = folder + "/x%d.raw";

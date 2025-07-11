@@ -1263,7 +1263,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> Mesh::select_elements(
+    std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> Mesh::select_elements(
             const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
             const std::vector<std::string>                                      &block_names) {
         SFEM_TRACE_SCOPE("Sideset::create_from_selector");
@@ -1276,7 +1276,7 @@ namespace sfem {
         int  nxe    = n_nodes_per_element();
 
         size_t                                                        n_blocks = this->n_blocks();
-        std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> selected_elements;
+        std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> selected_elements;
 
         for (size_t b = 0; b < n_blocks; b++) {
             auto block = this->block(b);
