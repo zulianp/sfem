@@ -162,7 +162,7 @@ namespace sfem {
                                                                const geom_t                         ymax = 1,
                                                                const geom_t                         zmax = 1);
 
-        std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> select_elements(
+        std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> select_elements(
                 const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
                 const std::vector<std::string>                                      &block_names = {});
 

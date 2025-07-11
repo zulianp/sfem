@@ -7,6 +7,7 @@
 // C++ Includes
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Buffer.hpp"
+#include "sfem_Mesh.hpp"
 
 #include <memory>
 #include <vector>
@@ -15,6 +16,8 @@ namespace sfem {
 
     class SemiStructuredMesh {
     public:
+        using Block = Mesh::Block;
+
         idx_t   **element_data();
         geom_t  **point_data();
         ptrdiff_t interior_start() const;
