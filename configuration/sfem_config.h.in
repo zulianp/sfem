@@ -158,5 +158,6 @@ typedef char mask_t;
 #endif // SFEM_ENABLE_CUDA
 
 typedef int64_t sshex_side_code_t;
+typedef uint16_t block_idx_t;
 
 #endif  // SFEM_CONFIG_HPP
