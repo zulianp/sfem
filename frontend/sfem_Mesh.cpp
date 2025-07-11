@@ -209,6 +209,12 @@ namespace sfem {
             auto elements_buffer = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
             impl_->points        = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
             impl_->spatial_dim   = spatial_dim;
+            impl_->nnodes        = impl_->nnodes;
+            impl_->n_owned_nodes = impl_->nnodes;
+            impl_->n_owned_elements = nelements;
+            impl_->n_owned_elements_with_ghosts = 0;
+            impl_->n_shared_elements = 0;
+            impl_->n_owned_nodes_with_ghosts = 0;
 
             // Create default block
             auto default_block = std::make_shared<Block>();
@@ -1086,46 +1092,21 @@ namespace sfem {
         return nullptr;
     }
 
-    int Mesh::split_boundary_layer() {
+    int Mesh::split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name) {
         if (n_blocks() != 1) {
             SFEM_ERROR("Mesh must have exactly one block to split boundary layer!\n");
             return SFEM_FAILURE;
-        }
-
-        std::shared_ptr<Sideset> sideset;
-
-        {
-            ptrdiff_t      n_surf_elements = 0;
-            element_idx_t *parent          = 0;
-            int16_t       *side_idx        = 0;
-
-            if (extract_skin_sideset(this->n_elements(),
-                                     this->n_nodes(),
-                                     this->element_type(),
-                                     this->elements()->data(),
-                                     &n_surf_elements,
-                                     &parent,
-                                     &side_idx) != SFEM_SUCCESS) {
-                SFEM_ERROR("Failed to extract skin!\n");
-            }
-
-            sideset = std::make_shared<sfem::Sideset>(this->comm(),
-                                                      sfem::manage_host_buffer(n_surf_elements, parent),
-                                                      sfem::manage_host_buffer(n_surf_elements, side_idx));
         }
 
         {
             const int       nxe        = n_nodes_per_element();
             const ptrdiff_t n_elements = this->n_elements();
 
-            auto parent    = sideset->parent();
-            auto lfi       = sideset->lfi();
             auto bdry_mask = create_host_buffer<mask_t>(mask_count(n_elements));
 
-            auto            d_parent     = parent->data();
-            auto            d_lfi        = lfi->data();
+            auto            d_parent     = elements->data();
             auto            d_bdry_mask  = bdry_mask->data();
-            const ptrdiff_t size_sideset = parent->size();
+            const ptrdiff_t size_sideset = elements->size();
 
             auto default_block = impl_->blocks[0];
 
@@ -1167,30 +1148,60 @@ namespace sfem {
                         d_interior_elements[v][n_interior_elements_count] = d_elements[v][i];
                     }
                     n_interior_elements_count++;
-                
+                }
+            }
+
+            // !!!!
+            remove_block(0);
+
+            {  // Boundary block
+                auto block = std::make_shared<Block>();
+                block->set_name(name);
+                block->set_element_type(default_block->element_type());
+                block->set_elements(bdry_elements);
+                impl_->blocks.push_back(block);
+            }
+
+            {  // Interior block
+                auto block = std::make_shared<Block>();
+                block->set_name(default_block->name());
+                block->set_element_type(default_block->element_type());
+                block->set_elements(interior_elements);
+                impl_->blocks.push_back(block);
             }
         }
 
-        // !!!!
-        remove_block(0);
-
-        {  // Boundary block
-            auto block = std::make_shared<Block>();
-            block->set_name("boundary_layer");
-            block->set_element_type(default_block->element_type());
-            block->set_elements(bdry_elements);
-            impl_->blocks.push_back(block);
-        }
-
-        {  // Interior block
-            auto block = std::make_shared<Block>();
-            block->set_name("interior");
-            block->set_element_type(default_block->element_type());
-            block->set_elements(interior_elements);
-            impl_->blocks.push_back(block);
-        }
+        return SFEM_SUCCESS;
     }
 
-    return SFEM_FAILURE;
-}
+    int Mesh::split_boundary_layer() {
+        if (n_blocks() != 1) {
+            SFEM_ERROR("Mesh must have exactly one block to split boundary layer!\n");
+            return SFEM_FAILURE;
+        }
+
+        std::shared_ptr<Sideset> sideset;
+
+        {
+            ptrdiff_t      n_surf_elements = 0;
+            element_idx_t *parent          = 0;
+            int16_t       *side_idx        = 0;
+
+            if (extract_skin_sideset(this->n_elements(),
+                                     this->n_nodes(),
+                                     this->element_type(),
+                                     this->elements()->data(),
+                                     &n_surf_elements,
+                                     &parent,
+                                     &side_idx) != SFEM_SUCCESS) {
+                SFEM_ERROR("Failed to extract skin!\n");
+            }
+
+            sideset = std::make_shared<sfem::Sideset>(this->comm(),
+                                                      sfem::manage_host_buffer(n_surf_elements, parent),
+                                                      sfem::manage_host_buffer(n_surf_elements, side_idx));
+        }
+
+        return split_block(sideset->parent(), "boundary_layer");
+    }
 }  // namespace sfem
