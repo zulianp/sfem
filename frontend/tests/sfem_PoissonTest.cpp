@@ -623,10 +623,10 @@ int test_boundary_layer_elasticity() {
   
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
             {.sidesets = left_sideset, .value = 0.2, .component = 0},
-            {.sidesets = left_sideset, .value = 0, .component = 1},
+            {.sidesets = left_sideset, .value = 0.2, .component = 1},
             {.sidesets = left_sideset, .value = 0, .component = 2},
             {.sidesets = right_sideset, .value = -0.2, .component = 0},
-            {.sidesets = right_sideset, .value = 0, .component = 1},
+            {.sidesets = right_sideset, .value = -0.2, .component = 1},
             {.sidesets = right_sideset, .value = 0, .component = 2},
     };
 
