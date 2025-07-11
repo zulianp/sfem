@@ -376,15 +376,6 @@ static void index_face(const int        L,
     int lidx_u = lagr_to_proteus_corners[local_side_table[f * 4 + lst_u]];
     int lidx_v = lagr_to_proteus_corners[local_side_table[f * 4 + lst_v]];
 
-    // printf("lst   (%d, %d, %d)\n", lst_o, lst_u, lst_v);
-
-    // printf("lst[] (%d, %d, %d)\n",
-    //        local_side_table[f * 4 + lst_o],
-    //        local_side_table[f * 4 + lst_u],
-    //        local_side_table[f * 4 + lst_v]);
-
-    // printf("lidx  (%d, %d, %d)\n", lidx_o, lidx_u, lidx_v);
-
     int o_start[3];
     int u_len[3], u_dir[3];
     int v_len[3], v_dir[3];
@@ -394,10 +385,6 @@ static void index_face(const int        L,
         int o      = coords[d][lidx_o];
         o_start[d] = o;
     }
-
-    // printf("po = [%d %d %d]\n", coords[0][lidx_o], coords[1][lidx_o], coords[2][lidx_o]);
-    // printf("pu = [%d %d %d]\n", coords[0][lidx_u], coords[1][lidx_u], coords[2][lidx_u]);
-    // printf("pv = [%d %d %d]\n", coords[0][lidx_v], coords[1][lidx_v], coords[2][lidx_v]);
 
     // U
     for (int d = 0; d < 3; d++) {
@@ -438,14 +425,6 @@ static void index_face(const int        L,
         }
     }
 
-    // printf("global_face_offset = %d\n", global_face_offset);
-    // printf("o  (%d, %d, %d)\n", o_start[0], o_start[1], o_start[2]);
-    // printf("u_dir  (%d, %d, %d)\n", u_dir[0], u_dir[1], u_dir[2]);
-    // printf("u_len    (%d, %d, %d)\n", u_len[0], u_len[1], u_len[2]);
-    // printf("v_dir  (%d, %d, %d)\n", v_dir[0], v_dir[1], v_dir[2]);
-    // printf("v_len    (%d, %d, %d)\n", v_len[0], v_len[1], v_len[2]);
-    // fflush(stdout);
-
     int local_offset = 0;
     for (int vzi = 0; vzi != v_len[2]; vzi += v_dir[2]) {
         for (int vyi = 0; vyi != v_len[1]; vyi += v_dir[1]) {
@@ -454,24 +433,9 @@ static void index_face(const int        L,
                 for (int uzi = 0; uzi != u_len[2]; uzi += u_dir[2]) {
                     for (int uyi = 0; uyi != u_len[1]; uyi += u_dir[1]) {
                         for (int uxi = 0; uxi != u_len[0]; uxi += u_dir[0]) {
-                            // printf("u = [%d %d %d]\n", uxi, uyi, uzi);
-                            // printf("v = [%d %d %d]\n", vxi, vyi, vzi);
-                            // printf("p = [%d %d %d]\n",
-                            //        uxi + vxi + o_start[0],
-                            //        uyi + vyi + o_start[1],
-                            //        uzi + vzi + o_start[2]);
-
                             int pidx = sshex8_lidx(L, uxi + vxi + o_start[0], uyi + vyi + o_start[1], uzi + vzi + o_start[2]);
-
-                            // idx_t u_offset = u_face_start + (uxi + uyi + uzi) * u_increment;
-                            // idx_t v_offset = v_face_start + (vxi + vyi + vzi) * v_increment;
-
                             idx_t fidx = global_face_offset + local_offset++;
-                            // v_offset * (L - 1) + u_offset;
                             elements[pidx][e] = fidx;
-
-                            // printf("offsets %d %d\n", u_offset, v_offset);
-                            // printf("p %d => %d\n", pidx, fidx);
                         }
                     }
                 }
@@ -655,22 +619,6 @@ int sshex8_generate_elements(const int       L,
 
                     idx_t edge_start = index_base + g_edges[d2] * nxedge;
 
-                    // printf("//----------\n");
-                    // printf("po(%d) = [%d %d %d]\n",
-                    //        lid1,
-                    //        coords[0][lid1],
-                    //        coords[1][lid1],
-                    //        coords[2][lid1]);
-                    // printf("pu(%d) = [%d %d %d]\n",
-                    //        lid2,
-                    //        coords[0][lid2],
-                    //        coords[1][lid2],
-                    //        coords[2][lid2]);
-
-                    // printf("start  = [%d %d %d]\n", start[0], start[1], start[2]);
-                    // printf("dir    = [%d %d %d]\n", dir[0], dir[1], dir[2]);
-                    // printf("len    = [%d %d %d]\n", len[0], len[1], len[2]);
-
                     int en = 0;
                     for (int zi = 0; zi != len[2]; zi += dir[2]) {
                         for (int yi = 0; yi != len[1]; yi += dir[1]) {
@@ -678,8 +626,6 @@ int sshex8_generate_elements(const int       L,
                                 const int lidx_edge    = sshex8_lidx(L, start[0] + xi, start[1] + yi, start[2] + zi);
                                 elements[lidx_edge][e] = edge_start + en;
                                 en += 1;
-
-                                // printf("%d) => %d\n", lidx_edge, elements[lidx_edge][e]);
                             }
                         }
                     }
@@ -690,9 +636,6 @@ int sshex8_generate_elements(const int       L,
         free(rowptr);
         free(colidx);
 
-        // printf("----------------------------\n");
-        // printf("index_base %d + %ld * %d\n", index_base, nedges, nxedge);
-        // printf("----------------------------\n");
         index_base += (nedges * nxedge);
 
         tack = MPI_Wtime();
@@ -774,8 +717,6 @@ int sshex8_generate_elements(const int       L,
                     int       en       = (zi - 1) * Lm1 * Lm1 + (yi - 1) * Lm1 + xi - 1;
                     for (ptrdiff_t e = 0; e < m_nelements; e++) {
                         elements[lidx_vol][e] = index_base + e * nxelement + en;
-                        // printf("elements[%d][%ld] = %d + %ld * %d + %d\n", lidx_vol, e,
-                        // index_base, e, nxelement, en);
                     }
                 }
             }
@@ -831,8 +772,6 @@ int sshex8_build_n2e(const int       L,
                                           sshex8_lidx(L, xi + 1, yi, zi + 1),
                                           sshex8_lidx(L, xi, yi + 1, zi + 1),
                                           sshex8_lidx(L, xi + 1, yi + 1, zi + 1)};
-
-                    // const ptrdiff_t e_macro = i * txe + zi * L * L + yi * L + xi;
 
                     for (int edof_i = 0; edof_i < 8; ++edof_i) {
                         assert(elems[lev[edof_i]][i] < nnodes);
@@ -1102,22 +1041,7 @@ int sshex8_hierarchical_renumbering(const int       L,
                 }
             }
         }
-
-        // stride *= 2;
     }
-
-    // for (int zi = 0; zi <= L; zi++) {
-    //     for (int yi = 0; yi <= L; yi++) {
-    //         for (int xi = 0; xi <= L; xi++) {
-    //             printf("(%d %d %d): ", xi, yi, zi);
-    //             for (ptrdiff_t e = 0; e < nelements; e++) {
-    //                 const int   v   = sshex8_lidx(L, xi, yi, zi);
-    //                 printf("%d (%d) ", elements[v][e], node_mapping[elements[v][e]]);
-    //             }
-    //             printf("\n");
-    //         }
-    //     }
-    // }
 
     for (int zi = 0; zi <= L; zi++) {
         for (int yi = 0; yi <= L; yi++) {
