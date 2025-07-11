@@ -592,7 +592,16 @@ int test_boundary_layer_elasticity() {
     auto m                    = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
-    m->split_boundary_layer();
+    real_t margin_min = 0.5;
+    real_t margin_max = 1.5;
+    auto selection = m->select_elements(
+            [margin_min, margin_max](const geom_t x, const geom_t y, const geom_t z) -> bool { 
+                return (x <= margin_min || x >= margin_max) || (y <= margin_min || y >= margin_max) || (z <= margin_min || z >= margin_max); },
+            {});
+    
+
+    m->split_block(selection[0].second, "boundary_layer");
+    m->renumber_nodes(); // Make sure that nodes in blocks are near each other
 
     auto fs = sfem::FunctionSpace::create(m, 3);
 

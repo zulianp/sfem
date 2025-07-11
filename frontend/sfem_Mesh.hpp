@@ -162,9 +162,13 @@ namespace sfem {
                                                                const geom_t                         ymax = 1,
                                                                const geom_t                         zmax = 1);
 
+        std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> select_elements(
+                const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
+                const std::vector<std::string>                                      &block_names = {});
+
         int split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name);
         int split_boundary_layer();
-
+        int renumber_nodes();
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(const std::shared_ptr<Communicator> &comm);
         void set_element_type(const enum ElemType element_type);
