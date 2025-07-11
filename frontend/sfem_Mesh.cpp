@@ -18,6 +18,8 @@
 // FIXME
 #include "sfem_prolongation_restriction.h"
 
+#include <list>
+
 namespace sfem {
 
     class Mesh::Block::Impl {
@@ -206,15 +208,15 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto elements_buffer = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
-            impl_->points        = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
-            impl_->spatial_dim   = spatial_dim;
-            impl_->nnodes        = impl_->nnodes;
-            impl_->n_owned_nodes = impl_->nnodes;
-            impl_->n_owned_elements = nelements;
+            auto elements_buffer                = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
+            impl_->points                       = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
+            impl_->spatial_dim                  = spatial_dim;
+            impl_->nnodes                       = impl_->nnodes;
+            impl_->n_owned_nodes                = impl_->nnodes;
+            impl_->n_owned_elements             = nelements;
             impl_->n_owned_elements_with_ghosts = 0;
-            impl_->n_shared_elements = 0;
-            impl_->n_owned_nodes_with_ghosts = 0;
+            impl_->n_shared_elements            = 0;
+            impl_->n_owned_nodes_with_ghosts    = 0;
 
             // Create default block
             auto default_block = std::make_shared<Block>();
@@ -1203,5 +1205,124 @@ namespace sfem {
         }
 
         return split_block(sideset->parent(), "boundary_layer");
+    }
+
+    int Mesh::renumber_nodes() {
+        auto points     = this->points()->data();
+        auto elements   = this->elements()->data();
+        auto n_nodes    = this->n_nodes();
+        auto n_elements = this->n_elements();
+
+        auto new_idx_buff = create_host_buffer<ptrdiff_t>(n_nodes);
+
+        auto new_idx = new_idx_buff->data();
+        for (ptrdiff_t i = 0; i < n_nodes; i++) {
+            new_idx[i] = -1;
+        }
+
+        int   nxe          = n_nodes_per_element();
+        idx_t next_node_id = 0;
+        for (auto &b : impl_->blocks) {
+            auto elements   = b->elements()->data();
+            auto n_elements = b->n_elements();
+
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                for (int v = 0; v < nxe; v++) {
+                    auto node = elements[v][e];
+                    if (new_idx[node] == -1) {
+                        new_idx[node] = next_node_id++;
+                    }
+                }
+            }
+        }
+
+        const int dim = spatial_dimension();
+
+        auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
+        auto new_points      = new_points_buff->data();
+
+        for (int d = 0; d < dim; d++) {
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                new_points[d][new_idx[i]] = points[d][i];
+            }
+        }
+
+        impl_->points = new_points_buff;
+
+        for (auto &b : impl_->blocks) {
+            auto elements   = b->elements()->data();
+            auto n_elements = b->n_elements();
+
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                for (int v = 0; v < nxe; v++) {
+                    elements[v][e] = new_idx[elements[v][e]];
+                }
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> Mesh::select_elements(
+            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
+            const std::vector<std::string>                                      &block_names) {
+        SFEM_TRACE_SCOPE("Sideset::create_from_selector");
+
+        // const ptrdiff_t nelements = mesh->n_elements();
+        const ptrdiff_t nnodes = n_nodes();
+        const int       dim    = spatial_dimension();
+
+        auto points = this->points()->data();
+        int  nxe    = n_nodes_per_element();
+
+        size_t                                                        n_blocks = this->n_blocks();
+        std::vector<std::pair<uint16_t, SharedBuffer<element_idx_t>>> selected_elements;
+
+        for (size_t b = 0; b < n_blocks; b++) {
+            auto block = this->block(b);
+            if (!block_names.empty() &&  //
+                std::find(block_names.begin(), block_names.end(), block->name()) == block_names.end()) {
+                continue;
+            }
+
+            const ptrdiff_t nelements = block->n_elements();
+            auto            elements  = block->elements()->data();
+
+            std::list<element_idx_t> selected_element_list;
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                // Barycenter of element
+                double p[3] = {0, 0, 0};
+
+                for (int v = 0; v < nxe; v++) {
+                    const idx_t node = elements[v][e];
+
+                    for (int d = 0; d < dim; d++) {
+                        p[d] += points[d][node];
+                    }
+                }
+
+                for (int d = 0; d < dim; d++) {
+                    p[d] /= nxe;
+                }
+
+                if (selector(p[0], p[1], p[2])) {
+                    selected_element_list.push_back(e);
+                }
+            }
+
+            const ptrdiff_t nselected_elements = selected_element_list.size();
+            auto            selected_element   = create_host_buffer<element_idx_t>(nselected_elements);
+
+            {
+                ptrdiff_t idx = 0;
+                for (auto p : selected_element_list) {
+                    selected_element->data()[idx++] = p;
+                }
+            }
+
+            selected_elements.push_back(std::make_pair(b, selected_element));
+        }
+
+        return selected_elements;
     }
 }  // namespace sfem
