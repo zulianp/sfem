@@ -42,6 +42,7 @@ set(SFEM_MODULES
     algebra base matrix 
     algebra/openmp
     mesh 
+    mesh/multiblock
     mesh/sshex8
     operators 
     operators/beam2 
