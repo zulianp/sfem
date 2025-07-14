@@ -220,6 +220,9 @@ NB_MODULE(pysfem, m) {
     nb::class_<std::vector<std::shared_ptr<Sideset>>>(m, "vector<Sideset>")
             .def("__getitem__", [](const std::vector<std::shared_ptr<Sideset>> &self, size_t index) -> std::shared_ptr<Sideset> {
                 return self[index];
+            })
+            .def("size", [](const std::vector<std::shared_ptr<Sideset>> &self) -> size_t {
+                return self.size();
             });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
@@ -342,7 +345,9 @@ NB_MODULE(pysfem, m) {
     m.def("create_hierarchical_prolongation", &sfem::create_hierarchical_prolongation);
 
     nb::class_<Constraint>(m, "Constraint");
-    nb::class_<Op>(m, "Op").def("initialize", &Op::initialize);
+    nb::class_<Op>(m, "Op")
+        .def("initialize", &Op::initialize)
+        .def("initialize", [](Op& self) { return self.initialize(std::vector<std::string>{}); });
     m.def("create_op", [](const std::shared_ptr<FunctionSpace> &space, const char *name, nb::handle es_handle = nb::handle()) {
         if (!es_handle.is_valid()) {
             return Factory::create_op(space, name);
