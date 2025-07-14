@@ -14,6 +14,8 @@
 // #define real_t  real_t
 
 #include "hyteg.h"
+#include "hyteg_Jacobian_matrix_real_t.h"
+
 #include "quadratures_rule.h"
 
 #define real_type real_t
