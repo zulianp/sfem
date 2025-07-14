@@ -371,15 +371,15 @@ tet4_resample_tetrahedron_local_hyteg_adjoint(const real_t                      
         hex_aa_8_collect_coeffs_indices_V(stride,  // Stride
                                           i,       // Indices of the element
                                           j,       //
-                                          k,       //
-                                          &i0,     // Output indices
-                                          &i1,     //
-                                          &i2,     //
-                                          &i3,     //
-                                          &i4,     //
-                                          &i5,     //
-                                          &i6,     //
-                                          &i7);    //
+                                          k,
+                                          &i0,   // Output indices
+                                          &i1,   //
+                                          &i2,   //
+                                          &i3,   //
+                                          &i4,   //
+                                          &i5,   //
+                                          &i6,   //
+                                          &i7);  //
 
         // Integrate the values of the field at the vertices of the tetrahedral element
         const real_t dV = (1.0 / 6.0) * det_jacobian * tet_qw[quad_i];
@@ -1036,6 +1036,7 @@ void                                                                            
 tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category,  //
                                                  const unsigned int     L,         // Refinement level
                                                  const real_t const*    bc,        // transposition vector for category
+                                                 const real_t           J[9],      // Jacobian matrix
                                                  const real_t           fx0,       // Tetrahedron vertices X-coordinates
                                                  const real_t           fx1,       //
                                                  const real_t           fx2,       //
@@ -1064,23 +1065,48 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
     // TODO: Implement the adjoint resampling for the tetrahedron
 
-    real_t J[9];  // Jacobian matrix for the tetrahedron
+    // Jacobian matrix for the tetrahedron
+}
 
-    jacobian_matrix_real_t(category,  // Category of the tetrahedron
-                           fx0,
-                           fy0,
-                           fz0,  // Vertex 0 coordinates
-                           fx1,
-                           fy1,
-                           fz1,  // Vertex 1 coordinates
-                           fx2,
-                           fy2,
-                           fz2,  // Vertex 2 coordinates
-                           fx3,
-                           fy3,
-                           fz3,          // Vertex 3 coordinates
-                           (real_t)(L),  // Refinement level
-                           J);           // Output Jacobian matrix
+real_t                                      //
+make_Jocobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinates
+                         const real_t fx1,  //
+                         const real_t fx2,  //
+                         const real_t fx3,  //
+                         const real_t fy0,  // Tetrahedron vertices Y-coordinates
+                         const real_t fy1,  //
+                         const real_t fy2,  //
+                         const real_t fy3,  //
+                         const real_t fz0,  // Tetrahedron vertices Z-coordinates
+                         const real_t fz1,  //
+                         const real_t fz2,  //
+                         const real_t fz3,
+                         real_t       J[9]) {  // Jacobian matrix
+    // Compute the Jacobian matrix for tetrahedron transformation
+    // J = [x1-x0, x2-x0, x3-x0]   <- Row 0: indices 0,1,2
+    //     [y1-y0, y2-y0, y3-y0]   <- Row 1: indices 3,4,5
+    //     [z1-z0, z2-z0, z3-z0]   <- Row 2: indices 6,7,8
+
+    // Row 0: x-components (indices 0,1,2)
+    J[0] = fx1 - fx0;  // dx/dxi
+    J[1] = fx2 - fx0;  // dx/deta
+    J[2] = fx3 - fx0;  // dx/dzeta
+
+    // Row 1: y-components (indices 3,4,5)
+    J[3] = fy1 - fy0;  // dy/dxi
+    J[4] = fy2 - fy0;  // dy/deta
+    J[5] = fy3 - fy0;  // dy/dzeta
+
+    // Row 2: z-components (indices 6,7,8)
+    J[6] = fz1 - fz0;  // dz/dxi
+    J[7] = fz2 - fz0;  // dz/deta
+    J[8] = fz3 - fz0;  // dz/dzeta
+
+    // Compute determinant of the 3x3 Jacobian matrix
+    const real_t det =
+            J[0] * (J[4] * J[8] - J[5] * J[7]) - J[1] * (J[3] * J[8] - J[5] * J[6]) + J[2] * (J[3] * J[7] - J[4] * J[6]);
+
+    return det;
 }
 
 //////////////////////////////////////////////////////////
@@ -1205,10 +1231,30 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                 for (int j = 0; j < nodes_pes_side - i - 1; j++) {  // Loop over the nodes on the second edge
 
                     {
+                        const unsigned int cat0 = 0;
+
                         // Coordinates of the node on the first edge for Cat 0
                         const real_t b0[3] = {(real_t)(j)*h,   //
                                               (real_t)(i)*h,   //
                                               (real_t)(k)*h};  //
+
+                        real_t Jacobian_0[9];
+
+                        jacobian_matrix_real_t(cat0,         // Category of the tetrahedron
+                                               x0_n,         //
+                                               y0_n,         //
+                                               z0_n,         //
+                                               x1_n,         //
+                                               y1_n,         //
+                                               z1_n,         //
+                                               x2_n,         //
+                                               y2_n,         //
+                                               z2_n,         //
+                                               x3_n,         //
+                                               y3_n,         //
+                                               z3_n,         //          // Vertex 3 coordinates
+                                               (real_t)(L),  // Refinement level
+                                               Jacobian_0);  // Output Jacobian matrix
 
                         // Solve the case for the current Cat. 0 tetrahedron.
                         // 1. Get the Jacobian matrix for the current Cat. 0 J_0 tetrahedron
@@ -1216,35 +1262,36 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                         // 3. Calculate the weighted field at the sub-tetrahedron vertices
                         // 4. Resample the field at the sub-tetrahedron vertices
 
-                        const unsigned int cat0 = 0;                              // Category 0
-                        tet4_resample_tetrahedron_local_adjoint_category(cat0,    // Category 0
-                                                                         L,       // Refinement level
-                                                                         b0,      // Transposition vector for category 0
-                                                                         x0_n,    // Tetrahedron vertices X-coordinates
-                                                                         x1_n,    //
-                                                                         x2_n,    //
-                                                                         x3_n,    //
-                                                                         y0_n,    // Tetrahedron vertices Y-coordinates
-                                                                         y1_n,    //
-                                                                         y2_n,    //
-                                                                         y3_n,    //
-                                                                         z0_n,    // Tetrahedron vertices Z-coordinates
-                                                                         z1_n,    //
-                                                                         z2_n,    //
-                                                                         z3_n,    //
-                                                                         wf0,     // Weighted field at the vertices
-                                                                         wf1,     //
-                                                                         wf2,     //
-                                                                         wf3,     //
-                                                                         ox,      // Origin of the grid
-                                                                         oy,      //
-                                                                         oz,      //
-                                                                         dx,      // Spacing of the grid
-                                                                         dy,      //
-                                                                         dz,      //
-                                                                         stride,  // Stride
-                                                                         n,       // Size of the grid
-                                                                         data);   // Output
+                        // Category 0
+                        tet4_resample_tetrahedron_local_adjoint_category(cat0,        // Category 0
+                                                                         L,           // Refinement level
+                                                                         b0,          // Transposition vector for category 0
+                                                                         Jacobian_0,  // Jacobian matrix
+                                                                         x0_n,        // Tetrahedron vertices X-coordinates
+                                                                         x1_n,        //
+                                                                         x2_n,        //
+                                                                         x3_n,        //
+                                                                         y0_n,        // Tetrahedron vertices Y-coordinates
+                                                                         y1_n,        //
+                                                                         y2_n,        //
+                                                                         y3_n,        //
+                                                                         z0_n,        // Tetrahedron vertices Z-coordinates
+                                                                         z1_n,        //
+                                                                         z2_n,        //
+                                                                         z3_n,        //
+                                                                         wf0,         // Weighted field at the vertices
+                                                                         wf1,         //
+                                                                         wf2,         //
+                                                                         wf3,         //
+                                                                         ox,          // Origin of the grid
+                                                                         oy,          //
+                                                                         oz,          //
+                                                                         dx,          // Spacing of the grid
+                                                                         dy,          //
+                                                                         dz,          //
+                                                                         stride,      // Stride
+                                                                         n,           // Size of the grid
+                                                                         data);       // Output
 
                     }  // END: Cat 0
 
@@ -1255,71 +1302,111 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
                         // Solve the case for the current Cat. 1, 2, 3, 4 tetrahedra.
 
-                        for (int cat = 1; cat <= 4; cat++) {
-                            tet4_resample_tetrahedron_local_adjoint_category(cat,     // Category 0
-                                                                             L,       // Refinement level
-                                                                             b1,      // Transposition vector for category 0
-                                                                             x0_n,    // Tetrahedron vertices X-coordinates
-                                                                             x1_n,    //
-                                                                             x2_n,    //
-                                                                             x3_n,    //
-                                                                             y0_n,    // Tetrahedron vertices Y-coordinates
-                                                                             y1_n,    //
-                                                                             y2_n,    //
-                                                                             y3_n,    //
-                                                                             z0_n,    // Tetrahedron vertices Z-coordinates
-                                                                             z1_n,    //
-                                                                             z2_n,    //
-                                                                             z3_n,    //
-                                                                             wf0,     // Weighted field at the vertices
-                                                                             wf1,     //
-                                                                             wf2,     //
-                                                                             wf3,     //
-                                                                             ox,      // Origin of the grid
-                                                                             oy,      //
-                                                                             oz,      //
-                                                                             dx,      // Spacing of the grid
-                                                                             dy,      //
-                                                                             dz,      //
-                                                                             stride,  // Stride
-                                                                             n,       // Size of the grid
-                                                                             data);   // Output
+                        for (int cat_i = 1; cat_i <= 4; cat_i++) {
+                            real_t Jacobian_5[9];
+
+                            jacobian_matrix_real_t(cat_i,        // Category of the tetrahedron
+                                                   x0_n,         //
+                                                   y0_n,         //
+                                                   z0_n,         //
+                                                   x1_n,         //
+                                                   y1_n,         //
+                                                   z1_n,         //
+                                                   x2_n,         //
+                                                   y2_n,         //
+                                                   z2_n,         //
+                                                   x3_n,         //
+                                                   y3_n,         //
+                                                   z3_n,         //          // Vertex 3 coordinates
+                                                   (real_t)(L),  // Refinement level
+                                                   Jacobian_5);  // Output Jacobian matrix
+
+                            tet4_resample_tetrahedron_local_adjoint_category(cat_i,       // Category 0
+                                                                             L,           // Refinement level
+                                                                             b1,          // Transposition vector for category 0
+                                                                             Jacobian_5,  // Jacobian matrix
+                                                                             x0_n,        // Tetrahedron vertices X-coordinates
+                                                                             x1_n,        //
+                                                                             x2_n,        //
+                                                                             x3_n,        //
+                                                                             y0_n,        // Tetrahedron vertices Y-coordinates
+                                                                             y1_n,        //
+                                                                             y2_n,        //
+                                                                             y3_n,        //
+                                                                             z0_n,        // Tetrahedron vertices Z-coordinates
+                                                                             z1_n,        //
+                                                                             z2_n,        //
+                                                                             z3_n,        //
+                                                                             wf0,         // Weighted field at the vertices
+                                                                             wf1,         //
+                                                                             wf2,         //
+                                                                             wf3,         //
+                                                                             ox,          // Origin of the grid
+                                                                             oy,          //
+                                                                             oz,          //
+                                                                             dx,          // Spacing of the grid
+                                                                             dy,          //
+                                                                             dz,          //
+                                                                             stride,      // Stride
+                                                                             n,           // Size of the grid
+                                                                             data);       // Output
                         }
                     }
 
                     if (j >= 1 && i >= 1) {
-                        const real_t       b5[3] = {(real_t)(j)*h,                //
-                                                    (real_t)(i)*h,                //
-                                                    (real_t)(k)*h};               //
-                        const unsigned int cat5  = 5;                             // Category 5
-                        tet4_resample_tetrahedron_local_adjoint_category(cat5,    // Category 0
-                                                                         L,       // Refinement level
-                                                                         b5,      // Transposition vector for category 0
-                                                                         x0_n,    // Tetrahedron vertices X-coordinates
-                                                                         x1_n,    //
-                                                                         x2_n,    //
-                                                                         x3_n,    //
-                                                                         y0_n,    // Tetrahedron vertices Y-coordinates
-                                                                         y1_n,    //
-                                                                         y2_n,    //
-                                                                         y3_n,    //
-                                                                         z0_n,    // Tetrahedron vertices Z-coordinates
-                                                                         z1_n,    //
-                                                                         z2_n,    //
-                                                                         z3_n,    //
-                                                                         wf0,     // Weighted field at the vertices
-                                                                         wf1,     //
-                                                                         wf2,     //
-                                                                         wf3,     //
-                                                                         ox,      // Origin of the grid
-                                                                         oy,      //
-                                                                         oz,      //
-                                                                         dx,      // Spacing of the grid
-                                                                         dy,      //
-                                                                         dz,      //
-                                                                         stride,  // Stride
-                                                                         n,       // Size of the grid
-                                                                         data);   // Output
+                        const unsigned int cat5 = 5;
+
+                        const real_t b5[3] = {(real_t)(j)*h,   //
+                                              (real_t)(i)*h,   //
+                                              (real_t)(k)*h};  //
+
+                        real_t Jacobian_5[9];
+
+                        jacobian_matrix_real_t(cat5,         // Category of the tetrahedron
+                                               x0_n,         //
+                                               y0_n,         //
+                                               z0_n,         //
+                                               x1_n,         //
+                                               y1_n,         //
+                                               z1_n,         //
+                                               x2_n,         //
+                                               y2_n,         //
+                                               z2_n,         //
+                                               x3_n,         //
+                                               y3_n,         //
+                                               z3_n,         //          // Vertex 3 coordinates
+                                               (real_t)(L),  // Refinement level
+                                               Jacobian_5);  // Output Jacobian matrix
+
+                        tet4_resample_tetrahedron_local_adjoint_category(cat5,        // Category 0
+                                                                         L,           // Refinement level
+                                                                         b5,          // Transposition vector for category 0
+                                                                         Jacobian_5,  // Jacobian matrix
+                                                                         x0_n,        // Tetrahedron vertices X-coordinates
+                                                                         x1_n,        //
+                                                                         x2_n,        //
+                                                                         x3_n,        //
+                                                                         y0_n,        // Tetrahedron vertices Y-coordinates
+                                                                         y1_n,        //
+                                                                         y2_n,        //
+                                                                         y3_n,        //
+                                                                         z0_n,        // Tetrahedron vertices Z-coordinates
+                                                                         z1_n,        //
+                                                                         z2_n,        //
+                                                                         z3_n,        //
+                                                                         wf0,         // Weighted field at the vertices
+                                                                         wf1,         //
+                                                                         wf2,         //
+                                                                         wf3,         //
+                                                                         ox,          // Origin of the grid
+                                                                         oy,          //
+                                                                         oz,          //
+                                                                         dx,          // Spacing of the grid
+                                                                         dy,          //
+                                                                         dz,          //
+                                                                         stride,      // Stride
+                                                                         n,           // Size of the grid
+                                                                         data);       // Output
 
                         // Solve the case for the current Cat. 5 tetrahedron.
                     }
