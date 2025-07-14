@@ -127,9 +127,12 @@ void jacobian_matrix_cat5_double(const double x0, const double y0, const double 
     J[8] = (-y0 + y3) / L;                     // J33
 }
 
-void jacobian_matrix_double(const int category, const double x0, const double y0, const double z0, const double x1,
-                            const double y1, const double z1, const double x2, const double y2, const double z2, const double x3,
-                            const double y3, const double z3, const double L, double J[9]) {
+void jacobian_matrix_double(const int    category,                              //
+                            const double x0, const double y0, const double z0,  //
+                            const double x1, const double y1, const double z1,  //
+                            const double x2, const double y2, const double z2,  //
+                            const double x3, const double y3, const double z3,  //
+                            const double L, double J[9]) {                      //
     switch (category) {
         case 0:
             jacobian_matrix_cat0_double(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, L, J);

@@ -127,9 +127,12 @@ void jacobian_matrix_cat5_real_t(const real_t x0, const real_t y0, const real_t 
     J[8] = (-y0 + y3) / L;                     // J33
 }
 
-void jacobian_matrix_real_t(const int category, const real_t x0, const real_t y0, const real_t z0, const real_t x1,
-                            const real_t y1, const real_t z1, const real_t x2, const real_t y2, const real_t z2, const real_t x3,
-                            const real_t y3, const real_t z3, const real_t L, real_t J[9]) {
+void jacobian_matrix_real_t(const int    category,                                               //
+                            const real_t x0, const real_t y0, const real_t z0, const real_t x1,  //
+                            const real_t y1, const real_t z1, const real_t x2,                   //
+                            const real_t y2, const real_t z2, const real_t x3,                   //
+                            const real_t y3, const real_t z3, const real_t L,                    //
+                            real_t J[9]) {                                                       //
     switch (category) {
         case 0:
             jacobian_matrix_cat0_real_t(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, L, J);
