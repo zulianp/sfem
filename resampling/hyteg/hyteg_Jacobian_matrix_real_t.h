@@ -89,6 +89,32 @@ void jacobian_matrix_cat5_real_t(const real_t x0, const real_t y0, const real_t 
                                  real_t       J[9]                                   //
 );
 
+/**
+ * @brief Calculate 3x3 Jacobian matrix for tetrahedron based on category
+ * 
+ * @param category 
+ * @param x0 
+ * @param y0 
+ * @param z0 
+ * @param x1 
+ * @param y1 
+ * @param z1 
+ * @param x2 
+ * @param y2 
+ * @param z2 
+ * @param x3 
+ * @param y3 
+ * @param z3 
+ * @param L 
+ * @param J 
+ */
+void jacobian_matrix_real_t(const int    category,                                               //
+                            const real_t x0, const real_t y0, const real_t z0, const real_t x1,  //
+                            const real_t y1, const real_t z1, const real_t x2,                   //
+                            const real_t y2, const real_t z2, const real_t x3,                   //
+                            const real_t y3, const real_t z3, const real_t L,                    //
+                            real_t J[9]);                                                        //
+
 #ifdef __cplusplus
 }
 #endif
