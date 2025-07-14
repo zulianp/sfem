@@ -1024,3 +1024,152 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 
     RETURN_FROM_FUNCTION(ret);
 }  // END OF FUNCTION tet4_resample_field_local_refine_adjoint_hyteg
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_refine_adjoint_hyteg ////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                                    //
+tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                      start_element,   // Mesh
+                                                 const ptrdiff_t                      end_element,     //
+                                                 const ptrdiff_t                      nnodes,          //
+                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                 const real_t                         alpha_th,        // Threshold for alpha
+                                                 real_t* const SFEM_RESTRICT          data) {                   //
+
+    PRINT_CURRENT_FUNCTION;
+    int ret = 0;
+
+    // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
+    // If the alpha value is below the minimum threshold, no refinement is applied.
+    // If the alpha value is above the maximum threshold, the maximum level of refinement is applied.
+
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    const real_t dx = (real_t)delta[0];
+    const real_t dy = (real_t)delta[1];
+    const real_t dz = (real_t)delta[2];
+
+    const real_t d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+    const real_t hexahedron_volume = dx * dy * dz;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("============================================================\n");
+    printf("= Start: %s: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+    printf("= Hexahedron volume = %g\n", hexahedron_volume);
+    printf("============================================================\n");
+#endif
+
+    int degenerated_tetrahedra_cnt = 0;
+    int uniform_refine_cnt         = 0;
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // loop over the 4 vertices of the tetrahedron
+        idx_t ev[4];
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }
+
+        // Read the coordinates of the vertices of the tetrahedron
+        // In the physical space
+        const real_t x0_n = xyz[0][ev[0]];
+        const real_t x1_n = xyz[0][ev[1]];
+        const real_t x2_n = xyz[0][ev[2]];
+        const real_t x3_n = xyz[0][ev[3]];
+
+        const real_t y0_n = xyz[1][ev[0]];
+        const real_t y1_n = xyz[1][ev[1]];
+        const real_t y2_n = xyz[1][ev[2]];
+        const real_t y3_n = xyz[1][ev[3]];
+
+        const real_t z0_n = xyz[2][ev[0]];
+        const real_t z1_n = xyz[2][ev[1]];
+        const real_t z2_n = xyz[2][ev[2]];
+        const real_t z3_n = xyz[2][ev[3]];
+
+        // Compute the alpha_tet to decide if the tetrahedron is refined
+        // Sides of the tetrahedron
+        real_t edges_length[6];
+
+        int vertex_a = -1;
+        int vertex_b = -1;
+
+        const real_t max_edges_length =             //
+                tet_edge_max_length(x0_n,           //
+                                    y0_n,           //
+                                    z0_n,           //
+                                    x1_n,           //
+                                    y1_n,           //
+                                    z1_n,           //
+                                    x2_n,           //
+                                    y2_n,           //
+                                    z2_n,           //
+                                    x3_n,           //
+                                    y3_n,           //
+                                    z3_n,           //
+                                    &vertex_a,      // Output
+                                    &vertex_b,      // Output
+                                    edges_length);  // Output
+
+        const real_t alpha_tet = max_edges_length / d_min;
+
+        const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha
+        const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
+        const int    max_refinement_L    = 3;    // Maximum refinement level
+
+        const int L = alpha_to_hyteg_level(alpha_tet,            //
+                                           alpha_min_threshold,  //
+                                           alpha_max_threshold,  //
+                                           max_refinement_L);    //
+
+        const real_t h = 1.0 / (real_t)L;  // Size of the sub-tetrahedron
+
+        for (int k = 0; k < L + 1; k++) {  // Loop over the refinement levels
+
+            const unsigned int nodes_pes_side  = (L - k) + 1;
+            const unsigned int nodes_per_layer = nodes_pes_side * (nodes_pes_side + 1) / 2;
+
+            for (int i = 0; i < nodes_pes_side - 1; i++) {          // Loop over the nodes on the first edge
+                for (int j = 0; j < nodes_pes_side - i - 1; j++) {  // Loop over the nodes on the second edge
+
+                    // Coordinates of the node on the first edge for Cat 0
+                    const real_t b0[3] = {(real_t)(j)*h,   //
+                                          (real_t)(i)*h,   //
+                                          (real_t)(k)*h};  //
+
+                    // Solve the case for the current Cat. 0 tetrahedron.
+                    // 1. Get the Jacobian matrix for the current Cat. 0 J_0 tetrahedron
+                    // 2. Use J_0 to calculate the coordinates of the sub-tetrahedron vertices in the physical space
+                    // 3. Calculate the weighted field at the sub-tetrahedron vertices
+                    // 4. Resample the field at the sub-tetrahedron vertices
+
+                    if (j >= 1) {
+                        const real_t b1[3] = {(real_t)(j)*h,   //
+                                              (real_t)(i)*h,   //
+                                              (real_t)(k)*h};  //
+
+                        // Solve the case for the current Cat. 1, 2, 3, 4 tetrahedra.
+                    }
+
+                    if (j >= 1 && i >= 1) {
+                        const real_t b5[3] = {(real_t)(j)*h,   //
+                                              (real_t)(i)*h,   //
+                                              (real_t)(k)*h};  //
+
+                        // Solve the case for the current Cat. 5 tetrahedron.
+                    }
+                }
+            }
+        }
+
+    }  // END: for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++)
+}
