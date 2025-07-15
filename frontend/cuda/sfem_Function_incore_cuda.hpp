@@ -18,6 +18,7 @@ namespace sfem {
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
     std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
     std::shared_ptr<Sideset>    to_device(const std::shared_ptr<Sideset> &ss);
+    std::vector<std::shared_ptr<Sideset>>    to_device(const std::vector<std::shared_ptr<Sideset>> &ss);
 
     SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const enum ElemType element_type);
 
@@ -38,6 +39,15 @@ namespace sfem {
         buffer_host_to_device(in->size() * sizeof(T), in->data(), buff);
 
         return std::make_shared<Buffer<T>>(in->size(), buff, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
+    }
+
+    template<typename T>
+    std::vector<SharedBuffer<T>> to_device(const std::vector<SharedBuffer<T>> &in) {
+        std::vector<SharedBuffer<T>> ret;
+        for (const auto &b : in) {
+            ret.push_back(to_device(b));
+        }
+        return ret;
     }
 
     template <typename T>
