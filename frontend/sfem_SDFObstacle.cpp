@@ -23,9 +23,15 @@ namespace sfem {
 
     std::shared_ptr<SDFObstacle> SDFObstacle::create(const std::shared_ptr<Grid<geom_t>> &sdf,
                                                      const enum ExecutionSpace            execution_space) {
-        assert(execution_space == sfem::EXECUTION_SPACE_HOST);
-        auto obs                    = std::make_shared<SDFObstacle>();
-        obs->impl_->sdf             = sdf;
+        auto obs = std::make_shared<SDFObstacle>();
+#ifdef SFEM_ENABLE_CUDA
+        if (execution_space == EXECUTION_SPACE_DEVICE) {
+            obs->impl_->sdf = to_device(sdf);
+        } else
+#endif
+        {
+            obs->impl_->sdf = sdf;
+        }
         obs->impl_->execution_space = execution_space;
         return obs;
     }
