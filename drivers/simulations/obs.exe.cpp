@@ -21,9 +21,8 @@
 
 #include "sfem_ssmgc.hpp"
 
-int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
-    auto comm = context.communicator();
-
+int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    
     if (argc != 6) {
         fprintf(stderr, "usage: %s <mesh> <sdf> <dirichlet_conditions> <contact_boundary> <output>\n", argv[0]);
         return SFEM_FAILURE;
@@ -140,6 +139,6 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    sfem::Context context(argc, argv);
-    return solve_obstacle_problem(context, argc, argv);
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_obstacle_problem(ctx->communicator(), argc, argv);
 }
