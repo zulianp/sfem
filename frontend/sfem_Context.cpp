@@ -43,6 +43,7 @@ namespace sfem {
     {
         return std::make_shared<Context>(argc, argv);
     }
+    
     std::shared_ptr<Context> initialize(int argc, char *argv[], MPI_Comm comm)
     {
         return std::make_shared<Context>(argc, argv, comm);

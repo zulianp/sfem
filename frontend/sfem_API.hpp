@@ -22,6 +22,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_Restrict.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
@@ -112,7 +113,9 @@ namespace sfem {
         return sfem::create_host_buffer<T>(n);
     }
 
-    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space, const std::string& name, const ExecutionSpace es) {
+    static std::shared_ptr<Op> create_op(const std::shared_ptr<FunctionSpace> &space,
+                                         const std::string                    &name,
+                                         const ExecutionSpace                  es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::Factory::create_op_gpu(space, name.c_str());
 #endif  // SFEM_ENABLE_CUDA
@@ -136,7 +139,6 @@ namespace sfem {
         cg->set_op(op);
         return cg;
     }
-    
 
     template <typename T>
     static std::shared_ptr<ShiftableJacobi<T>> create_shiftable_jacobi(const SharedBuffer<T> &diag, const ExecutionSpace es) {
@@ -521,194 +523,7 @@ namespace sfem {
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction(const std::shared_ptr<FunctionSpace> &from_space,
                                                                              const std::shared_ptr<FunctionSpace> &to_space,
                                                                              const ExecutionSpace                  es) {
-        auto      from_element = (enum ElemType)from_space->element_type();
-        auto      to_element   = (enum ElemType)to_space->element_type();
-        const int block_size   = from_space->block_size();
-
-        ptrdiff_t nnodes   = 0;
-        idx_t   **elements = nullptr;
-        int       nxe;
-        if (from_space->has_semi_structured_mesh()) {
-            auto &ssmesh = from_space->semi_structured_mesh();
-            nxe          = sshex8_nxe(ssmesh.level());
-            elements     = ssmesh.element_data();
-            nnodes       = ssmesh.n_nodes();
-        } else {
-            nxe      = elem_num_nodes(from_element);
-            elements = from_space->mesh().elements()->data();
-            nnodes   = from_space->mesh().n_nodes();
-        }
-
-        auto element_to_node_incidence_count = create_buffer<uint16_t>(nnodes, MEMORY_SPACE_HOST);
-        {
-            auto buff = element_to_node_incidence_count->data();
-
-            // #pragma omp parallel for // BAD performance with parallel for
-            const ptrdiff_t nelements = from_space->mesh().n_elements();
-            for (int d = 0; d < nxe; d++) {
-                for (ptrdiff_t i = 0; i < nelements; ++i) {
-                    // #pragma omp atomic update
-                    buff[elements[d][i]]++;
-                }
-            }
-        }
-
-#ifdef SFEM_ENABLE_CUDA
-        if (EXECUTION_SPACE_DEVICE == es) {
-            auto dbuff = to_device(element_to_node_incidence_count);
-
-            auto elements = from_space->device_elements();
-            if (!elements) {
-                elements = create_device_elements(from_space, from_space->element_type());
-                from_space->set_device_elements(elements);
-            }
-
-            if (from_space->has_semi_structured_mesh()) {
-                if (to_space->has_semi_structured_mesh()) {
-                    // FIXME make sure to reuse fine level elements and strides
-                    auto to_elements = to_space->device_elements();
-                    if (!to_elements) {
-                        to_elements = create_device_elements(to_space, to_space->element_type());
-                        to_space->set_device_elements(to_elements);
-                    }
-
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("cu_sshex8_restrict");
-
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
-
-                                cu_sshex8_restrict(from_ssm.n_elements(),
-                                                   from_ssm.level(),
-                                                   1,
-                                                   elements->data(),
-                                                   dbuff->data(),
-                                                   to_ssm.level(),
-                                                   1,
-                                                   to_elements->data(),
-                                                   block_size,
-                                                   SFEM_REAL_DEFAULT,
-                                                   1,
-                                                   from,
-                                                   SFEM_REAL_DEFAULT,
-                                                   1,
-                                                   to,
-                                                   SFEM_DEFAULT_STREAM);
-                            },
-                            es);
-
-                } else {
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_restriction");
-
-                                auto &ssm = from_space->semi_structured_mesh();
-                                cu_sshex8_hierarchical_restriction(ssm.level(),
-                                                                   ssm.n_elements(),
-                                                                   elements->data(),
-                                                                   dbuff->data(),
-                                                                   block_size,
-                                                                   SFEM_REAL_DEFAULT,
-                                                                   1,
-                                                                   from,
-                                                                   SFEM_REAL_DEFAULT,
-                                                                   1,
-                                                                   to,
-                                                                   SFEM_DEFAULT_STREAM);
-                            },
-                            es);
-                }
-
-            } else {
-                return make_op<real_t>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("cu_macrotet4_to_tet4_restriction_element_based");
-
-                            cu_macrotet4_to_tet4_restriction_element_based(from_space->mesh().n_elements(),
-                                                                           elements->data(),
-                                                                           dbuff->data(),
-                                                                           block_size,
-                                                                           SFEM_REAL_DEFAULT,
-                                                                           1,
-                                                                           from,
-                                                                           SFEM_REAL_DEFAULT,
-                                                                           1,
-                                                                           to,
-                                                                           SFEM_DEFAULT_STREAM);
-                        },
-                        es);
-            }
-        } else
-#endif
-        {
-            if (from_space->has_semi_structured_mesh()) {
-                if (!to_space->has_semi_structured_mesh()) {
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
-
-                                auto &ssm = from_space->semi_structured_mesh();
-                                sshex8_hierarchical_restriction(ssm.level(),
-                                                                ssm.n_elements(),
-                                                                ssm.element_data(),
-                                                                element_to_node_incidence_count->data(),
-                                                                block_size,
-                                                                from,
-                                                                to);
-                            },
-                            EXECUTION_SPACE_HOST);
-                } else {
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("sshex8_restrict");
-
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
-
-                                sshex8_restrict(from_ssm.n_elements(),    // nelements,
-                                                from_ssm.level(),         // from_level
-                                                1,                        // from_level_stride
-                                                from_ssm.element_data(),  // from_elements
-                                                element_to_node_incidence_count->data(),
-                                                to_ssm.level(),         // to_level
-                                                1,                      // to_level_stride
-                                                to_ssm.element_data(),  // to_elements
-                                                block_size,             // vec_size
-                                                from,
-                                                to);
-                            },
-                            EXECUTION_SPACE_HOST);
-                }
-            } else {
-                return make_op<real_t>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("hierarchical_restriction_with_counting");
-
-                            hierarchical_restriction_with_counting(from_element,
-                                                                   to_element,
-                                                                   from_space->mesh().n_elements(),
-                                                                   from_space->mesh().elements()->data(),
-                                                                   element_to_node_incidence_count->data(),
-                                                                   block_size,
-                                                                   from,
-                                                                   to);
-                        },
-                        EXECUTION_SPACE_HOST);
-            }
-        }
+        return sfem::Restrict<real_t>::create(from_space, to_space, es, from_space->block_size());
     }
 
     static std::shared_ptr<Operator<real_t>> create_hierarchical_restriction_from_graph(
@@ -1346,6 +1161,11 @@ namespace sfem {
                                                        sfem::manage_host_buffer(n_surf_elements, side_idx));
 
         return sideset;
+    }
+
+    static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
+        return make_in_place_op<real_t>(
+                f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
     }
 
 }  // namespace sfem
