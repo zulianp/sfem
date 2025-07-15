@@ -178,9 +178,7 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT wg,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -374,9 +372,9 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
             // Invert sign since distance field is negative inside and positive outside
 
             atomicAdd(&wg[ev[v]], -element_gap[v]);
-            atomicAdd(&xnormal[ev[v]], element_xnormal[v]);
-            atomicAdd(&ynormal[ev[v]], element_ynormal[v]);
-            atomicAdd(&znormal[ev[v]], element_znormal[v]);
+            atomicAdd(&normals[0][ev[v]], element_xnormal[v]);
+            atomicAdd(&normals[1][ev[v]], element_ynormal[v]);
+            atomicAdd(&normals[2][ev[v]], element_znormal[v]);
         }
     }
 }
@@ -395,9 +393,7 @@ extern "C" int cu_quadshell4_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    data,
         // Output
         real_t* const SFEM_RESTRICT wg,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -405,7 +401,7 @@ extern "C" int cu_quadshell4_resample_gap_local(
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_gap_local_kernel<<<n_blocks, block_size, 0>>>(
-            nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
+            nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -718,9 +714,7 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
     const real_t oz = (real_t)origin[2];
@@ -769,6 +763,7 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                 const real_t measure = cu_quadshell4_measure(
                         x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3], qx[q_ix], qx[q_iy]);
 
+                assert(measure != 0);
                 assert(measure > 0);
 
                 real_t g_qx, g_qy, g_qz;
@@ -889,9 +884,9 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
         }
 
         for (int v = 0; v < 4; ++v) {
-            atomicAdd(&xnormal[ev[v]], element_xnormal[v]);
-            atomicAdd(&ynormal[ev[v]], element_ynormal[v]);
-            atomicAdd(&znormal[ev[v]], element_znormal[v]);
+            atomicAdd(&normals[0][ev[v]], element_xnormal[v]);
+            atomicAdd(&normals[1][ev[v]], element_ynormal[v]);
+            atomicAdd(&normals[2][ev[v]], element_znormal[v]);
         }
     }
 }
@@ -909,9 +904,7 @@ extern "C" int cu_quadshell4_resample_gap_normals_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -919,7 +912,7 @@ extern "C" int cu_quadshell4_resample_gap_normals_local(
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
     cu_quadshell4_resample_gap_normals_local_kernel<<<n_blocks, block_size, 0>>>(
-            nelements, nnodes, elems, xyz, n, stride, origin, delta, data, xnormal, ynormal, znormal);
+            nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;

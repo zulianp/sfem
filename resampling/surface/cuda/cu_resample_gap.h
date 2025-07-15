@@ -25,10 +25,8 @@ int cu_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal);
+        real_t* const SFEM_RESTRICT  wg,
+        real_t** const SFEM_RESTRICT normals);
 
 int cu_resample_gap(
         // Mesh
@@ -44,10 +42,8 @@ int cu_resample_gap(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal);
+        real_t* const SFEM_RESTRICT  g,
+        real_t** const SFEM_RESTRICT normals);
 
 int cu_resample_gap_value_local(
         // Mesh
@@ -94,9 +90,7 @@ int cu_resample_gap_normals(  // Mesh
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal);
+        real_t** const SFEM_RESTRICT normals);
 
 int cu_resample_weight_local(
         // Mesh
@@ -108,10 +102,7 @@ int cu_resample_weight_local(
         // Output
         real_t* const SFEM_RESTRICT w);
 
-int cu_normalize(const ptrdiff_t             nnodes,
-                 real_t* const SFEM_RESTRICT xnormal,
-                 real_t* const SFEM_RESTRICT ynormal,
-                 real_t* const SFEM_RESTRICT znormal);
+int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals);
 
 #ifdef __cplusplus
 }

@@ -282,6 +282,7 @@ namespace sfem {
             if (EXECUTION_SPACE_DEVICE == this->execution_space) {
                 // FIXME: maybe this could be optimized by avoiding deallocating and allocating the buffer
                 surface_points_rest_device = to_device(surface_points);
+                surface_points_device = to_device(surface_points);
             }
 #endif
         }
@@ -406,7 +407,6 @@ namespace sfem {
         if (es == EXECUTION_SPACE_DEVICE) {
             ret->impl_->sides_device          = to_device(ret->impl_->sides);
             ret->impl_->node_mapping_device   = to_device(ret->impl_->node_mapping);
-            ret->impl_->surface_points_device = to_device(ret->impl_->surface_points);
         }
 #endif
 

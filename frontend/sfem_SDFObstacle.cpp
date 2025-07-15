@@ -67,9 +67,7 @@ namespace sfem {
                     sdf->data(),
                     // Output
                     gap,
-                    normals[0],
-                    normals[1],
-                    normals[2]);
+                    normals);
         }
 #endif
         return resample_gap(
@@ -116,9 +114,7 @@ namespace sfem {
                     sdf->delta(),
                     sdf->data(),
                     // Output
-                    normals[0],
-                    normals[1],
-                    normals[2]);
+                    normals);
         }
 #endif
         return resample_gap_normals(
