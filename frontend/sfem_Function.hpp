@@ -17,7 +17,7 @@
 // #include "isolver_function.h"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_Operator.hpp"
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Mesh.hpp"

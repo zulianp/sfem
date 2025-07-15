@@ -130,11 +130,11 @@ namespace sfem {
 
         class Memory {
         public:
-            SharedBuffer<T> rhs;
-            SharedBuffer<T> solution;
-            SharedBuffer<T> work;
-            SharedBuffer<T> diag;
-            inline ptrdiff_t           size() const { return solution->size(); }
+            SharedBuffer<T>  rhs;
+            SharedBuffer<T>  solution;
+            SharedBuffer<T>  work;
+            SharedBuffer<T>  diag;
+            inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
 
@@ -478,8 +478,8 @@ namespace sfem {
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
             if (constraints_op_) {
-                return operator_[level] +
-                       sfem::create_sparse_block_vector_mult(constraints_op_x_op_[level], memory_[level]->diag);
+                return operator_[level] + sfem::create_sparse_block_vector_mult(
+                                                  operator_[level]->rows(), constraints_op_x_op_[level], memory_[level]->diag);
             } else {
                 return operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
             }

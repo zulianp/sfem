@@ -85,7 +85,7 @@ namespace sfem {
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
                                   const SharedBuffer<T>&            diag) override {
             assert(execution_space() == (enum ExecutionSpace)diag->mem_space());
-            this->apply_op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
+            this->apply_op = op + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
 
             if (preconditioner_op) {
                 auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner_op);
