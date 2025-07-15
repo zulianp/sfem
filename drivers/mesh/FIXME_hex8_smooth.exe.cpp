@@ -62,7 +62,7 @@ std::shared_ptr<sfem::Buffer<real_t>> solve(const std::shared_ptr<sfem::Function
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
     cg->set_max_it(1000);

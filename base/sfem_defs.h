@@ -13,6 +13,15 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
+typedef const char* OperatorType;
+static OperatorType MATRIX_FREE = "MF";
+static OperatorType CRS = "CRS";
+static OperatorType CRS_SYM = "CRS_SYM";
+static OperatorType BSR = "BSR";
+static OperatorType BSR_SYM = "BSR_SYM";
+static OperatorType COO_SYM = "COO_SYM";
+
+
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
 
 typedef enum {

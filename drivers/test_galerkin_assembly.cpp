@@ -72,8 +72,8 @@ int main(int argc, char *argv[]) {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     int SFEM_PRINT_VECTORS = 0;
     int SFEM_SKIP_VERIFICATION = 0;
-    const char * SFEM_FINE_OP_TYPE = "MF";
-    const char * SFEM_COARSE_OP_TYPE = "MF";
+    const char * SFEM_FINE_OP_TYPE = MATRIX_FREE;
+    const char * SFEM_COARSE_OP_TYPE = MATRIX_FREE;
 
     SFEM_READ_ENV(SFEM_OPERATOR, );
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);

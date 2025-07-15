@@ -819,7 +819,7 @@ int main(int argc, char *argv[]) {
     auto                                 conds = sfem::create_dirichlet_conditions(fs, {prescribed_normal}, es);
     f->add_constraint(conds);
 
-    auto linear_op     = sfem::create_linear_operator("CRS", f, nullptr, es);
+    auto linear_op     = sfem::create_linear_operator(CRS, f, nullptr, es);
     auto linear_solver = sfem::create_cg<real_t>(linear_op, es);
 
     auto rhs        = sfem::create_host_buffer<real_t>(fs->n_dofs());

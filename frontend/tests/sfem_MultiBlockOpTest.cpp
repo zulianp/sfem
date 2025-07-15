@@ -18,7 +18,7 @@ int test_multi_block_op() {
     op->initialize();
     f->add_operator(op);
     
-    auto lop = sfem::create_linear_operator("MF", f, nullptr, f->execution_space());
+    auto lop = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, f->execution_space());
 
     auto cg = sfem::create_cg(lop, f->execution_space());
     auto x = sfem::create_buffer<real_t>(space->n_dofs(), f->execution_space());

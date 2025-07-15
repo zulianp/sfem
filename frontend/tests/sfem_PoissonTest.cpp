@@ -14,7 +14,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
 
     std::shared_ptr<sfem::Operator<real_t>> bjacobi;
     auto                                    diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -169,7 +169,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
 

@@ -220,7 +220,7 @@ int test_newmark() {
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
             // We will do nonlinear materials next, so we keep it here.
-            auto material_op = sfem::create_linear_operator("MF", f, solution, es);
+            auto material_op = sfem::create_linear_operator(MATRIX_FREE, f, solution, es);
             auto linear_op   = sfem::make_op<real_t>(
                     material_op->rows(),
                     material_op->cols(),
