@@ -48,8 +48,8 @@ namespace sfem {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
-        const char *SFEM_FINE_OP_TYPE = "MF";
-        const char *SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? "COO_SYM" : "BCRS_SYM";
+        const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;
+        const char *SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? COO_SYM : BSR_SYM;
 
         SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
         SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );

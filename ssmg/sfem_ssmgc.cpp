@@ -31,7 +31,7 @@ namespace sfem {
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
 
-        auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+        auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
         sp->set_op(linear_op);
         sp->default_init();
 
@@ -394,9 +394,9 @@ namespace sfem {
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
-            std::string coarse_op_type = es == EXECUTION_SPACE_HOST ? "BSR" : "MF";
+            std::string coarse_op_type = es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE;
             std::string debug_folder   = "debug_ssmgc";
-            std::string fine_op_type   = "MF";
+            std::string fine_op_type   = MATRIX_FREE;
 
             if (in) {
                 printf("SPMG: Reading Input\n");

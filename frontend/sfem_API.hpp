@@ -1194,25 +1194,25 @@ namespace sfem {
                                                                           const std::shared_ptr<sfem::Function>       &f,
                                                                           const std::shared_ptr<sfem::Buffer<real_t>> &x,
                                                                           enum sfem::ExecutionSpace                    es) {
-        if (format == "MF") {
+        if (format == MATRIX_FREE) {
             return sfem::make_linear_op(f);
         }
 
         if (f->space()->block_size() == 1) {
-            if (format == "CRS_SYM")
+            if (format == CRS_SYM)
                 return sfem::hessian_crs_sym(f, nullptr, es);
-            else if (format == "COO_SYM")
+            else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, nullptr, es);
 
-            if (format != "CRS") {
+            if (format != CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
             return sfem::hessian_crs(f, nullptr, es);
         }
 
-        if (format == "BSR") return sfem::hessian_bsr(f, nullptr, es);
-        if (format != "BCRS_SYM") {
+        if (format == BSR) return sfem::hessian_bsr(f, nullptr, es);
+        if (format != BSR_SYM) {
             fprintf(stderr, "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n", format.c_str());
         }
 

@@ -62,8 +62,8 @@ int main(int argc, char *argv[]) {
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     const char *SFEM_OPERATOR = "Laplacian";
-    const char *SFEM_FINE_OP_TYPE = "MF";
-    const char *SFEM_COARSE_OP_TYPE = "MF";
+    const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
 
     int SFEM_BLOCK_SIZE = 1;
     int SFEM_USE_PRECONDITIONER = 0;
