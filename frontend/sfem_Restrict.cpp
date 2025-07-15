@@ -7,6 +7,11 @@
 #include "sshex8.h"
 #include "ssquad4_interpolate.h"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "cu_sshex8_interpolate.h"
+#include "cu_ssquad4_interpolate.h"
+#endif
+
 namespace sfem {
 
     template <typename T>
@@ -337,7 +342,7 @@ namespace sfem {
                                     1,
                                     y,
                                     SFEM_DEFAULT_STREAM);
-                return;
+                return SFEM_SUCCESS;
             }
 #endif
             ssquad4_restrict(from_sides->extent(1),
