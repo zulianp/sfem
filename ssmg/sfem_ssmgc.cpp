@@ -178,7 +178,7 @@ namespace sfem {
 
                 auto hg = sfem::create_host_buffer<T>(upper_bound->size());
                 contact_conds->update_signed_distance(hdisp->data(), hg->data());
-                buffer_host_to_device(hg->size() * sizeof(T), (void*)hg->data(), (void*)upper_bound->data());
+                buffer_host_to_device(hg->size() * sizeof(T), (void *)hg->data(), (void *)upper_bound->data());
             } else
 #endif
             {
@@ -254,106 +254,35 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_CUDA
                 if (es == EXECUTION_SPACE_DEVICE) {
-                    assert(fine->sides->mem_space() == MEMORY_SPACE_DEVICE);
-
                     fine->count   = sfem::to_device(fine->count);
                     coarse->sides = sfem::to_device(coarse->sides);
                     coarse->sbv   = sfem::to_device(coarse->sbv);
-
-                    auto op = sfem::make_op<T>(
-                            coarse->mapping->size() * sym_block_size,
-                            fine->mapping->size() * sym_block_size,
-                            [coarse, fine, sym_block_size, level, coarse_level](const T *const from, T *const to) {
-                                SFEM_TRACE_SCOPE("ssquad4_restrict(sbv)");
-
-                                cu_ssquad4_restrict(fine->sides->extent(1),
-                                                    level,
-                                                    1,
-                                                    fine->sides->data(),
-                                                    fine->count->data(),
-                                                    coarse_level,
-                                                    1,
-                                                    coarse->sides->data(),
-                                                    sym_block_size,
-                                                    SFEM_REAL_DEFAULT,
-                                                    1,
-                                                    fine->sbv->data()->data(),
-                                                    SFEM_REAL_DEFAULT,
-                                                    1,
-                                                    coarse->sbv->data()->data(),
-                                                    SFEM_DEFAULT_STREAM);
-                            },
-                            es);
-                    restrict_sbv.push_back(op);
-
-                } else
-#endif
-                {
-                    auto op = sfem::make_op<T>(
-                            coarse->mapping->size() * sym_block_size,
-                            fine->mapping->size() * sym_block_size,
-                            [coarse, fine, sym_block_size, level, coarse_level](const T *const from, T *const to) {
-                                SFEM_TRACE_SCOPE("ssquad4_restrict(sbv)");
-
-                                ssquad4_restrict(fine->sides->extent(1),  // nelements
-                                                 level,                   // from_level
-                                                 1,                       // from_level_stride
-                                                 fine->sides->data(),     // from_elements
-                                                 fine->count->data(),     // from_element_to_node_incidence_count
-                                                 coarse_level,            // to_level
-                                                 1,                       // to_level_stride
-                                                 coarse->sides->data(),   // to_elements
-                                                 sym_block_size,          // vec_size
-                                                 fine->sbv->data()->data(),
-                                                 coarse->sbv->data()->data());
-                            },
-                            es);
-                    restrict_sbv.push_back(op);
                 }
-
-                auto c_restriction = sfem::make_op<T>(
-                        coarse->mapping->size(),
-                        fine->mapping->size(),
-                        [fine, coarse, level, coarse_level, es](const T *const from, T *const to) {
-                            SFEM_TRACE_SCOPE("ssquad4_restrict");
-
-// TODO check (cu_)ssquad4_restrict implementations
-#ifdef SFEM_ENABLE_CUDA
-                            if (es == EXECUTION_SPACE_DEVICE) {
-                                cu_ssquad4_restrict(fine->sides->extent(1),
-                                                    level,
-                                                    1,
-                                                    fine->sides->data(),
-                                                    fine->count->data(),
-                                                    coarse_level,
-                                                    1,
-                                                    coarse->sides->data(),
-                                                    1,
-                                                    SFEM_REAL_DEFAULT,
-                                                    1,
-                                                    from,
-                                                    SFEM_REAL_DEFAULT,
-                                                    1,
-                                                    to,
-                                                    SFEM_DEFAULT_STREAM);
-                                return;
-                            }
 #endif
-                            ssquad4_restrict(fine->sides->extent(1),  // nelements
-                                             level,                   // from_level
-                                             1,                       // from_level_stride
-                                             fine->sides->data(),     // from_elements
-                                             fine->count->data(),     // from_element_to_node_incidence_count
-                                             coarse_level,            // to_level
-                                             1,                       // to_level_stride
-                                             coarse->sides->data(),   // to_elements
-                                             1,                       // vec_size
-                                             from,
-                                             to);
-                        },
-                        es);
 
-                restrict_penalization.push_back(c_restriction);
+                restrict_sbv.push_back(SurfaceRestrict<real_t>::create(level,
+                                                                       fine_space->element_type(),
+                                                                       fine->mapping->size(),
+                                                                       fine->sides,
+                                                                       fine->count,
+                                                                       coarse_level,
+                                                                       coarse_space->element_type(),
+                                                                       coarse->mapping->size(),
+                                                                       coarse->sides,
+                                                                       es,
+                                                                       sym_block_size));
+
+                restrict_penalization.push_back(SurfaceRestrict<real_t>::create(level,
+                                                                                fine_space->element_type(),
+                                                                                fine->mapping->size(),
+                                                                                fine->sides,
+                                                                                fine->count,
+                                                                                coarse_level,
+                                                                                coarse_space->element_type(),
+                                                                                coarse->mapping->size(),
+                                                                                coarse->sides,
+                                                                                es,
+                                                                                1));
             }
         }
 
@@ -631,8 +560,8 @@ namespace sfem {
             mg->set_nlsmooth_steps(nlsmooth_steps);
 
             if (SFEM_ENABLE_NL_OBSTACLE) {
-                mg->set_update_constraints([that = this](const T *const disp) { 
-                    that->update_contact(disp); 
+                mg->set_update_constraints([that = this](const T *const disp) {
+                    that->update_contact(disp);
                     that->restrict_contact_constraints();
                 });
             }
