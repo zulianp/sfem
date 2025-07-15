@@ -89,19 +89,19 @@ int main(int argc, char *argv[]) {
         auto m = sfem::Mesh::create_hex8_cube(
                 comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
-        std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = "MF", .block_size = 1},
-                                   {.name = "LinearElasticity", .type = "MF", .block_size = 3},
-                                   {.name = "LinearElasticity", .type = "BSR", .block_size = 3}});
+        std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
+                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = 3},
+                                   {.name = "LinearElasticity", .type = BSR, .block_size = 3}});
 
         std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
             ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
 
-            ops.push_back({.name = "em:Laplacian", .type = "MF", .block_size = 1});
+            ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
         } else {
-            ops.push_back({.name = "Laplacian", .type = "CRS", .block_size = 1});
-            ops.push_back({.name = "Mass", .type = "MF", .block_size = 1});
-            ops.push_back({.name = "LumpedMass", .type = "MF", .block_size = 1});
+            ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
+            ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+            ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
         }
 
         for (auto &op_desc : ops) {

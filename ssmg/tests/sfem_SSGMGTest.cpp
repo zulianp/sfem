@@ -64,8 +64,8 @@ int test_ssgmg_poisson_cube() {
 
     const char *SFEM_OPERATOR = "Laplacian";
     // const char *SFEM_OPERATOR       = "em:Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = "MF";
-    const char *SFEM_COARSE_OP_TYPE = "MF";
+    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -74,7 +74,16 @@ int test_ssgmg_poisson_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          Lx,
+                                          1,
+                                          1);
 
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
@@ -113,8 +122,8 @@ int test_ssgmg_linear_elasticity_cube() {
     }
 
     const char *SFEM_OPERATOR       = "LinearElasticity";
-    const char *SFEM_FINE_OP_TYPE   = "MF";
-    const char *SFEM_COARSE_OP_TYPE = "MF";
+    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
 
     SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
@@ -126,7 +135,16 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          Lx,
+                                          1,
+                                          1);
 
     int  block_size = 3;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
