@@ -18,10 +18,8 @@ extern "C" int cu_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t* const SFEM_RESTRICT  wg,
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
     enum ElemType st = shell_type(element_type);
@@ -34,8 +32,7 @@ extern "C" int cu_resample_gap_local(
         //     return cu_beam2_resample_gap_local(
         //             nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
         case QUADSHELL4: {
-            return cu_quadshell4_resample_gap_local(
-                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
+            return cu_quadshell4_resample_gap_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, normals);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from  element_type: %d\n", st, element_type);
@@ -115,19 +112,16 @@ extern "C" int cu_resample_gap(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT g,
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t* const SFEM_RESTRICT  g,
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
     enum ElemType st = shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
     int err = 0;
-    err     = cu_resample_gap_local(
-                  st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xnormal, ynormal, znormal) ||
-          rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g) || cu_normalize(nnodes, xnormal, ynormal, znormal);
+    err     = cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals) ||
+          rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g) || cu_normalize(nnodes, normals);
 
     return err;
 }
@@ -199,9 +193,7 @@ extern "C" int cu_resample_gap_normals_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
     enum ElemType st = shell_type(element_type);
@@ -209,7 +201,7 @@ extern "C" int cu_resample_gap_normals_local(
     switch (st) {
         case QUADSHELL4: {
             return cu_quadshell4_resample_gap_normals_local(
-                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, xnormal, ynormal, znormal);
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from element_type: %d\n", st, element_type);
@@ -218,29 +210,23 @@ extern "C" int cu_resample_gap_normals_local(
     }
 }
 
-__global__ void cu_normalize_kernel(const ptrdiff_t             nnodes,
-                                    real_t* const SFEM_RESTRICT xnormal,
-                                    real_t* const SFEM_RESTRICT ynormal,
-                                    real_t* const SFEM_RESTRICT znormal) {
+__global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x; i < nnodes; i += gridDim.x * blockDim.x) {
-        real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
-        xnormal[i] /= denom;
-        ynormal[i] /= denom;
-        znormal[i] /= denom;
+        real_t denom = sqrt(normals[0][i] * normals[0][i] + normals[1][i] * normals[1][i] + normals[2][i] * normals[2][i]);
+        normals[0][i] /= denom;
+        normals[1][i] /= denom;
+        normals[2][i] /= denom;
     }
 }
 
-extern "C" int cu_normalize(const ptrdiff_t             nnodes,
-                            real_t* const SFEM_RESTRICT xnormal,
-                            real_t* const SFEM_RESTRICT ynormal,
-                            real_t* const SFEM_RESTRICT znormal) {
+extern "C" int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
     if (!nnodes) return SFEM_SUCCESS;
 
     SFEM_DEBUG_SYNCHRONIZE();
 
     int             block_size = 128;
     const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
-    cu_normalize_kernel<<<n_blocks, block_size, 0>>>(nnodes, xnormal, ynormal, znormal);
+    cu_normalize_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
 
     SFEM_DEBUG_SYNCHRONIZE();
     return SFEM_SUCCESS;
@@ -260,23 +246,10 @@ extern "C" int cu_resample_gap_normals(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT xnormal,
-        real_t* const SFEM_RESTRICT ynormal,
-        real_t* const SFEM_RESTRICT znormal) {
+        real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    return cu_resample_gap_normals_local(shell_type(element_type),
-                                         nelements,
-                                         nnodes,
-                                         elems,
-                                         xyz,
-                                         n,
-                                         stride,
-                                         origin,
-                                         delta,
-                                         data,
-                                         xnormal,
-                                         ynormal,
-                                         znormal) ||
-           cu_normalize(nnodes, xnormal, ynormal, znormal);
+    return cu_resample_gap_normals_local(
+                   shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals) ||
+           cu_normalize(nnodes, normals);
 }
