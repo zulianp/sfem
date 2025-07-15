@@ -98,6 +98,22 @@ namespace sfem {
     }
 
     template <typename T>
+    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+#endif  // SFEM_ENABLE_CUDA
+        return sfem::create_host_buffer<T>(n0, n1);
+    }
+
+    template <typename T>
+    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
+#endif  // SFEM_ENABLE_CUDA
+        return sfem::create_host_buffer<T>(n0, n1);
+    }
+
+    template <typename T>
     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n);
@@ -1165,7 +1181,9 @@ namespace sfem {
 
     static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
         return make_in_place_op<real_t>(
-                f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
+                f->space()->n_dofs(),
+                [=](real_t *const x) { f->apply_zero_constraints(x); },
+                f->execution_space());
     }
 
 }  // namespace sfem
