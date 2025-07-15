@@ -1,12 +1,16 @@
 #include "sfem_Grid.hpp"
-#include "sfem_Input.hpp"
 #include "sfem_Communicator.hpp"
+#include "sfem_Input.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "sfem_glob.hpp"
 #include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
 
 #include <fstream>
 #include <sstream>
@@ -17,9 +21,9 @@ namespace sfem {
     class Grid<T>::Impl {
     public:
         std::shared_ptr<Communicator> comm;
-        std::shared_ptr<Buffer<T>> field;
-        int                        block_size{1};
-        int                        spatial_dimension{3};
+        std::shared_ptr<Buffer<T>>    field;
+        int                           block_size{1};
+        int                           spatial_dimension{3};
 
         ptrdiff_t nlocal[3];
         ptrdiff_t nglobal[3];
@@ -28,6 +32,8 @@ namespace sfem {
         // Grid geometry
         geom_t origin[3];
         geom_t delta[3];
+
+        enum MemorySpace mem_space{MEMORY_SPACE_HOST};
     };
 
     template <class T>
@@ -53,7 +59,7 @@ namespace sfem {
     }
 
     template <class T>
-    Grid<T>::Grid(const std::shared_ptr<Communicator>& comm) : impl_(std::make_unique<Impl>()) {
+    Grid<T>::Grid(const std::shared_ptr<Communicator> &comm) : impl_(std::make_unique<Impl>()) {
         impl_->comm = comm;
     }
 
@@ -61,7 +67,7 @@ namespace sfem {
     Grid<T>::~Grid() = default;
 
     template <class T>
-    std::shared_ptr<Grid<T>> Grid<T>::create_from_file(const std::shared_ptr<Communicator>& comm, const std::string &path) {
+    std::shared_ptr<Grid<T>> Grid<T>::create_from_file(const std::shared_ptr<Communicator> &comm, const std::string &path) {
         auto ret = std::make_unique<Grid<T>>(comm);
         auto in  = YAMLNoIndent::create_from_file(path + "/meta.yaml");
 
@@ -128,7 +134,8 @@ namespace sfem {
         std::stringstream ss;
 
         std::string field_path;
-        ss << "path: " << "sdf.raw\n";
+        ss << "path: "
+           << "sdf.raw\n";
         ss << "spatial_dimension: " << impl_->spatial_dimension << "\n";
         ss << "nx: " << impl_->nglobal[0] << "\n";
         ss << "ox: " << impl_->origin[0] << "\n";
@@ -218,16 +225,16 @@ namespace sfem {
     }
 
     template <class T>
-    std::shared_ptr<Grid<T>> Grid<T>::create(const std::shared_ptr<Communicator>& comm,
-                                             const ptrdiff_t nx,
-                                             const ptrdiff_t ny,
-                                             const ptrdiff_t nz,
-                                             const geom_t    xmin,
-                                             const geom_t    ymin,
-                                             const geom_t    zmin,
-                                             const geom_t    xmax,
-                                             const geom_t    ymax,
-                                             const geom_t    zmax) {
+    std::shared_ptr<Grid<T>> Grid<T>::create(const std::shared_ptr<Communicator> &comm,
+                                             const ptrdiff_t                      nx,
+                                             const ptrdiff_t                      ny,
+                                             const ptrdiff_t                      nz,
+                                             const geom_t                         xmin,
+                                             const geom_t                         ymin,
+                                             const geom_t                         zmin,
+                                             const geom_t                         xmax,
+                                             const geom_t                         ymax,
+                                             const geom_t                         zmax) {
         auto ret = std::make_unique<Grid<T>>(comm);
 
         auto &impl = ret->impl_;
@@ -263,11 +270,35 @@ namespace sfem {
         return ret;
     }
 
-    // Explicit instantiation
-    template class Grid<float>;
-    template class Grid<double>;
+    template<typename T>
+    enum MemorySpace Grid<T>::mem_space() const
+    {
+        return impl_->mem_space;
+    }
 
-    std::shared_ptr<Grid<geom_t>> create_sdf(const std::shared_ptr<Communicator>& comm,
+#ifdef SFEM_ENABLE_CUDA
+    template<typename T>
+    std::shared_ptr<Grid<T>> Grid<T>::to_device() const {
+        auto ret = std::make_shared<Grid<T>>(impl_->comm);
+
+        ret->impl_->field             = sfem::to_device(impl_->field);
+        ret->impl_->block_size        = impl_->block_size;
+        ret->impl_->spatial_dimension = impl_->spatial_dimension;
+
+        for (int d = 0; d < 3; d++) {
+            ret->impl_->nlocal[d]  = impl_->nlocal[d];
+            ret->impl_->nglobal[d] = impl_->nglobal[d];
+            ret->impl_->stride[d]  = impl_->stride[d];
+            ret->impl_->origin[d]  = impl_->origin[d];
+            ret->impl_->delta[d]   = impl_->delta[d];
+        }
+
+        ret->impl_->mem_space = MEMORY_SPACE_DEVICE;
+        return ret;
+    }
+#endif // SFEM_ENABLE_CUDA
+
+    std::shared_ptr<Grid<geom_t>> create_sdf(const std::shared_ptr<Communicator>                            &comm,
                                              const ptrdiff_t                                                 nx,
                                              const ptrdiff_t                                                 ny,
                                              const ptrdiff_t                                                 nz,
@@ -304,4 +335,10 @@ namespace sfem {
 
         return g;
     }
+
+
+        // Explicit instantiation
+    template class Grid<float>;
+    template class Grid<double>;
+
 }  // namespace sfem

@@ -348,8 +348,6 @@ namespace sfem {
     std::unique_ptr<SSMeshContactSurface> SSMeshContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
-        assert(es == sfem::EXECUTION_SPACE_HOST);
-
         auto &ssmesh = space->semi_structured_mesh();
 
         if (sidesets.size() > 1) {

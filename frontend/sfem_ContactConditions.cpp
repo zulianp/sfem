@@ -375,7 +375,6 @@ namespace sfem {
             cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        // cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
         cc->impl_->normals = create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
         cc->impl_->assemble_mass_vector();
         cc->impl_->blas_           = sfem::blas<real_t>(es);
@@ -549,6 +548,11 @@ namespace sfem {
         for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+                assert(is_ptr_device(cs->elements_device()->data()));
+                assert(is_ptr_device(cs->points_device()->data()));
+                assert(is_ptr_device(cs->node_mapping_device()->data()));
+                assert(is_ptr_device(impl_->normals->data()));
+
                 err += obs->sample_normals(cs->element_type(),
                                            cs->elements()->extent(1),
                                            cs->node_mapping_device()->size(),
