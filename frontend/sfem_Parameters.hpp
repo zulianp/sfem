@@ -4,6 +4,9 @@
 #include "sfem_base.h"
 
 #include <memory>
+#include <tuple>
+#include <string>
+#include <memory>
 
 namespace sfem {
 

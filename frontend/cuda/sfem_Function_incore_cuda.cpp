@@ -98,6 +98,14 @@ namespace sfem {
         return std::make_shared<Sideset>(sideset->comm(), to_device(sideset->parent()), to_device(sideset->lfi()));
     }
 
+    std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss) {
+        std::vector<std::shared_ptr<Sideset>> ret;
+        for (const auto &s : ss) {
+            ret.push_back(to_device(s));
+        }
+        return ret;
+    }
+
     template <typename T>
     std::shared_ptr<Buffer<T>> manage_device_buffer(const ptrdiff_t n, T *data) {
         return Buffer<T>::own(n, data, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
@@ -199,7 +207,7 @@ namespace sfem {
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) : space(dc->space()), h_dirichlet(dc) {
             for (auto &c : dc->conditions()) {
-                DirichletConditions::Condition cond{.sideset   = (c.sideset) ? to_device(c.sideset) : nullptr,
+                DirichletConditions::Condition cond{.sidesets   = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
                                                     .nodeset   = to_device(c.nodeset),
                                                     .values    = (c.values) ? to_device(c.values) : nullptr,
                                                     .value     = c.value,
@@ -294,7 +302,7 @@ namespace sfem {
         GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
             for (auto &c : nc->conditions()) {
                 NeumannConditions::Condition cond{.element_type = c.element_type,
-                                                  .sideset      = (c.sideset) ? to_device(c.sideset) : nullptr,
+                                                  .sidesets      = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
                                                   .surface      = to_device(c.surface),
                                                   .values       = (c.values) ? to_device(c.values) : nullptr,
                                                   .value        = c.value,
