@@ -727,8 +727,7 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
     static const scalar_t qw[6] = {0.08566224619, 0.1803807865, 0.2339569673, 0.2339569673, 0.1803807865, 0.08566224619};
 
-#pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
