@@ -420,7 +420,7 @@ namespace sfem {
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
         void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
-        void set_debug(const bool val) { debug = val; }
+        void set_debug(const int val) { debug = val; }
         void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
         void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
         void set_enable_shift(const bool val) { enable_shift = val; }
@@ -500,6 +500,16 @@ namespace sfem {
             const T* const ub   = (upper_bound_) ? upper_bound_->data() : nullptr;
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
+
+            if(debug > 1) {
+                printf("Residual: %g\n", blas_.norm2(n_dofs, mem->work->data()));
+                if(ub) {
+                    printf("UB: %g, LUB %g\n", blas_.norm2(n_constrained_dofs, ub), blas_.norm2(n_constrained_dofs, l_ub));
+                }
+                if(lb) {
+                    printf("LB: %g, LLB %g\n", blas_.norm2(n_constrained_dofs, lb), blas_.norm2(n_constrained_dofs, l_lb));
+                }
+            }
 
             if (constraints_op_) {
                 // Jacobian
@@ -725,7 +735,6 @@ namespace sfem {
                 }
 
                 CycleReturnCode ret = cycle(coarser_level(level));
-                assert(ret != CYCLE_FAILURE);
 
                 {
                     // Prolongation
@@ -829,7 +838,7 @@ namespace sfem {
         T    penetration_tol_exp{0.9};
         bool enable_shift{true};
 
-        bool                      debug{false};
+        int                      debug{0};
         std::vector<struct Stats> stats;
 
         BLAS_Tpl<T>           blas_;
