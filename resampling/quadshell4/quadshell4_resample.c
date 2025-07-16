@@ -222,7 +222,7 @@ int quadshell4_resample_gap_local(
     static const scalar_t* const qw   = line_q6_w;
 
 #pragma omp parallel for  // nowait
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -239,7 +239,7 @@ int quadshell4_resample_gap_local(
         real_t element_znormal[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -430,7 +430,7 @@ int quadshell4_resample_weight_local(
     static const scalar_t* const qw   = line_q6_w;
 
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -439,7 +439,7 @@ int quadshell4_resample_weight_local(
         real_t element_weight[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -535,7 +535,7 @@ int quadshell4_resample_gap_value_local(
     static const scalar_t* const qw   = line_q6_w;
 
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -547,7 +547,7 @@ int quadshell4_resample_gap_value_local(
 
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -706,7 +706,7 @@ int quadshell4_resample_gap_normals_local(
     static const scalar_t* const qw   = line_q6_w;
 
 #pragma omp parallel for
-    for (ptrdiff_t i = 0; i < nelements; ++i) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -721,7 +721,7 @@ int quadshell4_resample_gap_normals_local(
         real_t element_znormal[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -846,6 +846,7 @@ int quadshell4_resample_gap_normals_local(
                         eval_ynormal /= denom;
                         eval_znormal /= denom;
                     }
+
 
 #pragma unroll(4)
                     for (int edof_i = 0; edof_i < 4; edof_i++) {

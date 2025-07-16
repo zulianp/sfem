@@ -211,11 +211,18 @@ extern "C" int cu_resample_gap_normals_local(
 }
 
 __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x; i < nnodes; i += gridDim.x * blockDim.x) {
-        real_t denom = sqrt(normals[0][i] * normals[0][i] + normals[1][i] * normals[1][i] + normals[2][i] * normals[2][i]);
-        normals[0][i] /= denom;
-        normals[1][i] /= denom;
-        normals[2][i] /= denom;
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nnodes; i += gridDim.x * blockDim.x) {
+        const real_t nx = normals[0][i];
+        const real_t ny = normals[1][i];
+        const real_t nz = normals[2][i];
+
+        const real_t denom = sqrt(nx * nx + ny * ny + nz * nz);
+        
+        if (denom > 0) {
+            normals[0][i] = nx / denom;
+            normals[1][i] = ny / denom;
+            normals[2][i] = nz / denom;
+        }
     }
 }
 
