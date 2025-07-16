@@ -613,7 +613,10 @@ namespace sfem {
                 penalty_pseudo_galerkin_assembly();
 
                 int ret = cycle(coarser_level(finest_level()));
-                assert(ret != CYCLE_FAILURE);
+                
+                if(ret == CYCLE_FAILURE) {
+                    fprintf(stderr, "Coarse level solver did not converge as desired!\n");
+                }
 
                 {
                     // Prolongation
