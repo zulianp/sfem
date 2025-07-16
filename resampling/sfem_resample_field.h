@@ -667,6 +667,20 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
                                                const real_t                         alpha_th,        // Threshold for alpha
                                                real_t* const SFEM_RESTRICT          data);
 
+int                                                                                                    //
+tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                      start_element,   // Mesh
+                                                 const ptrdiff_t                      end_element,     //
+                                                 const ptrdiff_t                      nnodes,          //
+                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                 const real_t                         alpha_th,        // Threshold for alpha
+                                                 real_t* const SFEM_RESTRICT          data);                    //
+
 /**
  * @brief
  *
@@ -684,19 +698,19 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
  * @param data
  * @return int
  */
-int                                                                                                   //
+int                                                                                                    //
 tet4_resample_field_local_ref_iter_adjoint_stack(const ptrdiff_t                      start_element,   // Mesh
-                                                const ptrdiff_t                      end_element,     //
-                                                const ptrdiff_t                      nnodes,          //
-                                                const idx_t** const SFEM_RESTRICT    elems,           //
-                                                const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                                                const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                                                const geom_t* const SFEM_RESTRICT    origin,          //
-                                                const geom_t* const SFEM_RESTRICT    delta,           //
-                                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                                const real_t                         alpha_th,        // Threshold for alpha
-                                                real_t* const SFEM_RESTRICT          data);                    //
+                                                 const ptrdiff_t                      end_element,     //
+                                                 const ptrdiff_t                      nnodes,          //
+                                                 const idx_t** const SFEM_RESTRICT    elems,           //
+                                                 const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                 const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                 const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                 const geom_t* const SFEM_RESTRICT    origin,          //
+                                                 const geom_t* const SFEM_RESTRICT    delta,           //
+                                                 const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
+                                                 const real_t                         alpha_th,        // Threshold for alpha
+                                                 real_t* const SFEM_RESTRICT          data);                    //
 
 /**
  * @brief Resample a field from a tetrahedral mesh to a structured grid (adjoint version).
