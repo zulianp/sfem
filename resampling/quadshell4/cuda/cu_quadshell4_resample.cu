@@ -177,7 +177,7 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg,
+        real_t* const SFEM_RESTRICT  wg,
         real_t** const SFEM_RESTRICT normals) {
     const real_t ox = (real_t)origin[0];
     const real_t oy = (real_t)origin[1];
@@ -191,7 +191,7 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
     static const scalar_t qw[6] = {0.08566224619, 0.1803807865, 0.2339569673, 0.2339569673, 0.1803807865, 0.08566224619};
 
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -208,7 +208,7 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
         real_t element_znormal[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -392,7 +392,7 @@ extern "C" int cu_quadshell4_resample_gap_local(
         const geom_t* const SFEM_RESTRICT    delta,
         const geom_t* const SFEM_RESTRICT    data,
         // Output
-        real_t* const SFEM_RESTRICT wg,
+        real_t* const SFEM_RESTRICT  wg,
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
@@ -421,7 +421,7 @@ __global__ void cu_quadshell4_resample_weight_local_kernel(
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
     static const scalar_t qw[6] = {0.08566224619, 0.1803807865, 0.2339569673, 0.2339569673, 0.1803807865, 0.08566224619};
 
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -429,7 +429,7 @@ __global__ void cu_quadshell4_resample_weight_local_kernel(
         real_t element_weight[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -541,7 +541,7 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
     static const scalar_t qw[6] = {0.08566224619, 0.1803807865, 0.2339569673, 0.2339569673, 0.1803807865, 0.08566224619};
 
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -552,7 +552,7 @@ __global__ void cu_quadshell4_resample_gap_value_local_kernel(
         real_t element_gap[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -727,7 +727,7 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
     static const scalar_t qx[6] = {0.03376524290, 0.1693953068, 0.3806904070, 0.6193095930, 0.8306046932, 0.9662347571};
     static const scalar_t qw[6] = {0.08566224619, 0.1803807865, 0.2339569673, 0.2339569673, 0.1803807865, 0.08566224619};
 
-    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nelements; i += blockDim.x * gridDim.x) {
+    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
         idx_t  ev[4];
         geom_t x[4], y[4], z[4];
 
@@ -742,7 +742,7 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
         real_t element_znormal[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elems[v][i];
+            ev[v] = elems[v][e];
         }
 
         for (int v = 0; v < 4; ++v) {
