@@ -1,6 +1,7 @@
 #include "sfem_ssmgc.hpp"
 
 #include "sfem_API.hpp"
+#include "sfem_Env.hpp"
 #include "ssquad4_interpolate.h"
 
 #include "lumped_ptdp.h"
@@ -311,7 +312,7 @@ namespace sfem {
             int coarse_linear_smoothing_steps = 10;
             int linear_smoothing_steps        = 1;
             int max_inner_it                  = 40;
-            int max_it                        = 15;
+            int max_it                        = sfem::Env::read("SFEM_MAX_IT", 15);
             int nlsmooth_steps                = 15;
             int max_coarse_it                 = 40000;
 
@@ -547,7 +548,7 @@ namespace sfem {
             }
 
             ////////////////////////////////////////////////////////////////////////////////////
-            mg->set_debug(true);
+            mg->set_debug(1);
             mg->enable_line_search(enable_line_search);
             mg->set_max_it(max_it);
             mg->set_max_inner_it(max_inner_it);
