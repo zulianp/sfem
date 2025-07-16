@@ -70,7 +70,7 @@ extern "C" int cu_resample_weight_local(
 }
 
 __global__ void cu_in_place_div(const ptrdiff_t n, real_t* const SFEM_RESTRICT inout, const real_t* const SFEM_RESTRICT w) {
-    for (ptrdiff_t i = blockIdx.x * blockDim.x; i < n; i += blockDim.x * gridDim.x) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         inout[i] /= w[i];
     }
 }
@@ -120,8 +120,9 @@ extern "C" int cu_resample_gap(
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
     int err = 0;
-    err     = cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals) ||
-          rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g) || cu_normalize(nnodes, normals);
+    err     = cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
+    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
+    err |= cu_normalize(nnodes, normals);
 
     return err;
 }
@@ -175,8 +176,9 @@ extern "C" int cu_resample_gap_value(
 
     enum ElemType st = shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
-    return cu_resample_gap_value_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g) ||
-           rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
+    int err = cu_resample_gap_value_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
+    err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
+    return err;
 }
 
 extern "C" int cu_resample_gap_normals_local(
@@ -217,7 +219,7 @@ __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_
         const real_t nz = normals[2][i];
 
         const real_t denom = sqrt(nx * nx + ny * ny + nz * nz);
-        
+
         if (denom > 0) {
             normals[0][i] = nx / denom;
             normals[1][i] = ny / denom;
@@ -256,7 +258,8 @@ extern "C" int cu_resample_gap_normals(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    return cu_resample_gap_normals_local(
-                   shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals) ||
-           cu_normalize(nnodes, normals);
+    int err = cu_resample_gap_normals_local(
+                   shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
+    err |= cu_normalize(nnodes, normals);
+    return err;
 }
