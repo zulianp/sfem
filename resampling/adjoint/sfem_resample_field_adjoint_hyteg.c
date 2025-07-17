@@ -1037,6 +1037,7 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
                                                  const unsigned int     L,           // Refinement level
                                                  const real_t const*    bc,          // transposition vector for category
                                                  const real_t           J_phys[9],   // Jacobian matrix
+                                                 const real_t           J_ref[9],    // Jacobian matrix
                                                  const real_t           del_J_phys,  // Determinant of the Jacobian matrix
                                                  const real_t           fx0,         // Tetrahedron vertices X-coordinates
                                                  const real_t           fx1,         //
@@ -1066,14 +1067,16 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
     // Jacobian matrix for the tetrahedron
 
-    const real_t theta_volume = del_J_phys / ((real_t)(6));  // Volume of the tetrahedron in the physical space
+    const real_t theta_volume = del_J_phys / (real_t)(6.0);  // Volume of the tetrahedron in the physical space
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
-        const real_t x_quad = tet_qx[quad_i];  // X-coordinate of the quadrature point
-        const real_t y_quad = tet_qy[quad_i];
-        const real_t z_quad = tet_qz[quad_i];
+        const real_t x_quad = tet_qx[quad_i] + bc[0];  // X-coordinate of the quadrature point
+        const real_t y_quad = tet_qy[quad_i] + bc[1];
+        const real_t z_quad = tet_qz[quad_i] + bc[2];
 
+        // The transformation from reference to physical coordinates should use all 4 vertices
+        // of the current tetrahedron (barycentric mapping).
         const real_t xq_phys = J_phys[0] * x_quad + J_phys[1] * y_quad + J_phys[2] * z_quad + fx0;  // Physical X-coordinate
         const real_t yq_phys = J_phys[3] * x_quad + J_phys[4] * y_quad + J_phys[5] * z_quad + fy0;  // Physical Y-coordinate
         const real_t zq_phys = J_phys[6] * x_quad + J_phys[7] * y_quad + J_phys[8] * z_quad + fz0;  // Physical Z-coordinate
@@ -1097,6 +1100,8 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         assert(l_x <= 1 + 1e-8);
         assert(l_y <= 1 + 1e-8);
         assert(l_z <= 1 + 1e-8);
+
+        // Move the quadrature point to the micro-tetrahedron local coordinate system
 
         // DUAL basis function (Shape functions for tetrahedral elements)
         // at the quadrature point
@@ -1239,6 +1244,14 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                                  const real_t                         alpha_th,        // Threshold for alpha
                                                  real_t* const SFEM_RESTRICT          data) {                   //
 
+#define HYTEG_D_LOG_ENABLED 0
+
+#if HYTEG_D_LOG_ENABLED
+#define HYTEG_D_LOG(...) printf(__VA_ARGS__)
+#else
+#define HYTEG_D_LOG(...) (void)0
+#endif
+
     PRINT_CURRENT_FUNCTION;
     int ret = 0;
 
@@ -1377,7 +1390,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
         const int    max_refinement_L    = 2;    // Maximum refinement level
 
-        const int L = 6 + 0 * alpha_to_hyteg_level(alpha_tet,            //
+        const int L = 1 + 0 * alpha_to_hyteg_level(alpha_tet,            //
                                                    alpha_min_threshold,  //
                                                    alpha_max_threshold,  //
                                                    max_refinement_L);    //
@@ -1411,13 +1424,13 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
         const real_t h = 1.0 / (real_t)L;  // Size of the sub-tetrahedron
 
-        printf("Processing element %ld, alpha_tet = %g, L = %d, max_edges_length = %g, d_min = %g, tet_volume = %g\n",  //
-               element_i,
-               alpha_tet,
-               L,
-               max_edges_length,
-               d_min,
-               tet_volume);
+        HYTEG_D_LOG("Processing element %ld, alpha_tet = %g, L = %d, max_edges_length = %g, d_min = %g, tet_volume = %g\n",  //
+                    element_i,
+                    alpha_tet,
+                    L,
+                    max_edges_length,
+                    d_min,
+                    tet_volume);
 
         real_t theta_volume_main = 0.0;  // Volume of the HyTeg tetrahedron
 
@@ -1429,22 +1442,22 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
             for (int i = 0; i < nodes_pes_side - 1; i++) {          // Loop over the nodes on the first edge
                 for (int j = 0; j < nodes_pes_side - i - 1; j++) {  // Loop over the nodes on the second edge
 
-                    printf("Processing element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
-                           element_i,
-                           L,
-                           i,
-                           j,
-                           k);
+                    HYTEG_D_LOG("Processing element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
+                                element_i,
+                                L,
+                                i,
+                                j,
+                                k);
 
                     {  // BEGIN: Cat 0
                         const unsigned int cat0 = 0;
 
-                        printf("**** Processing Cat 0 for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
-                               element_i,
-                               L,
-                               i,
-                               j,
-                               k);
+                        HYTEG_D_LOG("**** Processing Cat 0 for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
+                                    element_i,
+                                    L,
+                                    i,
+                                    j,
+                                    k);
 
                         // Coordinates of the node on the first edge for Cat 0
                         const real_t b0[3] = {(real_t)(j)*h,   //
@@ -1463,6 +1476,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                 L,                    // Refinement level
                                 b0,                   // Transposition vector for category 0
                                 J_vec_phy[cat0],      // Jacobian matrix
+                                J_vec_ref[cat0],      // Reference Jacobian matrix
                                 det_J_vec_phy[cat0],  // Determinant of the Jacobian matrix
                                 x0_n,                 // Tetrahedron vertices X-coordinates
                                 x1_n,                 //
@@ -1502,19 +1516,21 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                         // Solve the case for the current Cat. 1, 2, 3, 4 tetrahedra.
 
                         for (int cat_i = 1; cat_i <= 4; cat_i++) {
-                            printf("**** Processing Cat %d for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
-                                   cat_i,
-                                   element_i,
-                                   L,
-                                   i,
-                                   j,
-                                   k);
+                            HYTEG_D_LOG(
+                                    "**** Processing Cat %d for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
+                                    cat_i,
+                                    element_i,
+                                    L,
+                                    i,
+                                    j,
+                                    k);
 
                             tet4_resample_tetrahedron_local_adjoint_category(
                                     cat_i,                 // Category 0
                                     L,                     // Refinement level
                                     b1,                    // Transposition vector for category 0
                                     J_vec_phy[cat_i],      // Jacobian matrix
+                                    J_vec_ref[cat_i],      // Reference Jacobian matrix
                                     det_J_vec_phy[cat_i],  // Determinant of the Jacobian matrix
                                     x0_n,                  // Tetrahedron vertices X-coordinates
                                     x1_n,                  //
@@ -1550,12 +1566,12 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                     if (j >= 1 && i >= 1) {
                         const unsigned int cat5 = 5;
 
-                        printf("**** Processing Cat 5 for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
-                               element_i,
-                               L,
-                               i,
-                               j,
-                               k);
+                        HYTEG_D_LOG("**** Processing Cat 5 for element %ld, refinement level %d, i = %d, j = %d, k = %d\n",  //
+                                    element_i,
+                                    L,
+                                    i,
+                                    j,
+                                    k);
 
                         const real_t b5[3] = {(real_t)(j)*h,   //
                                               (real_t)(i)*h,   //
@@ -1566,6 +1582,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                 L,                    // Refinement level
                                 b5,                   // Transposition vector for category 0
                                 J_vec_phy[cat5],      // Jacobian matrix
+                                J_vec_ref[cat5],      // Reference Jacobian matrix
                                 det_J_vec_phy[cat5],  // Determinant of the Jacobian matrix
                                 x0_n,                 // Tetrahedron vertices X-coordinates
                                 x1_n,                 //
@@ -1601,11 +1618,13 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
             }          // END: for (int i = 0; i < nodes_pes_side - 1; i++) // Loop over the nodes on the first edge
         }              // END: for (int k = 0; k < L + 1; k++) // Loop over the refinement levels
 
-        printf("\n Element %ld: theta_volume_main = %g\n", element_i, theta_volume_main);
-        printf(" Element %ld: tet_volume =        %g\n", element_i, tet_volume);
-        printf(" Element %ld: diff vol   =        %g\n", element_i, (theta_volume_main - tet_volume));
+        HYTEG_D_LOG("\n Element %ld: theta_volume_main = %g\n", element_i, theta_volume_main);
+        HYTEG_D_LOG(" Element %ld: tet_volume =        %g\n", element_i, tet_volume);
+        HYTEG_D_LOG(" Element %ld: diff vol   =        %g\n", element_i, (theta_volume_main - tet_volume));
 
-        if (element_i == 335000) exit(EXIT_SUCCESS);  // Exit the program if the refinement is done
+        // if (element_i == 335000) exit(EXIT_SUCCESS);  // Exit the program if the refinement is done
 
     }  // END: for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++)
+
+    return ret;  // Return the result of the refinement
 }
