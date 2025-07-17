@@ -42,6 +42,7 @@ set(SFEM_MODULES
     algebra base matrix 
     algebra/openmp
     mesh 
+    mesh/multiblock
     mesh/sshex8
     operators 
     operators/beam2 
@@ -94,6 +95,9 @@ if(SFEM_ENABLE_RESAMPLING)
     list(APPEND SFEM_MODULES
         resampling
         resampling/tet10
+        resampling/hyteg
+        resampling/adjoint
+        resampling/data_structures
     )
 endif()
 
@@ -105,7 +109,10 @@ list(APPEND SFEM_MODULES
     resampling/surface
     )
 
-list(APPEND SFEM_MODULES frontend)
+list(APPEND SFEM_MODULES 
+    frontend
+    frontend/ops
+)
 
 if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
@@ -129,7 +136,9 @@ if(SFEM_ENABLE_CUDA)
         operators/tet10/cuda
         operators/tet4/cuda
         resampling/cuda
-        )
+        resampling/surface/cuda
+        resampling/quadshell4/cuda
+    )
 
     if(SFEM_ENABLE_AMG)
         list(APPEND SFEM_MODULES amg/cuda)
@@ -191,6 +200,11 @@ option(SFEM_TET10_WENO "Use WENO for TET10" ON)
 message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
+
+######################################################
+# SFEM_LOG_LEVEL
+set(SFEM_LOG_LEVEL 5 CACHE STRING "Set the default log level for SFEM")
+message(STATUS "SFEM_LOG_LEVEL: ${SFEM_LOG_LEVEL}")
 
 ######################################################
 # include
@@ -272,7 +286,6 @@ if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
 endif()
 
 if(NOT ${SFEM_ENABLE_ISOLVER})
-    message(WARNING "ISOLVER is disabled!")
      list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
 endif()
 

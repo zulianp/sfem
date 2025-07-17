@@ -344,10 +344,8 @@ std::shared_ptr<CellList> create_cell_list_from_sideset(const std::shared_ptr<sf
     return CellList::create(dim, n, stride, o, delta, max_radius, cell_ptr, cell_idx);
 }
 
-int self_contact(sfem::Context &context, int argc, char *argv[]) {
+int self_contact(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("self_contact");
-
-    auto comm = context.comm();
 
     if (argc != 3) {
         fprintf(stderr, "usage: %s <mesh> <output>\n", argv[0]);
@@ -516,6 +514,6 @@ int self_contact(sfem::Context &context, int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    sfem::Context context(argc, argv);
-    return self_contact(context, argc, argv);
+    auto ctx = sfem::initialize(argc, argv);
+    return self_contact(ctx->communicator(), argc, argv);
 }

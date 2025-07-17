@@ -10,7 +10,4 @@ namespace sfem {
 	int create_directory(const char *path);
 }
 
- extern "C" size_t count_files(const char *pattern);
-extern "C" int create_directory(const char *path);
-
 #endif //SFEM_GLOB_HPP

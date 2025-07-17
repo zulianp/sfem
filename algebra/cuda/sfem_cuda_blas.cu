@@ -211,21 +211,21 @@ using BLAS = BLASImpl<T>;
 #else
 
 template <typename T>
-__global__ void tscal(const ptrdiff_t n, const T alpha, T *const x) {
+__global__ void tscal(const ptrdiff_t n, const T alpha, T *const SFEM_RESTRICT x) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         x[i] *= alpha;
     }
 }
 
 template <typename T>
-__global__ void taxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
+__global__ void taxpby(const ptrdiff_t n, const T alpha, const T *const SFEM_RESTRICT x, const T beta, T *const SFEM_RESTRICT y) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         y[i] = alpha * x[i] + beta * y[i];
     }
 }
 
 template <typename T>
-__global__ void tzaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+__global__ void tzaxpby(const ptrdiff_t n, const T alpha, const T *const SFEM_RESTRICT x, const T beta, const T *const SFEM_RESTRICT y, T *const SFEM_RESTRICT z) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         z[i] = alpha * x[i] + beta * y[i];
     }
@@ -246,7 +246,7 @@ __device__ T warp_reduce_32(const T in) {
 }
 
 template <typename T>
-__global__ void tdot(const ptrdiff_t n, const T *const l, const T *const r, T *result) {
+__global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T *const SFEM_RESTRICT r, T *SFEM_RESTRICT result) {
     __shared__ T block_accumulator[SFEM_WARP_SIZE];
 
     T acc = 0;
@@ -299,6 +299,8 @@ public:
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
+        assert(x != y);
+
         taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, (T)1, y);
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -307,6 +309,8 @@ public:
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
+        assert(x != y);
+
         taxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y);
         SFEM_DEBUG_SYNCHRONIZE();
     }
@@ -314,6 +318,10 @@ public:
     static void zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
+        assert(x != y);
+        assert(x != z);
+        assert(z != y);
 
         tzaxpby<<<n_blocks, kernel_block_size>>>(n, alpha, x, beta, y, z);
         SFEM_DEBUG_SYNCHRONIZE();
@@ -336,7 +344,7 @@ public:
 #endif
 
 template <typename T>
-__global__ void tvalues_kernel(const ptrdiff_t n, const T value, T *const x) {
+__global__ void tvalues_kernel(const ptrdiff_t n, const T value, T *const SFEM_RESTRICT x) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         x[i] = value;
     }
@@ -351,7 +359,7 @@ static void tvalues(const ptrdiff_t n, const T value, T *const x) {
 }
 
 template <typename T>
-__global__ void txypaz_kernel(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+__global__ void txypaz_kernel(const ptrdiff_t n, const T *const SFEM_RESTRICT x, const T *const SFEM_RESTRICT y, const T alpha, T *const SFEM_RESTRICT z) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         z[i] = x[i] * y[i] + alpha * z[i];
     }
@@ -362,12 +370,16 @@ static void txypaz(const ptrdiff_t n, const T *const x, const T *const y, const 
     int       kernel_block_size = 128;
     ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
+    assert(x != y);
+    assert(x != z);
+    assert(z != y); 
+
     txypaz_kernel<<<n_blocks, kernel_block_size>>>(n, x, y, alpha, z);
     SFEM_DEBUG_SYNCHRONIZE();
 }
 
 template <typename T>
-__global__ void reciprocal_kernel(const ptrdiff_t n, const T alpha, T *const x) {
+__global__ void reciprocal_kernel(const ptrdiff_t n, const T alpha, T *const SFEM_RESTRICT x) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
         if (x[i]) x[i] = alpha / x[i];
     }

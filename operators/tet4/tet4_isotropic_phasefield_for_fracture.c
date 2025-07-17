@@ -13,7 +13,7 @@
 
 #include "sfem_vec.h"
 
-static SFEM_INLINE real_t tet4_measure(
+static SFEM_INLINE real_t tet4_measure_p(
     // x
     const real_t px0,
     const real_t px1,
@@ -545,7 +545,7 @@ void isotropic_phasefield_for_fracture_assemble_hessian(const ptrdiff_t nelement
         }
 
         const real_t measure =
-            tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
+            tet4_measure_p(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
 
         // Gradient does not depend on qp for tet4
         tet4_shape_grad(
@@ -700,7 +700,7 @@ void isotropic_phasefield_for_fracture_assemble_gradient(const ptrdiff_t nelemen
         }
 
         const real_t measure =
-            tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
+            tet4_measure_p(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
 
         // Gradient does not depend on qp for tet4
         tet4_shape_grad(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3], shape_grad);
@@ -825,7 +825,7 @@ void isotropic_phasefield_for_fracture_assemble_value(const ptrdiff_t nelements,
         }
 
         const real_t measure =
-            tet4_measure(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
+            tet4_measure_p(x[i0], x[i1], x[i2], x[i3], y[i0], y[i1], y[i2], y[i3], z[i0], z[i1], z[i2], z[i3]);
 
         tet4_fe_tgrad(x[i0],
                       x[i1],

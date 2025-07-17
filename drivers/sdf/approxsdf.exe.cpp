@@ -666,7 +666,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nx = 2000;
     // auto mesh = sfem::Mesh::create_tri3_square(comm, 4, 4, 0, 0, 1, 1);
-    auto mesh = sfem::Mesh::create_tri3_square(comm, nx, nx, 0, 0, 1, 1);
+    auto mesh = sfem::Mesh::create_tri3_square(sfem::Communicator::wrap(comm), nx, nx, 0, 0, 1, 1);
 
     // FIXME implement 3D
     // auto mesh = sfem::Mesh::create_hex8_cube(comm, 10, 10, 10, 0, 0, 0, 1, 1, 1);
@@ -717,13 +717,8 @@ int main(int argc, char *argv[]) {
         d[bn[i]] = 0;
     }
 
-    auto boundary_surface = std::make_shared<sfem::Mesh>(mesh->spatial_dimension(),
-                                                         st,
-                                                         sides->extent(1),
-                                                         sides->data(),
-                                                         mesh->n_nodes(),
-                                                         mesh->points()->data(),
-                                                         [mesh, sides](void *) {});
+    auto boundary_surface = std::make_shared<sfem::Mesh>(
+            mesh->comm(), mesh->spatial_dimension(), st, sides->extent(1), sides, mesh->n_nodes(), mesh->points());
 
     boundary_surface->write((output_folder + "/surface").c_str());
     normals->to_files((output_folder + "/surface/pseudo_normals.%d.raw").c_str());
@@ -783,7 +778,7 @@ int main(int argc, char *argv[]) {
         }
     } else {
         const std::string surface_path    = argv[1];
-        auto              surface         = sfem::Mesh::create_from_file(comm, surface_path.c_str());
+        auto              surface         = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), surface_path.c_str());
         auto              surface_normals = sfem::create_host_buffer<real_t>(dim, surface->n_nodes());
         compute_pseudo_normals(surface->element_type(),
                                surface->n_elements(),
@@ -824,7 +819,7 @@ int main(int argc, char *argv[]) {
     auto                                 conds = sfem::create_dirichlet_conditions(fs, {prescribed_normal}, es);
     f->add_constraint(conds);
 
-    auto linear_op     = sfem::create_linear_operator("CRS", f, nullptr, es);
+    auto linear_op     = sfem::create_linear_operator(CRS, f, nullptr, es);
     auto linear_solver = sfem::create_cg<real_t>(linear_op, es);
 
     auto rhs        = sfem::create_host_buffer<real_t>(fs->n_dofs());

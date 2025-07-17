@@ -23,11 +23,11 @@ namespace sfem {
         ptrdiff_t ndofs{SFEM_PTRDIFF_INVALID};
         BLAS_Tpl<T> blas;
 
-        std::shared_ptr<Buffer<mask_t>> bdy_dofs;
-        std::shared_ptr<Buffer<R>> offdiag_rowidx;
-        std::shared_ptr<Buffer<R>> offdiag_colidx;
-        std::shared_ptr<Buffer<T>> values;
-        std::shared_ptr<Buffer<T>> diag_values;
+        SharedBuffer<mask_t> bdy_dofs;
+        SharedBuffer<R> offdiag_rowidx;
+        SharedBuffer<R> offdiag_colidx;
+        SharedBuffer<T> values;
+        SharedBuffer<T> diag_values;
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
@@ -86,11 +86,11 @@ namespace sfem {
     };
 
     template <typename R, typename T>
-    std::shared_ptr<CooSymSpMV<R, T>> h_coosym(const std::shared_ptr<Buffer<mask_t>>& bdy_dofs,
-                                               const std::shared_ptr<Buffer<R>>& offdiag_rowidx,
-                                               const std::shared_ptr<Buffer<R>>& offdiag_colidx,
-                                               const std::shared_ptr<Buffer<T>>& values,
-                                               const std::shared_ptr<Buffer<T>>& diag_values) {
+    std::shared_ptr<CooSymSpMV<R, T>> h_coosym(const SharedBuffer<mask_t>& bdy_dofs,
+                                               const SharedBuffer<R>& offdiag_rowidx,
+                                               const SharedBuffer<R>& offdiag_colidx,
+                                               const SharedBuffer<T>& values,
+                                               const SharedBuffer<T>& diag_values) {
         auto ret = std::make_shared<CooSymSpMV<R, T>>();
         ret->bdy_dofs = bdy_dofs;
         ret->offdiag_rowidx = offdiag_rowidx;

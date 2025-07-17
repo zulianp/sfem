@@ -15,7 +15,7 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         BLAS_Tpl<T> blas;
-        std::shared_ptr<Buffer<T>> inv_diag;
+        SharedBuffer<T> inv_diag;
 
         void default_init() {
             OpenMP_BLAS<T>::build_blas(blas);
@@ -33,7 +33,7 @@ namespace sfem {
     };
 
     template <typename T>
-    std::shared_ptr<LpSmoother<T>> h_lpsmoother(const std::shared_ptr<Buffer<T>>& inv_diag) {
+    std::shared_ptr<LpSmoother<T>> h_lpsmoother(const SharedBuffer<T>& inv_diag) {
         auto ret = std::make_shared<LpSmoother<T>>();
         ret->n_dofs = inv_diag->size();
         ret->inv_diag = inv_diag;

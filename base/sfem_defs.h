@@ -13,7 +13,31 @@ extern "C" {
 enum RealType { SFEM_FLOAT16 = 2, SFEM_FLOAT32 = 4, SFEM_FLOAT64 = 8, SFEM_REAL_DEFAULT = 0 };
 enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_DEFAULT = 0 };
 
+typedef const char* OperatorType;
+static OperatorType MATRIX_FREE = "MF";
+static OperatorType CRS = "CRS";
+static OperatorType CRS_SYM = "CRS_SYM";
+static OperatorType BSR = "BSR";
+static OperatorType BSR_SYM = "BSR_SYM";
+static OperatorType COO_SYM = "COO_SYM";
+
+
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
+
+typedef enum {
+    SFEM_ACCELERATOR_TYPE_CPU     = 0,  // CPU
+    SFEM_ACCELERATOR_TYPE_CUDA    = 1,  // CUDA
+    SFEM_ACCELERATOR_TYPE_OPENCL  = 2,  // OpenCL Not supported
+    SFEM_ACCELERATOR_TYPE_OPENACC = 3,  // OpenACC Not supported
+    SFEM_ACCELERATOR_TYPE_HIP     = 4   // HIP Not supported
+} AcceleratorsType;                     //
+
+typedef enum {
+    ADJOINT_BASE = 0,                //
+    ADJOINT_REFINE_ONE_STEP,         //
+    ADJOINT_REFINE_ITERATIVE,        //
+    ADJOINT_REFINE_HYTEG_REFINEMENT  //
+} AdjointRefineType;                 //
 
 static void* SFEM_DEFAULT_STREAM = 0;
 

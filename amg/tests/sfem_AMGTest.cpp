@@ -29,7 +29,7 @@ int test_amg_poisson() {
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::wrap(comm), SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     const int block_size = 1;
     auto      fs         = sfem::FunctionSpace::create(m, block_size);
@@ -40,8 +40,8 @@ int test_amg_poisson() {
     auto left_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
-    sfem::DirichletConditions::Condition top{.sideset = top_ss, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition left{.sideset = left_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = left_ss, .value = -1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {top, left}, es);
 
@@ -88,7 +88,7 @@ int test_amg_sqp() {
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::wrap(comm), SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, SFEM_MESH_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     const int block_size = 1;
     auto      fs         = sfem::FunctionSpace::create(m, block_size);
@@ -96,7 +96,7 @@ int test_amg_sqp() {
     auto top_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
 
-    sfem::DirichletConditions::Condition top{.sideset = top_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_ss, .value = 1, .component = 0};
     auto                                 conds = sfem::create_dirichlet_conditions(fs, {top}, es);
 
     auto f  = sfem::Function::create(fs);
@@ -114,7 +114,7 @@ int test_amg_sqp() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     // Indices of potential contact boundary nodes
-    auto bottom = sfem::create_nodeset_from_sideset(fs, bottom_ss);
+    auto bottom = sfem::create_nodeset_from_sidesets(fs, {bottom_ss});
 
     // FIXME not GPU ready
     {

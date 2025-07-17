@@ -15,6 +15,8 @@
 
 #include "tet4_neohookean.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -82,14 +84,13 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     real_t *stress[3];
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
-        stress[d] = (real_t *)malloc(mesh.nelements * sizeof(real_t));
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
+        stress[d] = (real_t *)malloc(n_elements * sizeof(real_t));
     }
 
     // TODO
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
         real_t *u;
         ptrdiff_t u_n_local, u_n_global;
         array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        neohookean_principal_stresses_aos(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
+        neohookean_principal_stresses_aos(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
         free(u);
     } else {
         real_t *u[3];
@@ -109,16 +110,16 @@ int main(int argc, char *argv[]) {
         for (int d = 0; d < 3; d++) {
             array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
         }
-        neohookean_principal_stresses_soa(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, mu, lambda, u, stress);
+        neohookean_principal_stresses_soa(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
         for (int d = 0; d < 3; d++) {
             free(u[d]);
         }
     }
 
     char path[2048];
-    for (int d = 0; d < mesh.spatial_dim; ++d) {
-        sprintf(path, "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
-        array_write(comm, path, SFEM_MPI_REAL_T, stress[d], mesh.nelements, mesh.nelements);
+    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
+        snprintf(path, sizeof(path), "%s.%d%s.raw", output_prefix, d, SFEM_OUTPUT_POSTFIX);
+        array_write(comm, path, SFEM_MPI_REAL_T, stress[d], n_elements, n_elements);
         free(stress[d]);
     }
 
@@ -126,7 +127,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
