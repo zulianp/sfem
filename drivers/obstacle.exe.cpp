@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     double tick = MPI_Wtime();
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
                        values->data());
 
         char path[2048];
-        sprintf(path, "%s/crs_matrix", output_path);
+        snprintf(path, sizeof(path), "%s/crs_matrix", output_path);
         write_crs(path, *crs_graph, *values);
     }
 
@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     char path[2048];
-    sprintf(path, "%s/upper_bound.raw", output_path);
+    snprintf(path, sizeof(path), "%s/upper_bound.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_upper_bound->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
@@ -274,12 +274,12 @@ int main(int argc, char *argv[]) {
     auto h_rhs = rhs;
 #endif
 
-    sprintf(path, "%s/u.raw", output_path);
+    snprintf(path, sizeof(path), "%s/u.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_x->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }
 
-    sprintf(path, "%s/rhs.raw", output_path);
+    snprintf(path, sizeof(path), "%s/rhs.raw", output_path);
     if (array_write(comm, path, SFEM_MPI_REAL_T, (void *)h_rhs->data(), ndofs, ndofs)) {
         return SFEM_FAILURE;
     }

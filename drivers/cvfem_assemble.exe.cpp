@@ -23,6 +23,8 @@
 #include "cvfem_tri3_diffusion.h"
 #include "tet4_laplacian.h"
 
+#include "sfem_API.hpp"
+
 ptrdiff_t read_file(MPI_Comm comm, const char *path, void **data) {
     MPI_Status status;
     MPI_Offset nbytes;
@@ -90,10 +92,9 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     double tack = MPI_Wtime();
     printf("assemble.c: read\t\t%g seconds\n", tack - tick);
@@ -108,9 +109,9 @@ int main(int argc, char *argv[]) {
     real_t *values = 0;
 
     build_crs_graph_for_elem_type(
-            mesh.element_type, mesh.nelements, mesh.nnodes, mesh.elements, &rowptr, &colidx);
+            mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), &rowptr, &colidx);
 
-    nnz = rowptr[mesh.nnodes];
+    nnz = rowptr[n_nodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
     memset(values, 0, nnz * sizeof(real_t));
 
@@ -122,22 +123,22 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        switch (mesh.element_type) {
+        switch (mesh->element_type()) {
             case TRI3: {
-                cvfem_tri3_diffusion_assemble_hessian(mesh.nelements,
-                                                      mesh.nnodes,
-                                                      mesh.elements,
-                                                      mesh.points,
+                cvfem_tri3_diffusion_assemble_hessian(n_elements,
+                                                      n_nodes,
+                                                      mesh->elements()->data(),
+                                                      mesh->points()->data(),
                                                       rowptr,
                                                       colidx,
                                                       values);
                 break;
             }
             case TET4: {
-                tet4_laplacian_crs(mesh.nelements,
-                                   mesh.nnodes,
-                                   mesh.elements,
-                                   mesh.points,
+                tet4_laplacian_crs(n_elements,
+                                   n_nodes,
+                                   mesh->elements()->data(),
+                                   mesh->points()->data(),
                                    rowptr,
                                    colidx,
                                    values);
@@ -157,8 +158,8 @@ int main(int argc, char *argv[]) {
     // Boundary conditions
     ///////////////////////////////////////////////////////////////////////////////
 
-    real_t *rhs = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
-    memset(rhs, 0, mesh.nnodes * sizeof(real_t));
+    real_t *rhs = (real_t *)malloc(n_nodes * sizeof(real_t));
+    memset(rhs, 0, n_nodes * sizeof(real_t));
 
     if (SFEM_HANDLE_NEUMANN) {  // Neumann
         SFEM_ERROR("FIXME!");
@@ -188,7 +189,7 @@ int main(int argc, char *argv[]) {
     if (SFEM_HANDLE_DIRICHLET) {
         // Dirichlet
         char path[1024 * 10];
-        sprintf(path, "%s/zd.raw", folder);
+        snprintf(path, sizeof(path), "%s/zd.raw", folder);
 
         const char *SFEM_DIRICHLET_NODES = 0;
         SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
@@ -210,14 +211,14 @@ int main(int argc, char *argv[]) {
     if (SFEM_HANDLE_RHS) {
 #if SFEM_REAL_T_IS_DOUBLE
         if (SFEM_EXPORT_FP32) {
-            array_dtof(mesh.nnodes, (const real_t *)rhs, (float *)rhs);
+            array_dtof(n_nodes, (const real_t *)rhs, (float *)rhs);
         }
 #endif
 
         {
             char path[1024 * 10];
-            sprintf(path, "%s/rhs.raw", output_folder);
-            array_write(comm, path, value_type, rhs, mesh.nnodes, mesh.nnodes);
+            snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
+            array_write(comm, path, value_type, rhs, n_nodes, n_nodes);
         }
     }
 
@@ -240,8 +241,8 @@ int main(int argc, char *argv[]) {
         crs_out.rowptr = (char *)rowptr;
         crs_out.colidx = (char *)colidx;
         crs_out.values = (char *)values;
-        crs_out.grows = mesh.nnodes;
-        crs_out.lrows = mesh.nnodes;
+        crs_out.grows = n_nodes;
+        crs_out.lrows = n_nodes;
         crs_out.lnnz = nnz;
         crs_out.gnnz = nnz;
         crs_out.start = 0;
@@ -264,16 +265,13 @@ int main(int argc, char *argv[]) {
     free(colidx);
     free(values);
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
 
-    mesh_destroy(&mesh);
 
     tock = MPI_Wtime();
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
+        printf("#elements %ld #nodes %ld #nz %ld\n", (long)n_elements, (long)n_nodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

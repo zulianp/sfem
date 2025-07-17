@@ -1,9 +1,7 @@
 #include "sfem_API.hpp"
 
+#include "sfem_macros.h"
 #include "sortreduce.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -22,7 +20,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        tet4_mesh     = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto tet4_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     const char *output_folder = argv[2];
 
     const ptrdiff_t n_elements = tet4_mesh->n_elements();

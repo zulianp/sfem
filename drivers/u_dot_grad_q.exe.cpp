@@ -15,6 +15,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -46,10 +48,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
     real_t *u[3];
 
@@ -59,22 +58,22 @@ int main(int argc, char *argv[]) {
         array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &_nope_, &nu_p0_or_p1);
     }
 
-    assert(nu_p0_or_p1 == mesh.nelements || nu_p0_or_p1 == mesh.nnodes);
+    assert(nu_p0_or_p1 == mesh->n_elements() || nu_p0_or_p1 == mesh->n_nodes());
 
-    real_t *div_u = (real_t *)malloc(mesh.nnodes * sizeof(real_t));
-    memset(div_u, 0, mesh.nnodes * sizeof(real_t));
+    real_t *div_u = (real_t *)malloc(mesh->n_nodes() * sizeof(real_t));
+    memset(div_u, 0, mesh->n_nodes() * sizeof(real_t));
 
-    if(nu_p0_or_p1 == mesh.nelements) {
-        p0_u_dot_grad_q_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
+    if(nu_p0_or_p1 == mesh->n_elements()) {
+        p0_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     } else {
-        p1_u_dot_grad_q_apply(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, u[0], u[1], u[2], div_u);
+        p1_u_dot_grad_q_apply(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), u[0], u[1], u[2], div_u);
     }
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);
 
     if (SFEM_SCALE != 1) {
-        for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
             div_u[i] *= SFEM_SCALE;
         }
     }
@@ -84,7 +83,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_VERBOSE) {
         real_t integral = 0.;
-        for (ptrdiff_t i = 0; i < mesh.nnodes; ++i) {
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
             integral += div_u[i];
         }
 
@@ -93,7 +92,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, mesh.nnodes , mesh.nnodes );
+    array_write(comm, path_output, SFEM_MPI_REAL_T, div_u, mesh->n_nodes(), mesh->n_nodes());
 
     for (int d = 0; d < 3; ++d) {
         free(u[d]);
@@ -105,7 +104,7 @@ int main(int argc, char *argv[]) {
 
     if (!rank) {
         printf("----------------------------------------\n");
-        printf("#elements %ld #nodes %ld\n", (long)mesh.nelements, (long)mesh.nnodes);
+        printf("#elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 

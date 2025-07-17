@@ -17,6 +17,9 @@
 
 #include "argsort.h"
 
+#include "sfem_API.hpp"
+#include "sfem_Env.hpp"
+
 #ifdef DSFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
 #endif
@@ -144,8 +147,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     const char *output_folder = argv[2];
 
-    int SFEM_ORDER_WITH_COORDINATE = -1;
-    SFEM_READ_ENV(SFEM_ORDER_WITH_COORDINATE, atoi);
+    int SFEM_ORDER_WITH_COORDINATE = sfem::Env::read<int>("SFEM_ORDER_WITH_COORDINATE", -1);
 
     if (!rank) {
         printf("%s %s %s\n", argv[0], folder, output_folder);
@@ -154,25 +156,28 @@ int main(int argc, char *argv[]) {
 
     double tick = MPI_Wtime();
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto elements = mesh->elements()->data();
+    auto points = mesh->points()->data();
+    const ptrdiff_t n_owned_nodes = mesh->n_owned_nodes();
+    const ptrdiff_t n_owned_elements = mesh->n_owned_elements();
+    const int nxe = elem_num_nodes(mesh->element_type());
 
-    const int nxe = elem_num_nodes(mesh.element_type);
+    auto sfc_buff = sfem::create_host_buffer<sfc_t>(n_owned_elements);
+    auto sfc = sfc_buff->data();
 
-    sfc_t *sfc = (sfc_t *)malloc(mesh.n_owned_elements * sizeof(sfc_t));
-    memset(sfc, 0, mesh.n_owned_elements * sizeof(sfc_t));
-
-    element_idx_t *idx = (element_idx_t *)malloc(mesh.n_owned_elements * sizeof(element_idx_t));
+    auto idx_buff = sfem::create_host_buffer<element_idx_t>(n_owned_elements);
+    auto idx = idx_buff->data();
 
     geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0}, box_extent[3] = {0, 0, 0};
-    for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-        box_min[coord] = mesh.points[coord][0];
-        box_max[coord] = mesh.points[coord][0];
 
-        for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            const geom_t x = mesh.points[coord][i];
+    int spatial_dim = mesh->spatial_dimension();
+    for (int coord = 0; coord < spatial_dim; coord++) {
+        box_min[coord] = points[coord][0];
+        box_max[coord] = points[coord][0];
+
+        for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
+            const geom_t x = points[coord][i];
             box_min[coord] = MIN(box_min[coord], x);
             box_max[coord] = MAX(box_max[coord], x);
         }
@@ -187,11 +192,11 @@ int main(int argc, char *argv[]) {
     if (normalize_with_max_range) {
         geom_t mm = box_extent[0];
 
-        for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+        for (int coord = 0; coord < spatial_dim; coord++) {
             mm = MAX(mm, box_extent[coord]);
         }
 
-        for (int coord = 0; coord < mesh.spatial_dim; coord++) {
+        for (int coord = 0; coord < spatial_dim; coord++) {
             box_extent[coord] = mm;
         }
     }
@@ -199,22 +204,22 @@ int main(int argc, char *argv[]) {
     sfc_t urange[3] = {sfc_urange, sfc_urange, sfc_urange};
 
     if (SFEM_ORDER_WITH_COORDINATE != -1) {
-        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+        for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
-            const idx_t i0 = mesh.elements[0][i];
+            const idx_t i0 = elements[0][i];
 
-            for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                geom_t x = mesh.points[coord][i0];
+            for (int coord = 0; coord < spatial_dim; coord++) {
+                geom_t x = points[coord][i0];
                 x -= box_min[coord];
                 x /= box_extent[coord];
                 b[coord] = x;
             }
 
-            for (int d = 1; d < mesh.element_type; d++) {
-                const idx_t ii = mesh.elements[d][i];
+            for (int d = 1; d < nxe; d++) {
+                const idx_t ii = elements[d][i];
 
-                for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                    geom_t x = mesh.points[coord][ii];
+                for (int coord = 0; coord < spatial_dim; coord++) {
+                    geom_t x = points[coord][ii];
                     x -= box_min[coord];
                     x /= box_extent[coord];
                     b[coord] = MIN(b[coord], x);
@@ -228,22 +233,22 @@ int main(int argc, char *argv[]) {
             // (int)sfc[i]);
         }
     } else {
-        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+        for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
             geom_t b[3] = {0, 0, 0};
-            const idx_t i0 = mesh.elements[0][i];
+            const idx_t i0 = elements[0][i];
 
-            for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                geom_t x = mesh.points[coord][i0];
+            for (int coord = 0; coord < spatial_dim; coord++) {
+                geom_t x = points[coord][i0];
                 x -= box_min[coord];
                 x /= box_extent[coord];
                 b[coord] = x;
             }
 
             for (int d = 1; d < nxe; d++) {
-                const idx_t ii = mesh.elements[d][i];
+                const idx_t ii = elements[d][i];
 
-                for (int coord = 0; coord < mesh.spatial_dim; coord++) {
-                    geom_t x = mesh.points[coord][ii];
+                for (int coord = 0; coord < spatial_dim; coord++) {
+                    geom_t x = points[coord][ii];
                     x -= box_min[coord];
                     x /= box_extent[coord];
                     b[coord] = MIN(b[coord], x);
@@ -288,13 +293,15 @@ int main(int argc, char *argv[]) {
     } else
 #endif
     {
-        for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+        for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
             idx[i] = i;
         }
 
-        sort_function(mesh.n_owned_elements, sfc, idx);
+        sort_function(n_owned_elements, sfc, idx);
 
-        ptrdiff_t buff_size = MAX(mesh.n_owned_elements, mesh.n_owned_nodes) * sizeof(idx_t);
+        // idx_buff->print(std::cout);
+
+        ptrdiff_t buff_size = MAX(n_owned_elements, n_owned_nodes) * sizeof(idx_t);
         void *buff = malloc(buff_size);
 
         // 1) rearrange elements
@@ -302,17 +309,17 @@ int main(int argc, char *argv[]) {
             idx_t *elem_buff = (idx_t *)buff;
 
             for (int d = 0; d < nxe; d++) {
-                memcpy(elem_buff, mesh.elements[d], mesh.n_owned_elements * sizeof(idx_t));
-                for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-                    mesh.elements[d][i] = elem_buff[idx[i]];
+                memcpy(elem_buff, elements[d], n_owned_elements * sizeof(idx_t));
+                for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
+                    elements[d][i] = elem_buff[idx[i]];
                 }
             }
 
             const char *SFEM_EXPORT_SFC = 0;
             SFEM_READ_ENV(SFEM_EXPORT_SFC, );
             if (SFEM_EXPORT_SFC) {
-                memcpy(elem_buff, sfc, mesh.n_owned_elements * sizeof(sfc_t));
-                for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+                memcpy(elem_buff, sfc, n_owned_elements * sizeof(sfc_t));
+                for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
                     sfc[i] = elem_buff[idx[i]];
                 }
 
@@ -320,8 +327,8 @@ int main(int argc, char *argv[]) {
                             SFEM_EXPORT_SFC,
                             SFEM_MPI_SFC_T,
                             sfc,
-                            mesh.n_owned_elements,
-                            mesh.n_owned_elements);
+                            n_owned_elements,
+                            n_owned_elements);
             }
         }
 
@@ -332,23 +339,23 @@ int main(int argc, char *argv[]) {
         idx_t *node_buff = (idx_t *)buff;
 
         {
-            memset(node_buff, 0, mesh.n_owned_nodes * sizeof(idx_t));
+            memset(node_buff, 0, n_owned_nodes * sizeof(idx_t));
 
             idx_t next_node = 1;
-            for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
+            for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
                 for (int d = 0; d < nxe; d++) {
-                    idx_t i0 = mesh.elements[d][i];
+                    idx_t i0 = elements[d][i];
 
                     if (!node_buff[i0]) {
                         node_buff[i0] = next_node++;
-                        assert(next_node - 1 <= mesh.n_owned_nodes);
+                        assert(next_node - 1 <= n_owned_nodes);
                     }
                 }
             }
 
-            assert(next_node - 1 == mesh.n_owned_nodes);
+            assert(next_node - 1 == n_owned_nodes);
 
-            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+            for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
                 assert(node_buff[i] > 0);
                 node_buff[i] -= 1;
             }
@@ -356,19 +363,19 @@ int main(int argc, char *argv[]) {
 
         // Update e2n
         for (int d = 0; d < nxe; d++) {
-            for (ptrdiff_t i = 0; i < mesh.n_owned_elements; i++) {
-                idx_t i0 = mesh.elements[d][i];
-                mesh.elements[d][i] = node_buff[i0];
+            for (ptrdiff_t i = 0; i < n_owned_elements; i++) {
+                idx_t i0 = elements[d][i];
+                elements[d][i] = node_buff[i0];
             }
         }
 
         // update coordinates
-        geom_t *x_buff = (geom_t*)malloc(mesh.n_owned_nodes * sizeof(geom_t));
-        for (int d = 0; d < mesh.spatial_dim; d++) {
-            memcpy(x_buff, mesh.points[d], mesh.n_owned_nodes * sizeof(geom_t));
+        geom_t *x_buff = (geom_t*)malloc(n_owned_nodes * sizeof(geom_t));
+        for (int d = 0; d < spatial_dim; d++) {
+            memcpy(x_buff, points[d], n_owned_nodes * sizeof(geom_t));
 
-            for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-                mesh.points[d][node_buff[i]] = x_buff[i];
+            for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
+                points[d][node_buff[i]] = x_buff[i];
             }
         }
 
@@ -379,11 +386,8 @@ int main(int argc, char *argv[]) {
         free(x_buff);
     }
 
-    free(sfc);
-    free(idx);
+    mesh->write(output_folder);
 
-    mesh_write(output_folder, &mesh);
-    mesh_destroy(&mesh);
     double tock = MPI_Wtime();
 
     if (!rank) {

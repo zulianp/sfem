@@ -48,15 +48,14 @@ int test_derefine_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
 
     return test_derefine(m, "test_derefine_cube");
 }
 
 int test_derefine_mesh() {
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto     m    = sfem::Mesh::create_from_file(comm, "impeller");
+    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), "impeller");
     return test_derefine(m, "test_derefine_mesh");
 }
 
@@ -180,8 +179,7 @@ int test_prolongation_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 2, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 2, 1, 1);
 
     return test_prolongation(m, "test_derefine_cube");
 }
@@ -192,8 +190,7 @@ int test_restrict_cube() {
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
     return test_restriction(m, "test_restrict_cube");
 }

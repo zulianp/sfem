@@ -1,12 +1,13 @@
 #include "sshex8_interpolate.h"
 
+#include "sfem_macros.h"
 #include "sshex8.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 
 int         sshex8_hierarchical_restriction(int                                 level,
                                             const ptrdiff_t                     nelements,

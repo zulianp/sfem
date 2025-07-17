@@ -1,3 +1,8 @@
+# Originally from:
+# SHUNN, Lee; HAM, Frank. Symmetric quadrature rules for tetrahedra based on a cubic close-packed lattice arrangement. 
+# Journal of Computational and Applied Mathematics, 2012, 236.17: 4348-4364.
+############################################################################################
+
 import re
 
 import numpy as np
@@ -78,7 +83,7 @@ def rule_to_c(rule):
     """
     Convert a rule to a c++ string.
     """
-    TET4_NQP = rule.shape[0]
+    TET_QUAD_NQP = rule.shape[0]
     
     def column_to_nr_str(column, precision):
         """
@@ -92,20 +97,20 @@ def rule_to_c(rule):
             
         
     
-    rule_str = f"#define TET4_NQP  {TET4_NQP}\n"
-    rule_str += "static real_t tet4_qw[TET4_NQP] = {\n"
+    rule_str = f"#define TET_QUAD_NQP  {TET_QUAD_NQP}\n"
+    rule_str += "static real_t tet_qw[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(3, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qx[TET4_NQP] = {\n"
+    rule_str += "static real_t tet_qx[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(0, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qy[TET4_NQP] = {\n"
+    rule_str += "static real_t tet_qy[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(1, 16)
     rule_str += "};\n\n"
     
-    rule_str += "static real_t tet4_qz[TET4_NQP] = {\n"
+    rule_str += "static real_t tet_qz[TET_QUAD_NQP] = {\n"
     rule_str += column_to_nr_str(2, 16)
     rule_str += "};\n\n"
     
@@ -120,7 +125,7 @@ def main_rule():
         np.array: the main rule for the tet4 element.
         it is a 56 point rule the first three columns are the x, y, z coordinates and the fourth column is the weight.
     """
-    tet4_qx = [0.2500000000000000, 0.6175871903000830, 0.1274709365666390, 0.1274709365666390,
+    tet_qx = [0.2500000000000000, 0.6175871903000830, 0.1274709365666390, 0.1274709365666390,
             0.1274709365666390, 0.9037635088221031, 0.0320788303926323, 0.0320788303926323,
             0.0320788303926323, 0.4502229043567190, 0.0497770956432810, 0.0497770956432810,
             0.0497770956432810, 0.4502229043567190, 0.4502229043567190, 0.3162695526014501,
@@ -133,7 +138,7 @@ def main_rule():
             0.7303134278075384, 0.1937464752488044, 0.0379700484718286, 0.7303134278075384,
             0.1937464752488044]
 
-    tet4_qy = [0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.1274709365666390,
+    tet_qy = [0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.1274709365666390,
             0.6175871903000830, 0.0320788303926323, 0.0320788303926323, 0.0320788303926323,
             0.9037635088221031, 0.0497770956432810, 0.4502229043567190, 0.0497770956432810,
             0.4502229043567190, 0.0497770956432810, 0.4502229043567190, 0.1837304473985499,
@@ -146,7 +151,7 @@ def main_rule():
             0.1937464752488044, 0.0379700484718286, 0.1937464752488044, 0.0379700484718286,
             0.7303134278075384]
     
-    tet4_qz = [0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.6175871903000830,
+    tet_qz = [0.2500000000000000, 0.1274709365666390, 0.1274709365666390, 0.6175871903000830,
             0.1274709365666390, 0.0320788303926323, 0.0320788303926323, 0.9037635088221031,
             0.0320788303926323, 0.0497770956432810, 0.0497770956432810, 0.4502229043567190,
             0.4502229043567190, 0.4502229043567190, 0.0497770956432810, 0.1837304473985499,
@@ -159,7 +164,7 @@ def main_rule():
             0.0379700484718286, 0.7303134278075384, 0.7303134278075384, 0.1937464752488044,
             0.0379700484718286]
     
-    tet4_qw = [-0.2359620398477559, 0.0244878963560563, 0.0244878963560563, 0.0244878963560563,
+    tet_qw = [-0.2359620398477559, 0.0244878963560563, 0.0244878963560563, 0.0244878963560563,
             0.0244878963560563,  0.0039485206398261, 0.0039485206398261, 0.0039485206398261,
             0.0039485206398261,  0.0263055529507371, 0.0263055529507371, 0.0263055529507371,
             0.0263055529507371,  0.0263055529507371, 0.0263055529507371, 0.0829803830550590,
@@ -173,12 +178,12 @@ def main_rule():
             0.0134324384376852]
 
     # Convert to numpy arrays
-    tet4_qx_np = np.array(tet4_qx)
-    tet4_qy_np = np.array(tet4_qy)
-    tet4_qz_np = np.array(tet4_qz)
-    tet4_qw_np = np.array(tet4_qw)
+    tet_qx_np = np.array(tet_qx)
+    tet_qy_np = np.array(tet_qy)
+    tet_qz_np = np.array(tet_qz)
+    tet_qw_np = np.array(tet_qw)
     
-    rule = np.array([tet4_qx_np, tet4_qy_np, tet4_qz_np, tet4_qw_np]).T
+    rule = np.array([tet_qx_np, tet_qy_np, tet_qz_np, tet_qw_np]).T
     return rule
 
 

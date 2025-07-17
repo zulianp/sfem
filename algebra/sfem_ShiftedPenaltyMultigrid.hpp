@@ -24,7 +24,7 @@
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const std::shared_ptr<Buffer<T>>& diagonal_scaling, const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
     /**
      * @class ShiftedPenaltyMultigrid
@@ -130,11 +130,11 @@ namespace sfem {
 
         class Memory {
         public:
-            std::shared_ptr<Buffer<T>> rhs;
-            std::shared_ptr<Buffer<T>> solution;
-            std::shared_ptr<Buffer<T>> work;
-            std::shared_ptr<Buffer<T>> diag;
-            inline ptrdiff_t           size() const { return solution->size(); }
+            SharedBuffer<T>  rhs;
+            SharedBuffer<T>  solution;
+            SharedBuffer<T>  work;
+            SharedBuffer<T>  diag;
+            inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
 
@@ -176,8 +176,8 @@ namespace sfem {
             }
         };
 
-        void set_upper_bound(const std::shared_ptr<Buffer<T>>& ub) { upper_bound_ = ub; }
-        void set_lower_bound(const std::shared_ptr<Buffer<T>>& lb) { lower_bound_ = lb; }
+        void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
+        void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
 
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Operator<T>>& op_t) {
@@ -227,7 +227,7 @@ namespace sfem {
             int count_lagr_mult_updates = 0;
             T   omega                   = 1 / penalty_param_;
 
-            std::shared_ptr<Buffer<T>> x_old;
+            SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
                 x_old = make_buffer(n_dofs);
                 blas_.copy(n_dofs, x, x_old->data());
@@ -420,7 +420,7 @@ namespace sfem {
         void set_penalty_param(const real_t val) { penalty_param_ = val; }
         void enable_line_search(const bool val) { enable_line_search_ = val; }
         void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
-        void set_debug(const bool val) { debug = val; }
+        void set_debug(const int val) { debug = val; }
         void set_execution_space(enum ExecutionSpace es) { execution_space_ = es; }
         void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
         void set_enable_shift(const bool val) { enable_shift = val; }
@@ -431,7 +431,7 @@ namespace sfem {
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
 
     private:
-        std::shared_ptr<Buffer<T>> make_buffer(const ptrdiff_t n) const {
+        SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
             return Buffer<T>::own(n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());
         }
 
@@ -478,8 +478,8 @@ namespace sfem {
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
             if (constraints_op_) {
-                return operator_[level] +
-                       sfem::create_sparse_block_vector_mult(constraints_op_x_op_[level], memory_[level]->diag);
+                return operator_[level] + sfem::create_sparse_block_vector_mult(
+                                                  operator_[level]->rows(), constraints_op_x_op_[level], memory_[level]->diag);
             } else {
                 return operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
             }
@@ -500,6 +500,16 @@ namespace sfem {
             const T* const ub   = (upper_bound_) ? upper_bound_->data() : nullptr;
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
+
+            if(debug > 1) {
+                printf("Residual: %g\n", blas_.norm2(n_dofs, mem->work->data()));
+                if(ub) {
+                    printf("UB: %g, LUB %g\n", blas_.norm2(n_constrained_dofs, ub), blas_.norm2(n_constrained_dofs, l_ub));
+                }
+                if(lb) {
+                    printf("LB: %g, LLB %g\n", blas_.norm2(n_constrained_dofs, lb), blas_.norm2(n_constrained_dofs, l_lb));
+                }
+            }
 
             if (constraints_op_) {
                 // Jacobian
@@ -613,7 +623,10 @@ namespace sfem {
                 penalty_pseudo_galerkin_assembly();
 
                 int ret = cycle(coarser_level(finest_level()));
-                assert(ret != CYCLE_FAILURE);
+                
+                if(ret == CYCLE_FAILURE) {
+                    fprintf(stderr, "Coarse level solver did not converge as desired!\n");
+                }
 
                 {
                     // Prolongation
@@ -722,7 +735,6 @@ namespace sfem {
                 }
 
                 CycleReturnCode ret = cycle(coarser_level(level));
-                assert(ret != CYCLE_FAILURE);
 
                 {
                     // Prolongation
@@ -798,9 +810,9 @@ namespace sfem {
         std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
         std::function<void(const T* const)>                update_constraints_;
 
-        std::shared_ptr<Buffer<T>> upper_bound_;
-        std::shared_ptr<Buffer<T>> lower_bound_;
-        std::shared_ptr<Buffer<T>> correction, lagr_lb, lagr_ub;
+        SharedBuffer<T> upper_bound_;
+        SharedBuffer<T> lower_bound_;
+        SharedBuffer<T> correction, lagr_lb, lagr_ub;
 
         // Internals
         std::vector<std::shared_ptr<Memory>> memory_;
@@ -826,7 +838,7 @@ namespace sfem {
         T    penetration_tol_exp{0.9};
         bool enable_shift{true};
 
-        bool                      debug{false};
+        int                      debug{0};
         std::vector<struct Stats> stats;
 
         BLAS_Tpl<T>           blas_;

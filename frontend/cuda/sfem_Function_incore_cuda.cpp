@@ -98,6 +98,14 @@ namespace sfem {
         return std::make_shared<Sideset>(sideset->comm(), to_device(sideset->parent()), to_device(sideset->lfi()));
     }
 
+    std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss) {
+        std::vector<std::shared_ptr<Sideset>> ret;
+        for (const auto &s : ss) {
+            ret.push_back(to_device(s));
+        }
+        return ret;
+    }
+
     template <typename T>
     std::shared_ptr<Buffer<T>> manage_device_buffer(const ptrdiff_t n, T *data) {
         return Buffer<T>::own(n, data, &d_buffer_destroy, MEMORY_SPACE_DEVICE);
@@ -199,7 +207,7 @@ namespace sfem {
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) : space(dc->space()), h_dirichlet(dc) {
             for (auto &c : dc->conditions()) {
-                DirichletConditions::Condition cond{.sideset   = (c.sideset) ? to_device(c.sideset) : nullptr,
+                DirichletConditions::Condition cond{.sidesets   = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
                                                     .nodeset   = to_device(c.nodeset),
                                                     .values    = (c.values) ? to_device(c.values) : nullptr,
                                                     .value     = c.value,
@@ -294,7 +302,7 @@ namespace sfem {
         GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
             for (auto &c : nc->conditions()) {
                 NeumannConditions::Condition cond{.element_type = c.element_type,
-                                                  .sideset      = (c.sideset) ? to_device(c.sideset) : nullptr,
+                                                  .sidesets      = (!c.sidesets.empty()) ? to_device(c.sidesets) : std::vector<std::shared_ptr<Sideset>>(),
                                                   .surface      = to_device(c.surface),
                                                   .values       = (c.values) ? to_device(c.values) : nullptr,
                                                   .value        = c.value,
@@ -348,7 +356,7 @@ namespace sfem {
         const char *name() const override { return "gpu:Laplacian"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULaplacian:initialize");
             auto elements = space->device_elements();
             if (!elements) {
@@ -363,8 +371,6 @@ namespace sfem {
         GPULaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-            auto mesh = (mesh_t *)derefined_space->mesh().impl_mesh();
-
             auto ret = std::make_shared<GPULaplacian>(derefined_space);
             assert(derefined_space->element_type() == macro_base_elem(fff->element_type()));
             assert(ret->element_type == macro_base_elem(fff->element_type()));
@@ -466,7 +472,7 @@ namespace sfem {
         const char *name() const override { return "ss:gpu::Laplacian"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULaplacian:initialize");
 
             auto elements = space->device_elements();
@@ -593,7 +599,7 @@ namespace sfem {
         const char *name() const override { return "gpu:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULinearElasticity:initialize");
 
             real_t SFEM_SHEAR_MODULUS        = 1;
@@ -768,7 +774,7 @@ namespace sfem {
         const char *name() const override { return "ss::gpu::LinearElasticity"; }
         inline bool is_linear() const override { return true; }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
 
             real_t SFEM_SHEAR_MODULUS        = mu;
@@ -938,7 +944,7 @@ namespace sfem {
             return nullptr;
         }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             auto mesh             = space->mesh_ptr();
             auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
 
@@ -1047,7 +1053,7 @@ namespace sfem {
             return nullptr;
         }
 
-        int initialize() override {
+        int initialize(const std::vector<std::string> &block_names = {}) override {
             auto mesh             = space->mesh_ptr();
             auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
 

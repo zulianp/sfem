@@ -43,9 +43,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -55,9 +55,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto left_right = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = left_right, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = left_right, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = left_right, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -95,7 +95,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
@@ -112,9 +112,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -124,9 +124,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -175,7 +175,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
@@ -192,9 +192,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -204,9 +204,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -256,12 +256,19 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
 int test_contact() {
     MPI_Comm comm = MPI_COMM_WORLD;
+
+    int comm_size;
+    MPI_Comm_size(comm, &comm_size);
+
+    if(comm_size > 1) {
+        SFEM_ERROR("test_contact() can only be run in serial!\n");
+    }
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -277,7 +284,7 @@ int test_contact() {
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * resolution_ratio,
@@ -288,9 +295,9 @@ int test_contact() {
                                           y_top,
                                           1);
 
-    const int block_size = m->spatial_dimension();
+    const int block_size = mesh->spatial_dimension();
 
-    auto fs = sfem::FunctionSpace::create(m, block_size);
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -363,7 +370,7 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        fs->mesh_ptr()->write("test_contact/coarse_mesh");
+        mesh->write("test_contact/coarse_mesh");
         fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
 
         auto out = f->output();

@@ -10,26 +10,53 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_CRSGraph.hpp"
+#include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include <memory>
 
 namespace sfem {
-    void                        register_device_ops();
-    std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc);
-    std::shared_ptr<Op>         to_device(const std::shared_ptr<NeumannConditions> &nc);
-    std::shared_ptr<Sideset>    to_device(const std::shared_ptr<Sideset> &ss);
+    void                                  register_device_ops();
+    std::shared_ptr<Constraint>           to_device(const std::shared_ptr<DirichletConditions> &dc);
+    std::shared_ptr<Op>                   to_device(const std::shared_ptr<NeumannConditions> &nc);
+    std::shared_ptr<Sideset>              to_device(const std::shared_ptr<Sideset> &ss);
+    std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss);
 
-    std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
-                                                          const enum ElemType                   element_type);
+    SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const enum ElemType element_type);
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> create_device_buffer(const std::ptrdiff_t n) {
+    SharedBuffer<T> create_device_buffer(const std::ptrdiff_t n) {
         auto ret = std::make_shared<Buffer<T>>(n, (T *)d_buffer_alloc(n * sizeof(T)), &d_buffer_destroy, MEMORY_SPACE_DEVICE);
         return ret;
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> to_device(const std::shared_ptr<Buffer<T>> &in) {
+    SharedBuffer<T *> create_device_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1) {
+        T **dev_buff0 = (T **)d_buffer_alloc(n0 * sizeof(T *));
+
+        std::vector<T *> host_dev_ptrs(n0);
+        for (size_t i0 = 0; i0 < n0; i0++) {
+            host_dev_ptrs[i0] = (T *)d_buffer_alloc(n1 * sizeof(T));
+            d_memset(host_dev_ptrs[i0], 0, n1 * sizeof(T));
+        }
+
+        buffer_host_to_device(n0 * sizeof(T *), host_dev_ptrs.data(), dev_buff0);
+
+        return std::make_shared<Buffer<T *>>(
+                n0,
+                n1,
+                dev_buff0,
+                [n0, host_dev_ptrs](int n, void **ptr) {
+                    for (size_t i0 = 0; i0 < n0; i0++) {
+                        d_buffer_destroy(host_dev_ptrs[i0]);
+                    }
+
+                    d_buffer_destroy(ptr);
+                },
+                MEMORY_SPACE_DEVICE);
+    }
+
+    template <typename T>
+    SharedBuffer<T> to_device(const SharedBuffer<T> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
         }
@@ -42,7 +69,16 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T *>> to_device(const std::shared_ptr<Buffer<T *>> &in) {
+    std::vector<SharedBuffer<T>> to_device(const std::vector<SharedBuffer<T>> &in) {
+        std::vector<SharedBuffer<T>> ret;
+        for (const auto &b : in) {
+            ret.push_back(to_device(b));
+        }
+        return ret;
+    }
+
+    template <typename T>
+    SharedBuffer<T *> to_device(const SharedBuffer<T *> &in) {
         if (in->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
         }
@@ -83,7 +119,7 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> to_host(const std::shared_ptr<Buffer<T>> &in) {
+    SharedBuffer<T> to_host(const SharedBuffer<T> &in) {
         if (in->mem_space() == MEMORY_SPACE_HOST) {
             return in;
         }

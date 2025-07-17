@@ -21,9 +21,8 @@
 
 #include "sfem_ssmgc.hpp"
 
-int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
-    MPI_Comm comm = context.comm();
-
+int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    
     if (argc != 6) {
         fprintf(stderr, "usage: %s <mesh> <sdf> <dirichlet_conditions> <contact_boundary> <output>\n", argv[0]);
         return SFEM_FAILURE;
@@ -52,9 +51,9 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
         }
     }
 
-    auto      m          = sfem::Mesh::create_from_file(comm, mesh_path);
-    const int block_size = m->spatial_dimension();
-    auto      fs         = sfem::FunctionSpace::create(m, block_size);
+    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
+    const int block_size = mesh->spatial_dimension();
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     fs->semi_structured_mesh().apply_hierarchical_renumbering();
@@ -77,7 +76,7 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 
     auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
     auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
-    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, contact_boundary, es);
+    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -140,6 +139,6 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    sfem::Context context(argc, argv);
-    return solve_obstacle_problem(context, argc, argv);
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_obstacle_problem(ctx->communicator(), argc, argv);
 }
