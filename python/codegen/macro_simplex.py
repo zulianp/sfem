@@ -7,7 +7,7 @@ from fe import FE
 import sympy as sp
 from sfem_codegen import *
 
-dim = 2
+dim = 3
 
 if dim == 2:
     sub_simplices = np.array([[0, 3, 5], [3, 1, 4], [5, 4, 2], [3, 4, 5]])
@@ -69,6 +69,8 @@ def str_to_file(path, mystr):
 
 
 def assign_fff(name, mat):
+    # import pdb
+    # pdb.set_trace()
     rows, cols = mat.shape
 
     expr = []
@@ -115,7 +117,7 @@ def sub_fff_generic(micro_ref, FFFs):
 
     # print("------------------")
     # print(Aminv)
-    # print(detAm)
+    print(detAm)
     # print(FFAms)
     return FFAms
 

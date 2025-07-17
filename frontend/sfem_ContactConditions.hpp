@@ -59,7 +59,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space();
 
-        const std::shared_ptr<Buffer<idx_t>> node_mapping();
+        const SharedBuffer<idx_t> node_mapping();
 
         static std::shared_ptr<ContactConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space,
                                                                   const enum ExecutionSpace             es);
@@ -70,7 +70,7 @@ namespace sfem {
 
         static std::shared_ptr<ContactConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                          const std::shared_ptr<Grid<geom_t>>  &sdf,
-                                                         const std::shared_ptr<Sideset>       &sideset,
+                                                         const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                          const enum ExecutionSpace             es);
 
         // int copy_constrained_dofs(const real_t *const src, real_t *const dest);
@@ -101,8 +101,7 @@ namespace sfem {
 
         int full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s);
 
-        std::shared_ptr<Buffer<idx_t *>> ss_sides();
-        // std::shared_ptr<Sideset>         sideset();
+        SharedBuffer<idx_t *> ss_sides();
 
     private:
         class Impl;

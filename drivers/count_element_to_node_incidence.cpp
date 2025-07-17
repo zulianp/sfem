@@ -25,23 +25,23 @@ int main(int argc, char *argv[]) {
     const char *path_count = argv[2];
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(comm, folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    auto &mesh = *((mesh_t *)m->impl_mesh());
+    int *count = (int*)calloc(m->n_nodes(), sizeof(int));
 
-    int *count = (int*)calloc(mesh.nnodes, sizeof(int));
+    int nxe = elem_num_nodes(m->element_type());
 
-    int nxe = elem_num_nodes((enum ElemType)mesh.element_type);
-
+    const ptrdiff_t nelements = m->n_elements();
+    const auto elements = m->elements()->data();
     for (int d = 0; d < nxe; d++) {
 #pragma omp parallel for
-        for (ptrdiff_t i = 0; i < mesh.nelements; ++i) {
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
 #pragma omp atomic update
-            count[mesh.elements[d][i]]++;
+            count[elements[d][i]]++;
         }
     }
 
-    if (array_write(comm, path_count, MPI_INT, count, mesh.nnodes, mesh.nnodes)) {
+    if (array_write(comm, path_count, MPI_INT, count, m->n_nodes(), m->n_nodes())) {
         return SFEM_FAILURE;
     }
 

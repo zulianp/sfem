@@ -3,6 +3,7 @@
 #include "sfem_test.h"
 
 #include "sfem_API.hpp"
+#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
 
 // FIXME
@@ -13,7 +14,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
 
     std::shared_ptr<sfem::Operator<real_t>> bjacobi;
     auto                                    diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -109,7 +110,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
 #endif
 
-    solver->verbose = true;
+    solver->verbose = false;
     solver->set_max_it(max_it);
     solver->set_rtol(0);
     solver->set_atol(1e-8);
@@ -168,15 +169,23 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
 
-    int SFEM_MAX_IT = 20000;
-    SFEM_READ_ENV(SFEM_MAX_IT, atoi);
+    int SFEM_MAX_IT = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
+    bool SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
 
     cg->set_max_it(SFEM_MAX_IT);
     cg->set_op(linear_op);
+
+    if (SFEM_USE_PRECONDITIONER) {
+        auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+        f->hessian_diag(nullptr, diag->data());
+        auto preconditioner = sfem::create_shiftable_jacobi(diag, es);
+        cg->set_preconditioner_op(preconditioner);
+    }
+
     cg->set_rtol(1e-9);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -189,8 +198,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     SFEM_TEST_ASSERT(cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     double tock = MPI_Wtime();
 
-    int SFEM_VERBOSE = 0;
-    SFEM_READ_ENV(SFEM_VERBOSE, atoi);
+    bool SFEM_VERBOSE = sfem::Env::read<bool>("SFEM_VERBOSE", false);
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");
@@ -198,8 +206,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
         printf("---------------------\n");
     }
 
-    int SFEM_ENABLE_OUTPUT = 0;
-    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    bool SFEM_ENABLE_OUTPUT = sfem::Env::read<bool>("SFEM_ENABLE_OUTPUT", false);
 
     if (SFEM_ENABLE_OUTPUT) {
         if (SFEM_VERBOSE) {
@@ -233,24 +240,13 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
 }
 
 int test_poisson() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
-
-    const char *SFEM_EXECUTION_SPACE{nullptr};
-    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
-
-    if (SFEM_EXECUTION_SPACE) {
-        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    }
-
-    int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    int SFEM_BASE_RESOLUTION = 1;
-    // SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+    MPI_Comm comm                      = MPI_COMM_WORLD;
+    auto     es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    int      SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
+    int      SFEM_BASE_RESOLUTION      = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 1);
 
     auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
     auto fs = sfem::FunctionSpace::create(m, 1);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
@@ -267,11 +263,11 @@ int test_poisson() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(comm, left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(comm, right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
-    sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition left{.sidesets = {left_sideset}, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = {right_sideset}, .value = 1, .component = 0};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {left, right}, es);
     f->add_constraint(conds);
@@ -282,110 +278,184 @@ int test_poisson() {
     return test_linear_function(f, "test_poisson");
 }
 
-int test_poisson_and_boundary_selector() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
-
-    const char *SFEM_EXECUTION_SPACE{nullptr};
-    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
-
-    if (SFEM_EXECUTION_SPACE) {
-        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    }
-
-    const char *SFEM_OPERATOR = "Laplacian";
-    SFEM_READ_ENV(SFEM_OPERATOR, );
+int test_poisson_and_boundary_selector_aux(const char                        *test_name,
+                                           const std::shared_ptr<sfem::Mesh> &m,
+                                           const std::string                 &operator_name,
+                                           int                                block_size,
+                                           sfem::ExecutionSpace               es,
+                                           std::vector<std::string>           block_names = {}) {
+    auto fs = sfem::FunctionSpace::create(m, block_size);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 1;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    int SFEM_BLOCK_SIZE = 1;
-    if (strcmp(SFEM_OPERATOR, "VectorLaplacian") == 0) {
-        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
-        SFEM_BLOCK_SIZE = 3;
-    }
-
-    // SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
-
-    int SFEM_BASE_RESOLUTION = 6;
-    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
-
-    int x_dim = 1;
-
-    auto m = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION * x_dim, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, x_dim, 1, 1);
-    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
 
     auto f = sfem::Function::create(fs);
 
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
+    auto aabb = m->compute_bounding_box();
 
-    auto right_sideset =
-            sfem::Sideset::create_from_selector(m, [x_dim](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
-                return x > (x_dim - 1e-5) && x < (x_dim + 1e-5);
+    const geom_t x_min = aabb.first->data()[0];
+    const geom_t y_min = aabb.first->data()[1];
+    const geom_t z_min = aabb.first->data()[2];
+    const geom_t x_max = aabb.second->data()[0];
+    const geom_t y_max = aabb.second->data()[1];
+    const geom_t z_max = aabb.second->data()[2];
+
+    auto left_sideset =
+            sfem::Sideset::create_from_selector(m, [x_min](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+                return x > (x_min - 1e-5) && x < (x_min + 1e-5);
             });
 
-    auto top_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > (1 - 1e-5) && z < (1 + 1e-5); });
+    auto right_sideset =
+            sfem::Sideset::create_from_selector(m, [x_max](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+                return x > (x_max - 1e-5) && x < (x_max + 1e-5);
+            });
 
-    auto bottom_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > -1e-5 && z < 1e-5; });
+    auto top_sideset =
+            sfem::Sideset::create_from_selector(m, [z_max](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool {
+                return z > (z_max - 1e-5) && z < (z_max + 1e-5);
+            });
 
-    auto front_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > (1 - 1e-5) && y < (1 + 1e-5); });
+    auto bottom_sideset =
+            sfem::Sideset::create_from_selector(m, [z_min](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool {
+                return z > (z_min - 1e-5) && z < (z_min + 1e-5);
+            });
 
-    auto back_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+    auto front_sideset =
+            sfem::Sideset::create_from_selector(m, [y_max](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
+                return y > (y_max - 1e-5) && y < (y_max + 1e-5);
+            });
 
-    sfem::DirichletConditions::Condition left{.sideset = left_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition top{.sideset = top_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition bottom{.sideset = bottom_sideset, .value = -1, .component = 0};
-    sfem::DirichletConditions::Condition front{.sideset = front_sideset, .value = 1, .component = 0};
-    sfem::DirichletConditions::Condition back{.sideset = back_sideset, .value = -1, .component = 0};
+    auto back_sideset =
+            sfem::Sideset::create_from_selector(m, [y_min](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool {
+                return y > (y_min - 1e-5) && y < (y_min + 1e-5);
+            });
 
-    if (SFEM_BLOCK_SIZE == 1) {
+    sfem::DirichletConditions::Condition left{.sidesets = left_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = right_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition top{.sidesets = top_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition bottom{.sidesets = bottom_sideset, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition front{.sidesets = front_sideset, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition back{.sidesets = back_sideset, .value = -1, .component = 0};
+
+    if (block_size == 1) {
         auto conds = sfem::create_dirichlet_conditions(fs, {left, right, bottom, top, front, back}, es);
         f->add_constraint(conds);
     } else {
-        sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = -1, .component = 1};
-        sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 1, .component = 1};
-        sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = -1, .component = 2};
-        sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 1, .component = 2};
+        sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = -1, .component = 1};
+        sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 1, .component = 1};
+        sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = -1, .component = 2};
+        sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 1, .component = 2};
 
         auto conds = sfem::create_dirichlet_conditions(fs, {left, left1, left2, top, right1, right2}, es);
         f->add_constraint(conds);
     }
 
-    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
-    op->initialize();
+    auto op = sfem::create_op(fs, operator_name, es);
+    op->initialize(block_names);
     f->add_operator(op);
-    return test_linear_function(f, "test_poisson_and_boundary_selector");
+    return test_linear_function(f, test_name);
+}
+
+int test_poisson_and_boundary_selector() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+
+    int x_dim = 1;
+
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+                                          SFEM_BASE_RESOLUTION * x_dim,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          x_dim,
+                                          1,
+                                          1);
+
+    return test_poisson_and_boundary_selector_aux("test_poisson_and_boundary_selector", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
+}
+
+int test_poisson_and_boundary_selector_checkerboard() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    auto m                    = sfem::Mesh::create_hex8_checkerboard_cube(
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+
+    return test_poisson_and_boundary_selector_aux(
+            "test_poisson_and_boundary_selector_checkerboard", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es);
+}
+
+int test_poisson_and_boundary_selector_bidomain() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+
+    return test_poisson_and_boundary_selector_aux(
+            "test_poisson_and_boundary_selector_bidomain", m, SFEM_OPERATOR, SFEM_BLOCK_SIZE, es, {"left"});
+}
+
+int test_generic_operator_with_boundary_conditions(const std::string                                       &test_name,
+                                                   const std::shared_ptr<sfem::FunctionSpace>              &fs,
+                                                   std::shared_ptr<sfem::Op>                                op,
+                                                   const std::vector<sfem::DirichletConditions::Condition> &boundary_conditions,
+                                                   int                                                      refine_level = 1) {
+    if (refine_level > 1) {
+        fs->promote_to_semi_structured(refine_level);
+    }
+
+    auto f = sfem::Function::create(fs);
+
+    // Add boundary conditions
+    auto conds = sfem::create_dirichlet_conditions(fs, boundary_conditions, op->execution_space());
+    f->add_constraint(conds);
+
+    f->add_operator(op);
+
+    return test_linear_function(f, test_name);
 }
 
 int test_linear_elasticity() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
+    MPI_Comm comm                      = MPI_COMM_WORLD;
+    auto     es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    int      SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
 
-    const char *SFEM_EXECUTION_SPACE{nullptr};
-    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
 
-    if (SFEM_EXECUTION_SPACE) {
-        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    }
-
-    int SFEM_ELEMENT_REFINE_LEVEL = 4;
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-
-    auto m  = sfem::Mesh::create_hex8_cube(comm);
-    auto fs = sfem::FunctionSpace::create(m, 3);
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    auto f = sfem::Function::create(fs);
-
+    // Create sidesets for boundary conditions
     auto left_parent  = sfem::create_host_buffer<element_idx_t>(1);
     auto right_parent = sfem::create_host_buffer<element_idx_t>(1);
     auto left_lfi     = sfem::create_host_buffer<int16_t>(1);
@@ -396,22 +466,176 @@ int test_linear_elasticity() {
     right_parent->data()[0] = 0;
     right_lfi->data()[0]    = HEX8_RIGHT;
 
-    auto left_sideset  = std::make_shared<sfem::Sideset>(comm, left_parent, left_lfi);
-    auto right_sideset = std::make_shared<sfem::Sideset>(comm, right_parent, right_lfi);
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
 
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = -2, .component = 0};
-    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0, .component = 2};
+    // Define boundary conditions
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
+            {.sidesets = {left_sideset}, .value = -2, .component = 0},
+            {.sidesets = {left_sideset}, .value = 0, .component = 1},
+            {.sidesets = {left_sideset}, .value = 0, .component = 2},
+            {.sidesets = {right_sideset}, .value = 1, .component = 0}};
 
-    sfem::DirichletConditions::Condition right{.sideset = right_sideset, .value = 1, .component = 0};
+    auto fs = sfem::FunctionSpace::create(m, 3);
+    // Create and initialize operator
+    auto op = sfem::create_op(fs, "LinearElasticity", es);
+    op->initialize();
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2, right}, es);
-    f->add_constraint(conds);
+    return test_generic_operator_with_boundary_conditions("test_linear_elasticity",
+                                                          fs,
+                                                          op,
+                                                          boundary_conditions,
+                                                          SFEM_ELEMENT_REFINE_LEVEL);
+}
+
+// Example of how to create additional tests using the generic function
+int test_poisson_simple() {
+    MPI_Comm comm = MPI_COMM_WORLD;
+    auto     es   = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
+
+    // Create sidesets for boundary conditions
+    auto left_parent  = sfem::create_host_buffer<element_idx_t>(1);
+    auto right_parent = sfem::create_host_buffer<element_idx_t>(1);
+    auto left_lfi     = sfem::create_host_buffer<int16_t>(1);
+    auto right_lfi    = sfem::create_host_buffer<int16_t>(1);
+
+    left_parent->data()[0]  = 0;
+    left_lfi->data()[0]     = HEX8_LEFT;
+    right_parent->data()[0] = 0;
+    right_lfi->data()[0]    = HEX8_RIGHT;
+
+    auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
+    auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
+
+    // Define boundary conditions for Poisson
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
+            {.sidesets = {left_sideset}, .value = -1, .component = 0}, {.sidesets = {right_sideset}, .value = 1, .component = 0}};
+
+    auto fs = sfem::FunctionSpace::create(m, 1);
+
+    // Create and initialize operator
+    auto op = sfem::create_op(fs, "Laplacian", es);
+    op->initialize();
+
+    return test_generic_operator_with_boundary_conditions("test_poisson_simple",
+                                                          fs,
+                                                          op,
+                                                          boundary_conditions,
+                                                          1  // no refinement
+    );
+}
+
+int test_bidomain_elasticity() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+
+    auto fs = sfem::FunctionSpace::create(m, 3);
 
     auto op = sfem::create_op(fs, "LinearElasticity", es);
     op->initialize();
-    f->add_operator(op);
-    return test_linear_function(f, "test_linear_elasticity");
+    op->set_value_in_block("left", "mu", 1);
+    op->set_value_in_block("left", "lambda", 1);
+
+    op->set_value_in_block("right", "mu", 10);
+    op->set_value_in_block("right", "lambda", 10);
+
+    auto right_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+
+    auto left_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
+
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
+            {.sidesets = left_sideset, .value = 0, .component = 0},
+            {.sidesets = left_sideset, .value = -1, .component = 1},
+            {.sidesets = left_sideset, .value = 0, .component = 2},
+            {.sidesets = right_sideset, .value = 0, .component = 0},
+            {.sidesets = right_sideset, .value = 1, .component = 1},
+            {.sidesets = right_sideset, .value = 0, .component = 2},
+    };
+
+    return test_generic_operator_with_boundary_conditions("test_bidomain_elasticity",
+                                                          fs,
+                                                          op,
+                                                          boundary_conditions,
+                                                          1  // no refinement
+    );
+}
+
+int test_boundary_layer_elasticity() {
+    MPI_Comm comm          = MPI_COMM_WORLD;
+    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+
+    int SFEM_BLOCK_SIZE = 1;
+    if (SFEM_OPERATOR == "VectorLaplacian") {
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
+        SFEM_BLOCK_SIZE = 3;
+    }
+
+    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    auto m                    = sfem::Mesh::create_hex8_cube(
+            sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
+
+    real_t margin_min = 0.5;
+    real_t margin_max = 1.5;
+    auto selection = m->select_elements(
+            [margin_min, margin_max](const geom_t x, const geom_t y, const geom_t z) -> bool { 
+                return (x <= margin_min || x >= margin_max) || (y <= margin_min || y >= margin_max) || (z <= margin_min || z >= margin_max); },
+            {});
+    
+
+    m->split_block(selection[0].second, "boundary_layer");
+    m->renumber_nodes(); // Make sure that nodes in blocks are near each other
+
+    auto fs = sfem::FunctionSpace::create(m, 3);
+
+    auto op = sfem::create_op(fs, "LinearElasticity", es);
+    op->initialize();
+    op->set_value_in_block("boundary_layer", "mu", 10);
+    op->set_value_in_block("boundary_layer", "lambda", 10);
+
+    op->set_value_in_block("default", "mu", 1);
+    op->set_value_in_block("default", "lambda", 1);
+
+    auto left_sideset = sfem::Sideset::create_from_selector(
+        m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
+
+
+    auto right_sideset = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
+
+  
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
+            {.sidesets = left_sideset, .value = 0.2, .component = 0},
+            {.sidesets = left_sideset, .value = 0.2, .component = 1},
+            {.sidesets = left_sideset, .value = 0, .component = 2},
+            {.sidesets = right_sideset, .value = -0.2, .component = 0},
+            {.sidesets = right_sideset, .value = -0.2, .component = 1},
+            {.sidesets = right_sideset, .value = 0, .component = 2},
+    };
+
+    return test_generic_operator_with_boundary_conditions("test_boundary_layer_elasticity",
+                                                          fs,
+                                                          op,
+                                                          boundary_conditions,
+                                                          1  // no refinement
+    );
 }
 
 #ifdef SFEM_ENABLE_RYAML
@@ -439,7 +663,7 @@ int test_poisson_yaml() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    auto m  = sfem::Mesh::create_hex8_cube(comm);
+    auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(16);
     auto f = sfem::Function::create(fs);
@@ -459,9 +683,13 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     // SFEM_RUN_TEST(test_poisson);
-    // SFEM_RUN_TEST(test_linear_elasticity);
+    SFEM_RUN_TEST(test_linear_elasticity);
+    SFEM_RUN_TEST(test_poisson_simple);
     SFEM_RUN_TEST(test_poisson_and_boundary_selector);
-
+    SFEM_RUN_TEST(test_poisson_and_boundary_selector_checkerboard);
+    SFEM_RUN_TEST(test_poisson_and_boundary_selector_bidomain);
+    SFEM_RUN_TEST(test_bidomain_elasticity);
+    SFEM_RUN_TEST(test_boundary_layer_elasticity);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_poisson_yaml);
 #endif

@@ -1,9 +1,7 @@
 #include "sfem_API.hpp"
 
 #include "sortreduce.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#include "sfem_macros.h"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -23,12 +21,12 @@ int main(int argc, char *argv[]) {
     }
 
     const char     *output_folder = argv[2];
-    auto            hex8_mesh     = sfem::mesh_connectivity_from_file(comm, argv[1]);
-    const ptrdiff_t n_elements    = hex8_mesh->extent(1);
+    auto            hex8_elements = sfem::mesh_connectivity_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    const ptrdiff_t n_elements    = hex8_elements->extent(1);
     auto            tet4_elements = sfem::create_host_buffer<idx_t>(4, n_elements * 6);
     auto            elems         = tet4_elements->data();
 
-    auto hex8_elems = hex8_mesh->data();
+    auto hex8_elems = hex8_elements->data();
     for (ptrdiff_t e = 0; e < n_elements; e++) {
         idx_t ii[8];
         for (ptrdiff_t d = 0; d < 8; d++) {

@@ -27,9 +27,9 @@ namespace sfem {
         std::ptrdiff_t cols() const override { return block_size_ * block_cols_; }
         inline int block_size() const { return block_size_; }
 
-        std::shared_ptr<Buffer<R>> row_ptr;
-        std::shared_ptr<Buffer<C>> col_idx;
-        std::shared_ptr<Buffer<T>> values;
+        SharedBuffer<R> row_ptr;
+        SharedBuffer<C> col_idx;
+        SharedBuffer<T> values;
 
         int block_size_{0};
         ptrdiff_t block_cols_{0};
@@ -68,12 +68,12 @@ namespace sfem {
 
     template <typename R, typename C, typename T>
     std::shared_ptr<BSRSpMV<R, C, T>> h_bsr_spmv(const ptrdiff_t block_rows,
-                                                 const ptrdiff_t block_cols,
-                                                 const int block_size,
-                                                 const std::shared_ptr<Buffer<R>>& rowptr,
-                                                 const std::shared_ptr<Buffer<C>>& colidx,
-                                                 const std::shared_ptr<Buffer<T>>& values,
-                                                 const T scale_output) {
+                                                  const ptrdiff_t block_cols,
+                                                  const int block_size,
+                                                  const SharedBuffer<R>& rowptr,
+                                                  const SharedBuffer<C>& colidx,
+                                                  const SharedBuffer<T>& values,
+                                                  const T scale_output) {
         auto ret = std::make_shared<BSRSpMV<R, C, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;

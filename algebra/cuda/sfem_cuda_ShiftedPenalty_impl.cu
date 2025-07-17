@@ -173,10 +173,10 @@ namespace sfem {
     template <typename T>
     __global__ void ramp_p_kernel(const ptrdiff_t n,
                                   const T         penalty_param,
-                                  const T* const  x,
-                                  const T* const  ub,
-                                  const T* const  lagr_ub,
-                                  T* const        out) {
+                                  const T* const SFEM_RESTRICT x,
+                                  const T* const SFEM_RESTRICT ub,
+                                  const T* const SFEM_RESTRICT lagr_ub,
+                                  T* const SFEM_RESTRICT out) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             out[i] -= penalty_param * tmax(T(0), x[i] - ub[i] + lagr_ub[i] / penalty_param);
         }
@@ -204,10 +204,10 @@ namespace sfem {
     template <typename T>
     __global__ void ramp_m_kernel(const ptrdiff_t n,
                                   const T         penalty_param,
-                                  const T* const  x,
-                                  const T* const  lb,
-                                  const T* const  lagr_lb,
-                                  T* const        out) {
+                                  const T* const SFEM_RESTRICT x,
+                                  const T* const SFEM_RESTRICT lb,
+                                  const T* const SFEM_RESTRICT lagr_lb,
+                                  T* const SFEM_RESTRICT out) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             out[i] -= penalty_param * tmin(T(0), x[i] - lb[i] + lagr_lb[i] / penalty_param);
         }
@@ -235,9 +235,9 @@ namespace sfem {
     template <typename T>
     __global__ void update_lagr_p_kernel(const ptrdiff_t n,
                                          const T         penalty_param,
-                                         const T* const  x,
-                                         const T* const  ub,
-                                         T* const        lagr_ub) {
+                                         const T* const SFEM_RESTRICT x,
+                                         const T* const SFEM_RESTRICT ub,
+                                         T* const SFEM_RESTRICT lagr_ub) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             lagr_ub[i] = tmax(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
         }
@@ -264,9 +264,9 @@ namespace sfem {
     template <typename T>
     __global__ void update_lagr_m_kernel(const ptrdiff_t n,
                                          const T         penalty_param,
-                                         const T* const  x,
-                                         const T* const  lb,
-                                         T* const        lagr_lb) {
+                                         const T* const SFEM_RESTRICT x,
+                                         const T* const SFEM_RESTRICT lb,
+                                         T* const SFEM_RESTRICT lagr_lb) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             lagr_lb[i] = tmin(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
         }
@@ -290,11 +290,11 @@ namespace sfem {
 
     template <typename T>
     __global__ void calc_J_pen_p_kernel(const ptrdiff_t n,
-                                        const T* const  x,
+                                        const T* const SFEM_RESTRICT x,
                                         const T         penalty_param,
-                                        const T* const  ub,
-                                        const T* const  lagr_ub,
-                                        T* const        result) {
+                                        const T* const SFEM_RESTRICT ub,
+                                        const T* const SFEM_RESTRICT lagr_ub,
+                                        T* const SFEM_RESTRICT result) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             result[i] += ((x[i] - ub[i] + lagr_ub[i] / penalty_param) >= 0) * penalty_param;
         }
@@ -302,11 +302,11 @@ namespace sfem {
 
     template <typename T>
     __global__ void calc_J_pen_m_kernel(const ptrdiff_t n,
-                                        const T* const  x,
+                                        const T* const SFEM_RESTRICT x,
                                         const T         penalty_param,
-                                        const T* const  lb,
-                                        const T* const  lagr_lb,
-                                        T* const        result) {
+                                        const T* const SFEM_RESTRICT lb,
+                                        const T* const SFEM_RESTRICT lagr_lb,
+                                        T* const SFEM_RESTRICT result) {
         for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
             result[i] += ((x[i] - lb[i] + lagr_lb[i] / penalty_param) <= 0) * penalty_param;
         }

@@ -1,4 +1,5 @@
 #include "sfem_glob.hpp"
+#include "sfem_glob.h"
 #include "sfem_base.h"
 #ifndef _WIN32
 #include <glob.h>

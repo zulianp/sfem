@@ -1,6 +1,7 @@
 #ifndef SFEM_BASE_H
 #define SFEM_BASE_H
 
+#include <stdio.h>
 #include <stdlib.h>
 
 // FIXME
@@ -11,12 +12,28 @@
 #define SFEM_SUCCESS 0
 #define SFEM_FAILURE 1
 
-#define PRINT_CURRENT_FUNCTION \
-    printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
+// #define SFEM_LOG_LEVEL 4
 
-#define RETURN_FROM_FUNCTION(__RET_VAL__)                                                                                \
-    printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
-    return __RET_VAL__;
+#if SFEM_LOG_LEVEL >= 5
+
+#define PRINT_CURRENT_FUNCTION \
+    { printf("\033[32m\nEnter Function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); }
+
+#define RETURN_FROM_FUNCTION(__RET_VAL__)                                                                                    \
+    {                                                                                                                        \
+        printf("\033[31m\nReturn from function\033[0m: \033[33m%s\033[0m, file: %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
+        return __RET_VAL__;                                                                                                  \
+    }
+
+#else
+
+#define PRINT_CURRENT_FUNCTION
+
+#define RETURN_FROM_FUNCTION(__RET_VAL__) \
+    { return __RET_VAL__; }
+
+#endif
+
 
 #define SFEM_READ_ENV(name, conversion) \
     do {                                \

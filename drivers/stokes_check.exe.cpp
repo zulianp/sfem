@@ -28,6 +28,8 @@
 
 #include "read_mesh.h"
 
+#include "sfem_API.hpp"
+
 static SFEM_INLINE real_t ux1(const real_t x, const real_t y) {
     return x * x * (1 - x) * (1 - x) * 2 * y * (1 - y) * (2 * y - 1);
 }
@@ -252,19 +254,16 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    mesh_t mesh;
-    if (mesh_read(comm, folder, &mesh)) {
-        return EXIT_FAILURE;
-    }
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
 
-    if (mesh.element_type != TRI3) {
+    if (mesh->element_type() != TRI3) {
         fprintf(stderr, "element_type must be TRI3\n");
         return EXIT_FAILURE;
     }
 
-    real_t *ux = (real_t *)calloc(mesh.nnodes, sizeof(real_t));
-    real_t *uy = (real_t *)calloc(mesh.nnodes, sizeof(real_t));
-    real_t *p = (real_t *)calloc(mesh.nnodes, sizeof(real_t));
+    real_t *ux = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t *uy = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
+    real_t *p = (real_t *)calloc(mesh->n_nodes(), sizeof(real_t));
 
     // Optional params
     real_t SFEM_MU = 1;
@@ -285,20 +284,20 @@ int main(int argc, char *argv[]) {
             SFEM_MU);
     }
 
-    stokes_ref_sol(SFEM_PROBLEM_TYPE, SFEM_MU, mesh.nnodes, mesh.points, ux, uy, p);
+    stokes_ref_sol(SFEM_PROBLEM_TYPE, SFEM_MU, mesh->n_nodes(), mesh->points()->data(), ux, uy, p);
 
-    array_write(comm, path_ux, SFEM_MPI_REAL_T, ux, mesh.nnodes, mesh.nnodes);
-    array_write(comm, path_uy, SFEM_MPI_REAL_T, uy, mesh.nnodes, mesh.nnodes);
-    array_write(comm, path_p, SFEM_MPI_REAL_T, p, mesh.nnodes, mesh.nnodes);
+    array_write(comm, path_ux, SFEM_MPI_REAL_T, ux, mesh->n_nodes(), mesh->n_nodes());
+    array_write(comm, path_uy, SFEM_MPI_REAL_T, uy, mesh->n_nodes(), mesh->n_nodes());
+    array_write(comm, path_p, SFEM_MPI_REAL_T, p, mesh->n_nodes(), mesh->n_nodes());
 
     ///////////////////////////////////////////////////////////////////////////////
     // Free resources
     ///////////////////////////////////////////////////////////////////////////////
 
-    ptrdiff_t nelements = mesh.nelements;
-    ptrdiff_t nnodes = mesh.nnodes;
+    ptrdiff_t nelements = mesh->n_elements();
+    ptrdiff_t nnodes = mesh->n_nodes();
 
-    mesh_destroy(&mesh);
+
 
     free(ux);
     free(uy);

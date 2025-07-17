@@ -16,7 +16,10 @@
 #cmakedefine SFEM_ENABLE_RYAML
 #cmakedefine SFEM_ENABLE_TRACE
 #cmakedefine SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+#cmakedefine SFEM_ENABLE_MPI
+#cmakedefine SFEM_ENABLE_AVX512_SORT
 
+#cmakedefine01 SFEM_PRINT_THROUGHPUT
 
 #ifdef SFEM_ENABLE_CUDA
 #define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
@@ -132,6 +135,8 @@ typedef @SFEM_LOCAL_IDX_C_TYPE@ local_idx_t;
 
 #define SFEM_CUDA_MEMORY_MODEL @SFEM_CUDA_MEMORY_MODEL@
 
+#define SFEM_LOG_LEVEL @SFEM_LOG_LEVEL@
+
 #endif  // SFEM_ENABLE_CUSTOM_NUMBERS
 
 #define SFEM_WARP_SIZE 32
@@ -153,5 +158,6 @@ typedef char mask_t;
 #endif // SFEM_ENABLE_CUDA
 
 typedef int64_t sshex_side_code_t;
+typedef uint16_t block_idx_t;
 
 #endif  // SFEM_CONFIG_HPP

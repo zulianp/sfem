@@ -22,7 +22,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION,
@@ -43,28 +43,28 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     }
 
     auto f = sfem::Function::create(fs);
-
+    
     auto left_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 2 - 1e-5; });
 
-    sfem::DirichletConditions::Condition right0{.sideset = right_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition right0{.sidesets = right_sideset, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 0, .component = 2};
 
 #if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
     f->add_constraint(d_conds);
 
-    sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
+    sfem::NeumannConditions::Condition nc_left{.sidesets = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
 #else  // Test with Dirichlet only (in case diable test_newmark)
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0.2, .component = 0};
-    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0.2, .component = 1};
-    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0.2, .component = 2};
+    sfem::DirichletConditions::Condition left0{.sidesets = left_sideset, .value = 0.2, .component = 0};
+    sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = 0.2, .component = 1};
+    sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = 0.2, .component = 2};
     auto d_conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2, right0, right1, right2}, es);
     f->add_constraint(d_conds);
 #endif
@@ -220,7 +220,7 @@ int test_newmark() {
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
             // We will do nonlinear materials next, so we keep it here.
-            auto material_op = sfem::create_linear_operator("MF", f, solution, es);
+            auto material_op = sfem::create_linear_operator(MATRIX_FREE, f, solution, es);
             auto linear_op   = sfem::make_op<real_t>(
                     material_op->rows(),
                     material_op->cols(),

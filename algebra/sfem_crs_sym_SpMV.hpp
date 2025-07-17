@@ -18,9 +18,9 @@ namespace sfem {
         std::ptrdiff_t rows() const override { return rows_; }
         std::ptrdiff_t cols() const override { return cols_; }
 
-        std::shared_ptr<Buffer<R>> rowptr;
-        std::shared_ptr<Buffer<C>> colidx;
-        std::shared_ptr<Buffer<T>> diag_values;
+        SharedBuffer<R> rowptr;
+        SharedBuffer<C> colidx;
+        SharedBuffer<T> diag_values;
         std::shared_ptr<Buffer<T>> off_diag_values;
         T scale_output{0};
 
@@ -75,10 +75,9 @@ namespace sfem {
     };
 
     template <typename R, typename C, typename T>
-    std::shared_ptr<CRSSymSpMV<R, C, T>> h_crs_sym_spmv(
-            const ptrdiff_t rows, const ptrdiff_t cols, const std::shared_ptr<Buffer<R>>& rowptr,
-            const std::shared_ptr<Buffer<C>>& colidx, const std::shared_ptr<Buffer<T>>& diag_values,
-            const std::shared_ptr<Buffer<T>>& off_diag_values, const T scale_output) {
+    std::shared_ptr<CRSSymSpMV<R, C, T>> h_crs_sym(const ptrdiff_t rows, const ptrdiff_t cols, const SharedBuffer<R>& rowptr,
+                                                    const SharedBuffer<C>& colidx, const SharedBuffer<T>& diag_values,
+                                                    const SharedBuffer<T>& off_diag_values, const T scale_output) {
         auto ret = std::make_shared<CRSSymSpMV<R, C, T>>();
         ret->rowptr = rowptr;
         ret->colidx = colidx;

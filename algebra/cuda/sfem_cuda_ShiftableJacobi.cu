@@ -11,7 +11,7 @@ namespace sfem {
     namespace private_ {
 
         template <typename T>
-        __global__ void inverse3_inplace_apply_AoS(const ptrdiff_t n_blocks, T* const inout) {
+        __global__ void inverse3_inplace_apply_AoS(const ptrdiff_t n_blocks, T* const SFEM_RESTRICT inout) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto ddi = &inout[b * 9];
 
@@ -60,7 +60,7 @@ namespace sfem {
         };
 
         template <typename T>
-        __global__ void mask3_apply(const ptrdiff_t n_blocks, const mask_t* const constraints_mask, T* const inout) {
+        __global__ void mask3_apply(const ptrdiff_t n_blocks, const mask_t* const SFEM_RESTRICT constraints_mask, T* const SFEM_RESTRICT inout) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto ivi = &inout[b * 9];
 
@@ -98,7 +98,7 @@ namespace sfem {
         };
 
         template <typename In, typename Out>
-        __global__ void sbv3_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
+        __global__ void sbv3_add_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const SFEM_RESTRICT in, Out* const SFEM_RESTRICT out) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto di  = &in[b * 6];
                 auto ivi = &out[b * 9];
@@ -122,10 +122,10 @@ namespace sfem {
 
         template <typename DD, typename S, typename IVD>
         __global__ void sbv3_add_sparse_sym_diag_to_diag(const ptrdiff_t    n_blocks,
-                                                         const idx_t* const idx,
-                                                         const DD* const    dd,
-                                                         const S* const     s,
-                                                         IVD* const         ivd) {
+                                                         const idx_t* const SFEM_RESTRICT idx,
+                                                         const DD* const    SFEM_RESTRICT dd,
+                                                         const S* const     SFEM_RESTRICT s,
+                                                         IVD* const         SFEM_RESTRICT ivd) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
                 auto di = &dd[i * 6];
                 auto si = s[i];
@@ -151,7 +151,7 @@ namespace sfem {
         }
 
         template <typename In, typename Out>
-        __global__ void sbv3_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const in, Out* const out) {
+        __global__ void sbv3_sym_diag_to_diag(const ptrdiff_t n_blocks, const In* const SFEM_RESTRICT in, Out* const SFEM_RESTRICT out) {
             for (ptrdiff_t b = blockIdx.x * blockDim.x + threadIdx.x; b < n_blocks; b += blockDim.x * gridDim.x) {
                 auto di  = &in[b * 6];
                 auto ivi = &out[b * 9];
@@ -174,7 +174,7 @@ namespace sfem {
         }
 
         template <typename B, typename In, typename Out>
-        __global__ void sbv3_apply(const ptrdiff_t n_blocks, const B* const blocks, const In* const in, Out* const out) {
+        __global__ void sbv3_apply(const ptrdiff_t n_blocks, const B* const SFEM_RESTRICT blocks, const In* const SFEM_RESTRICT in, Out* const SFEM_RESTRICT out) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
                 const auto* const xi = &in[i * 3];
                 auto* const       yi = &out[i * 3];

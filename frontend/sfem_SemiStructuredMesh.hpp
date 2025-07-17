@@ -5,8 +5,9 @@
 #include "sfem_base.h"
 
 // C++ Includes
-#include "sfem_ForwardDeclarations.hpp"
 #include "sfem_Buffer.hpp"
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_Mesh.hpp"
 
 #include <memory>
 #include <vector>
@@ -15,6 +16,8 @@ namespace sfem {
 
     class SemiStructuredMesh {
     public:
+        using Block = Mesh::Block;
+
         idx_t   **element_data();
         geom_t  **point_data();
         ptrdiff_t interior_start() const;
@@ -39,13 +42,17 @@ namespace sfem {
 
         std::shared_ptr<SemiStructuredMesh> derefine(const int to_level);
 
-        std::shared_ptr<Buffer<geom_t *>> points();
-        std::shared_ptr<Buffer<idx_t *>>  elements();
+        SharedBuffer<geom_t *> points();
+        SharedBuffer<idx_t *>  elements();
 
         int export_as_standard(const char *path);
         int write(const char *path);
 
         std::shared_ptr<Mesh> macro_mesh();
+
+        size_t n_blocks() const;
+        std::vector<std::shared_ptr<Block>> &blocks();
+        std::shared_ptr<Block>               block(const block_idx_t block_id);
 
     private:
         class Impl;

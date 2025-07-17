@@ -11,6 +11,7 @@
 
 #include "matrixio_array.h"
 #include "sfem_MPIType.hpp"
+#include "sfem_Communicator.hpp"
 
 namespace sfem {
 
@@ -172,6 +173,11 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        void release() {
+            destroy_ = nullptr;
+            ptr_ = nullptr;
+        }
+
     private:
         size_t                              extent_[2];
         T                                 **ptr_{nullptr};
@@ -279,10 +285,10 @@ namespace sfem {
     }
 
     template <typename T>
-    std::shared_ptr<Buffer<T>> create_buffer_from_file(MPI_Comm comm, const char *path) {
+    std::shared_ptr<Buffer<T>> create_buffer_from_file(const std::shared_ptr<Communicator> &comm, const char *path) {
         T        *data{nullptr};
         ptrdiff_t local_size{0}, global_size{0};
-        array_create_from_file(comm, path, sfem::MPIType<T>::value(), (void **)&data, &local_size, &global_size);
+        array_create_from_file(comm->get(), path, sfem::MPIType<T>::value(), (void **)&data, &local_size, &global_size);
         return manage_host_buffer<T>(local_size, data);
     }
 
@@ -310,6 +316,10 @@ namespace sfem {
 
         return out;
     }
+
+
+    template<typename T>
+    using SharedBuffer = std::shared_ptr<Buffer<T>>;
 
 }  // namespace sfem
 
