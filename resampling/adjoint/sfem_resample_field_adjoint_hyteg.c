@@ -1067,12 +1067,12 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
     // Jacobian matrix for the tetrahedron
 
-    const real_t theta_volume = del_J_phys / (real_t)(6.0);  // Volume of the tetrahedron in the physical space
+    const real_t theta_volume = del_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
         const real_t x_quad = tet_qx[quad_i] + bc[0];  // X-coordinate of the quadrature point
-        const real_t y_quad = tet_qy[quad_i] + bc[1];
+        const real_t y_quad = tet_qy[quad_i] + bc[1];  // Adjusted for the category transformation
         const real_t z_quad = tet_qz[quad_i] + bc[2];
 
         // The transformation from reference to physical coordinates should use all 4 vertices
@@ -1080,6 +1080,10 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_t xq_phys = J_phys[0] * x_quad + J_phys[1] * y_quad + J_phys[2] * z_quad + fx0;  // Physical X-coordinate
         const real_t yq_phys = J_phys[3] * x_quad + J_phys[4] * y_quad + J_phys[5] * z_quad + fy0;  // Physical Y-coordinate
         const real_t zq_phys = J_phys[6] * x_quad + J_phys[7] * y_quad + J_phys[8] * z_quad + fz0;  // Physical Z-coordinate
+
+        const real_t xq_mref = J_ref[0] * tet_qx[quad_i] + J_ref[1] * tet_qy[quad_i] + J_ref[2] * tet_qz[quad_i] + bc[0];
+        const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
+        const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
 
         const real_t grid_x = (xq_phys - ox) / dx;
         const real_t grid_y = (yq_phys - oy) / dy;
@@ -1089,9 +1093,9 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const ptrdiff_t j = floor(grid_y);
         const ptrdiff_t k = floor(grid_z);
 
-        const real_type l_x = (grid_x - (real_type)i);
-        const real_type l_y = (grid_y - (real_type)j);
-        const real_type l_z = (grid_z - (real_type)k);
+        const real_t l_x = (grid_x - (real_t)i);
+        const real_t l_y = (grid_y - (real_t)j);
+        const real_t l_z = (grid_z - (real_t)k);
 
         assert(l_x >= -1e-8);
         assert(l_y >= -1e-8);
@@ -1104,11 +1108,12 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         // Move the quadrature point to the micro-tetrahedron local coordinate system
 
         // DUAL basis function (Shape functions for tetrahedral elements)
-        // at the quadrature point
-        const real_t f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
-        const real_t f1 = tet_qx[quad_i];
-        const real_t f2 = tet_qy[quad_i];
-        const real_t f3 = tet_qz[quad_i];
+        // at the quadrature point in the coordinate system of the micro-tetrahedron in
+        // the reference space
+        const real_t f0 = 1.0 - xq_mref - yq_mref - zq_mref;
+        const real_t f1 = xq_mref;
+        const real_t f2 = yq_mref;
+        const real_t f3 = zq_mref;
 
         // Values of the shape functions at the quadrature point
         // In the local coordinate system of the tetrahedral element
@@ -1175,6 +1180,12 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
     }  // END: for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++)
 }  // END OF FUNCTION tet4_resample_tetrahedron_local_adjoint_category
 
+/**
+ * @brief Calculate the determinant of the Jacobian matrix.
+ *
+ * @param J 3x3 Jacobian matrix
+ * @return real_t
+ */
 real_t                      //
 det_J(const real_t J[9]) {  // Calculate the determinant of the Jacobian matrix
     // J = [x1-x0, x2-x0, x3-x0]   <- Row 0: indices 0,1,2
@@ -1184,6 +1195,24 @@ det_J(const real_t J[9]) {  // Calculate the determinant of the Jacobian matrix
     return J[0] * (J[4] * J[8] - J[5] * J[7]) - J[1] * (J[3] * J[8] - J[5] * J[6]) + J[2] * (J[3] * J[7] - J[4] * J[6]);
 }
 
+/**
+ * @brief Calculate the Jacobian matrix for a tetrahedron.
+ *
+ * @param fx0
+ * @param fx1
+ * @param fx2
+ * @param fx3
+ * @param fy0
+ * @param fy1
+ * @param fy2
+ * @param fy3
+ * @param fz0
+ * @param fz1
+ * @param fz2
+ * @param fz3
+ * @param J  Output Jacobian matrix in the row-major order
+ * @return real_t
+ */
 real_t                                      //
 make_Jocobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinates
                          const real_t fx1,  //
@@ -1390,7 +1419,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
         const int    max_refinement_L    = 2;    // Maximum refinement level
 
-        const int L = 1 + 0 * alpha_to_hyteg_level(alpha_tet,            //
+        const int L = 3 + 0 * alpha_to_hyteg_level(alpha_tet,            //
                                                    alpha_min_threshold,  //
                                                    alpha_max_threshold,  //
                                                    max_refinement_L);    //
@@ -1418,7 +1447,20 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                    J_vec_phy[cat_i]);  // Output Jacobian matrix
 
             // Calculate the determinant of the Jacobian matrix for the current category
-            det_J_vec_phy[cat_i] = det_J(J_vec_phy[cat_i]);
+            det_J_vec_phy[cat_i] = fabs(det_J(J_vec_phy[cat_i]));
+
+            HYTEG_D_LOG("Category %d: J = [%g, %g, %g, %g, %g, %g, %g, %g, %g], det_J = %g\n",  //
+                        cat_i,
+                        J_vec_phy[cat_i][0],    // J[0][0]
+                        J_vec_phy[cat_i][1],    // J[0][1]
+                        J_vec_phy[cat_i][2],    // J[0][2]
+                        J_vec_phy[cat_i][3],    // J[1][0]
+                        J_vec_phy[cat_i][4],    // J[1][1]
+                        J_vec_phy[cat_i][5],    // J[1][2]
+                        J_vec_phy[cat_i][6],    // J[2][0]
+                        J_vec_phy[cat_i][7],    // J[2][1]
+                        J_vec_phy[cat_i][8],    // J[2][2]
+                        det_J_vec_phy[cat_i]);  // Determinant of the Jacobian matrix
 
         }  // END: for (int cat_i = 0; cat_i < 6; cat_i++)
 
