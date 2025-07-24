@@ -1348,21 +1348,21 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
         const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
 
-        real_t det_J_phys =                //
-                make_Jocobian_matrix_tet(  //
-                        x0_n,              // Tetrahedron vertices X-coordinates
-                        x1_n,              //
-                        x2_n,              //
-                        x3_n,              //
-                        y0_n,              // Tetrahedron vertices Y-coordinates
-                        y1_n,              //
-                        y2_n,              //
-                        y3_n,              //
-                        z0_n,              // Tetrahedron vertices Z-coordinates
-                        z1_n,              //
-                        z2_n,              //
-                        z3_n,              // Vertex 3 coordinates
-                        J_phy);            // Output Jacobian matrix
+        real_t det_J_phys =                     //
+                fabs(make_Jocobian_matrix_tet(  //
+                        x0_n,                   // Tetrahedron vertices X-coordinates
+                        x1_n,                   //
+                        x2_n,                   //
+                        x3_n,                   //
+                        y0_n,                   // Tetrahedron vertices Y-coordinates
+                        y1_n,                   //
+                        y2_n,                   //
+                        y3_n,                   //
+                        z0_n,                   // Tetrahedron vertices Z-coordinates
+                        z1_n,                   //
+                        z2_n,                   //
+                        z3_n,                   // Vertex 3 coordinates
+                        J_phy));                // Output Jacobian matrix
 
         real_t tet_volume = tet4_measure_v2(x0_n,  // Coordinates of the vertices
                                             x1_n,  //
@@ -1643,7 +1643,22 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         HYTEG_D_LOG(" Element %ld: tet_volume =        %g\n", element_i, tet_volume);
         HYTEG_D_LOG(" Element %ld: diff vol   =        %g\n", element_i, (theta_volume_main - tet_volume));
 
-        // if (element_i == 335000) exit(EXIT_SUCCESS);  // Exit the program if the refinement is done
+#if HYTEG_D_LOG_ENABLED == 1
+        if (element_i == 33) exit(EXIT_SUCCESS);  // Exit the program if the refinement is done
+#endif
+
+        // Check if the tetrahedron is degenerated
+        if (det_J_phys < 1e-8) {
+            degenerated_tetrahedra_cnt++;
+            HYTEG_D_LOG("Element %ld: Degenerated tetrahedron detected! Det(J) = %g\n", element_i, det_J_phys);
+            continue;  // Skip the degenerated tetrahedron
+        }
+
+        // Check if the tetrahedron is uniformly refined
+        if (L == 2) {
+            uniform_refine_cnt++;
+            HYTEG_D_LOG("Element %ld: Uniformly refined tetrahedron detected! L = %d\n", element_i, L);
+        }
 
     }  // END: for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++)
 
