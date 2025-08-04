@@ -1070,8 +1070,6 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
         const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
 
-        // The transformation from reference to physical coordinates should use all 4 vertices
-        // of the current tetrahedron (barycentric mapping).
         const real_t xq_phys = J_phys[0] * xq_mref + J_phys[1] * yq_mref + J_phys[2] * zq_mref + fx0;  // Physical X-coordinate
         const real_t yq_phys = J_phys[3] * xq_mref + J_phys[4] * yq_mref + J_phys[5] * zq_mref + fy0;  // Physical Y-coordinate
         const real_t zq_phys = J_phys[6] * xq_mref + J_phys[7] * yq_mref + J_phys[8] * zq_mref + fz0;  // Physical Z-coordinate
@@ -1407,7 +1405,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
         const int    max_refinement_L    = 2;    // Maximum refinement level
 
-        const int L = 2 + 0 * alpha_to_hyteg_level(alpha_tet,            //
+        const int L = 2 + 0 * alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                                    alpha_min_threshold,  //
                                                    alpha_max_threshold,  //
                                                    max_refinement_L);    //
