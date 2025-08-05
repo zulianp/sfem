@@ -1094,16 +1094,24 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
     real_t cumulated_dV = 0.0;  // Cumulative volume for debugging
 
-    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+    // printf bc
+    // printf("Category %d: transposition vector bc = [%e, %e, %e]\n", category, bc[0], bc[1], bc[2]);
+    // printf("Tet vertices X-coordinates: \nfx0 = %e, fy0 = %e, fz0 = %e\n", fx0, fy0, fz0);
 
-        // Mapping the quadrature point from the reference space to the mini-tetrahedron local coordinate system
+    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+        // Mapping the quadrature point from the reference space to the mini-tetrahedron
         const real_t xq_mref = J_ref[0] * tet_qx[quad_i] + J_ref[1] * tet_qy[quad_i] + J_ref[2] * tet_qz[quad_i] + bc[0];
         const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
         const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
 
+        // printf("Quadrature point in the reference space: xq_mref = %e, yq_mref = %e, zq_mref = %e\n", xq_mref, yq_mref,
+        // zq_mref);
+
         const real_t xq_phys = J_phys[0] * xq_mref + J_phys[1] * yq_mref + J_phys[2] * zq_mref + fx0;  // Physical X-coordinate
         const real_t yq_phys = J_phys[3] * xq_mref + J_phys[4] * yq_mref + J_phys[5] * zq_mref + fy0;  // Physical Y-coordinate
         const real_t zq_phys = J_phys[6] * xq_mref + J_phys[7] * yq_mref + J_phys[8] * zq_mref + fz0;  // Physical Z-coordinate
+
+        // printf("%.12e, %.12e, %.12e\n", xq_phys, yq_phys, zq_phys);
 
         const real_t grid_x = (xq_phys - ox) / dx;
         const real_t grid_y = (yq_phys - oy) / dy;
@@ -1297,7 +1305,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                                  const real_t                         alpha_th,        // Threshold for alpha
                                                  real_t* const SFEM_RESTRICT          data) {                   //
 
-#define HYTEG_D_LOG_ENABLED 1
+#define HYTEG_D_LOG_ENABLED 0
 
 #if HYTEG_D_LOG_ENABLED
 #define HYTEG_D_LOG(...) printf(__VA_ARGS__)
@@ -1440,7 +1448,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
         const int    max_refinement_L    = 2;    // Maximum refinement level
 
-        const int L = 3 + 0 * alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
+        const int L = 2 + 0 * alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                                    alpha_min_threshold,  //
                                                    alpha_max_threshold,  //
                                                    max_refinement_L);    //
@@ -1465,47 +1473,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                    z3_unit,             // Vertex 3 coordinates
                                    (real_t)L,           // Refinement level
                                    J_vec_mini[cat_i]);  // Output Jacobian matrix
-        }
 
-        // real_t J_vec_phy[6][9];   // Jacobian matrices for the 6 categories of tetrahedra for the physical current element
-        // real_t det_J_vec_phy[6];  // Determinants of the Jacobian matrices for the 6 categories of tetrahedra for the physical
-        //                           // current element
-
-        // for (int cat_i = 0; cat_i < 6; cat_i++) {
-        //     // Calculate the Jacobian matrix for the current category
-        //     jacobian_matrix_real_t(cat_i,              // Category of the tetrahedron
-        //                            x0_n,               //
-        //                            y0_n,               //
-        //                            z0_n,               //
-        //                            x1_n,               //
-        //                            y1_n,               //
-        //                            z1_n,               //
-        //                            x2_n,               //
-        //                            y2_n,               //
-        //                            z2_n,               //
-        //                            x3_n,               //
-        //                            y3_n,               //
-        //                            z3_n,               // Vertex 3 coordinates
-        //                            (real_t)(L),        // Refinement level
-        //                            J_vec_phy[cat_i]);  // Output Jacobian matrix
-
-        //     // Calculate the determinant of the Jacobian matrix for the current category
-        //     det_J_vec_phy[cat_i] = fabs(det_J(J_vec_phy[cat_i]));
-
-        //     HYTEG_D_LOG("Category %d: J = [%g, %g, %g, %g, %g, %g, %g, %g, %g], det_J = %g\n",  //
-        //                 cat_i,
-        //                 J_vec_phy[cat_i][0],    // J[0][0]
-        //                 J_vec_phy[cat_i][1],    // J[0][1]
-        //                 J_vec_phy[cat_i][2],    // J[0][2]
-        //                 J_vec_phy[cat_i][3],    // J[1][0]
-        //                 J_vec_phy[cat_i][4],    // J[1][1]
-        //                 J_vec_phy[cat_i][5],    // J[1][2]
-        //                 J_vec_phy[cat_i][6],    // J[2][0]
-        //                 J_vec_phy[cat_i][7],    // J[2][1]
-        //                 J_vec_phy[cat_i][8],    // J[2][2]
-        //                 det_J_vec_phy[cat_i]);  // Determinant of the Jacobian matrix
-
-        // }  // END: for (int cat_i = 0; cat_i < 6; cat_i++)
+        }  // END of for (int cat_i = 0; cat_i < 6; cat_i++)
 
         const real_t h = 1.0 / (real_t)L;  // Size of the sub-tetrahedron
 
@@ -1612,7 +1581,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                             J_vec_mini[cat_i],  // Reference Jacobian matrix
                                             det_J_phys,         // Determinant of the Jacobian matrix
                                             x0_n,               // Tetrahedron vertices X-coordinates
-                                            y0_n,               //
+                                            y0_n,               // Tetrahedron vertices Y-coordinates
                                             z0_n,               // Tetrahedron vertices Z-coordinates
                                             wf0,                // Weighted field at the vertices
                                             wf1,                //
@@ -1627,6 +1596,18 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                             stride,             // Stride
                                             n,                  //
                                             data);              // Size of the grid
+
+                            printf("J_vec_mini[%d] = \n[%.12e, %.12e, %.12e, \n%.12e, %.12e, %.12e, \n%.12e, %.12e, %.12e]\n",
+                                   cat_i,  //
+                                   J_vec_mini[cat_i][0],
+                                   J_vec_mini[cat_i][1],
+                                   J_vec_mini[cat_i][2],
+                                   J_vec_mini[cat_i][3],
+                                   J_vec_mini[cat_i][4],
+                                   J_vec_mini[cat_i][5],
+                                   J_vec_mini[cat_i][6],
+                                   J_vec_mini[cat_i][7],
+                                   J_vec_mini[cat_i][8]);
 
                             // theta_volume_main +=
                             //         det_J_vec_phy[cat_i] * (1.0 / 6.0);  // Accumulate the volume of the HyTeg tetrahedron
@@ -1647,30 +1628,30 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                               (real_t)(i)*h,   //
                                               (real_t)(k)*h};  //
 
-                        cumulated_volume +=  //
-                                tet4_resample_tetrahedron_local_adjoint_category(
-                                        cat5,              //
-                                        L,                 //
-                                        b5,                // Transposition vector for category 0)
-                                        J_phy,             // Jacobian matrix
-                                        J_vec_mini[cat5],  // Reference Jacobian matrix
-                                        det_J_phys,        // Determinant of the Jacobian matrix
-                                        x0_n,              // Tetrahedron vertices X-coordinates
-                                        y0_n,              //
-                                        z0_n,              // Tetrahedron vertices Z-coordinates
-                                        wf0,               // Weighted field at the vertices
-                                        wf1,               //
-                                        wf2,               //
-                                        wf3,               //
-                                        ox,                // Origin of the grid
-                                        oy,                //
-                                        oz,                //
-                                        dx,                // Spacing of the grid
-                                        dy,                //
-                                        dz,                //
-                                        stride,            // Stride
-                                        n,                 //
-                                        data);             // Size of the grid
+                        cumulated_volume +=                                        //
+                                tet4_resample_tetrahedron_local_adjoint_category(  //
+                                        cat5,                                      //
+                                        L,                                         //
+                                        b5,                                        // Transposition vector for category 0)
+                                        J_phy,                                     // Jacobian matrix
+                                        J_vec_mini[cat5],                          // Reference Jacobian matrix
+                                        det_J_phys,                                // Determinant of the Jacobian matrix
+                                        x0_n,                                      // Tetrahedron vertices X-coordinates
+                                        y0_n,                                      //
+                                        z0_n,                                      // Tetrahedron vertices Z-coordinates
+                                        wf0,                                       // Weighted field at the vertices
+                                        wf1,                                       //
+                                        wf2,                                       //
+                                        wf3,                                       //
+                                        ox,                                        // Origin of the grid
+                                        oy,                                        //
+                                        oz,                                        //
+                                        dx,                                        // Spacing of the grid
+                                        dy,                                        //
+                                        dz,                                        //
+                                        stride,                                    // Stride
+                                        n,                                         //
+                                        data);                                     // Size of the grid
                         // theta_volume_main += det_J_vec_phy[cat5] * (1.0 / 6.0);  // Accumulate the volume of the HyTeg
                         // tetrahedron
 
