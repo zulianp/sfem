@@ -7,129 +7,142 @@
 #include "hyteg_Jacobian_matrix_real_t.h"
 #include <math.h>
 
-void jacobian_matrix_cat0_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+
+void jacobian_matrix_cat0_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 0
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x0 + x1) / L;  // J11
-    J[1] = (-x0 + x2) / L;  // J12
-    J[2] = (-x0 + x3) / L;  // J13
-    J[3] = (-y0 + y1) / L;  // J21
-    J[4] = (-y0 + y2) / L;  // J22
-    J[5] = (-y0 + y3) / L;  // J23
-    J[6] = (-z0 + z1) / L;  // J31
-    J[7] = (-z0 + z2) / L;  // J32
-    J[8] = (-z0 + z3) / L;  // J33
+    J[0] = (-x0 + x1)/L; // J11
+    J[1] = (-x0 + x2)/L; // J12
+    J[2] = (-x0 + x3)/L; // J13
+    J[3] = (-y0 + y1)/L; // J21
+    J[4] = (-y0 + y2)/L; // J22
+    J[5] = (-y0 + y3)/L; // J23
+    J[6] = (-z0 + z1)/L; // J31
+    J[7] = (-z0 + z2)/L; // J32
+    J[8] = (-z0 + z3)/L; // J33
 }
 
-void jacobian_matrix_cat1_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+void jacobian_matrix_cat1_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 1
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x1 + x3) / L;            // J11
-    J[1] = (-x0 + x3) / L;            // J12
-    J[2] = (-x0 - x1 + x2 + x3) / L;  // J13
-    J[3] = (-y1 + y3) / L;            // J21
-    J[4] = (-y0 + y3) / L;            // J22
-    J[5] = (-y0 - y1 + y2 + y3) / L;  // J23
-    J[6] = (-z1 + z3) / L;            // J31
-    J[7] = (-z0 + z3) / L;            // J32
-    J[8] = (-z0 - z1 + z2 + z3) / L;  // J33
+    J[0] = (-x0 - x1 + x2 + x3)/L; // J11
+    J[1] = (-x0 + x3)/L; // J12
+    J[2] = (-x1 + x3)/L; // J13
+    J[3] = (-y0 - y1 + y2 + y3)/L; // J21
+    J[4] = (-y0 + y3)/L; // J22
+    J[5] = (-y1 + y3)/L; // J23
+    J[6] = (-z0 - z1 + z2 + z3)/L; // J31
+    J[7] = (-z0 + z3)/L; // J32
+    J[8] = (-z1 + z3)/L; // J33
 }
 
-void jacobian_matrix_cat2_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+void jacobian_matrix_cat2_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 2
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x0 + x2) / L;            // J11
-    J[1] = (-x0 - x1 + x2 + x3) / L;  // J12
-    J[2] = (-x0 + x3) / L;            // J13
-    J[3] = (-y0 + y2) / L;            // J21
-    J[4] = (-y0 - y1 + y2 + y3) / L;  // J22
-    J[5] = (-y0 + y3) / L;            // J23
-    J[6] = (-z0 + z2) / L;            // J31
-    J[7] = (-z0 - z1 + z2 + z3) / L;  // J32
-    J[8] = (-z0 + z3) / L;            // J33
+    J[0] = (-x0 + x3)/L; // J11
+    J[1] = (-x0 - x1 + x2 + x3)/L; // J12
+    J[2] = (-x0 + x2)/L; // J13
+    J[3] = (-y0 + y3)/L; // J21
+    J[4] = (-y0 - y1 + y2 + y3)/L; // J22
+    J[5] = (-y0 + y2)/L; // J23
+    J[6] = (-z0 + z3)/L; // J31
+    J[7] = (-z0 - z1 + z2 + z3)/L; // J32
+    J[8] = (-z0 + z2)/L; // J33
 }
 
-void jacobian_matrix_cat3_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+void jacobian_matrix_cat3_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 3
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x1 + x2) / L;            // J11
-    J[1] = (-x1 + x3) / L;            // J12
-    J[2] = (-x0 - x1 + x2 + x3) / L;  // J13
-    J[3] = (-y1 + y2) / L;            // J21
-    J[4] = (-y1 + y3) / L;            // J22
-    J[5] = (-y0 - y1 + y2 + y3) / L;  // J23
-    J[6] = (-z1 + z2) / L;            // J31
-    J[7] = (-z1 + z3) / L;            // J32
-    J[8] = (-z0 - z1 + z2 + z3) / L;  // J33
+    J[0] = (-x0 - x1 + x2 + x3)/L; // J11
+    J[1] = (-x1 + x3)/L; // J12
+    J[2] = (-x1 + x2)/L; // J13
+    J[3] = (-y0 - y1 + y2 + y3)/L; // J21
+    J[4] = (-y1 + y3)/L; // J22
+    J[5] = (-y1 + y2)/L; // J23
+    J[6] = (-z0 - z1 + z2 + z3)/L; // J31
+    J[7] = (-z1 + z3)/L; // J32
+    J[8] = (-z1 + z2)/L; // J33
 }
 
-void jacobian_matrix_cat4_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+void jacobian_matrix_cat4_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 4
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x2 + x3) / L;  // J11
-    J[1] = (-x0 + x3) / L;  // J12
-    J[2] = (-x1 + x3) / L;  // J13
-    J[3] = (-y2 + y3) / L;  // J21
-    J[4] = (-y0 + y3) / L;  // J22
-    J[5] = (-y1 + y3) / L;  // J23
-    J[6] = (-z2 + z3) / L;  // J31
-    J[7] = (-z0 + z3) / L;  // J32
-    J[8] = (-z1 + z3) / L;  // J33
+    J[0] = (-x0 - x1 + x2 + x3)/L; // J11
+    J[1] = (-x1 + x2)/L; // J12
+    J[2] = (-x0 + x2)/L; // J13
+    J[3] = (-y0 - y1 + y2 + y3)/L; // J21
+    J[4] = (-y1 + y2)/L; // J22
+    J[5] = (-y0 + y2)/L; // J23
+    J[6] = (-z0 - z1 + z2 + z3)/L; // J31
+    J[7] = (-z1 + z2)/L; // J32
+    J[8] = (-z0 + z2)/L; // J33
 }
 
-void jacobian_matrix_cat5_real_t(const real_t x0, const real_t y0, const real_t z0,  //
-                                 const real_t x1, const real_t y1, const real_t z1,  //
-                                 const real_t x2, const real_t y2, const real_t z2,  //
-                                 const real_t x3, const real_t y3, const real_t z3,  //
-                                 const real_t L,                                     //
-                                 real_t       J[9]                                   //
+void jacobian_matrix_cat5_real_t(
+    const real_t x0, const real_t y0, const real_t z0, //
+    const real_t x1, const real_t y1, const real_t z1, //
+    const real_t x2, const real_t y2, const real_t z2, //
+    const real_t x3, const real_t y3, const real_t z3, //
+    const real_t L, //
+    real_t J[9] //
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 5
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (-x1 + x2) / L;            // J11
-    J[1] = (-x0 - x1 + x2 + x3) / L;  // J12
-    J[2] = (-x0 + x2) / L;            // J13
-    J[3] = (-y1 + y2) / L;            // J21
-    J[4] = (-y0 - y1 + y2 + y3) / L;  // J22
-    J[5] = (-y0 + y2) / L;            // J23
-    J[6] = (-z1 + z2) / L;            // J31
-    J[7] = (-z0 - z1 + z2 + z3) / L;  // J32
-    J[8] = (-z0 + z2) / L;            // J33
+    J[0] = (x0 - x1)/L; // J11
+    J[1] = (-x2 + x3)/L; // J12
+    J[2] = (-x1 + x3)/L; // J13
+    J[3] = (y0 - y1)/L; // J21
+    J[4] = (-y2 + y3)/L; // J22
+    J[5] = (-y1 + y3)/L; // J23
+    J[6] = (z0 - z1)/L; // J31
+    J[7] = (-z2 + z3)/L; // J32
+    J[8] = (-z1 + z3)/L; // J33
 }
 
-void jacobian_matrix_real_t(const int category, const real_t x0, const real_t y0, const real_t z0, const real_t x1,
-                            const real_t y1, const real_t z1, const real_t x2, const real_t y2, const real_t z2, const real_t x3,
-                            const real_t y3, const real_t z3, const real_t L, real_t J[9]) {
+void jacobian_matrix_real_t(
+    const int category,
+    const real_t x0, const real_t y0, const real_t z0,
+    const real_t x1, const real_t y1, const real_t z1,
+    const real_t x2, const real_t y2, const real_t z2,
+    const real_t x3, const real_t y3, const real_t z3,
+    const real_t L,
+    real_t J[9]
+) {
     switch (category) {
         case 0:
             jacobian_matrix_cat0_real_t(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, L, J);

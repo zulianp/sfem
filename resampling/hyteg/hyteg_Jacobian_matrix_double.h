@@ -26,67 +26,73 @@ extern "C" {
  * @param L Level parameter
  * @param J Output 3x3 Jacobian matrix stored in row-major order
  */
-void jacobian_matrix_cat0_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat0_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 /**
  * Calculate 3x3 Jacobian matrix for tetrahedron category 1
  */
-void jacobian_matrix_cat1_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat1_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 /**
  * Calculate 3x3 Jacobian matrix for tetrahedron category 2
  */
-void jacobian_matrix_cat2_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat2_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 /**
  * Calculate 3x3 Jacobian matrix for tetrahedron category 3
  */
-void jacobian_matrix_cat3_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat3_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 /**
  * Calculate 3x3 Jacobian matrix for tetrahedron category 4
  */
-void jacobian_matrix_cat4_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat4_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 /**
  * Calculate 3x3 Jacobian matrix for tetrahedron category 5
  */
-void jacobian_matrix_cat5_double(const double x0, const double y0, const double z0,  //
-                                 const double x1, const double y1, const double z1,  //
-                                 const double x2, const double y2, const double z2,  //
-                                 const double x3, const double y3, const double z3,  //
-                                 const double L,                                     //
-                                 double       J[9]                                   //
+void jacobian_matrix_cat5_double(
+    const double x0, const double y0, const double z0, //
+    const double x1, const double y1, const double z1, //
+    const double x2, const double y2, const double z2, //
+    const double x3, const double y3, const double z3, //
+    const double L, //
+    double J[9] //
 );
 
 #ifdef __cplusplus
