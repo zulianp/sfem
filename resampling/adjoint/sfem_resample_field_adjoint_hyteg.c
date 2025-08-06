@@ -1446,7 +1446,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
         const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha, Less: make less refinements.
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
-        const int    max_refinement_L    = 2;    // Maximum refinement level
+        const int    max_refinement_L    = 3;    // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                            alpha_min_threshold,  //
