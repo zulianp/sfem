@@ -65,15 +65,14 @@ namespace sfem {
         } else {
             auto ret = std::make_shared<Laplacian>(space);
             assert(space->n_blocks() == 1);  // FIXME
-            ret->element_types.clear();
-            ret->element_types.push_back(macro_base_elem(element_type));
+            ret->override_element_types({macro_base_elem(element_type)});
             return ret;
         }
     }
 
     const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
 
-    int SemiStructuredEMLaplacian::initialize() {
+    int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
         auto &ssm      = space->semi_structured_mesh();
         auto  mesh     = space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);

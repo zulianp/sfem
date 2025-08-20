@@ -19,7 +19,7 @@ namespace sfem {
         const char *name() const override { return "HEX8Smooth"; }
 
         bool is_linear() const override { return true; }
-        int  initialize() override { return SFEM_SUCCESS; }
+        int  initialize(const std::vector<std::string> &block_names = {}) override { return SFEM_SUCCESS; }
 
         int gradient(const real_t *const x, real_t *const out) override {
             SFEM_ERROR("IMPLEMENT ME!");
@@ -62,7 +62,7 @@ std::shared_ptr<sfem::Buffer<real_t>> solve(const std::shared_ptr<sfem::Function
     auto es        = f->execution_space();
     auto fs        = f->space();
     auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
     cg->set_max_it(1000);
@@ -133,9 +133,9 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
         sz->data()[i] = points[2][idx[i]];
     }
 
-    sfem::DirichletConditions::Condition s0{.sideset = sideset, .nodeset = nodeset, .values = sx, .component = 0};
-    sfem::DirichletConditions::Condition s1{.sideset = sideset, .nodeset = nodeset, .values = sy, .component = 1};
-    sfem::DirichletConditions::Condition s2{.sideset = sideset, .nodeset = nodeset, .values = sz, .component = 2};
+    sfem::DirichletConditions::Condition s0{.sidesets = {sideset}, .nodeset = nodeset, .values = sx, .component = 0};
+    sfem::DirichletConditions::Condition s1{.sidesets = {sideset}, .nodeset = nodeset, .values = sy, .component = 1};
+    sfem::DirichletConditions::Condition s2{.sidesets = {sideset}, .nodeset = nodeset, .values = sz, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {s0, s1, s2}, es);
     auto f     = sfem::Function::create(fs);

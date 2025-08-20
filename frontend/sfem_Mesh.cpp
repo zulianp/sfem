@@ -5,16 +5,20 @@
 #include "crs_graph.h"
 #include "multiblock_crs_graph.h"
 #include "read_mesh.h"
+#include "sfem_mask.h"
 #include "sfem_mesh.h"
 #include "sfem_mesh_write.h"
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
+#include "sfem_Sideset.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
 // FIXME
 #include "sfem_prolongation_restriction.h"
+
+#include <list>
 
 namespace sfem {
 
@@ -180,9 +184,7 @@ namespace sfem {
         if (index >= impl_->blocks.size()) {
             SFEM_ERROR("Block index out of range");
         }
-        if (impl_->blocks.size() <= 1) {
-            SFEM_ERROR("Cannot remove the last block");
-        }
+
         impl_->blocks.erase(impl_->blocks.begin() + index);
     }
 
@@ -206,9 +208,15 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto elements_buffer = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
-            impl_->points        = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
-            impl_->spatial_dim   = spatial_dim;
+            auto elements_buffer                = manage_host_buffer<idx_t>(nnodesxelem, nelements, elements);
+            impl_->points                       = manage_host_buffer<geom_t>(spatial_dim, impl_->nnodes, points);
+            impl_->spatial_dim                  = spatial_dim;
+            impl_->nnodes                       = impl_->nnodes;
+            impl_->n_owned_nodes                = impl_->nnodes;
+            impl_->n_owned_elements             = nelements;
+            impl_->n_owned_elements_with_ghosts = 0;
+            impl_->n_shared_elements            = 0;
+            impl_->n_owned_nodes_with_ghosts    = 0;
 
             // Create default block
             auto default_block = std::make_shared<Block>();
@@ -317,19 +325,18 @@ namespace sfem {
         }
 
         if (impl_->blocks.size() == 1) {
-
             return mesh_write_serial(path,
-                                 impl_->blocks[0]->element_type(),
-                                 impl_->blocks[0]->elements()->extent(1),
-                                 impl_->blocks[0]->elements()->data(),
-                                 impl_->spatial_dim,
-                                 impl_->nnodes,
-                                 impl_->points->data());
+                                     impl_->blocks[0]->element_type(),
+                                     impl_->blocks[0]->elements()->extent(1),
+                                     impl_->blocks[0]->elements()->data(),
+                                     impl_->spatial_dim,
+                                     impl_->nnodes,
+                                     impl_->points->data());
         } else {
-            std::vector<ptrdiff_t> n_elements;
+            std::vector<ptrdiff_t>     n_elements;
             std::vector<enum ElemType> element_types;
-            std::vector<idx_t **> elements;
-            std::vector<const char *> block_names;
+            std::vector<idx_t **>      elements;
+            std::vector<const char *>  block_names;
 
             for (auto &block : impl_->blocks) {
                 n_elements.push_back(block->elements()->extent(1));
@@ -338,14 +345,14 @@ namespace sfem {
                 block_names.push_back(block->name().c_str());
             }
             return mesh_multiblock_write_serial(path,
-                                                 impl_->blocks.size(),
-                                                 block_names.data(),
-                                                 element_types.data(),
-                                                 n_elements.data(),
-                                                 elements.data(),
-                                                 impl_->spatial_dim,
-                                                 impl_->nnodes,
-                                                 impl_->points->data());
+                                                impl_->blocks.size(),
+                                                block_names.data(),
+                                                element_types.data(),
+                                                n_elements.data(),
+                                                elements.data(),
+                                                impl_->spatial_dim,
+                                                impl_->nnodes,
+                                                impl_->points->data());
         }
     }
 
@@ -715,18 +722,18 @@ namespace sfem {
         const ptrdiff_t nelements = nx * ny * nz;
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
 
-        if(nx % 2 != 0 || ny % 2 != 0 || nz % 2 != 0) {
+        if (nx % 2 != 0 || ny % 2 != 0 || nz % 2 != 0) {
             SFEM_ERROR("nx, ny, and nz must be even");
         }
 
-        ret->impl_->spatial_dim = 3;
-        ret->impl_->nnodes      = nnodes;
-        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
+        ret->impl_->spatial_dim    = 3;
+        ret->impl_->nnodes         = nnodes;
+        ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
         auto white_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
         auto black_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
-        auto points   = ret->impl_->points->data();
-        auto white_elements = white_elements_buffer->data(); 
+        auto points         = ret->impl_->points->data();
+        auto white_elements = white_elements_buffer->data();
         auto black_elements = black_elements_buffer->data();
 
         const ptrdiff_t ldz = (ny + 1) * (nx + 1);
@@ -759,7 +766,7 @@ namespace sfem {
                     const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
                     const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
 
-                    if((xi + yi + zi) % 2 == 0) {
+                    if ((xi + yi + zi) % 2 == 0) {
                         white_elements[0][white_elements_count] = i0;
                         white_elements[1][white_elements_count] = i1;
                         white_elements[2][white_elements_count] = i2;
@@ -814,6 +821,119 @@ namespace sfem {
         black_block->set_element_type(HEX8);
         black_block->set_elements(black_elements_buffer);
         ret->impl_->blocks.push_back(black_block);
+        return ret;
+    }
+
+    std::shared_ptr<Mesh> Mesh::create_hex8_bidomain_cube(const std::shared_ptr<Communicator> &comm,
+                                                          const int                            nx,
+                                                          const int                            ny,
+                                                          const int                            nz,
+                                                          const geom_t                         xmin,
+                                                          const geom_t                         ymin,
+                                                          const geom_t                         zmin,
+                                                          const geom_t                         xmax,
+                                                          const geom_t                         ymax,
+                                                          const geom_t                         zmax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = nx * ny * nz;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
+
+        ret->impl_->spatial_dim    = 3;
+        ret->impl_->nnodes         = nnodes;
+        ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
+        auto left_elements_buffer  = create_host_buffer<idx_t>(8, nelements / 2);
+        auto right_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
+
+        auto points         = ret->impl_->points->data();
+        auto left_elements  = left_elements_buffer->data();
+        auto right_elements = right_elements_buffer->data();
+
+        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+        const double hz = (zmax - zmin) * 1. / nz;
+
+        assert(hx > 0);
+        assert(hy > 0);
+        assert(hz > 0);
+
+        ptrdiff_t left_elements_count  = 0;
+        ptrdiff_t right_elements_count = 0;
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const ptrdiff_t e = zi * ny * nx + yi * nx + xi;
+
+                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+
+                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+
+                    if (xi < nx / 2) {
+                        left_elements[0][left_elements_count] = i0;
+                        left_elements[1][left_elements_count] = i1;
+                        left_elements[2][left_elements_count] = i2;
+                        left_elements[3][left_elements_count] = i3;
+
+                        left_elements[4][left_elements_count] = i4;
+                        left_elements[5][left_elements_count] = i5;
+                        left_elements[6][left_elements_count] = i6;
+                        left_elements[7][left_elements_count] = i7;
+
+                        left_elements_count++;
+                    } else {
+                        right_elements[0][right_elements_count] = i0;
+                        right_elements[1][right_elements_count] = i1;
+                        right_elements[2][right_elements_count] = i2;
+                        right_elements[3][right_elements_count] = i3;
+
+                        right_elements[4][right_elements_count] = i4;
+                        right_elements[5][right_elements_count] = i5;
+                        right_elements[6][right_elements_count] = i6;
+                        right_elements[7][right_elements_count] = i7;
+
+                        right_elements_count++;
+                    }
+                }
+            }
+        }
+
+        assert(left_elements_count == nelements / 2);
+        assert(right_elements_count == nelements / 2);
+
+        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
+            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
+                    points[0][node] = (double)xmin + xi * hx;
+                    points[1][node] = (double)ymin + yi * hy;
+                    points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        // Create left and right blocks
+        auto left_block = std::make_shared<Block>();
+        left_block->set_name("left");
+        left_block->set_element_type(HEX8);
+        left_block->set_elements(left_elements_buffer);
+        ret->impl_->blocks.push_back(left_block);
+
+        auto right_block = std::make_shared<Block>();
+        right_block->set_name("right");
+        right_block->set_element_type(HEX8);
+        right_block->set_elements(right_elements_buffer);
+        ret->impl_->blocks.push_back(right_block);
+
         return ret;
     }
 
@@ -935,5 +1055,274 @@ namespace sfem {
         ret->impl_->blocks.push_back(default_block);
 
         return ret;
+    }
+
+    std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
+        auto points = impl_->points->data();
+
+        int  dim = spatial_dimension();
+        auto min = create_host_buffer<geom_t>(dim);
+        auto max = create_host_buffer<geom_t>(dim);
+
+        auto d_min = min->data();
+        auto d_max = max->data();
+
+        for (int d = 0; d < dim; d++) {
+            d_min[d] = points[d][0];
+            d_max[d] = points[d][0];
+        }
+
+        ptrdiff_t n_nodes = this->n_nodes();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_nodes; i++) {
+            for (int d = 0; d < dim; d++) {
+                d_min[d] = std::min(d_min[d], points[d][i]);
+                d_max[d] = std::max(d_max[d], points[d][i]);
+            }
+        }
+
+        return {min, max};
+    }
+
+    std::shared_ptr<Mesh::Block> Mesh::find_block(const std::string &name) const {
+        for (auto &block : impl_->blocks) {
+            if (block->name() == name) {
+                return block;
+            }
+        }
+        return nullptr;
+    }
+
+    int Mesh::split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name) {
+        if (n_blocks() != 1) {
+            SFEM_ERROR("Mesh must have exactly one block to split boundary layer!\n");
+            return SFEM_FAILURE;
+        }
+
+        {
+            const int       nxe        = n_nodes_per_element();
+            const ptrdiff_t n_elements = this->n_elements();
+
+            auto bdry_mask = create_host_buffer<mask_t>(mask_count(n_elements));
+
+            auto            d_parent     = elements->data();
+            auto            d_bdry_mask  = bdry_mask->data();
+            const ptrdiff_t size_sideset = elements->size();
+
+            auto default_block = impl_->blocks[0];
+
+            auto d_elements = default_block->elements()->data();
+
+            ptrdiff_t n_bdry_elements = 0;
+            for (ptrdiff_t i = 0; i < size_sideset; i++) {
+                if (mask_get(d_parent[i], d_bdry_mask) == 0) {
+                    n_bdry_elements++;
+                    mask_set(d_parent[i], d_bdry_mask);
+                }
+            }
+
+            memset(d_bdry_mask, 0, mask_count(n_elements) * sizeof(mask_t));
+
+            auto      bdry_elements         = create_host_buffer<idx_t>(nxe, n_bdry_elements);
+            ptrdiff_t n_bdry_elements_count = 0;
+
+            auto d_bdry_elements = bdry_elements->data();
+
+            for (int e = 0; e < size_sideset; e++) {
+                if (mask_get(d_parent[e], d_bdry_mask) == 0) {
+                    for (int v = 0; v < nxe; v++) {
+                        d_bdry_elements[v][n_bdry_elements_count] = d_elements[v][d_parent[e]];
+                    }
+                    mask_set(d_parent[e], d_bdry_mask);
+                    n_bdry_elements_count++;
+                }
+            }
+
+            auto      interior_elements         = create_host_buffer<idx_t>(nxe, n_elements - n_bdry_elements);
+            ptrdiff_t n_interior_elements_count = 0;
+            auto      d_interior_elements       = interior_elements->data();
+
+            for (ptrdiff_t i = 0; i < n_elements; i++) {
+                if (mask_get(i, d_bdry_mask) == 0) {
+                    for (int v = 0; v < nxe; v++) {
+                        assert(n_interior_elements_count < interior_elements->extent(1));
+                        d_interior_elements[v][n_interior_elements_count] = d_elements[v][i];
+                    }
+                    n_interior_elements_count++;
+                }
+            }
+
+            // !!!!
+            remove_block(0);
+
+            {  // Boundary block
+                auto block = std::make_shared<Block>();
+                block->set_name(name);
+                block->set_element_type(default_block->element_type());
+                block->set_elements(bdry_elements);
+                impl_->blocks.push_back(block);
+            }
+
+            {  // Interior block
+                auto block = std::make_shared<Block>();
+                block->set_name(default_block->name());
+                block->set_element_type(default_block->element_type());
+                block->set_elements(interior_elements);
+                impl_->blocks.push_back(block);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Mesh::split_boundary_layer() {
+        if (n_blocks() != 1) {
+            SFEM_ERROR("Mesh must have exactly one block to split boundary layer!\n");
+            return SFEM_FAILURE;
+        }
+
+        std::shared_ptr<Sideset> sideset;
+
+        {
+            ptrdiff_t      n_surf_elements = 0;
+            element_idx_t *parent          = 0;
+            int16_t       *side_idx        = 0;
+
+            if (extract_skin_sideset(this->n_elements(),
+                                     this->n_nodes(),
+                                     this->element_type(),
+                                     this->elements()->data(),
+                                     &n_surf_elements,
+                                     &parent,
+                                     &side_idx) != SFEM_SUCCESS) {
+                SFEM_ERROR("Failed to extract skin!\n");
+            }
+
+            sideset = std::make_shared<sfem::Sideset>(this->comm(),
+                                                      sfem::manage_host_buffer(n_surf_elements, parent),
+                                                      sfem::manage_host_buffer(n_surf_elements, side_idx));
+        }
+
+        return split_block(sideset->parent(), "boundary_layer");
+    }
+
+    int Mesh::renumber_nodes() {
+        auto points     = this->points()->data();
+        auto elements   = this->elements()->data();
+        auto n_nodes    = this->n_nodes();
+        auto n_elements = this->n_elements();
+
+        auto new_idx_buff = create_host_buffer<ptrdiff_t>(n_nodes);
+
+        auto new_idx = new_idx_buff->data();
+        for (ptrdiff_t i = 0; i < n_nodes; i++) {
+            new_idx[i] = -1;
+        }
+
+        int   nxe          = n_nodes_per_element();
+        idx_t next_node_id = 0;
+        for (auto &b : impl_->blocks) {
+            auto elements   = b->elements()->data();
+            auto n_elements = b->n_elements();
+
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                for (int v = 0; v < nxe; v++) {
+                    auto node = elements[v][e];
+                    if (new_idx[node] == -1) {
+                        new_idx[node] = next_node_id++;
+                    }
+                }
+            }
+        }
+
+        const int dim = spatial_dimension();
+
+        auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
+        auto new_points      = new_points_buff->data();
+
+        for (int d = 0; d < dim; d++) {
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                new_points[d][new_idx[i]] = points[d][i];
+            }
+        }
+
+        impl_->points = new_points_buff;
+
+        for (auto &b : impl_->blocks) {
+            auto elements   = b->elements()->data();
+            auto n_elements = b->n_elements();
+
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                for (int v = 0; v < nxe; v++) {
+                    elements[v][e] = new_idx[elements[v][e]];
+                }
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> Mesh::select_elements(
+            const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
+            const std::vector<std::string>                                      &block_names) {
+        SFEM_TRACE_SCOPE("Sideset::create_from_selector");
+
+        // const ptrdiff_t nelements = mesh->n_elements();
+        const ptrdiff_t nnodes = n_nodes();
+        const int       dim    = spatial_dimension();
+
+        auto points = this->points()->data();
+        int  nxe    = n_nodes_per_element();
+
+        size_t                                                        n_blocks = this->n_blocks();
+        std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> selected_elements;
+
+        for (size_t b = 0; b < n_blocks; b++) {
+            auto block = this->block(b);
+            if (!block_names.empty() &&  //
+                std::find(block_names.begin(), block_names.end(), block->name()) == block_names.end()) {
+                continue;
+            }
+
+            const ptrdiff_t nelements = block->n_elements();
+            auto            elements  = block->elements()->data();
+
+            std::list<element_idx_t> selected_element_list;
+            for (ptrdiff_t e = 0; e < nelements; e++) {
+                // Barycenter of element
+                double p[3] = {0, 0, 0};
+
+                for (int v = 0; v < nxe; v++) {
+                    const idx_t node = elements[v][e];
+
+                    for (int d = 0; d < dim; d++) {
+                        p[d] += points[d][node];
+                    }
+                }
+
+                for (int d = 0; d < dim; d++) {
+                    p[d] /= nxe;
+                }
+
+                if (selector(p[0], p[1], p[2])) {
+                    selected_element_list.push_back(e);
+                }
+            }
+
+            const ptrdiff_t nselected_elements = selected_element_list.size();
+            auto            selected_element   = create_host_buffer<element_idx_t>(nselected_elements);
+
+            {
+                ptrdiff_t idx = 0;
+                for (auto p : selected_element_list) {
+                    selected_element->data()[idx++] = p;
+                }
+            }
+
+            selected_elements.push_back(std::make_pair(b, selected_element));
+        }
+
+        return selected_elements;
     }
 }  // namespace sfem

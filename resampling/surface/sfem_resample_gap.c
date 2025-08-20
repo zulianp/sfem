@@ -273,10 +273,13 @@ int resample_gap_normals(
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
-        xnormal[i] /= denom;
-        ynormal[i] /= denom;
-        znormal[i] /= denom;
+        const real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
+
+        if (denom > 0) {
+            xnormal[i] /= denom;
+            ynormal[i] /= denom;
+            znormal[i] /= denom;
+        }
     }
 
     return SFEM_SUCCESS;

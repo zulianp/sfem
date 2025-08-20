@@ -31,22 +31,27 @@
 
 int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coarse_fs,
                                 const std::shared_ptr<sfem::FunctionSpace> &fine_fs,
-                                const std::shared_ptr<sfem::Sideset>       &sideset,
+                                const std::vector<std::shared_ptr<sfem::Sideset>>       &sideset,
                                 const std::string                          &name,
                                 const sfem::ExecutionSpace                  es) {
+
+    if(sideset.size() > 1) {
+        SFEM_ERROR("Not implemented!\n");
+    }
+
     auto coarse_x = sfem::create_host_buffer<real_t>(coarse_fs->n_dofs());
     auto fine_x   = sfem::create_buffer<real_t>(fine_fs->n_dofs(), es);
 
     auto &&fine_ssmesh   = fine_fs->semi_structured_mesh();
     auto &&coarse_ssmesh = coarse_fs->semi_structured_mesh();
-
+    
     ptrdiff_t n_nodes{0};
     idx_t    *nodes{nullptr};
     SFEM_TEST_ASSERT(sshex8_extract_nodeset_from_sideset(coarse_ssmesh.level(),
                                                          coarse_ssmesh.element_data(),
-                                                         sideset->parent()->size(),
-                                                         sideset->parent()->data(),
-                                                         sideset->lfi()->data(),
+                                                         sideset[0]->parent()->size(),
+                                                         sideset[0]->parent()->data(),
+                                                         sideset[0]->lfi()->data(),
                                                          &n_nodes,
                                                          &nodes) == SFEM_SUCCESS);
 
@@ -69,13 +74,13 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
 #endif
 
     const int nexs       = (fine_ssmesh.level() + 1) * (fine_ssmesh.level() + 1);
-    auto      fine_sides = sfem::create_host_buffer<idx_t>(nexs, sideset->parent()->size());
+    auto      fine_sides = sfem::create_host_buffer<idx_t>(nexs, sideset[0]->parent()->size());
 
     SFEM_TEST_ASSERT(sshex8_extract_surface_from_sideset(fine_ssmesh.level(),
                                                          fine_ssmesh.element_data(),
-                                                         sideset->parent()->size(),
-                                                         sideset->parent()->data(),
-                                                         sideset->lfi()->data(),
+                                                         sideset[0]->parent()->size(),
+                                                         sideset[0]->parent()->data(),
+                                                         sideset[0]->lfi()->data(),
                                                          fine_sides->data()) == SFEM_SUCCESS);
 
     SFEM_TEST_ASSERT(ssquad4_prolongate(fine_sides->extent(1),                        // nelements,
@@ -161,7 +166,7 @@ int test_trace_space_prolongation_restriction() {
     auto sideset = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    return test_trace_space_operations(fs->derefine(2), fs, sideset, "test_trace_space_prolongation_restriction", es);
+    return test_trace_space_operations(fs->derefine(2), fs, {sideset}, "test_trace_space_prolongation_restriction", es);
 }
 
 int main(int argc, char *argv[]) {

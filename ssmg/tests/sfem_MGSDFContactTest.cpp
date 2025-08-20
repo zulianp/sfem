@@ -43,9 +43,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -55,9 +55,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto left_right = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = left_right, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = left_right, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = left_right, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -95,7 +95,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
@@ -112,9 +112,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -124,9 +124,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -175,7 +175,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
@@ -192,9 +192,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -204,9 +204,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-    sfem::DirichletConditions::Condition x_bc{.sideset = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sideset = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sideset = ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
     f->add_constraint(conds);
@@ -256,7 +256,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
