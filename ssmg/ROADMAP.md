@@ -225,14 +225,15 @@ MS := Milestone
 
 ## Paper 1: Shifted--Penalty Multigrid for Variational Inequalities
 
-- [ ] Authorship: Hardik, Austen, Rolf, Panayot, Patrick
-- [ ] GMG for solving A x = b, B * x <= g, A in R^{n x n}, B in R^{m x n}
+- [ ] Authorship: Grabriele, Austen, Hardik, Rolf, Panayot, Patrick
+- [ ] GMG for solving A x = b, B(x) <= g(x), A in R^{n x n}, B in R^{m x n}
 - [ ] Details of optimization algorithm
 - [ ] Fully geometric MG
 - [ ] Examples in 2D and 3D including constrained Poisson problem, linear elasticity
-- [ ] Matlab Implementation
+- [ ] Matlab Implementation (2D studies with different Smoothers)
+- [ ] HPC version (3D, 600M dofs, Block-Jacobi smoother)
 - [ ] Convergence of the method on toy problems (no Perf)
-- [ ] Experiements  
+- [ ] Experiments  
    - [ ] Elasticity 1) 2D Axis-aligned contact Matlab
    - [x] Elasticity 2) SDF cube vs half-sphere (s) (stresses), correct stress verification
    - [x] Elasticity 3) Complex showcase (displacement)
@@ -240,9 +241,9 @@ MS := Milestone
    - [x] Energy norm `|| . ||A`  of correction, convergence rates x is the solution `|| xkp1 - xk ||A / || xk - xkm1||A`
    - [x] Statistics: Number of outer iterations / cycles / smoothing (we keep track of norms per cycle per outer iteration)
 
-- [ ] Post-processor 
-   - [ ] Cauchy  stress for HEX8/SSHEX8
-   - [ ] Contact stress for HEX8/SSHEX8 (lambda = M^-1 (b - A x))
+- [x] Post-processor C++
+   - [x] Cauchy  stress for HEX8/SSHEX8
+   - [x] Contact stress for HEX8/SSHEX8 (lambda = M^-1 (b - A x))
 
 If rejected content goes to **P2**
 

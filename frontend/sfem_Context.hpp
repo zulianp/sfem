@@ -13,12 +13,14 @@ namespace sfem {
         Context(int argc, char *argv[]);
         Context(int argc, char *argv[], MPI_Comm comm);
         ~Context();
-        MPI_Comm comm();
         std::shared_ptr<Communicator> communicator();
 
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
+
+    std::shared_ptr<Context> initialize(int argc, char *argv[]);
+    std::shared_ptr<Context> initialize(int argc, char *argv[], MPI_Comm comm);
 }  // namespace sfem
 
 #endif  // CONTEXT_INIT_HPP

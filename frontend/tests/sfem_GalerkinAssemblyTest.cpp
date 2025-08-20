@@ -63,10 +63,10 @@ int test_cube() {
     const char *SFEM_OPERATOR = "Laplacian";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
-    const char *SFEM_FINE_OP_TYPE = "MF";
+    const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
 
-    const char *SFEM_COARSE_OP_TYPE = "MF";
+    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
     SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;

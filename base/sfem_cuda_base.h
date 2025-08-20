@@ -54,6 +54,10 @@ namespace sfem {
         nvtxRangePop();  \
     } while (0)
 
+// Launch bounds configuration for CUDA kernels
+#define SFEM_LAUNCH_BOUNDS(threads_per_block, min_blocks_per_sm) \
+    __launch_bounds__(threads_per_block, min_blocks_per_sm)
+
 #else //SFEM_ENABLE_NVTX
 
 #define SFEM_NVTX_SCOPE(name)

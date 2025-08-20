@@ -2,12 +2,12 @@
 
 #include "sortreduce.h"
 
-int build_multiblock_n2e(const uint16_t      n_blocks,
+int build_multiblock_n2e(const block_idx_t   n_blocks,
                          const enum ElemType element_types[],
                          const ptrdiff_t     n_elements[],
                          idx_t **const       elements[],
                          const ptrdiff_t     n_nodes,
-                         uint16_t          **out_block_number,
+                         block_idx_t       **out_block_number,
                          count_t           **out_n2eptr,
                          element_idx_t     **out_elindex) {
     count_t *n2eptr = (count_t *)malloc((n_nodes + 1) * sizeof(count_t));
@@ -16,7 +16,7 @@ int build_multiblock_n2e(const uint16_t      n_blocks,
     int *book_keeping = (int *)malloc((n_nodes) * sizeof(int));
     memset(book_keeping, 0, (n_nodes) * sizeof(int));
 
-    for (uint16_t i = 0; i < n_blocks; i++) {
+    for (block_idx_t i = 0; i < n_blocks; i++) {
         enum ElemType element_type = element_types[i];
         int           nnodesxelem  = elem_num_nodes(element_type);
 
@@ -32,9 +32,9 @@ int build_multiblock_n2e(const uint16_t      n_blocks,
     }
 
     element_idx_t *elindex      = (element_idx_t *)malloc(n2eptr[n_nodes] * sizeof(element_idx_t));
-    uint16_t      *block_number = (uint16_t *)malloc(n2eptr[n_nodes] * sizeof(uint16_t));
+    block_idx_t   *block_number = (block_idx_t *)malloc(n2eptr[n_nodes] * sizeof(block_idx_t));
 
-    for (uint16_t i = 0; i < n_blocks; i++) {
+    for (block_idx_t i = 0; i < n_blocks; i++) {
         enum ElemType element_type = element_types[i];
         int           nnodesxelem  = elem_num_nodes(element_type);
 
@@ -44,7 +44,7 @@ int build_multiblock_n2e(const uint16_t      n_blocks,
 
                 assert(n2eptr[node] + book_keeping[node] < n2eptr[node + 1]);
 
-                elindex[n2eptr[node] + book_keeping[node]]      = j;
+                elindex[n2eptr[node] + book_keeping[node]]        = j;
                 block_number[n2eptr[node] + book_keeping[node]++] = i;
             }
         }
@@ -59,14 +59,14 @@ int build_multiblock_n2e(const uint16_t      n_blocks,
     return SFEM_SUCCESS;
 }
 
-int build_multiblock_crs_graph_from_n2e(const uint16_t                           n_blocks,
+int build_multiblock_crs_graph_from_n2e(const block_idx_t                        n_blocks,
                                         const enum ElemType                      element_types[],
                                         const ptrdiff_t                          n_elements[],
                                         const ptrdiff_t                          n_nodes,
                                         idx_t **const SFEM_RESTRICT              elems[],
                                         const count_t *const SFEM_RESTRICT       n2eptr,
                                         const element_idx_t *const SFEM_RESTRICT elindex,
-                                        const uint16_t *const SFEM_RESTRICT      block_number,
+                                        const block_idx_t *const SFEM_RESTRICT   block_number,
                                         count_t                                **out_rowptr,
                                         idx_t                                  **out_colidx) {
     count_t *rowptr = (count_t *)malloc((n_nodes + 1) * sizeof(count_t));
@@ -87,7 +87,7 @@ int build_multiblock_crs_graph_from_n2e(const uint16_t                          
 
                 for (count_t e = ebegin; e < eend; ++e) {
                     element_idx_t eidx = elindex[e];
-                    uint16_t      b    = block_number[e];
+                    block_idx_t   b    = block_number[e];
                     assert(eidx < n_elements[b]);
 
                     int nnodesxelem = elem_num_nodes(element_types[b]);
@@ -124,7 +124,7 @@ int build_multiblock_crs_graph_from_n2e(const uint16_t                          
 
                 for (count_t e = ebegin; e < eend; ++e) {
                     element_idx_t eidx = elindex[e];
-                    uint16_t      b    = block_number[e];
+                    block_idx_t   b    = block_number[e];
                     assert(eidx < n_elements[b]);
 
                     int nnodesxelem = elem_num_nodes(element_types[b]);
@@ -150,14 +150,14 @@ int build_multiblock_crs_graph_from_n2e(const uint16_t                          
     return 0;
 }
 
-int build_multiblock_crs_graph(const uint16_t      n_blocks,
+int build_multiblock_crs_graph(const block_idx_t   n_blocks,
                                const enum ElemType element_types[],
                                const ptrdiff_t     n_elements[],
                                idx_t **const       elems[],
                                const ptrdiff_t     n_nodes,
                                count_t           **out_rowptr,
                                idx_t             **out_colidx) {
-    uint16_t      *block_number = 0;
+    block_idx_t   *block_number = 0;
     count_t       *n2eptr       = 0;
     element_idx_t *elindex      = 0;
 
@@ -172,14 +172,14 @@ int build_multiblock_crs_graph(const uint16_t      n_blocks,
     return SFEM_SUCCESS;
 }
 
-static int build_multiblock_crs_graph_upper_triangular_from_n2e(const uint16_t                           n_blocks,
+static int build_multiblock_crs_graph_upper_triangular_from_n2e(const block_idx_t                        n_blocks,
                                                                 const enum ElemType                      element_types[],
                                                                 const ptrdiff_t                          n_elements[],
                                                                 const ptrdiff_t                          n_nodes,
                                                                 idx_t **const SFEM_RESTRICT              elems[],
                                                                 const count_t *const SFEM_RESTRICT       n2eptr,
                                                                 const element_idx_t *const SFEM_RESTRICT elindex,
-                                                                const uint16_t *const SFEM_RESTRICT      block_number,
+                                                                const block_idx_t *const SFEM_RESTRICT   block_number,
                                                                 count_t                                **out_rowptr,
                                                                 idx_t                                  **out_colidx) {
     count_t *rowptr = (count_t *)malloc((n_nodes + 1) * sizeof(count_t));
@@ -200,7 +200,7 @@ static int build_multiblock_crs_graph_upper_triangular_from_n2e(const uint16_t  
 
                 for (count_t e = ebegin; e < eend; ++e) {
                     element_idx_t eidx = elindex[e];
-                    uint16_t      b    = block_number[e];
+                    block_idx_t   b    = block_number[e];
                     assert(eidx < n_elements[b]);
 
                     int nnodesxelem = elem_num_nodes(element_types[b]);
@@ -237,7 +237,7 @@ static int build_multiblock_crs_graph_upper_triangular_from_n2e(const uint16_t  
 
                     for (count_t e = ebegin; e < eend; ++e) {
                         element_idx_t eidx = elindex[e];
-                        uint16_t      b    = block_number[e];
+                        block_idx_t   b    = block_number[e];
                         assert(eidx < n_elements[b]);
 
                         int nnodesxelem = elem_num_nodes(element_types[b]);
@@ -266,14 +266,14 @@ static int build_multiblock_crs_graph_upper_triangular_from_n2e(const uint16_t  
     return 0;
 }
 
-int build_multiblock_crs_graph_upper_triangular(const uint16_t      n_blocks,
+int build_multiblock_crs_graph_upper_triangular(const block_idx_t   n_blocks,
                                                 const enum ElemType element_types[],
                                                 const ptrdiff_t     n_elements[],
                                                 idx_t **const       elems[],
                                                 const ptrdiff_t     n_nodes,
                                                 count_t           **out_rowptr,
                                                 idx_t             **out_colidx) {
-    uint16_t      *block_number = 0;
+    block_idx_t   *block_number = 0;
     count_t       *n2eptr       = 0;
     element_idx_t *elindex      = 0;
 

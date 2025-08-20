@@ -32,9 +32,9 @@ namespace sfem {
             const SharedBuffer<idx_t *> &elements() const;
 
             // Setters for internal use
-            void set_name(const std::string &name);
-            void set_element_type(enum ElemType element_type);
-            void set_elements(SharedBuffer<idx_t *> elements);
+            void      set_name(const std::string &name);
+            void      set_element_type(enum ElemType element_type);
+            void      set_elements(SharedBuffer<idx_t *> elements);
             ptrdiff_t n_elements() const;
 
         private:
@@ -68,6 +68,7 @@ namespace sfem {
         size_t                       n_blocks() const;
         std::shared_ptr<const Block> block(size_t index) const;
         std::shared_ptr<Block>       block(size_t index);
+        std::shared_ptr<Block>       find_block(const std::string &name) const;
         void add_block(const std::string &name, enum ElemType element_type, SharedBuffer<idx_t *> elements);
         void remove_block(size_t index);
 
@@ -150,16 +151,39 @@ namespace sfem {
                                                                    const geom_t                         ymax = 1,
                                                                    const geom_t                         zmax = 1);
 
+        static std::shared_ptr<Mesh> create_hex8_bidomain_cube(const std::shared_ptr<Communicator> &comm,
+                                                               const int                            nx   = 2,
+                                                               const int                            ny   = 2,
+                                                               const int                            nz   = 2,
+                                                               const geom_t                         xmin = 0,
+                                                               const geom_t                         ymin = 0,
+                                                               const geom_t                         zmin = 0,
+                                                               const geom_t                         xmax = 1,
+                                                               const geom_t                         ymax = 1,
+                                                               const geom_t                         zmax = 1);
+
+        std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> select_elements(
+                const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
+                const std::vector<std::string>                                      &block_names = {});
+
+        int split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name);
+        int split_boundary_layer();
+        int renumber_nodes();
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(const std::shared_ptr<Communicator> &comm);
         void set_element_type(const enum ElemType element_type);
 
         void extract_deprecated(mesh_t *mesh);
 
+        std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> compute_bounding_box();
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
+
+    using SharedMesh  = std::shared_ptr<Mesh>;
+    using SharedBlock = std::shared_ptr<Mesh::Block>;
 }  // namespace sfem
 
 #endif  // SFEM_MESH_HPP

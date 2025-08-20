@@ -42,6 +42,7 @@ set(SFEM_MODULES
     algebra base matrix 
     algebra/openmp
     mesh 
+    mesh/multiblock
     mesh/sshex8
     operators 
     operators/beam2 
@@ -135,7 +136,9 @@ if(SFEM_ENABLE_CUDA)
         operators/tet10/cuda
         operators/tet4/cuda
         resampling/cuda
-        )
+        resampling/surface/cuda
+        resampling/quadshell4/cuda
+    )
 
     if(SFEM_ENABLE_AMG)
         list(APPEND SFEM_MODULES amg/cuda)
@@ -195,9 +198,6 @@ message(STATUS "SFEM_TET10_CUDA: ${SFEM_TET10_CUDA}")
 
 option(SFEM_TET10_WENO "Use WENO for TET10" ON)
 message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
-
-# Add the Op base implementation to the build
-list(APPEND SFEM_SOURCES frontend/ops/sfem_Op.cpp)
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 

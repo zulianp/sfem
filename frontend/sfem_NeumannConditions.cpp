@@ -143,7 +143,7 @@ namespace sfem {
 
                 } else {
                     auto sideset                = Sideset::create_from_file(space->mesh_ptr()->comm(), pch);
-                    cneumann_conditions.sideset = sideset;
+                    cneumann_conditions.sidesets.push_back(sideset);
 
                     auto surface                     = create_surface_from_sideset(space, sideset);
                     cneumann_conditions.element_type = surface.first;
@@ -285,12 +285,12 @@ namespace sfem {
 
         for (auto &c : nc->impl_->conditions) {
             if (!c.surface) {
-                auto it = sideset_to_surface.find(c.sideset);
+                auto it = sideset_to_surface.find(c.sidesets[0]);
                 if (it == sideset_to_surface.end()) {
-                    auto surface                  = create_surface_from_sideset(space, c.sideset);
+                    auto surface                  = create_surface_from_sidesets(space, c.sidesets);
                     c.element_type                = surface.first;
                     c.surface                     = surface.second;
-                    sideset_to_surface[c.sideset] = surface;
+                    sideset_to_surface[c.sidesets[0]] = surface;
                 } else {
                     c.element_type = it->second.first;
                     c.surface      = it->second.second;

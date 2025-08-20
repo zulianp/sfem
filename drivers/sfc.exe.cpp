@@ -18,6 +18,7 @@
 #include "argsort.h"
 
 #include "sfem_API.hpp"
+#include "sfem_Env.hpp"
 
 #ifdef DSFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
@@ -146,8 +147,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     const char *output_folder = argv[2];
 
-    int SFEM_ORDER_WITH_COORDINATE = -1;
-    SFEM_READ_ENV(SFEM_ORDER_WITH_COORDINATE, atoi);
+    int SFEM_ORDER_WITH_COORDINATE = sfem::Env::read<int>("SFEM_ORDER_WITH_COORDINATE", -1);
 
     if (!rank) {
         printf("%s %s %s\n", argv[0], folder, output_folder);
@@ -163,10 +163,11 @@ int main(int argc, char *argv[]) {
     const ptrdiff_t n_owned_elements = mesh->n_owned_elements();
     const int nxe = elem_num_nodes(mesh->element_type());
 
-    sfc_t *sfc = (sfc_t *)malloc(n_owned_elements * sizeof(sfc_t));
-    memset(sfc, 0, n_owned_elements * sizeof(sfc_t));
+    auto sfc_buff = sfem::create_host_buffer<sfc_t>(n_owned_elements);
+    auto sfc = sfc_buff->data();
 
-    element_idx_t *idx = (element_idx_t *)malloc(n_owned_elements * sizeof(element_idx_t));
+    auto idx_buff = sfem::create_host_buffer<element_idx_t>(n_owned_elements);
+    auto idx = idx_buff->data();
 
     geom_t box_min[3] = {0, 0, 0}, box_max[3] = {0, 0, 0}, box_extent[3] = {0, 0, 0};
 
@@ -298,6 +299,8 @@ int main(int argc, char *argv[]) {
 
         sort_function(n_owned_elements, sfc, idx);
 
+        // idx_buff->print(std::cout);
+
         ptrdiff_t buff_size = MAX(n_owned_elements, n_owned_nodes) * sizeof(idx_t);
         void *buff = malloc(buff_size);
 
@@ -382,9 +385,6 @@ int main(int argc, char *argv[]) {
         free(buff);
         free(x_buff);
     }
-
-    free(sfc);
-    free(idx);
 
     mesh->write(output_folder);
 

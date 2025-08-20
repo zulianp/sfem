@@ -11,51 +11,61 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Mesh.hpp"
 
+#include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
+#include "sfem_Parameters.hpp"
+
 namespace sfem {
+
+    class Laplacian::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
+        std::shared_ptr<MultiDomainOp> domains;
+#if SFEM_PRINT_THROUGHPUT
+        std::unique_ptr<OpTracer> op_profiler;
+#endif
+        Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+#if SFEM_PRINT_THROUGHPUT
+            op_profiler = std::make_unique<OpTracer>(space, "Laplacian::apply");
+#endif
+        }
+        ~Impl() {}
+
+        void print_info() { domains->print_info(); }
+
+        int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
+    };
+
+    int Laplacian::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("Laplacian::initialize");
+        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        return SFEM_SUCCESS;
+    }
 
     std::unique_ptr<Op> Laplacian::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("Laplacian::create");
 
         assert(1 == space->block_size());
 
-        auto ret           = std::make_unique<Laplacian>(space);
-        ret->element_types = space->element_types();
+        auto ret = std::make_unique<Laplacian>(space);
         return ret;
     }
 
     std::shared_ptr<Op> Laplacian::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret = std::make_shared<Laplacian>(space);
-
-        ret->element_types.reserve(space->n_blocks());
-        for (auto et : space->element_types()) {
-            ret->element_types.push_back(macro_type_variant(et));
-        }
-
+        auto ret            = std::make_shared<Laplacian>(space);
+        ret->impl_->domains = impl_->domains->lor_op(space, {});
         return ret;
     }
 
     std::shared_ptr<Op> Laplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret = std::make_shared<Laplacian>(space);
-        
-        ret->element_types.reserve(space->n_blocks());
-        for (auto et : space->element_types()) {
-            ret->element_types.push_back(macro_base_elem(et));
-        }
+        auto ret            = std::make_shared<Laplacian>(space);
+        ret->impl_->domains = impl_->domains->derefine_op(space, {});
         return ret;
     }
 
-    Laplacian::Laplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+    Laplacian::Laplacian(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>(space)) {}
 
-    Laplacian::~Laplacian() {
-        if (SFEM_PRINT_THROUGHPUT && calls) {
-            printf("Laplacian::apply called %ld times. Total: %g [s], "
-                   "Avg: %g [s], TP %g [MDOF/s]\n",
-                   calls,
-                   total_time,
-                   total_time / calls,
-                   1e-6 * space->n_dofs() / (total_time / calls));
-        }
-    }
+    Laplacian::~Laplacian() = default;
 
     int Laplacian::hessian_crs(const real_t *const  x,
                                const count_t *const rowptr,
@@ -63,20 +73,20 @@ namespace sfem {
                                real_t *const        values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs");
 
-        auto mesh  = space->mesh_ptr();
-        auto graph = space->dof_to_dof_graph();
+        auto mesh  = impl_->space->mesh_ptr();
+        auto graph = impl_->space->dof_to_dof_graph();
         int  err   = SFEM_SUCCESS;
 
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_crs(element_types[block],
-                                 mesh->n_elements(),
+        impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_crs(domain.element_type,
+                                 domain.block->n_elements(),
                                  mesh->n_nodes(),
-                                 mesh->block(block)->elements()->data(),
+                                 domain.block->elements()->data(),
                                  mesh->points()->data(),
                                  graph->rowptr()->data(),
                                  graph->colidx()->data(),
                                  values);
-        }
+        });
 
         return err;
     }
@@ -88,20 +98,20 @@ namespace sfem {
                                    real_t *const        off_diag_values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_crs_sym");
 
-        auto mesh = space->mesh_ptr();
+        auto mesh = impl_->space->mesh_ptr();
         int  err  = SFEM_SUCCESS;
 
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_crs_sym(element_types[block],
-                                     mesh->block(block)->n_elements(),
+        impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_crs_sym(domain.element_type,
+                                     domain.block->n_elements(),
                                      mesh->n_nodes(),
-                                     mesh->block(block)->elements()->data(),
+                                     domain.block->elements()->data(),
                                      mesh->points()->data(),
                                      rowptr,
                                      colidx,
                                      diag_values,
                                      off_diag_values);
-        }
+        });
 
         return err;
     }
@@ -109,17 +119,17 @@ namespace sfem {
     int Laplacian::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
-        auto mesh = space->mesh_ptr();
+        auto mesh = impl_->space->mesh_ptr();
         int  err  = SFEM_SUCCESS;
 
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_diag(element_types[block],
-                                  mesh->block(block)->n_elements(),
+        impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_diag(domain.element_type,
+                                  domain.block->n_elements(),
                                   mesh->n_nodes(),
-                                  mesh->block(block)->elements()->data(),
+                                  domain.block->elements()->data(),
                                   mesh->points()->data(),
                                   values);
-        }
+        });
 
         return err;
     }
@@ -127,71 +137,61 @@ namespace sfem {
     int Laplacian::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("Laplacian::gradient");
 
-        auto mesh = space->mesh_ptr();
-
-        int err = SFEM_SUCCESS;
-
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_assemble_gradient(element_types[block],
-                                               mesh->block(block)->n_elements(),
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_assemble_gradient(domain.element_type,
+                                               domain.block->n_elements(),
                                                mesh->n_nodes(),
-                                               mesh->block(block)->elements()->data(),
+                                               domain.block->elements()->data(),
                                                mesh->points()->data(),
                                                x,
                                                out);
-        }
-
-        return err;
+        });
     }
 
-    int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+    int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("Laplacian::apply");
+        SFEM_OP_CAPTURE();
 
-        auto   mesh = space->mesh_ptr();
-        double tick = MPI_Wtime();
-
-        int err = SFEM_SUCCESS;
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_apply(element_types[block],
-                                   mesh->block(block)->n_elements(),
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_apply(domain.element_type,
+                                   domain.block->n_elements(),
                                    mesh->n_nodes(),
-                                   mesh->block(block)->elements()->data(),
+                                   domain.block->elements()->data(),
                                    mesh->points()->data(),
                                    h,
                                    out);
-        }
-
-        double tock = MPI_Wtime();
-        total_time += (tock - tick);
-        calls++;
-        return err;
+        });
     }
 
     int Laplacian::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("Laplacian::value");
 
-        auto mesh = space->mesh_ptr();
-
-        int err = SFEM_SUCCESS;
-        for (int block = 0; block < space->n_blocks(); block++) {
-            err |= laplacian_assemble_value(element_types[block],
-                                            mesh->block(block)->n_elements(),
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_assemble_value(domain.element_type,
+                                            domain.block->n_elements(),
                                             mesh->n_nodes(),
-                                            mesh->block(block)->elements()->data(),
+                                            domain.block->elements()->data(),
                                             mesh->points()->data(),
                                             x,
                                             out);
-        }
-
-        return err;
+        });
     }
 
     int Laplacian::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> Laplacian::clone() const {
-        auto ret = std::make_shared<Laplacian>(space);
-        *ret     = *this;
-        return ret;
+        SFEM_ERROR("IMPLEMENT ME!\n");
+        return nullptr;
     }
 
+    void Laplacian::set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) {
+        impl_->domains->set_value_in_block(block_name, var_name, value);
+    }
+
+    void Laplacian::override_element_types(const std::vector<enum ElemType> &element_types) {
+        impl_->domains->override_element_types(element_types);
+    }
 }  // namespace sfem

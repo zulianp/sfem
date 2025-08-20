@@ -37,7 +37,7 @@
 #include "sfem_cuda_blas.hpp"
 #endif
 
-static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
+// static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
 
 namespace sfem {
     class AxisAlignedContactConditions::Impl {
@@ -70,11 +70,11 @@ namespace sfem {
 
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                                        const bool                            as_zero) const {
-        
         auto space = impl_->space;
-        auto et   = (enum ElemType)space->element_type();
+        auto et    = (enum ElemType)space->element_type();
 
-        const ptrdiff_t max_coarse_idx = max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements()->data());
+        const ptrdiff_t max_coarse_idx =
+                max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements()->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -297,7 +297,7 @@ namespace sfem {
         void assemble_mass_vector() {
             SFEM_TRACE_SCOPE("ContactConditions::assemble_mass_vector");
 
-            contact_surface->collect_points();
+            contact_surface->reset_points();
 
             auto st           = contact_surface->element_type();
             auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->comm(),
@@ -362,23 +362,24 @@ namespace sfem {
 
     ContactConditions::~ContactConditions() = default;
 
-    std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace> &space,
-                                                                 const std::shared_ptr<Grid<geom_t>>  &sdf,
-                                                                 const std::shared_ptr<Sideset>       &sideset,
-                                                                 const enum ExecutionSpace             es) {
+    std::shared_ptr<ContactConditions> ContactConditions::create(const std::shared_ptr<FunctionSpace>        &space,
+                                                                 const std::shared_ptr<Grid<geom_t>>         &sdf,
+                                                                 const std::vector<std::shared_ptr<Sideset>> &sidesets,
+                                                                 const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
-        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es_to_be_ported));
+        cc->impl_->obstacles.push_back(SDFObstacle::create(sdf, es));
 
         if (space->has_semi_structured_mesh()) {
-            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sideset, es_to_be_ported);
+            cc->impl_->contact_surface = SSMeshContactSurface::create(space, sidesets, es);
         } else {
-            cc->impl_->contact_surface = MeshContactSurface::create(space, sideset, es_to_be_ported);
+            cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        cc->impl_->normals = create_host_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs());
-        cc->impl_->assemble_mass_vector();
-        cc->impl_->blas_           = sfem::blas<real_t>(es);
+        cc->impl_->normals         = create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
         cc->impl_->execution_space = es;
+        cc->impl_->blas_           = sfem::blas<real_t>(es);
+        cc->impl_->assemble_mass_vector();
+
         return cc;
     }
 
@@ -413,7 +414,7 @@ namespace sfem {
 
         auto sdf = Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
-        return create(space, std::move(sdf), sideset, es);
+        return create(space, std::move(sdf), {sideset}, es);
     }
 
     std::shared_ptr<ContactConditions> ContactConditions::create_from_env(const std::shared_ptr<FunctionSpace> &space,
@@ -464,25 +465,25 @@ namespace sfem {
     int ContactConditions::normal_project(const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("ContactConditions::normal_project");
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-
-        const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
-        auto      normals = impl_->normals->data();
+        const ptrdiff_t n       = impl_->contact_surface->node_mapping()->size();
+        const int       dim     = impl_->space->mesh_ptr()->spatial_dimension();
+        auto            normals = impl_->normals->data();
 
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            err = cu_obstacle_normal_project(dim, n, idx, normals, h, out);
+            const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
+            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out);
         } else
 #endif
         {
-            err = obstacle_normal_project(dim, n, idx, normals, h, out);
-        }
+            const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
+            err                    = obstacle_normal_project(dim, n, idx, normals, h, out);
 
-        if (impl_->debug) {
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC: %g = %g * %g\n", out[i], normals[0][i], h[idx[i] * dim + 0]);
+            if (impl_->debug) {
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    printf("CC: %g = %g * %g\n", out[i], normals[0][i], h[idx[i] * dim + 0]);
+                }
             }
         }
 
@@ -537,16 +538,24 @@ namespace sfem {
 
         auto cs = impl_->contact_surface;
 
-        // FIXME
-#ifdef SFEM_ENABLE_CUDA
-        if (MEMORY_SPACE_DEVICE == impl_->normals->mem_space()) {
-            impl_->normals = sfem::to_host(impl_->normals);
-        }
-#endif
-
         int err = 0;
         for (auto &obs : impl_->obstacles) {
-            // FIXME always sample gap and normals together
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+                assert(is_ptr_device(cs->elements_device()->data()));
+                assert(is_ptr_device(cs->points_device()->data()));
+                assert(is_ptr_device(cs->node_mapping_device()->data()));
+                assert(is_ptr_device(impl_->normals->data()));
+
+                err += obs->sample_normals(cs->element_type(),
+                                           cs->elements()->extent(1),
+                                           cs->node_mapping_device()->size(),
+                                           cs->elements_device()->data(),
+                                           cs->points_device()->data(),
+                                           impl_->normals->data());
+                continue;
+            }
+#endif
             err += obs->sample_normals(cs->element_type(),
                                        cs->elements()->extent(1),
                                        cs->node_mapping()->size(),
@@ -554,12 +563,6 @@ namespace sfem {
                                        cs->points()->data(),
                                        impl_->normals->data());
         }
-
-#ifdef SFEM_ENABLE_CUDA
-        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            impl_->normals = sfem::to_device(impl_->normals);
-        }
-#endif
 
         return err;
     }
@@ -600,6 +603,17 @@ namespace sfem {
 #endif
         {
             for (auto &obs : impl_->obstacles) {
+#ifdef SFEM_ENABLE_CUDA
+                if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+                    err += obs->sample_value(cs->element_type(),
+                                             cs->elements_device()->extent(1),
+                                             cs->node_mapping_device()->size(),
+                                             cs->elements_device()->data(),
+                                             cs->points_device()->data(),
+                                             g);
+                    continue;
+                }
+#endif
                 // FIXME always sample gap and normals together
                 err += obs->sample_value(cs->element_type(),
                                          cs->elements()->extent(1),

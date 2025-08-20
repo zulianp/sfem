@@ -330,7 +330,7 @@ int mesh_read_elements(MPI_Comm         comm,
     {
         idx_t *idx = 0;
         for (int d = 0; d < nnodesxelem; ++d) {
-            sprintf(path, "%s/i%d.raw", folder, d);
+            snprintf(path, sizeof(path), "%s/i%d.raw", folder, d);
             ret |= array_create_from_file(comm, path, mpi_idx_t, (void **)&idx, n_local_elements, n_elements);
             elems[d] = idx;
         }
@@ -370,17 +370,17 @@ int mesh_read_mpi(const MPI_Comm  comm,
     if (!rank) {
         char pattern[1024 * 10];
         // sprintf(pattern, "%s/i[0-9].*", folder);
-        sprintf(pattern, "%s/i*.raw", folder);
+        snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
         counts[0] = count_files(pattern);
 
-        sprintf(pattern, "%s/x.raw", folder);
+        snprintf(pattern, sizeof(pattern), "%s/x.raw", folder);
         counts[1] += count_files(pattern);
 
-        sprintf(pattern, "%s/y.raw", folder);
+        snprintf(pattern, sizeof(pattern), "%s/y.raw", folder);
         counts[1] += count_files(pattern);
 
-        sprintf(pattern, "%s/z.raw", folder);
+        snprintf(pattern, sizeof(pattern), "%s/z.raw", folder);
         counts[1] += count_files(pattern);
     }
 
@@ -441,7 +441,7 @@ int mesh_read_mpi(const MPI_Comm  comm,
         static const char *str_xyz = "xyzt";
 
         for (int d = 0; d < ndims; ++d) {
-            sprintf(path, "%s/%c.raw", folder, str_xyz[d]);
+            snprintf(path, sizeof(path), "%s/%c.raw", folder, str_xyz[d]);
             array_create_from_file(comm, path, mpi_geom_t, (void **)&xyz[d], &n_local_nodes, &n_nodes);
         }
 
@@ -890,8 +890,8 @@ int mesh_read_serial(const char *folder,
     MPI_Datatype mpi_geom_t = SFEM_MPI_GEOM_T;
     MPI_Datatype mpi_idx_t  = SFEM_MPI_IDX_T;
 
-    ptrdiff_t n_local_elements = 0, n_elements = 0;
-    ptrdiff_t n_local_nodes = 0, n_nodes = 0;
+    ptrdiff_t n_elements = 0;
+    ptrdiff_t n_nodes = 0;
 
     char pattern[1024 * 10];
     snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
@@ -906,6 +906,11 @@ int mesh_read_serial(const char *folder,
     snprintf(pattern, sizeof(pattern), "%s/z.raw", folder);
     ndims += count_files(pattern);
 
+    if (!ndims) {
+        SFEM_ERROR("No coordinates found in input folder %s\n", folder);
+        return SFEM_FAILURE;
+    }
+
     idx_t **elems = (idx_t **)malloc(sizeof(idx_t *) * nnodesxelem);
     for (int d = 0; d < nnodesxelem; d++) {
         elems[d] = 0;
@@ -913,7 +918,7 @@ int mesh_read_serial(const char *folder,
 
     char path[1024 * 10];
     {
-        ptrdiff_t n_local_elements0 = 0, n_elements0 = 0;
+        ptrdiff_t n_elements0 = 0;
         for (int d = 0; d < nnodesxelem; ++d) {
             snprintf(path, sizeof(path), "%s/i%d.raw", folder, d);
 
@@ -921,19 +926,16 @@ int mesh_read_serial(const char *folder,
             if (read_raw_array(path, sizeof(idx_t), (void **)&idx, &n_elements) != SFEM_SUCCESS) {
                 return SFEM_FAILURE;
             }
-            n_local_elements = n_elements;
             // End of Selection
             elems[d] = idx;
 
             if (d == 0) {
-                n_local_elements0 = n_local_elements;
                 n_elements0       = n_elements;
             } else {
-                assert(n_local_elements0 == n_local_elements);
                 assert(n_elements0 == n_elements);
 
                 if (n_elements0 != n_elements) {
-                    SFEM_ERROR("Inconsistent lenghts in input %ld != %ld\n", (long)n_local_elements0, (long)n_local_elements);
+                    SFEM_ERROR("Inconsistent lenghts in input %ld != %ld\n", (long)n_elements0, (long)n_elements);
                 }
             }
         }
@@ -953,7 +955,7 @@ int mesh_read_serial(const char *folder,
         snprintf(path, sizeof(path), "%s/%c.raw", folder, str_xyz[d]);
 
         geom_t *xyz_d = 0;
-        if (read_raw_array(path, sizeof(geom_t), (void **)&xyz_d, &n_local_nodes) != SFEM_SUCCESS) {
+        if (read_raw_array(path, sizeof(geom_t), (void **)&xyz_d, &n_nodes) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
         xyz[d] = xyz_d;
@@ -961,9 +963,9 @@ int mesh_read_serial(const char *folder,
 
     *nnodesxelem_out = nnodesxelem;
     *spatial_dim_out = ndims;
-    *nelements_out   = n_local_elements;
+    *nelements_out   = n_elements;
     *elems_out       = elems;
-    *nnodes_out      = n_local_nodes;
+    *nnodes_out      = n_nodes;
     *xyz_out         = xyz;
 
     return SFEM_SUCCESS;
