@@ -107,7 +107,7 @@ namespace sfem {
                                   const SharedBuffer<T>&            diag) override {
             assert(sbv->n_blocks() == diag->size());
             
-            this->op = op + sfem::create_sparse_block_vector_mult(sbv, diag);
+            this->op = op + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
 
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {

@@ -21,9 +21,8 @@
 
 #include "sfem_ssmgc.hpp"
 
-int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
-    auto comm = context.communicator();
-
+int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    
     if (argc != 6) {
         fprintf(stderr, "usage: %s <mesh> <sdf> <dirichlet_conditions> <contact_boundary> <output>\n", argv[0]);
         return SFEM_FAILURE;
@@ -77,7 +76,7 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 
     auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
     auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
-    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, contact_boundary, es);
+    auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -140,6 +139,6 @@ int solve_obstacle_problem(sfem::Context &context, int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    sfem::Context context(argc, argv);
-    return solve_obstacle_problem(context, argc, argv);
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_obstacle_problem(ctx->communicator(), argc, argv);
 }

@@ -1,13 +1,14 @@
 #include "sfem_BoundaryMass.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_Mesh.hpp"
-#include "mass.h"
 #include <mpi.h>
+#include "mass.h"
+#include "sfem_Mesh.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
-    std::unique_ptr<Op> BoundaryMass::create(const std::shared_ptr<FunctionSpace> &space, const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
+    std::unique_ptr<Op> BoundaryMass::create(const std::shared_ptr<FunctionSpace>   &space,
+                                             const std::shared_ptr<Buffer<idx_t *>> &boundary_elements) {
         SFEM_TRACE_SCOPE("BoundaryMass::create");
 
         auto ret          = std::make_unique<BoundaryMass>(space);
@@ -23,9 +24,7 @@ namespace sfem {
 
     BoundaryMass::BoundaryMass(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-    int BoundaryMass::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int BoundaryMass::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     int BoundaryMass::hessian_crs(const real_t *const  x,
                                   const count_t *const rowptr,
@@ -109,8 +108,6 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int BoundaryMass::report(const real_t *const) {
-        return SFEM_SUCCESS;
-    }
+    int BoundaryMass::report(const real_t *const) { return SFEM_SUCCESS; }
 
-} // namespace sfem 
+}  // namespace sfem

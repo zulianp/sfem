@@ -1,18 +1,17 @@
 #include "sfem_SemiStructuredVectorLaplacian.hpp"
 
 // C includes
-#include "sshex8_vector_laplacian.h"
 #include "hex8_fff.h"
+#include "sshex8_vector_laplacian.h"
 
 // C++ includes
-#include "sfem_VectorLaplacian.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_glob.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
-
+#include "sfem_VectorLaplacian.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -46,7 +45,10 @@ namespace sfem {
 
     SemiStructuredVectorLaplacian::SemiStructuredVectorLaplacian(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-    int SemiStructuredVectorLaplacian::hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) {
+    int SemiStructuredVectorLaplacian::hessian_crs(const real_t *const  x,
+                                                   const count_t *const rowptr,
+                                                   const idx_t *const   colidx,
+                                                   real_t *const        values) {
         SFEM_ERROR("[Error] ss:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
@@ -94,7 +96,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int SemiStructuredVectorLaplacian::initialize() { return SFEM_SUCCESS; }
+    int SemiStructuredVectorLaplacian::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> SemiStructuredVectorLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredVectorLaplacian::derefine_op");
@@ -145,4 +147,4 @@ namespace sfem {
         return ret;
     }
 
-} // namespace sfem 
+}  // namespace sfem

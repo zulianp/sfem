@@ -1,7 +1,7 @@
 /**
  * @file sfem_LinearElasticity.hpp
  * @brief Linear elasticity operator for finite element analysis
- * 
+ *
  * This file defines the LinearElasticity operator, which implements
  * the discrete linear elasticity equations for solid mechanics problems.
  * The operator supports various element types and matrix formats.
@@ -15,64 +15,42 @@ namespace sfem {
 
     /**
      * @brief Linear elasticity operator for solid mechanics
-     * 
+     *
      * The LinearElasticity operator implements the discrete form of the
      * linear elasticity equations:
-     * 
+     *
      * -∇·σ = f
      * σ = λ(∇·u)I + 2μ(∇u + ∇u^T)/2
-     * 
+     *
      * where:
      * - σ is the Cauchy stress tensor
      * - u is the displacement field
      * - λ and μ are the Lamé parameters
      * - f is the body force
-     * 
+     *
      * The operator supports:
      * - Various element types (HEX8, TET4, etc.)
      * - Multiple matrix formats (CRS, BSR, diagonal)
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
+     * - Multi-domain operations via MultiDomainOp
      */
     class LinearElasticity final : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
+        const char *name() const override { return "LinearElasticity"; }
+        inline bool is_linear() const override { return true; }
 
-        real_t mu{1};     ///< Shear modulus (second Lamé parameter)
-        real_t lambda{1}; ///< First Lamé parameter
-
-        long   calls{0};      ///< Number of apply() calls for performance tracking
-        double total_time{0}; ///< Total time spent in apply() for performance tracking
-
-        /**
-         * @brief Jacobian storage for performance optimization
-         * 
-         * Precomputed Jacobian determinants and adjugates for HEX8 elements
-         * to avoid repeated computation during matrix-vector products.
-         */
-        class Jacobians {
-        public:
-            std::shared_ptr<Buffer<jacobian_t>> adjugate;   ///< Adjugate matrices
-            std::shared_ptr<Buffer<jacobian_t>> determinant; ///< Determinants
-
-            /**
-             * @brief Constructor
-             * @param n_elements Number of elements
-             * @param size_adjugate Size of adjugate storage per element
-             */
-            Jacobians(const ptrdiff_t n_elements, const int size_adjugate)
-                : adjugate(sfem::create_host_buffer<jacobian_t>(n_elements * size_adjugate)),
-                  determinant(sfem::create_host_buffer<jacobian_t>(n_elements)) {}
-        };
-
-        std::shared_ptr<Jacobians> jacobians; ///< Precomputed Jacobians
+        // Accessors for compatibility with semi-structured wrappers
+        real_t get_mu() const;
+        void   set_mu(real_t val);
+        real_t get_lambda() const;
+        void   set_lambda(real_t val);
 
         /**
          * @brief Create a LinearElasticity operator
          * @param space Function space
          * @return Unique pointer to the operator
-         * 
+         *
          * The operator reads material parameters from environment variables:
          * - SFEM_SHEAR_MODULUS: Shear modulus μ (default: 1.0)
          * - SFEM_FIRST_LAME_PARAMETER: First Lamé parameter λ (default: 1.0)
@@ -93,17 +71,16 @@ namespace sfem {
          */
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 
-        const char *name() const override { return "LinearElasticity"; }
-        inline bool is_linear() const override { return true; }
-
         /**
          * @brief Initialize the operator
+         * @param block_names Optional list of block names to initialize
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
-         * 
+         *
+         * Sets up the MultiDomainOp for multi-block operations.
          * For HEX8 elements, this precomputes Jacobian determinants and adjugates
          * to optimize matrix-vector products.
          */
-        int initialize() override;
+        int initialize(const std::vector<std::string> &block_names = {}) override;
 
         /**
          * @brief Constructor
@@ -113,7 +90,7 @@ namespace sfem {
 
         /**
          * @brief Destructor
-         * 
+         *
          * Prints performance statistics if SFEM_PRINT_THROUGHPUT is enabled.
          */
         ~LinearElasticity();
@@ -143,11 +120,18 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override;
 
         // Vector operations
-        int gradient(const real_t *const x, real_t *const out) override;
-        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
-        int value(const real_t *x, real_t *const out) override;
-        int report(const real_t *const) override;
+        int                 gradient(const real_t *const x, real_t *const out) override;
+        int                 apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
+        int                 value(const real_t *x, real_t *const out) override;
+        int                 report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
+
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 
-} // namespace sfem 
+}  // namespace sfem

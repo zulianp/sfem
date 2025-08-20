@@ -14,7 +14,7 @@ public:
     std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
     const char *name() const override;
     inline bool is_linear() const override { return true; }
-    int initialize() override;
+            int initialize(const std::vector<std::string> &block_names = {}) override;
     SpectralElementLaplacian(const std::shared_ptr<FunctionSpace> &space);
     int hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values) override;
     int hessian_diag(const real_t *const, real_t *const out) override;

@@ -32,9 +32,9 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 
     const int n = base_resolution * (fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().level() : 1);
 
-    sfem::DirichletConditions::Condition xtop{.sideset = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sideset = top_ss, .value = -0.05, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sideset = top_ss, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition xtop{.sidesets = {top_ss}, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition ytop{.sidesets = {top_ss}, .value = -0.05, .component = 1};
+    sfem::DirichletConditions::Condition ztop{.sidesets = {top_ss}, .value = 0, .component = 2};
 
     auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
     f->add_constraint(conds);
@@ -172,7 +172,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     f->hessian_block_diag_sym(nullptr, diag->data());
     f->constaints_mask(mask->data());
 
-    auto linear_op = sfem::create_linear_operator("MF", f, nullptr, es);
+    auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg(linear_op, es);
     cg->apply(rhs->data(), x->data());
 

@@ -1,9 +1,7 @@
 #include "sfem_API.hpp"
 
+#include "sfem_macros.h"
 #include "sortreduce.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

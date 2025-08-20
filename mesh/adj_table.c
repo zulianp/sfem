@@ -480,4 +480,50 @@ int extract_nodeset_from_sideset(const int                                elemen
     return SFEM_SUCCESS;
 }
 
+int extract_nodeset_from_sidesets(ptrdiff_t                                n_sidesets,
+                                  const enum ElemType                      element_type[],
+                                  idx_t **const SFEM_RESTRICT              elems[],
+                                  const ptrdiff_t                          n_surf_elements[],
+                                  const element_idx_t *const SFEM_RESTRICT parent_element[],
+                                  const int16_t *const SFEM_RESTRICT       side_idx[],
+                                  ptrdiff_t                               *n_nodes_out,
+                                  idx_t **SFEM_RESTRICT                    nodes_out) {
+    ptrdiff_t n_nodes = 0;
+    for (ptrdiff_t ss = 0; ss < n_sidesets; ss++) {
+        const enum ElemType st = side_type(element_type[ss]);
+        const int           nn = elem_num_nodes(st);
+        n_nodes += n_surf_elements[ss] * nn;
+    }
+
+    idx_t    *nodes       = malloc(n_nodes * sizeof(idx_t));
+    ptrdiff_t node_offset = 0;
+
+    for (ptrdiff_t ss = 0; ss < n_sidesets; ss++) {
+        const enum ElemType st = side_type(element_type[ss]);
+        const int           nn = elem_num_nodes(st);
+
+        const ptrdiff_t n = nn * n_surf_elements[ss];
+        int             local_side_table[SFEM_MAX_NUM_SIDES * SFEM_MAX_NUM_NODES_PER_SIDE];
+        fill_local_side_table(element_type[ss], local_side_table);
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < n_surf_elements[ss]; i++) {
+            const ptrdiff_t e = parent_element[ss][i];
+            const int       s = side_idx[ss][i];
+
+            for (int k = 0; k < nn; k++) {
+                idx_t node                      = elems[ss][LST(s, k)][e];
+                nodes[node_offset + i * nn + k] = node;
+            }
+        }
+
+        node_offset += n;
+    }
+
+    *n_nodes_out = sortreduce(nodes, n_nodes);
+    *nodes_out   = realloc(nodes, *n_nodes_out * sizeof(idx_t));
+
+    return SFEM_SUCCESS;
+}
+
 #undef LST

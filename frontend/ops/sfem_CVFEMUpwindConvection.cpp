@@ -1,9 +1,9 @@
 #include "sfem_CVFEMUpwindConvection.hpp"
-#include "sfem_glob.hpp"
-#include "sfem_Tracer.hpp"
-#include "sfem_Mesh.hpp"
-#include "cvfem_operators.h"
 #include <mpi.h>
+#include "cvfem_operators.h"
+#include "sfem_Mesh.hpp"
+#include "sfem_Tracer.hpp"
+#include "sfem_glob.hpp"
 
 namespace sfem {
 
@@ -35,9 +35,12 @@ namespace sfem {
         ptrdiff_t nlocal, nglobal;
 
         real_t *vel0, *vel1, *vel2;
-        if (array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
-            array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
-            array_create_from_file(space->mesh_ptr()->comm()->get(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
+        if (array_create_from_file(
+                    space->mesh_ptr()->comm()->get(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
+            array_create_from_file(
+                    space->mesh_ptr()->comm()->get(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
+            array_create_from_file(
+                    space->mesh_ptr()->comm()->get(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
             fprintf(stderr, "Unable to read input velocity\n");
             assert(0);
             return nullptr;
@@ -83,9 +86,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int CVFEMUpwindConvection::gradient(const real_t *const x, real_t *const out) {
-        return apply(nullptr, x, out);
-    }
+    int CVFEMUpwindConvection::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
 
     int CVFEMUpwindConvection::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         auto mesh = space->mesh_ptr();
@@ -127,9 +128,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int CVFEMUpwindConvection::report(const real_t *const) {
-        return SFEM_SUCCESS;
-    }
+    int CVFEMUpwindConvection::report(const real_t *const) { return SFEM_SUCCESS; }
 
     std::shared_ptr<Op> CVFEMUpwindConvection::clone() const {
         auto ret = std::make_shared<CVFEMUpwindConvection>(space);
@@ -137,8 +136,6 @@ namespace sfem {
         return ret;
     }
 
-    int CVFEMUpwindConvection::initialize() {
-        return SFEM_SUCCESS;
-    }
+    int CVFEMUpwindConvection::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
-} // namespace sfem 
+}  // namespace sfem

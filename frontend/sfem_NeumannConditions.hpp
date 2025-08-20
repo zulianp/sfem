@@ -24,7 +24,7 @@ namespace sfem {
     public:
         struct Condition {
             enum ElemType            element_type { INVALID };
-            std::shared_ptr<Sideset> sideset;  /// Maybe undefined in certain cases
+            std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe empty in certain cases
             SharedBuffer<idx_t *>    surface;
             SharedBuffer<real_t>     values;
             real_t                   value{0};

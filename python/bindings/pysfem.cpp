@@ -215,6 +215,15 @@ NB_MODULE(pysfem, m) {
     m.def("mesh_connectivity_from_file", [](const char *folder) -> std::shared_ptr<IdxBuffer2D> {
         return sfem::mesh_connectivity_from_file(sfem::Communicator::world(), folder);
     });
+    
+    // Add vector<Sideset> binding  
+    nb::class_<std::vector<std::shared_ptr<Sideset>>>(m, "vector<Sideset>")
+            .def("__getitem__", [](const std::vector<std::shared_ptr<Sideset>> &self, size_t index) -> std::shared_ptr<Sideset> {
+                return self[index];
+            })
+            .def("size", [](const std::vector<std::shared_ptr<Sideset>> &self) -> size_t {
+                return self.size();
+            });
 
     nb::class_<IdxBuffer2D>(m, "IdxBuffer2D");
     nb::class_<sfem::Buffer<int>>(m, "Buffer<int>")
@@ -336,7 +345,9 @@ NB_MODULE(pysfem, m) {
     m.def("create_hierarchical_prolongation", &sfem::create_hierarchical_prolongation);
 
     nb::class_<Constraint>(m, "Constraint");
-    nb::class_<Op>(m, "Op").def("initialize", &Op::initialize);
+    nb::class_<Op>(m, "Op")
+        .def("initialize", &Op::initialize)
+        .def("initialize", [](Op& self) { return self.initialize(std::vector<std::string>{}); });
     m.def("create_op", [](const std::shared_ptr<FunctionSpace> &space, const char *name, nb::handle es_handle = nb::handle()) {
         if (!es_handle.is_valid()) {
             return Factory::create_op(space, name);
@@ -514,7 +525,7 @@ NB_MODULE(pysfem, m) {
     // Add DirichletConditions::Condition binding
     nb::class_<DirichletConditions::Condition>(m, "DirichletCondition")
             .def(nb::init<>())
-            .def_rw("sideset", &DirichletConditions::Condition::sideset)
+            .def_rw("sidesets", &DirichletConditions::Condition::sidesets)
             .def_rw("nodeset", &DirichletConditions::Condition::nodeset)
             .def_rw("values", &DirichletConditions::Condition::values)
             .def_rw("value", &DirichletConditions::Condition::value)
@@ -541,8 +552,8 @@ NB_MODULE(pysfem, m) {
             .def_static("create",
                         [](const std::shared_ptr<FunctionSpace> &fs,
                            const std::shared_ptr<Grid<geom_t>>  &sdf,
-                           const std::shared_ptr<Sideset>       &sideset,
-                           const enum ExecutionSpace             es) { return ContactConditions::create(fs, sdf, sideset, es); });
+                           const std::vector<std::shared_ptr<Sideset>> &sidesets,
+                           const enum ExecutionSpace             es) { return ContactConditions::create(fs, sdf, sidesets, es); });
 
     m.def("signed_distance_for_mesh_viz",
           [](const std::shared_ptr<ContactConditions> &cc,
