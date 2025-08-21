@@ -385,7 +385,9 @@ print_rank_info(int              mpi_rank,   //
 
 real_t mesh_fun_par(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
 
-real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(3.0 * x) + cos(3.0 * y) + sin(3.0 * z)); }
+real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) + cos(6.0 * y) + sin(6.0 * z)); }
+
+real_t mesh_fun_trig_2(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) + cos(6.0 * y) + sin(6.0 * z)); }
 
 real_t mesh_fun_ones(real_t x, real_t y, real_t z) { return 1.0; }
 

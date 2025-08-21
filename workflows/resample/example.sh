@@ -26,6 +26,10 @@ export OMP_NUM_THREADS=$NCORES
 field=field.raw
 
 mesh=mesh
+
+refine torus torus2
+refine torus2 torus3
+mesh=torus3
 # mesh=impeller_tet4
 
 out=resampled
@@ -49,7 +53,7 @@ if [[ -d "$skinned" ]]
 then
 	echo "Reusing existing mesh $skinned and SDF!"
 else
-	create_sphere.sh 5
+	create_sphere.sh 3
 	sfc $mesh $mesh_sorted
 	mkdir -p $skinned
 	SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
@@ -59,7 +63,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 550
+sdf_test.py $sdf 125
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
