@@ -13,7 +13,7 @@
 #include "hyteg_jacobian_float.h"
 #include "hyteg_jacobian_double.h"
 
-#define HYTEG_MAX_REFINEMENT_LEVEL 12
+#define HYTEG_MAX_REFINEMENT_LEVEL 22
 #define HYTEG_MIN_REFINEMENT_LEVEL 1
 
 #endif /* __HYTEG_H__ */

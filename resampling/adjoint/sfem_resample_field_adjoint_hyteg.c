@@ -513,16 +513,19 @@ alpha_to_hyteg_level(const real_t alpha,                //
 
     // return 1;  ///// TODO
 
-    if (alpha < alpha_min_threshold) return 1;                           // No refinement
-    if (alpha > alpha_max_threshold) return HYTEG_MAX_REFINEMENT_LEVEL;  // Maximum refinement
+    const int min_refinement_L = 2;  // Minimum refinement level
+
+    if (alpha < alpha_min_threshold) return min_refinement_L;  // No refinement
+    if (alpha > alpha_max_threshold) return max_refinement_L;  // Maximum refinement
 
     real_t alpha_x = alpha - alpha_min_threshold;  // Shift the alpha to start from 0
     real_t L_real  = (alpha_x / (alpha_max_threshold - alpha_min_threshold) * (real_t)(HYTEG_MAX_REFINEMENT_LEVEL - 1)) + 1.0;
 
-    int L = L_real >= 1.0 ? (int)L_real : 1;                                  // Convert to integer
+    int L = L_real >= 1.0 ? (int)L_real : min_refinement_L;                   // Convert to integer
     L     = L > HYTEG_MAX_REFINEMENT_LEVEL ? HYTEG_MAX_REFINEMENT_LEVEL : L;  // Clamp to maximum level
 
-    return L >= max_refinement_L ? max_refinement_L : L;  // Return the level, clamped to max_refinement_L
+    const int ret = L >= max_refinement_L ? max_refinement_L : L;
+    return (ret) < min_refinement_L ? min_refinement_L : (ret);  // Ensure L is within bounds
 }
 
 //////////////////////////////////////////////////////////
@@ -1354,13 +1357,13 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 #define HYTEG_D_LOG(...) (void)0
 #endif
 
-#define MAX_REF_L 5  // Maximum refinement level for HyTeg tetrahedra
+#define MAX_REF_L 3  // Maximum refinement level for HyTeg tetrahedra
 
     PRINT_CURRENT_FUNCTION;
 
-    int histo_L[MAX_REF_L + 1] = {0};  // Histogram of refinement levels
+    int64_t histo_L[MAX_REF_L + 1] = {0};  // Histogram of refinement levels
 
-    int max_L = 0;  // Maximum refinement level
+    int64_t max_L = 0;  // Maximum refinement level
 
     int ret = 0;
 
@@ -1506,7 +1509,12 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
         if (L > max_L) {
             max_L = L;  // Update the maximum refinement level
-            printf("New maximum refinement level: %d\n", max_L);
+            printf("New maximum refinement level: %d, alpha_tet = %g, max_edges_length = %g, d_min = %g, tet_volume = %g\n",  //
+                   max_L,
+                   alpha_tet,
+                   max_edges_length,
+                   d_min,
+                   tet_volume);
         }
 
         real_t cumulated_volume = 0.0;  // Cumulative volume for debugging
@@ -1585,7 +1593,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                 tet4_resample_tetrahedron_local_adjoint_category(
                                         cat0,              //
                                         L,                 //
-                                        b0,                // Transposition vector for category 0)
+                                        b0,                // Translation vector for category 0)
                                         J_phy,             // Jacobian matrix
                                         J_vec_mini[cat0],  // Reference Jacobian matrix
                                         det_J_phys,        // Determinant of the Jacobian matrix for physical tet
@@ -1632,7 +1640,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                     tet4_resample_tetrahedron_local_adjoint_category(
                                             cat_i,              //
                                             L,                  //
-                                            b1,                 // Transposition vector for category 1, 2, 3, 4
+                                            b1,                 // Translation vector for category 1, 2, 3, 4
                                             J_phy,              // Jacobian matrix
                                             J_vec_mini[cat_i],  // Reference Jacobian matrix
                                             det_J_phys,         // Determinant of the Jacobian matrix
@@ -1688,7 +1696,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                 tet4_resample_tetrahedron_local_adjoint_category(  //
                                         cat5,                                      //
                                         L,                                         //
-                                        b5,                                        // Transposition vector for category 5
+                                        b5,                                        // Translation vector for category 5
                                         J_phy,                                     // Jacobian matrix
                                         J_vec_mini[cat5],                          // Reference Jacobian matrix
                                         det_J_phys,                                // Determinant of the Jacobian matrix
@@ -1744,7 +1752,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 #if SFEM_LOG_LEVEL >= 5
     // Print the histogram of refinement levels
     printf("Histogram of refinement levels:\n");
-    for (int l = 1; l <= max_L; l++) {
+    for (int l = 1; l <= MAX_REF_L; l++) {
         printf("L = %d: %e elements\n", l, (double)(histo_L[l]));
     }
 
@@ -1752,19 +1760,19 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
     // Find the maximum value
     int max_value = 0;
-    for (int l = 1; l <= max_L; l++) {
+    for (int l = 1; l <= MAX_REF_L; l++) {
         if (histo_L[l] > max_value) {
             max_value = histo_L[l];
         }
     }
 
     // Print the visual histogram with # symbols
-    const int max_width = get_terminal_columns() * 0.9;  // Maximum number of # symbols per bar
-    for (int l = 1; l <= max_L; l++) {
+    const int max_width = get_terminal_columns();  // Maximum number of # symbols per bar
+    for (int l = 1; l <= MAX_REF_L; l++) {
         int num_symbols = max_value > 0 ? (int)((double)histo_L[l] / max_value * max_width) : 0;
 
         // Print the level and value
-        printf("L = %d: %e ", l, (double)(histo_L[l]));
+        printf("L = %3d: %e ", l, (double)(histo_L[l]));
 
         // Print the symbols
         for (int i = 0; i < num_symbols; i++) {
