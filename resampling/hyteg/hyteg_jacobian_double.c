@@ -76,6 +76,6 @@ double det_jacobian_cat5_dbl(
     const double L //
 ) {
     // Calculate determinant of Jacobian for tetrahedron category 5
-    double det = (x0*(y1*(-z2 + z3) + y2*(z1 - z3) + y3*(-z1 + z2)) + x1*(y0*(z2 - z3) + y2*(-z0 + z3) + y3*(z0 - z2)) + x2*(y0*(-z1 + z3) + y1*(z0 - z3) + y3*(-z0 + z1)) + x3*(y0*(z1 - z2) + y1*(-z0 + z2) + y2*(z0 - z1)))/pow(L, 3);
+    double det = (x0*(y1*(z2 - z3) + y2*(-z1 + z3) + y3*(z1 - z2)) + x1*(y0*(-z2 + z3) + y2*(z0 - z3) + y3*(-z0 + z2)) + x2*(y0*(z1 - z3) + y1*(-z0 + z3) + y3*(z0 - z1)) + x3*(y0*(-z1 + z2) + y1*(z0 - z2) + y2*(-z0 + z1)))/pow(L, 3);
     return det;
 }

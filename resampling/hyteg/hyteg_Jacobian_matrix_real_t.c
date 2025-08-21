@@ -123,13 +123,13 @@ void jacobian_matrix_cat5_real_t(
 ) {
     // Calculate 3x3 Jacobian matrix for tetrahedron category 5
     // Matrix stored in row-major order: J[0]=J11, J[1]=J12, J[2]=J13, J[3]=J21, etc.
-    J[0] = (x0 - x1)/L; // J11
+    J[0] = (-x0 + x3)/L; // J11
     J[1] = (-x2 + x3)/L; // J12
     J[2] = (-x1 + x3)/L; // J13
-    J[3] = (y0 - y1)/L; // J21
+    J[3] = (-y0 + y3)/L; // J21
     J[4] = (-y2 + y3)/L; // J22
     J[5] = (-y1 + y3)/L; // J23
-    J[6] = (z0 - z1)/L; // J31
+    J[6] = (-z0 + z3)/L; // J31
     J[7] = (-z2 + z3)/L; // J32
     J[8] = (-z1 + z3)/L; // J33
 }
