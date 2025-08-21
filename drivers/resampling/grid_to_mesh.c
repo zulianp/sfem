@@ -711,7 +711,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_ones,                //
+                              mesh_fun_trig,                //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
@@ -767,7 +767,7 @@ int main(int argc, char* argv[]) {
 
                     info.alpha_th            = 2.5;
                     info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
-                    info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
+                    // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                     // info.adjoint_refine_type = ADJOINT_BASE;
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 

@@ -18,6 +18,47 @@
 
 #include "quadratures_rule.h"
 
+#include <stdio.h>
+
+// For Linux/macOS
+#ifndef _WIN32
+#include <sys/ioctl.h>
+#include <unistd.h>  // for STDOUT_FILENO
+
+// For Windows
+#else
+#include <windows.h>
+#endif
+
+int get_terminal_columns() {
+#ifndef _WIN32
+    struct winsize w;
+    // ioctl will retrieve the window size information
+    // STDOUT_FILENO is the file descriptor for standard output
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
+        // Return a default value or -1 on error
+        return 80;
+    }
+    return w.ws_col;
+#else
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    // Get the handle to the standard output
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h == INVALID_HANDLE_VALUE) {
+        // Return a default value or -1 on error
+        return 80;
+    }
+    // Get the console screen buffer info
+    if (GetConsoleScreenBufferInfo(h, &csbi)) {
+        // Calculate the width of the window
+        return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    } else {
+        // Return a default value or -1 on error
+        return 80;
+    }
+#endif
+}
+
 #define real_type real_t
 #define SFEM_RESTRICT __restrict__
 
@@ -1313,7 +1354,14 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 #define HYTEG_D_LOG(...) (void)0
 #endif
 
+#define MAX_REF_L 5  // Maximum refinement level for HyTeg tetrahedra
+
     PRINT_CURRENT_FUNCTION;
+
+    int histo_L[MAX_REF_L + 1] = {0};  // Histogram of refinement levels
+
+    int max_L = 0;  // Maximum refinement level
+
     int ret = 0;
 
     // The minimum and maximum thresholds for alpha are used to determine the level of refinement.
@@ -1360,6 +1408,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
     real_t J_vec_mini[6][9];  // Jacobian matrices for the 6 categories of tetrahedra for the refined and reference element
     real_t J_phy[9];          // Jacobian matrices for the 6 categories of tetrahedra for the physical current
 
+    // #pragma omp parallel for  // Parallel loop over the elements
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
         idx_t ev[4];
@@ -1444,14 +1493,21 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
         const real_t alpha_tet = max_edges_length / d_min;
 
-        const real_t alpha_min_threshold = 1.7;  // Minimum threshold for alpha, Less: make less refinements.
-        const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
-        const int    max_refinement_L    = 3;    // Maximum refinement level
+        const real_t alpha_min_threshold = 1.3;        // Minimum threshold for alpha, Less: more accurate.
+        const real_t alpha_max_threshold = 8.0;        // Maximum threshold for alpha. Less: make more refinements.
+        const int    max_refinement_L    = MAX_REF_L;  // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                            alpha_min_threshold,  //
                                            alpha_max_threshold,  //
                                            max_refinement_L);    //
+
+        histo_L[L] += 1;  // Update the histogram of refinement levels
+
+        if (L > max_L) {
+            max_L = L;  // Update the maximum refinement level
+            printf("New maximum refinement level: %d\n", max_L);
+        }
 
         real_t cumulated_volume = 0.0;  // Cumulative volume for debugging
 
@@ -1534,8 +1590,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                         J_vec_mini[cat0],  // Reference Jacobian matrix
                                         det_J_phys,        // Determinant of the Jacobian matrix for physical tet
                                         x0_n,              // Tetrahedron vertices XYZ-coordinates
-                                        y0_n,              // 
-                                        z0_n,              // 
+                                        y0_n,              //
+                                        z0_n,              //
                                         wf0,               // Weighted field at the vertices
                                         wf1,               //
                                         wf2,               //
@@ -1684,6 +1740,42 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         }
 
     }  // END: for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++)
+
+#if SFEM_LOG_LEVEL >= 5
+    // Print the histogram of refinement levels
+    printf("Histogram of refinement levels:\n");
+    for (int l = 1; l <= max_L; l++) {
+        printf("L = %d: %e elements\n", l, (double)(histo_L[l]));
+    }
+
+    printf("\nHistogram of refinement levels (visual):\n");
+
+    // Find the maximum value
+    int max_value = 0;
+    for (int l = 1; l <= max_L; l++) {
+        if (histo_L[l] > max_value) {
+            max_value = histo_L[l];
+        }
+    }
+
+    // Print the visual histogram with # symbols
+    const int max_width = get_terminal_columns() * 0.9;  // Maximum number of # symbols per bar
+    for (int l = 1; l <= max_L; l++) {
+        int num_symbols = max_value > 0 ? (int)((double)histo_L[l] / max_value * max_width) : 0;
+
+        // Print the level and value
+        printf("L = %d: %e ", l, (double)(histo_L[l]));
+
+        // Print the symbols
+        for (int i = 0; i < num_symbols; i++) {
+            printf("#");
+        }
+        printf("\n");
+    }
+
+    // Print the scale
+    printf("\nScale: Each # represents approximately %e elements\n", (double)max_value / max_width);
+#endif
 
     return ret;  // Return the result of the refinement
 }
