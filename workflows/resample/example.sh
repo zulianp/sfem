@@ -29,7 +29,8 @@ mesh=mesh
 
 refine torus torus2
 refine torus2 torus3
-mesh=torus3
+refine torus3 torus4
+mesh=torus2
 # mesh=impeller_tet4
 
 out=resampled
@@ -141,7 +142,9 @@ process_raw_file test_field
 process_raw_file test_field_alpha
 process_raw_file test_field_volume
 
-
+if [[ -f "test_field.xdmf" ]]; then
+    sed -i 's/Precision="4"/Precision="8"/' test_field.xdmf
+fi
 
 
 
