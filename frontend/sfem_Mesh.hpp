@@ -177,6 +177,8 @@ namespace sfem {
 
         std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> compute_bounding_box();
 
+        std::shared_ptr<Mesh> clone() const;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

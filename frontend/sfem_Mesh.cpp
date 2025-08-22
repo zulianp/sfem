@@ -1325,4 +1325,11 @@ namespace sfem {
 
         return selected_elements;
     }
+
+
+    std::shared_ptr<Mesh> Mesh::clone() const {
+        auto ret = std::make_shared<Mesh>();    
+        SFEM_IMPLEMENT_ME();
+        return ret;
+    }
 }  // namespace sfem
