@@ -317,6 +317,21 @@ namespace sfem {
         return out;
     }
 
+    template <typename T>
+    std::shared_ptr<Buffer<T *>> copy(const std::shared_ptr<Buffer<T *>> &buffer) {
+        if(buffer->mem_space() == MEMORY_SPACE_DEVICE) {
+            SFEM_IMPLEMENT_ME();
+        }
+
+        auto data = (T **)malloc(buffer->extent(0) * sizeof(T *));
+        for(ptrdiff_t i = 0; i < buffer->extent(0); i++) {
+            data[i] = (T *)malloc(buffer->extent(1) * sizeof(T));
+            memcpy(data[i], buffer->data()[i], buffer->extent(1) * sizeof(T));
+        }
+
+       return manage_host_buffer<T>(buffer->extent(0), buffer->extent(1), data);
+    }
+
 
     template<typename T>
     using SharedBuffer = std::shared_ptr<Buffer<T>>;
