@@ -505,15 +505,16 @@ calculate_det_Jacobian_for_category(const int    category,  //
 // alpha_to_hyteg_level //////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
-int                                                     //
-alpha_to_hyteg_level(const real_t alpha,                //
-                     const real_t alpha_min_threshold,  //
-                     const real_t alpha_max_threshold,  //
-                     const int    max_refinement_L) {      //
+int                                                           //
+alpha_to_hyteg_level(const real_t       alpha,                //
+                     const real_t       alpha_min_threshold,  //
+                     const real_t       alpha_max_threshold,  //
+                     const unsigned int min_refinement_L,     //
+                     const unsigned int max_refinement_L) {   //
 
     // return 1;  ///// TODO
 
-    const int min_refinement_L = 2;  // Minimum refinement level
+    // const int min_refinement_L = 2;  // Minimum refinement level
 
     if (alpha < alpha_min_threshold) return min_refinement_L;  // No refinement
     if (alpha > alpha_max_threshold) return max_refinement_L;  // Maximum refinement
@@ -632,6 +633,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
         const int L = alpha_to_hyteg_level(alpha_tet,            //
                                            alpha_min_threshold,  //
                                            alpha_max_threshold,  //
+                                           1,                    //
                                            max_refinement_L);    //
 
         const int     hyteg_num_tetrahedra = get_hyteg_num_tetrahedra(L);
@@ -1131,8 +1133,8 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
     // Jacobian matrix for the tetrahedron
 
-    const real_t N_micro_tet     = pow(L, 3);          // Number of micro-tetrahedra in the HyTeg tetrahedron
-    const real_t inv_N_micro_tet = 1.0 / N_micro_tet;  // Inverse of the number of micro-tetrahedra
+    const real_t N_micro_tet     = pow((double)(L), 3.0);  // Number of micro-tetrahedra in the HyTeg tetrahedron
+    const real_t inv_N_micro_tet = 1.0 / N_micro_tet;      // Inverse of the number of micro-tetrahedra
 
     const real_t theta_volume = del_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
 
@@ -1143,6 +1145,7 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
     // printf("Tet vertices X-coordinates: \nfx0 = %e, fy0 = %e, fz0 = %e\n", fx0, fy0, fz0);
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
+
         // Mapping the quadrature point from the reference space to the mini-tetrahedron
         const real_t xq_mref = J_ref[0] * tet_qx[quad_i] + J_ref[1] * tet_qy[quad_i] + J_ref[2] * tet_qz[quad_i] + bc[0];
         const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
@@ -1357,7 +1360,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 #define HYTEG_D_LOG(...) (void)0
 #endif
 
-#define MAX_REF_L 3  // Maximum refinement level for HyTeg tetrahedra
+#define MAX_REF_L 20  // Maximum refinement level for HyTeg tetrahedra
 
     PRINT_CURRENT_FUNCTION;
 
@@ -1503,6 +1506,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const int L = alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                            alpha_min_threshold,  //
                                            alpha_max_threshold,  //
+                                           1,                    //
                                            max_refinement_L);    //
 
         histo_L[L] += 1;  // Update the histogram of refinement levels

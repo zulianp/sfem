@@ -385,9 +385,11 @@ print_rank_info(int              mpi_rank,   //
 
 real_t mesh_fun_par(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
 
+real_t mesh_fun_lin_x(real_t x, real_t y, real_t z) { return x; }
+
 real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) + cos(6.0 * y) + sin(6.0 * z)); }
 
-real_t mesh_fun_trig_2(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) + cos(6.0 * y) + sin(6.0 * z)); }
+real_t mesh_fun_trig_pos(real_t x, real_t y, real_t z) { return 8.0 + mesh_fun_trig(x, y, z); }
 
 real_t mesh_fun_ones(real_t x, real_t y, real_t z) { return 1.0; }
 
@@ -713,7 +715,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_trig,                //
+                              mesh_fun_lin_x,               //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
@@ -767,8 +769,8 @@ int main(int argc, char* argv[]) {
                     //                                          g,           //
                     //                                          &info);      //
 
-                    info.alpha_th            = 2.5;
-                    info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
+                    info.alpha_th            = 1.5;
+                    // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE;
                     // info.adjoint_refine_type = ADJOINT_REFINE_ITERATIVE_QUEUE;
                     // info.adjoint_refine_type = ADJOINT_BASE;
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
