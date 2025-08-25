@@ -1190,16 +1190,43 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_t f2 = yq_mref;
         const real_t f3 = zq_mref;
 
+        // if ((f0 < 0.0) || (f1 < 0.0) || (f2 < 0.0) || (f3 < 0.0)) {
+        //     printf("Warning: Quadrature point outside the tetrahedron! f0 = %g, f1 = %g, f2 = %g, f3 = %g\n", f0, f1, f2, f3);
+        // }
+
         // Values of the shape functions at the quadrature point
         // In the local coordinate system of the tetrahedral element
         // For each vertex of the tetrahedral element
-        const real_t tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-        const real_t tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-        const real_t tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-        const real_t tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+        // const real_t tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
+        // const real_t tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
+        // const real_t tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
+        // const real_t tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+
+        // if (tet4_f0 < 0.0 || tet4_f1 < 0.0 || tet4_f2 < 0.0 || tet4_f3 < 0.0) {
+        //     printf("** Warning: Shape function negative at quadrature point!: \ntet4_f0 = %g, tet4_f1 = %g, tet4_f2 = %g, "
+        //            "tet4_f3 = "
+        //            "%g, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g, xq_mref = %g, yq_mref = %g, zq_mref = %g, f0 = %g, f1 = %g, f2 = "
+        //            "%g, f3 = %g\n",
+        //            tet4_f0,
+        //            tet4_f1,
+        //            tet4_f2,
+        //            tet4_f3,
+        //            wf0,
+        //            wf1,
+        //            wf2,
+        //            wf3,
+        //            xq_mref,
+        //            yq_mref,
+        //            zq_mref,
+        //            f0,
+        //            f1,
+        //            f2,
+        //            f3);
+        // }
 
         // Compute the weighted field value at the quadrature point
-        const real_t    wf_quad = tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3;
+        // const real_t    wf_quad = tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3;
+        const real_t    wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
         const real_type dV      = theta_volume * inv_N_micro_tet * tet_qw[quad_i];
         const real_type It      = wf_quad * dV;
 
@@ -1499,14 +1526,16 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
         const real_t alpha_tet = max_edges_length / d_min;
 
-        const real_t alpha_min_threshold = 1.3;        // Minimum threshold for alpha, Less: more accurate.
-        const real_t alpha_max_threshold = 8.0;        // Maximum threshold for alpha. Less: make more refinements.
-        const int    max_refinement_L    = MAX_REF_L;  // Maximum refinement level
+        const real_t alpha_min_threshold = 1.3;  // Minimum threshold for alpha, Less: more accurate.
+        const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
+
+        const int min_refinement_L = 1;          // Minimum refinement level
+        const int max_refinement_L = MAX_REF_L;  // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                            alpha_min_threshold,  //
                                            alpha_max_threshold,  //
-                                           1,                    //
+                                           min_refinement_L,     //
                                            max_refinement_L);    //
 
         histo_L[L] += 1;  // Update the histogram of refinement levels
@@ -1755,10 +1784,10 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
 #if SFEM_LOG_LEVEL >= 5
     // Print the histogram of refinement levels
-    printf("Histogram of refinement levels:\n");
-    for (int l = 1; l <= MAX_REF_L; l++) {
-        printf("L = %d: %e elements\n", l, (double)(histo_L[l]));
-    }
+    // printf("Histogram of refinement levels:\n");
+    // for (int l = 1; l <= MAX_REF_L; l++) {
+    //     printf("L = %d: %e elements\n", l, (double)(histo_L[l]));
+    // }
 
     printf("\nHistogram of refinement levels (visual):\n");
 

@@ -91,22 +91,22 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
 #else
 
         real_type tet4_f0, tet4_f1, tet4_f2, tet4_f3;
-        {
-            // DUAL basis function (Shape functions for tetrahedral elements)
-            // at the quadrature point
-            const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
-            const real_type f1 = tet_qx[quad_i];
-            const real_type f2 = tet_qy[quad_i];
-            const real_type f3 = tet_qz[quad_i];
 
-            // Values of the shape functions at the quadrature point
-            // In the local coordinate system of the tetrahedral element
-            // For each vertex of the tetrahedral element
-            tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-            tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-            tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-            tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
-        }
+        // DUAL basis function (Shape functions for tetrahedral elements)
+        // at the quadrature point
+        const real_type f0 = 1.0 - tet_qx[quad_i] - tet_qy[quad_i] - tet_qz[quad_i];
+        const real_type f1 = tet_qx[quad_i];
+        const real_type f2 = tet_qy[quad_i];
+        const real_type f3 = tet_qz[quad_i];
+
+        // Values of the shape functions at the quadrature point
+        // In the local coordinate system of the tetrahedral element
+        // For each vertex of the tetrahedral element
+        tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
+        tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
+        tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
+        tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
+
 #endif
 
         const real_type grid_x = (g_qx - ox) / dx;
@@ -187,7 +187,8 @@ tet4_resample_tetrahedron_local_adjoint(const real_type                      x0,
 
         // Integrate the values of the field at the vertices of the tetrahedral element
         const real_type dV = theta_volume * tet_qw[quad_i];
-        const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
+        // const real_type It = (tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3) * dV;
+        const real_type It = (f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3) * dV;
 
         const real_type d0 = It * hex8_f0;
         const real_type d1 = It * hex8_f1;
