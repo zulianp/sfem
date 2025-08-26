@@ -1190,40 +1190,6 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_t f2 = yq_mref;
         const real_t f3 = zq_mref;
 
-        // if ((f0 < 0.0) || (f1 < 0.0) || (f2 < 0.0) || (f3 < 0.0)) {
-        //     printf("Warning: Quadrature point outside the tetrahedron! f0 = %g, f1 = %g, f2 = %g, f3 = %g\n", f0, f1, f2, f3);
-        // }
-
-        // Values of the shape functions at the quadrature point
-        // In the local coordinate system of the tetrahedral element
-        // For each vertex of the tetrahedral element
-        // const real_t tet4_f0 = 4.0 * f0 - f1 - f2 - f3;
-        // const real_t tet4_f1 = -f0 + 4.0 * f1 - f2 - f3;
-        // const real_t tet4_f2 = -f0 - f1 + 4.0 * f2 - f3;
-        // const real_t tet4_f3 = -f0 - f1 - f2 + 4.0 * f3;
-
-        // if (tet4_f0 < 0.0 || tet4_f1 < 0.0 || tet4_f2 < 0.0 || tet4_f3 < 0.0) {
-        //     printf("** Warning: Shape function negative at quadrature point!: \ntet4_f0 = %g, tet4_f1 = %g, tet4_f2 = %g, "
-        //            "tet4_f3 = "
-        //            "%g, wf0 = %g, wf1 = %g, wf2 = %g, wf3 = %g, xq_mref = %g, yq_mref = %g, zq_mref = %g, f0 = %g, f1 = %g, f2 = "
-        //            "%g, f3 = %g\n",
-        //            tet4_f0,
-        //            tet4_f1,
-        //            tet4_f2,
-        //            tet4_f3,
-        //            wf0,
-        //            wf1,
-        //            wf2,
-        //            wf3,
-        //            xq_mref,
-        //            yq_mref,
-        //            zq_mref,
-        //            f0,
-        //            f1,
-        //            f2,
-        //            f3);
-        // }
-
         // Compute the weighted field value at the quadrature point
         // const real_t    wf_quad = tet4_f0 * wf0 + tet4_f1 * wf1 + tet4_f2 * wf2 + tet4_f3 * wf3;
         const real_t    wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
