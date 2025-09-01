@@ -2,8 +2,20 @@
 #include <stddef.h>
 
 #include "quadratures_rule_cuda.cuh"
+// #include "sfem_config.h"
+
+typedef float   geom_t;
+typedef int32_t idx_t;
 
 #define LANES_PER_TILE 8
+
+typedef struct {
+    float        alpha;
+    float        alpha_min_threshold;
+    float        alpha_max_threshold;
+    unsigned int min_refinement_L;
+    unsigned int max_refinement_L;
+} mini_tet_parameters_t;
 
 // Float3 template class that provides type mapping for float3/double3
 template <typename T>
@@ -130,6 +142,93 @@ hex_aa_8_collect_coeffs_indices_T(const ptrdiff_t stride0,             // Stride
     *i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
     *i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
     *i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+}
+
+template <typename RealType>
+__device__ RealType                      //
+points_distance_cu(const RealType x0,    //
+                   const RealType y0,    //
+                   const RealType z0,    //
+                   const RealType x1,    //
+                   const RealType y1,    //
+                   const RealType z1) {  //
+
+    const RealType dx = x1 - x0;
+    const RealType dy = y1 - y0;
+    const RealType dz = z1 - z0;
+
+    return sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+template <typename RealType>
+__device__ RealType                                    //
+tet_edge_max_length_cu(const RealType  v0x,            //
+                       const RealType  v0y,            //
+                       const RealType  v0z,            //
+                       const RealType  v1x,            //
+                       const RealType  v1y,            //
+                       const RealType  v1z,            //
+                       const RealType  v2x,            //
+                       const RealType  v2y,            //
+                       const RealType  v2z,            //
+                       const RealType  v3x,            //
+                       const RealType  v3y,            //
+                       const RealType  v3z,            //
+                       int*            vertex_a,       //
+                       int*            vertex_b,       //
+                       RealType* const edge_length) {  //
+
+    real_t max_length = 0.0;
+
+    // Edge 0 (v0, v1)
+    edge_length[0] = points_distance_cu(v0x, v0y, v0z, v1x, v1y, v1z);
+    if (edge_length[0] > max_length) {
+        max_length = edge_length[0];
+        *vertex_a  = 0;
+        *vertex_b  = 1;
+    }
+
+    // Edge 1 (v0, v2)
+    edge_length[1] = points_distance_cu(v0x, v0y, v0z, v2x, v2y, v2z);
+    if (edge_length[1] > max_length) {
+        max_length = edge_length[1];
+        *vertex_a  = 0;
+        *vertex_b  = 2;
+    }
+
+    // Edge 2 (v0, v3)
+    edge_length[2] = points_distance_cu(v0x, v0y, v0z, v3x, v3y, v3z);
+    if (edge_length[2] > max_length) {
+        max_length = edge_length[2];
+        *vertex_a  = 0;
+        *vertex_b  = 3;
+    }
+
+    // Edge 3 (v1, v2)
+    edge_length[3] = points_distance_cu(v1x, v1y, v1z, v2x, v2y, v2z);
+    if (edge_length[3] > max_length) {
+        max_length = edge_length[3];
+        *vertex_a  = 1;
+        *vertex_b  = 2;
+    }
+
+    // Edge 4 (v1, v3)
+    edge_length[4] = points_distance_cu(v1x, v1y, v1z, v3x, v3y, v3z);
+    if (edge_length[4] > max_length) {
+        max_length = edge_length[4];
+        *vertex_a  = 1;
+        *vertex_b  = 3;
+    }
+
+    // Edge 5 (v2, v3)
+    edge_length[5] = points_distance_cu(v2x, v2y, v2z, v3x, v3y, v3z);
+    if (edge_length[5] > max_length) {
+        max_length = edge_length[5];
+        *vertex_a  = 2;
+        *vertex_b  = 3;
+    }
+
+    return max_length;
 }
 
 template <typename FloatType>
@@ -336,9 +435,118 @@ __device__ void main_tet_loop(const int L) {
     }
 }
 
-__global__ void sfem_adjoint_mini_tet_kernel(const int L) {
-    /// ATTENTION: The tet id is given by
-    /// tet_id = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+#define HYTEG_MAX_REFINEMENT_LEVEL 20
+
+template <typename RealType>
+__device__ int                                                   //
+alpha_to_hyteg_level_cu(const RealType     alpha,                //
+                        const RealType     alpha_min_threshold,  //
+                        const RealType     alpha_max_threshold,  //
+                        const unsigned int min_refinement_L,     //
+                        const unsigned int max_refinement_L) {   //
+
+    // return 1;  ///// TODO
+
+    // const int min_refinement_L = 2;  // Minimum refinement level
+
+    if (alpha < alpha_min_threshold) return min_refinement_L;  // No refinement
+    if (alpha > alpha_max_threshold) return max_refinement_L;  // Maximum refinement
+
+    real_t alpha_x = alpha - alpha_min_threshold;  // Shift the alpha to start from 0
+    real_t L_real  = (alpha_x / (alpha_max_threshold - alpha_min_threshold) * (real_t)(HYTEG_MAX_REFINEMENT_LEVEL - 1)) + 1.0;
+
+    int L = L_real >= RealType(1.0) ? (int)L_real : min_refinement_L;         // Convert to integer
+    L     = L > HYTEG_MAX_REFINEMENT_LEVEL ? HYTEG_MAX_REFINEMENT_LEVEL : L;  // Clamp to maximum level
+
+    const int ret = L >= max_refinement_L ? max_refinement_L : L;
+    return (ret) < min_refinement_L ? min_refinement_L : (ret);  // Ensure L is within bounds
+}
+
+template <typename RealType>
+__global__ void                                                                //
+sfem_adjoint_mini_tet_kernel(const ptrdiff_t             start_element,        // Mesh
+                             const ptrdiff_t             end_element,          //
+                             const ptrdiff_t             nnodes,               //
+                             const idx_t** const         elems,                //
+                             const geom_t** const        xyz,                  //
+                             const ptrdiff_t             n0,                   // SDF
+                             const ptrdiff_t             n1,                   //
+                             const ptrdiff_t             n2,                   //
+                             const ptrdiff_t             stride0,              // Stride
+                             const ptrdiff_t             stride1,              //
+                             const ptrdiff_t             stride2,              //
+                             const geom_t                origin0,              // Origin
+                             const geom_t                origin1,              //
+                             const geom_t                origin2,              //
+                             const geom_t                dx,                   // Delta
+                             const geom_t                dy,                   //
+                             const geom_t                dz,                   //
+                             const RealType* const       weighted_field,       // Input weighted field
+                             const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
+                             RealType* const             data) {                           //
+
+    const int tet_id    = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+    const int element_i = start_element + tet_id;  // Global element index
+
+    const RealType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+    const RealType hexahedron_volume = dx * dy * dz;
+
+    idx_t ev[4];
+    for (int v = 0; v < 4; ++v) {
+        ev[v] = elems[v][element_i];
+    }
+
+    // Read the coordinates of the vertices of the tetrahedron
+    // In the physical space
+    const RealType x0_n = xyz[0][ev[0]];
+    const RealType x1_n = xyz[0][ev[1]];
+    const RealType x2_n = xyz[0][ev[2]];
+    const RealType x3_n = xyz[0][ev[3]];
+
+    const RealType y0_n = xyz[1][ev[0]];
+    const RealType y1_n = xyz[1][ev[1]];
+    const RealType y2_n = xyz[1][ev[2]];
+    const RealType y3_n = xyz[1][ev[3]];
+
+    const RealType z0_n = xyz[2][ev[0]];
+    const RealType z1_n = xyz[2][ev[1]];
+    const RealType z2_n = xyz[2][ev[2]];
+    const RealType z3_n = xyz[2][ev[3]];
+
+    const RealType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+    const RealType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+    const RealType wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+    const RealType wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+    RealType edges_length[6];
+
+    int vertex_a = -1;
+    int vertex_b = -1;
+
+    const RealType max_edges_length =              //
+            tet_edge_max_length_cu(x0_n,           //
+                                   y0_n,           //
+                                   z0_n,           //
+                                   x1_n,           //
+                                   y1_n,           //
+                                   z1_n,           //
+                                   x2_n,           //
+                                   y2_n,           //
+                                   z2_n,           //
+                                   x3_n,           //
+                                   y3_n,           //
+                                   z3_n,           //
+                                   &vertex_a,      // Output
+                                   &vertex_b,      // Output
+                                   edges_length);  // Output
+
+    const RealType alpha_tet = max_edges_length / d_min;
+
+    const int L = alpha_to_hyteg_level_cu(alpha_tet,                                          //
+                                          RealType(mini_tet_parameters.alpha_min_threshold),  //
+                                          RealType(mini_tet_parameters.alpha_max_threshold),  //
+                                          mini_tet_parameters.min_refinement_L,               //
+                                          mini_tet_parameters.max_refinement_L);              //
 
     main_tet_loop<double>(L);
 }
@@ -347,8 +555,34 @@ __global__ void sfem_adjoint_mini_tet_kernel(const int L) {
 #ifdef __TESTING__
 
 int main() {
-    const int L = 4;  // Example refinement level
-    sfem_adjoint_mini_tet_kernel<<<1, 1>>>(L);
+    mini_tet_parameters_t mini_tet_parameters;
+    mini_tet_parameters.alpha               = 0.5;
+    mini_tet_parameters.alpha_min_threshold = 0.0;
+    mini_tet_parameters.alpha_max_threshold = 1.0;
+    mini_tet_parameters.min_refinement_L    = 1;
+    mini_tet_parameters.max_refinement_L    = 20;
+
+    // const int L = 4;  // Example refinement level
+    sfem_adjoint_mini_tet_kernel<double><<<1, 1>>>(0,        //
+                                                   1,        //
+                                                   1,        //
+                                                   nullptr,  //
+                                                   nullptr,
+                                                   1,        //
+                                                   1,        //
+                                                   1,        //
+                                                   1,        //
+                                                   1,        //
+                                                   1,        //
+                                                   0.0,      //
+                                                   0.0,      //
+                                                   0.0,      //
+                                                   1.0,      //
+                                                   1.0,      //
+                                                   1.0,      //
+                                                   nullptr,  //
+                                                   mini_tet_parameters,
+                                                   nullptr);  //
     cudaDeviceSynchronize();
     return 0;
 }
