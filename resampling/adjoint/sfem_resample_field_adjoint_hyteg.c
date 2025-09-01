@@ -1286,7 +1286,7 @@ det_J(const real_t J[9]) {  // Calculate the determinant of the Jacobian matrix
  * @return real_t
  */
 real_t                                      //
-make_Jocobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinates
+make_Jacobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinates
                          const real_t fx1,  //
                          const real_t fx2,  //
                          const real_t fx3,  //
@@ -1438,7 +1438,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
 
         real_t det_J_phys =                     //
-                fabs(make_Jocobian_matrix_tet(  //
+                fabs(make_Jacobian_matrix_tet(  //
                         x0_n,                   // Tetrahedron vertices X-coordinates
                         x1_n,                   //
                         x2_n,                   //
