@@ -92,6 +92,7 @@ if(SFEM_ENABLE_CUDA)
         operators/proteus_hex8/cuda
         operators/hierarchical/cuda
         resampling/cuda
+        resampling/adjoint_cuda
         )
 endif()
 
