@@ -383,6 +383,8 @@ print_rank_info(int              mpi_rank,   //
     }
 }
 
+/// Test functions for mesh field
+
 real_t mesh_fun_par(real_t x, real_t y, real_t z) { return x * x + y * y + z * z; }
 
 real_t mesh_fun_lin_x(real_t x, real_t y, real_t z) { return x; }

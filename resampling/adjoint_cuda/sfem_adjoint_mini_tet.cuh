@@ -418,7 +418,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType f3 = zq_mref;
 
         const FloatType wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
-        const FloatType dV      = theta_volume * inv_N_micro_tet * tet_qw[quad_i];
+        const FloatType dV      = theta_volume * inv_N_micro_tet * qw;
         const FloatType It      = wf_quad * dV;
 
         cumulated_dV += dV;  // Cumulative volume for debugging
@@ -474,15 +474,15 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     }
 
     // Reduce the cumulated_dV across all lanes in the tile
-    unsigned int mask = 0xFF;  // Mask for 8 lanes
+    // unsigned int mask = 0xFF;  // Mask for 8 lanes
 
-    // Reduction using warp shuffle operations
-    for (int offset = LANES_PER_TILE / 2; offset > 0; offset >>= 1) {
-        cumulated_dV += __shfl_down_sync(mask, cumulated_dV, offset);
-    }
+    // // Reduction using warp shuffle operations
+    // for (int offset = LANES_PER_TILE / 2; offset > 0; offset >>= 1) {
+    //     cumulated_dV += __shfl_down_sync(mask, cumulated_dV, offset);
+    // }
 
-    // Broadcast the result from lane 0 to all other lanes in the tile
-    cumulated_dV = __shfl_sync(mask, cumulated_dV, 0);
+    // // Broadcast the result from lane 0 to all other lanes in the tile
+    // cumulated_dV = __shfl_sync(mask, cumulated_dV, 0);
 
     return cumulated_dV;
 }
@@ -523,7 +523,7 @@ __device__ void main_tet_loop_gpu(const int                              L,
     FloatType3      Jacobian_c[6][3];
     const FloatType h = FloatType(1.0) / FloatType(L);
 
-    for (int c = 0; c < 6; ++c) {
+    for (int c = 0; c < 6; c++) {
         bool status = get_category_Jacobian<FloatType>(c, FloatType(L), Jacobian_c[c]);
         if (!status) {
             // Handle error: invalid category
@@ -572,6 +572,8 @@ __device__ void main_tet_loop_gpu(const int                              L,
                                                                      n1,
                                                                      n2,
                                                                      data);
+
+                //  continue;
 
                 if (i >= 1) {
                     // Category 1
@@ -751,7 +753,9 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
     const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
     const FloatType hexahedron_volume = dx * dy * dz;
 
-    idx_t ev[4];
+    // printf("Exaedre volume: %e\n", hexahedron_volume);
+
+    idx_t ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
 
     ev[0] = elems.elems_v0[element_i];
     ev[1] = elems.elems_v1[element_i];

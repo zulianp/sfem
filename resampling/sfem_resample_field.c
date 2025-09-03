@@ -4,6 +4,7 @@
 #include <stddef.h>  // Add this for ptrdiff_t type
 #include <stdio.h>
 #include <string.h>
+#include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #include "sfem_base.h"
 #include "sfem_config.h"  // Include the generated config header
 
@@ -1252,6 +1253,24 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
+#define TEST_GPU_HYTEG_REFINEMENT
+#ifdef TEST_GPU_HYTEG_REFINEMENT
+
+            ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                             //
+                                                                     mesh->nelements,                //
+                                                                     mesh->nnodes,                   //
+                                                                     (const idx_t**)mesh->elements,  //
+                                                                     (const geom_t**)mesh->points,   //
+                                                                     n,                              //
+                                                                     stride,                         //
+                                                                     origin,                         //
+                                                                     delta,                          //
+                                                                     mass_vector,                    //
+                                                                     2.5,                            //
+                                                                     data);                          //
+
+#else
+
             ret = tet4_resample_field_local_refine_adjoint_hyteg_d(0,                              //
                                                                    mesh->nelements,                //
                                                                    mesh->nnodes,                   //
@@ -1264,7 +1283,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                                    mass_vector,                    //
                                                                    2.5,                            //
                                                                    data);                          //
-
+#endif
             break;
 
         case ADJOINT_BASE:

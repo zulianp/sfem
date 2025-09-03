@@ -9,7 +9,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/home/sriva/git/sfem/resampling/test_grid/test_grid_new",
+            "program": "/home/sriva/git/sfem/resampling/test_grid/grid_to_mesh",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

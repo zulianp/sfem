@@ -89,6 +89,17 @@ copy_elems_tet4_device_async(const idx_t**      elems,         // elements from 
                              elems_tet4_device* elems_device,  // to device
                              cudaStream_t       stream) {            // stream
 
+    // printf("In copy_elems_tet4_device_async\n");
+    // printf("elems_device->elems_v0: %p\n", (void*)elems_device->elems_v0);
+    // printf("elems_device->elems_v1: %p\n", (void*)elems_device->elems_v1);
+    // printf("elems_device->elems_v2: %p\n", (void*)elems_device->elems_v2);
+    // printf("elems_device->elems_v3: %p\n", (void*)elems_device->elems_v3);
+
+    // printf("elems[0]: %p\n", (void*)elems[0]);
+    // printf("elems[1]: %p\n", (void*)elems[1]);
+    // printf("elems[2]: %p\n", (void*)elems[2]);
+    // printf("elems[3]: %p\n", (void*)elems[3]);
+
     cudaMemcpyAsync(elems_device->elems_v0, elems[0], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(elems_device->elems_v1, elems[1], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(elems_device->elems_v2, elems[2], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
