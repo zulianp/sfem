@@ -19,6 +19,7 @@ extern "C" {
 void                                                                                    //
 call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
                                       const ptrdiff_t             end_element,          //
+                                      const ptrdiff_t             nelements,            //
                                       const ptrdiff_t             nnodes,               //
                                       const idx_t** const         elems,                //
                                       const geom_t** const        xyz,                  //

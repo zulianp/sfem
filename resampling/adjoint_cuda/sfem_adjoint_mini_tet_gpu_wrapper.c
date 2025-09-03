@@ -19,7 +19,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     mini_tet_parameters_t mini_tet_parameters;
 
-    mini_tet_parameters.alpha_min_threshold = 1.7;
+    mini_tet_parameters.alpha_min_threshold = alpha_th;
     mini_tet_parameters.alpha_max_threshold = 8.0;
     mini_tet_parameters.min_refinement_L    = 1;
     mini_tet_parameters.max_refinement_L    = 15;
@@ -27,6 +27,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     call_sfem_adjoint_mini_tet_kernel_gpu(  //
             start_element,                  // Mesh
             end_element,                    //
+            end_element - start_element,    // nelements
             nnodes,                         //
             elems,                          //
             xyz,                            //
@@ -45,4 +46,6 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
             weighted_field,                 // Input weighted field
             mini_tet_parameters,            // Threshold for alpha
             data);                          //
+
+    return EXIT_SUCCESS;
 }

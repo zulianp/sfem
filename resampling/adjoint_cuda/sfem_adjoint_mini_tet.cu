@@ -30,8 +30,11 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     cudaStream_t cuda_stream_alloc = 0;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
 
-    real_t* data_device = NULL;
+    real_t* data_device           = NULL;
+    real_t* weighted_field_device = NULL;
+
     cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+    cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
 
     elems_tet4_device elements_device = make_elems_tet4_device();
     cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
@@ -39,14 +42,31 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     xyz_tet4_device xyz_device = make_xyz_tet4_device();
     cuda_allocate_xyz_tet4_device_async(&xyz_device, nnodes, cuda_stream_alloc);
 
-    cudaStreamSynchronize(cuda_stream_alloc);
+    cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
 
-    cudaMemsetAsync((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+    cudaMemcpyAsync((void*)weighted_field_device,
+                    (void*)weighted_field,
+                    nnodes * sizeof(real_t),
+                    cudaMemcpyHostToDevice,
+                    cuda_stream_alloc);
+
+    cudaMemset((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t));
 
     copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
+    // copy_elems_tet4_device(elems, nelements, &elements_device);
+
+    // cudaStreamSynchronize(cuda_stream_alloc);
+    // exit(EXIT_FAILURE);  // Temporary
+
     copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
 
     cudaStreamSynchronize(cuda_stream_alloc);
+
+    // Optional: check for errors
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
+    }
 
     const unsigned int threads_per_block      = 256;
     const unsigned int total_threads_per_grid = (end_element - start_element) * LANES_PER_TILE;
@@ -55,34 +75,34 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     cudaStream_t cuda_stream = 0;  // default stream
     cudaStreamCreate(&cuda_stream);
 
-    sfem_adjoint_mini_tet_kernel_gpu<real_t><<<blocks_per_grid,                     //
-                                               threads_per_block,                   //
-                                               0,                                   //
-                                               cuda_stream>>>(start_element,        // Mesh
-                                                              end_element,          //
-                                                              nnodes,               //
-                                                              elements_device,      //
-                                                              xyz_device,           //
-                                                              n0,                   // SDF
-                                                              n1,                   //
-                                                              n2,                   //
-                                                              stride0,              // Stride
-                                                              stride1,              //
-                                                              stride2,              //
-                                                              origin0,              // Origin
-                                                              origin1,              //
-                                                              origin2,              //
-                                                              dx,                   // Delta
-                                                              dy,                   //
-                                                              dz,                   //
-                                                              weighted_field,       // Input weighted field
-                                                              mini_tet_parameters,  // Threshold for alpha
-                                                              data);                //
+    sfem_adjoint_mini_tet_kernel_gpu<real_t><<<blocks_per_grid,                       //
+                                               threads_per_block,                     //
+                                               0,                                     //
+                                               cuda_stream>>>(start_element,          // Mesh
+                                                              end_element,            //
+                                                              nnodes,                 //
+                                                              elements_device,        //
+                                                              xyz_device,             //
+                                                              n0,                     // SDF
+                                                              n1,                     //
+                                                              n2,                     //
+                                                              stride0,                // Stride
+                                                              stride1,                //
+                                                              stride2,                //
+                                                              origin0,                // Origin
+                                                              origin1,                //
+                                                              origin2,                //
+                                                              dx,                     // Delta
+                                                              dy,                     //
+                                                              dz,                     //
+                                                              weighted_field_device,  // Input weighted field
+                                                              mini_tet_parameters,    // Threshold for alpha
+                                                              data_device);           //
 
     cudaStreamSynchronize(cuda_stream);
 
     // Optional: check for errors
-    cudaError_t error = cudaGetLastError();
+    error = cudaGetLastError();
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
     }
@@ -90,6 +110,8 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     cudaStreamDestroy(cuda_stream);
 
     cudaMemcpyAsync((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost, cuda_stream_alloc);
+
+    cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
 
     free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
     free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
