@@ -5,8 +5,9 @@
 #include <stddef.h>
 
 #include "quadratures_rule_cuda.cuh"
-#include "sfem_resample_field_adjoint_hyteg.h"
 #include "sfem_config.h"
+#include "sfem_resample_field_adjoint_hyteg.h"
+#include "sfem_resample_field_cuda_fun.cuh"
 
 // typedef float   geom_t;
 // typedef int32_t idx_t;
@@ -724,8 +725,8 @@ __global__ void                                                                 
 sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
                                  const ptrdiff_t             end_element,          //
                                  const ptrdiff_t             nnodes,               //
-                                 const idx_t** const         elems,                //
-                                 const geom_t** const        xyz,                  //
+                                 const elems_tet4_device     elems,                //
+                                 const xyz_tet4_device       xyz,                  //
                                  const ptrdiff_t             n0,                   // SDF
                                  const ptrdiff_t             n1,                   //
                                  const ptrdiff_t             n2,                   //
@@ -751,26 +752,28 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
     const FloatType hexahedron_volume = dx * dy * dz;
 
     idx_t ev[4];
-    for (int v = 0; v < 4; ++v) {
-        ev[v] = elems[v][element_i];
-    }
+
+    ev[0] = elems.elems_v0[element_i];
+    ev[1] = elems.elems_v1[element_i];
+    ev[2] = elems.elems_v2[element_i];
+    ev[3] = elems.elems_v3[element_i];
 
     // Read the coordinates of the vertices of the tetrahedron
     // In the physical space
-    const FloatType x0_n = xyz[0][ev[0]];
-    const FloatType x1_n = xyz[0][ev[1]];
-    const FloatType x2_n = xyz[0][ev[2]];
-    const FloatType x3_n = xyz[0][ev[3]];
+    const FloatType x0_n = xyz.x[ev[0]];
+    const FloatType x1_n = xyz.x[ev[1]];
+    const FloatType x2_n = xyz.x[ev[2]];
+    const FloatType x3_n = xyz.x[ev[3]];
 
-    const FloatType y0_n = xyz[1][ev[0]];
-    const FloatType y1_n = xyz[1][ev[1]];
-    const FloatType y2_n = xyz[1][ev[2]];
-    const FloatType y3_n = xyz[1][ev[3]];
+    const FloatType y0_n = xyz.y[ev[0]];
+    const FloatType y1_n = xyz.y[ev[1]];
+    const FloatType y2_n = xyz.y[ev[2]];
+    const FloatType y3_n = xyz.y[ev[3]];
 
-    const FloatType z0_n = xyz[2][ev[0]];
-    const FloatType z1_n = xyz[2][ev[1]];
-    const FloatType z2_n = xyz[2][ev[2]];
-    const FloatType z3_n = xyz[2][ev[3]];
+    const FloatType z0_n = xyz.z[ev[0]];
+    const FloatType z1_n = xyz.z[ev[1]];
+    const FloatType z2_n = xyz.z[ev[2]];
+    const FloatType z3_n = xyz.z[ev[3]];
 
     const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
     const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
@@ -851,6 +854,7 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
 extern "C" void                                                                         //
 call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
                                       const ptrdiff_t             end_element,          //
+                                      const ptrdiff_t             nelements,            //
                                       const ptrdiff_t             nnodes,               //
                                       const idx_t** const         elems,                //
                                       const geom_t** const        xyz,                  //
