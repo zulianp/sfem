@@ -1,8 +1,6 @@
 #include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #include "sfem_resample_field_adjoint_hyteg.h"
 
-
-
 int                                                                                                      //
 tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t                      start_element,   // Mesh
                                                    const ptrdiff_t                      end_element,     //
@@ -21,8 +19,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     mini_tet_parameters_t mini_tet_parameters;
 
-    mini_tet_parameters.alpha_max_threshold = 8.0;
     mini_tet_parameters.alpha_min_threshold = 1.7;
+    mini_tet_parameters.alpha_max_threshold = 8.0;
     mini_tet_parameters.min_refinement_L    = 1;
     mini_tet_parameters.max_refinement_L    = 15;
 

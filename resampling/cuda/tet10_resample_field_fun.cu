@@ -23,9 +23,9 @@ xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {  //
 //////////////////////////////////////////////////////////
 // copy_xyz_tet10_device
 //////////////////////////////////////////////////////////
-void copy_xyz_tet10_device(const ptrdiff_t   nnodes,  //
-                           xyz_tet10_device* xyz,     //
-                           const geom_t**     xyz_host) {  //
+void copy_xyz_tet10_device(const ptrdiff_t   nnodes,   //
+                           xyz_tet10_device* xyz,      //
+                           const geom_t**    xyz_host) {  //
 
     cudaError_t err0 = cudaMemcpy(xyz->x, xyz_host[0], nnodes * sizeof(idx_t), cudaMemcpyHostToDevice);
     cudaError_t err1 = cudaMemcpy(xyz->y, xyz_host[1], nnodes * sizeof(idx_t), cudaMemcpyHostToDevice);
@@ -152,11 +152,11 @@ make_xyz_tet10_device_unified(const ptrdiff_t nnodes) {  //
 //////////////////////////////////////////////////////////
 // copy_xyz_tet10_device_unified
 //////////////////////////////////////////////////////////
-void                                                     //
-copy_xyz_tet10_device_unified(const ptrdiff_t   nnodes,  //
-                              xyz_tet10_device* xyz,     //
-                              const geom_t**     xyz_host) {  //
-                                                         //
+void                                                      //
+copy_xyz_tet10_device_unified(const ptrdiff_t   nnodes,   //
+                              xyz_tet10_device* xyz,      //
+                              const geom_t**    xyz_host) {  //
+                                                          //
     xyz->x = (geom_t*)xyz_host[0];
     xyz->y = (geom_t*)xyz_host[1];
     xyz->z = (geom_t*)xyz_host[2];
@@ -216,10 +216,10 @@ xyz_tet10_device make_xyz_tet10_managed(const ptrdiff_t nnodes) {
 //////////////////////////////////////////////////////////
 // copy_xyz_tet10_managed
 //////////////////////////////////////////////////////////
-void                                              //
-copy_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
-                       xyz_tet10_device* xyz,     //
-                       const geom_t**     xyz_host) {  //
+void                                               //
+copy_xyz_tet10_managed(const ptrdiff_t   nnodes,   //
+                       xyz_tet10_device* xyz,      //
+                       const geom_t**    xyz_host) {  //
 
     cudaError_t err0 = cudaMemcpy(xyz->x, xyz_host[0], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice);
     cudaError_t err1 = cudaMemcpy(xyz->y, xyz_host[1], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice);

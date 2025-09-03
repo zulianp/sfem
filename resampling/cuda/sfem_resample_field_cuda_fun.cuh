@@ -31,6 +31,11 @@ void                                                              //
 cuda_allocate_elems_tet4_device(elems_tet4_device* elems_device,  //
                                 const ptrdiff_t    nelements);       //
 
+void                                                                    //
+cuda_allocate_elems_tet4_device_async(elems_tet4_device* elems_device,  //
+                                      const ptrdiff_t    nelements,     //
+                                      cudaStream_t       stream);             //
+
 /**
  * @brief Functions for the elements struct
  *
@@ -53,6 +58,12 @@ copy_elems_tet4_device(const idx_t**      elems,          //
                        const ptrdiff_t    nelements,      //
                        elems_tet4_device* elems_device);  //
 
+void                                                           //
+copy_elems_tet4_device_async(const idx_t**      elems,         // elements from host
+                             const ptrdiff_t    nelements,     // number of elements
+                             elems_tet4_device* elems_device,  // to device
+                             cudaStream_t       stream);             // stream
+
 /**
  * @brief
  *
@@ -72,6 +83,10 @@ copy_elems_tet4_device_unified(const idx_t**      elems,          //
  */
 void                                                      //
 free_elems_tet4_device(elems_tet4_device* elems_device);  //
+
+void                                                           //
+free_elems_tet4_device_async(elems_tet4_device* elems_device,  //
+                             cudaStream_t       stream);             //
 
 /**
  * @brief Free memory for the elements struct
@@ -100,6 +115,11 @@ void                                                        //
 cuda_allocate_xyz_tet4_device(xyz_tet4_device* xyz_device,  //
                               const ptrdiff_t  nnodes);      //
 
+void                                                              //
+cuda_allocate_xyz_tet4_device_async(xyz_tet4_device* xyz_device,  //
+                                    const ptrdiff_t  nnodes,      //
+                                    cudaStream_t     stream);         //
+
 /**
  * @brief Allocate managed memory for the xyz struct
  *
@@ -126,6 +146,10 @@ make_xyz_tet4_device();  //
 void                                                //
 free_xyz_tet4_device(xyz_tet4_device* xyz_device);  //
 
+void                                                     //
+free_xyz_tet4_device_async(xyz_tet4_device* xyz_device,  //
+                           cudaStream_t     stream);         //
+
 /**
  * @brief Free memory for the xyz struct
  * @brief This function is used when the memory is allocated in the unified memory
@@ -147,6 +171,12 @@ void                                                //
 copy_xyz_tet4_device(const geom_t**   xyz,          //
                      const ptrdiff_t  nnodes,       //
                      xyz_tet4_device* xyz_device);  //
+
+void                                                     //
+copy_xyz_tet4_device_async(const geom_t**   xyz,         //
+                           const ptrdiff_t  nnodes,      //
+                           xyz_tet4_device* xyz_device,  //
+                           cudaStream_t     stream);         //
 
 /**
  * @brief Copy the xyz struct from host to device

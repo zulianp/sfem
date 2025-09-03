@@ -1,10 +1,12 @@
 #include <stdio.h>
 
 #include "sfem_adjoint_mini_tet.cuh"
+#include "sfem_resample_field_cuda_fun.cuh"
 
 extern "C" void                                                                         //
 call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
                                       const ptrdiff_t             end_element,          //
+                                      const ptrdiff_t             nelements,            //
                                       const ptrdiff_t             nnodes,               //
                                       const idx_t** const         elems,                //
                                       const geom_t** const        xyz,                  //
@@ -25,6 +27,27 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
                                       real_t* const               data) {
     //
 
+    cudaStream_t cuda_stream_alloc = 0;  // default stream
+    cudaStreamCreate(&cuda_stream_alloc);
+
+    real_t* data_device = NULL;
+    cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+
+    elems_tet4_device elements_device = make_elems_tet4_device();
+    cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
+
+    xyz_tet4_device xyz_device = make_xyz_tet4_device();
+    cuda_allocate_xyz_tet4_device_async(&xyz_device, nnodes, cuda_stream_alloc);
+
+    cudaStreamSynchronize(cuda_stream_alloc);
+
+    cudaMemsetAsync((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+
+    copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
+    copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
+
+    cudaStreamSynchronize(cuda_stream_alloc);
+
     const unsigned int threads_per_block      = 256;
     const unsigned int total_threads_per_grid = (end_element - start_element) * LANES_PER_TILE;
     const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
@@ -38,8 +61,8 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
                                                cuda_stream>>>(start_element,        // Mesh
                                                               end_element,          //
                                                               nnodes,               //
-                                                              elems,                //
-                                                              xyz,                  //
+                                                              elements_device,      //
+                                                              xyz_device,           //
                                                               n0,                   // SDF
                                                               n1,                   //
                                                               n2,                   //
@@ -65,6 +88,17 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     }
 
     cudaStreamDestroy(cuda_stream);
+
+    cudaMemcpyAsync((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost, cuda_stream_alloc);
+
+    free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
+    free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
+
+    cudaStreamSynchronize(cuda_stream_alloc);
+
+    cudaFreeAsync(data_device, cuda_stream_alloc);
+
+    cudaStreamDestroy(cuda_stream_alloc);
 
 }  // END: call_sfem_adjoint_mini_tet_kernel_gpu
    // ////////////////////////////////////////////////////////////////////////////////////////////////

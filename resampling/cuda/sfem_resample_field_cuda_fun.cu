@@ -38,6 +38,17 @@ cuda_allocate_elems_tet4_device(elems_tet4_device* elems_device,  //
     cudaMalloc((void**)&elems_device->elems_v3, nelements * sizeof(idx_t));
 }
 
+void                                                                    //
+cuda_allocate_elems_tet4_device_async(elems_tet4_device* elems_device,  //
+                                      const ptrdiff_t    nelements,     //
+                                      cudaStream_t       stream) {            //
+
+    cudaMallocAsync((void**)&elems_device->elems_v0, nelements * sizeof(idx_t), stream);
+    cudaMallocAsync((void**)&elems_device->elems_v1, nelements * sizeof(idx_t), stream);
+    cudaMallocAsync((void**)&elems_device->elems_v2, nelements * sizeof(idx_t), stream);
+    cudaMallocAsync((void**)&elems_device->elems_v3, nelements * sizeof(idx_t), stream);
+}
+
 /**
  * @brief Functions for the elements struct
  *
@@ -72,6 +83,18 @@ copy_elems_tet4_device(const idx_t**      elems,           // elements from host
     cudaMemcpy(elems_device->elems_v3, elems[3], nelements * sizeof(idx_t), cudaMemcpyHostToDevice);
 }
 
+void                                                           //
+copy_elems_tet4_device_async(const idx_t**      elems,         // elements from host
+                             const ptrdiff_t    nelements,     // number of elements
+                             elems_tet4_device* elems_device,  // to device
+                             cudaStream_t       stream) {            // stream
+
+    cudaMemcpyAsync(elems_device->elems_v0, elems[0], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(elems_device->elems_v1, elems[1], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(elems_device->elems_v2, elems[2], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(elems_device->elems_v3, elems[3], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+}
+
 /**
  * @brief
  *
@@ -103,6 +126,19 @@ free_elems_tet4_device(elems_tet4_device* elems_device) {  //
     cudaFree(elems_device->elems_v2);
     cudaFree(elems_device->elems_v3);
 
+    elems_device->elems_v0 = NULL;
+    elems_device->elems_v1 = NULL;
+    elems_device->elems_v2 = NULL;
+    elems_device->elems_v3 = NULL;
+}
+
+void                                                           //
+free_elems_tet4_device_async(elems_tet4_device* elems_device,  //
+                             cudaStream_t       stream) {            //
+    cudaFreeAsync(elems_device->elems_v0, stream);
+    cudaFreeAsync(elems_device->elems_v1, stream);
+    cudaFreeAsync(elems_device->elems_v2, stream);
+    cudaFreeAsync(elems_device->elems_v3, stream);
     elems_device->elems_v0 = NULL;
     elems_device->elems_v1 = NULL;
     elems_device->elems_v2 = NULL;
@@ -143,6 +179,16 @@ cuda_allocate_xyz_tet4_device(xyz_tet4_device* xyz_device,  //
     cudaMalloc((void**)&xyz_device->x, nnodes * sizeof(geom_t));
     cudaMalloc((void**)&xyz_device->y, nnodes * sizeof(geom_t));
     cudaMalloc((void**)&xyz_device->z, nnodes * sizeof(geom_t));
+}
+
+void                                                              //
+cuda_allocate_xyz_tet4_device_async(xyz_tet4_device* xyz_device,  //
+                                    const ptrdiff_t  nnodes,      //
+                                    cudaStream_t     stream) {        //
+
+    cudaMallocAsync((void**)&xyz_device->x, nnodes * sizeof(geom_t), stream);
+    cudaMallocAsync((void**)&xyz_device->y, nnodes * sizeof(geom_t), stream);
+    cudaMallocAsync((void**)&xyz_device->z, nnodes * sizeof(geom_t), stream);
 }
 
 /**
@@ -202,6 +248,19 @@ free_xyz_tet4_device(xyz_tet4_device* xyz_device) {  //
     xyz_device->z = NULL;
 }
 
+void                                                     //
+free_xyz_tet4_device_async(xyz_tet4_device* xyz_device,  //
+                           cudaStream_t     stream) {        //
+
+    cudaFreeAsync(xyz_device->x, stream);
+    cudaFreeAsync(xyz_device->y, stream);
+    cudaFreeAsync(xyz_device->z, stream);
+
+    xyz_device->x = NULL;
+    xyz_device->y = NULL;
+    xyz_device->z = NULL;
+}
+
 /**
  * @brief Free memory for the xyz struct
  * @brief This function is used when the memory is allocated in the unified memory
@@ -231,6 +290,17 @@ copy_xyz_tet4_device(const geom_t**   xyz,           //
     cudaMemcpy(xyz_device->x, xyz[0], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device->y, xyz[1], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice);
     cudaMemcpy(xyz_device->z, xyz[2], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice);
+}
+
+void                                                     //
+copy_xyz_tet4_device_async(const geom_t**   xyz,         //
+                           const ptrdiff_t  nnodes,      //
+                           xyz_tet4_device* xyz_device,  //
+                           cudaStream_t     stream) {        //
+
+    cudaMemcpyAsync(xyz_device->x, xyz[0], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(xyz_device->y, xyz[1], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(xyz_device->z, xyz[2], nnodes * sizeof(geom_t), cudaMemcpyHostToDevice, stream);
 }
 
 /**
