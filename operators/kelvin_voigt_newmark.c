@@ -22,6 +22,7 @@ int kelvin_voigt_newmark_apply_adjugate_soa(const enum ElemType                 
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values) {
     switch (element_type) {
@@ -37,6 +38,7 @@ int kelvin_voigt_newmark_apply_adjugate_soa(const enum ElemType                 
                                                                 k,
                                                                 K,
                                                                 eta,
+                                                                rho,
                                                                 1,
                                                                 &u[0],
                                                                 &u[1],
@@ -65,8 +67,14 @@ int kelvin_voigt_newmark_gradient_soa(const enum ElemType                   elem
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
-                                         const real_t *const SFEM_RESTRICT     v,
+                                         const real_t *const SFEM_RESTRICT     vx,
+                                         const real_t *const SFEM_RESTRICT     vy,
+                                         const real_t *const SFEM_RESTRICT     vz,
+                                         const real_t *const SFEM_RESTRICT     ax,
+                                         const real_t *const SFEM_RESTRICT     ay,
+                                         const real_t *const SFEM_RESTRICT     az,
                                          real_t *const SFEM_RESTRICT           values) {
     // return linear_elasticity_apply_aos(element_type, nelements, nnodes, elements, points, mu, lambda, u, values);
     switch (element_type) {
@@ -79,13 +87,17 @@ int kelvin_voigt_newmark_gradient_soa(const enum ElemType                   elem
                                                                 k,
                                                                 K,
                                                                 eta,
+                                                                rho,
                                                                 1,
                                                                 &u[0],
                                                                 &u[1],
                                                                 &u[2],
-                                                                &v[0],
-                                                                &v[1],
-                                                                &v[2],
+                                                                vx,
+                                                                vy,
+                                                                vz,
+                                                                ax,
+                                                                ay,
+                                                                az,
                                                                 1,
                                                                 &values[0],
                                                                 &values[1],
@@ -116,6 +128,7 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const enum ElemType                 
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values) {
     switch (element_type) {
@@ -131,6 +144,7 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const enum ElemType                 
                                                                 k,
                                                                 K,
                                                                 eta,
+                                                                rho,
                                                                 3,
                                                                 &u[0],
                                                                 &u[1],
@@ -160,8 +174,14 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
-                                         const real_t *const SFEM_RESTRICT     v,
+                                         const real_t *const SFEM_RESTRICT     vx,
+                                         const real_t *const SFEM_RESTRICT     vy,
+                                         const real_t *const SFEM_RESTRICT     vz,
+                                         const real_t *const SFEM_RESTRICT     ax,
+                                         const real_t *const SFEM_RESTRICT     ay,
+                                         const real_t *const SFEM_RESTRICT     az,
                                          real_t *const SFEM_RESTRICT           values){
     switch (element_type) {
         case HEX8: {
@@ -173,17 +193,22 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
                                                                 k,
                                                                 K,
                                                                 eta,
+                                                                rho,
                                                                 3,
                                                                 &u[0],
                                                                 &u[1],
-                                                                &u[2],
-                                                                &v[0],
-                                                                &v[1],
-                                                                &v[2],
+                                                                &u[2],  
+                                                                vx,
+                                                                vy,
+                                                                vz,
+                                                                ax,
+                                                                ay,
+                                                                az,
                                                                 3,
                                                                 &values[0],
                                                                 &values[1],
                                                                 &values[2]);
+                                                                
         }
         default: {
             SFEM_ERROR("kelvin_voigt_newmark_gradient_aos not implemented for type %s\n", type_to_string(element_type));
