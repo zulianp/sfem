@@ -23,6 +23,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t              nele
                                  const real_t                 k,
                                  const real_t                 K,
                                  const real_t                 eta,
+                                 const real_t                 rho,
 
                                  const ptrdiff_t              u_stride,
                                  const real_t *const          ux,
@@ -89,6 +90,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t              nele
                                                      dt,
                                                      gamma,
                                                      beta,
+                                                     rho,
                                                      jacobian_adjugate,
                                                      jacobian_determinant,
                                                      qx[kx],
@@ -136,6 +138,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t                 k,
                                  const real_t                 K,
                                  const real_t                 eta,
+                                 const real_t                 rho,
 
                                  const ptrdiff_t              u_stride,
 
@@ -146,6 +149,10 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t *const          vx,
                                  const real_t *const          vy,
                                  const real_t *const          vz,
+
+                                 const real_t *const          ax,
+                                 const real_t *const          ay,
+                                 const real_t *const          az,
 
 
                                  const ptrdiff_t              out_stride,
@@ -170,6 +177,10 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
         scalar_t element_vy[8];
         scalar_t element_vz[8];
 
+        scalar_t element_ax[8];
+        scalar_t element_ay[8];
+        scalar_t element_az[8];
+
         accumulator_t element_outx[8];
         accumulator_t element_outy[8];
         accumulator_t element_outz[8];
@@ -193,6 +204,9 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
             element_vx[v]       = vx[idx];
             element_vy[v]       = vy[idx];
             element_vz[v]       = vz[idx];
+            element_ax[v]       = ax[idx];
+            element_ay[v]       = ay[idx];
+            element_az[v]       = az[idx];
         }
 
         for (int d = 0; d < 8; d++) {
@@ -209,6 +223,7 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                     hex8_kelvin_voigt_newmark_gradient_adj(k,
                                                      K,
                                                      eta,
+                                                     rho,
                                                      jacobian_adjugate,
                                                      jacobian_determinant,
                                                      qx[kx],
@@ -221,6 +236,9 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                                      element_vx,
                                                      element_vy,
                                                      element_vz,
+                                                     element_ax,
+                                                     element_ay,
+                                                     element_az,
                                                      element_outx,
                                                      element_outy,
                                                      element_outz);

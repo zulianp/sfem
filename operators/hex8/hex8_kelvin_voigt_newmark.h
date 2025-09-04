@@ -23,6 +23,7 @@ int affine_hex8_kelvin_voigt_newmark_lhs_apply(const ptrdiff_t              nele
                                  const real_t                 k,
                                  const real_t                 K,
                                  const real_t                 eta, 
+                                 const real_t                 rho,
 
                                  const ptrdiff_t              u_stride,
                                  const real_t *const          ux,
@@ -74,7 +75,8 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t                 k,
                                  const real_t                 K,
                                  const real_t                 eta,
-
+                                 const real_t                 rho,
+                                 
                                  const ptrdiff_t              u_stride,
 
                                  const real_t *const          ux,
@@ -84,6 +86,10 @@ int affine_hex8_kelvin_voigt_newmark_gradient(const ptrdiff_t              nelem
                                  const real_t *const          vx,
                                  const real_t *const          vy,
                                  const real_t *const          vz,
+
+                                 const real_t *const          ax,
+                                 const real_t *const          ay,
+                                 const real_t *const          az,
 
                                  const ptrdiff_t              out_stride,
                                  real_t *const                outx,
