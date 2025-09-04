@@ -196,8 +196,8 @@ class GPULinearKVOp:
         # eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
         # eval_gradient = eval_stiffness + eval_damping + eval_inertia
 
-        eval_lhs_matrix = eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
-        eval_gradient = eval_stiffness + eval_damping 
+        eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
+        eval_gradient = eval_inertia + eval_stiffness + eval_damping 
 
         # Store results
         self.rho = rho
@@ -315,33 +315,33 @@ class GPULinearKVOp:
 
     #     return expr
     
-    # def M_matrix(self):
-    #     M = self.eval_M_matrix
-    #     rows, cols = M.shape
+    def M_matrix(self):
+        M = self.eval_M_matrix
+        rows, cols = M.shape
 
-    #     expr = []
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
-    #             expr.append(ast.Assignment(var, M[i, j]))
+        expr = []
+        for i in range(0, rows):
+            for j in range(0, cols):
+                var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
+                expr.append(ast.Assignment(var, M[i, j]))
 
-    #     return expr
+        return expr
     
-    # def M_sym(self):
-    #     M = self.eval_M_matrix
-    #     rows, cols = M.shape
+    def M_sym(self):
+        M = self.eval_M_matrix
+        rows, cols = M.shape
 
-    #     expr = []
-    #     idx = 0
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             if j > i:
-    #                 continue
-    #             var = sp.symbols(f"element_matrix[{idx}*stride]")
-    #             expr.append(ast.Assignment(var, M[i, j]))
-    #             idx += 1
+        expr = []
+        idx = 0
+        for i in range(0, rows):
+            for j in range(0, cols):
+                if j > i:
+                    continue
+                var = sp.symbols(f"element_matrix[{idx}*stride]")
+                expr.append(ast.Assignment(var, M[i, j]))
+                idx += 1
 
-    #     return expr
+        return expr
     
     def lhs_matrix(self):
         lhs = self.eval_lhs_matrix
@@ -615,10 +615,10 @@ def main():
     c_log("//--------------------------")
     c_code(op.velocity_gradient())
 
-    # c_log("//--------------------------")
-    # c_log("// acceleration_vector")
-    # c_log("//--------------------------")
-    # c_code(op.acceleration_vector())
+    c_log("//--------------------------")
+    c_log("// acceleration_vector")
+    c_log("//--------------------------")
+    c_code(op.acceleration_vector())
 
     # c_log("//--------------------------")
     # c_log("// C_matrix")
@@ -630,10 +630,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_matrix())
 
-    # c_log("//--------------------------")
-    # c_log("// M_matrix")
-    # c_log("//--------------------------")
-    # c_code(op.M_matrix())
+    c_log("//--------------------------")
+    c_log("// M_matrix")
+    c_log("//--------------------------")
+    c_code(op.M_matrix())
 
     # c_log("//--------------------------")
     # c_log("// C_sym")
@@ -645,10 +645,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_sym())
 
-    # c_log("//--------------------------")
-    # c_log("// M_sym")
-    # c_log("//--------------------------")
-    # c_code(op.M_sym())
+    c_log("//--------------------------")
+    c_log("// M_sym")
+    c_log("//--------------------------")
+    c_code(op.M_sym())
 
     # c_log("//--------------------------")
     # c_log("// gradient_C")

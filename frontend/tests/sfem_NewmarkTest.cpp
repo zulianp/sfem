@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #include "sfem_test.h"
-
+#include "sfem_ssgmg.hpp"
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
@@ -134,7 +134,7 @@ int test_explicit_euler() {
     auto displacement = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
-    real_t dt          = 0.0001;
+    real_t dt          = 0.1;
     real_t T           = 50 * dt;
     size_t export_freq = 1;
     size_t steps       = 0;
@@ -197,14 +197,14 @@ int test_newmark() {
     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
-    real_t dt          = 0.2;
-    real_t T           = 4;
+    real_t dt          = 0.1;
+    real_t T           = 5;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
     int    nliter      = 1;
 
-    bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
+    bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
@@ -215,6 +215,8 @@ int test_newmark() {
         // If no issues encountered we log the time
         output->log_time(t);
     }
+
+    auto solver     =  sfem::create_ssgmg(f, es);
 
     while (t < T) {
         for (int k = 0; k < nliter; k++) {

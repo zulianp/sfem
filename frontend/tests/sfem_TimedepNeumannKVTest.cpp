@@ -21,13 +21,13 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
         es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
     }
 
-    int SFEM_BASE_RESOLUTION = 12;
+    int SFEM_BASE_RESOLUTION = 8;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION,
                                           SFEM_BASE_RESOLUTION,
@@ -61,9 +61,9 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
         }); 
 
 
-    sfem::DirichletConditions::Condition bottom0{.sideset = bottom_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition bottom1{.sideset = bottom_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition bottom2{.sideset = bottom_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition bottom0{.sidesets = bottom_sideset, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition bottom1{.sidesets = bottom_sideset, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition bottom2{.sidesets = bottom_sideset, .value = 0, .component = 2};
 
 #if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {bottom0, bottom1, bottom2}, es);
@@ -172,15 +172,17 @@ int test_newmark_kv() {
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
     real_t dt          = 1e-3;
-    real_t T           = 0.15;
+    real_t T           = 0.3;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
     int    nliter      = 1;
 
     auto time_load = [&t, &T]() -> real_t {
-        return (t < T/3) ? -1 : 0.0;
+        return (t < T/3) ? -40 : 0.0;
     };
+
+    std::shared_ptr<sfem::Op> current_neumann_op = nullptr;
 
     bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
@@ -196,10 +198,14 @@ int test_newmark_kv() {
 
     while (t < T) {
 
+        if (current_neumann_op) {
+            f->remove_operator(current_neumann_op);
+        }
         real_t load_mag = time_load();
-        sfem::NeumannConditions::Condition nc_top{.sideset = top_load_sideset, .value = load_mag, .component = 2};
-        auto n_conds = sfem::create_neumann_conditions(fs, {nc_top}, es);
-        f->add_operator(n_conds);
+        sfem::NeumannConditions::Condition nc_top{.sidesets = top_load_sideset, .value = load_mag, .component = 2};
+        current_neumann_op = sfem::create_neumann_conditions(fs, {nc_top}, es);
+        f->add_operator(current_neumann_op);
+
 
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
