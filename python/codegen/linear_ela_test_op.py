@@ -38,26 +38,25 @@ def assign_add_matrix(name, mat):
     return expr
 
 
-class GPULinearKVOp:
+class LinearKVOp:
     SoA_IO = True
 
     def __init__(self, fe):
         dims = fe.manifold_dim()
 
-        q_temp = [qx, qy, qz]
-        q = sp.Matrix(dims, 1, q_temp[0:dims])
+        q = fe.quadrature_point()
 
         self.init_opt(fe, q)
 
     def init_opt(self, fe, q):
         fe.use_adjugate = True
+        dV = fe.symbol_jacobian_determinant()
         dims = fe.manifold_dim()
-        q = sp.Matrix(dims, 1, q)
-        self.q = q
         shape_grad = fe.physical_tgrad(q)
         shape_grad_ref = fe.tgrad(q)
         shape_vec = fe.tfun(q)
         jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+        e_jac_inv = fe.jacobian_inverse(q)
 
         if self.SoA_IO:
             disp = coeffs_SoA("u", dims, fe.n_nodes())
@@ -80,6 +79,8 @@ class GPULinearKVOp:
         self.acce_vec_name = "acce_vec"
 
         rho, eta, k, K, dt, gamma, beta = sp.symbols("rho eta k K dt gamma beta", real=True)
+        mu, lmbda = sp.symbols("mu lambda", real=True)
+
         disp_grad = sp.Matrix(dims, dims, coeffs(self.disp_grad_name, dims * dims))
         velo_grad = sp.Matrix(dims, dims, coeffs(self.velo_grad_name, dims * dims))
         acce_vec = sp.Matrix(dims, 1, coeffs(self.acce_vec_name, dims))
@@ -135,12 +136,6 @@ class GPULinearKVOp:
         stiffness = k * epsu + (K - k/dims) * tr(epsu) * I_matrix
         inertia = rho * acce_vec
 
-        # Reference measure
-        dV = (
-            fe.reference_measure()
-            * fe.symbol_jacobian_determinant()
-            * fe.quadrature_weight()
-        )
 
         # Compute weak forms for gradient vectors
         eval_inertia = sp.zeros(rows, 1)
@@ -157,6 +152,9 @@ class GPULinearKVOp:
             eval_inertia[i] = inner(inertia, shape_vec[i]) * dV
             eval_inertia[i] = simplify(eval_inertia[i])
 
+
+
+
         # Compute matrices
         eval_M_matrix = sp.zeros(rows, rows)
         eval_C_matrix = sp.zeros(rows, cols)
@@ -170,25 +168,11 @@ class GPULinearKVOp:
                 
                 # Damping matrix components
                 integrand_C = eta * (inner(eps_j, eps_i) - (1/dims) * tr(eps_j) * tr(eps_i))
-                eval_C_matrix[i, j] = integrand_C * dV
-                eval_C_matrix[i, j] = simplify(eval_C_matrix[i, j])
+                eval_C_matrix[i, j] = integrand_C 
                 
                 # Stiffness matrix components
-                integrand_K = (K - (1/dims) * k) * tr(eps_j) * tr(eps_i) + k * inner(eps_j, eps_i)
-                eval_K_matrix[i, j] = integrand_K * dV
-                eval_K_matrix[i, j] = simplify(eval_K_matrix[i, j])
-
-                # # Mass matrix components
-                dim_i = i // fe.n_nodes()
-                node_i = i % fe.n_nodes()
-                dim_j = j // fe.n_nodes()
-                node_j = j % fe.n_nodes()
-
-                if dim_i == dim_j:
-                    eval_M_matrix[i, j] = rho * shape_vec[node_i+dim_i*fe.n_nodes()][dim_i,0] * shape_vec[node_j+dim_j*fe.n_nodes()][dim_j,0] * dV
-                    eval_M_matrix[i, j] = simplify(eval_M_matrix[i, j])
-                else:
-                    eval_M_matrix[i, j] = 0
+                integrand_K = lmbda * tr(eps_j) * tr(eps_i) + 2*mu* inner(eps_j, eps_i)
+                eval_K_matrix[i, j] = integrand_K 
 
 
 
@@ -196,8 +180,34 @@ class GPULinearKVOp:
         # eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
         # eval_gradient = eval_stiffness + eval_damping + eval_inertia
 
-        eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
-        eval_gradient = eval_inertia + eval_stiffness + eval_damping 
+        eval_lhs_matrix = eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
+        eval_gradient = eval_stiffness + eval_damping 
+
+        ###################################################################
+        # Gradient
+        ###################################################################
+
+        full_eval = False
+
+        for i in range(0, rows):
+            for j in range(0, cols):
+                integr = fe.integrate(q, eval_lhs_matrix[i, j])
+                if full_eval:
+                    integr = subsmat(integr, disp_grad, self.eval_disp_grad)
+                    integr = subsmat(integr, jac_inv, e_jac_inv)
+                integr = integr * dV
+                eval_lhs_matrix[i, j] = integr
+
+        for i in range(0, rows):
+            for j in range(0, cols):
+                integr = fe.integrate(q, eval_K_matrix[i, j])
+                if full_eval:
+                    integr = subsmat(integr, disp_grad, self.eval_disp_grad)
+                    integr = subsmat(integr, jac_inv, e_jac_inv)
+                integr = integr * dV
+                eval_K_matrix[i, j] = integr
+        ###################################################################
+
 
         # Store results
         self.rho = rho
@@ -216,6 +226,7 @@ class GPULinearKVOp:
         self.eval_M_matrix = eval_M_matrix
         self.eval_lhs_matrix = eval_lhs_matrix
         self.eval_gradient = eval_gradient 
+
 
         self.fe = fe
         if self.SoA_IO:
@@ -258,93 +269,21 @@ class GPULinearKVOp:
         expr = []
         expr.extend(assign_matrix("jacobian", self.jac))
         return expr
-
-    # def C_matrix(self):
-    #     C = self.eval_C_matrix
-    #     rows, cols = C.shape
-
-    #     expr = []
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
-    #             expr.append(ast.Assignment(var, C[i, j]))
-
-    #     return expr
     
-    # def C_sym(self):
-    #     C = self.eval_C_matrix
-    #     rows, cols = C.shape
-
-    #     expr = []
-    #     idx = 0
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             if j > i:
-    #                 continue
-    #             var = sp.symbols(f"element_matrix[{idx}*stride]")
-    #             expr.append(ast.Assignment(var, C[i, j]))
-    #             idx += 1
-
-    #     return expr
-    
-    # def K_matrix(self):
-    #     K = self.eval_K_matrix
-    #     rows, cols = K.shape
-
-    #     expr = []
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
-    #             expr.append(ast.Assignment(var, K[i, j]))
-
-    #     return expr
-    
-    # def K_sym(self):
-    #     K = self.eval_K_matrix
-    #     rows, cols = K.shape
-
-    #     expr = []
-    #     idx = 0
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             if j > i:
-    #                 continue
-    #             var = sp.symbols(f"element_matrix[{idx}*stride]")
-    #             expr.append(ast.Assignment(var, K[i, j]))
-    #             idx += 1
-
-    #     return expr
-    
-    def M_matrix(self):
-        M = self.eval_M_matrix
-        rows, cols = M.shape
+    def lhs_matrix(self):
+        lhs = self.eval_lhs_matrix
+        rows, cols = lhs.shape
 
         expr = []
         for i in range(0, rows):
             for j in range(0, cols):
                 var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
-                expr.append(ast.Assignment(var, M[i, j]))
+                expr.append(ast.Assignment(var, lhs[i, j]))
 
         return expr
     
-    def M_sym(self):
-        M = self.eval_M_matrix
-        rows, cols = M.shape
-
-        expr = []
-        idx = 0
-        for i in range(0, rows):
-            for j in range(0, cols):
-                if j > i:
-                    continue
-                var = sp.symbols(f"element_matrix[{idx}*stride]")
-                expr.append(ast.Assignment(var, M[i, j]))
-                idx += 1
-
-        return expr
-    
-    def lhs_matrix(self):
-        lhs = self.eval_lhs_matrix
+    def K_matrix(self):
+        lhs = self.eval_K_matrix
         rows, cols = lhs.shape
 
         expr = []
@@ -371,51 +310,6 @@ class GPULinearKVOp:
 
         return expr
 
-    # def gradient_C(self):
-    #     g = self.eval_damping
-    #     rows, cols = g.shape
-
-    #     expr = []
-    #     if self.SoA_IO:
-    #         assert self.fe.SoA
-
-    #         coords = ["x", "y", "z"]
-    #         for d in range(0, self.fe.spatial_dim()):
-    #             name = f"out{coords[d]}"
-    #             for i in range(0, self.fe.n_nodes()):
-    #                 idx = d * self.fe.n_nodes() + i
-
-    #                 var = sp.symbols(f"{name}[{i}]")
-    #                 expr.append(ast.Assignment(var, g[idx]))
-    #     else:
-    #         for i in range(0, rows):
-    #             var = sp.symbols(f"element_vector[{i}*stride]")
-    #             expr.append(ast.Assignment(var, g[i]))
-
-    #     return expr
-
-    # def gradient_K(self):
-    #     g = self.eval_stiffness
-    #     rows, cols = g.shape
-
-    #     expr = []
-    #     if self.SoA_IO:
-    #         assert self.fe.SoA
-
-    #         coords = ["x", "y", "z"]
-    #         for d in range(0, self.fe.spatial_dim()):
-    #             name = f"out{coords[d]}"
-    #             for i in range(0, self.fe.n_nodes()):
-    #                 idx = d * self.fe.n_nodes() + i
-
-    #                 var = sp.symbols(f"{name}[{i}]")
-    #                 expr.append(ast.Assignment(var, g[idx]))
-    #     else:
-    #         for i in range(0, rows):
-    #             var = sp.symbols(f"element_vector[{i}*stride]")
-    #             expr.append(ast.Assignment(var, g[i]))
-
-    #     return expr
     
     def gradient_M(self):
         g = self.eval_inertia
@@ -439,99 +333,6 @@ class GPULinearKVOp:
                 expr.append(ast.Assignment(var, g[i]))
 
         return expr
-
-    # def apply_C(self):
-    #     C = self.eval_C_matrix
-    #     rows, cols = C.shape
-    #     increment = self.increment
-
-    #     expr = []
-    #     if self.SoA_IO:
-    #         assert self.fe.SoA
-
-    #         coords = ["x", "y", "z"]
-    #         for d in range(0, self.fe.spatial_dim()):
-    #             name = f"out{coords[d]}"
-    #             for i in range(0, self.fe.n_nodes()):
-    #                 idx = d * self.fe.n_nodes() + i
-    #                 Cv = 0
-    #                 for j in range(0, cols):
-    #                     Cv += C[idx, j] * increment[j]
-
-    #                 var = sp.symbols(f"{name}[{i}]")
-    #                 expr.append(ast.Assignment(var, Cv))
-    #     else:
-    #         for i in range(0, rows):
-    #             Cv = 0
-    #             for j in range(0, cols):
-    #                 Cv += C[i, j] * increment[j]
-
-    #             var = sp.symbols(f"element_vector[{i}*stride]")
-    #             expr.append(ast.Assignment(var, Cv))
-                
-    #     return expr
-
-    # def apply_K(self):
-    #     K = self.eval_K_matrix
-    #     rows, cols = K.shape
-    #     increment = self.increment
-
-    #     expr = []
-    #     if self.SoA_IO:
-    #         assert self.fe.SoA
-
-    #         coords = ["x", "y", "z"]
-    #         for d in range(0, self.fe.spatial_dim()):
-    #             name = f"out{coords[d]}"
-    #             for i in range(0, self.fe.n_nodes()):
-    #                 idx = d * self.fe.n_nodes() + i
-    #                 Ku = 0
-    #                 for j in range(0, cols):
-    #                     Ku += K[idx, j] * increment[j]
-
-    #                 var = sp.symbols(f"{name}[{i}]")
-    #                 expr.append(ast.Assignment(var, Ku))
-    #     else:
-    #         for i in range(0, rows):
-    #             Ku = 0
-    #             for j in range(0, cols):
-    #                 Ku += K[i, j] * increment[j]
-
-    #             var = sp.symbols(f"element_vector[{i}*stride]")
-    #             expr.append(ast.Assignment(var, Ku))
-                
-    #     return expr
-        
-    # def apply_M(self):
-    #     M = self.eval_M_matrix
-    #     rows, cols = M.shape
-    #     increment = self.increment
-
-    #     expr = []
-    #     if self.SoA_IO:
-    #         assert self.fe.SoA
-
-    #         coords = ["x", "y", "z"]
-    #         for d in range(0, self.fe.spatial_dim()):
-    #             name = f"out{coords[d]}"
-    #             for i in range(0, self.fe.n_nodes()):
-    #                 idx = d * self.fe.n_nodes() + i
-    #                 Ma = 0
-    #                 for j in range(0, cols):
-    #                     Ma += M[idx, j] * increment[j]
-
-    #                 var = sp.symbols(f"{name}[{i}]")
-    #                 expr.append(ast.Assignment(var, Ma))
-    #     else:
-    #         for i in range(0, rows):
-    #             Ma = 0
-    #             for j in range(0, cols):
-    #                 Ma += M[i, j] * increment[j]
-
-    #             var = sp.symbols(f"element_vector[{i}*stride]")
-    #             expr.append(ast.Assignment(var, Ma))
-                
-    #     return expr
         
     def apply_lhs(self):  
         lhs = self.eval_lhs_matrix
@@ -597,7 +398,7 @@ def main():
     fe = Hex8()
     # fe = Tri3()
 
-    op = GPULinearKVOp(fe)
+    op = LinearKVOp(fe)
 
     # c_log("//--------------------------")
     # c_log("// geometry")
@@ -605,20 +406,20 @@ def main():
     # c_code(op.jacobian())
     # c_code(op.geometry())
 
-    c_log("//--------------------------")
-    c_log("// displacement_gradient")
-    c_log("//--------------------------")
-    c_code(op.displacement_gradient())
+    # c_log("//--------------------------")
+    # c_log("// displacement_gradient")
+    # c_log("//--------------------------")
+    # c_code(op.displacement_gradient())
 
-    c_log("//--------------------------")
-    c_log("// velocity_gradient")
-    c_log("//--------------------------")
-    c_code(op.velocity_gradient())
+    # c_log("//--------------------------")
+    # c_log("// velocity_gradient")
+    # c_log("//--------------------------")
+    # c_code(op.velocity_gradient())
 
-    c_log("//--------------------------")
-    c_log("// acceleration_vector")
-    c_log("//--------------------------")
-    c_code(op.acceleration_vector())
+    # c_log("//--------------------------")
+    # c_log("// acceleration_vector")
+    # c_log("//--------------------------")
+    # c_code(op.acceleration_vector())
 
     # c_log("//--------------------------")
     # c_log("// C_matrix")
@@ -630,10 +431,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_matrix())
 
-    c_log("//--------------------------")
-    c_log("// M_matrix")
-    c_log("//--------------------------")
-    c_code(op.M_matrix())
+    # c_log("//--------------------------")
+    # c_log("// M_matrix")
+    # c_log("//--------------------------")
+    # c_code(op.M_matrix())
 
     # c_log("//--------------------------")
     # c_log("// C_sym")
@@ -645,10 +446,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_sym())
 
-    c_log("//--------------------------")
-    c_log("// M_sym")
-    c_log("//--------------------------")
-    c_code(op.M_sym())
+    # c_log("//--------------------------")
+    # c_log("// M_sym")
+    # c_log("//--------------------------")
+    # c_code(op.M_sym())
 
     # c_log("//--------------------------")
     # c_log("// gradient_C")
@@ -681,25 +482,30 @@ def main():
     # c_code(op.apply_M())
 
 
-    # c_log("//--------------------------")
-    # c_log("// lhs_matrix")
-    # c_log("//--------------------------")
-    # c_code(op.lhs_matrix())
+    c_log("//--------------------------")
+    c_log("// lhs_matrix")
+    c_log("//--------------------------")
+    c_code(op.lhs_matrix())
+
+    c_log("//--------------------------")
+    c_log("// K_matrix")
+    c_log("//--------------------------")
+    c_code(op.K_matrix())
 
     # c_log("//--------------------------")
     # c_log("// lhs_sym")
     # c_log("//--------------------------")
     # c_code(op.lhs_sym())
 
-    c_log("//--------------------------")
-    c_log("// apply_lhs")
-    c_log("//--------------------------")
-    c_code(op.apply_lhs())
+    # c_log("//--------------------------")
+    # c_log("// apply_lhs")
+    # c_log("//--------------------------")
+    # c_code(op.apply_lhs())
 
-    c_log("//--------------------------")
-    c_log("// gradient")
-    c_log("//--------------------------")
-    c_code(op.gradient())
+    # c_log("//--------------------------")
+    # c_log("// gradient")
+    # c_log("//--------------------------")
+    # c_code(op.gradient())
 
     stop = perf_counter()
     console.print(f"// Overall: {stop - start} seconds")
