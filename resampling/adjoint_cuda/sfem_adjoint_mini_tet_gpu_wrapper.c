@@ -24,28 +24,27 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     mini_tet_parameters.min_refinement_L    = 1;
     mini_tet_parameters.max_refinement_L    = 15;
 
-    call_sfem_adjoint_mini_tet_kernel_gpu(  //
-            start_element,                  // Mesh
-            end_element,                    //
-            end_element - start_element,    // nelements
-            nnodes,                         //
-            elems,                          //
-            xyz,                            //
-            n[0],                           // SDF
-            n[1],                           //
-            n[2],                           //
-            stride[0],                      // Stride
-            stride[1],                      //
-            stride[2],                      //
-            origin[0],                      // Origin
-            origin[1],                      //
-            origin[2],                      //
-            delta[0],                       // Delta
-            delta[1],                       //
-            delta[2],                       //
-            weighted_field,                 // Input weighted field
-            mini_tet_parameters,            // Threshold for alpha
-            data);                          //
+    call_sfem_adjoint_mini_tet_kernel_gpu(start_element,                  // Mesh
+                                          end_element,                    //
+                                          (end_element - start_element),  // nelements
+                                          nnodes,                         //
+                                          elems,                          //
+                                          xyz,                            //
+                                          n[0],                           // SDF
+                                          n[1],                           //
+                                          n[2],                           //
+                                          stride[0],                      // Stride
+                                          stride[1],                      //
+                                          stride[2],                      //
+                                          origin[0],                      // Origin
+                                          origin[1],                      //
+                                          origin[2],                      //
+                                          delta[0],                       // Delta
+                                          delta[1],                       //
+                                          delta[2],                       //
+                                          weighted_field,                 // Input weighted field
+                                          mini_tet_parameters,            // Threshold for alpha
+                                          data);                          //
 
     return EXIT_SUCCESS;
 }

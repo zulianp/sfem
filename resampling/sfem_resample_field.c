@@ -1256,7 +1256,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 #define TEST_GPU_HYTEG_REFINEMENT
 #ifdef TEST_GPU_HYTEG_REFINEMENT
 
-            ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                             //
+            ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                              //
                                                                      mesh->nelements,                //
                                                                      mesh->nnodes,                   //
                                                                      (const idx_t**)mesh->elements,  //
@@ -1268,6 +1268,26 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                                      mass_vector,                    //
                                                                      2.5,                            //
                                                                      data);                          //
+
+            real_t          min_val    = data[0];
+            real_t          max_val    = data[0];
+            ptrdiff_t       min_idx    = 0;
+            ptrdiff_t       max_idx    = 0;
+            const ptrdiff_t total_size = n[0] * n[1] * n[2];
+
+            for (ptrdiff_t i = 1; i < total_size; ++i) {
+                if (data[i] < min_val) {
+                    min_val = data[i];
+                    min_idx = i;
+                }
+                if (data[i] > max_val) {
+                    max_val = data[i];
+                    max_idx = i;
+                }
+            }
+
+            printf("Data range II: min = %e (at index %ld), max = %e (at index %ld)\n", min_val, min_idx, max_val, max_idx);
+            break;
 
 #else
 
@@ -1283,8 +1303,28 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                                    mass_vector,                    //
                                                                    2.5,                            //
                                                                    data);                          //
-#endif
+
+            // real_t          min_val    = data[0];
+            // real_t          max_val    = data[0];
+            // ptrdiff_t       min_idx    = 0;
+            // ptrdiff_t       max_idx    = 0;
+            // const ptrdiff_t total_size = n[0] * n[1] * n[2];
+
+            // for (ptrdiff_t i = 1; i < total_size; ++i) {
+            //     if (data[i] < min_val) {
+            //         min_val = data[i];
+            //         min_idx = i;
+            //     }
+            //     if (data[i] > max_val) {
+            //         max_val = data[i];
+            //         max_idx = i;
+            //     }
+            // }
+
+            // printf("Data range II: min = %e (at index %ld), max = %e (at index %ld)\n", min_val, min_idx, max_val, max_idx);
             break;
+
+#endif
 
         case ADJOINT_BASE:
         default:

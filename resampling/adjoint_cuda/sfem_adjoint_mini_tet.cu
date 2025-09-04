@@ -69,7 +69,7 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     }
 
     const unsigned int threads_per_block      = 256;
-    const unsigned int total_threads_per_grid = (end_element - start_element) * LANES_PER_TILE;
+    const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
     const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
 
     cudaStream_t cuda_stream = 0;  // default stream
@@ -109,7 +109,32 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
 
     cudaStreamDestroy(cuda_stream);
 
-    cudaMemcpyAsync((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost, cuda_stream_alloc);
+    cudaMemcpy((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
+
+    // Find min and max values in the data array
+    real_t          min_val    = data[0];
+    real_t          max_val    = data[0];
+    ptrdiff_t       min_idx    = 0;
+    ptrdiff_t       max_idx    = 0;
+    const ptrdiff_t total_size = n0 * n1 * n2;
+
+    for (ptrdiff_t i = 1; i < total_size; ++i) {
+        if (data[i] < min_val) {
+            min_val = data[i];
+            min_idx = i;
+        }
+        if (data[i] > max_val) {
+            max_val = data[i];
+            max_idx = i;
+        }
+    }
+
+    printf("Data range (real_t size: %zu bytes): min = %e (at index %ld), max = %e (at index %ld)\n",
+           sizeof(real_t),
+           min_val,
+           min_idx,
+           max_val,
+           max_idx);
 
     cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
 
