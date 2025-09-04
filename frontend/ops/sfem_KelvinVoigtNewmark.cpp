@@ -14,9 +14,11 @@ namespace sfem {
     class KelvinVoigtNewmark final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Buffer<real_t>> vel_[3];
+        std::shared_ptr<Buffer<real_t>> acc_[3];
         enum ElemType                  element_type { INVALID };
 
-        real_t k{2.0}, K{5/3}, eta{1}, dt{0.2}, gamma{0.5}, beta{0.25};
+        real_t k{2.0}, K{5/3}, eta{0.5}, dt{0.2}, gamma{0.5}, beta{0.25}, rho{1.0};
 
         long   calls{0};
         double total_time{0};
@@ -43,10 +45,11 @@ namespace sfem {
 
             real_t SFEM_YOUNG_MODULUS        = 2.0;
             real_t SFEM_BULK_MODULUS        = 5/3;
-            real_t SFEM_DAMPING_RATIO        = 1;
+            real_t SFEM_DAMPING_RATIO        = 0.5;
             real_t SFEM_DT                = 0.2;
             real_t SFEM_GAMMA            = 0.5;
             real_t SFEM_BETA            = 0.25;
+            real_t SFEM_DENSITY        = 1.0;
 
             SFEM_READ_ENV(SFEM_YOUNG_MODULUS, atof);
             SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
@@ -54,6 +57,7 @@ namespace sfem {
             SFEM_READ_ENV(SFEM_DT, atof);
             SFEM_READ_ENV(SFEM_GAMMA, atof);
             SFEM_READ_ENV(SFEM_BETA, atof);
+            SFEM_READ_ENV(SFEM_DENSITY, atof);
 
             ret->k           = SFEM_YOUNG_MODULUS;
             ret->K           = SFEM_BULK_MODULUS;
@@ -61,7 +65,7 @@ namespace sfem {
             ret->dt          = SFEM_DT;
             ret->gamma       = SFEM_GAMMA;
             ret->beta        = SFEM_BETA;
-
+            ret->rho         = SFEM_DENSITY;
             ret->element_type = (enum ElemType)space->element_type();
 
             return ret;
@@ -78,6 +82,7 @@ namespace sfem {
             ret->dt          = dt;
             ret->gamma       = gamma;
             ret->beta        = beta;
+            ret->rho         = rho;
             return ret;
         }
 
@@ -92,11 +97,22 @@ namespace sfem {
             ret->dt          = dt;
             ret->gamma       = gamma;
             ret->beta        = beta;
+            ret->rho         = rho;
             return ret;
         }
 
         const char *name() const override { return "KelvinVoigtNewmark"; }
         inline bool is_linear() const override { return true; }
+
+        void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
+            if (strcmp(name, "velocity") == 0) {
+                vel_[component] = vel;
+            } else if (strcmp(name, "acceleration") == 0) {
+                acc_[component] = vel;
+            } else {
+                SFEM_ERROR("Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, 0/1/2) first.\n");
+            }
+        }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             auto mesh = space->mesh_ptr();
@@ -195,15 +211,25 @@ namespace sfem {
             auto mesh = space->mesh_ptr();
             const ptrdiff_t ndofs = mesh->n_nodes() * 3;
             const real_t *u = x;
-            const real_t *v = x + ndofs;
+
+            // AoS view: pass three component pointers with stride=3
+            const real_t* vbase = vel_[0]->data();
+            const real_t* vx = &vbase[0];
+            const real_t* vy = &vbase[1];
+            const real_t* vz = &vbase[2];
+
+            const real_t* abase = acc_[0]->data();
+            const real_t* ax = &abase[0];
+            const real_t* ay = &abase[1];
+            const real_t* az = &abase[2];
 
             double tick = MPI_Wtime();
 
             if (jacobians) {
                 SFEM_TRACE_SCOPE("kelvin_voigt_newmark_gradient_aos");
                 kelvin_voigt_newmark_gradient_aos(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), 
-                                jacobians->adjugate->data(), jacobians->determinant->data(), this->k, this->K, this->eta,
-                             u, v, out);
+                                jacobians->adjugate->data(), jacobians->determinant->data(), this->k, this->K, this->eta, this->rho,
+                             u, vx, vy, vz, ax, ay, az, out);
             } else {
                 SFEM_ERROR("Jacobians not initialized for gradient!\n");
                 return SFEM_FAILURE;
@@ -216,6 +242,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        
 
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
@@ -231,7 +258,7 @@ namespace sfem {
                                            mesh->elements()->data(),
                                            jacobians->adjugate->data(), jacobians->determinant->data(),
                                            this->dt, this->gamma, this->beta,
-                                           this->k, this->K, this->eta,
+                                           this->k, this->K, this->eta, this->rho,
                                            h,
                                            out);
             } else {

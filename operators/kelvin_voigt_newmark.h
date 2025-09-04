@@ -23,6 +23,7 @@ int kelvin_voigt_newmark_apply_adjugate_soa(const enum ElemType                 
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values);
 
@@ -36,9 +37,14 @@ int kelvin_voigt_newmark_gradient_soa(const enum ElemType                   elem
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
-
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
-                                         const real_t *const SFEM_RESTRICT     v,
+                                         const real_t *const SFEM_RESTRICT     vx,
+                                         const real_t *const SFEM_RESTRICT     vy,
+                                         const real_t *const SFEM_RESTRICT     vz,
+                                         const real_t *const SFEM_RESTRICT     ax,
+                                         const real_t *const SFEM_RESTRICT     ay,
+                                         const real_t *const SFEM_RESTRICT     az,
                                          real_t *const SFEM_RESTRICT           values);
 
 
@@ -58,6 +64,7 @@ int kelvin_voigt_newmark_apply_adjugate_aos(const enum ElemType                 
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values);
 
@@ -74,8 +81,14 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
                                          const real_t                          k,
                                          const real_t                          K,
                                          const real_t                          eta,
+                                         const real_t                          rho,
                                          const real_t *const SFEM_RESTRICT     u,
-                                         const real_t *const SFEM_RESTRICT     v,
+                                         const real_t *const SFEM_RESTRICT     vx,
+                                         const real_t *const SFEM_RESTRICT     vy,
+                                         const real_t *const SFEM_RESTRICT     vz,
+                                         const real_t *const SFEM_RESTRICT     ax,
+                                         const real_t *const SFEM_RESTRICT     ay,
+                                         const real_t *const SFEM_RESTRICT     az,
                                          real_t *const SFEM_RESTRICT           values);
 
 
