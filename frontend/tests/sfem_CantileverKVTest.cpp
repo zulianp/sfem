@@ -27,7 +27,7 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 4,
                                           SFEM_BASE_RESOLUTION,
@@ -55,15 +55,15 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     auto top_sideset = sfem::Sideset::create_from_selector(
         m, [](const geom_t /*x*/, const geom_t /*y*/, const geom_t z) -> bool { return z > 0.004 - 1e-6 && z < 0.004 + 1e-6; }); 
 
-    sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition left2{.sideset = left_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition left0{.sidesets = left_sideset, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition left1{.sidesets = left_sideset, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition left2{.sidesets = left_sideset, .value = 0, .component = 2};
 
 #if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {left0, left1, left2}, es);
     f->add_constraint(d_conds);
 
-    sfem::NeumannConditions::Condition nc_top{.sideset = top_sideset, .value = -0.1, .component = 2};
+    sfem::NeumannConditions::Condition nc_top{.sidesets = top_sideset, .value = -0.1, .component = 2};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_top}, es);
 
     f->add_operator(n_conds);

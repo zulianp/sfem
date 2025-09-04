@@ -1,0 +1,11 @@
+#ifndef SFEM_VERSION_HPP
+#define SFEM_VERSION_HPP
+
+#define SFEM_VERSION_MAJOR 0
+#define SFEM_VERSION_MINOR 1
+#define SFEM_VERSION_PATCH 0
+#define SFEM_GIT_VERSION "304e61c2"
+//#define SFEM_VERSION_TWEAK 
+#define SFEM_VERSION "0.1.0"
+
+#endif
