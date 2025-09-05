@@ -9,6 +9,7 @@
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
+#include "sfem_Env.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -86,8 +87,15 @@ int main(int argc, char *argv[]) {
             es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
 
-        auto m = sfem::Mesh::create_hex8_cube(
-                comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+        std::string path = sfem::Env::read_string("SFEM_MESH", "");
+        std::shared_ptr<sfem::Mesh> m;
+
+        if (!path.empty()) {
+            m = sfem::Mesh::create_from_file(comm, path.c_str());
+        } else {
+            m = sfem::Mesh::create_hex8_cube(
+                    comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+        }
 
         std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
                                    {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = 3},
@@ -100,7 +108,10 @@ int main(int argc, char *argv[]) {
             ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
         } else {
             ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-            ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+            if(m->element_type() == HEX8) {
+                // FIXME
+                ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+            }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
         }
 
