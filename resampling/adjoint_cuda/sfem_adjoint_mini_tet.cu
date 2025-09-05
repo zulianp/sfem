@@ -27,7 +27,7 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
                                       real_t* const               data) {
     //
 
-    cudaStream_t cuda_stream_alloc = 0;  // default stream
+    cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
 
     real_t* data_device           = NULL;

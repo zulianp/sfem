@@ -1237,6 +1237,64 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_type d6 = It * hex8_f6;
         const real_type d7 = It * hex8_f7;
 
+        if (quad_i, 8 && category == 0) {
+            printf("Point mapping [cat=%d, L=%d, qp=%d]:\n"
+                   "  Mini-ref: (%lf, %lf, %lf)\n"
+                   "  Physical: (%lf, %lf, %lf)\n"
+                   "  Grid coords: (%lf, %lf, %lf)\n"
+                   "  Grid index: (%ld, %ld, %ld)\n"
+                   "  Local coords: (%lf, %lf, %lf)\n"
+                   "  Hex shape functions: [%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf]\n"
+                   "  Hex indices: [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n"
+                   "  Total contribution It: %le\n"
+                   "  Contributions: [%le, %le, %le, %le, %le, %le, %le, %le]\n",
+                   category,
+                   L,
+                   quad_i,
+                   (double)xq_mref,
+                   (double)yq_mref,
+                   (double)zq_mref,
+                   (double)xq_phys,
+                   (double)yq_phys,
+                   (double)zq_phys,
+                   (double)grid_x,
+                   (double)grid_y,
+                   (double)grid_z,
+                   (long)i,
+                   (long)j,
+                   (long)k,
+                   (double)l_x,
+                   (double)l_y,
+                   (double)l_z,
+                   (double)hex8_f0,
+                   (double)hex8_f1,
+                   (double)hex8_f2,
+                   (double)hex8_f3,
+                   (double)hex8_f4,
+                   (double)hex8_f5,
+                   (double)hex8_f6,
+                   (double)hex8_f7,
+                   (long)i0,
+                   (long)i1,
+                   (long)i2,
+                   (long)i3,
+                   (long)i4,
+                   (long)i5,
+                   (long)i6,
+                   (long)i7,
+                   (double)It,
+                   (double)d0,
+                   (double)d1,
+                   (double)d2,
+                   (double)d3,
+                   (double)d4,
+                   (double)d5,
+                   (double)d6,
+                   (double)d7);
+
+            exit(1);
+        }
+
         // Update the data
         data[i0] += d0;
         data[i1] += d1;
@@ -1496,7 +1554,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
         const real_t alpha_max_threshold = 8.0;  // Maximum threshold for alpha. Less: make more refinements.
 
         const int min_refinement_L = 1;          // Minimum refinement level
-        const int max_refinement_L = MAX_REF_L;  // Maximum refinement level
+        const int max_refinement_L = 1;  // Maximum refinement level
 
         const int L = alpha_to_hyteg_level(alpha_tet,            // // DEBUG forced to 2 refinements
                                            alpha_min_threshold,  //
