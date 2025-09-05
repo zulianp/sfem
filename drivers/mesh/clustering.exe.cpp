@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
 
     // Write reordered mesh
     mesh->reorder_elements_from_tags(elem2cluster);
+    mesh->renumber_nodes();
     mesh->write(output_folder.c_str());
 
     if (!rank) {
