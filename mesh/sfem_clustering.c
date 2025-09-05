@@ -205,6 +205,7 @@ int sfem_element_clustering(
     ptrdiff_t *n_clusters)
 {
     if (!n_elements || !cluster_size || !adj_ptr || !adj_idx || !elem2cluster || !cluster_sizes || !n_clusters) {
+        SFEM_ERROR("Invalid arguments");
         return 1;
     }
 
@@ -233,6 +234,16 @@ int sfem_element_clustering(
     // Simple greedy clustering algorithm
     ptrdiff_t current_cluster = 0;
     ptrdiff_t elements_assigned = 0;
+
+    // INSERT_YOUR_CODE
+    // Compute max_connectivity by looping over the adjacency graph
+    idx_t max_connectivity = 0;
+    for (ptrdiff_t elem = 0; elem < n_elements; elem++) {
+        idx_t connectivity = adj_ptr[elem + 1] - adj_ptr[elem];
+        if (connectivity > max_connectivity) {
+            max_connectivity = connectivity;
+        }
+    }
 
     while (elements_assigned < n_elements) {
         // If current cluster is full, start new cluster
@@ -267,6 +278,10 @@ int sfem_element_clustering(
                     best_elem = elem;
                     best_connectivity = connectivity;
                     best_elem_idx = i;
+
+                    if(max_connectivity == connectivity) {
+                        break;
+                    }
                 }
             }
         }
@@ -323,6 +338,7 @@ int sfem_calculate_cluster_connectivity(
 {
     if (!n_elements || !adj_ptr || !adj_idx || !elem2cluster || !connectivity || 
         !total_connectivity || !max_connectivity || !min_connectivity) {
+        SFEM_ERROR("Invalid arguments");
         return 1;
     }
 
