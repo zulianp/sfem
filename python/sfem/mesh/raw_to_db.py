@@ -175,6 +175,12 @@ def add_fields(field_data, field_data_type, storage, check_len):
 
             for f in files:
                 data = np.fromfile(f, dtype=t)
+
+                if t == np.int32:
+                    print(f"Warning converting field from int32 to {t} to work with Paraview")
+                    data = data.astype(np.float32)
+                    t = np.float32
+
                 name = os.path.splitext(os.path.basename(f))[0]
 
                 if len(data) != check_len:
