@@ -73,11 +73,9 @@ int main(int argc, char *argv[]) {
     {
         auto comm = context.communicator();
 
-        int SFEM_BASE_RESOLUTION = 50;
-        SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
-
-        int SFEM_ELEMENT_REFINE_LEVEL = 0;
-        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+        int SFEM_BASE_RESOLUTION = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
+        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+        int SFEM_REPEAT = sfem::Env::read("SFEM_REPEAT", 5);
 
         sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
