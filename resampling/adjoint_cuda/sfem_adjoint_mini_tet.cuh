@@ -611,8 +611,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
                                 &hex8_f6,
                                 &hex8_f7);
 
-        ptrdiff_t i0 = 0,  //,
-                i1 = 0, i2 = 0, i3 = 0, i4 = 0, i5 = 0, i6 = 0, i7 = 0;
+        ptrdiff_t i0 = 0, i1 = 0, i2 = 0, i3 = 0, i4 = 0, i5 = 0, i6 = 0, i7 = 0;
         hex_aa_8_collect_coeffs_indices_gpu(stride0,  //
                                             stride1,
                                             stride2,
@@ -636,6 +635,62 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType d5 = It * hex8_f5;
         const FloatType d6 = It * hex8_f6;
         const FloatType d7 = It * hex8_f7;
+
+        if (threadIdx.x < LANES_PER_TILE && blockIdx.x == 0 && quad_i == 0 && category == 0) {
+            printf("Point mapping [cat=%d, L=%d, qp=%d]:\n"
+                   "  Mini-ref: (%lf, %lf, %lf)\n"
+                   "  Physical: (%lf, %lf, %lf)\n"
+                   "  Grid coords: (%lf, %lf, %lf)\n"
+                   "  Grid index: (%ld, %ld, %ld)\n"
+                   "  Local coords: (%lf, %lf, %lf)\n"
+                   "  Hex shape functions: [%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf]\n"
+                   "  Hex indices: [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n"
+                   "  Total contribution It: %le\n"
+                   "  Contributions: [%le, %le, %le, %le, %le, %le, %le, %le]\n",
+                   category,
+                   L,
+                   quad_i_tile,
+                   (double)xq_mref,
+                   (double)yq_mref,
+                   (double)zq_mref,
+                   (double)xq_phys,
+                   (double)yq_phys,
+                   (double)zq_phys,
+                   (double)grid_x,
+                   (double)grid_y,
+                   (double)grid_z,
+                   (long)i,
+                   (long)j,
+                   (long)k,
+                   (double)l_x,
+                   (double)l_y,
+                   (double)l_z,
+                   (double)hex8_f0,
+                   (double)hex8_f1,
+                   (double)hex8_f2,
+                   (double)hex8_f3,
+                   (double)hex8_f4,
+                   (double)hex8_f5,
+                   (double)hex8_f6,
+                   (double)hex8_f7,
+                   (long)i0,
+                   (long)i1,
+                   (long)i2,
+                   (long)i3,
+                   (long)i4,
+                   (long)i5,
+                   (long)i6,
+                   (long)i7,
+                   (double)It,
+                   (double)d0,
+                   (double)d1,
+                   (double)d2,
+                   (double)d3,
+                   (double)d4,
+                   (double)d5,
+                   (double)d6,
+                   (double)d7);
+        }
 
         // Update the data with atomic operations to prevent race conditions
         atomicAdd(&data[i0], d0);
@@ -723,10 +778,10 @@ __device__ void main_tet_loop_gpu(const int                               L,
 
     for (int k = 0; k <= L; ++k) {  // Loop over z
 
-        const int nodes_per_side  = (L - k) + 1;
-        const int nodes_per_layer = nodes_per_side * (nodes_per_side + 1) / 2;
+        const int nodes_per_side = (L - k) + 1;
+        // const int nodes_per_layer = nodes_per_side * (nodes_per_side + 1) / 2;
         // Removed unused variable Ns
-        const int Nl = nodes_per_layer;
+        // const int Nl = nodes_per_layer;
 
         // Layer loop info
         // printf("Layer %d: Ik = %d, Ns = %d, Nl = %d\n", k, Ik, Ns, Nl);

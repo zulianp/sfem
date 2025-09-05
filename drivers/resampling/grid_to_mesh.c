@@ -389,11 +389,11 @@ real_t mesh_fun_par(real_t x, real_t y, real_t z) { return x * x + y * y + z * z
 
 real_t mesh_fun_lin_x(real_t x, real_t y, real_t z) { return x; }
 
-real_t mesh_fun_lin_hs_x(real_t x, real_t y, real_t z) { return x > 0.4 ? 1.0 : -1.0; }
+real_t mesh_fun_lin_hs_x(real_t x, real_t y, real_t z) { return x > 0.4 ? 1.0 : 0.0; }
 
-real_t mesh_fun_lin_hs_y(real_t x, real_t y, real_t z) { return y > 0.4 ? 1.0 : -1.0; }
+real_t mesh_fun_lin_hs_y(real_t x, real_t y, real_t z) { return y > 0.4 ? 1.0 : 0.0; }
 
-real_t mesh_fun_lin_hs_z(real_t x, real_t y, real_t z) { return z > 0.0 ? 1.0 : -1.0; }
+real_t mesh_fun_lin_hs_z(real_t x, real_t y, real_t z) { return z > 0.0 ? 1.0 : 0.0; }
 
 real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) + cos(6.0 * y) + sin(6.0 * z)); }
 

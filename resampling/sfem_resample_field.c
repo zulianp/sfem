@@ -1253,7 +1253,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-#define TEST_GPU_HYTEG_REFINEMENT
+// #define TEST_GPU_HYTEG_REFINEMENT
 #ifdef TEST_GPU_HYTEG_REFINEMENT
 
             ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                              //
