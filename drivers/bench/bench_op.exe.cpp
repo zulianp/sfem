@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         } else {
             ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
             ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
-            ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
+            // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
         }
 
         for (auto &op_desc : ops) {

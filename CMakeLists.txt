@@ -112,6 +112,7 @@ list(APPEND SFEM_MODULES
 list(APPEND SFEM_MODULES 
     frontend
     frontend/ops
+    frontend/mesh
 )
 
 if(SFEM_ENABLE_METIS)
