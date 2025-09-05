@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
     }
 
     int cluster_size = sfem::Env::read("SFEM_CLUSTER_SIZE", 32);
+    bool use_openmp   = sfem::Env::read("SFEM_USE_OPENMP", true);
 
     auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
     std::string output_folder = argv[2];
@@ -47,15 +48,24 @@ int main(int argc, char *argv[]) {
 
     // Perform clustering using the refactored function
     ptrdiff_t actual_n_clusters = n_clusters;
-    int result = sfem_element_clustering(
-        n_elements,
-        cluster_size,
-        adj_ptr,
-        adj_idx,
-        elem2cluster_data,
-        cluster_sizes.data(),
-        &actual_n_clusters
-    );
+    int result = 0;
+    if (use_openmp) {
+        result = sfem_element_clustering_openmp(n_elements,
+                                                cluster_size,
+                                                adj_ptr,
+                                                adj_idx,
+                                                elem2cluster_data,
+                                                cluster_sizes.data(),
+                                                &actual_n_clusters);
+    } else {
+        result = sfem_element_clustering(n_elements,
+                                         cluster_size,
+                                         adj_ptr,
+                                         adj_idx,
+                                         elem2cluster_data,
+                                         cluster_sizes.data(),
+                                         &actual_n_clusters);
+    }
 
     if (result != 0) {
         if (!rank) {

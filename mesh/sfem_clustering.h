@@ -48,6 +48,16 @@ int sfem_element_clustering(
  * 
  * @return 0 on success, non-zero on error
  */
+int sfem_element_clustering_openmp(
+    const ptrdiff_t n_elements,
+    const ptrdiff_t cluster_size,
+    const count_t *const SFEM_RESTRICT adj_ptr,
+    const element_idx_t *const SFEM_RESTRICT adj_idx,
+    idx_t *const SFEM_RESTRICT elem2cluster,
+    ptrdiff_t *const SFEM_RESTRICT cluster_sizes,
+    ptrdiff_t *n_clusters
+);
+
 int sfem_calculate_cluster_connectivity(
     const ptrdiff_t n_elements,
     const count_t *const SFEM_RESTRICT adj_ptr,
