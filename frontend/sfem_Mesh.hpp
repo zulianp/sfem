@@ -179,6 +179,8 @@ namespace sfem {
 
         std::shared_ptr<Mesh> clone() const;
 
+        void reorder_elements_from_tags(const SharedBuffer<idx_t> &tags);
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
