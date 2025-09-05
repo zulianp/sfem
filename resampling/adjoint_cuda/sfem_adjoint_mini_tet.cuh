@@ -643,6 +643,12 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
                    "  Grid coords: (%lf, %lf, %lf)\n"
                    "  Grid index: (%ld, %ld, %ld)\n"
                    "  Local coords: (%lf, %lf, %lf)\n"
+                   "  J_phys matrix:\n"
+                   "    [%lf, %lf, %lf]\n"
+                   "    [%lf, %lf, %lf]\n"
+                   "    [%lf, %lf, %lf]\n"
+                   "  Tet shape functions: [%lf, %lf, %lf, %lf]\n"
+                   "  Weighted field values: [%lf, %lf, %lf, %lf]\n"
                    "  Hex shape functions: [%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf]\n"
                    "  Hex indices: [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n"
                    "  Total contribution It: %le\n"
@@ -665,6 +671,23 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
                    (double)l_x,
                    (double)l_y,
                    (double)l_z,
+                   (double)J_phys[0].x,
+                   (double)J_phys[0].y,
+                   (double)J_phys[0].z,
+                   (double)J_phys[1].x,
+                   (double)J_phys[1].y,
+                   (double)J_phys[1].z,
+                   (double)J_phys[2].x,
+                   (double)J_phys[2].y,
+                   (double)J_phys[2].z,
+                   (double)f0,
+                   (double)f1,
+                   (double)f2,
+                   (double)f3,
+                   (double)wf0,
+                   (double)wf1,
+                   (double)wf2,
+                   (double)wf3,
                    (double)hex8_f0,
                    (double)hex8_f1,
                    (double)hex8_f2,
