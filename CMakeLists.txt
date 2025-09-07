@@ -238,7 +238,7 @@ endif()
 ######################################################
 # link
 
-target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
+target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
 # message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
@@ -250,6 +250,11 @@ set_target_properties(
     SOVERSION ${SFEM_VERSION_MAJOR})
 
 set(SFEM_TARGETS sfem)
+
+# Optional generated operator plug-ins (not built by default)
+if(SFEM_ENABLE_CODEGEN)
+    add_subdirectory(operators/generated)
+endif() 
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
 
