@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
-try:
-    from sfem_codegen import *
-except Exception:
-    # Minimal shims to allow file generation without SymPy at runtime
-    import sympy as sp  # will fail if sympy missing; we guard uses
-    def simplify(expr):
-        return expr
+from sfem_codegen import *
+
+from sympy.parsing.sympy_parser import parse_expr
+
 from quad4 import *
 from tri3 import *
 from tri6 import *
@@ -16,25 +13,32 @@ from tet20 import *
 from hex8 import *
 from aahex8 import *
 
-import sys
-import os
+# from tpl_hyperelasticity import TPLHyperelasticity
 
-from time import perf_counter
-from tpl_hyperelasticity import TPLHyperelasticity
 
+def dbg():
+    import pdb; pdb.set_trace()
 
 def simplify(expr):
     return expr
     # return sp.simplify(expr)
 
+def create_matrix_symbol(name, rows, cols):
+    # return sp.Matrix(rows, cols, [sp.symbols(f"{name}[{i*cols + j}]") for i in range(0, rows) for j in range(0, cols)])
+    return matrix_coeff(name, rows, cols)
 
-def assign_matrix(name, mat):
+
+def simplify_matrix(mat):
+    rows, cols = mat.shape
+    return sp.Matrix(rows, cols, [simplify(mat[i, j]) for i in range(0, rows) for j in range(0, cols)])
+
+
+def assign_matrix(var, mat):
     rows, cols = mat.shape
     expr = []
     for i in range(0, rows):
         for j in range(0, cols):
-            var = sp.symbols(f"{name}[{i*cols + j}]")
-            expr.append(ast.Assignment(var, mat[i, j]))
+            expr.append(ast.Assignment(var[i, j], mat[i, j]))
     return expr
 
 
@@ -52,165 +56,219 @@ class SRHyperelasticity:
     @staticmethod
     def create_from_string(fe, str_expr: str):
         # Allow users to pass expressions in terms of invariants I1b, I2b, J
+        
+        fun = parse_expr(str_expr)    
+        return SRHyperelasticity(fe, fun) #, TPLHyperelasticity(fe))
+
+    def init_symbols(self, fun):
+        self.fun = simplify(fun)
         I1b, I2b, J = sp.symbols("I1b I2b J", real=True)
-        mu, lam = sp.symbols("mu lam", real=True)
-        # Replace Python keyword 'lambda' with 'lam' if present
-        expr_src = str_expr.replace("lambda", "lam")
-        local_ns = {"I1b": I1b, "I2b": I2b, "J": J, "mu": mu, "lam": lam, "log": sp.log}
-        fun = sp.parse_expr(expr_src, local_dict=local_ns)
-        return SRHyperelasticity(fe, fun, TPLHyperelasticity(fe))
+        invariants = [I1b, I2b, J]
+        symbol_names = list(fun.free_symbols)
 
-    def init_templates(self, tpl: TPLHyperelasticity = None):
-        self.tpl = tpl if tpl is not None else TPLHyperelasticity(self.fe)
-      
-
-    def init_symbols(self):
-        # Invariants
-        self.I1b = sp.symbols("I1b", real=True)
-        self.I2b = sp.symbols("I2b", real=True)
-        self.J = sp.symbols("J", real=True)
+        all_symbols = []
+        for s in symbol_names + invariants:
+            if str(s) not in [str(sym) for sym in all_symbols]:
+                all_symbols.append(s)
+                match str(s):
+                    case "I1b":
+                        self.I1b_symb = s
+                    case "I2b":
+                        self.I2b_symb = s
+                    case "J":
+                        self.J_symb = s
+        
+        self.disp_grad_symb = create_matrix_symbol("disp_grad", self.fe.spatial_dim(), self.fe.spatial_dim())
+        self.F_symb = create_matrix_symbol("F", self.fe.spatial_dim(), self.fe.spatial_dim())
+        self.jac_inv_symb = create_matrix_symbol("jac_inv", self.fe.manifold_dim(), self.fe.spatial_dim())
+        self.Pinv_xJinv_t_symb = create_matrix_symbol("Pinv_xJinv_t", self.fe.manifold_dim(), self.fe.manifold_dim())
+        self.trial_grad_symb = create_matrix_symbol("trial_grad", self.fe.manifold_dim(), self.fe.manifold_dim())
         self.safe_log = lambda x: sp.log(sp.Max(1e-8, x))
         self.safe_sqrt = lambda x: sp.sqrt(sp.Max(1e-8, x))
 
-    def __init__(self, fe, fun, tpl: TPLHyperelasticity = None):
-        self.init_symbols()
+    def __init__(self, fe, fun): #  tpl: TPLHyperelasticity):
         self.fe = fe
-        self.init_templates(tpl)
-        self.fun = simplify(fun)
+        self.init_symbols(fun)
 
-    def value(self):
-        dfdI1b = sp.diff(self.fun, self.I1b)
-        dfdI2b = sp.diff(self.fun, self.I2b)
-        dfdJ = sp.diff(self.fun, self.J)
-        return dfdI1b, dfdI2b, dfdJ
+        # Expressions to be evaluated for code generation
+        self.expression_table = {}
+        self.__build_sym(fe)
+        
+    # ---------------- Directional derivatives (separated from FEM) ----------------
+    def __compute_piola_stress(self):
+        F = self.F_symb
+        F_inv_T = F.T.inv()
+        J = determinant(F)
+        B = F * F.T
+        Jm23 = J ** (-sp.Rational(2, 3))
+        Bbar = Jm23 * B
+        I1b = sp.trace(Bbar)
 
+        I2b = (I1b * I1b - sp.trace(Bbar * Bbar)) / 2
 
-    def apply(self):
-        pass
+        # Differentiate strain energy with respect to invariants
+        dW_dI1b = sp.diff(self.fun, self.I1b_symb)
+        dW_dI2b = sp.diff(self.fun, self.I2b_symb)
+        dW_dJ = sp.diff(self.fun, self.J_symb)
 
-    # ---------------- Symbolic core (P_tXJinv_t idiom) ----------------
-    def _build_sym(self, fe):
-        dims = fe.manifold_dim()
-        q = fe.quadrature_point()
+        # Isochoric stress contributions from chain rule
+        P_iso_I1b = Jm23 * (2*F - sp.Rational(2,3) * I1b * F_inv_T)
+        P_iso_I2b = Jm23 * (2*I1b*F - 2*F*B - sp.Rational(2,3) * I2b * F_inv_T)
+        
+        # Volumetric stress contribution
+        P_vol = J * F_inv_T
+        
+        # Apply chain rule: P = dW/dI1b * dI1b/dF + dW/dI2b * dI2b/dF + dW/dJ * dJ/dF
+        P = dW_dI1b * P_iso_I1b + dW_dI2b * P_iso_I2b + dW_dJ * P_vol
 
-        fe.use_adjugate = True
-        gref = fe.tgrad(q, ncomp=dims)
-        jac_inv = fe.symbol_jacobian_inverse_as_adjugate()
+        for i in range(0, P.shape[0]):
+            for j in range(0, P.shape[1]):
+                P[i, j] = P[i, j].subs({self.I1b_symb: I1b, self.I2b_symb: I2b, self.J_symb: J})
 
-        # Build displacement gradient in physical coordinates
-        u = coeffs_SoA("u", dims, fe.n_nodes())
+        return simplify_matrix(P)
+
+    def __build_sym(self, fe):
+        fe = self.fe
+
+        # First Piola-Kirchhoff stress
+        P = self.__compute_piola_stress()
+        dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()        
+        P_tXJinv_t = P * self.jac_inv_symb.T * dV
+
+        self.expression_table["P"] = P
+        self.expression_table["P_tXJinv_t"] = P_tXJinv_t
+        self.expression_table["dV"] = dV
+        
+        F_dot_h = simplify(inner(P, self.trial_grad_symb))
+
+        lin_stress = sp.zeros(self.fe.spatial_dim(), self.fe.spatial_dim())
+        for i in range(0, self.fe.spatial_dim()):
+            for j in range(0, self.fe.spatial_dim()):
+                lin_stress[i, j] = sp.diff(F_dot_h, self.F_symb[i, j])
+
+        # print(lin_stress)
+        self.expression_table["lin_stress"] = lin_stress
+        self.expression_table["lin_stressXJinv_t"] = lin_stress * self.jac_inv_symb.T * dV
+
+        # Build FEM symbols
+        dims = self.fe.manifold_dim()
+        q = self.fe.quadrature_point()
+        gref = self.fe.tgrad(q, ncomp=dims)
+        jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        
+        u = coeffs_SoA("u", dims, self.fe.n_nodes())
         disp_grad = sp.zeros(dims, dims)
-        for i in range(0, dims * fe.n_nodes()):
+        for i in range(0, dims * self.fe.n_nodes()):
             disp_grad += u[i] * gref[i]
         disp_grad = disp_grad * jac_inv
 
-        # Define a symbolic F_s to differentiate W(F_s) w.r.t. F_s entries
-        F_s = sp.Matrix(dims, dims, matrix_coeff("Fsym", dims, dims))
-        J_s = determinant(F_s)
-        B_s = F_s * F_s.T
-        Jm23_s = J_s ** (-sp.Rational(2, 3))
-        Bbar_s = Jm23_s * B_s
-        I1b_s = sp.trace(Bbar_s)
-        I2b_s = (I1b_s * I1b_s - sp.trace(Bbar_s * Bbar_s)) / 2
+        inc_grad = sp.zeros(dims, dims)
+        for i in range(0, dims * self.fe.n_nodes()):
+            inc_grad += u[i] * gref[i]
+        inc_grad = inc_grad * jac_inv
+        
+        F = sp.eye(dims) + self.disp_grad_symb
+        
+        self.expression_table["disp_grad"] = disp_grad
+        self.expression_table["inc_grad"] = inc_grad
+        self.expression_table["F"] = F
+        self.expression_table["jac_inv"] = jac_inv
 
-        W_s = self.fun.subs({self.I1b: I1b_s, self.I2b: I2b_s, self.J: J_s})
-        P_s = sp.Matrix(dims, dims, [0] * (dims * dims))
-        for i in range(dims):
-            for j in range(dims):
-                P_s[i, j] = sp.diff(W_s, F_s[i, j])
+    def def_grad(self):
+        fe = self.fe
+        dims = self.fe.manifold_dim()
+        F = self.expression_table["F"]
 
-        # Substitute F_s with actual F = I + disp_grad
-        F = sp.eye(dims) + disp_grad
-        subs_map = {}
-        for i in range(dims):
-            for j in range(dims):
-                subs_map[F_s[i, j]] = F[i, j]
-        P = P_s.xreplace(subs_map)
+        for i in range(0, dims):
+            for j in range(0, dims):
+                F[i, j] = subsmat(F[i, j], self.disp_grad_symb, self.expression_table["disp_grad"])
 
-        # Rename adjugate[...] -> jacobian_adjugate[...] to match runtime variable names
-        adj_map = {}
-        for i in range(dims):
-            for j in range(dims):
-                adj_map[sp.symbols(f"adjugate[{i*dims + j}]")] = sp.symbols(f"jacobian_adjugate[{i*dims + j}]")
-        P = P.xreplace(adj_map)
+        return F
 
-        dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()
-
-        W_eval = W_s.xreplace(subs_map).xreplace(adj_map)
-        P_tXJinv_t = P * jac_inv.T * dV
-
-        return {
-            'dims': dims,
-            'gref': gref,
-            'jac_inv': jac_inv,
-            'disp_grad': disp_grad,
-            'F': F,
-            'W': W_eval,
-            'P': P,
-            'Ps': P_s,
-            'Fs': F_s,
-            'subs_map': subs_map,
-            'P_tXJinv_t': P_tXJinv_t,
-            'dV': dV,
-        }
-
-    def kernel_value(self, fe):
-        s = self._build_sym(fe)
+    def kernel_value(self):
+        fe = self.fe
         expr = []
         form = sp.symbols("element_scalar[0]")
         expr.append(ast.AddAugmentedAssignment(form, s['W'] * s['dV']))
-        return c_gen(expr)
+        return expr
 
-    def kernel_gradient(self, fe):
-        s = self._build_sym(fe)
-        dims = s['dims']
+    def kernel_apply(self):
+        fe = self.fe
+        dims = self.fe.manifold_dim()
+        grad = fe.tgrad(q, ncomp=dims)
+        
         expr = []
-        for i in range(0, dims * fe.n_nodes()):
-            lform = sp.symbols(f"element_vector[{i}*stride]")
-            expr.append(ast.AddAugmentedAssignment(lform, inner(s['P_tXJinv_t'], s['gref'][i])))
-        return c_gen(expr)
+        F = self.def_grad()
+        expr.extend(assign_matrix(self.F_symb, F))
 
-    def kernel_apply(self, fe):
-        s = self._build_sym(fe)
-        dims = s['dims']
-        jac_inv = s['jac_inv']
-        dV = s['dV']
+        print(f"T F[{dims*dims}];")
+        print("{", end="")
+        c_code(expr)
+        print("}\n\n")
 
-        # Build linearized stress using symbolic Ps and Fs, then substitute Fs->F
-        Ps = s['Ps']
-        Fs = s['Fs']
-        H = sp.Matrix(dims, dims, coeffs("grad_trial", dims * dims))
-        dPs = sp.Matrix(dims, dims, [0] * (dims * dims))
-        for a in range(dims):
-            for b in range(dims):
-                acc = 0
-                for i in range(dims):
-                    for j in range(dims):
-                        acc += sp.diff(Ps[a, b], Fs[i, j]) * H[i, j]
-                dPs[a, b] = simplify(acc)
+        print(f"T trial_grad[{dims*dims}];")
+        print("{", end="")
+        c_code(assign_matrix(self.trial_grad_symb, self.expression_table["inc_grad"]))
+        print("}\n\n")
 
-        # Substitute Fs entries with actual F entries
-        adj_map = {}
-        for i in range(dims):
-            for j in range(dims):
-                adj_map[sp.symbols(f"adjugate[{i*dims + j}]")] = sp.symbols(f"jacobian_adjugate[{i*dims + j}]")
-        dP = dPs.xreplace(s['subs_map']).xreplace(adj_map)
+        lin_stress_x_jinv_t = self.expression_table["lin_stressXJinv_t"]
 
-        Lop = dP * jac_inv.T * dV
+        lin_stress_symb = matrix_coeff("lin_stressXJinv_t", dims, dims)
+
+        print(f"T *lin_stressXJinv_t = F;")
+        print("{", end="")
+        c_code(assign_matrix(lin_stress_symb, lin_stress_x_jinv_t))
+        print("}\n\n")
 
         expr = []
         for i in range(0, dims * fe.n_nodes()):
             lform = sp.symbols(f"element_vector[{i}*stride]")
-            expr.append(ast.AddAugmentedAssignment(lform, inner(Lop, s['gref'][i])))
-        return c_gen(expr)
+            expr.append(ast.Assignment(lform, inner(lin_stress_symb, grad[i])))
 
-    def kernel_hessian(self, fe):
+        print("{", end="")
+        c_code(expr)
+        print("}\n\n")
+        return expr
+        
+
+    def kernel_gradient(self):
+        fe = self.fe
+        dims = self.fe.manifold_dim()
+        grad = fe.tgrad(q, ncomp=dims)
+        
+        # Generate the actual chain rule expressions directly
+        expr = []
+
+        F = self.def_grad()
+        expr.extend(assign_matrix(self.F_symb, F))
+
+        print(f"T F[{dims*dims}];")
+        print("{", end="")
+        c_code(expr)
+        print("}\n\n")
+
+        print(f"T *Pinv_xJinv_t = F;")
+        print("{", end="")
+        c_code(assign_matrix(self.Pinv_xJinv_t_symb, self.expression_table["P_tXJinv_t"]))
+        print("}\n\n")
+   
+        expr = []
+        for i in range(0, dims * fe.n_nodes()):
+            lform = sp.symbols(f"element_vector[{i}*stride]")
+            expr.append(ast.Assignment(lform, inner( self.Pinv_xJinv_t_symb, grad[i])))
+        
+        print("{", end="")
+        c_code(expr)
+        print("}\n\n")
+        return expr
+
+    def kernel_hessian(self):
         """Emit code for the full element Hessian (matrix) using P_tXJinv_t idiom.
 
         H[i,j] = inner( (dP(F):H_j) * Jinv^T * dV, gref_i )
         where H_j is the physical gradient for trial dof j derived from reference gradients.
         """
-        s = self._build_sym(fe)
+        fe = self.fe
         dims = s['dims']
         ndofs = dims * fe.n_nodes()
 
@@ -242,63 +300,25 @@ class SRHyperelasticity:
                 var = sp.symbols(f"element_matrix[{i*ndofs + j}*stride]")
                 expr.append(ast.Assignment(var, inner(Lop, s['gref'][i])))
 
-        return c_gen(expr)
+        return expr
 
     def emit_all(self, out_dir: str = None, opname: str = "hyperelasticity"):
-        """Emit gradient/apply/value for the given FE using the injected backend.
-
-        This hides any template/rendering details from the generator.
-        """
         fe = self.fe
-        k_value = self.kernel_value(fe)
-        k_grad = self.kernel_gradient(fe)
-        k_apply = self.kernel_apply(fe)
-        self.tpl.emit_all(opname=opname, kernels={'gradient': k_grad, 'apply': k_apply, 'value': k_value}, out_dir=out_dir)
+        # k_value = self.kernel_value(fe)
+        # k_grad = self.kernel_gradient()
+        k_apply = self.kernel_apply()
+        # k_apply = self.kernel_apply(fe)
+        
+        # self.tpl.emit_all(opname=opname, kernels={'gradient': k_grad, 'apply': k_apply, 'value': k_value}, out_dir=out_dir)
 
 def main():
-    fes = {
-        "HEX8": Hex8(),
-        "TET4": Tet4()
-    }
-
-    if len(sys.argv) < 2:
-        print("Usage: python3 sr_hyperelasticity.py \"<strain_energy_function>\" [EType]")
-        print("Example: python3 sr_hyperelasticity.py \"J * (I2b + (I1b * 0.8341331275382947))\" HEX8")
-        exit(1)
-
-    strain_energy_function = sys.argv[1]
-    
+    strain_energy_function = "(mu/2)*(I1b - 3) + (lmbda/2)*(log(J))**2"
+    # strain_energy_function = "J * (I2b + (I1b * 0.8341331275382947))"
+    name = "neohookean"
+    # fe = Tet4()
     fe = Hex8()
-    if len(sys.argv) >= 3:
-        et = sys.argv[2].upper()
-        if et in fes:
-            fe = fes[et]
-        else:
-            print(f"[WARN] Unknown EType '{et}', defaulting to HEX8")
-
-    # Demo shortcut: build standard Neo-Hookean Ogden from invariants
-    if strain_energy_function.upper() == "DEMO_NEOHOOKEAN_OGDEN":
-        # Section 2.1 style: isochoric + volumetric split
-        # Wiso(I1b) = mu/2 (I1b - 3),  Wvol(J) = lambda/2 (log J)^2
-        strain_energy_function = "(mu/2)*(I1b - 3) + (lambda/2)*(log(J))**2"
-
     op = SRHyperelasticity.create_from_string(fe, strain_energy_function)
-    op.emit_all(opname="hyperelasticity")
-
-def demo_neohookean_ogden(fe_name: str = "TET4", mu_val: float = 1.0, lambda_val: float = 1.0):
-    """Demo: generate kernels for Neo-Hookean Ogden using invariants (Section 2.1 split).
-
-    W(I1b, J) = mu/2 (I1b - 3) + lambda/2 (log J)^2
-    """
-    fes = {
-        "HEX8": Hex8(),
-        "TET4": Tet4()
-    }
-    fe = fes.get(fe_name.upper(), Tet4())
-    W = f"(mu/2)*(I1b - 3) + (lambda/2)*(log(J))**2"
-    op = SRHyperelasticity.create_from_string(fe, W)
-    # Substitute constants if needed; emit symbolic code independent of specific numeric values
-    op.emit_all(opname="neohookean")
+    op.emit_all(opname=name)
 
 
 if __name__ == "__main__":
