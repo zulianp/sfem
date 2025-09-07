@@ -129,7 +129,7 @@ int build_n2ln(const ptrdiff_t nelements,
             for (int edof_i = 0; edof_i < nnodesxelem; ++edof_i) {
                 idx_t lnode = elems[edof_i][eidx];
                 if (lnode == node) {
-                    ln_index[ebegin + book_keeping++] = e * nnodesxelem + edof_i;
+                    ln_index[ebegin + book_keeping++] = eidx * nnodesxelem + edof_i;
                     break;
                 }
             }
