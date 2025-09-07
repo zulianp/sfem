@@ -1,4 +1,3 @@
-import numpy as np
 import sympy as sp
 from sympy.utilities.codegen import codegen
 import sympy.codegen.ast as ast
@@ -15,13 +14,6 @@ real_t = "scalar_t"
 
 def c_log(expr):
     console.print(expr)
-
-
-# from sympy.matrices.dense import eye
-# from sympy.polys.matrices import DomainMatrix
-# from sympy.physics.quantum import TensorProduct
-# from sympy.physics.matrices import msigma
-
 
 def perp(e):
     return sp.Matrix(2, 1, [-e[1], e[0]])
@@ -137,7 +129,6 @@ def adjugate(mat):
 
 
 import sympy as sy
-import numpy as np
 import sys
 
 
@@ -194,7 +185,15 @@ def c_gen(expr, dump=False, optimizations="basic"):
         console.print("--------------------------")
         console.print(f"Running cse")
 
-    opcounts = np.array([0, 0, 0])
+    # Track operation counts (optional, numpy-free)
+    opcounts = [0, 0, 0]
+
+    def _acc_ops(dst, src):
+        if isinstance(dst, list):
+            for i in range(3):
+                dst[i] += int(src[i])
+        else:
+            dst += src
 
     start = perf_counter()
 
@@ -212,11 +211,11 @@ def c_gen(expr, dump=False, optimizations="basic"):
 
     for var, expr in sub_expr:
         lines.append(f"const {real_t} {var} = {printer.doprint(expr)};")
-        opcounts += opcount(expr)
+        _acc_ops(opcounts, opcount(expr))
 
     for v in simpl_expr:
         lines.append(printer.doprint(v))
-        opcounts += opcount(v)
+        _acc_ops(opcounts, opcount(v))
 
     code_string = f"\n".join(lines)
 

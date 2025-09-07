@@ -14,6 +14,7 @@
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
 
 
@@ -101,6 +102,15 @@ namespace sfem {
         auto  it  = ntc.find(m_name);
 
         if (it == ntc.end()) {
+            // Try dynamic plug-in: prefix "plugin:"
+            const std::string prefix = "plugin:";
+            if (m_name.rfind(prefix, 0) == 0) {
+                std::string opname = m_name.substr(prefix.size());
+                auto        uop    = PlugInOp::create(space, opname);
+                if (!uop) return nullptr;
+                return std::shared_ptr<Op>(uop.release());
+            }
+
             std::cerr << "Unable to find op " << m_name << "\n";
             return nullptr;
         }
