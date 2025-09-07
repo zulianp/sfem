@@ -21,6 +21,7 @@ option(SFEM_ENABLE_MPI "Enable MPI support" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
+option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
