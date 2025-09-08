@@ -36,6 +36,11 @@
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
+#include "sfem_Communicator.hpp"
+
+#ifdef SFEM_ENABLE_MPI
+#include <mpi.h>
+#endif
 
 #ifdef SFEM_ENABLE_RYAML
 

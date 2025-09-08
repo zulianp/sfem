@@ -273,7 +273,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
