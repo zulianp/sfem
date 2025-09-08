@@ -299,7 +299,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 0
+#if 1
         tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
                                           jacobian_determinant,
                                           mu,
