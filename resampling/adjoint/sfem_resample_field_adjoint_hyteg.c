@@ -1237,63 +1237,63 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_type d6 = It * hex8_f6;
         const real_type d7 = It * hex8_f7;
 
-        // if (quad_i < 8 && category == 0) {
-        //     printf("Point mapping [cat=%d, L=%d, qp=%d]:\n"
-        //            "  Mini-ref: (%lf, %lf, %lf)\n"
-        //            "  Physical: (%lf, %lf, %lf)\n"
-        //            "  Grid coords: (%lf, %lf, %lf)\n"
-        //            "  Grid index: (%ld, %ld, %ld)\n"
-        //            "  Local coords: (%lf, %lf, %lf)\n"
-        //            "  Hex shape functions: [%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf]\n"
-        //            "  Hex indices: [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n"
-        //            "  Total contribution It: %le\n"
-        //            "  Contributions: [%le, %le, %le, %le, %le, %le, %le, %le]\n",
-        //            category,
-        //            L,
-        //            quad_i,
-        //            (double)xq_mref,
-        //            (double)yq_mref,
-        //            (double)zq_mref,
-        //            (double)xq_phys,
-        //            (double)yq_phys,
-        //            (double)zq_phys,
-        //            (double)grid_x,
-        //            (double)grid_y,
-        //            (double)grid_z,
-        //            (long)i,
-        //            (long)j,
-        //            (long)k,
-        //            (double)l_x,
-        //            (double)l_y,
-        //            (double)l_z,
-        //            (double)hex8_f0,
-        //            (double)hex8_f1,
-        //            (double)hex8_f2,
-        //            (double)hex8_f3,
-        //            (double)hex8_f4,
-        //            (double)hex8_f5,
-        //            (double)hex8_f6,
-        //            (double)hex8_f7,
-        //            (long)i0,
-        //            (long)i1,
-        //            (long)i2,
-        //            (long)i3,
-        //            (long)i4,
-        //            (long)i5,
-        //            (long)i6,
-        //            (long)i7,
-        //            (double)It,
-        //            (double)d0,
-        //            (double)d1,
-        //            (double)d2,
-        //            (double)d3,
-        //            (double)d4,
-        //            (double)d5,
-        //            (double)d6,
-        //            (double)d7);
+        if (quad_i < 8 && category == 0) {
+            printf("---- Debug info (tet4_resample_tetrahedron_local_adjoint_category_gpu) ----\n");
+            printf("Category: %d, L: %d, quad_i: %d, dV %e, det_J_phys: %e, theta_volume %e, inv_N_micro_tet %e\n",
+                   category,
+                   L,
+                   quad_i,
+                   (double)dV,
+                   (double)del_J_phys,
+                   (double)theta_volume,
+                   (double)inv_N_micro_tet);
+            printf("Quad point (ref space): %e, %e, %e, weight: %e\n",
+                   (double)tet_qx[quad_i],
+                   (double)tet_qy[quad_i],
+                   (double)tet_qz[quad_i],
+                   (double)tet_qw[quad_i]);
+            printf("Mapped quad point (mini-ref space): %e, %e, %e\n", (double)xq_mref, (double)yq_mref, (double)zq_mref);
+            printf("Wfs: %e, %e, %e, %e\n", (double)wf0, (double)wf1, (double)wf2, (double)wf3);
+            printf("Hex indices: %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld\n",
+                   (long)i0,
+                   (long)i1,
+                   (long)i2,
+                   (long)i3,
+                   (long)i4,
+                   (long)i5,
+                   (long)i6,
+                   (long)i7);
 
-        //     if (quad_i > 6) exit(1);
-        // }
+            printf("Hex shape functions: %e, %e, %e, %e, %e, %e, %e, %e\n",
+                   (double)hex8_f0,
+                   (double)hex8_f1,
+                   (double)hex8_f2,
+                   (double)hex8_f3,
+                   (double)hex8_f4,
+                   (double)hex8_f5,
+                   (double)hex8_f6,
+                   (double)hex8_f7);
+            printf("It: %e, dV: %e, wf_quad: %e, inv_N_micro_tet %e \n",
+                   (double)It,
+                   (double)dV,
+                   (double)wf_quad,
+                   (double)inv_N_micro_tet);
+
+            printf("d0: %e, d1: %e, d2: %e, d3: %e, d4: %e, d5: %e, d6: %e, d7: %e\n",
+                   (double)d0,
+                   (double)d1,
+                   (double)d2,
+                   (double)d3,
+                   (double)d4,
+                   (double)d5,
+                   (double)d6,
+                   (double)d7);
+
+            printf("d0 = It * hex8_f0 = %e * %e = %e\n", (double)It, (double)hex8_f0, (double)d0);
+            printf("-------------------------------------------------------------\n");
+
+            if (quad_i > 6) exit(1);
+        }
 
         // Update the data
         data[i0] += d0;
@@ -1563,6 +1563,26 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                            max_refinement_L);    //
 
         histo_L[L] += 1;  // Update the histogram of refinement levels
+
+        if (element_i == 0) {
+            printf("---- Debug info (sfem_adjoint_mini_tet_kernel_gpu) ----\n");
+            printf("Element %d / %d\n", element_i, end_element);
+            printf("Vertex indices: %ld, %ld, %ld, %ld\n", (long)ev[0], (long)ev[1], (long)ev[2], (long)ev[3]);
+            printf("Vertex coordinates:\n");
+            printf("V0: (%e, %e, %e), wf0: %e\n", (double)x0_n, (double)y0_n, (double)z0_n, (double)wf0);
+            printf("V1: (%e, %e, %e), wf1: %e\n", (double)x1_n, (double)y1_n, (double)z1_n, (double)wf1);
+            printf("V2: (%e, %e, %e), wf2: %e\n", (double)x2_n, (double)y2_n, (double)z2_n, (double)wf2);
+            printf("V3: (%e, %e, %e), wf3: %e\n", (double)x3_n, (double)y3_n, (double)z3_n, (double)wf3);
+            printf("det_J_phys = %e\n", (double)det_J_phys);
+            printf("tet J matrix = \n");
+            printf("%e, %e, %e\n", (double)J_phy[0], (double)J_phy[1], (double)J_phy[2]);
+            printf("%e, %e, %e\n", (double)J_phy[3], (double)J_phy[4], (double)J_phy[5]);
+            printf("%e, %e, %e\n", (double)J_phy[6], (double)J_phy[7], (double)J_phy[8]);
+            printf("tet_volume = %e\n", (double)tet_volume);
+            printf("max_edges_length = %e, between vertices %d and %d\n", (double)max_edges_length, vertex_a, vertex_b);
+
+            printf("---------------------------------------------------\n");
+        }
 
         if (L > max_L) {
             max_L = L;  // Update the maximum refinement level

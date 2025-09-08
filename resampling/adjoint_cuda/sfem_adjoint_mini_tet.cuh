@@ -333,60 +333,60 @@ make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahed
 // hex_aa_8_eval_fun_T_cu
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ void                                 //
-hex_aa_8_eval_fun_T_gpu(const FloatType  x,     // Local coordinates (in the unit cube)
-                        const FloatType  y,     //
-                        const FloatType  z,     //
-                        FloatType* const f0,    // Output
-                        FloatType* const f1,    //
-                        FloatType* const f2,    //
-                        FloatType* const f3,    //
-                        FloatType* const f4,    //
-                        FloatType* const f5,    //
-                        FloatType* const f6,    //
-                        FloatType* const f7) {  //
+__device__ void                              //
+hex_aa_8_eval_fun_T_gpu(const FloatType x,   // Local coordinates (in the unit cube)
+                        const FloatType y,   //
+                        const FloatType z,   //
+                        FloatType&      f0,  // Output
+                        FloatType&      f1,  //
+                        FloatType&      f2,  //
+                        FloatType&      f3,  //
+                        FloatType&      f4,  //
+                        FloatType&      f5,  //
+                        FloatType&      f6,  //
+                        FloatType&      f7) {     //
     // Quadrature point (local coordinates)
     // With respect to the hat functions of a cube element
     // In a local coordinate system
     //
-    *f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    *f1 = x * (1.0 - y) * (1.0 - z);
-    *f2 = x * y * (1.0 - z);
-    *f3 = (1.0 - x) * y * (1.0 - z);
-    *f4 = (1.0 - x) * (1.0 - y) * z;
-    *f5 = x * (1.0 - y) * z;
-    *f6 = x * y * z;
-    *f7 = (1.0 - x) * y * z;
+    f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
+    f1 = x * (1.0 - y) * (1.0 - z);
+    f2 = x * y * (1.0 - z);
+    f3 = (1.0 - x) * y * (1.0 - z);
+    f4 = (1.0 - x) * (1.0 - y) * z;
+    f5 = x * (1.0 - y) * z;
+    f6 = x * y * z;
+    f7 = (1.0 - x) * y * z;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Function to collect the indices of the 8 vertices of a hexahedron
 // hex_aa_8_collect_coeffs_indices_cu
 ////////////////////////////////////////////////////////////////////////////////
-__device__ void                                                          //
-hex_aa_8_collect_coeffs_indices_gpu(const ptrdiff_t stride0,             // Stride
-                                    const ptrdiff_t stride1,             //
-                                    const ptrdiff_t stride2,             //
-                                    const ptrdiff_t i,                   // Indices of the element
-                                    const ptrdiff_t j,                   //
-                                    const ptrdiff_t k,                   //
-                                    ptrdiff_t* const __restrict__ i0,    //
-                                    ptrdiff_t* const __restrict__ i1,    //
-                                    ptrdiff_t* const __restrict__ i2,    //
-                                    ptrdiff_t* const __restrict__ i3,    //
-                                    ptrdiff_t* const __restrict__ i4,    //
-                                    ptrdiff_t* const __restrict__ i5,    //
-                                    ptrdiff_t* const __restrict__ i6,    //
-                                    ptrdiff_t* const __restrict__ i7) {  //
+__device__ void                                               //
+hex_aa_8_collect_coeffs_indices_gpu(const ptrdiff_t stride0,  // Stride
+                                    const ptrdiff_t stride1,  //
+                                    const ptrdiff_t stride2,  //
+                                    const ptrdiff_t i,        // Indices of the element
+                                    const ptrdiff_t j,        //
+                                    const ptrdiff_t k,        //
+                                    ptrdiff_t&      i0,       //
+                                    ptrdiff_t&      i1,       //
+                                    ptrdiff_t&      i2,       //
+                                    ptrdiff_t&      i3,       //
+                                    ptrdiff_t&      i4,       //
+                                    ptrdiff_t&      i5,       //
+                                    ptrdiff_t&      i6,       //
+                                    ptrdiff_t&      i7) {          //
 
-    *i0 = i * stride0 + j * stride1 + k * stride2;
-    *i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    *i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    *i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    *i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    *i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    *i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    *i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    i0 = i * stride0 + j * stride1 + k * stride2;
+    i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
+    i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
+    i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
+    i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
+    i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
+    i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -592,40 +592,56 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         // printf("theta_volume = %e, inv_N_micro_tet = %e, qw = %e\n", theta_volume, inv_N_micro_tet, qw);
 
         const FloatType wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
-        const FloatType dV      = theta_volume * inv_N_micro_tet * qw;
-        const FloatType It      = wf_quad * dV;
+        // const FloatType wf_quad = f0 * 1.0 + f1 * 1.0 + f2 * 1.0 + f3 * 1.0;
+        const FloatType dV = theta_volume * inv_N_micro_tet * qw;
+        const FloatType It = wf_quad * dV;
 
         // cumulated_dV += dV;  // Cumulative volume for debugging
 
-        FloatType hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
+        FloatType hex8_f0 = 0.0,  //
+                hex8_f1   = 0.0,  //
+                hex8_f2   = 0.0,  //
+                hex8_f3   = 0.0,  //
+                hex8_f4   = 0.0,  //
+                hex8_f5   = 0.0,  //
+                hex8_f6   = 0.0,  //
+                hex8_f7   = 0.0;  //
 
         hex_aa_8_eval_fun_T_gpu(l_x,  //
                                 l_y,
                                 l_z,
-                                &hex8_f0,
-                                &hex8_f1,
-                                &hex8_f2,
-                                &hex8_f3,
-                                &hex8_f4,
-                                &hex8_f5,
-                                &hex8_f6,
-                                &hex8_f7);
+                                hex8_f0,
+                                hex8_f1,
+                                hex8_f2,
+                                hex8_f3,
+                                hex8_f4,
+                                hex8_f5,
+                                hex8_f6,
+                                hex8_f7);
 
-        ptrdiff_t i0 = 0, i1 = 0, i2 = 0, i3 = 0, i4 = 0, i5 = 0, i6 = 0, i7 = 0;
+        ptrdiff_t i0 = 0,  //
+                i1   = 0,  //
+                i2   = 0,  //
+                i3   = 0,  //
+                i4   = 0,  //
+                i5   = 0,  //
+                i6   = 0,  //
+                i7   = 0;  //
+
         hex_aa_8_collect_coeffs_indices_gpu(stride0,  //
                                             stride1,
                                             stride2,
                                             i,
                                             j,
                                             k,
-                                            &i0,
-                                            &i1,
-                                            &i2,
-                                            &i3,
-                                            &i4,
-                                            &i5,
-                                            &i6,
-                                            &i7);
+                                            i0,
+                                            i1,
+                                            i2,
+                                            i3,
+                                            i4,
+                                            i5,
+                                            i6,
+                                            i7);
 
         const FloatType d0 = It * hex8_f0;
         const FloatType d1 = It * hex8_f1;
@@ -636,84 +652,55 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType d6 = It * hex8_f6;
         const FloatType d7 = It * hex8_f7;
 
-        if (threadIdx.x < LANES_PER_TILE && blockIdx.x == 0 && quad_i == 0 && category == 0) {
-            printf("Point mapping [cat=%d, L=%d, qp=%d]:\n"
-                   "  Mini-ref: (%lf, %lf, %lf)\n"
-                   "  Physical: (%lf, %lf, %lf)\n"
-                   "  Grid coords: (%lf, %lf, %lf)\n"
-                   "  Grid index: (%ld, %ld, %ld)\n"
-                   "  Local coords: (%lf, %lf, %lf)\n"
-                   "  J_phys matrix:\n"
-                   "    [%lf, %lf, %lf]\n"
-                   "    [%lf, %lf, %lf]\n"
-                   "    [%lf, %lf, %lf]\n"
-                   "  Tet shape functions: [%lf, %lf, %lf, %lf]\n"
-                   "  Weighted field values: [%lf, %lf, %lf, %lf]\n"
-                   "  Hex shape functions: [%lf, %lf, %lf, %lf, %lf, %lf, %lf, %lf]\n"
-                   "  Hex indices: [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n"
-                   "  Total contribution It: %le\n"
-                   "  Contributions: [%le, %le, %le, %le, %le, %le, %le, %le]\n",
-                   category,
-                   L,
-                   quad_i_tile,
-                   (double)xq_mref,
-                   (double)yq_mref,
-                   (double)zq_mref,
-                   (double)xq_phys,
-                   (double)yq_phys,
-                   (double)zq_phys,
-                   (double)grid_x,
-                   (double)grid_y,
-                   (double)grid_z,
-                   (long)i,
-                   (long)j,
-                   (long)k,
-                   (double)l_x,
-                   (double)l_y,
-                   (double)l_z,
-                   (double)J_phys[0].x,
-                   (double)J_phys[0].y,
-                   (double)J_phys[0].z,
-                   (double)J_phys[1].x,
-                   (double)J_phys[1].y,
-                   (double)J_phys[1].z,
-                   (double)J_phys[2].x,
-                   (double)J_phys[2].y,
-                   (double)J_phys[2].z,
-                   (double)f0,
-                   (double)f1,
-                   (double)f2,
-                   (double)f3,
-                   (double)wf0,
-                   (double)wf1,
-                   (double)wf2,
-                   (double)wf3,
-                   (double)hex8_f0,
-                   (double)hex8_f1,
-                   (double)hex8_f2,
-                   (double)hex8_f3,
-                   (double)hex8_f4,
-                   (double)hex8_f5,
-                   (double)hex8_f6,
-                   (double)hex8_f7,
-                   (long)i0,
-                   (long)i1,
-                   (long)i2,
-                   (long)i3,
-                   (long)i4,
-                   (long)i5,
-                   (long)i6,
-                   (long)i7,
-                   (double)It,
-                   (double)d0,
-                   (double)d1,
-                   (double)d2,
-                   (double)d3,
-                   (double)d4,
-                   (double)d5,
-                   (double)d6,
-                   (double)d7);
-        }
+        // if (threadIdx.x < LANES_PER_TILE && blockIdx.x == 0 && quad_i == 0 && category == 0) {
+        //     printf("---- Debug info (tet4_resample_tetrahedron_local_adjoint_category_gpu) ----\n");
+        //     printf("Category: %d, L: %d, quad_i_tile: %d, dV, det_J_phys: %e, N_micro_tet: %e\n",
+        //            category,
+        //            L,
+        //            quad_i_tile,
+        //            (double)det_J_phys,
+        //            (double)N_micro_tet);
+        //     printf("Quad point (ref space): %e, %e, %e, weight: %e\n", (double)qx, (double)qy, (double)qz, (double)qw);
+        //     printf("Mapped quad point (mini-ref space): %e, %e, %e\n", (double)xq_mref, (double)yq_mref, (double)zq_mref);
+        //     printf("Wfs: %e, %e, %e, %e\n", (double)wf0, (double)wf1, (double)wf2, (double)wf3);
+        //     printf("Hex indices: %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld\n",
+        //            (long)i0,
+        //            (long)i1,
+        //            (long)i2,
+        //            (long)i3,
+        //            (long)i4,
+        //            (long)i5,
+        //            (long)i6,
+        //            (long)i7);
+
+        //     printf("Hex shape functions: %e, %e, %e, %e, %e, %e, %e, %e\n",
+        //            (double)hex8_f0,
+        //            (double)hex8_f1,
+        //            (double)hex8_f2,
+        //            (double)hex8_f3,
+        //            (double)hex8_f4,
+        //            (double)hex8_f5,
+        //            (double)hex8_f6,
+        //            (double)hex8_f7);
+        //     printf("It: %e, dV: %e, wf_quad: %e, inv_N_micro_tet %e \n",
+        //            (double)It,
+        //            (double)dV,
+        //            (double)wf_quad,
+        //            (double)inv_N_micro_tet);
+
+        //     printf("d0: %e, d1: %e, d2: %e, d3: %e, d4: %e, d5: %e, d6: %e, d7: %e\n",
+        //            (double)d0,
+        //            (double)d1,
+        //            (double)d2,
+        //            (double)d3,
+        //            (double)d4,
+        //            (double)d5,
+        //            (double)d6,
+        //            (double)d7);
+
+        //     printf("d0 = It * hex8_f0 = %e * %e = %e\n", (double)It, (double)hex8_f0, (double)d0);
+        //     printf("-------------------------------------------------------------\n");
+        // }
 
         // Update the data with atomic operations to prevent race conditions
         atomicAdd(&data[i0], d0);
@@ -937,7 +924,7 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
 
     if (element_i >= end_element) return;  // Out of range
 
-    // printf("Processing element %d / %d\n", element_i, end_element);
+    // printf("Processing element %ld / %ld\n", element_i, end_element);
 
     const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
     const FloatType hexahedron_volume = dx * dy * dz;
@@ -953,20 +940,20 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
 
     // Read the coordinates of the vertices of the tetrahedron
     // In the physical space
-    const FloatType x0_n = xyz.x[ev[0]];
-    const FloatType x1_n = xyz.x[ev[1]];
-    const FloatType x2_n = xyz.x[ev[2]];
-    const FloatType x3_n = xyz.x[ev[3]];
+    const FloatType x0_n = FloatType(xyz.x[ev[0]]);
+    const FloatType x1_n = FloatType(xyz.x[ev[1]]);
+    const FloatType x2_n = FloatType(xyz.x[ev[2]]);
+    const FloatType x3_n = FloatType(xyz.x[ev[3]]);
 
-    const FloatType y0_n = xyz.y[ev[0]];
-    const FloatType y1_n = xyz.y[ev[1]];
-    const FloatType y2_n = xyz.y[ev[2]];
-    const FloatType y3_n = xyz.y[ev[3]];
+    const FloatType y0_n = FloatType(xyz.y[ev[0]]);
+    const FloatType y1_n = FloatType(xyz.y[ev[1]]);
+    const FloatType y2_n = FloatType(xyz.y[ev[2]]);
+    const FloatType y3_n = FloatType(xyz.y[ev[3]]);
 
-    const FloatType z0_n = xyz.z[ev[0]];
-    const FloatType z1_n = xyz.z[ev[1]];
-    const FloatType z2_n = xyz.z[ev[2]];
-    const FloatType z3_n = xyz.z[ev[3]];
+    const FloatType z0_n = FloatType(xyz.z[ev[0]]);
+    const FloatType z1_n = FloatType(xyz.z[ev[1]]);
+    const FloatType z2_n = FloatType(xyz.z[ev[2]]);
+    const FloatType z3_n = FloatType(xyz.z[ev[3]]);
 
     const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
     const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
@@ -1007,18 +994,62 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
 
     const FloatType det_J_phys =                               //
             abs(make_Jacobian_matrix_tet_gpu<FloatType>(x0_n,  //
-                                                        y0_n,
-                                                        z0_n,  //
-                                                        x1_n,
-                                                        y1_n,
-                                                        z1_n,  //
+                                                        x1_n,  //
                                                         x2_n,
-                                                        y2_n,
-                                                        z2_n,  //
                                                         x3_n,
+                                                        y0_n,
+                                                        y1_n,
+                                                        y2_n,
                                                         y3_n,
-                                                        z3_n,             //
-                                                        Jacobian_phys));  // Output
+                                                        z0_n,
+                                                        z1_n,
+                                                        z2_n,
+                                                        z3_n,
+                                                        Jacobian_phys));
+
+    // if (element_i == 0 && threadIdx.x < LANES_PER_TILE && blockIdx.x == 0) {
+    //     printf("---- Debug info (sfem_adjoint_mini_tet_kernel_gpu) ----\n");
+    //     printf("Element %ld / %ld\n", element_i, end_element);
+    //     printf("Vertex indices: %ld, %ld, %ld, %ld\n", (long)ev[0], (long)ev[1], (long)ev[2], (long)ev[3]);
+    //     printf("Vertex coordinates:\n");
+    //     printf("V0: (%e, %e, %e), wf0: %e\n", (double)x0_n, (double)y0_n, (double)z0_n, (double)wf0);
+    //     printf("V1: (%e, %e, %e), wf1: %e\n", (double)x1_n, (double)y1_n, (double)z1_n, (double)wf1);
+    //     printf("V2: (%e, %e, %e), wf2: %e\n", (double)x2_n, (double)y2_n, (double)z2_n, (double)wf2);
+    //     printf("V3: (%e, %e, %e), wf3: %e\n", (double)x3_n, (double)y3_n, (double)z3_n, (double)wf3);
+    //     printf("det_J_phys = %e\n", (double)det_J_phys);
+    //     printf("Jacobian_phys[0] = (%e, %e, %e)\n",
+    //            (double)Jacobian_phys[0].x,
+    //            (double)Jacobian_phys[0].y,
+    //            (double)Jacobian_phys[0].z);
+    //     printf("Jacobian_phys[1] = (%e, %e, %e)\n",
+    //            (double)Jacobian_phys[1].x,
+    //            (double)Jacobian_phys[1].y,
+    //            (double)Jacobian_phys[1].z);
+    //     printf("Jacobian_phys[2] = (%e, %e, %e)\n",
+    //            (double)Jacobian_phys[2].x,
+    //            (double)Jacobian_phys[2].y,
+    //            (double)Jacobian_phys[2].z);
+    //     printf("Max edge length: %e (between vertices %d and %d)\n", (double)max_edges_length, vertex_a, vertex_b);
+
+    //     printf("---------------------------------------------------\n");
+    // }
+
+    // printf("det_J_phys = %e\n", (double)det_J_phys);
+    // printf("Values x0_n = %e, y0_n = %e, z0_n = %e, x1_n = %e, y1_n = %e, z1_n = %e, x2_n = %e, y2_n = %e, z2_n = %e, x3_n =
+    // %e, "
+    //        "y3_n = %e, z3_n = %e\n",
+    //        (double)x0_n,
+    //        (double)y0_n,
+    //        (double)z0_n,
+    //        (double)x1_n,
+    //        (double)y1_n,
+    //        (double)z1_n,
+    //        (double)x2_n,
+    //        (double)y2_n,
+    //        (double)z2_n,
+    //        (double)x3_n,
+    //        (double)y3_n,
+    //        (double)z3_n);
 
     main_tet_loop_gpu<FloatType>(L,                                          //
                                  Jacobian_phys,                              //
