@@ -388,7 +388,7 @@ namespace sfem {
                     c["path"] >> path;
                     idx_t    *arr{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (!array_create_from_file(comm->get(), path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
                     }
 
