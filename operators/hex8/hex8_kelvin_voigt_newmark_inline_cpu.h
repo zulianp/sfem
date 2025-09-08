@@ -5352,6 +5352,192 @@ static SFEM_INLINE void hex8_kelvin_voigt_newmark_gradient_adj(const scalar_t k,
             qw * ((1.0 / 2.0) * eta * (-x31 * x83 - x81 * x87 + 2 * x82 * x93) - x22 * x83 - x78 * x91 - x81 * x85 - x82 * x92);
 }
 
+// static SFEM_INLINE void hex8_kelvin_voigt_newmark_diag(const scalar_t                      K,
+//                                                          const scalar_t                      beta,
+//                                                          const scalar_t                      gamma,
+//                                                          const scalar_t                      dt,
+//                                                          const scalar_t                      eta,
+//                                                          const scalar_t                      rho,
+//                                                          const scalar_t                      k,
+//                                                          const scalar_t                      qx,
+//                                                          const scalar_t                      qy,
+//                                                          const scalar_t                      qz,
+//                                                          const scalar_t                      qw,
+//                                                          const scalar_t *const SFEM_RESTRICT adjugate,
+//                                                          const scalar_t                      jacobian_determinant,
+//                                                          scalar_t *const SFEM_RESTRICT       element_diag) {
+//     const scalar_t x0   = qx - 1;
+//     const scalar_t x1   = POW2(x0);
+//     const scalar_t x2   = qy - 1;
+//     const scalar_t x3   = POW2(x2);
+//     const scalar_t x4   = qz - 1;
+//     const scalar_t x5   = 1.0 / beta;
+//     const scalar_t x6   = jacobian_determinant * rho * x5 / POW2(dt);
+//     const scalar_t x7   = POW2(x4) * x6;
+//     const scalar_t x8   = x3 * x7;
+//     const scalar_t x9   = x1 * x8;
+//     const scalar_t x10  = x2 * x4;
+//     const scalar_t x11  = adjugate[0] * x10;
+//     const scalar_t x12  = x0 * x4;
+//     const scalar_t x13  = adjugate[3] * x12;
+//     const scalar_t x14  = x0 * x2;
+//     const scalar_t x15  = adjugate[6] * x14;
+//     const scalar_t x16  = POW2(x11 + x13 + x15);
+//     const scalar_t x17  = adjugate[1] * x10;
+//     const scalar_t x18  = adjugate[4] * x12;
+//     const scalar_t x19  = adjugate[7] * x14;
+//     const scalar_t x20  = POW2(x17 + x18 + x19);
+//     const scalar_t x21  = adjugate[2] * x10;
+//     const scalar_t x22  = adjugate[5] * x12;
+//     const scalar_t x23  = adjugate[8] * x14;
+//     const scalar_t x24  = POW2(x21 + x22 + x23);
+//     const scalar_t x25  = x20 + x24;
+//     const scalar_t x26  = (1.0 / 2.0) / jacobian_determinant;
+//     const scalar_t x27  = eta * gamma * x26 * x5 / dt;
+//     const scalar_t x28  = K - 0.33333333333333331 * k;
+//     const scalar_t x29  = 2 * x16;
+//     const scalar_t x30  = POW2(qx);
+//     const scalar_t x31  = x30 * x8;
+//     const scalar_t x32  = qx * x4;
+//     const scalar_t x33  = adjugate[3] * x32;
+//     const scalar_t x34  = qx * x2;
+//     const scalar_t x35  = adjugate[6] * x34;
+//     const scalar_t x36  = POW2(x11 + x33 + x35);
+//     const scalar_t x37  = adjugate[4] * x32;
+//     const scalar_t x38  = adjugate[7] * x34;
+//     const scalar_t x39  = POW2(x17 + x37 + x38);
+//     const scalar_t x40  = adjugate[5] * x32;
+//     const scalar_t x41  = adjugate[8] * x34;
+//     const scalar_t x42  = POW2(x21 + x40 + x41);
+//     const scalar_t x43  = x39 + x42;
+//     const scalar_t x44  = 2 * x36;
+//     const scalar_t x45  = POW2(qy);
+//     const scalar_t x46  = x45 * x7;
+//     const scalar_t x47  = x30 * x46;
+//     const scalar_t x48  = qx * qy;
+//     const scalar_t x49  = adjugate[6] * x48;
+//     const scalar_t x50  = qy * x4;
+//     const scalar_t x51  = adjugate[0] * x50;
+//     const scalar_t x52  = POW2(x33 + x49 + x51);
+//     const scalar_t x53  = adjugate[7] * x48;
+//     const scalar_t x54  = adjugate[1] * x50;
+//     const scalar_t x55  = POW2(x37 + x53 + x54);
+//     const scalar_t x56  = adjugate[8] * x48;
+//     const scalar_t x57  = adjugate[2] * x50;
+//     const scalar_t x58  = POW2(x40 + x56 + x57);
+//     const scalar_t x59  = x55 + x58;
+//     const scalar_t x60  = 2 * x52;
+//     const scalar_t x61  = x1 * x46;
+//     const scalar_t x62  = qy * x0;
+//     const scalar_t x63  = adjugate[6] * x62;
+//     const scalar_t x64  = POW2(x13 + x51 + x63);
+//     const scalar_t x65  = adjugate[7] * x62;
+//     const scalar_t x66  = POW2(x18 + x54 + x65);
+//     const scalar_t x67  = adjugate[8] * x62;
+//     const scalar_t x68  = POW2(x22 + x57 + x67);
+//     const scalar_t x69  = x66 + x68;
+//     const scalar_t x70  = 2 * x64;
+//     const scalar_t x71  = POW2(qz) * x6;
+//     const scalar_t x72  = x3 * x71;
+//     const scalar_t x73  = x1 * x72;
+//     const scalar_t x74  = qz * x2;
+//     const scalar_t x75  = adjugate[0] * x74;
+//     const scalar_t x76  = qz * x0;
+//     const scalar_t x77  = adjugate[3] * x76;
+//     const scalar_t x78  = POW2(x15 + x75 + x77);
+//     const scalar_t x79  = adjugate[1] * x74;
+//     const scalar_t x80  = adjugate[4] * x76;
+//     const scalar_t x81  = POW2(x19 + x79 + x80);
+//     const scalar_t x82  = adjugate[2] * x74;
+//     const scalar_t x83  = adjugate[5] * x76;
+//     const scalar_t x84  = POW2(x23 + x82 + x83);
+//     const scalar_t x85  = x81 + x84;
+//     const scalar_t x86  = 2 * x78;
+//     const scalar_t x87  = x30 * x72;
+//     const scalar_t x88  = qx * qz;
+//     const scalar_t x89  = adjugate[3] * x88;
+//     const scalar_t x90  = POW2(x35 + x75 + x89);
+//     const scalar_t x91  = adjugate[4] * x88;
+//     const scalar_t x92  = POW2(x38 + x79 + x91);
+//     const scalar_t x93  = adjugate[5] * x88;
+//     const scalar_t x94  = POW2(x41 + x82 + x93);
+//     const scalar_t x95  = x92 + x94;
+//     const scalar_t x96  = 2 * x90;
+//     const scalar_t x97  = x45 * x71;
+//     const scalar_t x98  = x30 * x97;
+//     const scalar_t x99  = qy * qz;
+//     const scalar_t x100 = adjugate[0] * x99;
+//     const scalar_t x101 = POW2(x100 + x49 + x89);
+//     const scalar_t x102 = adjugate[1] * x99;
+//     const scalar_t x103 = POW2(x102 + x53 + x91);
+//     const scalar_t x104 = adjugate[2] * x99;
+//     const scalar_t x105 = POW2(x104 + x56 + x93);
+//     const scalar_t x106 = x103 + x105;
+//     const scalar_t x107 = 2 * x101;
+//     const scalar_t x108 = x1 * x97;
+//     const scalar_t x109 = POW2(x100 + x63 + x77);
+//     const scalar_t x110 = POW2(x102 + x65 + x80);
+//     const scalar_t x111 = POW2(x104 + x67 + x83);
+//     const scalar_t x112 = x110 + x111;
+//     const scalar_t x113 = 2 * x109;
+//     const scalar_t x114 = x16 + x24;
+//     const scalar_t x115 = 2 * x20;
+//     const scalar_t x116 = x36 + x42;
+//     const scalar_t x117 = 2 * x39;
+//     const scalar_t x118 = x52 + x58;
+//     const scalar_t x119 = 2 * x55;
+//     const scalar_t x120 = x64 + x68;
+//     const scalar_t x121 = 2 * x66;
+//     const scalar_t x122 = x78 + x84;
+//     const scalar_t x123 = 2 * x81;
+//     const scalar_t x124 = x90 + x94;
+//     const scalar_t x125 = 2 * x92;
+//     const scalar_t x126 = x101 + x105;
+//     const scalar_t x127 = 2 * x103;
+//     const scalar_t x128 = x109 + x111;
+//     const scalar_t x129 = 2 * x110;
+//     const scalar_t x130 = x16 + x20;
+//     const scalar_t x131 = 2 * x24;
+//     const scalar_t x132 = x36 + x39;
+//     const scalar_t x133 = 2 * x42;
+//     const scalar_t x134 = x52 + x55;
+//     const scalar_t x135 = 2 * x58;
+//     const scalar_t x136 = x64 + x66;
+//     const scalar_t x137 = 2 * x68;
+//     const scalar_t x138 = x78 + x81;
+//     const scalar_t x139 = 2 * x84;
+//     const scalar_t x140 = x90 + x92;
+//     const scalar_t x141 = 2 * x94;
+//     const scalar_t x142 = x101 + x103;
+//     const scalar_t x143 = 2 * x105;
+//     const scalar_t x144 = x109 + x110;
+//     const scalar_t x145 = 2 * x111;
+//     diagx[0]            = qw * (x26 * (k * (x25 + x29) + x28 * x29) + x27 * (1.3333333333333335 * x16 + x25) + x9);
+//     diagx[1]            = qw * (x26 * (k * (x43 + x44) + x28 * x44) + x27 * (1.3333333333333335 * x36 + x43) + x31);
+//     diagx[2]            = qw * (x26 * (k * (x59 + x60) + x28 * x60) + x27 * (1.3333333333333335 * x52 + x59) + x47);
+//     diagx[3]            = qw * (x26 * (k * (x69 + x70) + x28 * x70) + x27 * (1.3333333333333335 * x64 + x69) + x61);
+//     diagx[4]            = qw * (x26 * (k * (x85 + x86) + x28 * x86) + x27 * (1.3333333333333335 * x78 + x85) + x73);
+//     diagx[5]            = qw * (x26 * (k * (x95 + x96) + x28 * x96) + x27 * (1.3333333333333335 * x90 + x95) + x87);
+//     diagx[6]            = qw * (x26 * (k * (x106 + x107) + x107 * x28) + x27 * (1.3333333333333335 * x101 + x106) + x98);
+//     diagx[7]            = qw * (x108 + x26 * (k * (x112 + x113) + x113 * x28) + x27 * (1.3333333333333335 * x109 + x112));
+//     diagy[0]            = qw * (x26 * (k * (x114 + x115) + x115 * x28) + x27 * (x114 + 1.3333333333333335 * x20) + x9);
+//     diagy[1]            = qw * (x26 * (k * (x116 + x117) + x117 * x28) + x27 * (x116 + 1.3333333333333335 * x39) + x31);
+//     diagy[2]            = qw * (x26 * (k * (x118 + x119) + x119 * x28) + x27 * (x118 + 1.3333333333333335 * x55) + x47);
+//     diagy[3]            = qw * (x26 * (k * (x120 + x121) + x121 * x28) + x27 * (x120 + 1.3333333333333335 * x66) + x61);
+//     diagy[4]            = qw * (x26 * (k * (x122 + x123) + x123 * x28) + x27 * (x122 + 1.3333333333333335 * x81) + x73);
+//     diagy[5]            = qw * (x26 * (k * (x124 + x125) + x125 * x28) + x27 * (x124 + 1.3333333333333335 * x92) + x87);
+//     diagy[6]            = qw * (x26 * (k * (x126 + x127) + x127 * x28) + x27 * (1.3333333333333335 * x103 + x126) + x98);
+//     diagy[7]            = qw * (x108 + x26 * (k * (x128 + x129) + x129 * x28) + x27 * (1.3333333333333335 * x110 + x128));
+//     diagz[0]            = qw * (x26 * (k * (x130 + x131) + x131 * x28) + x27 * (x130 + 1.3333333333333335 * x24) + x9);
+//     diagz[1]            = qw * (x26 * (k * (x132 + x133) + x133 * x28) + x27 * (x132 + 1.3333333333333335 * x42) + x31);
+//     diagz[2]            = qw * (x26 * (k * (x134 + x135) + x135 * x28) + x27 * (x134 + 1.3333333333333335 * x58) + x47);
+//     diagz[3]            = qw * (x26 * (k * (x136 + x137) + x137 * x28) + x27 * (x136 + 1.3333333333333335 * x68) + x61);
+//     diagz[4]            = qw * (x26 * (k * (x138 + x139) + x139 * x28) + x27 * (x138 + 1.3333333333333335 * x84) + x73);
+//     diagz[5]            = qw * (x26 * (k * (x140 + x141) + x141 * x28) + x27 * (x140 + 1.3333333333333335 * x94) + x87);
+//     diagz[6]            = qw * (x26 * (k * (x142 + x143) + x143 * x28) + x27 * (1.3333333333333335 * x105 + x142) + x98);
+//     diagz[7]            = qw * (x108 + x26 * (k * (x144 + x145) + x145 * x28) + x27 * (1.3333333333333335 * x111 + x144));
+// }
+
 static SFEM_INLINE void sshex8_displacement_gradient(const scalar_t *const SFEM_RESTRICT adjugate,
                                                      const scalar_t                      jacobian_determinant,
                                                      const scalar_t *const SFEM_RESTRICT ux,
@@ -5839,16 +6025,16 @@ static SFEM_INLINE void sshex8_kelvin_voigt_newmark_gradient_adj(const scalar_t 
     outz[7]             = x267 + x272;
 }
 
-static SFEM_INLINE void hex8_kelvin_voigt_newmark_diag(const scalar_t                      K,
-                                                       const scalar_t                      beta,
-                                                       const scalar_t                      gamma,
-                                                       const scalar_t                      dt,
-                                                       const scalar_t                      eta,
-                                                       const scalar_t                      rho,
-                                                       const scalar_t                      k,
-                                                       const scalar_t *const SFEM_RESTRICT adjugate,
-                                                       const scalar_t                      jacobian_determinant,
-                                                       scalar_t *const SFEM_RESTRICT       element_diag) {
+static SFEM_INLINE void sshex8_kelvin_voigt_newmark_diag(const scalar_t                      K,
+                                                         const scalar_t                      beta,
+                                                         const scalar_t                      gamma,
+                                                         const scalar_t                      dt,
+                                                         const scalar_t                      eta,
+                                                         const scalar_t                      rho,
+                                                         const scalar_t                      k,
+                                                         const scalar_t *const SFEM_RESTRICT adjugate,
+                                                         const scalar_t                      jacobian_determinant,
+                                                         scalar_t *const SFEM_RESTRICT       element_diag) {
     const scalar_t x0   = POW2(adjugate[2]);
     const scalar_t x1   = POW2(dt);
     const scalar_t x2   = beta * x1;

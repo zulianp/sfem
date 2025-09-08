@@ -22,7 +22,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION,
                                           SFEM_BASE_RESOLUTION,
@@ -56,9 +56,9 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
     //     }); 
 
 
-    sfem::DirichletConditions::Condition bottom0{.sideset = bottom_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition bottom1{.sideset = bottom_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition bottom2{.sideset = bottom_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition bottom0{.sidesets = bottom_sideset, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition bottom1{.sidesets = bottom_sideset, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition bottom2{.sidesets = bottom_sideset, .value = 0, .component = 2};
 
 #if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {bottom0, bottom1, bottom2}, es);
@@ -167,7 +167,7 @@ int test_newmark() {
     int    nliter      = 1;
 
     auto time_load = [&t, &T]() -> real_t {
-        return (t < 0.01) ? -1 : 0.0;
+        return (t < T/3) ? -20 : 0.0;
     };
 
     std::shared_ptr<sfem::Op> current_neumann_op = nullptr;
@@ -190,7 +190,7 @@ int test_newmark() {
             f->remove_operator(current_neumann_op);
         }
         real_t load_mag = time_load();
-        sfem::NeumannConditions::Condition nc_top{.sideset = top_load_sideset, .value = load_mag, .component = 2};
+        sfem::NeumannConditions::Condition nc_top{.sidesets = top_load_sideset, .value = load_mag, .component = 2};
         current_neumann_op = sfem::create_neumann_conditions(fs, {nc_top}, es);
         f->add_operator(current_neumann_op);
         
