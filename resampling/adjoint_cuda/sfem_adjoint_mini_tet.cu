@@ -83,6 +83,12 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
            total_threads_per_grid);
 #endif
 
+    cudaEvent_t start_event, stop_event;
+    cudaEventCreate(&start_event);
+    cudaEventCreate(&stop_event);
+
+    cudaEventRecord(start_event, cuda_stream);
+
     sfem_adjoint_mini_tet_kernel_gpu<real_t><<<blocks_per_grid,                       //
                                                threads_per_block,                     //
                                                0,                                     //
@@ -114,6 +120,21 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
     }
+
+    cudaEventRecord(stop_event, cuda_stream);
+    cudaEventSynchronize(stop_event);
+
+    float milliseconds = 0.0f;
+    cudaEventElapsedTime(&milliseconds, start_event, stop_event);
+
+    if (SFEM_LOG_LEVEL >= 1) {
+        printf("================= SFEM Adjoint Mini-Tet Kernel GPU ================\n");
+        printf("Kernel execution time: %f ms\n", milliseconds);
+        printf("===================================================================\n");
+    }
+
+    cudaEventDestroy(start_event);
+    cudaEventDestroy(stop_event);
 
     cudaStreamDestroy(cuda_stream);
 
