@@ -54,6 +54,8 @@ namespace sfem {
 
         int value(const real_t *x, real_t *const out) override;
 
+        int hessian_diag(const real_t *const x, real_t *const values) override;
+
         inline bool is_linear() const override { return true; }
 
         int                            n_conditions() const;
