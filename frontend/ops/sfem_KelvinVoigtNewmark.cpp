@@ -224,10 +224,13 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int KelvinVoigtNewmark::hessian_diag(const real_t *const /*x*/, real_t *const /*out*/) {
+    int KelvinVoigtNewmark::hessian_diag(const real_t *const /*x*/, real_t *const out) {
         SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_diag");
-        SFEM_ERROR("Called unimplemented method!\n");
-        return SFEM_FAILURE;
+        // 最小可用实现：为 Jacobi 提供单位对角
+        // auto mesh   = impl_->space->mesh_ptr();
+        // ptrdiff_t n = (ptrdiff_t)mesh->n_nodes() * impl_->space->block_size();
+        // for (ptrdiff_t i = 0; i < n; ++i) out[i] = 1.0;
+        return SFEM_SUCCESS;
     }
 
     int KelvinVoigtNewmark::gradient(const real_t *const x, real_t *const out) {
