@@ -196,8 +196,8 @@ class GPULinearKVOp:
         # eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
         # eval_gradient = eval_stiffness + eval_damping + eval_inertia
 
-        eval_lhs_matrix = eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
-        eval_gradient = eval_stiffness + eval_damping 
+        eval_lhs_matrix = eval_M_matrix/(beta*dt*dt) + eval_C_matrix*gamma/(beta*dt) + eval_K_matrix
+        eval_gradient = eval_inertia + eval_stiffness + eval_damping 
 
         # Store results
         self.rho = rho
@@ -315,33 +315,33 @@ class GPULinearKVOp:
 
     #     return expr
     
-    # def M_matrix(self):
-    #     M = self.eval_M_matrix
-    #     rows, cols = M.shape
+    def M_matrix(self):
+        M = self.eval_M_matrix
+        rows, cols = M.shape
 
-    #     expr = []
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
-    #             expr.append(ast.Assignment(var, M[i, j]))
+        expr = []
+        for i in range(0, rows):
+            for j in range(0, cols):
+                var = sp.symbols(f"element_matrix[{i*cols + j}*stride]")
+                expr.append(ast.Assignment(var, M[i, j]))
 
-    #     return expr
+        return expr
     
-    # def M_sym(self):
-    #     M = self.eval_M_matrix
-    #     rows, cols = M.shape
+    def M_sym(self):
+        M = self.eval_M_matrix
+        rows, cols = M.shape
 
-    #     expr = []
-    #     idx = 0
-    #     for i in range(0, rows):
-    #         for j in range(0, cols):
-    #             if j > i:
-    #                 continue
-    #             var = sp.symbols(f"element_matrix[{idx}*stride]")
-    #             expr.append(ast.Assignment(var, M[i, j]))
-    #             idx += 1
+        expr = []
+        idx = 0
+        for i in range(0, rows):
+            for j in range(0, cols):
+                if j > i:
+                    continue
+                var = sp.symbols(f"element_matrix[{idx}*stride]")
+                expr.append(ast.Assignment(var, M[i, j]))
+                idx += 1
 
-    #     return expr
+        return expr
     
     def lhs_matrix(self):
         lhs = self.eval_lhs_matrix
@@ -563,6 +563,31 @@ class GPULinearKVOp:
                 expr.append(ast.Assignment(var, L))
                 
         return expr
+
+    def hessian_diag(self):
+        H = self.eval_lhs_matrix
+        rows, cols = H.shape
+
+        expr = []
+
+        if self.SoA_IO:
+            assert self.fe.SoA
+
+            coords = ["x", "y", "z"]
+            for d in range(0, self.fe.spatial_dim()):
+                name = f"diag{coords[d]}"
+                for i in range(0, self.fe.n_nodes()):
+                    idx = d * self.fe.n_nodes() + i
+                    Hii = H[idx, idx]
+
+                    var = sp.symbols(f"{name}[{i}]")
+                    expr.append(ast.Assignment(var, Hii))
+        else:
+            for i in range(0, rows):
+                var = sp.symbols(f"diag[{i}*stride]")
+                expr.append(ast.Assignment(var, (H[i, i])))
+
+        return expr
     
 
     def gradient(self):
@@ -615,10 +640,10 @@ def main():
     c_log("//--------------------------")
     c_code(op.velocity_gradient())
 
-    # c_log("//--------------------------")
-    # c_log("// acceleration_vector")
-    # c_log("//--------------------------")
-    # c_code(op.acceleration_vector())
+    c_log("//--------------------------")
+    c_log("// acceleration_vector")
+    c_log("//--------------------------")
+    c_code(op.acceleration_vector())
 
     # c_log("//--------------------------")
     # c_log("// C_matrix")
@@ -700,6 +725,11 @@ def main():
     c_log("// gradient")
     c_log("//--------------------------")
     c_code(op.gradient())
+
+    c_log("//--------------------------")
+    c_log("// hessian_diag")
+    c_log("//--------------------------")
+    c_code(op.hessian_diag())
 
     stop = perf_counter()
     console.print(f"// Overall: {stop - start} seconds")

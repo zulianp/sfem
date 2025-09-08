@@ -223,9 +223,10 @@ namespace sfem {
             ret->rho                      = rho;
             return ret;
         } else {
-            auto ret = std::make_shared<SemiStructuredKelvinVoigtNewmark>(space);
-            ret->initialize();
-            return ret;
+            auto base = create_kelvin_voigt_newmark(space); // unique_ptr<Op>
+            base->initialize();
+            return std::shared_ptr<Op>(std::move(base));
+            
         }
     }
 
