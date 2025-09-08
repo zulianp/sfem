@@ -153,39 +153,3 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
    // ////////////////////////////////////////////////////////////////////////////////////////////////
    // ////////////////////////////////////////////////////////////////////////////////////////////////
    // ////////////////////////////////////////////////////////////////////////////////////////////////
-
-// // #define __TESTING__
-// #ifdef __TESTING__
-
-// int main() {
-//     mini_tet_parameters_t mini_tet_parameters;
-
-//     mini_tet_parameters.alpha_min_threshold = 2.0;
-//     mini_tet_parameters.alpha_max_threshold = 8.0;
-//     mini_tet_parameters.min_refinement_L    = 1;
-//     mini_tet_parameters.max_refinement_L    = 20;
-
-//     // const int L = 4;  // Example refinement level
-//     sfem_adjoint_mini_tet_kernel_gpu<double><<<1, 1>>>(0,        //
-//                                                        1,        //
-//                                                        1,        //
-//                                                        nullptr,  //
-//                                                        nullptr,
-//                                                        1,        //
-//                                                        1,        //
-//                                                        1,        //
-//                                                        1,        //
-//                                                        1,        //
-//                                                        1,        //
-//                                                        0.0,      //
-//                                                        0.0,      //
-//                                                        0.0,      //
-//                                                        1.0,      //
-//                                                        1.0,      //
-//                                                        1.0,      //
-//                                                        nullptr,  //
-//                                                        mini_tet_parameters,
-//                                                        nullptr);  //
-//     cudaDeviceSynchronize();
-//     return 0;
-// }
