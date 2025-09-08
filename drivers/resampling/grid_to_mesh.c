@@ -875,8 +875,17 @@ int main(int argc, char* argv[]) {
                         field_cnt_real[i] = (real_t)(field_cnt[i]);
                     }
 
+                    char out_filename_raw[1000];
+
+                    const char* env_out_filename = getenv("OUT_FILENAME_RAW");
+                    if (env_out_filename && strlen(env_out_filename) > 0) {
+                        snprintf(out_filename_raw, 1000, "%s", env_out_filename);
+                    } else {
+                        snprintf(out_filename_raw, 1000, "/home/sriva/git/sfem/workflows/resample/test_field.raw", mpi_rank);
+                    }
+
                     ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/test_field.raw",
+                                  out_filename_raw,
                                   ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
                                   3,
                                   field,
