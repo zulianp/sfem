@@ -1,16 +1,14 @@
 #include <stdio.h>
 
 #include "sfem_test.h"
-
+#include "sfem_ssgmg.hpp"
+#include "hex8_jacobian.h"
+#include "kelvin_voigt_newmark.h"
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
-#include "hex8_jacobian.h"
-#include "kelvin_voigt_newmark.h"
 
-
-
-std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
+std::pair<std::shared_ptr<sfem::Function>, std::shared_ptr<sfem::Op>> create_kelvin_voigt_newmark_function() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -27,7 +25,7 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                           // Grid
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION,
@@ -42,10 +40,10 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
-    // if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-    //     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    //     // fs->semi_structured_mesh().apply_hierarchical_renumbering();
-    // }
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+        // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    }
 
     auto f = sfem::Function::create(fs);
 
@@ -55,15 +53,15 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     auto right_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 2 - 1e-5; });
 
-    sfem::DirichletConditions::Condition right0{.sideset = right_sideset, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition right1{.sideset = right_sideset, .value = 0, .component = 1};
-    sfem::DirichletConditions::Condition right2{.sideset = right_sideset, .value = 0, .component = 2};
+    sfem::DirichletConditions::Condition right0{.sidesets = right_sideset, .value = 0, .component = 0};
+    sfem::DirichletConditions::Condition right1{.sidesets = right_sideset, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition right2{.sidesets = right_sideset, .value = 0, .component = 2};
 
 #if 1
     auto d_conds = sfem::create_dirichlet_conditions(fs, {right0, right1, right2}, es);
     f->add_constraint(d_conds);
 
-    sfem::NeumannConditions::Condition nc_left{.sideset = left_sideset, .value = 0.5, .component = 0};
+    sfem::NeumannConditions::Condition nc_left{.sidesets = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
 #else  // Test with Dirichlet only (in case diable test_newmark)
@@ -77,13 +75,8 @@ std::shared_ptr<sfem::Function> create_kelvin_voigt_newmark_function() {
     auto kelvin_voigt_newmark = sfem::create_op(fs, "KelvinVoigtNewmark", es);
     kelvin_voigt_newmark->initialize();
     f->add_operator(kelvin_voigt_newmark);
-    return f;
+    return std::make_pair(f, kelvin_voigt_newmark);
 }
-
-
-
-
-
 
 std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
     auto fs = f->space();
@@ -130,13 +123,14 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     return output;
 }
 
-
-
-
 int test_newmark_kv() {
-    auto f           = create_kelvin_voigt_newmark_function();
-    auto mass_vector = create_mass_vector(f);
-    auto output      = create_output(f, "test_newmark_kv");
+
+    // int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    // if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+    auto [f, kelvin_voigt_newmark] = create_kelvin_voigt_newmark_function();
+    auto mass_vector               = create_mass_vector(f);
+    auto output                    = create_output(f, "test_newmark_kv");
 
     auto fs = f->space();
     auto m  = fs->mesh_ptr();
@@ -148,15 +142,14 @@ int test_newmark_kv() {
     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
     auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
     auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
-    auto            packed_data  = sfem::create_buffer<real_t>(2*ndofs, es);
 
     auto increment = sfem::create_buffer<real_t>(ndofs, es);
-    auto temp_vel = sfem::create_buffer<real_t>(ndofs, es);
+    auto temp_vel  = sfem::create_buffer<real_t>(ndofs, es);
     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
-    real_t dt          = 0.2;
-    real_t T           = 4;
+    real_t dt          = 0.1;
+    real_t T           = 5;
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
@@ -164,6 +157,9 @@ int test_newmark_kv() {
 
     bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
+
+    int SFEM_ELEMENT_REFINE_LEVEL = 0;
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
         output->write_time_step("disp", t, displacement->data());
@@ -174,83 +170,194 @@ int test_newmark_kv() {
         output->log_time(t);
     }
 
+    kelvin_voigt_newmark->set_field("velocity", temp_vel, 0);
+    kelvin_voigt_newmark->set_field("acceleration", increment, 0);
+
+    // auto solver     =  sfem::create_ssgmg(f, es);
+
     while (t < T) {
-        for (int k = 0; k < nliter; k++) {
-            // This could be put out of the loop since the operator is linear.
-            // We will do nonlinear materials next, so we keep it here.
-            auto material_op = sfem::create_linear_operator("MF", f, solution, es);
-            auto linear_op   = sfem::make_op<real_t>(
-                    material_op->rows(),
-                    material_op->cols(),
-                    [=](const real_t *const x, real_t *const y) {
-                        {
-                            SFEM_TRACE_SCOPE("Newmark_KV::hessian_apply_integr");
-                            blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
-                            blas->scal(ndofs, 4 / (dt * dt), y);
-                        }
-                        material_op->apply(x, y);
-                    },
-                    es);
+            for (int k = 0; k < nliter; k++) {
+                // This could be put out of the loop since the operator is linear.
+                // We will do nonlinear materials next, so we keep it here.
+                auto material_op = sfem::create_linear_operator("MF", f, solution, es);
+                auto linear_op   = sfem::make_op<real_t>(
+                        material_op->rows(),
+                        material_op->cols(),
+                        [=](const real_t *const x, real_t *const y) { material_op->apply(x, y); },
+                        es);
 
-            auto solver     = sfem::create_cg<real_t>(linear_op, es);
-            solver->verbose = false;
+                auto solver     = sfem::create_cg<real_t>(linear_op, es);
+                solver->verbose = false;
 
-            // Use increment as temp buffer
-            blas->zeros(ndofs, increment->data());
-            blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-            blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-            blas->scal(ndofs, 4 / (dt * dt), increment->data());
-            blas->axpy(ndofs, -1, acceleration->data(), increment->data());
-            blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
+                // Use increment as temp buffer
+                blas->zeros(ndofs, increment->data());
+                blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
+                blas->axpy(ndofs, -dt, velocity->data(), increment->data());
+                blas->scal(ndofs, 4 / (dt * dt), increment->data());
+                blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+                // blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
 
-            blas->zeros(ndofs, temp_vel->data());
-            blas->copy(ndofs, increment->data(), temp_vel->data());
-            blas->zaxpby(ndofs, dt/2, temp_vel->data(), dt/2, acceleration->data(), temp_vel->data());
-            blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+                blas->zeros(ndofs, temp_vel->data());
+                blas->copy(ndofs, increment->data(), temp_vel->data());
+                blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
+                blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+                
+                blas->zeros(ndofs, g->data());
+                // Adds material gradient computation to g
+                f->gradient(solution->data(), g->data());
 
-            blas->copy(ndofs, solution->data(), packed_data->data());
-            blas->copy(ndofs, temp_vel->data(), packed_data->data() + ndofs);
-            // Adds material gradient computation to g
-            f->gradient(packed_data->data(), g->data());
+                blas->zeros(ndofs, increment->data());
+                solver->apply(g->data(), increment->data());
+                blas->axpy(ndofs, -1, increment->data(), solution->data());
+            }
 
-            blas->zeros(ndofs, increment->data());
-            solver->apply(g->data(), increment->data());
-            blas->axpy(ndofs, -1, increment->data(), solution->data());
-        }
+            ////////////////////////////////
+            // Update all quantities
+            ////////////////////////////////
 
-        ////////////////////////////////
-        // Update all quantities
-        ////////////////////////////////
+            // acceleration
+            blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
+            blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
+            blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
 
-        // acceleration
-        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
+            // velocity
+            blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
+            blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
 
-        // velocity
-        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
+            // displacement
+            blas->copy(ndofs, solution->data(), displacement->data());
 
-        // displacement
-        blas->copy(ndofs, solution->data(), displacement->data());
+            t += dt;
+            if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
+                printf("%g/%g\n", double(t), double(T));
 
-        t += dt;
-        if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
-            printf("%g/%g\n", double(t), double(T));
+                // Write to disk
+                output->write_time_step("disp", t, displacement->data());
+                output->write_time_step("velocity", t, velocity->data());
+                output->write_time_step("acceleration", t, acceleration->data());
 
-            // Write to disk
-            output->write_time_step("disp", t, displacement->data());
-            output->write_time_step("velocity", t, velocity->data());
-            output->write_time_step("acceleration", t, acceleration->data());
-
-            // If no issues encountered we log the time
-            output->log_time(t);
-        }
+                // If no issues encountered we log the time
+                output->log_time(t);
+            }
     }
+    
+// }else
+// {
+//     auto [f, kelvin_voigt_newmark] = create_kelvin_voigt_newmark_function();
+//     auto mass_vector               = create_mass_vector(f);
+//     auto output                    = create_output(f, "test_newmark_kv");
 
+//     auto fs = f->space();
+//     auto m  = fs->mesh_ptr();
+//     auto es = f->execution_space();
+
+//     auto blas = sfem::blas<real_t>(es);
+
+//     const ptrdiff_t ndofs        = fs->n_dofs();
+//     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
+//     auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
+//     auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+
+//     auto increment = sfem::create_buffer<real_t>(ndofs, es);
+//     auto temp_vel  = sfem::create_buffer<real_t>(ndofs, es);
+//     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
+//     auto g         = sfem::create_buffer<real_t>(ndofs, es);
+
+//     real_t dt          = 0.1;
+//     real_t T           = 5;
+//     size_t export_freq = 1;
+//     size_t steps       = 0;
+//     real_t t           = 0;
+//     int    nliter      = 1;
+
+//     bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
+//     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
+
+//     int SFEM_ELEMENT_REFINE_LEVEL = 0;
+//     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+//     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
+//         output->write_time_step("disp", t, displacement->data());
+//         output->write_time_step("velocity", t, velocity->data());
+//         output->write_time_step("acceleration", t, acceleration->data());
+
+//         // If no issues encountered we log the time
+//         output->log_time(t);
+//     }
+
+//     kelvin_voigt_newmark->set_field("velocity", temp_vel, 0);
+//     kelvin_voigt_newmark->set_field("acceleration", increment, 0);
+
+
+//     while (t < T) {
+//             for (int k = 0; k < nliter; k++) {
+//                 // This could be put out of the loop since the operator is linear.
+//                 // We will do nonlinear materials next, so we keep it here.
+//                 auto material_op = sfem::create_linear_operator("MF", f, solution, es);
+//                 auto linear_op   = sfem::make_op<real_t>(
+//                         material_op->rows(),
+//                         material_op->cols(),
+//                         [=](const real_t *const x, real_t *const y) { material_op->apply(x, y); },
+//                         es);
+
+//                 auto solver     = sfem::create_cg<real_t>(linear_op, es);
+//                 solver->verbose = false;
+
+//                 // Use increment as temp buffer
+//                 blas->zeros(ndofs, increment->data());
+//                 blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
+//                 blas->axpy(ndofs, -dt, velocity->data(), increment->data());
+//                 blas->scal(ndofs, 4 / (dt * dt), increment->data());
+//                 blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+//                 // blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
+
+//                 blas->zeros(ndofs, temp_vel->data());
+//                 blas->copy(ndofs, increment->data(), temp_vel->data());
+//                 blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
+//                 blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+                
+//                 blas->zeros(ndofs, g->data());
+//                 // Adds material gradient computation to g
+//                 f->gradient(solution->data(), g->data());
+
+//                 blas->zeros(ndofs, increment->data());
+//                 solver->apply(g->data(), increment->data());
+//                 blas->axpy(ndofs, -1, increment->data(), solution->data());
+//             }
+
+//             ////////////////////////////////
+//             // Update all quantities
+//             ////////////////////////////////
+
+//             // acceleration
+//             blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
+//             blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
+//             blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
+
+//             // velocity
+//             blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
+//             blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
+
+//             // displacement
+//             blas->copy(ndofs, solution->data(), displacement->data());
+
+//             t += dt;
+//             if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
+//                 printf("%g/%g\n", double(t), double(T));
+
+//                 // Write to disk
+//                 output->write_time_step("disp", t, displacement->data());
+//                 output->write_time_step("velocity", t, velocity->data());
+//                 output->write_time_step("acceleration", t, acceleration->data());
+
+//                 // If no issues encountered we log the time
+//                 output->log_time(t);
+//             }
+//     }
+
+// }
     return SFEM_TEST_SUCCESS;
 }
-
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
@@ -258,10 +365,7 @@ int main(int argc, char *argv[]) {
 #ifdef SFEM_ENABLE_CUDA
     sfem::register_device_ops();
 #endif
-    SFEM_RUN_TEST(test_newmark_kv);  
+    SFEM_RUN_TEST(test_newmark_kv);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-
-
-
