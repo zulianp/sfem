@@ -223,10 +223,19 @@ namespace sfem {
             ret->rho                      = rho;
             return ret;
         } else {
-            auto base = create_kelvin_voigt_newmark(space); // unique_ptr<Op>
-            base->initialize();
-            return std::shared_ptr<Op>(std::move(base));
-            
+            assert(space->element_type() == macro_base_elem(element_type));
+            auto ret = std::make_shared<KelvinVoigtNewmark>(space);
+            ret->initialize();
+            ret->set_k(k);
+            ret->set_K(K);
+            ret->set_eta(eta);
+            ret->set_dt(dt);
+            ret->set_gamma(gamma);
+            ret->set_beta(beta);
+            ret->set_rho(rho);
+            ret->override_element_types({macro_base_elem(element_type)});
+
+            return ret;
         }
     }
 
