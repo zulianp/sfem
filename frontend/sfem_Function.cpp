@@ -522,6 +522,9 @@ namespace sfem {
         printf("[DEBUG] Function::derefine - Processing %zu operators:\n", impl_->ops.size());
         for (size_t i = 0; i < impl_->ops.size(); i++) {
             auto &o = impl_->ops[i];
+            if (o->is_no_op()) {
+                continue;
+            }
             printf("[DEBUG]   Op[%zu]: %s\n", i, o->name());
             auto dop = o->derefine_op(space);
             if (!dop) {
