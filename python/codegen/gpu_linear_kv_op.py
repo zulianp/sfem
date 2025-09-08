@@ -563,6 +563,31 @@ class GPULinearKVOp:
                 expr.append(ast.Assignment(var, L))
                 
         return expr
+
+    def hessian_diag(self):
+        H = self.eval_lhs_matrix
+        rows, cols = H.shape
+
+        expr = []
+
+        if self.SoA_IO:
+            assert self.fe.SoA
+
+            coords = ["x", "y", "z"]
+            for d in range(0, self.fe.spatial_dim()):
+                name = f"diag{coords[d]}"
+                for i in range(0, self.fe.n_nodes()):
+                    idx = d * self.fe.n_nodes() + i
+                    Hii = H[idx, idx]
+
+                    var = sp.symbols(f"{name}[{i}]")
+                    expr.append(ast.Assignment(var, Hii))
+        else:
+            for i in range(0, rows):
+                var = sp.symbols(f"diag[{i}*stride]")
+                expr.append(ast.Assignment(var, (H[i, i])))
+
+        return expr
     
 
     def gradient(self):
@@ -630,10 +655,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_matrix())
 
-    c_log("//--------------------------")
-    c_log("// M_matrix")
-    c_log("//--------------------------")
-    c_code(op.M_matrix())
+    # c_log("//--------------------------")
+    # c_log("// M_matrix")
+    # c_log("//--------------------------")
+    # c_code(op.M_matrix())
 
     # c_log("//--------------------------")
     # c_log("// C_sym")
@@ -645,10 +670,10 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.K_sym())
 
-    c_log("//--------------------------")
-    c_log("// M_sym")
-    c_log("//--------------------------")
-    c_code(op.M_sym())
+    # c_log("//--------------------------")
+    # c_log("// M_sym")
+    # c_log("//--------------------------")
+    # c_code(op.M_sym())
 
     # c_log("//--------------------------")
     # c_log("// gradient_C")
@@ -700,6 +725,11 @@ def main():
     c_log("// gradient")
     c_log("//--------------------------")
     c_code(op.gradient())
+
+    c_log("//--------------------------")
+    c_log("// hessian_diag")
+    c_log("//--------------------------")
+    c_code(op.hessian_diag())
 
     stop = perf_counter()
     console.print(f"// Overall: {stop - start} seconds")

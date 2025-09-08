@@ -521,7 +521,7 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
             scalar_t sub_determinant;
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
 
-            hex8_kelvin_voigt_newmark_diag(K, eta, rho, k, beta, gamma, dt, sub_adjugate, sub_determinant, element_diag);
+            sshex8_kelvin_voigt_newmark_diag(K, eta, rho, k, beta, gamma, dt, sub_adjugate, sub_determinant, element_diag);
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {

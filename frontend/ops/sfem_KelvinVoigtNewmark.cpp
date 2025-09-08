@@ -201,6 +201,7 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override {
             SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_diag");
             SFEM_ERROR("Called unimplemented method!\n");
+            // TODO
             return SFEM_FAILURE;
         }
 

@@ -173,7 +173,7 @@ int test_newmark_kv() {
     kelvin_voigt_newmark->set_field("velocity", temp_vel, 0);
     kelvin_voigt_newmark->set_field("acceleration", increment, 0);
 
-    auto solver     =  sfem::create_ssgmg(f, es);
+    // auto solver     =  sfem::create_ssgmg(f, es);
 
     while (t < T) {
             for (int k = 0; k < nliter; k++) {
