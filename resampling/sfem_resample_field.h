@@ -9,6 +9,7 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
+#include "sfem_resample_field_adjoint_hyteg.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -329,20 +330,21 @@ in_out_tet4(const int                            mpi_size,   // MPI size
  *
  * @return 0 if the operation is successful.
  */
-int                                                                         //
-resample_field_adjoint_tet4(const int                            mpi_size,  // MPI size
-                            const int                            mpi_rank,  // MPI rank
-                            const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
-                            const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
-                            const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
-                            const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
-                            const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
-                            const real_t* const SFEM_RESTRICT    g,         // Weighted field
-                            real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
-                            unsigned int*                        data_cnt,  // SDF: data count (output)
-                            real_t const*                        alpha,     // SDF: tet alpha
-                            real_t const*                        volume,    // SDF: tet volume
-                            sfem_resample_field_info*            info);                // Info struct with options and flags
+int                                                                            //
+resample_field_adjoint_tet4(const int                            mpi_size,     // MPI size
+                            const int                            mpi_rank,     // MPI rank
+                            const mesh_t* const SFEM_RESTRICT    mesh,         // Mesh: mesh_t struct
+                            const ptrdiff_t* const SFEM_RESTRICT n,            // SDF: n[3]
+                            const ptrdiff_t* const SFEM_RESTRICT stride,       // SDF: stride[3]
+                            const geom_t* const SFEM_RESTRICT    origin,       // SDF: origin[3]
+                            const geom_t* const SFEM_RESTRICT    delta,        // SDF: delta[3]
+                            const real_t* const SFEM_RESTRICT    g,            // Weighted field
+                            real_t* const SFEM_RESTRICT          data,         // SDF: data (output)
+                            unsigned int*                        data_cnt,     // SDF: data count (output)
+                            real_t const*                        alpha,        // SDF: tet alpha
+                            real_t const*                        volume,       // SDF: tet volume
+                            sfem_resample_field_info*            info,         // Info struct with options and flags
+                            const mini_tet_parameters_t          mini_tet_parameters);  // Mini tet params
 
 /// @brief  DEBUG code for testing the adjoint resampling operation
 /// @param mpi_size
@@ -678,8 +680,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                                  const geom_t* const SFEM_RESTRICT    origin,          //
                                                  const geom_t* const SFEM_RESTRICT    delta,           //
                                                  const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                                 const real_t                         alpha_th,        // Threshold for alpha
-                                                 real_t* const SFEM_RESTRICT          data);                    //
+                                                 const mini_tet_parameters_t          mini_tet_parameters,
+                                                 real_t* const SFEM_RESTRICT          data);  //
 
 /**
  * @brief

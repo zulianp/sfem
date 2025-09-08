@@ -50,7 +50,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
                                                    const geom_t* const SFEM_RESTRICT    origin,          //
                                                    const geom_t* const SFEM_RESTRICT    delta,           //
                                                    const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                                   const real_t                         alpha_th,        // Threshold for alpha
+                                                //    const real_t                         alpha_th,        // Threshold for alpha
+                                                   const mini_tet_parameters_t          mini_tet_parameters,
                                                    real_t* const SFEM_RESTRICT          data);
 
 #ifdef __cplusplus
