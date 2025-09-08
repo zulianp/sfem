@@ -39,7 +39,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     // SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
 
-    const char *SFEM_OPERATOR = "Neohookean";
+    const char *SFEM_OPERATOR = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
