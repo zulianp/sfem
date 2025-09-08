@@ -299,7 +299,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 1
+#if 1 // Old implementation
         tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
                                           jacobian_determinant,
                                           mu,
@@ -313,7 +313,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                           element_outx,
                                           element_outy,
                                           element_outz);
-#else
+#else // New partial assembly implementation
         scalar_t F[9];
         tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
         scalar_t S_iklm[81];
