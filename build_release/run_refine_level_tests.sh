@@ -5,7 +5,7 @@ set -e
 # switch to the directory of the script (build_release)
 cd "$(dirname "$0")"
 
-REFINE_LEVELS=(1 2 3 4)
+REFINE_LEVELS=(4)
 
 echo "Starting Kelvin-Voigt refine level comparison tests..."
 

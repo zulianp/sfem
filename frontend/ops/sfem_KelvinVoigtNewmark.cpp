@@ -224,7 +224,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int KelvinVoigtNewmark::hessian_diag(const real_t *const /*x*/, real_t *const /*out*/) {
+    int KelvinVoigtNewmark::hessian_diag(const real_t *const /*x*/, real_t *const out) {
         SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_diag");
         SFEM_ERROR("Called unimplemented method!\n");
         return SFEM_FAILURE;
