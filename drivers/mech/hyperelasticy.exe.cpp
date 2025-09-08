@@ -87,9 +87,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
     auto cg = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose = true;
-    cg->set_max_it(1000);
+    cg->set_max_it(10000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-8);
+    cg->set_rtol(1e-6);
 
     cg->apply(rhs->data(), increment->data());
     sfem::blas<real_t>(es)->axpy(ndofs, 1, increment->data(), displacement->data());
