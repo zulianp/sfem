@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from ctypes import Array, Array
 from sfem_codegen import *
 
 from sympy.parsing.sympy_parser import parse_expr
@@ -13,8 +14,51 @@ from tet20 import *
 from hex8 import *
 from aahex8 import *
 
+from sympy import Array
+
 # from tpl_hyperelasticity import TPLHyperelasticity
 
+ # INSERT_YOUR_CODE
+def detect_constitutive_tensor_symmetries(tensor):
+    """
+    Detects and prints all index symmetries of a 4th order constitutive tensor.
+    Prints which (i,j,k,l) index permutations leave the tensor unchanged.
+    """
+    import itertools
+
+    dim = tensor.shape[0]
+    index_permutations = [
+        # Major symmetry: (i,j,k,l) == (k,l,i,j)
+        ("major", lambda i,j,k,l: (k,l,i,j)),
+        # Minor symmetry 1: (i,j,k,l) == (j,i,k,l)
+        ("minor_ij", lambda i,j,k,l: (j,i,k,l)),
+        # Minor symmetry 2: (i,j,k,l) == (i,j,l,k)
+        ("minor_kl", lambda i,j,k,l: (i,j,l,k)),
+        # Full symmetry: (i,j,k,l) == (j,i,l,k)
+        ("full", lambda i,j,k,l: (j,i,l,k)),
+    ]
+    symmetries_found = set()
+    for name, perm in index_permutations:
+        symmetric = True
+        for i, j, k, l in itertools.product(range(dim), repeat=4):
+            orig = tensor[i, j, k, l]
+            permuted = tensor[perm(i,j,k,l)]
+            if not sp.simplify(orig - permuted) == 0:
+                symmetric = False
+                break
+        if symmetric:
+            print(f"Constitutive tensor is symmetric under {name} symmetry: (i,j,k,l) <-> {perm(0,1,2,3)}")
+            symmetries_found.add(name)
+    if not symmetries_found:
+        print("No standard symmetries detected in constitutive tensor.")
+    else:
+        print("Detected symmetries:", symmetries_found)
+    # Print all (i,j,k,l) patterns that are symmetric
+    # print("Symmetric index patterns:")
+    # for name, perm in index_permutations:
+    #     for i, j, k, l in itertools.product(range(dim), repeat=4):
+    #         if sp.simplify(tensor[i, j, k, l] - tensor[perm(i,j,k,l)]) == 0:
+    #             print(f"({i},{j},{k},{l}) == {perm(i,j,k,l)} under {name} symmetry")
 
 def dbg():
     import pdb; pdb.set_trace()
@@ -27,6 +71,15 @@ def create_matrix_symbol(name, rows, cols):
     # return sp.Matrix(rows, cols, [sp.symbols(f"{name}[{i*cols + j}]") for i in range(0, rows) for j in range(0, cols)])
     return matrix_coeff(name, rows, cols)
 
+
+def create_tensor4_symbol(name, size0, size1, size2, size3):
+    terms = []
+    for i in range(0, size0):
+        for j in range(0, size1):
+            for k in range(0, size2):
+                for l in range(0, size3):
+                    terms.append(sp.symbols(f"{name}[{i*size1*size2*size3 + j*size2*size3 + k*size3 + l}]"))
+    return Array(terms, shape=(size0, size1, size2, size3))
 
 def simplify_matrix(mat):
     rows, cols = mat.shape
@@ -41,6 +94,16 @@ def assign_matrix(var, mat):
             expr.append(ast.Assignment(var[i, j], mat[i, j]))
     return expr
 
+
+def assign_tensor4(var, mat):
+    size0, size1, size2, size3 = mat.shape
+    expr = []
+    for i in range(0, size0):
+        for j in range(0, size1):
+            for k in range(0, size2):
+                for l in range(0, size3):
+                    expr.append(ast.Assignment(var[i, j, k, l], mat[i, j, k, l]))
+    return expr
 
 def assign_add_matrix(name, mat):
     rows, cols = mat.shape
@@ -83,8 +146,11 @@ class SRHyperelasticity:
         self.jac_inv_symb = create_matrix_symbol("jac_inv", self.fe.manifold_dim(), self.fe.spatial_dim())
         self.Pinv_xJinv_t_symb = create_matrix_symbol("Pinv_xJinv_t", self.fe.manifold_dim(), self.fe.manifold_dim())
         self.trial_grad_symb = create_matrix_symbol("trial_grad", self.fe.manifold_dim(), self.fe.manifold_dim())
+        self.inc_grad_symb = create_matrix_symbol("inc_grad", self.fe.manifold_dim(), self.fe.manifold_dim())
         self.safe_log = lambda x: sp.log(sp.Max(1e-8, x))
         self.safe_sqrt = lambda x: sp.sqrt(sp.Max(1e-8, x))
+        self.constitutive_tensor_symb = create_tensor4_symbol("constitutive_tensor", self.fe.spatial_dim(), self.fe.spatial_dim(), self.fe.spatial_dim(), self.fe.spatial_dim())
+        self.S_iklm_symb = create_tensor4_symbol("S_iklm", self.fe.spatial_dim(), self.fe.spatial_dim(), self.fe.spatial_dim(), self.fe.spatial_dim())
 
     def __init__(self, fe, fun): #  tpl: TPLHyperelasticity):
         self.fe = fe
@@ -134,6 +200,7 @@ class SRHyperelasticity:
         P = self.__compute_piola_stress()
         dV = fe.reference_measure() * fe.symbol_jacobian_determinant() * fe.quadrature_weight()        
         P_tXJinv_t = P * self.jac_inv_symb.T * dV
+        jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
 
         self.expression_table["P"] = P
         self.expression_table["P_tXJinv_t"] = P_tXJinv_t
@@ -146,15 +213,46 @@ class SRHyperelasticity:
             for j in range(0, self.fe.spatial_dim()):
                 lin_stress[i, j] = sp.diff(F_dot_h, self.F_symb[i, j])
 
+        dim = self.fe.spatial_dim()
+        terms = []
+        for i in range(0, dim):
+            for j in range(0, dim):
+                for k in range(0, dim):
+                    for l in range(0, dim):
+                        print(f"computing {i}, {j}, {k}, {l})")
+                        terms.append(sp.diff(P[i, j], self.F_symb[k, l]))
+        
+        print("Done computing terms")
+        constitutive_tensor = Array(terms, shape=(dim, dim, dim, dim))
+        print("Created constitutive tensor")
+
+        # detect_constitutive_tensor_symmetries(constitutive_tensor)
+        # print("Done detecting symmetries")
+
+
+        terms = []
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for l in range(0, dim):
+                    for m in range(0, dim):
+                        acc = 0
+                        for j in range(0, dim):
+                            acc += constitutive_tensor[i, j, k, l] * jac_inv[m, j]
+                        terms.append(acc)
+
+        S_iklm = Array(terms, shape=(dim, dim, dim, dim))
+
+   
         # print(lin_stress)
         self.expression_table["lin_stress"] = lin_stress
         self.expression_table["lin_stressXJinv_t"] = lin_stress * self.jac_inv_symb.T * dV
+        self.expression_table["S_iklm"] = S_iklm
 
         # Build FEM symbols
         dims = self.fe.manifold_dim()
         q = self.fe.quadrature_point()
         gref = self.fe.tgrad(q, ncomp=dims)
-        jac_inv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        
         
         u = coeffs_SoA("u", dims, self.fe.n_nodes())
         disp_grad = sp.zeros(dims, dims)
@@ -173,6 +271,7 @@ class SRHyperelasticity:
         self.expression_table["inc_grad"] = inc_grad
         self.expression_table["F"] = F
         self.expression_table["jac_inv"] = jac_inv
+        self.expression_table["constitutive_tensor"] = constitutive_tensor
 
     def def_grad(self):
         fe = self.fe
@@ -192,6 +291,49 @@ class SRHyperelasticity:
         expr.append(ast.AddAugmentedAssignment(form, s['W'] * s['dV']))
         return expr
 
+    def partial_assembly(self):
+        S_iklm = self.expression_table["S_iklm"]
+        # c_code(assign_tensor4(self.S_iklm_symb, S_iklm))
+        return S_iklm
+
+    # def kernel_apply(self):
+    #     fe = self.fe
+    #     dims = self.fe.manifold_dim()
+    #     grad = fe.tgrad(q, ncomp=dims)
+        
+    #     expr = []
+    #     F = self.def_grad()
+    #     expr.extend(assign_matrix(self.F_symb, F))
+
+    #     print(f"T F[{dims*dims}];")
+    #     print("{", end="")
+    #     c_code(expr)
+    #     print("}\n\n")
+
+    #     print(f"T trial_grad[{dims*dims}];")
+    #     print("{", end="")
+    #     c_code(assign_matrix(self.trial_grad_symb, self.expression_table["inc_grad"]))
+    #     print("}\n\n")
+
+    #     lin_stress_x_jinv_t = self.expression_table["lin_stressXJinv_t"]
+
+    #     lin_stress_symb = matrix_coeff("lin_stressXJinv_t", dims, dims)
+
+    #     print(f"T *lin_stressXJinv_t = F;")
+    #     print("{", end="")
+    #     c_code(assign_matrix(lin_stress_symb, lin_stress_x_jinv_t))
+    #     print("}\n\n")
+
+    #     expr = []
+    #     for i in range(0, dims * fe.n_nodes()):
+    #         lform = sp.symbols(f"element_vector[{i}*stride]")
+    #         expr.append(ast.Assignment(lform, inner(lin_stress_symb, grad[i])))
+
+    #     print("{", end="")
+    #     c_code(expr)
+    #     print("}\n\n")
+    #     return expr
+
     def kernel_apply(self):
         fe = self.fe
         dims = self.fe.manifold_dim()
@@ -206,24 +348,31 @@ class SRHyperelasticity:
         c_code(expr)
         print("}\n\n")
 
-        print(f"T trial_grad[{dims*dims}];")
+        print(f"T inc_grad[{dims*dims}];")
         print("{", end="")
-        c_code(assign_matrix(self.trial_grad_symb, self.expression_table["inc_grad"]))
+        c_code(assign_matrix(self.inc_grad_symb, self.expression_table["inc_grad"]))
         print("}\n\n")
 
-        lin_stress_x_jinv_t = self.expression_table["lin_stressXJinv_t"]
+        partial_assembly = self.partial_assembly()
+        S_iklm_symb = self.S_iklm_symb
 
-        lin_stress_symb = matrix_coeff("lin_stressXJinv_t", dims, dims)
-
-        print(f"T *lin_stressXJinv_t = F;")
-        print("{", end="")
-        c_code(assign_matrix(lin_stress_symb, lin_stress_x_jinv_t))
+        print(f"T S_iklm[{dims*dims*dims*dims}];")
+        c_code(assign_tensor4(S_iklm_symb, partial_assembly))
         print("}\n\n")
+
+        Hkl = self.inc_grad_symb
+
+        Lim = sp.zeros(dims, dims)
+        for i in range(0, dims):
+            for k in range(0, dims):
+                for l in range(0, dims):
+                    for m in range(0, dims):
+                        Lim[i, m] += S_iklm_symb[i, k, l, m] * Hkl[k, l]
 
         expr = []
         for i in range(0, dims * fe.n_nodes()):
             lform = sp.symbols(f"element_vector[{i}*stride]")
-            expr.append(ast.Assignment(lform, inner(lin_stress_symb, grad[i])))
+            expr.append(ast.Assignment(lform, inner(Lim, grad[i])))
 
         print("{", end="")
         c_code(expr)
@@ -304,10 +453,11 @@ class SRHyperelasticity:
 
     def emit_all(self, out_dir: str = None, opname: str = "hyperelasticity"):
         fe = self.fe
-        # k_value = self.kernel_value(fe)
+        # k_value = self.kernel_value()
         # k_grad = self.kernel_gradient()
+        # k_apply = self.kernel_apply()
         k_apply = self.kernel_apply()
-        # k_apply = self.kernel_apply(fe)
+        # k_partial_assembly = self.partial_assembly()
         
         # self.tpl.emit_all(opname=opname, kernels={'gradient': k_grad, 'apply': k_apply, 'value': k_value}, out_dir=out_dir)
 
@@ -315,8 +465,9 @@ def main():
     strain_energy_function = "(mu/2)*(I1b - 3) + (lmbda/2)*(log(J))**2"
     # strain_energy_function = "J * (I2b + (I1b * 0.8341331275382947))"
     name = "neohookean"
-    # fe = Tet4()
-    fe = Hex8()
+    fe = Tet4()
+    # fe = Tri3()
+    # fe = Hex8()
     op = SRHyperelasticity.create_from_string(fe, strain_energy_function)
     op.emit_all(opname=name)
 

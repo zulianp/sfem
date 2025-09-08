@@ -2,63 +2,83 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+if [[ -z "$SFEM_PATH" ]]
+then
+	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
+	exit 1
+fi
 
-source $SCRIPTPATH/../sfem_config.sh
-export PATH=$SCRIPTPATH/../../:$PATH
-export PATH=$SCRIPTPATH/../../build/:$PATH
-export PATH=$SCRIPTPATH/../../bin/:$PATH
+export PATH=$SFEM_PATH/bin:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
+export PATH=$SFEM_PATH/worflows/mech/:$PATH
 
-PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python/sfem:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
-PATH=$SCRIPTPATH/../../../matrix.io:$PATH
+HERE=$PWD
 
-# create_cylinder.sh 6
-# create_cylinder.sh 3
+REF=7
+# REF=3
+IR=0.51
+OR=0.61
+H=10
+L=-2.5
+R=7.5
+MID=0.56
 
-create_cylinder_p2.sh 4
-export SFEM_USE_MACRO=1
+nx=$(( REF * 20 ))
+nr=$(( REF * 1 ))
+nz=$(( REF * 25 ))
 
-export SFEM_MESH_DIR=mesh
+rm -rf aorta_geometry
+if [[ ! -d aorta_geometry ]]
+then
+	mkdir -p aorta_geometry
+	cd aorta_geometry
 
-sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
-sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
+	create_ring_mesh $IR $OR $nr $nx ring
+	mv ring/x0.raw ring/x.raw
+	mv ring/x1.raw ring/y.raw
+	mv ring/x2.raw ring/z.raw
 
-# export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
-export PATH=$CODE_DIR/utopia/utopia/build:$PATH
+	SFEM_TRANSLATE_Z=$L hex8_extrude_mesh ring $H $nz aorta
+	mv aorta/x0.raw aorta/x.raw
+	mv aorta/x1.raw aorta/y.raw
+	mv aorta/x2.raw aorta/z.raw
 
-set -x
+	rm -rf ring
 
-export VAR_UX=0
-export VAR_UY=1
-export VAR_UZ=2
-export SFEM_BLOCK_SIZE=3
+	set -x
 
-export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright"
-export SFEM_DIRICHLET_VALUE="0,0,0,0.5"
-export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX"
+	SFEM_DEBUG=1 create_sideset aorta 0    0     0.1 0.2 	contact_boundary
+	SFEM_DEBUG=1 create_sideset aorta $OR  $OR   0.1 0.2 	outer_boundary
+	SFEM_DEBUG=1 create_sideset aorta $MID $MID  $L  0.999 	inlet
+	SFEM_DEBUG=1 create_sideset aorta $MID $MID  $R  0.999 	outlet
 
-# export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright,$sright,$sright"
-# export SFEM_DIRICHLET_VALUE="0,0,0,0.05,0,0"
-# export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX,$VAR_UY,$VAR_UZ"
+	raw_to_db.py contact_boundary/surf 	contact_boundary/surf.vtk 	--coords=aorta --cell_type=quad
+	raw_to_db.py outer_boundary/surf 	outer_boundary/surf.vtk 	--coords=aorta --cell_type=quad
+	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=aorta --cell_type=quad
+	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=aorta --cell_type=quad
+	raw_to_db.py aorta 					aorta.vtk 
 
-export SFEM_SHEAR_MODULUS="1"
-export SFEM_FIRST_LAME_PARAMETER="1"
-
-export SFEM_OUTPUT_DIR=sfem_output
-export SFEM_MATERIAL=linear
-
-# export OMP_NUM_THREADS=32
-export OMP_NUM_THREADS=16
-# export OMP_NUM_THREADS=8
-export OMP_PROC_BIND=true
+	cd $HERE
+fi
 
 
-# lldb -- 
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -apply_gradient_descent_step true -atol 1e-6 #-matrix_free false
+# SFEM_GRID_SHIFT="-0.03" SFEM_GRID_SCALE="-1" SFEM_ELEMENT_REFINE_LEVEL=8 \
+# 	SFEM_TRACE_FILE=obs.csv \
 
-aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $SFEM_BLOCK_SIZE $SFEM_OUTPUT_DIR/out
-raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"
+hyperelasticy aorta_geometry/aorta  dirichlet.yaml output
+
+# They are all zeros
+# rm -f output/out/contact_stress.{1,2}.raw
+# rm -f output/out/rhs.{0,1,2}.raw
+
+mv output/mesh/x0.raw output/mesh/x.raw
+mv output/mesh/x1.raw output/mesh/y.raw
+mv output/mesh/x2.raw output/mesh/z.raw
+
+# SFEM_TRACE_FILE=hex8_cauchy_stress.csv \
+# 	hex8_cauchy_stress output/mesh 1 1 output/out/disp.0.raw output/out/disp.1.raw output/out/disp.2.raw output/out/cauchy_stress
+
+raw_to_db.py output/mesh output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS
+raw_to_db.py output/coarse_mesh macro_mesh.vtk
