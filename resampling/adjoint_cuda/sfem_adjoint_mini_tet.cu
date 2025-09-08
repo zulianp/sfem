@@ -27,40 +27,48 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
                                       real_t* const               data) {
     //
 
-    cudaStream_t cuda_stream_alloc = NULL;  // default stream
-    cudaStreamCreate(&cuda_stream_alloc);
+    // cudaStream_t cuda_stream_alloc = NULL;  // default stream
+    // cudaStreamCreate(&cuda_stream_alloc);
 
     real_t* data_device           = NULL;
     real_t* weighted_field_device = NULL;
 
-    cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
-    cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
+    // cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+    // cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
+
+    cudaMalloc((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t));
+    cudaMalloc((void**)&weighted_field_device, nnodes * sizeof(real_t));
 
     elems_tet4_device elements_device = make_elems_tet4_device();
-    cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
+    // cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
+    cuda_allocate_elems_tet4_device(&elements_device, nelements);
 
     xyz_tet4_device xyz_device = make_xyz_tet4_device();
-    cuda_allocate_xyz_tet4_device_async(&xyz_device, nnodes, cuda_stream_alloc);
+    // cuda_allocate_xyz_tet4_device_async(&xyz_device, nnodes, cuda_stream_alloc);
+    cuda_allocate_xyz_tet4_device(&xyz_device, nnodes);
 
-    cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
+    // cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
 
-    cudaMemcpyAsync((void*)weighted_field_device,
-                    (void*)weighted_field,
-                    nnodes * sizeof(real_t),
-                    cudaMemcpyHostToDevice,
-                    cuda_stream_alloc);
+    // cudaMemcpyAsync((void*)weighted_field_device,
+    //                 (void*)weighted_field,
+    //                 nnodes * sizeof(real_t),
+    //                 cudaMemcpyHostToDevice,
+    //                 cuda_stream_alloc);
+
+    cudaMemcpy((void*)weighted_field_device, (void*)weighted_field, nnodes * sizeof(real_t), cudaMemcpyHostToDevice);
 
     cudaMemset((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t));
 
-    copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
-    // copy_elems_tet4_device(elems, nelements, &elements_device);
+    // copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
+    copy_elems_tet4_device(elems, nelements, &elements_device);
 
     // cudaStreamSynchronize(cuda_stream_alloc);
     // exit(EXIT_FAILURE);  // Temporary
 
-    copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
+    // copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
+    copy_xyz_tet4_device(xyz, nnodes, &xyz_device);
 
-    cudaStreamSynchronize(cuda_stream_alloc);
+    // cudaStreamSynchronize(cuda_stream_alloc);
 
     // Optional: check for errors
     cudaError_t error = cudaGetLastError();
@@ -74,6 +82,16 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
 
     cudaStream_t cuda_stream = 0;  // default stream
     cudaStreamCreate(&cuda_stream);
+
+    printf("Kernel args: start_element: %ld, end_element: %ld, nelements: %ld, nnodes: %ld\n",
+           start_element,
+           end_element,
+           nelements,
+           nnodes);
+    printf("Kernel launch: blocks_per_grid: %u, threads_per_block: %u, total_threads_per_grid: %u\n",
+           blocks_per_grid,
+           threads_per_block,
+           total_threads_per_grid);
 
     sfem_adjoint_mini_tet_kernel_gpu<real_t><<<blocks_per_grid,                       //
                                                threads_per_block,                     //
@@ -136,18 +154,25 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
            max_val,
            max_idx);
 
-    cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
+    // cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
+    cudaFree((void*)weighted_field_device);
 
-    free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
-    free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
+    // free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
+    free_xyz_tet4_device(&xyz_device);
 
-    cudaStreamSynchronize(cuda_stream_alloc);
+    // free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
+    free_elems_tet4_device(&elements_device);
 
-    cudaFreeAsync(data_device, cuda_stream_alloc);
+    // cudaStreamSynchronize(cuda_stream_alloc);
+    cudaFree((void*)data_device);
 
-    cudaStreamDestroy(cuda_stream_alloc);
+    // cudaFreeAsync(data_device, cuda_stream_alloc);
+
+    // cudaStreamDestroy(cuda_stream_alloc);
 
 }  // END: call_sfem_adjoint_mini_tet_kernel_gpu
+   // ////////////////////////////////////////////////////////////////////////////////////////////////
+   // ////////////////////////////////////////////////////////////////////////////////////////////////
    // ////////////////////////////////////////////////////////////////////////////////////////////////
 
 // // #define __TESTING__

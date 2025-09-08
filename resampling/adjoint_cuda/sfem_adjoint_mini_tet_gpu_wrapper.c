@@ -22,7 +22,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     mini_tet_parameters.alpha_min_threshold = alpha_th;
     mini_tet_parameters.alpha_max_threshold = 8.0;
     mini_tet_parameters.min_refinement_L    = 1;
-    mini_tet_parameters.max_refinement_L    = 1;
+    mini_tet_parameters.max_refinement_L    = 20;
 
     call_sfem_adjoint_mini_tet_kernel_gpu(start_element,                  // Mesh
                                           end_element,                    //
