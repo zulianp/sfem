@@ -19,6 +19,7 @@
 #include "sfem_mesh_write.h"
 #include "sfem_queue.h"
 #include "sfem_resample_field.h"
+#include "sfem_resample_field_adjoint_hyteg.h"
 #include "sfem_resample_field_tet4_math.h"
 #include "tet10_resample_field.h"
 
@@ -783,6 +784,13 @@ int main(int argc, char* argv[]) {
                     info.adjoint_refine_type = ADJOINT_BASE;
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 
+                    mini_tet_parameters_t mini_tet_parameters;
+
+                    mini_tet_parameters.alpha_min_threshold = 1.0;
+                    mini_tet_parameters.alpha_max_threshold = 8.0;
+                    mini_tet_parameters.min_refinement_L    = 1;
+                    mini_tet_parameters.max_refinement_L    = 22;
+
 #if SFEM_LOG_LEVEL >= 5
                     printf("info.adjoint_refine_type = %d, %s:%d\n", info.adjoint_refine_type, __FILE__, __LINE__);
                     // print as a string
@@ -799,20 +807,21 @@ int main(int argc, char* argv[]) {
                     }
 #endif
 
-                    ret_resample_adjoint =                             //
-                            resample_field_adjoint_tet4(mpi_size,      //
-                                                        mpi_rank,      //
-                                                        &mesh,         //
-                                                        nlocal,        //
-                                                        stride,        //
-                                                        origin,        //
-                                                        delta,         //
-                                                        g,             //
-                                                        field,         //
-                                                        field_cnt,     //
-                                                        field_alpha,   //
-                                                        filed_volume,  //
-                                                        &info);        //
+                    ret_resample_adjoint =                                     //
+                            resample_field_adjoint_tet4(mpi_size,              //
+                                                        mpi_rank,              //
+                                                        &mesh,                 //
+                                                        nlocal,                //
+                                                        stride,                //
+                                                        origin,                //
+                                                        delta,                 //
+                                                        g,                     //
+                                                        field,                 //
+                                                        field_cnt,             //
+                                                        field_alpha,           //
+                                                        filed_volume,          //
+                                                        &info,                 //
+                                                        mini_tet_parameters);  //
 
                     // BitArray bit_array_in_out = create_bit_array(nlocal[0] * nlocal[1] * nlocal[2]);
 

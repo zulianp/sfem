@@ -1145,20 +1145,21 @@ resample_field_mesh_tet4(const int                            mpi_size,  // MPI 
 // resample_field_adjoint //////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-int                                                                         //
-resample_field_adjoint_tet4(const int                            mpi_size,  // MPI size
-                            const int                            mpi_rank,  // MPI rank
-                            const mesh_t* const SFEM_RESTRICT    mesh,      // Mesh: mesh_t struct
-                            const ptrdiff_t* const SFEM_RESTRICT n,         // SDF: n[3]
-                            const ptrdiff_t* const SFEM_RESTRICT stride,    // SDF: stride[3]
-                            const geom_t* const SFEM_RESTRICT    origin,    // SDF: origin[3]
-                            const geom_t* const SFEM_RESTRICT    delta,     // SDF: delta[3]
-                            const real_t* const SFEM_RESTRICT    g,         // Weighted field
-                            real_t* const SFEM_RESTRICT          data,      // SDF: data (output)
-                            unsigned int*                        data_cnt,  // SDF: data count (output)
-                            real_t const*                        alpha,     // SDF: tet alpha
-                            real_t const*                        volume,    // SDF: tet volume
-                            sfem_resample_field_info*            info) {               // Info struct with options and flags
+int                                                                             //
+resample_field_adjoint_tet4(const int                            mpi_size,      // MPI size
+                            const int                            mpi_rank,      // MPI rank
+                            const mesh_t* const SFEM_RESTRICT    mesh,          // Mesh: mesh_t struct
+                            const ptrdiff_t* const SFEM_RESTRICT n,             // SDF: n[3]
+                            const ptrdiff_t* const SFEM_RESTRICT stride,        // SDF: stride[3]
+                            const geom_t* const SFEM_RESTRICT    origin,        // SDF: origin[3]
+                            const geom_t* const SFEM_RESTRICT    delta,         // SDF: delta[3]
+                            const real_t* const SFEM_RESTRICT    g,             // Weighted field
+                            real_t* const SFEM_RESTRICT          data,          // SDF: data (output)
+                            unsigned int*                        data_cnt,      // SDF: data count (output)
+                            real_t const*                        alpha,         // SDF: tet alpha
+                            real_t const*                        volume,        // SDF: tet volume
+                            sfem_resample_field_info*            info,          //
+                            const mini_tet_parameters_t          mini_tet_parameters) {  // Info struct with options and flags
     //
     PRINT_CURRENT_FUNCTION;
     int ret = 0;
@@ -1266,27 +1267,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                                      origin,                         //
                                                                      delta,                          //
                                                                      mass_vector,                    //
-                                                                     2.5,                            //
+                                                                     mini_tet_parameters,            //
                                                                      data);                          //
 
-            real_t          min_val    = data[0];
-            real_t          max_val    = data[0];
-            ptrdiff_t       min_idx    = 0;
-            ptrdiff_t       max_idx    = 0;
-            const ptrdiff_t total_size = n[0] * n[1] * n[2];
-
-            for (ptrdiff_t i = 1; i < total_size; ++i) {
-                if (data[i] < min_val) {
-                    min_val = data[i];
-                    min_idx = i;
-                }
-                if (data[i] > max_val) {
-                    max_val = data[i];
-                    max_idx = i;
-                }
-            }
-
-            printf("Data range II: min = %e (at index %ld), max = %e (at index %ld)\n", min_val, min_idx, max_val, max_idx);
             break;
 
 #else
@@ -1301,27 +1284,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,  // M
                                                                    origin,                         //
                                                                    delta,                          //
                                                                    mass_vector,                    //
-                                                                   2.5,                            //
+                                                                   mini_tet_parameters,            //
                                                                    data);                          //
 
-            // real_t          min_val    = data[0];
-            // real_t          max_val    = data[0];
-            // ptrdiff_t       min_idx    = 0;
-            // ptrdiff_t       max_idx    = 0;
-            // const ptrdiff_t total_size = n[0] * n[1] * n[2];
-
-            // for (ptrdiff_t i = 1; i < total_size; ++i) {
-            //     if (data[i] < min_val) {
-            //         min_val = data[i];
-            //         min_idx = i;
-            //     }
-            //     if (data[i] > max_val) {
-            //         max_val = data[i];
-            //         max_idx = i;
-            //     }
-            // }
-
-            // printf("Data range II: min = %e (at index %ld), max = %e (at index %ld)\n", min_val, min_idx, max_val, max_idx);
             break;
 
 #endif

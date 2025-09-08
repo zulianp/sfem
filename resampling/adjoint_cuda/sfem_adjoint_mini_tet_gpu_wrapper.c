@@ -12,17 +12,10 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
                                                    const geom_t* const SFEM_RESTRICT    origin,          //
                                                    const geom_t* const SFEM_RESTRICT    delta,           //
                                                    const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
-                                                   const real_t                         alpha_th,        // Threshold for alpha
-                                                   real_t* const SFEM_RESTRICT          data) {                   //
+                                                   const mini_tet_parameters_t          mini_tet_parameters,
+                                                   real_t* const SFEM_RESTRICT          data) {  //
 
     PRINT_CURRENT_FUNCTION;
-
-    mini_tet_parameters_t mini_tet_parameters;
-
-    mini_tet_parameters.alpha_min_threshold = alpha_th;
-    mini_tet_parameters.alpha_max_threshold = 8.0;
-    mini_tet_parameters.min_refinement_L    = 1;
-    mini_tet_parameters.max_refinement_L    = 20;
 
     call_sfem_adjoint_mini_tet_kernel_gpu(start_element,                  // Mesh
                                           end_element,                    //

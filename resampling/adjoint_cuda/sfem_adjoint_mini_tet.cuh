@@ -12,8 +12,8 @@
 // typedef float   geom_t;
 // typedef int32_t idx_t;
 
-#define LANES_PER_TILE 8
-#define HYTEG_MAX_REFINEMENT_LEVEL 20
+#define LANES_PER_TILE 32
+#define HYTEG_MAX_REFINEMENT_LEVEL 22
 
 // typedef struct {
 //     float        alpha_min_threshold;
@@ -165,7 +165,7 @@ __device__ bool get_category_Jacobian(const unsigned int                category
                                       const FloatType                   L,             //
                                       typename Float3<FloatType>::type* Jacobian_c) {  //
 
-    const FloatType invL = FloatType(1.0) / FloatType(L);
+    const FloatType invL = FloatType(1.0) / L;
     const FloatType zero = FloatType(0.0);
 
     switch (category) {
@@ -576,7 +576,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType grid_y = (yq_phys - oy) / dy;
         const FloatType grid_z = (zq_phys - oz) / dz;
 
-        const ptrdiff_t i = floor(grid_x);  /// ATTENTION: To be replaced with the adaptive floor
+        const ptrdiff_t i = floor(grid_x);  /// ATTENTION: To be replaced with the template floor
         const ptrdiff_t j = floor(grid_y);  /// In the sfem math library
         const ptrdiff_t k = floor(grid_z);
 
@@ -584,7 +584,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType l_y = (grid_y - (FloatType)(j));
         const FloatType l_z = (grid_z - (FloatType)(k));
 
-        const FloatType f0 = 1.0 - xq_mref - yq_mref - zq_mref;
+        const FloatType f0 = FloatType(1.0) - xq_mref - yq_mref - zq_mref;
         const FloatType f1 = xq_mref;
         const FloatType f2 = yq_mref;
         const FloatType f3 = zq_mref;
@@ -767,23 +767,6 @@ __device__ void main_tet_loop_gpu(const int                               L,
             // Handle error: invalid category
             // For example, you might want to set a default value or log an error
         }
-
-        // if (threadIdx.x == 0 && blockIdx.x == 0) {
-        //     printf("==== J_ref for Category %d (L=%d) ====\n", cat_i, L);
-        //     printf("J_ref[0] = (%f, %f, %f)\n",
-        //            (float)Jacobian_c[cat_i][0].x,
-        //            (float)Jacobian_c[cat_i][0].y,
-        //            (float)Jacobian_c[cat_i][0].z);
-        //     printf("J_ref[1] = (%f, %f, %f)\n",
-        //            (float)Jacobian_c[cat_i][1].x,
-        //            (float)Jacobian_c[cat_i][1].y,
-        //            (float)Jacobian_c[cat_i][1].z);
-        //     printf("J_ref[2] = (%f, %f, %f)\n",
-        //            (float)Jacobian_c[cat_i][2].x,
-        //            (float)Jacobian_c[cat_i][2].y,
-        //            (float)Jacobian_c[cat_i][2].z);
-        //     printf("===================================\n");
-        // }
     }
 
     for (int k = 0; k <= L; ++k) {  // Loop over z
@@ -805,38 +788,41 @@ __device__ void main_tet_loop_gpu(const int                               L,
 
                 // Category 0
                 // ... category 0 logic here ...
-                tet4_resample_tetrahedron_local_adjoint_category_gpu(0,  //
-                                                                     L,
-                                                                     bc,
-                                                                     J_phys,
-                                                                     Jacobian_c[0],
-                                                                     det_J_phys,
-                                                                     fxyz,
-                                                                     wf0,
-                                                                     wf1,
-                                                                     wf2,
-                                                                     wf3,
-                                                                     ox,
-                                                                     oy,
-                                                                     oz,
-                                                                     dx,
-                                                                     dy,
-                                                                     dz,
-                                                                     stride0,
-                                                                     stride1,
-                                                                     stride2,
-                                                                     n0,
-                                                                     n1,
-                                                                     n2,
-                                                                     data);
+                {
+                    const unsigned int cat_0 = 0;
+                    tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_0,  //
+                                                                         L,
+                                                                         bc,
+                                                                         J_phys,
+                                                                         Jacobian_c[cat_0],
+                                                                         det_J_phys,
+                                                                         fxyz,
+                                                                         wf0,
+                                                                         wf1,
+                                                                         wf2,
+                                                                         wf3,
+                                                                         ox,
+                                                                         oy,
+                                                                         oz,
+                                                                         dx,
+                                                                         dy,
+                                                                         dz,
+                                                                         stride0,
+                                                                         stride1,
+                                                                         stride2,
+                                                                         n0,
+                                                                         n1,
+                                                                         n2,
+                                                                         data);
+                }
 
                 if (i >= 1) {
-                    for (int cat = 1; cat <= 4; cat++) {
-                        tet4_resample_tetrahedron_local_adjoint_category_gpu(cat,  //
+                    for (int cat_ii = 1; cat_ii <= 4; cat_ii++) {
+                        tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_ii,  //
                                                                              L,
                                                                              bc,
                                                                              J_phys,
-                                                                             Jacobian_c[cat],
+                                                                             Jacobian_c[cat_ii],
                                                                              det_J_phys,
                                                                              fxyz,
                                                                              wf0,
@@ -862,11 +848,12 @@ __device__ void main_tet_loop_gpu(const int                               L,
                 if (j >= 1 && i >= 1) {
                     // Category 5
                     // ... category 5 logic here ...
-                    tet4_resample_tetrahedron_local_adjoint_category_gpu(5,  //
+                    const unsigned int cat_5 = 5;
+                    tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_5,  //
                                                                          L,
                                                                          bc,
                                                                          J_phys,
-                                                                         Jacobian_c[5],
+                                                                         Jacobian_c[cat_5],
                                                                          det_J_phys,
                                                                          fxyz,
                                                                          wf0,
@@ -1007,7 +994,7 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
                                                         z3_n,
                                                         Jacobian_phys));
 
-    // if (element_i == 0 && threadIdx.x < LANES_PER_TILE && blockIdx.x == 0) {
+    // if (element_i == 37078) {
     //     printf("---- Debug info (sfem_adjoint_mini_tet_kernel_gpu) ----\n");
     //     printf("Element %ld / %ld\n", element_i, end_element);
     //     printf("Vertex indices: %ld, %ld, %ld, %ld\n", (long)ev[0], (long)ev[1], (long)ev[2], (long)ev[3]);
@@ -1032,24 +1019,8 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
     //     printf("Max edge length: %e (between vertices %d and %d)\n", (double)max_edges_length, vertex_a, vertex_b);
 
     //     printf("---------------------------------------------------\n");
+    //     __trap();
     // }
-
-    // printf("det_J_phys = %e\n", (double)det_J_phys);
-    // printf("Values x0_n = %e, y0_n = %e, z0_n = %e, x1_n = %e, y1_n = %e, z1_n = %e, x2_n = %e, y2_n = %e, z2_n = %e, x3_n =
-    // %e, "
-    //        "y3_n = %e, z3_n = %e\n",
-    //        (double)x0_n,
-    //        (double)y0_n,
-    //        (double)z0_n,
-    //        (double)x1_n,
-    //        (double)y1_n,
-    //        (double)z1_n,
-    //        (double)x2_n,
-    //        (double)y2_n,
-    //        (double)z2_n,
-    //        (double)x3_n,
-    //        (double)y3_n,
-    //        (double)z3_n);
 
     main_tet_loop_gpu<FloatType>(L,                                          //
                                  Jacobian_phys,                              //
