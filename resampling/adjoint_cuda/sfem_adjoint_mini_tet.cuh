@@ -1,8 +1,10 @@
 #ifndef __SFEM_ADJOINT_MINI_TET_CUH__
 #define __SFEM_ADJOINT_MINI_TET_CUH__
 
+#include <cooperative_groups.h>
 #include <cuda_runtime.h>
 #include <stddef.h>
+#include <cuda/atomic>
 
 #include "quadratures_rule_cuda.cuh"
 #include "sfem_config.h"
@@ -11,6 +13,8 @@
 
 // typedef float   geom_t;
 // typedef int32_t idx_t;
+
+namespace cg = cooperative_groups;
 
 #define LANES_PER_TILE 32
 #define HYTEG_MAX_REFINEMENT_LEVEL 22
@@ -328,6 +332,47 @@ make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahed
     return det;
 }
 
+// Fast floor for float/double -> int (round down)
+__device__ __forceinline__ int fast_floorf(float x) { return __float2int_rd(x); }
+__device__ __forceinline__ int fast_floord(double x) { return __double2int_rd(x); }
+template <typename T>
+__device__ __forceinline__ int fast_floor(T x);
+template <>
+__device__ __forceinline__ int fast_floor<float>(float x) {
+    return fast_floorf(x);
+}
+template <>
+__device__ __forceinline__ int fast_floor<double>(double x) {
+    return fast_floord(x);
+}
+
+__device__ __forceinline__ float  fast_fmaf(float a, float b, float c) { return __fmaf_rn(a, b, c); }
+__device__ __forceinline__ double fast_fmad(double a, double b, double c) { return __fma_rn(a, b, c); }
+template <typename T>
+__device__ __forceinline__ T fast_fma(T a, T b, T c);
+
+template <>
+__device__ __forceinline__ float fast_fma<float>(float a, float b, float c) {
+    return fast_fmaf(a, b, c);
+}
+template <>
+__device__ __forceinline__ double fast_fma<double>(double a, double b, double c) {
+    return fast_fmad(a, b, c);
+}
+
+__device__ __forceinline__ float  fast_sqrtf(float x) { return sqrtf(x); }
+__device__ __forceinline__ double fast_sqrtd(double x) { return sqrt(x); }
+template <typename T>
+__device__ __forceinline__ T fast_sqrt(T x);
+template <>
+__device__ __forceinline__ float fast_sqrt<float>(float x) {
+    return fast_sqrtf(x);
+}
+template <>
+__device__ __forceinline__ double fast_sqrt<double>(double x) {
+    return fast_sqrtd(x);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Function to evaluate the 8 trilinear shape functions of a hexahedron
 // hex_aa_8_eval_fun_T_cu
@@ -344,19 +389,19 @@ hex_aa_8_eval_fun_T_gpu(const FloatType x,   // Local coordinates (in the unit c
                         FloatType&      f4,  //
                         FloatType&      f5,  //
                         FloatType&      f6,  //
-                        FloatType&      f7) {     //
-    // Quadrature point (local coordinates)
-    // With respect to the hat functions of a cube element
-    // In a local coordinate system
-    //
-    f0 = (1.0 - x) * (1.0 - y) * (1.0 - z);
-    f1 = x * (1.0 - y) * (1.0 - z);
-    f2 = x * y * (1.0 - z);
-    f3 = (1.0 - x) * y * (1.0 - z);
-    f4 = (1.0 - x) * (1.0 - y) * z;
-    f5 = x * (1.0 - y) * z;
-    f6 = x * y * z;
-    f7 = (1.0 - x) * y * z;
+                        FloatType&      f7) {
+    const FloatType one = FloatType(1.0);
+    const FloatType mx  = one - x;
+    const FloatType my  = one - y;
+    const FloatType mz  = one - z;
+    f0                  = mx * my * mz;
+    f1                  = x * my * mz;
+    f2                  = x * y * mz;
+    f3                  = mx * y * mz;
+    f4                  = mx * my * z;
+    f5                  = x * my * z;
+    f6                  = x * y * z;
+    f7                  = mx * y * z;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -405,7 +450,9 @@ points_distance_gpu(const FloatType x0,    //
     const FloatType dy = y1 - y0;
     const FloatType dz = z1 - z0;
 
-    return sqrt(dx * dx + dy * dy + dz * dz);
+    // dx*dx + dy*dy + dz*dz using fused multiply-adds
+    const FloatType sum = fast_fma(dx, dx, fast_fma(dy, dy, dz * dz));
+    return fast_sqrt(sum);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -514,6 +561,37 @@ alpha_to_hyteg_level_gpu(const FloatType    alpha,                //
 /////////////////////////////////////////////////////////////////////////////////
 // Resampling function for a mini-tetrahedron and a given category
 /////////////////////////////////////////////////////////////////////////////////
+
+// Warp-aggregated atomicAdd to reduce contention (1 atomic per unique address in a warp)
+template <typename T>
+__device__ inline void warpAggAtomicAdd(T* data, ptrdiff_t idx, T val) {
+#if __CUDA_ARCH__ >= 700
+    const unsigned full_mask = __activemask();
+    // Group lanes by target address
+    unsigned long long key    = reinterpret_cast<unsigned long long>(data + idx);
+    const unsigned     peers  = __match_any_sync(full_mask, key);
+    const int          leader = __ffs(peers) - 1;
+    const int          lane   = threadIdx.x & (warpSize - 1);
+
+    // Leader accumulates contributions from its peer group using uniform shuffles
+    T sum = val;
+    for (int src = 0; src < warpSize; ++src) {
+        // Everyone executes the same shuffle; only the leader of a group uses selected values
+        T v = __shfl_sync(full_mask, val, src);
+        if (lane == leader && (peers & (1u << src)) && src != leader) {
+            sum += v;
+        }
+    }
+
+    if (lane == leader) {
+        atomicAdd(&data[idx], sum);
+    }
+#else
+    // Fallback for older architectures
+    atomicAdd(&data[idx], val);
+#endif
+}
+
 template <typename FloatType>
 __device__ FloatType  //
 tet4_resample_tetrahedron_local_adjoint_category_gpu(
@@ -553,14 +631,35 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     const int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     const int lane_id   = thread_id % LANES_PER_TILE;
 
+    const FloatType inv_dx = FloatType(1.0) / dx;
+    const FloatType inv_dy = FloatType(1.0) / dy;
+    const FloatType inv_dz = FloatType(1.0) / dz;
+
+    // Per-thread cell-aware accumulation (one-entry cache)
+    ptrdiff_t cache_base = -1;  // invalid
+    // Relative offsets for the 8 hex nodes (constant for given strides)
+    const ptrdiff_t off0 = 0;
+    const ptrdiff_t off1 = stride0;
+    const ptrdiff_t off2 = stride0 + stride1;
+    const ptrdiff_t off3 = stride1;
+    const ptrdiff_t off4 = stride2;
+    const ptrdiff_t off5 = stride0 + stride2;
+    const ptrdiff_t off6 = stride0 + stride1 + stride2;
+    const ptrdiff_t off7 = stride1 + stride2;
+
+    FloatType acc0 = 0, acc1 = 0, acc2 = 0, acc3 = 0;
+    FloatType acc4 = 0, acc5 = 0, acc6 = 0, acc7 = 0;
+
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i += LANES_PER_TILE) {  // loop over the quadrature points
 
         const int quad_i_tile = quad_i + lane_id;
+        if (quad_i_tile >= TET_QUAD_NQP) continue;  // skip inactive lanes early
 
-        const FloatType qx = quad_i_tile < TET_QUAD_NQP ? tet_qx[quad_i_tile] : 0.0;
-        const FloatType qy = quad_i_tile < TET_QUAD_NQP ? tet_qy[quad_i_tile] : 0.0;
-        const FloatType qz = quad_i_tile < TET_QUAD_NQP ? tet_qz[quad_i_tile] : 0.0;
-        const FloatType qw = quad_i_tile < TET_QUAD_NQP ? tet_qw[quad_i_tile] : 0.0;
+        // Direct loads (avoid ternaries)
+        const FloatType qx = tet_qx[quad_i_tile];
+        const FloatType qy = tet_qy[quad_i_tile];
+        const FloatType qz = tet_qz[quad_i_tile];
+        const FloatType qw = tet_qw[quad_i_tile];
 
         // Mapping the quadrature point from the reference space to the mini-tetrahedron
         const FloatType xq_mref = J_ref[0].x * qx + J_ref[0].y * qy + J_ref[0].z * qz + bc.x;
@@ -572,13 +671,14 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType yq_phys = J_phys[1].x * xq_mref + J_phys[1].y * yq_mref + J_phys[1].z * zq_mref + fxyz.y;
         const FloatType zq_phys = J_phys[2].x * xq_mref + J_phys[2].y * yq_mref + J_phys[2].z * zq_mref + fxyz.z;
 
-        const FloatType grid_x = (xq_phys - ox) / dx;
-        const FloatType grid_y = (yq_phys - oy) / dy;
-        const FloatType grid_z = (zq_phys - oz) / dz;
+        const FloatType grid_x = (xq_phys - ox) * inv_dx;
+        const FloatType grid_y = (yq_phys - oy) * inv_dy;
+        const FloatType grid_z = (zq_phys - oz) * inv_dz;
 
-        const ptrdiff_t i = floor(grid_x);  /// ATTENTION: To be replaced with the template floor
-        const ptrdiff_t j = floor(grid_y);  /// In the sfem math library
-        const ptrdiff_t k = floor(grid_z);
+        // Fast floor
+        const ptrdiff_t i = (ptrdiff_t)fast_floor<FloatType>(grid_x);
+        const ptrdiff_t j = (ptrdiff_t)fast_floor<FloatType>(grid_y);
+        const ptrdiff_t k = (ptrdiff_t)fast_floor<FloatType>(grid_z);
 
         const FloatType l_x = (grid_x - (FloatType)(i));
         const FloatType l_y = (grid_y - (FloatType)(j));
@@ -619,30 +719,6 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
                                 hex8_f6,
                                 hex8_f7);
 
-        ptrdiff_t i0 = 0,  //
-                i1   = 0,  //
-                i2   = 0,  //
-                i3   = 0,  //
-                i4   = 0,  //
-                i5   = 0,  //
-                i6   = 0,  //
-                i7   = 0;  //
-
-        hex_aa_8_collect_coeffs_indices_gpu(stride0,  //
-                                            stride1,
-                                            stride2,
-                                            i,
-                                            j,
-                                            k,
-                                            i0,
-                                            i1,
-                                            i2,
-                                            i3,
-                                            i4,
-                                            i5,
-                                            i6,
-                                            i7);
-
         const FloatType d0 = It * hex8_f0;
         const FloatType d1 = It * hex8_f1;
         const FloatType d2 = It * hex8_f2;
@@ -652,65 +728,64 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType d6 = It * hex8_f6;
         const FloatType d7 = It * hex8_f7;
 
-        // if (threadIdx.x < LANES_PER_TILE && blockIdx.x == 0 && quad_i == 0 && category == 0) {
-        //     printf("---- Debug info (tet4_resample_tetrahedron_local_adjoint_category_gpu) ----\n");
-        //     printf("Category: %d, L: %d, quad_i_tile: %d, dV, det_J_phys: %e, N_micro_tet: %e\n",
-        //            category,
-        //            L,
-        //            quad_i_tile,
-        //            (double)det_J_phys,
-        //            (double)N_micro_tet);
-        //     printf("Quad point (ref space): %e, %e, %e, weight: %e\n", (double)qx, (double)qy, (double)qz, (double)qw);
-        //     printf("Mapped quad point (mini-ref space): %e, %e, %e\n", (double)xq_mref, (double)yq_mref, (double)zq_mref);
-        //     printf("Wfs: %e, %e, %e, %e\n", (double)wf0, (double)wf1, (double)wf2, (double)wf3);
-        //     printf("Hex indices: %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld\n",
-        //            (long)i0,
-        //            (long)i1,
-        //            (long)i2,
-        //            (long)i3,
-        //            (long)i4,
-        //            (long)i5,
-        //            (long)i6,
-        //            (long)i7);
+        // Base linear index for the current cell
+        const ptrdiff_t base = i * stride0 + j * stride1 + k * stride2;
 
-        //     printf("Hex shape functions: %e, %e, %e, %e, %e, %e, %e, %e\n",
-        //            (double)hex8_f0,
-        //            (double)hex8_f1,
-        //            (double)hex8_f2,
-        //            (double)hex8_f3,
-        //            (double)hex8_f4,
-        //            (double)hex8_f5,
-        //            (double)hex8_f6,
-        //            (double)hex8_f7);
-        //     printf("It: %e, dV: %e, wf_quad: %e, inv_N_micro_tet %e \n",
-        //            (double)It,
-        //            (double)dV,
-        //            (double)wf_quad,
-        //            (double)inv_N_micro_tet);
-
-        //     printf("d0: %e, d1: %e, d2: %e, d3: %e, d4: %e, d5: %e, d6: %e, d7: %e\n",
-        //            (double)d0,
-        //            (double)d1,
-        //            (double)d2,
-        //            (double)d3,
-        //            (double)d4,
-        //            (double)d5,
-        //            (double)d6,
-        //            (double)d7);
-
-        //     printf("d0 = It * hex8_f0 = %e * %e = %e\n", (double)It, (double)hex8_f0, (double)d0);
-        //     printf("-------------------------------------------------------------\n");
-        // }
+        if (base == cache_base) {
+            // Same cell as previous iteration: accumulate locally
+            acc0 += d0;
+            acc1 += d1;
+            acc2 += d2;
+            acc3 += d3;
+            acc4 += d4;
+            acc5 += d5;
+            acc6 += d6;
+            acc7 += d7;
+        } else {
+            // Flush previous cell if any
+            if (cache_base != -1) {
+                atomicAdd(&data[cache_base + off0], acc0);
+                atomicAdd(&data[cache_base + off1], acc1);
+                atomicAdd(&data[cache_base + off2], acc2);
+                atomicAdd(&data[cache_base + off3], acc3);
+                atomicAdd(&data[cache_base + off4], acc4);
+                atomicAdd(&data[cache_base + off5], acc5);
+                atomicAdd(&data[cache_base + off6], acc6);
+                atomicAdd(&data[cache_base + off7], acc7);
+            }
+            // Start accumulating for the new cell
+            cache_base = base;
+            acc0       = d0;
+            acc1       = d1;
+            acc2       = d2;
+            acc3       = d3;
+            acc4       = d4;
+            acc5       = d5;
+            acc6       = d6;
+            acc7       = d7;
+        }
 
         // Update the data with atomic operations to prevent race conditions
-        atomicAdd(&data[i0], d0);
-        atomicAdd(&data[i1], d1);
-        atomicAdd(&data[i2], d2);
-        atomicAdd(&data[i3], d3);
-        atomicAdd(&data[i4], d4);
-        atomicAdd(&data[i5], d5);
-        atomicAdd(&data[i6], d6);
-        atomicAdd(&data[i7], d7);
+        // atomicAdd(&data[i0], d0);
+        // atomicAdd(&data[i1], d1);
+        // atomicAdd(&data[i2], d2);
+        // atomicAdd(&data[i3], d3);
+        // atomicAdd(&data[i4], d4);
+        // atomicAdd(&data[i5], d5);
+        // atomicAdd(&data[i6], d6);
+        // atomicAdd(&data[i7], d7);
+    }
+
+    // Flush tail
+    if (cache_base != -1) {
+        atomicAdd(&data[cache_base + off0], acc0);
+        atomicAdd(&data[cache_base + off1], acc1);
+        atomicAdd(&data[cache_base + off2], acc2);
+        atomicAdd(&data[cache_base + off3], acc3);
+        atomicAdd(&data[cache_base + off4], acc4);
+        atomicAdd(&data[cache_base + off5], acc5);
+        atomicAdd(&data[cache_base + off6], acc6);
+        atomicAdd(&data[cache_base + off7], acc7);
     }
 
     // Reduce the cumulated_dV across all lanes in the tile
