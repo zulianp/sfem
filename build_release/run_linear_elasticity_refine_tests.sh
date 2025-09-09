@@ -11,14 +11,14 @@ echo "Starting Linear Elasticity Newmark refine level comparison tests..."
 
 export SFEM_SHEAR_MODULUS=2
 export SFEM_FIRST_LAME_PARAMETER=1.6666666666666667
-export SFEM_YOUNG_MODULUS=4
+export SFEM_SHEAR_STIFFNESS_KV=4
 export SFEM_BULK_MODULUS=3
 export SFEM_DT=0.1
 
 echo "Material parameters:"
 echo "  SHEAR_MODULUS = $SFEM_SHEAR_MODULUS"
 echo "  LAME_PARAMETER = $SFEM_FIRST_LAME_PARAMETER"
-echo "  YOUNG_MODULUS = $SFEM_YOUNG_MODULUS"
+echo "  SHEAR_STIFFNESS_KV = $SFEM_SHEAR_STIFFNESS_KV"
 echo "  BULK_MODULUS = $SFEM_BULK_MODULUS"
 echo "  DT = $SFEM_DT"
 
@@ -53,7 +53,7 @@ ls -d test_newmark_refine_*
 echo "Starting ParaView..."
 if [ -f "../../paraview_setting_2x2_full_kv_with_mesh.pvsm" ]; then
     echo "Note: ParaView state file is for KV tests, but will work for linear elasticity too"
-    /Applications/ParaView-5.13.3.app/Contents/MacOS/paraview --state=../../paraview_setting_2x2_full_kv_with_mesh.pvsm &
+    /Applications/ParaView-5.13.3.app/Contents/MacOS/paraview --state=../../paraview_setting_2x2_full_kv_with_mesh.pvsm  >/dev/null 2>&1 &
     echo "Using ParaView state: ../../paraview_setting_2x2_full_kv_with_mesh.pvsm"
 else
     echo "No state file found, opening files directly"
