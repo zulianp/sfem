@@ -216,7 +216,7 @@ int test_newmark() {
         output->log_time(t);
     }
 
-    auto solver     =  sfem::create_ssgmg(f, es);
+    // auto solver     =  sfem::create_ssgmg(f, es);
 
     while (t < T) {
         for (int k = 0; k < nliter; k++) {
