@@ -22,7 +22,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> acc_[3];
 
         // KV-Newmark parameters
-        real_t k{2.0}, K{5.0 / 3.0}, eta{1.0}, dt{0.2}, gamma{0.5}, beta{0.25}, rho{1.0};
+        real_t k{4.0}, K{3.0}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
         bool   use_affine_approximation{true};
 
         long   calls{0};
