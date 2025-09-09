@@ -319,8 +319,12 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
         scalar_t S_ikqm[81];
         tet4_S_ikqm(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikqm);
         scalar_t *inc_grad = F;
-        tet4_ref_inc_grad(element_ux, element_uy, element_uz, inc_grad);
-        tet4_partial_assembly_neohookean(S_iklm, inc_grad, element_outx, element_outy, element_outz);
+        tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
+
+        static const scalar_t grad_x[4] = {-1, 1, 0, 0};
+        static const scalar_t grad_y[4] = {-1, 0, 1, 0};
+        static const scalar_t grad_z[4] = {-1, 0, 0, 1};
+        tet4_apply_S_ikqm(S_ikqm, inc_grad, grad_x, grad_y, grad_z, 1, element_outx, element_outy, element_outz);
 #endif
 
         for (int edof_i = 0; edof_i < 4; edof_i++) {
