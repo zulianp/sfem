@@ -205,37 +205,49 @@ class PAKernelGenerator:
         content.append("")
 
         # Emit apply kernel using SoA gradients (gx, gy, gz)
-        apply_fun = """
+        # Embed reference shape function gradients via FE.grad at the reference point
+        q = self.fe.quadrature_point()
+        g = self.fe.grad(q)
+        nfun = self.fe.n_nodes()
+        grad_assign = []
+        # Declarations
+        grad_decl = "scalar_t grad_x[{}];\nscalar_t grad_y[{}];\nscalar_t grad_z[{}];\n".format(nfun, nfun, nfun)
+        for node in range(nfun):
+            grad_assign.append(ast.Assignment(sp.symbols(f"grad_x[{node}]"), g[node][0]))
+            grad_assign.append(ast.Assignment(sp.symbols(f"grad_y[{node}]"), g[node][1]))
+            grad_assign.append(ast.Assignment(sp.symbols(f"grad_z[{node}]"), g[node][2]))
+        grad_code = c_gen(grad_assign)
+
+        apply_fun = f"""
 static SFEM_INLINE void tet4_apply_S_ikqm(
     const scalar_t *const SFEM_RESTRICT S_ikqm,    // 3x3x3x3, includes dV
     const scalar_t *const SFEM_RESTRICT inc_grad,  // 3x3 reference trial gradient R
-    const scalar_t *const SFEM_RESTRICT grad_x,    // length 4
-    const scalar_t *const SFEM_RESTRICT grad_y,    // length 4
-    const scalar_t *const SFEM_RESTRICT grad_z,    // length 4
-    const count_t                       stride,
     scalar_t *const SFEM_RESTRICT       element_outx,
     scalar_t *const SFEM_RESTRICT       element_outy,
     scalar_t *const SFEM_RESTRICT       element_outz)
-{
+{{
     #define D 3
     #define IDX(i,k,q,m) ((((i) * D + (k)) * D + (q)) * D + (m))
 
-    // M[i][m] = sum_{k,q} S_ikqm[i,k,q,m] * inc_grad[k,q]
+    {grad_decl}
+    {grad_code}
+
+    // M[i][m] = sum{{k,q}} S_ikqm[i,k,q,m] * inc_grad[k,q]
     scalar_t M[D][D];
-    for (int i = 0; i < D; ++i) {
-        for (int m = 0; m < D; ++m) {
+    for (int i = 0; i < D; ++i) {{
+        for (int m = 0; m < D; ++m) {{
             scalar_t acc = 0;
-            for (int k = 0; k < D; ++k) {
-                for (int q = 0; q < D; ++q) {
+            for (int k = 0; k < D; ++k) {{
+                for (int q = 0; q < D; ++q) {{
                     acc += S_ikqm[IDX(i, k, q, m)] * inc_grad[k * D + q];
-                }
-            }
+                }}
+            }}
             M[i][m] = acc;
-        }
-    }
+        }}
+    }}
 
     // Write SoA outputs: x,y,z components into separate arrays
-    for (int node = 0; node < 4; ++node) {
+    for (int node = 0; node < {nfun}; ++node) {{
         const scalar_t gx = grad_x[node];
         const scalar_t gy = grad_y[node];
         const scalar_t gz = grad_z[node];
@@ -244,14 +256,14 @@ static SFEM_INLINE void tet4_apply_S_ikqm(
         const scalar_t valy = M[1][0] * gx + M[1][1] * gy + M[1][2] * gz;
         const scalar_t valz = M[2][0] * gx + M[2][1] * gy + M[2][2] * gz;
 
-        element_outx[node * stride] = valx;
-        element_outy[node * stride] = valy;
-        element_outz[node * stride] = valz;
-    }
+        element_outx[node] = valx;
+        element_outy[node] = valy;
+        element_outz[node] = valz;
+    }}
 
     #undef IDX
     #undef D
-}
+}}
 """
 
         content.append(apply_fun)
