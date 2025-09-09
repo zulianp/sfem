@@ -15,6 +15,7 @@ from hex8 import *
 from aahex8 import *
 
 from sympy import Array
+import numpy as np
 
 # from tpl_hyperelasticity import TPLHyperelasticity
 
@@ -133,13 +134,13 @@ class SRHyperelasticity:
         for s in symbol_names + invariants:
             if str(s) not in [str(sym) for sym in all_symbols]:
                 all_symbols.append(s)
-                match str(s):
-                    case "I1b":
-                        self.I1b_symb = s
-                    case "I2b":
-                        self.I2b_symb = s
-                    case "J":
-                        self.J_symb = s
+                sname = str(s)
+                if sname == "I1b":
+                    self.I1b_symb = s
+                elif sname == "I2b":
+                    self.I2b_symb = s
+                elif sname == "J":
+                    self.J_symb = s
         
         self.disp_grad_symb = create_matrix_symbol("disp_grad", self.fe.spatial_dim(), self.fe.spatial_dim())
         self.F_symb = create_matrix_symbol("F", self.fe.spatial_dim(), self.fe.spatial_dim())
@@ -163,7 +164,8 @@ class SRHyperelasticity:
     # ---------------- Directional derivatives (separated from FEM) ----------------
     def __compute_piola_stress(self):
         F = self.F_symb
-        F_inv_T = F.T.inv()
+        # Use explicit inverse to ensure correct differentiation through F^{-T}
+        F_inv_T = inverse(F).T
         J = determinant(F)
         B = F * F.T
         Jm23 = J ** (-sp.Rational(2, 3))
@@ -293,46 +295,7 @@ class SRHyperelasticity:
 
     def partial_assembly(self):
         S_iklm = self.expression_table["S_iklm"]
-        # c_code(assign_tensor4(self.S_iklm_symb, S_iklm))
         return S_iklm
-
-    # def kernel_apply(self):
-    #     fe = self.fe
-    #     dims = self.fe.manifold_dim()
-    #     grad = fe.tgrad(q, ncomp=dims)
-        
-    #     expr = []
-    #     F = self.def_grad()
-    #     expr.extend(assign_matrix(self.F_symb, F))
-
-    #     print(f"T F[{dims*dims}];")
-    #     print("{", end="")
-    #     c_code(expr)
-    #     print("}\n\n")
-
-    #     print(f"T trial_grad[{dims*dims}];")
-    #     print("{", end="")
-    #     c_code(assign_matrix(self.trial_grad_symb, self.expression_table["inc_grad"]))
-    #     print("}\n\n")
-
-    #     lin_stress_x_jinv_t = self.expression_table["lin_stressXJinv_t"]
-
-    #     lin_stress_symb = matrix_coeff("lin_stressXJinv_t", dims, dims)
-
-    #     print(f"T *lin_stressXJinv_t = F;")
-    #     print("{", end="")
-    #     c_code(assign_matrix(lin_stress_symb, lin_stress_x_jinv_t))
-    #     print("}\n\n")
-
-    #     expr = []
-    #     for i in range(0, dims * fe.n_nodes()):
-    #         lform = sp.symbols(f"element_vector[{i}*stride]")
-    #         expr.append(ast.Assignment(lform, inner(lin_stress_symb, grad[i])))
-
-    #     print("{", end="")
-    #     c_code(expr)
-    #     print("}\n\n")
-    #     return expr
 
     def kernel_apply(self):
         fe = self.fe
@@ -357,6 +320,7 @@ class SRHyperelasticity:
         S_iklm_symb = self.S_iklm_symb
 
         print(f"T S_iklm[{dims*dims*dims*dims}];")
+        print("{", end="")
         c_code(assign_tensor4(S_iklm_symb, partial_assembly))
         print("}\n\n")
 
@@ -370,9 +334,10 @@ class SRHyperelasticity:
                         Lim[i, m] += S_iklm_symb[i, k, l, m] * Hkl[k, l]
 
         expr = []
+        dV = self.expression_table["dV"]
         for i in range(0, dims * fe.n_nodes()):
             lform = sp.symbols(f"element_vector[{i}*stride]")
-            expr.append(ast.Assignment(lform, inner(Lim, grad[i])))
+            expr.append(ast.Assignment(lform, inner(Lim, grad[i]) * dV))
 
         print("{", end="")
         c_code(expr)
@@ -418,20 +383,25 @@ class SRHyperelasticity:
         where H_j is the physical gradient for trial dof j derived from reference gradients.
         """
         fe = self.fe
-        dims = s['dims']
+        dims = self.fe.manifold_dim()
         ndofs = dims * fe.n_nodes()
 
-        F = s['F']
-        P = s['P']
-        jac_inv = s['jac_inv']
-        dV = s['dV']
+        # Use internally managed symbols and expressions
+        # Differentiate P w.r.t. the fundamental F symbols, then substitute F = I + disp_grad
+        P = self.expression_table["P"]
+        jac_inv = self.expression_table["jac_inv"]
+        dV = self.expression_table["dV"]
+
+        # Reference gradients and physical mapping
+        q = self.fe.quadrature_point()
+        gref = fe.tgrad(q, ncomp=dims)
 
         expr = []
 
         # Loop over trial dofs j and test dofs i
         for j in range(0, ndofs):
-            # Physical gradient for trial j: Htrial = gref[j] * jac_inv
-            Htrial = s['gref'][j] * jac_inv
+            # Physical gradient for trial dof j
+            Htrial = gref[j] * jac_inv
 
             # Linearized stress dP = (∂P/∂F):Htrial
             dP = sp.Matrix(dims, dims, [0] * (dims * dims))
@@ -440,14 +410,17 @@ class SRHyperelasticity:
                     acc = 0
                     for i1 in range(dims):
                         for i2 in range(dims):
-                            acc += sp.diff(P[a, b], F[i1, i2]) * Htrial[i1, i2]
-                    dP[a, b] = simplify(acc)
+                            # Differentiate w.r.t. the fundamental F symbols
+                            acc += sp.diff(P[a, b], self.F_symb[i1, i2]) * Htrial[i1, i2]
+                    # Substitute F = I + disp_grad symbols to evaluate at current state
+                    dP[a, b] = simplify(subsmat(acc, self.F_symb, self.expression_table["F"]))
 
+            # Map to reference test side and scale by measure
             Lop = dP * jac_inv.T * dV
 
             for i in range(0, ndofs):
                 var = sp.symbols(f"element_matrix[{i*ndofs + j}*stride]")
-                expr.append(ast.Assignment(var, inner(Lop, s['gref'][i])))
+                expr.append(ast.Assignment(var, inner(Lop, gref[i])))
 
         return expr
 
@@ -461,6 +434,119 @@ class SRHyperelasticity:
         
         # self.tpl.emit_all(opname=opname, kernels={'gradient': k_grad, 'apply': k_apply, 'value': k_value}, out_dir=out_dir)
 
+def verify_kernel_apply_against_hessian(op: SRHyperelasticity, ntests: int = 2, seed: int = 0):
+    """Numerically verify that matrix-free kernel_apply matches full Hessian action.
+
+    Compares (S_iklm : H) : T * dV vs assembled H @ h for random increments on a Tet4.
+    """
+    np.random.seed(seed)
+
+    fe = op.fe
+    assert isinstance(fe, Tet4)
+
+    dims = fe.manifold_dim()
+    ndofs = dims * fe.n_nodes()
+
+    # Symbols to substitute
+    mu, lmbda = sp.symbols("mu lmbda")
+    qw = fe.quadrature_weight()
+    q = fe.quadrature_point()
+    gref = fe.tgrad(q, ncomp=dims)
+
+    # Random invertible J
+    J = np.random.randn(dims, dims)
+    while abs(np.linalg.det(J)) < 1e-2:
+        J = np.random.randn(dims, dims)
+    detJ = float(np.linalg.det(J))
+    Jinv = np.linalg.inv(J)
+    Adj = detJ * Jinv  # adjugate
+
+    # Substitutions for geometry and parameters
+    subs = {}
+    subs[op.fe.symbol_jacobian_determinant()] = detJ
+    subs[qw] = 1.0
+    # Assign adjugate symbols
+    adj = fe.symbol_adjugate()
+    for i in range(dims):
+        for j in range(dims):
+            subs[adj[i, j]] = Adj[i, j]
+    # Material params
+    subs[mu] = 2.0
+    subs[lmbda] = 5.0
+
+    # Evaluate reference gradients numerically (Tet4 are constant)
+    # Evaluate each tensorized gradient G (dims x dims) numerically
+    gref_num = []
+    for G in gref:
+        Gnum = np.zeros((dims, dims), dtype=float)
+        for r in range(dims):
+            for c in range(dims):
+                Gnum[r, c] = float(sp.N(G[r, c].subs(subs)))
+        gref_num.append(Gnum)
+
+    # Evaluate S_iklm (partial assembly) at F = I
+    S = op.partial_assembly()
+    Fsym = op.F_symb
+    I = sp.eye(dims)
+    subs_F = {Fsym[i, j]: (1.0 if i == j else 0.0) for i in range(dims) for j in range(dims)}
+    subs_all = {**subs, **subs_F}
+
+    # Numeric S_iklm tensor
+    S_num = np.zeros((dims, dims, dims, dims), dtype=float)
+    for i in range(dims):
+        for k in range(dims):
+            for l in range(dims):
+                for m in range(dims):
+                    S_num[i, k, l, m] = float(sp.N(S[i, k, l, m].subs(subs_all)))
+
+    dV = float(sp.N(op.expression_table["dV"].subs(subs)))
+
+    for _ in range(ntests):
+        # Random increment vector h and corresponding H = sum_j h_j * (gref[j] * Jinv)
+        h = np.random.randn(ndofs)
+        H = np.zeros((dims, dims), dtype=float)
+        for j in range(ndofs):
+            H += h[j] * (gref_num[j] @ Jinv)
+
+        # Matrix-free apply: r_i = inner((S:H), gref[i]) * dV
+        r_apply = np.zeros((ndofs,), dtype=float)
+        for i in range(ndofs):
+            comp_i = i // fe.n_nodes()
+            # Compute Lim[comp_i, :] only
+            Lim_row = np.zeros((dims,), dtype=float)
+            for k in range(dims):
+                for l in range(dims):
+                    Lim_row += S_num[comp_i, k, l, :] * H[k, l]
+            # inner(Lim, gref[i]) reduces to dot(Lim_row, row of gref[i])
+            r_apply[i] = float(np.dot(Lim_row, gref_num[i][comp_i, :]) * dV)
+
+        # Full Hessian assemble times h
+        # Build constitutive tensor C = dP/dF at F = I
+        C = op.expression_table["constitutive_tensor"]
+        C_num = np.zeros((dims, dims, dims, dims), dtype=float)
+        for a in range(dims):
+            for b in range(dims):
+                for k in range(dims):
+                    for l in range(dims):
+                        C_num[a, b, k, l] = float(sp.N(C[a, b, k, l].subs(subs_all)))
+
+        # Assemble Hmat * h via dP contraction
+        r_full = np.zeros((ndofs,), dtype=float)
+        for j in range(ndofs):
+            Htrial = gref_num[j] @ Jinv
+            dP = np.zeros((dims, dims), dtype=float)
+            for a in range(dims):
+                for b in range(dims):
+                    dP[a, b] = (C_num[a, b] * Htrial).sum()
+            Lop = dP @ Jinv.T * dV
+            for i in range(ndofs):
+                comp_i = i // fe.n_nodes()
+                r_full[i] += np.dot(Lop[comp_i, :], gref_num[i][comp_i, :]) * h[j]
+
+        err = np.linalg.norm(r_apply - r_full) / max(1.0, np.linalg.norm(r_full))
+        print(f"apply vs full error: {err:.3e}")
+        assert err < 1e-8, f"Mismatch between kernel_apply and full Hessian action: {err}"
+
 def main():
     strain_energy_function = "(mu/2)*(I1b - 3) + (lmbda/2)*(log(J))**2"
     # strain_energy_function = "J * (I2b + (I1b * 0.8341331275382947))"
@@ -470,6 +556,8 @@ def main():
     # fe = Hex8()
     op = SRHyperelasticity.create_from_string(fe, strain_energy_function)
     op.emit_all(opname=name)
+    # Numerical consistency check: matrix-free vs full Hessian
+    verify_kernel_apply_against_hessian(op, ntests=2, seed=42)
 
 
 if __name__ == "__main__":
