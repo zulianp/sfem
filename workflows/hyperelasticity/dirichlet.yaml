@@ -9,4 +9,4 @@ dirichlet_conditions:
     format: file
     path: aorta_geometry/outlet
     value: 0.1
-    component: 2
+    component: 0
