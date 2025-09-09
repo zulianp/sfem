@@ -92,6 +92,20 @@ int kelvin_voigt_newmark_gradient_aos(const enum ElemType                   elem
                                          real_t *const SFEM_RESTRICT           values);
 
 
+int kelvin_voigt_newmark_assemble_diag_aos(const enum ElemType          element_type,
+                                            const ptrdiff_t              nelements,
+                                            const ptrdiff_t              nnodes,
+                                            idx_t **const SFEM_RESTRICT  elems,
+                                            geom_t **const SFEM_RESTRICT xyz,
+                                            const real_t                 beta,
+                                            const real_t                 gamma,
+                                            const real_t                 dt,
+                                            const real_t                 k,
+                                            const real_t                 K,
+                                            const real_t                 eta,
+                                            const real_t                 rho,
+                                            real_t *const SFEM_RESTRICT  values);
+
 
 #ifdef __cplusplus
 }

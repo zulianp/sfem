@@ -34,7 +34,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> acc_[3];
         enum ElemType                   element_type{INVALID};
 
-        real_t k{2.0}, K{5.0 / 3.0}, eta{0.5}, dt{0.2}, gamma{0.5}, beta{0.25}, rho{1.0};
+        real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
 
         long   calls{0};
         double total_time{0};
@@ -58,15 +58,15 @@ namespace sfem {
 
         auto ret = std::make_unique<KelvinVoigtNewmark>(space);
 
-        real_t SFEM_YOUNG_MODULUS = 2.0;
-        real_t SFEM_BULK_MODULUS  = 5.0 / 3.0;
-        real_t SFEM_DAMPING_RATIO = 0.5;
-        real_t SFEM_DT            = 0.2;
+        real_t SFEM_SHEAR_STIFFNESS_KV = 4;
+        real_t SFEM_BULK_MODULUS  = 3;
+        real_t SFEM_DAMPING_RATIO = 0.1;
+        real_t SFEM_DT            = 0.1;
         real_t SFEM_GAMMA         = 0.5;
         real_t SFEM_BETA          = 0.25;
         real_t SFEM_DENSITY       = 1.0;
 
-        SFEM_READ_ENV(SFEM_YOUNG_MODULUS, atof);
+        SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
         SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
         SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
         SFEM_READ_ENV(SFEM_DT, atof);
@@ -74,7 +74,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_BETA, atof);
         SFEM_READ_ENV(SFEM_DENSITY, atof);
 
-        ret->impl_->k = SFEM_YOUNG_MODULUS;
+        ret->impl_->k = SFEM_SHEAR_STIFFNESS_KV;
         ret->impl_->K = SFEM_BULK_MODULUS;
         ret->impl_->eta = SFEM_DAMPING_RATIO;
         ret->impl_->dt  = SFEM_DT;
@@ -224,10 +224,39 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int KelvinVoigtNewmark::hessian_diag(const real_t *const /*x*/, real_t *const out) {
+    int KelvinVoigtNewmark::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("KelvinVoigtNewmark::hessian_diag");
-        SFEM_ERROR("Called unimplemented method!\n");
-        return SFEM_FAILURE;
+
+        auto mesh = impl_->space->mesh_ptr();
+        int  err  = SFEM_SUCCESS;
+
+        impl_->iterate([&](const OpDomain &domain) {
+            auto block        = domain.block;
+            auto beta       = domain.parameters->get_real_value("beta", impl_->beta);
+            auto gamma       = domain.parameters->get_real_value("gamma", impl_->gamma);
+            auto dt           = domain.parameters->get_real_value("dt", impl_->dt);
+            auto k           = domain.parameters->get_real_value("k", impl_->k);
+            auto K           = domain.parameters->get_real_value("K", impl_->K);
+            auto eta           = domain.parameters->get_real_value("eta", impl_->eta);
+            auto rho           = domain.parameters->get_real_value("rho", impl_->rho);
+            auto element_type = domain.element_type;
+
+            return kelvin_voigt_newmark_assemble_diag_aos(element_type,
+                                                       block->n_elements(),
+                                                       mesh->n_nodes(),
+                                                       block->elements()->data(),
+                                                       mesh->points()->data(),
+                                                       impl_->beta,
+                                                       impl_->gamma,
+                                                       impl_->dt,
+                                                       impl_->k,
+                                                       impl_->K,
+                                                       impl_->eta,
+                                                       impl_->rho,
+                                                       out);
+        });
+
+        return err;
     }
 
     int KelvinVoigtNewmark::gradient(const real_t *const x, real_t *const out) {
