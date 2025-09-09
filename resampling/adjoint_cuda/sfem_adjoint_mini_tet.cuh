@@ -48,6 +48,77 @@ struct Float3<float> {
     __device__ static inline type make(float x, float y, float z) { return make_float3(x, y, z); }
 };
 
+// Warp-aggregated atomicAdd to reduce contention (1 atomic per unique address in a warp)
+template <typename T>
+__device__ inline void warpAggAtomicAdd(T* data, ptrdiff_t idx, T val) {
+#if __CUDA_ARCH__ >= 700
+    const unsigned full_mask = __activemask();
+    // Group lanes by target address
+    unsigned long long key    = reinterpret_cast<unsigned long long>(data + idx);
+    const unsigned     peers  = __match_any_sync(full_mask, key);
+    const int          leader = __ffs(peers) - 1;
+    const int          lane   = threadIdx.x & (warpSize - 1);
+
+    // Leader accumulates contributions from its peer group using uniform shuffles
+    T sum = val;
+    for (int src = 0; src < warpSize; ++src) {
+        // Everyone executes the same shuffle; only the leader of a group uses selected values
+        T v = __shfl_sync(full_mask, val, src);
+        if (lane == leader && (peers & (1u << src)) && src != leader) {
+            sum += v;
+        }
+    }
+
+    if (lane == leader) {
+        atomicAdd(&data[idx], sum);
+    }
+#else
+    // Fallback for older architectures
+    atomicAdd(&data[idx], val);
+#endif
+}
+
+// Fast floor for float/double -> int (round down)
+__device__ __forceinline__ int fast_floorf(float x) { return __float2int_rd(x); }
+__device__ __forceinline__ int fast_floord(double x) { return __double2int_rd(x); }
+template <typename T>
+__device__ __forceinline__ int fast_floor(T x);
+template <>
+__device__ __forceinline__ int fast_floor<float>(float x) {
+    return fast_floorf(x);
+}
+template <>
+__device__ __forceinline__ int fast_floor<double>(double x) {
+    return fast_floord(x);
+}
+
+__device__ __forceinline__ float  fast_fmaf(float a, float b, float c) { return fmaf(a, b, c); }
+__device__ __forceinline__ double fast_fmad(double a, double b, double c) { return fma(a, b, c); }
+template <typename T>
+__device__ __forceinline__ T fast_fma(T a, T b, T c);
+
+template <>
+__device__ __forceinline__ float fast_fma<float>(float a, float b, float c) {
+    return fast_fmaf(a, b, c);
+}
+template <>
+__device__ __forceinline__ double fast_fma<double>(double a, double b, double c) {
+    return fast_fmad(a, b, c);
+}
+
+__device__ __forceinline__ float  fast_sqrtf(float x) { return sqrtf(x); }
+__device__ __forceinline__ double fast_sqrtd(double x) { return sqrt(x); }
+template <typename T>
+__device__ __forceinline__ T fast_sqrt(T x);
+template <>
+__device__ __forceinline__ float fast_sqrt<float>(float x) {
+    return fast_sqrtf(x);
+}
+template <>
+__device__ __forceinline__ double fast_sqrt<double>(double x) {
+    return fast_sqrtd(x);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Function to get the Jacobian matrix for a given category
 // get_category_Jacobian
@@ -325,52 +396,13 @@ make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahed
     //                      J[1] * (J[3] * J[8] - J[5] * J[6]) +  //
     //                      J[2] * (J[3] * J[7] - J[4] * J[6]);   //
 
-    const FloatType det = J[0].x * (J[1].y * J[2].z - J[1].z * J[2].y) -  //
-                          J[0].y * (J[1].x * J[2].z - J[1].z * J[2].x) +  //
-                          J[0].z * (J[1].x * J[2].y - J[1].y * J[2].x);   //
+    // FMA-accelerated evaluation
+    const FloatType m00 = fast_fma(J[1].y, J[2].z, -(J[1].z * J[2].y));  // J[1].y*J[2].z - J[1].z*J[2].y
+    const FloatType m01 = fast_fma(J[1].x, J[2].z, -(J[1].z * J[2].x));  // J[1].x*J[2].z - J[1].z*J[2].x
+    const FloatType m02 = fast_fma(J[1].x, J[2].y, -(J[1].y * J[2].x));  // J[1].x*J[2].y - J[1].y*J[2].x
+    const FloatType det = fast_fma(J[0].x, m00, fast_fma(-J[0].y, m01, J[0].z * m02));
 
     return det;
-}
-
-// Fast floor for float/double -> int (round down)
-__device__ __forceinline__ int fast_floorf(float x) { return __float2int_rd(x); }
-__device__ __forceinline__ int fast_floord(double x) { return __double2int_rd(x); }
-template <typename T>
-__device__ __forceinline__ int fast_floor(T x);
-template <>
-__device__ __forceinline__ int fast_floor<float>(float x) {
-    return fast_floorf(x);
-}
-template <>
-__device__ __forceinline__ int fast_floor<double>(double x) {
-    return fast_floord(x);
-}
-
-__device__ __forceinline__ float  fast_fmaf(float a, float b, float c) { return __fmaf_rn(a, b, c); }
-__device__ __forceinline__ double fast_fmad(double a, double b, double c) { return __fma_rn(a, b, c); }
-template <typename T>
-__device__ __forceinline__ T fast_fma(T a, T b, T c);
-
-template <>
-__device__ __forceinline__ float fast_fma<float>(float a, float b, float c) {
-    return fast_fmaf(a, b, c);
-}
-template <>
-__device__ __forceinline__ double fast_fma<double>(double a, double b, double c) {
-    return fast_fmad(a, b, c);
-}
-
-__device__ __forceinline__ float  fast_sqrtf(float x) { return sqrtf(x); }
-__device__ __forceinline__ double fast_sqrtd(double x) { return sqrt(x); }
-template <typename T>
-__device__ __forceinline__ T fast_sqrt(T x);
-template <>
-__device__ __forceinline__ float fast_sqrt<float>(float x) {
-    return fast_sqrtf(x);
-}
-template <>
-__device__ __forceinline__ double fast_sqrt<double>(double x) {
-    return fast_sqrtd(x);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -547,8 +579,8 @@ alpha_to_hyteg_level_gpu(const FloatType    alpha,                //
     if (alpha < alpha_min_threshold) return min_refinement_L;  // No refinement
     if (alpha > alpha_max_threshold) return max_refinement_L;  // Maximum refinement
 
-    FloatType alpha_x = alpha - alpha_min_threshold;  // Shift the alpha to start from 0
-    FloatType L_real =
+    const FloatType alpha_x = alpha - alpha_min_threshold;  // Shift the alpha to start from 0
+    const FloatType L_real =
             (alpha_x / (alpha_max_threshold - alpha_min_threshold) * (FloatType)(HYTEG_MAX_REFINEMENT_LEVEL - 1)) + 1.0;
 
     int L = L_real >= FloatType(1.0) ? (int)L_real : min_refinement_L;        // Convert to integer
@@ -561,34 +593,13 @@ alpha_to_hyteg_level_gpu(const FloatType    alpha,                //
 /////////////////////////////////////////////////////////////////////////////////
 // Resampling function for a mini-tetrahedron and a given category
 /////////////////////////////////////////////////////////////////////////////////
-
-// Warp-aggregated atomicAdd to reduce contention (1 atomic per unique address in a warp)
 template <typename T>
-__device__ inline void warpAggAtomicAdd(T* data, ptrdiff_t idx, T val) {
-#if __CUDA_ARCH__ >= 700
-    const unsigned full_mask = __activemask();
-    // Group lanes by target address
-    unsigned long long key    = reinterpret_cast<unsigned long long>(data + idx);
-    const unsigned     peers  = __match_any_sync(full_mask, key);
-    const int          leader = __ffs(peers) - 1;
-    const int          lane   = threadIdx.x & (warpSize - 1);
-
-    // Leader accumulates contributions from its peer group using uniform shuffles
-    T sum = val;
-    for (int src = 0; src < warpSize; ++src) {
-        // Everyone executes the same shuffle; only the leader of a group uses selected values
-        T v = __shfl_sync(full_mask, val, src);
-        if (lane == leader && (peers & (1u << src)) && src != leader) {
-            sum += v;
-        }
-    }
-
-    if (lane == leader) {
-        atomicAdd(&data[idx], sum);
-    }
+__device__ __forceinline__ void store_add(T* dst, T v) {
+// #define SFEM_NON_ATOMIC_UPDATES
+#if defined(SFEM_NON_ATOMIC_UPDATES)
+    *dst += v;  // non-atomic update (use only if no overlaps)
 #else
-    // Fallback for older architectures
-    atomicAdd(&data[idx], val);
+    atomicAdd(dst, v);  // default: safe atomic add
 #endif
 }
 
@@ -650,9 +661,23 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     FloatType acc0 = 0, acc1 = 0, acc2 = 0, acc3 = 0;
     FloatType acc4 = 0, acc5 = 0, acc6 = 0, acc7 = 0;
 
-    for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i += LANES_PER_TILE) {  // loop over the quadrature points
+    // Precompute offsets for grid mapping: (x - o) * inv_d == fma(inv_d, x, (-o)*inv_d)
+    const FloatType neg_ox_inv_dx = (-ox) * inv_dx;
+    const FloatType neg_oy_inv_dy = (-oy) * inv_dy;
+    const FloatType neg_oz_inv_dz = (-oz) * inv_dz;
 
-        const int quad_i_tile = quad_i + lane_id;
+    const ptrdiff_t quad_iterations = TET_QUAD_NQP / LANES_PER_TILE + ((TET_QUAD_NQP % LANES_PER_TILE) ? 1 : 0);
+    const ptrdiff_t quad_start      = lane_id * quad_iterations;
+
+    // printf("TET_QUAD_NQP=%d, LANES_PER_TILE=%d, quad_iterations=%ld, quad_start=%ld\n", TET_QUAD_NQP, LANES_PER_TILE,
+    // quad_iterations, quad_start);
+
+    // for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i += LANES_PER_TILE) {  // loop over the quadrature points
+    for (ptrdiff_t quad_i = 0; quad_i < quad_iterations; ++quad_i) {  // loop over the quadrature points
+
+        const ptrdiff_t quad_i_tile = quad_start + quad_i;
+        // const int quad_i_tile = quad_i + lane_id;
+
         if (quad_i_tile >= TET_QUAD_NQP) continue;  // skip inactive lanes early
 
         // Direct loads (avoid ternaries)
@@ -661,19 +686,37 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType qz = tet_qz[quad_i_tile];
         const FloatType qw = tet_qw[quad_i_tile];
 
+        // // Mapping the quadrature point from the reference space to the mini-tetrahedron
+        // const FloatType xq_mref = J_ref[0].x * qx + J_ref[0].y * qy + J_ref[0].z * qz + bc.x;
+        // const FloatType yq_mref = J_ref[1].x * qx + J_ref[1].y * qy + J_ref[1].z * qz + bc.y;
+        // const FloatType zq_mref = J_ref[2].x * qx + J_ref[2].y * qy + J_ref[2].z * qz + bc.z;
+
+        // // Mapping the quadrature point from the mini-tetrahedron to the physical space
+        // const FloatType xq_phys = J_phys[0].x * xq_mref + J_phys[0].y * yq_mref + J_phys[0].z * zq_mref + fxyz.x;
+        // const FloatType yq_phys = J_phys[1].x * xq_mref + J_phys[1].y * yq_mref + J_phys[1].z * zq_mref + fxyz.y;
+        // const FloatType zq_phys = J_phys[2].x * xq_mref + J_phys[2].y * yq_mref + J_phys[2].z * zq_mref + fxyz.z;
+
+        // const FloatType grid_x = (xq_phys - ox) * inv_dx;
+        // const FloatType grid_y = (yq_phys - oy) * inv_dy;
+        // const FloatType grid_z = (zq_phys - oz) * inv_dz;
+
         // Mapping the quadrature point from the reference space to the mini-tetrahedron
-        const FloatType xq_mref = J_ref[0].x * qx + J_ref[0].y * qy + J_ref[0].z * qz + bc.x;
-        const FloatType yq_mref = J_ref[1].x * qx + J_ref[1].y * qy + J_ref[1].z * qz + bc.y;
-        const FloatType zq_mref = J_ref[2].x * qx + J_ref[2].y * qy + J_ref[2].z * qz + bc.z;
+        const FloatType xq_mref = fast_fma(J_ref[0].z, qz, fast_fma(J_ref[0].y, qy, fast_fma(J_ref[0].x, qx, bc.x)));
+        const FloatType yq_mref = fast_fma(J_ref[1].z, qz, fast_fma(J_ref[1].y, qy, fast_fma(J_ref[1].x, qx, bc.y)));
+        const FloatType zq_mref = fast_fma(J_ref[2].z, qz, fast_fma(J_ref[2].y, qy, fast_fma(J_ref[2].x, qx, bc.z)));
 
         // Mapping the quadrature point from the mini-tetrahedron to the physical space
-        const FloatType xq_phys = J_phys[0].x * xq_mref + J_phys[0].y * yq_mref + J_phys[0].z * zq_mref + fxyz.x;
-        const FloatType yq_phys = J_phys[1].x * xq_mref + J_phys[1].y * yq_mref + J_phys[1].z * zq_mref + fxyz.y;
-        const FloatType zq_phys = J_phys[2].x * xq_mref + J_phys[2].y * yq_mref + J_phys[2].z * zq_mref + fxyz.z;
+        const FloatType xq_phys =
+                fast_fma(J_phys[0].z, zq_mref, fast_fma(J_phys[0].y, yq_mref, fast_fma(J_phys[0].x, xq_mref, fxyz.x)));
+        const FloatType yq_phys =
+                fast_fma(J_phys[1].z, zq_mref, fast_fma(J_phys[1].y, yq_mref, fast_fma(J_phys[1].x, xq_mref, fxyz.y)));
+        const FloatType zq_phys =
+                fast_fma(J_phys[2].z, zq_mref, fast_fma(J_phys[2].y, yq_mref, fast_fma(J_phys[2].x, xq_mref, fxyz.z)));
 
-        const FloatType grid_x = (xq_phys - ox) * inv_dx;
-        const FloatType grid_y = (yq_phys - oy) * inv_dy;
-        const FloatType grid_z = (zq_phys - oz) * inv_dz;
+        // Grid coords with fused multiply-add
+        const FloatType grid_x = fast_fma(inv_dx, xq_phys, neg_ox_inv_dx);
+        const FloatType grid_y = fast_fma(inv_dy, yq_phys, neg_oy_inv_dy);
+        const FloatType grid_z = fast_fma(inv_dz, zq_phys, neg_oz_inv_dz);
 
         // Fast floor
         const ptrdiff_t i = (ptrdiff_t)fast_floor<FloatType>(grid_x);
@@ -691,7 +734,8 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
 
         // printf("theta_volume = %e, inv_N_micro_tet = %e, qw = %e\n", theta_volume, inv_N_micro_tet, qw);
 
-        const FloatType wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
+        const FloatType wf_quad = fast_fma(f0, wf0, fast_fma(f1, wf1, fast_fma(f2, wf2, f3 * wf3)));
+
         // const FloatType wf_quad = f0 * 1.0 + f1 * 1.0 + f2 * 1.0 + f3 * 1.0;
         const FloatType dV = theta_volume * inv_N_micro_tet * qw;
         const FloatType It = wf_quad * dV;
@@ -744,14 +788,14 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         } else {
             // Flush previous cell if any
             if (cache_base != -1) {
-                atomicAdd(&data[cache_base + off0], acc0);
-                atomicAdd(&data[cache_base + off1], acc1);
-                atomicAdd(&data[cache_base + off2], acc2);
-                atomicAdd(&data[cache_base + off3], acc3);
-                atomicAdd(&data[cache_base + off4], acc4);
-                atomicAdd(&data[cache_base + off5], acc5);
-                atomicAdd(&data[cache_base + off6], acc6);
-                atomicAdd(&data[cache_base + off7], acc7);
+                store_add(&data[cache_base + off0], acc0);
+                store_add(&data[cache_base + off1], acc1);
+                store_add(&data[cache_base + off2], acc2);
+                store_add(&data[cache_base + off3], acc3);
+                store_add(&data[cache_base + off4], acc4);
+                store_add(&data[cache_base + off5], acc5);
+                store_add(&data[cache_base + off6], acc6);
+                store_add(&data[cache_base + off7], acc7);
             }
             // Start accumulating for the new cell
             cache_base = base;
@@ -764,28 +808,18 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
             acc6       = d6;
             acc7       = d7;
         }
-
-        // Update the data with atomic operations to prevent race conditions
-        // atomicAdd(&data[i0], d0);
-        // atomicAdd(&data[i1], d1);
-        // atomicAdd(&data[i2], d2);
-        // atomicAdd(&data[i3], d3);
-        // atomicAdd(&data[i4], d4);
-        // atomicAdd(&data[i5], d5);
-        // atomicAdd(&data[i6], d6);
-        // atomicAdd(&data[i7], d7);
     }
 
     // Flush tail
     if (cache_base != -1) {
-        atomicAdd(&data[cache_base + off0], acc0);
-        atomicAdd(&data[cache_base + off1], acc1);
-        atomicAdd(&data[cache_base + off2], acc2);
-        atomicAdd(&data[cache_base + off3], acc3);
-        atomicAdd(&data[cache_base + off4], acc4);
-        atomicAdd(&data[cache_base + off5], acc5);
-        atomicAdd(&data[cache_base + off6], acc6);
-        atomicAdd(&data[cache_base + off7], acc7);
+        store_add(&data[cache_base + off0], acc0);
+        store_add(&data[cache_base + off1], acc1);
+        store_add(&data[cache_base + off2], acc2);
+        store_add(&data[cache_base + off3], acc3);
+        store_add(&data[cache_base + off4], acc4);
+        store_add(&data[cache_base + off5], acc5);
+        store_add(&data[cache_base + off6], acc6);
+        store_add(&data[cache_base + off7], acc7);
     }
 
     // Reduce the cumulated_dV across all lanes in the tile
@@ -838,10 +872,6 @@ __device__ void main_tet_loop_gpu(const int                               L,
 
     for (int cat_i = 0; cat_i < 6; cat_i++) {
         bool status = get_category_Jacobian<FloatType>(cat_i, FloatType(L), Jacobian_c[cat_i]);
-        if (!status) {
-            // Handle error: invalid category
-            // For example, you might want to set a default value or log an error
-        }
     }
 
     for (int k = 0; k <= L; ++k) {  // Loop over z
