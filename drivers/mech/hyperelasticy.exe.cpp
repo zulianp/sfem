@@ -89,10 +89,15 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->verbose = true;
     cg->set_max_it(10000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-6);
+    cg->set_rtol(1e-8);
+    cg->set_atol(1e-10);
 
-    cg->apply(rhs->data(), increment->data());
-    sfem::blas<real_t>(es)->axpy(ndofs, 1, increment->data(), displacement->data());
+    auto blas = sfem::blas<real_t>(es);
+    for(int i = 0; i < 2; i++) {
+        blas->zeros(ndofs, increment->data());
+        cg->apply(rhs->data(), increment->data());
+        blas->axpy(ndofs, 1, increment->data(), displacement->data());
+    }
 
     // TODO: Newton iteration
 
