@@ -8,5 +8,5 @@ dirichlet_conditions:
   - type: sideset
     format: file
     path: aorta_geometry/outlet
-    value: 0.1
+    value: 2
     component: 0

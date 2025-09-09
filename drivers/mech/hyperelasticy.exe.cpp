@@ -12,6 +12,7 @@
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
+#include "sfem_Env.hpp"
 #include "sfem_DirichletConditions.hpp"
 
 
@@ -81,26 +82,27 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            increment     = sfem::create_buffer<real_t>(ndofs, es);
     auto            rhs   = sfem::create_buffer<real_t>(ndofs, es);
 
-    f->apply_constraints(rhs->data());
-    f->apply_constraints(displacement->data());
 
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
     auto cg = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose = true;
     cg->set_max_it(10000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-8);
+    cg->set_rtol(1e-6);
     cg->set_atol(1e-10);
 
+    // Newton iteration
+    int nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 20);
+    real_t alpha = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
     auto blas = sfem::blas<real_t>(es);
-    for(int i = 0; i < 2; i++) {
+    for(int i = 0; i < nl_max_it; i++) {
+        blas->zeros(ndofs, rhs->data());
+        f->gradient(displacement->data(), rhs->data());
         blas->zeros(ndofs, increment->data());
+        f->copy_constrained_dofs(rhs->data(), increment->data());
         cg->apply(rhs->data(), increment->data());
-        blas->axpy(ndofs, 1, increment->data(), displacement->data());
+        blas->axpy(ndofs, -alpha, increment->data(), displacement->data());
     }
-
-    // TODO: Newton iteration
-
    
     // Output to disk
     sfem::create_directory(output_path.c_str());
