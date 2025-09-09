@@ -10,6 +10,7 @@
 #include "sfem_SemiStructuredVectorLaplacian.hpp"
 #include "sfem_SemiStructuredLumpedMass.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_SemiStructuredKV.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
@@ -29,6 +30,7 @@ namespace sfem {
     class SemiStructuredVectorLaplacian;
     class SemiStructuredLumpedMass;
     class SemiStructuredEMLaplacian;
+    class SemiStructuredKelvinVoigtNewmark;
     class SpectralElementLaplacian;
     
     // Other operators
@@ -57,6 +59,7 @@ namespace sfem {
             instance_.private_register_op("KelvinVoigtNewmark", create_kelvin_voigt_newmark);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
+            instance_.private_register_op("ss:KelvinVoigtNewmark", SemiStructuredKelvinVoigtNewmark::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
             instance_.private_register_op("ss:VectorLaplacian", SemiStructuredVectorLaplacian::create);

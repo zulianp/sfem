@@ -301,6 +301,11 @@ namespace sfem {
         return nc;
     }
 
+    int NeumannConditions::hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
+        // Neumann conditions only affect RHS, not the system matrix diagonal
+        return SFEM_SUCCESS;
+    }
+
     std::shared_ptr<Op> NeumannConditions::derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) {
         // std::map<  //
         //         std::shared_ptr<Sideset>,
