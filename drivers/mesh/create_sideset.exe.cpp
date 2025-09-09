@@ -72,6 +72,9 @@ int main(int argc, char *argv[]) {
         const geom_t angle_threshold = atof(argv[5]);
         std::string  output_folder   = argv[6];
 
+        int SFEM_DEBUG = 0;
+        SFEM_READ_ENV(SFEM_DEBUG, atoi);
+
         if (!rank) {
             fprintf(stderr,
                     "%s %s %g %g %g %g %s\n",
@@ -100,7 +103,6 @@ int main(int argc, char *argv[]) {
         const ptrdiff_t n_nodes    = mesh->n_nodes();
         auto            elements   = mesh->elements()->data();
         auto            points     = mesh->points()->data();
-        const int       nsxe       = elem_num_sides(mesh->element_type());
 
         ///////////////////////////////////////////////////////////////////////////////
         // Create skin sideset
@@ -125,6 +127,8 @@ int main(int argc, char *argv[]) {
                 break;
         }
 
+        const int nsxe = elem_num_sides(element_type_hack);
+
         enum ElemType st   = side_type(element_type_hack);
         const int     nnxs = elem_num_nodes(st);
         const int     dim  = mesh->spatial_dimension();
@@ -144,7 +148,7 @@ int main(int argc, char *argv[]) {
 
         auto parent              = sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent_buff);
         auto side_idx            = sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx_buff);
-        auto table               = sfem::manage_host_buffer<element_idx_t>(n_surf_elements * nsxe, table_buff);
+        auto table               = sfem::manage_host_buffer<element_idx_t>(n_elements * nsxe, table_buff);
         auto element_mapping_ptr = sfem::create_host_buffer<element_idx_t>(n_elements + 1);
 
         auto local_side_table = sfem::create_host_buffer<int>(nsxe * nnxs);
@@ -173,15 +177,15 @@ int main(int argc, char *argv[]) {
 #pragma omp atomic update
             emap_ptr[sp + 1]++;
 
-            geom_t barycenter[3]= {0., 0., 0.};
+            geom_t barycenter[3] = {0., 0., 0.};
             for (int d = 0; d < dim; ++d) {
                 for (int n = 0; n < nnxs; n++) {
-                    idx_t node = elements[lst[s * nnxs + n]][e];
+                    idx_t node = elements[lst[s * nnxs + n]][sp];
                     barycenter[d] += points[d][node];
                 }
                 barycenter[d] /= nnxs;
             }
-        
+
             real_t sq_dist = 0.;
             for (int d = 0; d < dim; ++d) {
                 const real_t m_x   = barycenter[d];
@@ -223,7 +227,7 @@ int main(int argc, char *argv[]) {
         }
 
 #ifndef NDEBUG
-        for(ptrdiff_t i = 0; i < nmaps; i++) {
+        for (ptrdiff_t i = 0; i < nmaps; i++) {
             assert(emap_idx[i] < table->size());
         }
 #endif
@@ -236,7 +240,7 @@ int main(int argc, char *argv[]) {
         auto selected = sfem::create_host_buffer<uint8_t>(table->size());
         auto eselect  = selected->data();
 
-        ptrdiff_t size_queue    = (n_elements + 1);
+        ptrdiff_t size_queue    = (n_surf_elements + 1);
         auto      element_queue = sfem::create_host_buffer<ptrdiff_t>(size_queue);
         auto      equeue        = element_queue->data();
 
@@ -408,10 +412,8 @@ int main(int argc, char *argv[]) {
         sideset_parent->to_file((output_folder + "/parent.raw").c_str());
         sideset_lfi->to_file((output_folder + "/lfi.int16.raw").c_str());
 
-        int SFEM_DEBUG = 0;
-        SFEM_READ_ENV(SFEM_DEBUG, atoi);
-
         if (SFEM_DEBUG) {
+            printf("Extraced %ld/%ld surface elements\n", long(sideset_parent->size()), long(parent->size()));
             auto debug_elements = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(mesh->element_type())), n_selected);
 
             if (extract_surface_from_sideset(mesh->element_type(),
