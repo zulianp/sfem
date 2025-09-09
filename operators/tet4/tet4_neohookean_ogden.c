@@ -316,10 +316,10 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
 #else // New partial assembly implementation
         scalar_t F[9];
         tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
-        scalar_t S_iklm[81];
-        tet4_S_iklm(jacobian_adjugate, jacobian_determinant, F, mu, lambda, S_iklm);
+        scalar_t S_ikqm[81];
+        tet4_S_ikqm(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikqm);
         scalar_t *inc_grad = F;
-        tet4_inc_grad(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, inc_grad);
+        tet4_ref_inc_grad(element_ux, element_uy, element_uz, inc_grad);
         tet4_partial_assembly_neohookean(S_iklm, inc_grad, element_outx, element_outy, element_outz);
 #endif
 

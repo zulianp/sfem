@@ -203,6 +203,54 @@ class PAKernelGenerator:
         content.append(body_S)
         content.append("}\n")
         content.append("")
+
+        # Emit apply kernel using SoA gradients (gx, gy, gz)
+        apply_fun = """
+static SFEM_INLINE void tet4_apply_S_ikqm(
+    const scalar_t *const SFEM_RESTRICT S_ikqm,   // 3x3x3x3, includes dV
+    const scalar_t *const SFEM_RESTRICT inc_grad, // 3x3 reference trial gradient R
+    const scalar_t *const SFEM_RESTRICT grad_x,   // length 4
+    const scalar_t *const SFEM_RESTRICT grad_y,   // length 4
+    const scalar_t *const SFEM_RESTRICT grad_z,   // length 4
+    const count_t                       stride,
+    scalar_t       *const SFEM_RESTRICT element_vector)
+{
+    #define D 3
+    #define IDX(i,k,q,m) ((((i) * D + (k)) * D + (q)) * D + (m))
+
+    // M[i][m] = sum_{k,q} S_ikqm[i,k,q,m] * inc_grad[k,q]
+    scalar_t M[D][D];
+    for (int i = 0; i < D; ++i) {
+        for (int m = 0; m < D; ++m) {
+            scalar_t acc = 0;
+            for (int k = 0; k < D; ++k) {
+                for (int q = 0; q < D; ++q) {
+                    acc += S_ikqm[IDX(i, k, q, m)] * inc_grad[k * D + q];
+                }
+            }
+            M[i][m] = acc;
+        }
+    }
+
+    // element_vector[dof] = dot(M[comp][:], grad_phi[node][:])
+    for (int comp = 0; comp < D; ++comp) {
+        for (int node = 0; node < 4; ++node) {
+            const scalar_t gx = grad_x[node];
+            const scalar_t gy = grad_y[node];
+            const scalar_t gz = grad_z[node];
+            const scalar_t val = M[comp][0] * gx + M[comp][1] * gy + M[comp][2] * gz;
+            const int dof = comp * 4 + node;
+            element_vector[dof * stride] = val;
+        }
+    }
+
+    #undef IDX
+    #undef D
+}
+"""
+
+        content.append(apply_fun)
+        content.append("")
         content.append(f"#endif /* {GUARD} */\n")
 
         with open(out_path, "w") as f:
