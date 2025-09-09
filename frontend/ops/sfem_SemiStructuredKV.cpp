@@ -38,21 +38,21 @@ namespace sfem {
         assert(space->element_type() == SSHEX8);
         auto ret = std::make_unique<SemiStructuredKelvinVoigtNewmark>(space);
 
-        real_t SFEM_YOUNG_MODULUS        = 2.0;
-        real_t SFEM_BULK_MODULUS         = 5.0 / 3.0;
-        real_t SFEM_DAMPING_RATIO        = 1.0;
-        real_t SFEM_DT                   = 0.2;
+        real_t SFEM_SHEAR_STIFFNESS_KV        = 4.0;
+        real_t SFEM_BULK_MODULUS         = 3.0;
+        real_t SFEM_DAMPING_RATIO        = 0.1;
+        real_t SFEM_DT                   = 0.1;
         real_t SFEM_GAMMA                = 0.5;
         real_t SFEM_BETA                 = 0.25;
         real_t SFEM_DENSITY              = 1.0;
-        SFEM_READ_ENV(SFEM_YOUNG_MODULUS, atof);
+        SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
         SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
         SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
         SFEM_READ_ENV(SFEM_DT, atof);
         SFEM_READ_ENV(SFEM_GAMMA, atof);
         SFEM_READ_ENV(SFEM_BETA, atof);
         SFEM_READ_ENV(SFEM_DENSITY, atof);
-        ret->k           = SFEM_YOUNG_MODULUS;
+        ret->k           = SFEM_SHEAR_STIFFNESS_KV;
         ret->K           = SFEM_BULK_MODULUS;
         ret->eta         = SFEM_DAMPING_RATIO;
         ret->dt          = SFEM_DT;
@@ -96,13 +96,13 @@ namespace sfem {
                                                     ssm.interior_start(),
                                                     ssm.element_data(),
                                                     ssm.point_data(),
-                                                    K,
-                                                    eta,
-                                                    rho,
-                                                    k,
                                                     beta,
                                                     gamma,
                                                     dt,
+                                                    k,
+                                                    K,
+                                                    eta,
+                                                    rho,
                                                     3,
                                                     &values[0],
                                                     &values[1],

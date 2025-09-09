@@ -444,13 +444,13 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
                                             const ptrdiff_t              nnodes,
                                             idx_t **const SFEM_RESTRICT  elements,
                                             geom_t **const SFEM_RESTRICT points,
-                                            const real_t                 K,
-                                            const real_t                 eta,
-                                            const real_t                 rho,
-                                            const real_t                 k,
                                             const real_t                 beta,
                                             const real_t                 gamma,
                                             const real_t                 dt,
+                                            const real_t                 k,
+                                            const real_t                 K,
+                                            const real_t                 eta,
+                                            const real_t                 rho,
                                             const ptrdiff_t              out_stride,
                                             real_t *const                outx,
                                             real_t *const                outy,
@@ -521,7 +521,7 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
             scalar_t sub_determinant;
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
 
-            sshex8_kelvin_voigt_newmark_diag(K, eta, rho, k, beta, gamma, dt, sub_adjugate, sub_determinant, element_diag);
+            sshex8_kelvin_voigt_newmark_diag(beta, gamma, dt, k, K, eta, rho, sub_adjugate, sub_determinant, element_diag);
 
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
