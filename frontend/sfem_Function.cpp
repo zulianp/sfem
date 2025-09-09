@@ -519,20 +519,16 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::derefine");
         auto ret = std::make_shared<Function>(space);
 
-        printf("[DEBUG] Function::derefine - Processing %zu operators:\n", impl_->ops.size());
         for (size_t i = 0; i < impl_->ops.size(); i++) {
             auto &o = impl_->ops[i];
             if (o->is_no_op()) {
                 continue;
             }
-            printf("[DEBUG]   Op[%zu]: %s\n", i, o->name());
             auto dop = o->derefine_op(space);
             if (!dop) {
-                printf("[ERROR] Op[%zu] (%s) derefine_op returned nullptr!\n", i, o->name());
                 SFEM_ERROR("derefine_op returned nullptr");
                 return nullptr;
             }
-            printf("[DEBUG]   -> derefine_op returned: %s (is_no_op=%d)\n", dop->name(), dop->is_no_op());
             if (!dop->is_no_op()) {
                 ret->impl_->ops.push_back(dop);
             }

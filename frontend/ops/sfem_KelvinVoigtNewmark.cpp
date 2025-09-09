@@ -58,7 +58,7 @@ namespace sfem {
 
         auto ret = std::make_unique<KelvinVoigtNewmark>(space);
 
-        real_t SFEM_YOUNG_MODULUS = 4;
+        real_t SFEM_SHEAR_STIFFNESS_KV = 4;
         real_t SFEM_BULK_MODULUS  = 3;
         real_t SFEM_DAMPING_RATIO = 0.1;
         real_t SFEM_DT            = 0.1;
@@ -66,7 +66,7 @@ namespace sfem {
         real_t SFEM_BETA          = 0.25;
         real_t SFEM_DENSITY       = 1.0;
 
-        SFEM_READ_ENV(SFEM_YOUNG_MODULUS, atof);
+        SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
         SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
         SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
         SFEM_READ_ENV(SFEM_DT, atof);
@@ -74,7 +74,7 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_BETA, atof);
         SFEM_READ_ENV(SFEM_DENSITY, atof);
 
-        ret->impl_->k = SFEM_YOUNG_MODULUS;
+        ret->impl_->k = SFEM_SHEAR_STIFFNESS_KV;
         ret->impl_->K = SFEM_BULK_MODULUS;
         ret->impl_->eta = SFEM_DAMPING_RATIO;
         ret->impl_->dt  = SFEM_DT;
