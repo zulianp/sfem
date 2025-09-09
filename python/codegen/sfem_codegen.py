@@ -491,7 +491,8 @@ def matrix_coeff(name, rows, cols):
 
     for i in range(0, rows):
         for j in range(0, cols):
-            ui = sp.symbols(f"{name}[{i * rows + j}]", real=True)
+            # Index row-major: offset = i*cols + j (not i*rows + j)
+            ui = sp.symbols(f"{name}[{i * cols + j}]", real=True)
             list_coeffs.append(ui)
 
     ret = sp.Matrix(rows, cols, list_coeffs)
