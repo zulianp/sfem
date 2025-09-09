@@ -81,14 +81,29 @@ n_procs=1
 Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
 Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
+# Nsight_OUTPUT="/capstor/scratch/cscs/sriva/ncu_out"
+
 LAUNCH="mpiexec -np $n_procs "
+# LAUNCH="srun -p debug  --exclusive -n $n_procs --gpus-per-task=1  "
+
 # LAUNCH="srun -p debug  --cpu-bind=socket  --exclusive -n $n_procs --gpus-per-task=1  ./mps-wrapper.sh "
 
-# LAUNCH="srun -p debug -n $n_procs  ${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
+# LAUNCH="srun -p debug -n $n_procs  ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
+
 # LAUNCH=""
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
-# LAUNCH="${Nsight_PATH}/ncu  --set roofline --print-details body  -f --section ComputeWorkloadAnalysis -o ${Nsight_OUTPUT} "
+# LAUNCH="${Nsight_PATH}/ncu \
+#     --set roofline \
+#     --print-details body \
+#     -f \
+#     --section ComputeWorkloadAnalysis \
+#     --section InstructionStats \
+#     --section SourceCounters \
+#     --section LaunchStats \
+#     --kernel-name-base demangled \
+#     -o ${Nsight_OUTPUT} \
+# 	mpiexec -np $n_procs "
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
@@ -117,7 +132,7 @@ fi
 
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float64
+raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
 
 
 # Function to create metadata and convert raw files to XDMF format
