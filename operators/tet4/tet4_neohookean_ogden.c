@@ -299,7 +299,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 0 // Old implementation
+#if 0  // Old implementation
         tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
                                           jacobian_determinant,
                                           mu,
@@ -313,18 +313,47 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                           element_outx,
                                           element_outy,
                                           element_outz);
-#else // New partial assembly implementation
-        scalar_t F[9];
+#else  // New partial assembly implementation
+       // FUTURE: Preprocessing (once per linearization)
+        scalar_t F[9] = {0};
         tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
-        scalar_t S_ikqm[81];
+        scalar_t S_ikqm[81] = {0};
         tet4_S_ikqm(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikqm);
+
+        // FUTURE: Processing (each apply)
         scalar_t *inc_grad = F;
         tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
+        tet4_apply_S_ikqm(S_ikqm, inc_grad, element_outx, element_outy, element_outz);
 
-        static const scalar_t grad_x[4] = {-1, 1, 0, 0};
-        static const scalar_t grad_y[4] = {-1, 0, 1, 0};
-        static const scalar_t grad_z[4] = {-1, 0, 0, 1};
-        tet4_apply_S_ikqm(S_ikqm, inc_grad, grad_x, grad_y, grad_z, 1, element_outx, element_outy, element_outz);
+
+#ifndef NDEBUG
+        scalar_t test_outx[4] = {0};
+        scalar_t test_outy[4] = {0};
+        scalar_t test_outz[4] = {0};
+        tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
+                                          jacobian_determinant,
+                                          mu,
+                                          lambda,
+                                          element_ux,
+                                          element_uy,
+                                          element_uz,
+                                          element_hx,
+                                          element_hy,
+                                          element_hz,
+                                          test_outx,
+                                          test_outy,
+                                          test_outz);
+
+        for (int k = 0; k < 4; k++) {
+            scalar_t diffx = test_outx[k] - element_outx[k];
+            scalar_t diffy = test_outy[k] - element_outy[k];
+            scalar_t diffz = test_outz[k] - element_outz[k];
+
+            assert(fabs(diffx) < 1e-12);
+            assert(fabs(diffy) < 1e-12);
+            assert(fabs(diffz) < 1e-12);
+        }
+#endif  // NDEBUG
 #endif
 
         for (int edof_i = 0; edof_i < 4; edof_i++) {
@@ -344,20 +373,20 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
     return 0;
 }
 
-int tet4_neohookean_ogden_gradient(const ptrdiff_t              nelements,
-                                   const ptrdiff_t              nnodes,
-                                   idx_t **const SFEM_RESTRICT  elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   const real_t                 mu,
-                                   const real_t                 lambda,
-                                   const ptrdiff_t              u_stride,
-                                   const real_t *const  SFEM_RESTRICT        ux,
-                                   const real_t *const  SFEM_RESTRICT        uy,
-                                   const real_t *const  SFEM_RESTRICT        uz,
-                                   const ptrdiff_t              out_stride,
-                                   real_t *const SFEM_RESTRICT                outx,
-                                   real_t *const SFEM_RESTRICT                outy,
-                                   real_t *const SFEM_RESTRICT                outz) {
+int tet4_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
+                                   const ptrdiff_t                   nnodes,
+                                   idx_t **const SFEM_RESTRICT       elements,
+                                   geom_t **const SFEM_RESTRICT      points,
+                                   const real_t                      mu,
+                                   const real_t                      lambda,
+                                   const ptrdiff_t                   u_stride,
+                                   const real_t *const SFEM_RESTRICT ux,
+                                   const real_t *const SFEM_RESTRICT uy,
+                                   const real_t *const SFEM_RESTRICT uz,
+                                   const ptrdiff_t                   out_stride,
+                                   real_t *const SFEM_RESTRICT       outx,
+                                   real_t *const SFEM_RESTRICT       outy,
+                                   real_t *const SFEM_RESTRICT       outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
