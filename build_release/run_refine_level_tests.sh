@@ -5,7 +5,7 @@ set -e
 # switch to the directory of the script (build_release)
 cd "$(dirname "$0")"
 
-REFINE_LEVELS=(16)
+REFINE_LEVELS=(32)
 
 echo "Starting Kelvin-Voigt refine level comparison tests..."
 
@@ -16,7 +16,7 @@ export SFEM_BULK_MODULUS=3
 export SFEM_DT=0.1
 export SFEM_DAMPING_RATIO=1
 export SFEM_DENSITY=1
-export SFEM_NEWMARK_ENABLE_OUTPUT=0
+export SFEM_NEWMARK_ENABLE_OUTPUT=1
 
 echo "Material parameters:"
 echo "  SHEAR_MODULUS = $SFEM_SHEAR_MODULUS"
