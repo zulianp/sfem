@@ -1,10 +1,20 @@
 #ifndef __SFEM_ADJOINT_MINI_TET_FUN_CUH__
 #define __SFEM_ADJOINT_MINI_TET_FUN_CUH__
 
+#include <assert.h>
 #include <cooperative_groups.h>
 #include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
+#include <math.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/sequence.h>
+#include <thrust/sort.h>
 #include <cuda/atomic>
+#include <set>
 
 #include "quadratures_rule_cuda.cuh"
 #include "sfem_adjoint_mini_tet_fun.cuh"
@@ -91,6 +101,48 @@ __device__ __forceinline__ int fast_floor<float>(float x) {
 template <>
 __device__ __forceinline__ int fast_floor<double>(double x) {
     return fast_floord(x);
+}
+
+__device__ __forceinline__ int fast_ceilf(float x) { return __float2int_ru(x); }
+__device__ __forceinline__ int fast_ceild(double x) { return __double2int_ru(x); }
+
+template <typename T>
+__device__ __forceinline__ int fast_ceil(T x);
+template <>
+__device__ __forceinline__ int fast_ceil<float>(float x) {
+    return fast_ceilf(x);
+}
+template <>
+__device__ __forceinline__ int fast_ceil<double>(double x) {
+    return fast_ceild(x);
+}
+
+__device__ __forceinline__ float  fast_minf(float a, float b) { return a < b ? a : b; }
+__device__ __forceinline__ double fast_mind(double a, double b) { return a < b ? a : b; }
+
+template <typename T>
+__device__ __forceinline__ T fast_min(T a, T b);
+template <>
+__device__ __forceinline__ float fast_min<float>(float a, float b) {
+    return fast_minf(a, b);
+}
+template <>
+__device__ __forceinline__ double fast_min<double>(double a, double b) {
+    return fast_mind(a, b);
+}
+
+__device__ __forceinline__ float  fast_maxf(float a, float b) { return a > b ? a : b; }
+__device__ __forceinline__ double fast_maxd(double a, double b) { return a > b ? a : b; }
+
+template <typename T>
+__device__ __forceinline__ T fast_max(T a, T b);
+template <>
+__device__ __forceinline__ float fast_max<float>(float a, float b) {
+    return fast_maxf(a, b);
+}
+template <>
+__device__ __forceinline__ double fast_max<double>(double a, double b) {
+    return fast_maxd(a, b);
 }
 
 __device__ __forceinline__ float  fast_fmaf(float a, float b, float c) { return fmaf(a, b, c); }
@@ -602,6 +654,48 @@ __device__ __forceinline__ void store_add(T* dst, T v) {
 #else
     atomicAdd(dst, v);  // default: safe atomic add
 #endif
+}
+
+__global__ void setup_kernel(curandState* state, unsigned long seed, int n) {
+    int id = threadIdx.x + blockDim.x * blockIdx.x;
+    if (id < n) curand_init(seed, id, 0, &state[id]);
+}
+
+template <typename FloatType>
+__global__ void generate(curandState* globalState, FloatType* result, int count) {
+    int ind = threadIdx.x + blockDim.x * blockIdx.x;
+    if (ind < count) {
+        curandState localState = globalState[ind];
+        FloatType   RANDOM     = curand_uniform(&localState);
+        globalState[ind]       = localState;
+        result[ind]            = RANDOM;
+    }
+}
+
+template <typename FloatType>
+inline int generate_unique_random_numbers(const int                   N,          //
+                                          curandState*                devStates,  //
+                                          thrust::device_vector<int>& d_r,        //
+                                          int*                        d_result) {                        //
+    const int R = N;
+
+    if (R <= 0) return 1;
+
+    // setup seeds
+    dim3 block(256);
+    dim3 grid((R + block.x - 1) / block.x);
+    setup_kernel<<<grid, block>>>(devStates, (unsigned long)time(NULL), R);
+
+    // generate random numbers
+    generate<<<grid, block>>>(devStates, d_result, R);
+    cudaDeviceSynchronize();
+
+    thrust::sequence(d_r.begin(), d_r.end(), 0);
+
+    thrust::device_ptr<int> dp_res = thrust::device_pointer_cast(d_result);
+    thrust::sort_by_key(dp_res, dp_res + R, d_r.begin());
+
+    return 0;
 }
 
 #endif  // __SFEM_ADJOINT_MINI_TET_FUN_CUH__
