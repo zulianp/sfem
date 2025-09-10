@@ -229,9 +229,9 @@ class SRHyperelasticity:
 
         terms = []
         for i in range(0, dim):
-            for n in range(0, dim):
-                for k in range(0, dim):
-                    for m in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
                         S_ikmn = 0
                         for j in range(0, dim):
                             reduce_l = 0
@@ -249,7 +249,6 @@ class SRHyperelasticity:
         self.expression_table["S_ikmn"] = S_ikmn
         return S_ikmn  
 
-
     def __compute_SdotH_km(self):
         S_ikmn = self.S_ikmn_symb
         inc_grad = self.inc_grad_symb
@@ -266,7 +265,6 @@ class SRHyperelasticity:
 
     def __compute_apply(self):
         SdotH_km = self.__create_matrix_symbol("SdotH_km")
-        dim = self.fe.spatial_dim()
         nnodes = self.fe.n_nodes()
         eoutx = sp.Matrix(nnodes, 1, [0] * nnodes)
         eouty = sp.Matrix(nnodes, 1, [0] * nnodes)

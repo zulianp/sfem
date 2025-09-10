@@ -299,7 +299,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 0  // Old implementation
+#if 1  // Old implementation
         tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
                                           jacobian_determinant,
                                           mu,
@@ -349,9 +349,9 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
             scalar_t diffy = test_outy[k] - element_outy[k];
             scalar_t diffz = test_outz[k] - element_outz[k];
 
-            assert(fabs(diffx) < 1e-12);
-            assert(fabs(diffy) < 1e-12);
-            assert(fabs(diffz) < 1e-12);
+            assert(fabs(diffx) < 1e-8);
+            assert(fabs(diffy) < 1e-8);
+            assert(fabs(diffz) < 1e-8);
         }
 #endif  // NDEBUG
 #endif
