@@ -31,6 +31,9 @@ typedef struct OpDesc {
     template <class Op, class X, class Y>
     void measure(Op op, X x, Y y, int repeat) {
         sfem::device_synchronize();
+        
+        op->apply(x, y);
+
         double start = MPI_Wtime();
 
         for (int r = 0; r < repeat; r++) {
@@ -135,6 +138,7 @@ int main(int argc, char *argv[]) {
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }
 
+        std::cout << "#nodes " << m->n_nodes() << "\n";
         std::cout << OpDesc_t::header();
         for (auto &op_desc : ops) {
             op_desc.print(std::cout);
