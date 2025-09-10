@@ -48,6 +48,7 @@ class PAKernelGenerator:
         dV = self.dV
 
         # S_iklm with dV included
+        # test-side mapping uses Jinv^T; since JinvT = jac_inv (J^{-T}), we use indices [j,m]
         terms = []
         for i in range(dim):
             for k in range(dim):
@@ -55,11 +56,14 @@ class PAKernelGenerator:
                     for m in range(dim):
                         acc = 0
                         for j in range(dim):
-                            acc += C[i, j, k, l] * Jinv[m, j]
+                            acc += C[i, j, k, l] * Jinv[j, m]
                         terms.append(acc * dV)
+
+                        
         self.S_iklm = Array(terms, shape=(dim, dim, dim, dim))
 
         # S_ikqm precontracted also on trial-side mapping
+        # jac_inv is J^{-T}; we need Jinv (J^{-1}) on the trial side => use jac_inv.T
         terms_q = []
         for i in range(dim):
             for k in range(dim):
@@ -67,7 +71,7 @@ class PAKernelGenerator:
                     for m in range(dim):
                         acc = 0
                         for l in range(dim):
-                            acc += self.S_iklm[i, k, l, m] * Jinv[q, l]
+                            acc += self.S_iklm[i, k, l, m] * Jinv.T[q, l]
                         terms_q.append(acc)
         self.S_ikqm = Array(terms_q, shape=(dim, dim, dim, dim))
 
@@ -283,9 +287,9 @@ def demo_emit_for_tet4_neohookean():
     gen = PAKernelGenerator(op)
     gen.build_S_tensors()
     gen.emit_S_ikqm_assignments("S_ikqm")
-    gen.emit_header("operators/tet4/tet4_partial_assembly_pa_inline.h",
+    gen.emit_header("operators/tet4/tet4_partial_assembly_neohookean_inline.h",
                     func_name="tet4_S_ikqm",
-                    guard="TET4_PARTIAL_ASSEMBLY_S_IKQM_INLINE_H",
+                    guard="SFEM_TET4_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H",
                     tensor_name="S_ikqm")
 
 
