@@ -557,57 +557,45 @@ template <typename FloatType>
 class tet_properties_info_t {
 public:
     // Arrays allocated on device (length = count)
-    ptrdiff_t* delta0_index;  // delta with respect to the global grid in the global grid
-    ptrdiff_t* delta1_index;
-    ptrdiff_t* delta2_index;
+    ptrdiff_t* delta0_index = nullptr;  // delta with respect to the global grid in the global grid
+    ptrdiff_t* delta1_index = nullptr;
+    ptrdiff_t* delta2_index = nullptr;
 
-    ptrdiff_t* size0_local;
-    ptrdiff_t* size1_local;
-    ptrdiff_t* size2_local;
+    // ptrdiff_t* size0_local;
+    // ptrdiff_t* size1_local;
+    // ptrdiff_t* size2_local;
 
-    ptrdiff_t* stride0_local;
-    ptrdiff_t* stride1_local;
-    ptrdiff_t* stride2_local;
+    ptrdiff_t* total_size_local;
 
-    ptrdiff_t* n0_local;
-    ptrdiff_t* n1_local;
-    ptrdiff_t* n2_local;
+    ptrdiff_t* stride0_local = nullptr;
+    ptrdiff_t* stride1_local = nullptr;
+    ptrdiff_t* stride2_local = nullptr;
 
-    FloatType* min_x;
-    FloatType* min_y;
-    FloatType* min_z;
+    ptrdiff_t* n0_local = nullptr;
+    ptrdiff_t* n1_local = nullptr;
+    ptrdiff_t* n2_local = nullptr;
 
-    FloatType* max_x;
-    FloatType* max_y;
-    FloatType* max_z;
+    FloatType* min_x = nullptr;
+    FloatType* min_y = nullptr;
+    FloatType* min_z = nullptr;
+
+    FloatType* max_x = nullptr;
+    FloatType* max_y = nullptr;
+    FloatType* max_z = nullptr;
+
+    FloatType* min_grid_x = nullptr;  // Minimum grid coordinates covered by the tet
+    FloatType* min_grid_y = nullptr;
+    FloatType* min_grid_z = nullptr;
 
     // Host-side meta
-    size_t count;
+    size_t count = 0;
 
     __device__ size_t get_tet_grid_size(const ptrdiff_t tet_i) const {
-        return (size0_local[tet_i] * size1_local[tet_i] * size2_local[tet_i]);
+        return (n0_local[tet_i] * n1_local[tet_i] * n2_local[tet_i]);
     }
 
-    __host__ tet_properties_info_t()
-        : delta0_index(nullptr),
-          delta1_index(nullptr),
-          delta2_index(nullptr),
-          size0_local(nullptr),
-          size1_local(nullptr),
-          size2_local(nullptr),
-          stride0_local(nullptr),
-          stride1_local(nullptr),
-          stride2_local(nullptr),
-          n0_local(nullptr),
-          n1_local(nullptr),
-          n2_local(nullptr),
-          min_x(nullptr),
-          min_y(nullptr),
-          min_z(nullptr),
-          max_x(nullptr),
-          max_y(nullptr),
-          max_z(nullptr),
-          count(0) {}
+    tet_properties_info_t()  = default;
+    ~tet_properties_info_t() = default;
 
     __host__ cudaError_t alloc_async(size_t n, cudaStream_t stream) {
         count           = n;
@@ -626,9 +614,13 @@ public:
         if ((err = cudaMallocAsync((void**)&delta2_index, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
             return fail_cleanup(err);
 
-        if ((err = cudaMallocAsync((void**)&size0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&size1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&size2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&size0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return
+        // fail_cleanup(err); if ((err = cudaMallocAsync((void**)&size1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
+        // return fail_cleanup(err); if ((err = cudaMallocAsync((void**)&size2_local, n * sizeof(ptrdiff_t), stream)) !=
+        // cudaSuccess) return fail_cleanup(err);
+
+        if ((err = cudaMallocAsync((void**)&total_size_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
+            return fail_cleanup(err);
 
         if ((err = cudaMallocAsync((void**)&stride0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
             return fail_cleanup(err);
@@ -650,6 +642,10 @@ public:
         if ((err = cudaMallocAsync((void**)&max_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
         if ((err = cudaMallocAsync((void**)&max_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
 
+        if ((err = cudaMallocAsync((void**)&min_grid_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&min_grid_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&min_grid_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+
         return cudaSuccess;
     }
 
@@ -663,9 +659,11 @@ public:
         free_if(delta1_index);
         free_if(delta2_index);
 
-        free_if(size0_local);
-        free_if(size1_local);
-        free_if(size2_local);
+        // free_if(size0_local);
+        // free_if(size1_local);
+        // free_if(size2_local);
+
+        free_if(total_size_local);
 
         free_if(stride0_local);
         free_if(stride1_local);
@@ -683,6 +681,10 @@ public:
         free_if(max_y);
         free_if(max_z);
 
+        free_if(min_grid_x);
+        free_if(min_grid_y);
+        free_if(min_grid_z);
+
         reset();
         // Optionally, user can cudaStreamSynchronize(stream) after this
         return cudaSuccess;
@@ -691,12 +693,14 @@ public:
 private:
     __host__ void reset() {
         delta0_index = delta1_index = delta2_index = nullptr;
-        size0_local = size1_local = size2_local = nullptr;
+        // size0_local = size1_local = size2_local = nullptr;
+        total_size_local = nullptr;
         stride0_local = stride1_local = stride2_local = nullptr;
         n0_local = n1_local = n2_local = nullptr;
         min_x = min_y = min_z = nullptr;
         max_x = max_y = max_z = nullptr;
-        count                 = 0;
+        min_grid_x = min_grid_y = min_grid_z = nullptr;
+        count                                = 0;
     }
 };
 
@@ -769,6 +773,38 @@ sfem_make_local_tets_kernel_gpu(const ptrdiff_t                  shared_memory_s
     const FloatType max_grid_x = fast_ceil((x_max - origin0) / dx) + 1;
     const FloatType max_grid_y = fast_ceil((y_max - origin1) / dy) + 1;
     const FloatType max_grid_z = fast_ceil((z_max - origin2) / dz) + 1;
+
+    const ptrdiff_t sizen_0 = max_grid_x - min_grid_x + 1;
+    const ptrdiff_t sizen_1 = max_grid_y - min_grid_y + 1;
+    const ptrdiff_t sizen_2 = max_grid_z - min_grid_z + 1;
+
+    const ptrdiff_t total_size = sizen_0 * sizen_1 * sizen_2;
+
+    tet_properties_info.delta0_index[element_i] = min_grid_x;
+    tet_properties_info.delta1_index[element_i] = min_grid_y;
+    tet_properties_info.delta2_index[element_i] = min_grid_z;
+
+    tet_properties_info.n0_local[element_i] = sizen_0;
+    tet_properties_info.n1_local[element_i] = sizen_1;
+    tet_properties_info.n2_local[element_i] = sizen_2;
+
+    tet_properties_info.total_size_local[element_i] = total_size;
+
+    tet_properties_info.stride0_local[element_i] = 1;
+    tet_properties_info.stride1_local[element_i] = sizen_0;
+    tet_properties_info.stride2_local[element_i] = sizen_0 * sizen_1;
+
+    tet_properties_info.min_x[element_i] = x_min;
+    tet_properties_info.min_y[element_i] = y_min;
+    tet_properties_info.min_z[element_i] = z_min;
+
+    tet_properties_info.max_x[element_i] = x_max;
+    tet_properties_info.max_y[element_i] = y_max;
+    tet_properties_info.max_z[element_i] = z_max;
+
+    tet_properties_info.min_grid_x[element_i] = FloatType(min_grid_x);
+    tet_properties_info.min_grid_y[element_i] = FloatType(min_grid_y);
+    tet_properties_info.min_grid_z[element_i] = FloatType(min_grid_z);
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -949,5 +985,28 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
                                       const real_t* const         weighted_field,       // Input weighted field
                                       const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
                                       real_t* const               data);
+
+extern "C" void                                                                                     //
+call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
+                                                  const ptrdiff_t             end_element,          //
+                                                  const ptrdiff_t             nelements,            //
+                                                  const ptrdiff_t             nnodes,               //
+                                                  const idx_t** const         elems,                //
+                                                  const geom_t** const        xyz,                  //
+                                                  const ptrdiff_t             n0,                   // SDF
+                                                  const ptrdiff_t             n1,                   //
+                                                  const ptrdiff_t             n2,                   //
+                                                  const ptrdiff_t             stride0,              // Stride
+                                                  const ptrdiff_t             stride1,              //
+                                                  const ptrdiff_t             stride2,              //
+                                                  const geom_t                origin0,              // Origin
+                                                  const geom_t                origin1,              //
+                                                  const geom_t                origin2,              //
+                                                  const geom_t                dx,                   // Delta
+                                                  const geom_t                dy,                   //
+                                                  const geom_t                dz,                   //
+                                                  const real_t* const         weighted_field,       // Input weighted field
+                                                  const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
+                                                  real_t* const               data);
 
 #endif  // __SFEM_ADJOINT_MINI_TET_CUH__
