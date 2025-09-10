@@ -50,7 +50,7 @@ static SFEM_INLINE void tet4_S_ikmn(const scalar_t *const SFEM_RESTRICT adjugate
                                     const scalar_t                      lmbda,
                                     const scalar_t                      qw,
                                     scalar_t *const SFEM_RESTRICT       S_ikmn) {
-    scalar_t S_lin[81];  // Check if used in SSA mode
+    scalar_t * S_lin = S_ikmn;   // Check if used in SSA mode
     {
         const scalar_t x0   = F[4] * F[8];
         const scalar_t x1   = F[5] * F[6];
