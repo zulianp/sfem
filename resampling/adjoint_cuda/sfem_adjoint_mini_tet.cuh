@@ -708,26 +708,25 @@ private:
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__global__ void                                                                          //
-sfem_make_local_tets_kernel_gpu(const ptrdiff_t                  shared_memory_size,     //
-                                const ptrdiff_t                  start_element,          // Mesh
-                                const ptrdiff_t                  end_element,            //
-                                const ptrdiff_t                  nnodes,                 //
-                                const elems_tet4_device          elems,                  //
-                                const xyz_tet4_device            xyz,                    //
-                                const ptrdiff_t                  n0,                     // SDF
-                                const ptrdiff_t                  n1,                     //
-                                const ptrdiff_t                  n2,                     //
-                                const ptrdiff_t                  stride0,                // Stride
-                                const ptrdiff_t                  stride1,                //
-                                const ptrdiff_t                  stride2,                //
-                                const geom_t                     origin0,                // Origin
-                                const geom_t                     origin1,                //
-                                const geom_t                     origin2,                //
-                                const geom_t                     dx,                     // Delta
-                                const geom_t                     dy,                     //
-                                const geom_t                     dz,                     //
-                                tet_properties_info_t<FloatType> tet_properties_info) {  //
+__global__ void                                                                               //
+sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_element,          // Mesh
+                                     const ptrdiff_t                  end_element,            //
+                                     const ptrdiff_t                  nnodes,                 //
+                                     const elems_tet4_device          elems,                  //
+                                     const xyz_tet4_device            xyz,                    //
+                                     const ptrdiff_t                  n0,                     // SDF
+                                     const ptrdiff_t                  n1,                     //
+                                     const ptrdiff_t                  n2,                     //
+                                     const ptrdiff_t                  stride0,                // Stride
+                                     const ptrdiff_t                  stride1,                //
+                                     const ptrdiff_t                  stride2,                //
+                                     const geom_t                     origin0,                // Origin
+                                     const geom_t                     origin1,                //
+                                     const geom_t                     origin2,                //
+                                     const geom_t                     dx,                     // Delta
+                                     const geom_t                     dy,                     //
+                                     const geom_t                     dz,                     //
+                                     tet_properties_info_t<FloatType> tet_properties_info) {  //
 
     const int tet_id    = (blockIdx.x * blockDim.x + threadIdx.x);
     const int element_i = start_element + tet_id;  // Global element index

@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
+#include <thrust/extrema.h>
+
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
@@ -218,12 +222,14 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
     }
 
-    const unsigned int threads_per_block      = 256;
-    const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
-    const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
+    const unsigned int threads_per_block           = 256;
+    const unsigned int total_threads_per_grid_prop = (end_element - start_element + 1);
+    const unsigned int blocks_per_grid             = (total_threads_per_grid_prop + threads_per_block - 1) / threads_per_block;
 
     cudaStream_t cuda_stream = 0;  // default stream
     cudaStreamCreate(&cuda_stream);
+
+    real_t max_total_size_local = 0.0f;
 
 #if SFEM_LOG_LEVEL >= 5
     printf("Kernel args: start_element: %ld, end_element: %ld, nelements: %ld, nnodes: %ld\n",
@@ -231,10 +237,10 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
            end_element,
            nelements,
            nnodes);
-    printf("Kernel launch: blocks_per_grid: %u, threads_per_block: %u, total_threads_per_grid: %u\n",
+    printf("Kernel launch: blocks_per_grid: %u, threads_per_block: %u, total_threads_per_grid_prop: %u\n",
            blocks_per_grid,
            threads_per_block,
-           total_threads_per_grid);
+           total_threads_per_grid_prop);
 #endif
 
     cudaEvent_t start_event, stop_event;
@@ -243,29 +249,27 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
 
     cudaEventRecord(start_event, cuda_stream);
 
-    // sfem_adjoint_mini_tet_kernel_gpu<real_t><<<blocks_per_grid,                       //
-    //                                            threads_per_block,                     //
-    //                                            0,                                     //
-    //                                            cuda_stream>>>(start_element,          // Mesh
-    //                                                           end_element,            //
-    //                                                           nnodes,                 //
-    //                                                           elements_device,        //
-    //                                                           xyz_device,             //
-    //                                                           n0,                     // SDF
-    //                                                           n1,                     //
-    //                                                           n2,                     //
-    //                                                           stride0,                // Stride
-    //                                                           stride1,                //
-    //                                                           stride2,                //
-    //                                                           origin0,                // Origin
-    //                                                           origin1,                //
-    //                                                           origin2,                //
-    //                                                           dx,                     // Delta
-    //                                                           dy,                     //
-    //                                                           dz,                     //
-    //                                                           weighted_field_device,  // Input weighted field
-    //                                                           mini_tet_parameters,    // Threshold for alpha
-    //                                                           data_device);           //
+    sfem_make_local_data_tets_kernel_gpu<real_t><<<blocks_per_grid,                      //
+                                                   threads_per_block,                    //
+                                                   0,                                    //
+                                                   cuda_stream>>>(start_element,         // Mesh
+                                                                  end_element,           //
+                                                                  nnodes,                //
+                                                                  elements_device,       //
+                                                                  xyz_device,            //
+                                                                  n0,                    // SDF
+                                                                  n1,                    //
+                                                                  n2,                    //
+                                                                  stride0,               // Stride
+                                                                  stride1,               //
+                                                                  stride2,               //
+                                                                  origin0,               // Origin
+                                                                  origin1,               //
+                                                                  origin2,               //
+                                                                  dx,                    // Delta
+                                                                  dy,                    //
+                                                                  dz,                    //
+                                                                  tet_properties_info);  //
 
     cudaStreamSynchronize(cuda_stream);
 
@@ -273,6 +277,30 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
     error = cudaGetLastError();
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
+    }
+
+    {
+        const ptrdiff_t count = (end_element - start_element + 1);
+
+        auto d_begin = thrust::device_pointer_cast(tet_properties_info.total_size_local) + start_element;
+        auto d_end   = d_begin + count;
+
+        auto max_it          = thrust::max_element(d_begin, d_end);
+        max_total_size_local = *max_it;
+
+        // using value_t   = typename thrust::iterator_value<decltype(d_begin)>::type;
+        // value_t max_val = 0;
+
+        // Copy the max value to host
+        // cudaMemcpyAsync(&max_val, thrust::raw_pointer_cast(max_it), sizeof(value_t), cudaMemcpyDeviceToHost, cuda_stream);
+
+        const ptrdiff_t max_idx_global = (max_it - d_begin) + start_element;
+
+        // if (SFEM_LOG_LEVEL >= 1) {
+        //     printf("Max total_size_local = %lld at element %lld\n", (long long)max_val, (long long)max_idx_global);
+        // }
+
+        // max_total_size_local = max_val;
     }
 
     cudaEventRecord(stop_event, cuda_stream);
