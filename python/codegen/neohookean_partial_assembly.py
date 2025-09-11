@@ -16,13 +16,13 @@ from sympy import Array
 
 
 class PAKernelGenerator:
-    def __init__(self, name, op: SRHyperelasticity, metric_tensor_only=True):
+    def __init__(self, name, op: SRHyperelasticity, metric_tensor_only=False):
         self.name = name
         self.metric_tensor_only = metric_tensor_only
         op.partial_assembly()
         self.fe = op.fe
         self.expression_table = op.expression_table
-        self.use_canonical = False
+        self.use_canonical = True
         
     @staticmethod
     def _create_tensor4_symbol(name, size0, size1, size2, size3):
@@ -54,6 +54,21 @@ class PAKernelGenerator:
         for i in range(rows):
             for j in range(cols):
                 expr.append(ast.Assignment(var[i, j], mat[i, j]))
+        return expr
+
+    def __create_tensor4_symbol_packed(self, name):
+        dim = self.fe.spatial_dim()
+        N = (dim**2+1)*(dim**2)/2
+        packed = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
+        return packed
+
+    def __assign_tensor4_packed(self, var, mat):
+        N = len(mat)
+
+        assert len(var) == N, "Variable and matrix must have the same length"
+        expr = []
+        for i in range(N):
+            expr.append(ast.Assignment(var[i], mat[i]))
         return expr
 
     def emit_header(self, out_path, guard):
@@ -112,7 +127,7 @@ class PAKernelGenerator:
             f"    const {real_t}                      mu,\n"
             f"    const {real_t}                      lmbda,\n"
             f"    const {real_t}                      qw,\n"
-            f"    {real_t} *const SFEM_RESTRICT       {tensor_name}) "
+            f"    {real_t} *const SFEM_RESTRICT       {tensor_name + "_canonical" if self.use_canonical else ""}) "
             "{\n"
         )
 
@@ -131,9 +146,16 @@ class PAKernelGenerator:
             content.append("}\n")
             content.append("")
 
-
         if self.use_canonical:
-            
+            S_canonical_name = "S_ikmn_canonical"
+            S_canonical = self.expression_table[S_canonical_name]
+            S_canonical_symb = self.__create_tensor4_symbol_packed(S_canonical_name)
+            body_S_canonical = c_gen(self.__assign_tensor4_packed(S_canonical_symb, S_canonical))
+            content.append(f"#define {elem_type_lc.upper()}_{tensor_name.upper()}_SIZE {len(S_canonical)}")
+            content.append(sigS)
+            content.append(body_S_canonical)
+            content.append("}\n")
+            content.append("")
         else:
             body_S_lin = c_gen(self._assign_tensor4(S_lin_symb, S_lin))
             content.append(sigS)
@@ -149,7 +171,12 @@ class PAKernelGenerator:
 
         if not self.metric_tensor_only:
             expr = []
-            expr.extend(self._assign_matrix("SdotH_km", self.expression_table["SdotH_km"]))
+            if not self.use_canonical:
+                SdotH_km_decl = f"scalar_t SdotH_km[{dim*dim}];"
+                expr.extend(self._assign_matrix("SdotH_km", self.expression_table["SdotH_km"]))
+            else:
+                SdotH_km_decl = ""
+
             expr.extend(self._assign_matrix("eoutx", self.expression_table["eoutx"]))
             expr.extend(self._assign_matrix("eouty", self.expression_table["eouty"]))
             expr.extend(self._assign_matrix("eoutz", self.expression_table["eoutz"]))
@@ -157,13 +184,13 @@ class PAKernelGenerator:
 
             apply_fun = f"""
 static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
-    const scalar_t *const SFEM_RESTRICT S_ikmn,    // 3x3x3x3, includes dV
+    const scalar_t *const SFEM_RESTRICT S_ikmn{f"_canonical" if self.use_canonical else ""},    // 3x3x3x3, includes dV
     const scalar_t *const SFEM_RESTRICT inc_grad,  // 3x3 reference trial gradient R
     scalar_t *const SFEM_RESTRICT       eoutx,
     scalar_t *const SFEM_RESTRICT       eouty,
     scalar_t *const SFEM_RESTRICT       eoutz)
 {{
-    scalar_t SdotH_km[{dim*dim}];
+    {SdotH_km_decl}
     {body_apply}
 }}
 """
@@ -215,4 +242,4 @@ if __name__ == "__main__":
     # fe = Hex8()
     # fe = Tet10()
     neohookean(fe)
-    # compressible_mooney_rivlin(fe)
+    compressible_mooney_rivlin(fe)

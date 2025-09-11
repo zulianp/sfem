@@ -35,7 +35,7 @@ def build_canonical_map(d=3):
 
     return canon_list, canon_index, fetch_idx
 
-def pack_tensor(S, d=3):
+def pack_tensor(S, d=3, debug=False):
     """
     Pack a rank-4 tensor S[i,j,k,l] (numpy or sympy) into a minimal vector
     using only the symmetry S_{ijkl} = S_{jilk}.
@@ -51,10 +51,10 @@ def pack_tensor(S, d=3):
                     val = S[i,j,k,l]
                     if vec[idx] is None:
                         vec[idx] = val
-                    else:
+                    elif debug:
                         # Optional consistency check: values mapping to same orbit must match
                         if hasattr(val, 'equals'):  # sympy
-                            assert val.equals(vec[idx])
+                            assert sp.simplify(val - vec[idx]) == 0
                         else:
                             assert np.allclose(val, vec[idx])
     # Replace any remaining None with zeros (shouldn't happen if S is fully filled)
