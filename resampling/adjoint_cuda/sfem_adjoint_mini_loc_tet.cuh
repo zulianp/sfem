@@ -28,17 +28,17 @@ public:
     ptrdiff_t* n1_local = nullptr;
     ptrdiff_t* n2_local = nullptr;
 
-    FloatType* min_x = nullptr;
-    FloatType* min_y = nullptr;
-    FloatType* min_z = nullptr;
+    // FloatType* min_x = nullptr;
+    // FloatType* min_y = nullptr;
+    // FloatType* min_z = nullptr;
 
-    FloatType* max_x = nullptr;
-    FloatType* max_y = nullptr;
-    FloatType* max_z = nullptr;
+    // FloatType* max_x = nullptr;
+    // FloatType* max_y = nullptr;
+    // FloatType* max_z = nullptr;
 
-    FloatType* min_grid_x = nullptr;  // Minimum grid coordinates covered by the tet
-    FloatType* min_grid_y = nullptr;
-    FloatType* min_grid_z = nullptr;
+    // FloatType* min_grid_x = nullptr;  // Minimum grid coordinates covered by the tet
+    // FloatType* min_grid_y = nullptr;
+    // FloatType* min_grid_z = nullptr;
 
     // Host-side meta
     size_t count = 0;
@@ -86,18 +86,19 @@ public:
         if ((err = cudaMallocAsync((void**)&n1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
         if ((err = cudaMallocAsync((void**)&n2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        // FloatType arrays
-        if ((err = cudaMallocAsync((void**)&min_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // // FloatType arrays
+        // if ((err = cudaMallocAsync((void**)&min_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&min_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&min_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        if ((err = cudaMallocAsync((void**)&max_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&max_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&max_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&max_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&max_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&max_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        if ((err = cudaMallocAsync((void**)&min_grid_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_grid_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_grid_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
+        // if ((err = cudaMallocAsync((void**)&min_grid_x, n * sizeof(FloatType), stream)) != cudaSuccess) return
+        // fail_cleanup(err); if ((err = cudaMallocAsync((void**)&min_grid_y, n * sizeof(FloatType), stream)) != cudaSuccess)
+        // return fail_cleanup(err); if ((err = cudaMallocAsync((void**)&min_grid_z, n * sizeof(FloatType), stream)) !=
+        // cudaSuccess) return fail_cleanup(err);
 
         return cudaSuccess;
     }
@@ -126,17 +127,17 @@ public:
         free_if(n1_local);
         free_if(n2_local);
 
-        free_if(min_x);
-        free_if(min_y);
-        free_if(min_z);
+        // free_if(min_x);
+        // free_if(min_y);
+        // free_if(min_z);
 
-        free_if(max_x);
-        free_if(max_y);
-        free_if(max_z);
+        // free_if(max_x);
+        // free_if(max_y);
+        // free_if(max_z);
 
-        free_if(min_grid_x);
-        free_if(min_grid_y);
-        free_if(min_grid_z);
+        // free_if(min_grid_x);
+        // free_if(min_grid_y);
+        // free_if(min_grid_z);
 
         reset();
         // Optionally, user can cudaStreamSynchronize(stream) after this
@@ -150,10 +151,10 @@ private:
         total_size_local = nullptr;
         stride0_local = stride1_local = stride2_local = nullptr;
         n0_local = n1_local = n2_local = nullptr;
-        min_x = min_y = min_z = nullptr;
-        max_x = max_y = max_z = nullptr;
-        min_grid_x = min_grid_y = min_grid_z = nullptr;
-        count                                = 0;
+        // min_x = min_y = min_z = nullptr;
+        // max_x = max_y = max_z = nullptr;
+        // min_grid_x = min_grid_y = min_grid_z = nullptr;
+        count = 0;
     }
 };
 
@@ -232,29 +233,6 @@ sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_elem
 
     const ptrdiff_t total_size = sizen_0 * sizen_1 * sizen_2;
 
-    // if (total_size <= 8) {
-    //     const double dx_dbl = double(dx);
-    //     const double dy_dbl = double(dy);
-    //     const double dz_dbl = double(dz);
-
-    //     printf("Warning: Element %d has local grid size %ld x %ld x %ld = %ld, with dx=%e, dy=%e, dz=%e, min=(%e,%e,%e), "
-    //            "max=(%e,%e,%e)\n",
-    //            element_i,
-    //            (long)sizen_0,
-    //            (long)sizen_1,
-    //            (long)sizen_2,
-    //            (long)total_size,
-    //            (double)dx_dbl,
-    //            (double)dy_dbl,
-    //            (double)dz_dbl,
-    //            (double)x_min,
-    //            (double)y_min,
-    //            (double)z_min,
-    //            (double)x_max,
-    //            (double)y_max,
-    //            (double)z_max);
-    // }
-
     tet_properties_info.delta0_index[element_i] = min_grid_x;
     tet_properties_info.delta1_index[element_i] = min_grid_y;
     tet_properties_info.delta2_index[element_i] = min_grid_z;
@@ -269,17 +247,17 @@ sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_elem
     tet_properties_info.stride1_local[element_i] = sizen_0;
     tet_properties_info.stride2_local[element_i] = sizen_0 * sizen_1;
 
-    tet_properties_info.min_x[element_i] = x_min;
-    tet_properties_info.min_y[element_i] = y_min;
-    tet_properties_info.min_z[element_i] = z_min;
+    // tet_properties_info.min_x[element_i] = x_min;
+    // tet_properties_info.min_y[element_i] = y_min;
+    // tet_properties_info.min_z[element_i] = z_min;
 
-    tet_properties_info.max_x[element_i] = x_max;
-    tet_properties_info.max_y[element_i] = y_max;
-    tet_properties_info.max_z[element_i] = z_max;
+    // tet_properties_info.max_x[element_i] = x_max;
+    // tet_properties_info.max_y[element_i] = y_max;
+    // tet_properties_info.max_z[element_i] = z_max;
 
-    tet_properties_info.min_grid_x[element_i] = FloatType(min_grid_x);
-    tet_properties_info.min_grid_y[element_i] = FloatType(min_grid_y);
-    tet_properties_info.min_grid_z[element_i] = FloatType(min_grid_z);
+    // tet_properties_info.min_grid_x[element_i] = FloatType(min_grid_x);
+    // tet_properties_info.min_grid_y[element_i] = FloatType(min_grid_y);
+    // tet_properties_info.min_grid_z[element_i] = FloatType(min_grid_z);
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -311,20 +289,24 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
                                             const tet_properties_info_t<FloatType> tet_properties_info,  //
                                             FloatType* const                       data) {                                     //
 
-    const int tet_id               = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
-    const int element_i            = start_element + tet_id;  // Global element index
-    const int threading_block_size = blockDim.x;
-    const int warp_id              = threadIdx.x / LANES_PER_TILE;
-    const int lane_id              = threadIdx.x % LANES_PER_TILE;
+    const int tet_id    = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+    const int element_i = start_element + tet_id;  // Global element index
+    const int warp_id   = threadIdx.x / LANES_PER_TILE;
+    const int lane_id   = threadIdx.x % LANES_PER_TILE;
+    // const int threading_block_size = blockDim.x;
 
     extern __shared__ FloatType shared_local_data[];  // Shared memory for local accumulation
     // FloatType*                  tet_buffer = &shared_local_data[tets_per_block];
-    // FloatType*                  tet_local_buffer = nullptr;
-    __shared__ ptrdiff_t tet_start_buffer_idx[64];
 
-    for (int i = threadIdx.x; i < threading_block_size; i += blockDim.x) {
-        if (i < threading_block_size) shared_local_data[i] = 0.0;
+#define START_BUFFER_IDX_SIZE 64
+    __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
+
+    for (int i = threadIdx.x; i < shared_memory_size; i += blockDim.x) {
+        if (i < shared_memory_size) shared_local_data[i] = FloatType(0.0);
+        if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
     }
+
+    __syncthreads();
 
     if (lane_id == 0) {
         tet_start_buffer_idx[warp_id] = tet_properties_info.total_size_local[element_i];
@@ -356,9 +338,17 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
     const ptrdiff_t delta1_index = tet_properties_info.delta1_index[element_i];
     const ptrdiff_t delta2_index = tet_properties_info.delta2_index[element_i];
 
+    const ptrdiff_t stride0_local = tet_properties_info.stride0_local[element_i];
+    const ptrdiff_t stride1_local = tet_properties_info.stride1_local[element_i];
+    const ptrdiff_t stride2_local = tet_properties_info.stride2_local[element_i];
+
     const FloatType min_grid_x = dx * FloatType(delta0_index) + FloatType(origin0);
     const FloatType min_grid_y = dy * FloatType(delta1_index) + FloatType(origin1);
     const FloatType min_grid_z = dz * FloatType(delta2_index) + FloatType(origin2);
+
+    const ptrdiff_t n0_local = tet_properties_info.n0_local[element_i];
+    const ptrdiff_t n1_local = tet_properties_info.n1_local[element_i];
+    const ptrdiff_t n2_local = tet_properties_info.n2_local[element_i];
 
     // printf("Exaedre volume: %e\n", hexahedron_volume);
 
@@ -371,20 +361,20 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 
     // Read the coordinates of the vertices of the tetrahedron
     // In the physical space
-    const FloatType x0_n = FloatType(xyz.x[ev[0]]);
-    const FloatType x1_n = FloatType(xyz.x[ev[1]]);
-    const FloatType x2_n = FloatType(xyz.x[ev[2]]);
-    const FloatType x3_n = FloatType(xyz.x[ev[3]]);
+    const FloatType x0_n = FloatType(xyz.x[ev[0]]) - min_grid_x;
+    const FloatType x1_n = FloatType(xyz.x[ev[1]]) - min_grid_x;
+    const FloatType x2_n = FloatType(xyz.x[ev[2]]) - min_grid_x;
+    const FloatType x3_n = FloatType(xyz.x[ev[3]]) - min_grid_x;
 
-    const FloatType y0_n = FloatType(xyz.y[ev[0]]);
-    const FloatType y1_n = FloatType(xyz.y[ev[1]]);
-    const FloatType y2_n = FloatType(xyz.y[ev[2]]);
-    const FloatType y3_n = FloatType(xyz.y[ev[3]]);
+    const FloatType y0_n = FloatType(xyz.y[ev[0]]) - min_grid_y;
+    const FloatType y1_n = FloatType(xyz.y[ev[1]]) - min_grid_y;
+    const FloatType y2_n = FloatType(xyz.y[ev[2]]) - min_grid_y;
+    const FloatType y3_n = FloatType(xyz.y[ev[3]]) - min_grid_y;
 
-    const FloatType z0_n = FloatType(xyz.z[ev[0]]);
-    const FloatType z1_n = FloatType(xyz.z[ev[1]]);
-    const FloatType z2_n = FloatType(xyz.z[ev[2]]);
-    const FloatType z3_n = FloatType(xyz.z[ev[3]]);
+    const FloatType z0_n = FloatType(xyz.z[ev[0]]) - min_grid_z;
+    const FloatType z1_n = FloatType(xyz.z[ev[1]]) - min_grid_z;
+    const FloatType z2_n = FloatType(xyz.z[ev[2]]) - min_grid_z;
+    const FloatType z3_n = FloatType(xyz.z[ev[3]]) - min_grid_z;
 
     const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
     const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
@@ -426,7 +416,7 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
     const FloatType det_J_phys =                               //
             abs(make_Jacobian_matrix_tet_gpu<FloatType>(x0_n,  //
                                                         x1_n,  //
-                                                        x2_n,
+                                                        x2_n,  //
                                                         x3_n,
                                                         y0_n,
                                                         y1_n,
@@ -438,6 +428,30 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
                                                         z3_n,
                                                         Jacobian_phys));
 
+    // printf("Element %d: L=%d, alpha=%e, max_edge=%e, detJ=%e\n",
+    //        element_i,
+    //        L,
+    //        (double)alpha_tet,
+    //        (double)max_edges_length,
+    //        (double)det_J_phys);
+
+    // const int max_local_index_1 = (n0_local * n1_local * n2_local - 1);
+    // const int max_local_index_2 =
+    //         (n0_local - 1) * stride0_local + (n1_local - 1) * stride1_local + (n2_local - 1) * stride2_local;
+
+    // printf("Element %d: Local grid size = (%ld, %ld, %ld), strides = (%ld, %ld, %ld), total size = %ld, "
+    //        "max_local_index_1 = %d, max_local_index_2 = %d\n",
+    //        element_i,
+    //        (long)n0_local,
+    //        (long)n1_local,
+    //        (long)n2_local,
+    //        (long)stride0_local,
+    //        (long)stride1_local,
+    //        (long)stride2_local,
+    //        (long)tet_properties_info.total_size_local[element_i],
+    //        max_local_index_1,
+    //        max_local_index_2);
+
     main_tet_loop_gpu<FloatType>(L,                                          //
                                  Jacobian_phys,                              //
                                  det_J_phys,                                 //
@@ -446,19 +460,74 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
                                  wf1,                                        //
                                  wf2,                                        //
                                  wf3,                                        //
-                                 origin0,                                    //
-                                 origin1,                                    //
-                                 origin2,                                    //
+                                 FloatType(0.0),                             //
+                                 FloatType(0.0),                             //
+                                 FloatType(0.0),                             //
                                  dx,                                         //
                                  dy,                                         //
                                  dz,                                         //
-                                 stride0,                                    //
-                                 stride1,                                    //
-                                 stride2,                                    //
-                                 n0,                                         //
-                                 n1,                                         //
-                                 n2,                                         //
-                                 data);                                      //
+                                 stride0_local,                              //
+                                 stride1_local,                              //
+                                 stride2_local,                              //
+                                 n0_local,                                   //
+                                 n1_local,                                   //
+                                 n2_local,                                   //
+                                 &tet_local_buffer[0]);                      //
+
+    __syncwarp();
+
+    const ptrdiff_t total_size_local = tet_properties_info.total_size_local[element_i];
+
+    for (ptrdiff_t i = lane_id; i < total_size_local; i += LANES_PER_TILE) {
+        const ptrdiff_t i0 = (i % stride0_local);
+        const ptrdiff_t i1 = (i / stride1_local) % tet_properties_info.n1_local[element_i];
+        const ptrdiff_t i2 = (i / stride2_local);
+
+        const int       i_total_local          = (i2 * stride2_local + i1 * stride1_local + i0 * stride0_local);
+        const FloatType tet_local_buffer_value = tet_local_buffer[i_total_local];
+
+        // if (i_total_local < 0 or i_total_local >= total_size_local) {
+        //     printf("Error: i_total_local = %d out of range for element %d, total size %ld\n",
+        //            i_total_local,
+        //            element_i,
+        //            (long)tet_properties_info.total_size_local[element_i]);
+        //     __trap();
+        // }
+
+        // printf("tet_local_buffer[%d] = %e for element %d, total size %ld\n",
+        //        i_total_local,
+        //        (double)tet_local_buffer[i_total_local],
+        //        element_i,
+        //        (long)total_size_local);
+
+        // if (tet_local_buffer_value != 0.0)
+        {
+            // printf("Warning: ****************** \n");
+            printf("Error: tet_local_buffer[%d] = %e for element %d, total size %ld\n",
+                   i_total_local,
+                   (double)tet_local_buffer_value,
+                   element_i,
+                   (long)total_size_local);
+
+            const ptrdiff_t gi0 = i0 + delta0_index;
+            const ptrdiff_t gi1 = i1 + delta1_index;
+            const ptrdiff_t gi2 = i2 + delta2_index;
+
+            const ptrdiff_t g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
+
+            // if (gi0 >= 0 and gi0 < n0 and  //
+            //     gi1 >= 0 and gi1 < n1 and  //
+            //     gi2 >= 0 and gi2 < n2 and  //
+            //     g_index >= 0 and           //
+            //     g_index < n0 * n1 * n2)
+            {  //
+
+                // // Atomic add to global memory
+                atomicAdd(&data[g_index], tet_local_buffer_value);
+                // atomicAdd(&data[0], 1.0);
+            }
+        }
+    }
 }
 /////////////////////////////////////////////////////////////////////////////////
 

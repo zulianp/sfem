@@ -33,6 +33,8 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const ptrdiff_t                        n2,          //
         FloatType* const                       data) {                            // Output
 
+            // data[0] += 1; // To avoid unused variable warning
+
     const FloatType N_micro_tet     = (FloatType)(L) * (FloatType)(L) * (FloatType)(L);
     const FloatType inv_N_micro_tet = 1.0 / N_micro_tet;  // Inverse of the number of micro-tetrahedra
 
@@ -174,8 +176,35 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType d6 = It * hex8_f6;
         const FloatType d7 = It * hex8_f7;
 
+        // printf("It=%e, wfq=%e, dV=%e, (i,j,k)=(%ld,%ld,%ld), (l_x,l_y,l_z)=(%e,%e,%e), d0=%e\n",
+        //        (double)It,
+        //        (double)wf_quad,
+        //        (double)dV,
+        //        (long)i,
+        //        (long)j,
+        //        (long)k,
+        //        (double)l_x,
+        //        (double)l_y,
+        //        (double)l_z,
+        //        (double)d0);
+
         // Base linear index for the current cell
         const ptrdiff_t base = i * stride0 + j * stride1 + k * stride2;
+
+        // printf("quad_i_tile=%ld, lane_id=%d, (i,j,k)=(%ld,%ld,%ld), base=%ld, stride0=%ld, stride1=%ld, stride2=%ld, n0=%ld, "
+        //        "n1=%ld, n2=%ld\n",
+        //        (long)quad_i_tile,
+        //        lane_id,
+        //        (long)i,
+        //        (long)j,
+        //        (long)k,
+        //        (long)base,
+        //        (long)stride0,
+        //        (long)stride1,
+        //        (long)stride2,
+        //        (long)n0,
+        //        (long)n1,
+        //        (long)n2);
 
         if (base == cache_base) {
             // Same cell as previous iteration: accumulate locally
