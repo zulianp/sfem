@@ -317,8 +317,8 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
        // FUTURE: Preprocessing (once per linearization)
         scalar_t F[9] = {0};
         tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
-        scalar_t S_ikmn[81] = {0};
-        tet4_S_ikmn(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikmn);
+        scalar_t S_ikmn[TET4_S_IKMN_SIZE] = {0};
+        tet4_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikmn);
 
         // FUTURE: Processing (each apply)
         scalar_t *inc_grad = F;

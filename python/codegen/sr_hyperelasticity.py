@@ -173,15 +173,21 @@ class SRHyperelasticity:
         self.grady_symb = coeffs("grady", self.fe.n_nodes())
         self.gradz_symb = coeffs("gradz", self.fe.n_nodes())
         self.S_ikmn_canonical_symb = self.__create_tensor4_symbol_canonical("S_ikmn_canonical")
+        self.S_ikmn_packed_symb = self.__create_tensor4_symbol_packed("S_ikmn_packed")
     
     def __create_tensor4_symbol_canonical(self, name):
         dim = self.fe.spatial_dim()
         N = (dim**2+1)*(dim**2)/2
         can = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
-        print(can)
         can_map, _, _ = canon.build_canonical_map(dim)
         canon_reconstruct = canon.reconstruct_full(can, can_map, dim, as_sympy=True)
         return canon_reconstruct
+
+    def __create_tensor4_symbol_packed(self, name):
+        dim = self.fe.spatial_dim()
+        N = (dim**2+1)*(dim**2)/2
+        packed = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
+        return packed
 
     def __create_matrix_symbol(self, name):
         dim = self.fe.spatial_dim()
@@ -265,8 +271,8 @@ class SRHyperelasticity:
         return S_lin
         
     def __compute_metric_tensor(self):
-        P = self.__compute_piola_stress()
-        F = self.F_symb
+        # P = self.__compute_piola_stress()
+        # F = self.F_symb
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         dim = self.fe.spatial_dim()     
         S_lin = self.S_lin_symb
@@ -308,10 +314,34 @@ class SRHyperelasticity:
         return SdotH_km
 
     def __compute_metric_tensor_canonical(self):
-        S_ikmn = self.S_ikmn_symb
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        dim = self.fe.spatial_dim()     
+        S_lin = self.expression_table["S_lin"]
+
+        terms = []
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
+                        S_ikmn = 0
+                        for j in range(0, dim):
+                            reduce_l = 0
+                            for l in range(0, dim):
+                                reduce_l += S_lin[i, j, k, l] * Jinv[m, l] 
+                            S_ikmn += reduce_l * Jinv[n, j]
+                        
+                        terms.append(S_ikmn)
+
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
+        for i in range(0, dim**4):
+            terms[i] *= dV
+
+        S_ikmn = Array(terms, shape=(dim, dim, dim, dim))
+
         dim = self.fe.spatial_dim()
         S_ikmn_canonical, canon_list = canon.pack_tensor(S_ikmn, dim)
         self.expression_table["S_ikmn_canonical"] = S_ikmn_canonical
+        print("S_ikmn_canonical assembled!")
         return S_ikmn_canonical
 
     def __compute_SdotH_km_canonical(self):
@@ -390,7 +420,7 @@ class SRHyperelasticity:
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
 
 
-        detect_constitutive_tensor_symmetries(S_lin)
+        # detect_constitutive_tensor_symmetries(S_lin)
 
         terms = []
         for i in range(0, dim):
