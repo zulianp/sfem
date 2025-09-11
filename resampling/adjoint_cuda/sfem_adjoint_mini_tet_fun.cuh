@@ -27,7 +27,7 @@
 
 namespace cg = cooperative_groups;
 
-#define LANES_PER_TILE warpSize  // 32
+#define LANES_PER_TILE 32 // Number of lanes per tile (warp)
 #define HYTEG_MAX_REFINEMENT_LEVEL 22
 
 // typedef struct {

@@ -52,7 +52,7 @@ ifeq (${DISABLE_CUDA}, 1)
 	CUDA_FLAGS = 
 else
 	CUDA_LIBS_PATH = /usr/local/cuda-12.3/targets/x86_64-linux/lib
-	CUDA_FLAGS = -L${CUDA_LIBS_PATH} -lcudart  -L. -ltest_grid_new_cuda 
+	CUDA_FLAGS = -L${CUDA_LIBS_PATH} -lcudart   -L. -ltest_grid_new_cuda 
 endif
 
 
