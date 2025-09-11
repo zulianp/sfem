@@ -17,11 +17,12 @@ from aahex8 import *
 from sympy import Array
 import numpy as np
 
+import canon
+
 # https://github.com/tzakharko/m4-sme-exploration
+# https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
 
-# from tpl_hyperelasticity import TPLHyperelasticity
 
- # INSERT_YOUR_CODE
 def detect_constitutive_tensor_symmetries(tensor):
     """
     Detects and prints all index symmetries of a 4th order constitutive tensor.
@@ -37,9 +38,13 @@ def detect_constitutive_tensor_symmetries(tensor):
         ("minor_ij", lambda i,j,k,l: (j,i,k,l)),
         # Minor symmetry 2: (i,j,k,l) == (i,j,l,k)
         ("minor_kl", lambda i,j,k,l: (i,j,l,k)),
+        ("minor_il", lambda i,j,k,l: (l,j,k,i)),
+        ("minor_jk", lambda i,j,k,l: (i,k,j,l)),
         # Full symmetry: (i,j,k,l) == (j,i,l,k)
         ("full", lambda i,j,k,l: (j,i,l,k)),
     ]
+
+    names = ['i', 'j', 'k', 'l']
     symmetries_found = set()
     for name, perm in index_permutations:
         symmetric = True
@@ -50,29 +55,22 @@ def detect_constitutive_tensor_symmetries(tensor):
                 symmetric = False
                 break
         if symmetric:
-            print(f"Constitutive tensor is symmetric under {name} symmetry: (i,j,k,l) <-> {perm(0,1,2,3)}")
+            print(f"Constitutive tensor is symmetric under {name} symmetry: (i,j,k,l) <-> {perm(*names)}")
             symmetries_found.add(name)
     if not symmetries_found:
         print("No standard symmetries detected in constitutive tensor.")
     else:
         print("Detected symmetries:", symmetries_found)
-    # Print all (i,j,k,l) patterns that are symmetric
-    # print("Symmetric index patterns:")
-    # for name, perm in index_permutations:
-    #     for i, j, k, l in itertools.product(range(dim), repeat=4):
-    #         if sp.simplify(tensor[i, j, k, l] - tensor[perm(i,j,k,l)]) == 0:
-    #             print(f"({i},{j},{k},{l}) == {perm(i,j,k,l)} under {name} symmetry")
 
 def dbg():
     import pdb; pdb.set_trace()
 
 def simplify(expr):
-    # return expr
-    return sp.simplify(expr)
+    # return sp.simplify(expr)
+    return expr
 
 def create_matrix_symbol(name, rows, cols):
     return matrix_coeff(name, rows, cols)
-
 
 def create_tensor4_symbol(name, size0, size1, size2, size3):
     terms = []
@@ -89,16 +87,52 @@ def simplify_matrix(mat):
 
 class SRHyperelasticity:
     @staticmethod
-    def create_from_string_F(fe, str_expr: str):
+    def create_from_string(fe, str_expr: str):
         fun = parse_expr(str_expr) 
         return SRHyperelasticity(fe, fun)
 
-    def __init__(self, fe, fun): 
+    def create_from_string_unimodular(fe, str_expr: str):
+        fun = parse_expr(str_expr) 
+        return SRHyperelasticity(fe, fun, True)
+
+    def __init__(self, fe, fun, unimodular=False): 
         self.fe = fe
         self.expression_table = {}
-        self.__init_fun_of_F(fun)
+        if unimodular:
+            self.__init_fun_unimodular(fun)
+        else:
+            self.__init_fun(fun)
 
-    def __init_fun_of_F(self, fun):
+    def __init_fun_unimodular(self, fun):
+        self.__init_symbols(fun)
+
+        F = self.F_symb
+        det_F = sp.det(F)
+        B = F.T * F
+        I1 = sp.trace(B)
+        I2 = sp.Rational(1, 2) * (sp.trace(B)**2 - sp.trace(B**2))
+
+        I1b, I2b, J = sp.symbols("I1b I2b J", real=True)
+        invariants = [I1b, I2b, J]
+        symbol_names = list(self.fun.free_symbols)
+        all_symbols = []
+        for s in symbol_names + invariants:
+            if str(s) not in [str(sym) for sym in all_symbols]:
+                all_symbols.append(s)
+                sname = str(s)
+                if sname == "I1b":
+                    I1b = s
+                elif sname == "I2b":
+                    I2b = s
+                elif sname == "J":
+                    J = s
+
+        self.fun = self.fun.subs({
+            I1b: det_F**sp.Rational(-2, 3) * I1, 
+            I2b: det_F**sp.Rational(-4, 3) * I2, 
+            J: det_F})
+
+    def __init_fun(self, fun):
         self.__init_symbols(fun)
 
         F = self.F_symb
@@ -138,6 +172,16 @@ class SRHyperelasticity:
         self.gradx_symb = coeffs("gradx", self.fe.n_nodes())
         self.grady_symb = coeffs("grady", self.fe.n_nodes())
         self.gradz_symb = coeffs("gradz", self.fe.n_nodes())
+        self.S_ikmn_canonical_symb = self.__create_tensor4_symbol_canonical("S_ikmn_canonical")
+    
+    def __create_tensor4_symbol_canonical(self, name):
+        dim = self.fe.spatial_dim()
+        N = (dim**2+1)*(dim**2)/2
+        can = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
+        print(can)
+        can_map, _, _ = canon.build_canonical_map(dim)
+        canon_reconstruct = canon.reconstruct_full(can, can_map, dim, as_sympy=True)
+        return canon_reconstruct
 
     def __create_matrix_symbol(self, name):
         dim = self.fe.spatial_dim()
@@ -263,6 +307,28 @@ class SRHyperelasticity:
         self.expression_table["SdotH_km"] = SdotH_km
         return SdotH_km
 
+    def __compute_metric_tensor_canonical(self):
+        S_ikmn = self.S_ikmn_symb
+        dim = self.fe.spatial_dim()
+        S_ikmn_canonical, canon_list = canon.pack_tensor(S_ikmn, dim)
+        self.expression_table["S_ikmn_canonical"] = S_ikmn_canonical
+        return S_ikmn_canonical
+
+    def __compute_SdotH_km_canonical(self):
+        S_ikmn_canonical = self.S_ikmn_canonical_symb
+        dim = self.fe.spatial_dim()
+        inc_grad = self.inc_grad_symb
+        dim = self.fe.spatial_dim()
+        SdotH_km_canonical = self.__create_zero_matrix()
+        for k in range(0, dim):
+            for m in range(0, dim):
+                for i in range(0, dim):
+                    for n in range(0, dim):
+                        SdotH_km_canonical[k, m] += S_ikmn_canonical[i, k, m, n] * inc_grad[i, n]
+        
+        self.expression_table["SdotH_km_canonical"] = SdotH_km_canonical
+        return SdotH_km_canonical
+
     def __compute_apply(self):
         SdotH_km = self.__create_matrix_symbol("SdotH_km")
         nnodes = self.fe.n_nodes()
@@ -279,7 +345,24 @@ class SRHyperelasticity:
         self.expression_table["eoutx"] = eoutx
         self.expression_table["eouty"] = eouty
         self.expression_table["eoutz"] = eoutz
-        
+
+    def __compute_apply_canonical(self):
+        SdotH_km_canonical = self.expression_table["SdotH_km_canonical"]
+        nnodes = self.fe.n_nodes()
+        eoutx = sp.Matrix(nnodes, 1, [0] * nnodes)
+        eouty = sp.Matrix(nnodes, 1, [0] * nnodes)
+        eoutz = sp.Matrix(nnodes, 1, [0] * nnodes)
+        g = self.fe.grad(self.fe.quadrature_point())
+
+        for node in range(0, nnodes):
+            eoutx[node] += SdotH_km_canonical[0, 0] * g[node][0] + SdotH_km_canonical[0, 1] * g[node][1] + SdotH_km_canonical[0, 2] * g[node][2]
+            eouty[node] += SdotH_km_canonical[1, 0] * g[node][0] + SdotH_km_canonical[1, 1] * g[node][1] + SdotH_km_canonical[1, 2] * g[node][2]
+            eoutz[node] += SdotH_km_canonical[2, 0] * g[node][0] + SdotH_km_canonical[2, 1] * g[node][1] + SdotH_km_canonical[2, 2] * g[node][2]
+
+        self.expression_table["eoutx"] = eoutx
+        self.expression_table["eouty"] = eouty
+        self.expression_table["eoutz"] = eoutz
+        return SdotH_km_canonical
 
     def partial_assembly(self):
         self.__compute_dV()
@@ -293,3 +376,60 @@ class SRHyperelasticity:
         self.__compute_metric_tensor()
         self.__compute_SdotH_km()
         self.__compute_apply()
+
+        self.__compute_metric_tensor_canonical()
+        self.__compute_SdotH_km_canonical()
+        self.__compute_apply_canonical()
+
+    def check_metric_tensor_symmetries(self):
+        self.partial_assembly()
+        
+
+        dim = self.fe.spatial_dim()
+        S_lin = self.expression_table["S_lin"]
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+
+
+        detect_constitutive_tensor_symmetries(S_lin)
+
+        terms = []
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
+                        S_ikmn = 0
+                        for j in range(0, dim):
+                            reduce_l = 0
+                            for l in range(0, dim):
+                                reduce_l += S_lin[i, j, k, l] * Jinv[m, l] 
+                            S_ikmn += reduce_l * Jinv[n, j]
+                        
+                        terms.append(S_ikmn)
+
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
+        for i in range(0, dim**4):
+            terms[i] *= dV
+
+        S_ikmn = sp.MutableDenseNDimArray(terms, shape=(dim, dim, dim, dim))
+        # detect_constitutive_tensor_symmetries(S_ikmn)
+
+        vec, canon_list = canon.pack_tensor(S_ikmn)      # length 45 in 3D
+        S_reconstructed = canon.reconstruct_full(vec, canon_list, dim, as_sympy=True)
+        S_diff = S_reconstructed - S_ikmn
+
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
+                        S_diff[i, k, m, n] = sp.simplify(S_diff[i, k, m, n])
+                        print(f"{i}, {k}, {m}, {n}: {S_diff[i, k, m, n]}")
+
+
+        # print(S_diff)
+
+
+
+if __name__ == "__main__":
+    fe = Tet4()
+    op = SRHyperelasticity.create_from_string(fe, "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
+    op.check_metric_tensor_symmetries()
