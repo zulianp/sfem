@@ -305,7 +305,7 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
 
         sfem_adjoint_mini_tet_shared_loc_kernel_gpu<real_t><<<blocks_per_grid,                       //
                                                               threads_per_block,                     //
-                                                              shared_memory_size,                    //
+                                                              sizeof(real_t) * shared_memory_size,   //
                                                               cuda_stream>>>(shared_memory_size,     //
                                                                              tets_per_block,         //
                                                                              start_element,          // Mesh
