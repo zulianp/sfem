@@ -297,7 +297,7 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
     }
 
     {
-        const ptrdiff_t shared_memory_size = max_total_size_local * tets_per_block;
+        const ptrdiff_t shared_memory_size = max_total_size_local * tets_per_block + tets_per_block;
 
         const unsigned int threads_per_block      = LANES_PER_TILE * tets_per_block;
         const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
@@ -307,6 +307,7 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
                                                               threads_per_block,                     //
                                                               shared_memory_size,                    //
                                                               cuda_stream>>>(shared_memory_size,     //
+                                                                             tets_per_block,         //
                                                                              start_element,          // Mesh
                                                                              end_element,            //
                                                                              nnodes,                 //
@@ -326,11 +327,18 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
                                                                              dz,                     //
                                                                              weighted_field_device,  // Input weighted field
                                                                              mini_tet_parameters,    // Threshold for alpha
+                                                                             tet_properties_info,    //
                                                                              data_device);           //
     }
 
     cudaEventRecord(stop_event, cuda_stream);
     cudaEventSynchronize(stop_event);
+
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(err), __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
 
     float milliseconds = 0.0f;
     cudaEventElapsedTime(&milliseconds, start_event, stop_event);

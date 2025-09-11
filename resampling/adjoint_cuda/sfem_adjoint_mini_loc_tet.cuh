@@ -286,39 +286,64 @@ sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_elem
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__global__ void                                                                               //
-sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t             shared_memory_size,   //
-                                            const ptrdiff_t             start_element,        // Mesh
-                                            const ptrdiff_t             end_element,          //
-                                            const ptrdiff_t             nnodes,               //
-                                            const elems_tet4_device     elems,                //
-                                            const xyz_tet4_device       xyz,                  //
-                                            const ptrdiff_t             n0,                   // SDF
-                                            const ptrdiff_t             n1,                   //
-                                            const ptrdiff_t             n2,                   //
-                                            const ptrdiff_t             stride0,              // Stride
-                                            const ptrdiff_t             stride1,              //
-                                            const ptrdiff_t             stride2,              //
-                                            const geom_t                origin0,              // Origin
-                                            const geom_t                origin1,              //
-                                            const geom_t                origin2,              //
-                                            const geom_t                dx,                   // Delta
-                                            const geom_t                dy,                   //
-                                            const geom_t                dz,                   //
-                                            const FloatType* const      weighted_field,       // Input weighted field
-                                            const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
-                                            FloatType* const            data) {                          //
+__global__ void                                                                                          //
+sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                        shared_memory_size,   //
+                                            const ptrdiff_t                        tets_per_block,       //
+                                            const ptrdiff_t                        start_element,        // Mesh
+                                            const ptrdiff_t                        end_element,          //
+                                            const ptrdiff_t                        nnodes,               //
+                                            const elems_tet4_device                elems,                //
+                                            const xyz_tet4_device                  xyz,                  //
+                                            const ptrdiff_t                        n0,                   // SDF
+                                            const ptrdiff_t                        n1,                   //
+                                            const ptrdiff_t                        n2,                   //
+                                            const ptrdiff_t                        stride0,              // Stride
+                                            const ptrdiff_t                        stride1,              //
+                                            const ptrdiff_t                        stride2,              //
+                                            const geom_t                           origin0,              // Origin
+                                            const geom_t                           origin1,              //
+                                            const geom_t                           origin2,              //
+                                            const geom_t                           dx,                   // Delta
+                                            const geom_t                           dy,                   //
+                                            const geom_t                           dz,                   //
+                                            const FloatType* const                 weighted_field,       // Input weighted field
+                                            const mini_tet_parameters_t            mini_tet_parameters,  // Threshold for alpha
+                                            const tet_properties_info_t<FloatType> tet_properties_info,  //
+                                            FloatType* const                       data) {                                     //
 
     const int tet_id               = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
     const int element_i            = start_element + tet_id;  // Global element index
     const int threading_block_size = blockDim.x;
+    const int warp_id              = threadIdx.x / LANES_PER_TILE;
+    const int lane_id              = threadIdx.x % LANES_PER_TILE;
 
     extern __shared__ FloatType shared_local_data[];  // Shared memory for local accumulation
+    // FloatType*                  tet_buffer = &shared_local_data[tets_per_block];
+    // FloatType*                  tet_local_buffer = nullptr;
+    __shared__ ptrdiff_t tet_start_buffer_idx[64];
 
     for (int i = threadIdx.x; i < threading_block_size; i += blockDim.x) {
         if (i < threading_block_size) shared_local_data[i] = 0.0;
     }
+
+    if (lane_id == 0) {
+        tet_start_buffer_idx[warp_id] = tet_properties_info.total_size_local[element_i];
+    }
+
     __syncthreads();
+
+    if (lane_id == 0 and warp_id == 0) {
+        ptrdiff_t offset = 0;
+        for (int i = 0; i < tets_per_block; i++) {
+            const ptrdiff_t sz      = tet_start_buffer_idx[i];
+            tet_start_buffer_idx[i] = offset;
+            offset += sz;
+        }
+    }
+
+    __syncthreads();
+
+    FloatType* tet_local_buffer = &shared_local_data[tet_start_buffer_idx[warp_id]];
 
     if (element_i >= end_element) return;  // Out of range
 
@@ -326,6 +351,14 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t             shared_m
 
     const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
     const FloatType hexahedron_volume = dx * dy * dz;
+
+    const ptrdiff_t delta0_index = tet_properties_info.delta0_index[element_i];
+    const ptrdiff_t delta1_index = tet_properties_info.delta1_index[element_i];
+    const ptrdiff_t delta2_index = tet_properties_info.delta2_index[element_i];
+
+    const FloatType min_grid_x = dx * FloatType(delta0_index) + FloatType(origin0);
+    const FloatType min_grid_y = dy * FloatType(delta1_index) + FloatType(origin1);
+    const FloatType min_grid_z = dz * FloatType(delta2_index) + FloatType(origin2);
 
     // printf("Exaedre volume: %e\n", hexahedron_volume);
 
