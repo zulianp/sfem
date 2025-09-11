@@ -11,6 +11,9 @@ class Hex8(FE):
         super().__init__()
         self.isoparam = isoparam
 
+    def name(self):
+        return "Hex8"
+
     def is_isoparametric(self):
         return self.isoparam
 
