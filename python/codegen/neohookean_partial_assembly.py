@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 
 import sympy as sp
 import sympy.codegen.ast as ast
@@ -7,15 +8,21 @@ import sympy.codegen.ast as ast
 from sfem_codegen import c_code, c_gen, real_t, matrix_coeff
 from sympy import Array
 from tet4 import Tet4
+from hex8 import Hex8
+from tri3 import Tri3
+from tet10 import Tet10
 from sr_hyperelasticity import SRHyperelasticity
 from sympy import Array
 
 
 class PAKernelGenerator:
-    def __init__(self, op: SRHyperelasticity):
+    def __init__(self, name, op: SRHyperelasticity, metric_tensor_only=True):
+        self.name = name
+        self.metric_tensor_only = metric_tensor_only
         op.partial_assembly()
         self.fe = op.fe
         self.expression_table = op.expression_table
+        self.use_canonical = False
         
     @staticmethod
     def _create_tensor4_symbol(name, size0, size1, size2, size3):
@@ -51,6 +58,7 @@ class PAKernelGenerator:
 
     def emit_header(self, out_path, guard):
         dim = self.fe.spatial_dim()
+        elem_type_lc = self.fe.name().lower()
         tensor_name = "S_ikmn"
         S_lin_name = "S_lin"
         S_lin = self.expression_table[S_lin_name]
@@ -59,16 +67,25 @@ class PAKernelGenerator:
         inc_grad = self.expression_table["inc_grad"]
       
         S_lin_symb = self._create_tensor4_symbol(S_lin_name, dim, dim, dim, dim)
-        body_S_lin = c_gen(self._assign_tensor4(S_lin_symb, S_lin))
-
         S_symb = self._create_tensor4_symbol(tensor_name, dim, dim, dim, dim)
         body_S = c_gen(self._assign_tensor4(S_symb, S_ikmn))
 
         body_F = c_gen(self._assign_matrix("F", Fmat))
         body_R = c_gen(self._assign_matrix("inc_grad", inc_grad))
 
+        
+        is_constant = True
+        parms_q = "" 
+        if not isinstance(self.fe, Tet4) and not isinstance(self.fe, Tri3):
+            is_constant = False
+
+            parms_q = f"const {real_t}                      qx," 
+            parms_q += f"const {real_t}                      qy," if dim > 2 else ""
+            parms_q += f"const {real_t}                      qz," if dim > 2 else ""
+            parms_q += f"const {real_t}                      qw,"
+
         sigF = (
-            "static SFEM_INLINE void tet4_F(\n"
+            f"static SFEM_INLINE void {elem_type_lc}_F(\n"
             f"    const {real_t} *const SFEM_RESTRICT adjugate,\n"
             f"    const {real_t}                      jacobian_determinant,\n"
             f"    const {real_t} *const SFEM_RESTRICT dispx,\n"
@@ -79,7 +96,7 @@ class PAKernelGenerator:
         )
 
         sigR = (
-            "static SFEM_INLINE void tet4_ref_inc_grad(\n"
+            f"static SFEM_INLINE void {elem_type_lc}_ref_inc_grad(\n"
             f"    const {real_t} *const SFEM_RESTRICT incx,\n"
             f"    const {real_t} *const SFEM_RESTRICT incy,\n"
             f"    const {real_t} *const SFEM_RESTRICT incz,\n"
@@ -88,7 +105,7 @@ class PAKernelGenerator:
         )
 
         sigS = (
-            f"static SFEM_INLINE void tet4_{tensor_name}(\n"
+            f"static SFEM_INLINE void {elem_type_lc}_{tensor_name}_{self.name}(\n"
             f"    const {real_t} *const SFEM_RESTRICT adjugate,\n"
             f"    const {real_t}                      jacobian_determinant,\n"
             f"    const {real_t} *const SFEM_RESTRICT F,\n"
@@ -102,51 +119,44 @@ class PAKernelGenerator:
         content = []
         content.append(f"#ifndef {guard}")
         content.append(f"#define {guard}")
-        content.append("")
-        content.append(sigF)
-        content.append(body_F)
-        content.append("}\n")
-        content.append("")
+        if not self.metric_tensor_only:
+            content.append("")
+            content.append(sigF)
+            content.append(body_F)
+            content.append("}\n")
+            content.append("")
 
-        content.append(sigR)
-        content.append(body_R)
-        content.append("}\n")
-        content.append("")
-
-        content.append(sigS)
-        content.append(f"   {real_t} {S_lin_name}[{dim**4}]; // Check if used in SSA mode")
-        content.append("    {")
-        content.append(body_S_lin)
-        content.append("    }")
-
-        content.append(body_S)
-        content.append("}\n")
-        content.append("")
-
-        # Emit apply kernel using SoA gradients (gx, gy, gz)
-        # Embed reference shape function gradients via FE.grad at the reference point
-        q = self.fe.quadrature_point()
-        g = self.fe.grad(q)
-        nfun = self.fe.n_nodes()
-        grad_assign = []
-        # Declarations
-        # grad_decl = "scalar_t gradx[{}];\nscalar_t grady[{}];\nscalar_t gradz[{}];\n".format(nfun, nfun, nfun)
-        # for node in range(nfun):
-        #     grad_assign.append(ast.Assignment(sp.symbols(f"gradx[{node}]"), g[node][0]))
-        #     grad_assign.append(ast.Assignment(sp.symbols(f"grady[{node}]"), g[node][1]))
-        #     grad_assign.append(ast.Assignment(sp.symbols(f"gradz[{node}]"), g[node][2]))
-        # grad_code = c_gen(grad_assign)
+            content.append(sigR)
+            content.append(body_R)
+            content.append("}\n")
+            content.append("")
 
 
-        expr = []
-        expr.extend(self._assign_matrix("SdotH_km", self.expression_table["SdotH_km"]))
-        expr.extend(self._assign_matrix("eoutx", self.expression_table["eoutx"]))
-        expr.extend(self._assign_matrix("eouty", self.expression_table["eouty"]))
-        expr.extend(self._assign_matrix("eoutz", self.expression_table["eoutz"]))
-        body_apply = c_gen(expr)
+        if self.use_canonical:
+            
+        else:
+            body_S_lin = c_gen(self._assign_tensor4(S_lin_symb, S_lin))
+            content.append(sigS)
+            content.append(f"   {real_t} {S_lin_name}[{dim**4}]; // Check if used in SSA mode")
+            content.append("    {")
+            content.append(body_S_lin)
+            content.append("    }")
 
-        apply_fun = f"""
-static SFEM_INLINE void tet4_apply_{tensor_name}(
+            content.append(body_S)
+            content.append("}\n")
+            content.append("")
+
+
+        if not self.metric_tensor_only:
+            expr = []
+            expr.extend(self._assign_matrix("SdotH_km", self.expression_table["SdotH_km"]))
+            expr.extend(self._assign_matrix("eoutx", self.expression_table["eoutx"]))
+            expr.extend(self._assign_matrix("eouty", self.expression_table["eouty"]))
+            expr.extend(self._assign_matrix("eoutz", self.expression_table["eoutz"]))
+            body_apply = c_gen(expr)
+
+            apply_fun = f"""
+static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
     const scalar_t *const SFEM_RESTRICT S_ikmn,    // 3x3x3x3, includes dV
     const scalar_t *const SFEM_RESTRICT inc_grad,  // 3x3 reference trial gradient R
     scalar_t *const SFEM_RESTRICT       eoutx,
@@ -158,7 +168,7 @@ static SFEM_INLINE void tet4_apply_{tensor_name}(
 }}
 """
 
-        content.append(apply_fun)
+            content.append(apply_fun)
         content.append("")
         content.append(f"#endif /* {guard} */\n")
 
@@ -167,15 +177,42 @@ static SFEM_INLINE void tet4_apply_{tensor_name}(
         print(f"Wrote {out_path}")
 
 
-def demo_emit_for_tet4_neohookean():
+def neohookean(fe):
+    name = "neohookean"
     strain_energy_function = "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2"
-    fe = Tet4()
-    op = SRHyperelasticity.create_from_string_F(fe, strain_energy_function)
 
-    gen = PAKernelGenerator(op)
-    gen.emit_header("operators/tet4/tet4_partial_assembly_neohookean_inline.h",
-                    guard="SFEM_TET4_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H",)
+    op = SRHyperelasticity.create_from_string(fe, strain_energy_function)
+
+    elem_type_lc = fe.name().lower()
+    elem_type_uc = fe.name().upper()
+    gen = PAKernelGenerator(name, op)
+
+    output_dir = f"operators/{elem_type_lc}"
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
+                    guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
+
+def compressible_mooney_rivlin(fe):
+    name = "compressible_mooney_rivlin"
+    strain_energy_function = "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2"
+    op = SRHyperelasticity.create_from_string_unimodular(fe, strain_energy_function)
+    
+    elem_type_lc = fe.name().lower()
+    elem_type_uc = fe.name().upper()
+    gen = PAKernelGenerator(name, op)
+
+    output_dir = f"operators/{elem_type_lc}"
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
+                    guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
+
 
 
 if __name__ == "__main__":
-    demo_emit_for_tet4_neohookean()
+    fe = Tet4()
+    # fe = Hex8()
+    # fe = Tet10()
+    neohookean(fe)
+    # compressible_mooney_rivlin(fe)
