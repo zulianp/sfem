@@ -98,6 +98,7 @@ namespace sfem {
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const values);
 
+        int update(const real_t *const x);
         int gradient(const real_t *const x, real_t *const out);
         int apply(const real_t *const x, const real_t *const h, real_t *const out);
 

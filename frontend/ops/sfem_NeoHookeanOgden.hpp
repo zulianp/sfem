@@ -4,9 +4,6 @@
 namespace sfem {
     class NeoHookeanOgden final : public Op {
     public:
-        std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
-        real_t                         mu{1}, lambda{1};
         static std::unique_ptr<Op>     create(const std::shared_ptr<FunctionSpace> &space);
         std::shared_ptr<Op>            lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op>            derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
@@ -25,5 +22,11 @@ namespace sfem {
         int                 report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
         ~NeoHookeanOgden() override;
+
+        int update(const real_t *const x) override;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 }  // namespace sfem

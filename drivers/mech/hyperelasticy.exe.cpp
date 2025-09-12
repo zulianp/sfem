@@ -96,6 +96,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     real_t alpha = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
     auto blas = sfem::blas<real_t>(es);
     for(int i = 0; i < nl_max_it; i++) {
+        f->update(displacement->data());
         blas->zeros(ndofs, rhs->data());
         f->gradient(displacement->data(), rhs->data());
         blas->zeros(ndofs, increment->data());
