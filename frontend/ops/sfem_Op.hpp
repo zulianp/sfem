@@ -61,6 +61,8 @@ namespace sfem {
          */
         virtual int initialize(const std::vector<std::string> &block_names = {}) { return SFEM_SUCCESS; }
 
+        virtual int update(const real_t *const x) { return SFEM_SUCCESS; }
+
         /**
          * @brief Assemble the Hessian matrix in CRS format
          * @param x Current solution vector

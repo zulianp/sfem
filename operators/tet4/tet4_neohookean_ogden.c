@@ -216,7 +216,7 @@ static void neohookean_gradient_ref(const real_t                      mu,
 //     }
 
 //     *value += acc;
-//     return 0;
+//     return SFEM_SUCCESS;
 // }
 
 int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
@@ -325,7 +325,6 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
         tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
         tet4_apply_S_ikmn(S_ikmn, inc_grad, element_outx, element_outy, element_outz);
 
-
 #ifndef NDEBUG
         scalar_t test_outx[4] = {0};
         scalar_t test_outy[4] = {0};
@@ -370,7 +369,7 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 int tet4_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
@@ -519,7 +518,7 @@ int tet4_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 int tet4_neohookean_ogden_diag(const ptrdiff_t              nelements,
@@ -613,7 +612,7 @@ int tet4_neohookean_ogden_diag(const ptrdiff_t              nelements,
         }
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 // int tet4_neohookean_ogden_hessian(const ptrdiff_t nelements,
@@ -673,7 +672,7 @@ int tet4_neohookean_ogden_diag(const ptrdiff_t              nelements,
 //         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
 //     }
 
-//     return 0;
+//     return SFEM_SUCCESS;
 // }
 
 int tet4_neohookean_ogden_hessian(const ptrdiff_t                   nelements,
@@ -744,5 +743,136 @@ int tet4_neohookean_ogden_hessian(const ptrdiff_t                   nelements,
         tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
     }
 
-    return 0;
+    return SFEM_SUCCESS;
+}
+
+int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t                       nelements,
+                                                   idx_t **const SFEM_RESTRICT           elements,
+                                                   geom_t **const SFEM_RESTRICT          points,
+                                                   const real_t                          mu,
+                                                   const real_t                          lambda,
+                                                   const ptrdiff_t                       u_stride,
+                                                   const real_t *const SFEM_RESTRICT     ux,
+                                                   const real_t *const SFEM_RESTRICT     uy,
+                                                   const real_t *const SFEM_RESTRICT     uz,
+                                                   const ptrdiff_t                       S_ikmn_stride,
+                                                   metric_tensor_t **const SFEM_RESTRICT partial_assembly) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t    ev[4];
+        scalar_t element_ux[4];
+        scalar_t element_uy[4];
+        scalar_t element_uz[4];
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v]       = ux[idx];
+            element_uy[v]       = uy[idx];
+            element_uz[v]       = uz[idx];
+        }
+
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        // FUTURE: Preprocessing (once per linearization)
+        scalar_t F[9] = {0};
+        tet4_F(jacobian_adjugate, jacobian_determinant, element_ux, element_uy, element_uz, F);
+        scalar_t S_ikmn[TET4_S_IKMN_SIZE] = {0};
+        tet4_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikmn);
+
+        for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
+            partial_assembly[k][i * S_ikmn_stride] = S_ikmn[k];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+// Apply partially assembled operator
+int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                       nelements,
+                                                         idx_t **const SFEM_RESTRICT           elements,
+                                                         const ptrdiff_t                       S_ikmn_stride,
+                                                         metric_tensor_t **const SFEM_RESTRICT partial_assembly,
+                                                         const ptrdiff_t                       h_stride,
+                                                         const real_t *const                   hx,
+                                                         const real_t *const                   hy,
+                                                         const real_t *const                   hz,
+                                                         const ptrdiff_t                       out_stride,
+                                                         real_t *const                         outx,
+                                                         real_t *const                         outy,
+                                                         real_t *const                         outz) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+
+        scalar_t element_hx[4];
+        scalar_t element_hy[4];
+        scalar_t element_hz[4];
+
+        accumulator_t element_outx[4];
+        accumulator_t element_outy[4];
+        accumulator_t element_outz[4];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            const ptrdiff_t idx = ev[v] * h_stride;
+            element_hx[v]       = hx[idx];
+            element_hy[v]       = hy[idx];
+            element_hz[v]       = hz[idx];
+        }
+
+        scalar_t inc_grad[9];
+        tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
+
+        scalar_t S_ikmn[TET4_S_IKMN_SIZE];
+        for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
+            S_ikmn[k] = partial_assembly[k][i * S_ikmn_stride];
+        }
+
+        tet4_apply_S_ikmn(S_ikmn, inc_grad, element_outx, element_outy, element_outz);
+
+        for (int edof_i = 0; edof_i < 4; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            outx[idx] += element_outx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += element_outy[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += element_outz[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
