@@ -27,7 +27,7 @@ then
 	cd aorta_geometry
 
 
-	cylinder.py aorta.vtk 2
+	cylinder.py aorta.vtk 3
 	db_to_raw.py aorta.vtk aorta --select_elem_type=tetra
 	surf_type=tri3
 	

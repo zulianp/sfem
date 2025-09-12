@@ -509,6 +509,14 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int Function::update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("Function::update");
+        for (auto &op : impl_->ops) {
+            op->update(x);
+        }
+        return SFEM_SUCCESS;
+    }
+
     std::shared_ptr<Output> Function::output() { return impl_->output; }
 
     std::shared_ptr<Function> Function::derefine(const bool dirichlet_as_zero) {
