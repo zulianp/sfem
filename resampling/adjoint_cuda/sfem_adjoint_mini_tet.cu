@@ -135,6 +135,7 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     if (SFEM_LOG_LEVEL >= 5) {
         printf("================= SFEM Adjoint Mini-Tet Kernel GPU ================\n");
         printf("Kernel execution time: %f ms\n", milliseconds);
+        printf("  Tet per second: %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
         printf("===================================================================\n");
     }
 

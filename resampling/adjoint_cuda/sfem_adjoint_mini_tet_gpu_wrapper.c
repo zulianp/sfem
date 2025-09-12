@@ -17,6 +17,8 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     PRINT_CURRENT_FUNCTION;
 
+    // printf("Strides = %ld %ld %ld ************************************************ \n", stride[0], stride[1], stride[2]);
+
 // #define TEST_LOCAL_KERNEL
 #ifdef TEST_LOCAL_KERNEL
     call_sfem_adjoint_mini_tet_kernel_gpu(

@@ -31,12 +31,13 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const ptrdiff_t                        n0,          // Size of the grid
         const ptrdiff_t                        n1,          //
         const ptrdiff_t                        n2,          //
-        FloatType* const                       data) {                            // Output
+        FloatType* const                       data,        //
+        const ptrdiff_t                        size_hex_domain = 0) {              // Output
 
-            // data[0] += 1; // To avoid unused variable warning
+    // data[0] += 1; // To avoid unused variable warning
 
     const FloatType N_micro_tet     = (FloatType)(L) * (FloatType)(L) * (FloatType)(L);
-    const FloatType inv_N_micro_tet = 1.0 / N_micro_tet;  // Inverse of the number of micro-tetrahedra
+    const FloatType inv_N_micro_tet = 1.0 / N_micro_tet;  // Inverse of the number of mini-tetrahedra
 
     const FloatType theta_volume = det_J_phys / ((FloatType)(6.0));  // Volume of the mini-tetrahedron in the physical space
 
@@ -110,12 +111,21 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType zq_mref = fast_fma(J_ref[2].z, qz, fast_fma(J_ref[2].y, qy, fast_fma(J_ref[2].x, qx, bc.z)));
 
         // Mapping the quadrature point from the mini-tetrahedron to the physical space
-        const FloatType xq_phys =
-                fast_fma(J_phys[0].z, zq_mref, fast_fma(J_phys[0].y, yq_mref, fast_fma(J_phys[0].x, xq_mref, fxyz.x)));
-        const FloatType yq_phys =
-                fast_fma(J_phys[1].z, zq_mref, fast_fma(J_phys[1].y, yq_mref, fast_fma(J_phys[1].x, xq_mref, fxyz.y)));
-        const FloatType zq_phys =
-                fast_fma(J_phys[2].z, zq_mref, fast_fma(J_phys[2].y, yq_mref, fast_fma(J_phys[2].x, xq_mref, fxyz.z)));
+        const FloatType xq_phys = fast_fma(J_phys[0].z,                                        //
+                                           zq_mref,                                            //
+                                           fast_fma(J_phys[0].y,                               //
+                                                    yq_mref,                                   //
+                                                    fast_fma(J_phys[0].x, xq_mref, fxyz.x)));  //
+        const FloatType yq_phys = fast_fma(J_phys[1].z,                                        //
+                                           zq_mref,                                            //
+                                           fast_fma(J_phys[1].y,                               //
+                                                    yq_mref,                                   //
+                                                    fast_fma(J_phys[1].x, xq_mref, fxyz.y)));  //
+        const FloatType zq_phys = fast_fma(J_phys[2].z,                                        //
+                                           zq_mref,                                            //
+                                           fast_fma(J_phys[2].y,                               //
+                                                    yq_mref,                                   //
+                                                    fast_fma(J_phys[2].x, xq_mref, fxyz.z)));  //
 
         // Grid coords with fused multiply-add
         const FloatType grid_x = fast_fma(inv_dx, xq_phys, neg_ox_inv_dx);
@@ -192,7 +202,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const ptrdiff_t base = i * stride0 + j * stride1 + k * stride2;
 
         // printf("quad_i_tile=%ld, lane_id=%d, (i,j,k)=(%ld,%ld,%ld), base=%ld, stride0=%ld, stride1=%ld, stride2=%ld, n0=%ld, "
-        //        "n1=%ld, n2=%ld\n",
+        //        "n1=%ld, n2=%ld, size_hex_domain=%ld\n",
         //        (long)quad_i_tile,
         //        lane_id,
         //        (long)i,
@@ -204,7 +214,8 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         //        (long)stride2,
         //        (long)n0,
         //        (long)n1,
-        //        (long)n2);
+        //        (long)n2,
+        //        (long)size_hex_domain);
 
         if (base == cache_base) {
             // Same cell as previous iteration: accumulate locally
@@ -264,6 +275,10 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     // // Broadcast the result from lane 0 to all other lanes in the tile
     // cumulated_dV = __shfl_sync(mask, cumulated_dV, 0);
 
+    // for (int ii = 0; ii < size_hex_domain; ++ii) {
+    //     if (data[ii] != 0.0) printf("data[%d] = %e\n", ii, (double)data[ii]);
+    // }
+
     return 0.0;  // cumulated_dV;  // Return the cumulative volume for debugging
 }
 
@@ -292,7 +307,8 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                   const ptrdiff_t                         n0,       // Size of the grid
                                   const ptrdiff_t                         n1,       //
                                   const ptrdiff_t                         n2,       //
-                                  FloatType* const                        data) {                          // Output
+                                  FloatType* const                        data,     //
+                                  const ptrdiff_t                         size_hex_domain = 0) {            // Output
 
     const FloatType zero = 0.0;
 
@@ -349,7 +365,8 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                                                          n0,
                                                                          n1,
                                                                          n2,
-                                                                         data);
+                                                                         data,
+                                                                         size_hex_domain);
                 }
 
                 if (i >= 1) {
@@ -377,7 +394,8 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                                                              n0,
                                                                              n1,
                                                                              n2,
-                                                                             data);
+                                                                             data,
+                                                                             size_hex_domain);
                     }
                 }  // END if (i >= 1)
 
@@ -408,7 +426,8 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                                                          n0,
                                                                          n1,
                                                                          n2,
-                                                                         data);
+                                                                         data,
+                                                                         size_hex_domain);
                 }
             }
         }
