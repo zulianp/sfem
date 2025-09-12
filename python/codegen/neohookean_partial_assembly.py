@@ -15,6 +15,54 @@ from sr_hyperelasticity import SRHyperelasticity
 from sympy import Array
 
 
+# This is for non HEX elements (use sum factorization for HEX)
+build_Z_pikmn_body="""
+for(int qp = 0; qp < nqp; qp++) {{
+    scalar_t Hkm[9];
+    scalar_t gx[NFUN];
+    scalar_t gy[NFUN];
+    scalar_t gz[NFUN];
+    const scalar_t qx = q_qx[qp];
+    const scalar_t qy = q_qy[qp];
+    const scalar_t qz = q_qz[qp];
+
+    // Compute grads and Hkm at qp
+    {COMPUTE_G_AND_H}
+  
+    # Tensor product of 3 * NFUN with D*D
+    for(int pi = 0; pi < NFUN; pi++) {{
+        scalar_t * const SFEM_RESTRICT Z_kmnx = &Z_pikmn[pi * (D*D*D)];
+        scalar_t * const SFEM_RESTRICT Z_kmny = &Z_kmnx[1];
+        scalar_t * const SFEM_RESTRICT Z_kmnz = &Z_kmnx[2];
+        for(int km = 0; km < (D*D); km++) {{
+            Z_kmnx[km * 3] += gx[pi] * Hkm[km];
+            Z_kmny[km * 3] += gy[pi] * Hkm[km];
+            Z_kmnz[km * 3] += gz[pi] * Hkm[km];
+        }}
+    }}
+}}
+"""
+
+# Expanded S (Can this be optimized?)
+# S = (i, k, m, n) == (k, i, n, m)
+SdotZ_body="""
+for(int p = 0; p < n_fun; p++) {
+    scalar_t acc[D] = {0};
+    const scalar_t * const SFEM_RESTRICT Zpi = &Z_pikmn[Z_IDX(p, 0, 0, 0, 0)];
+    for(int i = 0; i < D; i++) {
+        const scalar_t * const SFEM_RESTRICT Si = &S[S_IDX(i, 0, 0, 0)];
+        for(int k = 0; k < D * D * D; k++) {
+            acc[i] += Si[iter] * Zpi[iter];
+        }
+    }
+
+    outx[p] += acc[0];
+    outy[p] += acc[1];
+    outz[p] += acc[2];
+}
+"""
+
+
 class PAKernelGenerator:
     def __init__(self, name, op: SRHyperelasticity, metric_tensor_only=False):
         self.name = name
@@ -88,21 +136,19 @@ class PAKernelGenerator:
         body_F = c_gen(self._assign_matrix("F", Fmat))
         body_R = c_gen(self._assign_matrix("inc_grad", inc_grad))
 
-        
         is_constant = True
-        parms_q = "" 
+        params_q = "" 
         if not isinstance(self.fe, Tet4) and not isinstance(self.fe, Tri3):
             is_constant = False
-
-            parms_q = f"const {real_t}                      qx," 
-            parms_q += f"const {real_t}                      qy," if dim > 2 else ""
-            parms_q += f"const {real_t}                      qz," if dim > 2 else ""
-            parms_q += f"const {real_t}                      qw,"
+            params_q =  f"  const {real_t}            qx,\n" 
+            params_q += f"  const {real_t}            qy,\n" if dim > 2 else ""
+            params_q += f"  const {real_t}            qz,\n" if dim > 2 else ""
 
         sigF = (
             f"static SFEM_INLINE void {elem_type_lc}_F(\n"
             f"    const {real_t} *const SFEM_RESTRICT adjugate,\n"
             f"    const {real_t}                      jacobian_determinant,\n"
+            f"{params_q}"
             f"    const {real_t} *const SFEM_RESTRICT dispx,\n"
             f"    const {real_t} *const SFEM_RESTRICT dispy,\n"
             f"    const {real_t} *const SFEM_RESTRICT dispz,\n"
@@ -112,6 +158,7 @@ class PAKernelGenerator:
 
         sigR = (
             f"static SFEM_INLINE void {elem_type_lc}_ref_inc_grad(\n"
+            f"{params_q}"
             f"    const {real_t} *const SFEM_RESTRICT incx,\n"
             f"    const {real_t} *const SFEM_RESTRICT incy,\n"
             f"    const {real_t} *const SFEM_RESTRICT incz,\n"
@@ -123,6 +170,7 @@ class PAKernelGenerator:
             f"static SFEM_INLINE void {elem_type_lc}_{tensor_name}_{self.name}(\n"
             f"    const {real_t} *const SFEM_RESTRICT adjugate,\n"
             f"    const {real_t}                      jacobian_determinant,\n"
+            f"{params_q}"
             f"    const {real_t} *const SFEM_RESTRICT F,\n"
             f"    const {real_t}                      mu,\n"
             f"    const {real_t}                      lmbda,\n"
@@ -184,7 +232,7 @@ class PAKernelGenerator:
 
             apply_fun = f"""
 static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
-    const scalar_t *const SFEM_RESTRICT S_ikmn{f"_canonical" if self.use_canonical else ""},    // 3x3x3x3, includes dV
+    {params_q}const scalar_t *const SFEM_RESTRICT S_ikmn{f"_canonical" if self.use_canonical else ""},    // 3x3x3x3, includes dV
     const scalar_t *const SFEM_RESTRICT inc_grad,  // 3x3 reference trial gradient R
     scalar_t *const SFEM_RESTRICT       eoutx,
     scalar_t *const SFEM_RESTRICT       eouty,
