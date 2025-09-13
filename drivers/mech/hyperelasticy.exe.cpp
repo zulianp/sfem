@@ -43,6 +43,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const char *SFEM_OPERATOR = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
+    const bool SFEM_VERBOSE = sfem::Env::read("SFEM_VERBOSE", 0);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
         const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -85,10 +87,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
     auto cg = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose = true;
+    cg->verbose = SFEM_VERBOSE;
     cg->set_max_it(10000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-6);
+    cg->set_rtol(1e-4);
     cg->set_atol(1e-10);
 
     // Newton iteration

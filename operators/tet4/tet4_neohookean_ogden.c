@@ -1,3 +1,5 @@
+#include "tet4_neohookean_ogden.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -862,6 +864,75 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
 
         for (int edof_i = 0; edof_i < 4; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            outx[idx] += element_outx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += element_outy[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += element_outz[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+// Apply partially assembled operator
+int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                  nelements,
+                                                                    idx_t **const SFEM_RESTRICT      elements,
+                                                                    const ptrdiff_t                  S_ikmn_stride,
+                                                                    compressed_t **const SFEM_RESTRICT     partial_assembly,
+                                                                    const scaling_t *const SFEM_RESTRICT scaling,
+                                                                    const ptrdiff_t                  h_stride,
+                                                                    const real_t *const              hx,
+                                                                    const real_t *const              hy,
+                                                                    const real_t *const              hz,
+                                                                    const ptrdiff_t                  out_stride,
+                                                                    real_t *const                    outx,
+                                                                    real_t *const                    outy,
+                                                                    real_t *const                    outz) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+
+        scalar_t element_hx[4];
+        scalar_t element_hy[4];
+        scalar_t element_hz[4];
+
+        accumulator_t element_outx[4];
+        accumulator_t element_outy[4];
+        accumulator_t element_outz[4];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 4; ++v) {
+            const ptrdiff_t idx = ev[v] * h_stride;
+            element_hx[v]       = hx[idx];
+            element_hy[v]       = hy[idx];
+            element_hz[v]       = hz[idx];
+        }
+
+        scalar_t inc_grad[9];
+        tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
+
+        scalar_t S_ikmn[TET4_S_IKMN_SIZE];
+        for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
+            S_ikmn[k] = (real_t)(scaling[i]) * (real_t)(partial_assembly[k][i * S_ikmn_stride]);
+            assert(S_ikmn[k] == S_ikmn[k]);
+        }
+
+        tet4_apply_S_ikmn(S_ikmn, inc_grad, element_outx, element_outy, element_outz);
+
+        for (int edof_i = 0; edof_i < 4; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+            assert(element_outx[edof_i] == element_outx[edof_i]);
+            assert(element_outy[edof_i] == element_outy[edof_i]);
+            assert(element_outz[edof_i] == element_outz[edof_i]);
 
 #pragma omp atomic update
             outx[idx] += element_outx[edof_i];
