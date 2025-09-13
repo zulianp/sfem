@@ -98,9 +98,11 @@ int main(int argc, char *argv[]) {
                     comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
         }
 
+        int dim = m->spatial_dimension();
+
         std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
-                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = 3},
-                                   {.name = "LinearElasticity", .type = BSR, .block_size = 3}});
+                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim},
+                                   {.name = "LinearElasticity", .type = BSR, .block_size = dim}});
 
         std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
@@ -114,6 +116,10 @@ int main(int argc, char *argv[]) {
                 ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
             }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
+
+            if(m->element_type() == TET4) {
+                ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
+            }
         }
 
         for (auto &op_desc : ops) {
@@ -133,7 +139,10 @@ int main(int argc, char *argv[]) {
             auto x         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto input     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto output    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+            f->update(x->data());
             auto linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
+
 
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }
