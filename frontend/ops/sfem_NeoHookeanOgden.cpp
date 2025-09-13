@@ -114,8 +114,15 @@ namespace sfem {
             printf("sizeof(metric_tensor_t) = %lu\n", sizeof(metric_tensor_t));
             printf("sizeof(compressed_t) = %lu\n", sizeof(compressed_t));
         }
-
+        
         ret->impl_->element_type = (enum ElemType)space->element_type();
+        
+        if (ret->impl_->element_type == HEX8) {
+            // This is the only implementation available for HEX8
+            ret->impl_->use_partial_assembly = true;
+            ret->impl_->use_compression = true;
+        }
+
         return ret;
     }
 

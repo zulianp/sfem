@@ -204,7 +204,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("LinearElasticity::hessian_bcrs_sym");
 
         auto mesh  = impl_->space->mesh_ptr();
-        auto graph = impl_->space->node_to_node_graph();
+        auto graph = impl_->space->mesh_ptr()->node_to_node_graph_upper_triangular();
         int  err   = SFEM_SUCCESS;
 
         impl_->iterate([&](const OpDomain &domain) {
