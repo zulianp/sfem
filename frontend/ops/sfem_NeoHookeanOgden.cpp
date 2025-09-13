@@ -177,7 +177,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         if (impl_->partial_assembly_buffer) {
             if (impl_->use_compression) {
-                return tet4_neohookean_ogden_compressed_partial_assembly_apply(  // impl_->element_type,
+                return neohookean_ogden_compressed_partial_assembly_apply(
+                     impl_->element_type,
                         mesh->n_elements(),
                         mesh->elements()->data(),
                         1,
