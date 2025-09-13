@@ -169,6 +169,8 @@ typedef float metric_tensor_t;
 
 typedef int64_t sshex_side_code_t;
 typedef uint16_t block_idx_t;
+typedef float  scaling_t;
+typedef half_t compressed_t;
 
 
 #endif  // SFEM_CONFIG_HPP

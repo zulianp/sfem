@@ -140,6 +140,21 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
                                             real_t *const                         outy,
                                             real_t *const                         outz);
 
+int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                  element_type,
+                                                       const ptrdiff_t                      nelements,
+                                                       idx_t **const SFEM_RESTRICT          elements,
+                                                       const ptrdiff_t                      S_ikmn_stride,
+                                                       compressed_t **const SFEM_RESTRICT   partial_assembly,
+                                                       const scaling_t *const SFEM_RESTRICT scaling,
+                                                       const ptrdiff_t                      h_stride,
+                                                       const real_t *const                  hx,
+                                                       const real_t *const                  hy,
+                                                       const real_t *const                  hz,
+                                                       const ptrdiff_t                      out_stride,
+                                                       real_t *const                        outx,
+                                                       real_t *const                        outy,
+                                                       real_t *const                        outz);
+
 #ifdef __cplusplus
 }
 #endif
