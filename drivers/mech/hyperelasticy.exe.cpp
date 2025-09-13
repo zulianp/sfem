@@ -84,7 +84,6 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            increment     = sfem::create_buffer<real_t>(ndofs, es);
     auto            rhs   = sfem::create_buffer<real_t>(ndofs, es);
 
-
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
     auto cg = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose = SFEM_VERBOSE;
