@@ -34,6 +34,67 @@ namespace sfem {
         bool use_partial_assembly{false};
         bool use_compression{false};
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        int compress_partial_assembly() {
+            auto mesh = space->mesh_ptr();
+
+            if (use_compression) {
+                if (!compression_scaling) {
+                    compression_scaling         = sfem::create_host_buffer<scaling_t>(mesh->n_elements());
+                    partial_assembly_compressed = sfem::create_host_buffer<compressed_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
+                }
+
+                auto cs  = compression_scaling->data();
+                auto pa  = partial_assembly_buffer->data();
+                auto pac = partial_assembly_compressed->data();
+
+                ptrdiff_t n_elements = mesh->n_elements();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    cs[i] = fabs(pa[0][i]);
+                }
+
+                for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n_elements; i++) {
+                        cs[i] = MAX(cs[i], fabs(pa[v][i]));
+                    }
+                }
+
+                real_t max_scaling = 0;
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    if (cs[i] > real_t(FP16_MAX)) {
+                        max_scaling = MAX(max_scaling, cs[i]);
+                        cs[i]       = real_t(cs[i] + 1e-8) / real_t(FP16_MAX);
+                    } else {
+                        cs[i] = 1;
+                    }
+                }
+
+#ifndef NDEBUG
+                ptrdiff_t num_nans = 0;
+#endif
+                for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n_elements; i++) {
+                        pac[v][i] = pa[v][i] / cs[i];
+
+#ifndef NDEBUG
+                        assert(cs[i] > 0);
+                        assert(std::isfinite(pac[v][i]));
+                        num_nans += !std::isfinite(pac[v][i]);
+#endif
+                    }
+                }
+#ifndef NDEBUG
+                printf("Max scaling: %g, num_nans: %ld\n", max_scaling, num_nans);
+#endif
+            }
+
+            return SFEM_SUCCESS;
+        }
     };
 
     std::unique_ptr<Op> NeoHookeanOgden::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -187,65 +248,8 @@ namespace sfem {
                                                                &u[2],
                                                                1,
                                                                impl_->partial_assembly_buffer->data());
-            
-            if (impl_->use_compression) {
-                if (!impl_->compression_scaling) {
-                    impl_->compression_scaling = sfem::create_host_buffer<scaling_t>(mesh->n_elements());
-                    impl_->partial_assembly_compressed =
-                            sfem::create_host_buffer<compressed_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
-                }
 
-                auto cs  = impl_->compression_scaling->data();
-                auto pa  = impl_->partial_assembly_buffer->data();
-                auto pac = impl_->partial_assembly_compressed->data();
-
-                ptrdiff_t n_elements = mesh->n_elements();
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    cs[i] = fabs(pa[0][i]);
-                }
-
-                for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n_elements; i++) {
-                        cs[i] = MAX(cs[i], fabs(pa[v][i]));
-                    }
-                }
-
-                real_t max_scaling = 0;
-
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    if (cs[i] > real_t(FP16_MAX)) {
-                        max_scaling = MAX(max_scaling, cs[i]);
-                        cs[i] = real_t(cs[i] + 1e-8) / real_t(FP16_MAX);
-                    } else {
-                        cs[i] = 1;
-                    }
-                }
-
-#ifndef NDEBUG
-                ptrdiff_t num_nans = 0;
-#endif
-                for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n_elements; i++) {                  
-                        pac[v][i] = pa[v][i] / cs[i];
-
-#ifndef NDEBUG
-                        assert(cs[i] > 0);
-                        assert(std::isfinite(pac[v][i]));
-                        num_nans += !std::isfinite(pac[v][i]);
-#endif
-                    }
-                }
-#ifndef NDEBUG
-                printf("Max scaling: %g, num_nans: %ld\n", max_scaling, num_nans);
-#endif
-
-            } else {
-                return ok;
-            }
+            return impl_->compress_partial_assembly();
         }
 
         return SFEM_SUCCESS;
