@@ -30,9 +30,10 @@ typedef struct OpDesc {
 
     template <class Op, class X, class Y>
     void measure(Op op, X x, Y y, int repeat) {
-        sfem::device_synchronize();
-        
+        // Warm-up
         op->apply(x, y);
+
+        sfem::device_synchronize();
 
         double start = MPI_Wtime();
 
@@ -109,11 +110,13 @@ int main(int argc, char *argv[]) {
             ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
 
             ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
+
         } else {
             ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
             if(m->element_type() == HEX8) {
                 // FIXME
                 ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+                ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim}); //FIXME
             }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
 
