@@ -157,9 +157,18 @@ typedef char mask_t;
 
 #endif // SFEM_ENABLE_CUDA
 
+#if defined(__APPLE__)
+  typedef __fp16 half_t;
+#else
+  typedef _Float16 half_t;
+#endif
+
+static const half_t FP16_MAX = (half_t)65504.0f;
+
+typedef float metric_tensor_t;
+
 typedef int64_t sshex_side_code_t;
 typedef uint16_t block_idx_t;
-// typedef real_t metric_tensor_t;
-typedef float metric_tensor_t;
+
 
 #endif  // SFEM_CONFIG_HPP

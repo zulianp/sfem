@@ -14,6 +14,7 @@
 #include "sfem_glob.hpp"
 
 // FIXME
+#include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
 #include <mpi.h>
@@ -26,7 +27,12 @@ namespace sfem {
         enum ElemType                   element_type { INVALID };
         real_t                          mu{1}, lambda{1};
         SharedBuffer<metric_tensor_t *> partial_assembly_buffer;
-        bool                            use_partial_assembly{false};
+
+        SharedBuffer<scaling_t>      compression_scaling;
+        SharedBuffer<compressed_t *> partial_assembly_compressed;
+
+        bool use_partial_assembly{false};
+        bool use_compression{false};
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
     };
 
@@ -40,7 +46,15 @@ namespace sfem {
         ret->impl_->mu                   = sfem::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
         ret->impl_->lambda               = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
         ret->impl_->use_partial_assembly = sfem::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", ret->impl_->use_partial_assembly);
-        ret->impl_->element_type         = (enum ElemType)space->element_type();
+        ret->impl_->use_compression      = sfem::Env::read("SFEM_USE_COMPRESSION", ret->impl_->use_compression);
+        if (ret->impl_->use_partial_assembly) {
+            printf("SFEM_SHEAR_MODULUS=%g\n", (double)ret->impl_->mu);
+            printf("SFEM_FIRST_LAME_PARAMETER=%g\n", (double)ret->impl_->lambda);
+            printf("sizeof(metric_tensor_t) = %lu\n", sizeof(metric_tensor_t));
+            printf("sizeof(compressed_t) = %lu\n", sizeof(compressed_t));
+        }
+
+        ret->impl_->element_type = (enum ElemType)space->element_type();
         return ret;
     }
 
@@ -101,19 +115,37 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::apply");
         auto mesh = impl_->space->mesh_ptr();
         if (impl_->partial_assembly_buffer) {
-            return neohookean_ogden_partial_assembly_apply(impl_->element_type,
-                                                           mesh->n_elements(),
-                                                           mesh->elements()->data(),
-                                                           1,
-                                                           impl_->partial_assembly_buffer->data(),
-                                                           3,
-                                                           &h[0],
-                                                           &h[1],
-                                                           &h[2],
-                                                           3,
-                                                           &out[0],
-                                                           &out[1],
-                                                           &out[2]);
+            if (impl_->use_compression) {
+                return tet4_neohookean_ogden_compressed_partial_assembly_apply(  // impl_->element_type,
+                        mesh->n_elements(),
+                        mesh->elements()->data(),
+                        1,
+                        impl_->partial_assembly_compressed->data(),
+                        impl_->compression_scaling->data(),
+                        3,
+                        &h[0],
+                        &h[1],
+                        &h[2],
+                        3,
+                        &out[0],
+                        &out[1],
+                        &out[2]);
+
+            } else {
+                return neohookean_ogden_partial_assembly_apply(impl_->element_type,
+                                                               mesh->n_elements(),
+                                                               mesh->elements()->data(),
+                                                               1,
+                                                               impl_->partial_assembly_buffer->data(),
+                                                               3,
+                                                               &h[0],
+                                                               &h[1],
+                                                               &h[2],
+                                                               3,
+                                                               &out[0],
+                                                               &out[1],
+                                                               &out[2]);
+            }
         }
 
         return neohookean_ogden_apply_aos(impl_->element_type,
@@ -143,18 +175,77 @@ namespace sfem {
                 impl_->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
             }
 
-            return neohookean_ogden_hessian_partial_assembly(impl_->element_type,
-                                                             mesh->n_elements(),
-                                                             mesh->elements()->data(),
-                                                             mesh->points()->data(),
-                                                             impl_->mu,
-                                                             impl_->lambda,
-                                                             3,
-                                                             &u[0],
-                                                             &u[1],
-                                                             &u[2],
-                                                             1,
-                                                             impl_->partial_assembly_buffer->data());
+            int ok = neohookean_ogden_hessian_partial_assembly(impl_->element_type,
+                                                               mesh->n_elements(),
+                                                               mesh->elements()->data(),
+                                                               mesh->points()->data(),
+                                                               impl_->mu,
+                                                               impl_->lambda,
+                                                               3,
+                                                               &u[0],
+                                                               &u[1],
+                                                               &u[2],
+                                                               1,
+                                                               impl_->partial_assembly_buffer->data());
+            
+            if (impl_->use_compression) {
+                if (!impl_->compression_scaling) {
+                    impl_->compression_scaling = sfem::create_host_buffer<scaling_t>(mesh->n_elements());
+                    impl_->partial_assembly_compressed =
+                            sfem::create_host_buffer<compressed_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
+                }
+
+                auto cs  = impl_->compression_scaling->data();
+                auto pa  = impl_->partial_assembly_buffer->data();
+                auto pac = impl_->partial_assembly_compressed->data();
+
+                ptrdiff_t n_elements = mesh->n_elements();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    cs[i] = fabs(pa[0][i]);
+                }
+
+                for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n_elements; i++) {
+                        cs[i] = MAX(cs[i], fabs(pa[v][i]));
+                    }
+                }
+
+                real_t max_scaling = 0;
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    if (cs[i] > real_t(FP16_MAX)) {
+                        max_scaling = MAX(max_scaling, cs[i]);
+                        cs[i] = real_t(cs[i] + 1e-8) / real_t(FP16_MAX);
+                    } else {
+                        cs[i] = 1;
+                    }
+                }
+
+#ifndef NDEBUG
+                ptrdiff_t num_nans = 0;
+#endif
+                for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
+#pragma omp parallel for
+                    for (ptrdiff_t i = 0; i < n_elements; i++) {                  
+                        pac[v][i] = pa[v][i] / cs[i];
+
+#ifndef NDEBUG
+                        assert(cs[i] > 0);
+                        assert(std::isfinite(pac[v][i]));
+                        num_nans += !std::isfinite(pac[v][i]);
+#endif
+                    }
+                }
+#ifndef NDEBUG
+                printf("Max scaling: %g, num_nans: %ld\n", max_scaling, num_nans);
+#endif
+
+            } else {
+                return ok;
+            }
         }
 
         return SFEM_SUCCESS;
