@@ -8,9 +8,6 @@
 extern "C" {
 #endif
 
-typedef float  scaling_t;
-typedef half_t compressed_t;
-
 int tet4_neohookean_ogden_value(const ptrdiff_t              nelements,
                                 const ptrdiff_t              nnodes,
                                 idx_t **const SFEM_RESTRICT  elements,
@@ -84,7 +81,7 @@ int tet4_neohookean_ogden_hessian(const ptrdiff_t                   nelements,
                                   const real_t *const SFEM_RESTRICT uz,
                                   count_t *const SFEM_RESTRICT      rowptr,
                                   idx_t *const SFEM_RESTRICT        colidx,
-                                  real_t *const SFEM_RESTRICT       values) ;
+                                  real_t *const SFEM_RESTRICT       values);
 
 int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t                       nelements,
                                                    idx_t **const SFEM_RESTRICT           elements,
@@ -111,19 +108,19 @@ int tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
                                                  real_t *const                         outy,
                                                  real_t *const                         outz);
 
-int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                  nelements,
-                                                                    idx_t **const SFEM_RESTRICT      elements,
-                                                                    const ptrdiff_t                  S_ikmn_stride,
-                                                                    compressed_t **const SFEM_RESTRICT     partial_assembly,
-                                                                    const scaling_t *const SFEM_RESTRICT scaling,
-                                                                    const ptrdiff_t                  h_stride,
-                                                                    const real_t *const              hx,
-                                                                    const real_t *const              hy,
-                                                                    const real_t *const              hz,
-                                                                    const ptrdiff_t                  out_stride,
-                                                                    real_t *const                    outx,
-                                                                    real_t *const                    outy,
-                                                                    real_t *const                    outz);
+int tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                      nelements,
+                                                            idx_t **const SFEM_RESTRICT          elements,
+                                                            const ptrdiff_t                      S_ikmn_stride,
+                                                            compressed_t **const SFEM_RESTRICT   partial_assembly,
+                                                            const scaling_t *const SFEM_RESTRICT scaling,
+                                                            const ptrdiff_t                      h_stride,
+                                                            const real_t *const                  hx,
+                                                            const real_t *const                  hy,
+                                                            const real_t *const                  hz,
+                                                            const ptrdiff_t                      out_stride,
+                                                            real_t *const                        outx,
+                                                            real_t *const                        outy,
+                                                            real_t *const                        outz);
 
 // Opt version later
 
