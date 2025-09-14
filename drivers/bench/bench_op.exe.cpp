@@ -26,6 +26,7 @@ typedef struct OpDesc {
     double      elapsed;
     double      throughput;
     double      bandwidth;
+    double      setup;
 
     template <class Op, class X, class Y>
     void measure(Op op, X x, Y y, int repeat) {
@@ -50,20 +51,21 @@ typedef struct OpDesc {
     }
 
     static const char *header() {
-        return "Operation          Type      Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Dimensions\n"
-               "----------------   -------   ---------   -------------    -----------    ------------\n";
+        return "Operation          Type      Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Setup [s]    Dimensions\n"
+               "----------------   -------   ---------   -------------    -----------    ---------    ------------\n";
     }
 
     void print(std::ostream &os) {
         char buf[256];
         snprintf(buf,
                  sizeof(buf),
-                 "%-16s   %-7s   %9.3e   %13.3f    %11.3f    (%d, %d)\n",
+                 "%-16s   %-7s   %9.3e   %13.3f    %11.3f    %9.3e    (%d, %d)\n",
                  name.c_str(),
                  type.c_str(),
                  elapsed,
                  throughput,
                  bandwidth,
+                 setup,
                  rows,
                  cols);
         os << buf;
@@ -142,8 +144,11 @@ int main(int argc, char *argv[]) {
             auto input     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto output    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
+            double start = MPI_Wtime();
             f->update(x->data());
             auto linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
+            double stop = MPI_Wtime();
+            op_desc.setup = stop - start;
 
 
             op_desc.measure(linear_op, input->data(), output->data(), 5);
