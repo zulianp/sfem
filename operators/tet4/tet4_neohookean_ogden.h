@@ -92,13 +92,11 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
                                                    const real_t *const SFEM_RESTRICT     ux,
                                                    const real_t *const SFEM_RESTRICT     uy,
                                                    const real_t *const SFEM_RESTRICT     uz,
-                                                   const ptrdiff_t                       S_ikmn_stride,
-                                                   metric_tensor_t **const SFEM_RESTRICT partial_assembly);
+                                                   metric_tensor_t *const SFEM_RESTRICT partial_assembly);
 
 int tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                       nelements,
                                                  idx_t **const SFEM_RESTRICT           elements,
-                                                 const ptrdiff_t                       S_ikmn_stride,
-                                                 metric_tensor_t **const SFEM_RESTRICT partial_assembly,
+                                                 const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
                                                  const ptrdiff_t                       h_stride,
                                                  const real_t *const                   hx,
                                                  const real_t *const                   hy,
@@ -110,8 +108,7 @@ int tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
 
 int tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                      nelements,
                                                             idx_t **const SFEM_RESTRICT          elements,
-                                                            const ptrdiff_t                      S_ikmn_stride,
-                                                            compressed_t **const SFEM_RESTRICT   partial_assembly,
+                                                            const compressed_t *const SFEM_RESTRICT   partial_assembly,
                                                             const scaling_t *const SFEM_RESTRICT scaling,
                                                             const ptrdiff_t                      h_stride,
                                                             const real_t *const                  hx,
