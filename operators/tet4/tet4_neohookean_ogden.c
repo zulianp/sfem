@@ -757,8 +757,7 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
                                                    const real_t *const SFEM_RESTRICT     ux,
                                                    const real_t *const SFEM_RESTRICT     uy,
                                                    const real_t *const SFEM_RESTRICT     uz,
-                                                   const ptrdiff_t                       S_ikmn_stride,
-                                                   metric_tensor_t **const SFEM_RESTRICT partial_assembly) {
+                                                   metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
@@ -808,8 +807,9 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
         scalar_t S_ikmn[TET4_S_IKMN_SIZE] = {0};
         tet4_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, F, mu, lambda, 1, S_ikmn);
 
+        metric_tensor_t *const pai = &partial_assembly[i * TET4_S_IKMN_SIZE];
         for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
-            partial_assembly[k][i * S_ikmn_stride] = S_ikmn[k];
+            pai[k] = S_ikmn[k];
         }
     }
 
@@ -819,8 +819,7 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
 // Apply partially assembled operator
 int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                       nelements,
                                                          idx_t **const SFEM_RESTRICT           elements,
-                                                         const ptrdiff_t                       S_ikmn_stride,
-                                                         metric_tensor_t **const SFEM_RESTRICT partial_assembly,
+                                                         const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
                                                          const ptrdiff_t                       h_stride,
                                                          const real_t *const                   hx,
                                                          const real_t *const                   hy,
@@ -855,9 +854,10 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
         scalar_t inc_grad[9];
         tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
 
+        const metric_tensor_t *const pai = &partial_assembly[i * TET4_S_IKMN_SIZE];
         scalar_t S_ikmn[TET4_S_IKMN_SIZE];
         for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
-            S_ikmn[k] = partial_assembly[k][i * S_ikmn_stride];
+            S_ikmn[k] = pai[k];
         }
 
         tet4_apply_S_ikmn(S_ikmn, inc_grad, element_outx, element_outy, element_outz);
@@ -882,8 +882,7 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
 // Apply partially assembled operator
 int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                      nelements,
                                                                     idx_t **const SFEM_RESTRICT          elements,
-                                                                    const ptrdiff_t                      S_ikmn_stride,
-                                                                    compressed_t **const SFEM_RESTRICT   partial_assembly,
+                                                                    const compressed_t *const SFEM_RESTRICT   partial_assembly,
                                                                     const scaling_t *const SFEM_RESTRICT scaling,
                                                                     const ptrdiff_t                      h_stride,
                                                                     const real_t *const                  hx,
@@ -918,9 +917,10 @@ int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
 
         // Load and decompress low precision tensor
         const scalar_t s = scaling[i];
+        const compressed_t *const pai = &partial_assembly[i * TET4_S_IKMN_SIZE];
         scalar_t S_ikmn[TET4_S_IKMN_SIZE];
         for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
-            S_ikmn[k] = s * (scalar_t)(partial_assembly[k][i * S_ikmn_stride]);
+            S_ikmn[k] = s * (scalar_t)(pai[k]);
             assert(S_ikmn[k] == S_ikmn[k]);
         }
 
