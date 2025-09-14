@@ -101,6 +101,10 @@ int main(int argc, char *argv[]) {
         }
 
         int dim = m->spatial_dimension();
+        double start = MPI_Wtime();
+        m->node_to_node_graph();
+        double stop = MPI_Wtime();
+        std::cout << "CRS Graph creation " << (stop - start) << " [s]\n";
 
         std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
                                    {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim},
