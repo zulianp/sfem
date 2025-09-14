@@ -25,6 +25,7 @@
 #include "sfem_ssmgc.hpp"
 
 int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    SFEM_TRACE_SCOPE("solve_hyperelasticity");
     
     if (argc != 4) {
         fprintf(stderr, "usage: %s <mesh> <dirichlet_conditions> <output>\n", argv[0]);
@@ -44,6 +45,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
     const bool SFEM_VERBOSE = sfem::Env::read("SFEM_VERBOSE", 0);
+    const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-4);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -89,7 +91,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->verbose = SFEM_VERBOSE;
     cg->set_max_it(10000);
     cg->set_op(linear_op);
-    cg->set_rtol(1e-4);
+    cg->set_rtol(SFEM_LSOLVE_RTOL);
     cg->set_atol(1e-10);
 
     // Newton iteration
