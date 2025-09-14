@@ -24,8 +24,7 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
                                                    const real_t *const SFEM_RESTRICT     ux,
                                                    const real_t *const SFEM_RESTRICT     uy,
                                                    const real_t *const SFEM_RESTRICT     uz,
-                                                   const ptrdiff_t                       S_ikmn_stride,
-                                                   metric_tensor_t **const SFEM_RESTRICT partial_assembly) {
+                                                   metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
@@ -69,8 +68,9 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
         scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
         hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, F, mu, lambda, 1, S_ikmn);
 
+        metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
-            partial_assembly[k][i * S_ikmn_stride] = S_ikmn[k];
+            pai[k] = S_ikmn[k];
         }
     }
 
@@ -80,8 +80,7 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
 // Apply partially assembled operator
 int         hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                      nelements,
                                                                     idx_t **const SFEM_RESTRICT          elements,
-                                                                    const ptrdiff_t                      S_ikmn_stride,
-                                                                    compressed_t **const SFEM_RESTRICT   partial_assembly,
+                                                                    const compressed_t *const SFEM_RESTRICT   partial_assembly,
                                                                     const scaling_t *const SFEM_RESTRICT scaling,
                                                                     const ptrdiff_t                      h_stride,
                                                                     const real_t *const                  hx,
@@ -116,9 +115,10 @@ int         hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
 
         // Load and decompress low precision tensor
         const scalar_t s = scaling[i];
+        const compressed_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         scalar_t       S_ikmn[HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
-            S_ikmn[k] = s * (scalar_t)(partial_assembly[k][i * S_ikmn_stride]);
+            S_ikmn[k] = s * (scalar_t)(pai[k]);
             assert(S_ikmn[k] == S_ikmn[k]);
         }
 

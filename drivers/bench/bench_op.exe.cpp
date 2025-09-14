@@ -5,7 +5,6 @@
 #include "sfem_base.h"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
-
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"

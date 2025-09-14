@@ -26,10 +26,10 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>  space;
         enum ElemType                   element_type { INVALID };
         real_t                          mu{1}, lambda{1};
-        SharedBuffer<metric_tensor_t *> partial_assembly_buffer;
+        SharedBuffer<metric_tensor_t> partial_assembly_buffer;
 
         SharedBuffer<scaling_t>      compression_scaling;
-        SharedBuffer<compressed_t *> partial_assembly_compressed;
+        SharedBuffer<compressed_t> partial_assembly_compressed;
 
         bool use_partial_assembly{false};
         bool use_compression{false};
@@ -41,23 +41,19 @@ namespace sfem {
             if (use_compression) {
                 if (!compression_scaling) {
                     compression_scaling         = sfem::create_host_buffer<scaling_t>(mesh->n_elements());
-                    partial_assembly_compressed = sfem::create_host_buffer<compressed_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
+                    partial_assembly_compressed = sfem::create_host_buffer<compressed_t>(mesh->n_elements() * TET4_S_IKMN_SIZE);
                 }
 
                 auto cs  = compression_scaling->data();
                 auto pa  = partial_assembly_buffer->data();
                 auto pac = partial_assembly_compressed->data();
-
-                ptrdiff_t n_elements = mesh->n_elements();
+                ptrdiff_t n_elements = mesh->n_elements();                
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    cs[i] = fabs(pa[0][i]);
-                }
-
-                for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n_elements; i++) {
-                        cs[i] = MAX(cs[i], fabs(pa[v][i]));
+                    auto pai = &pa[i * TET4_S_IKMN_SIZE];
+                    cs[i] = pai[0];
+                    for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
+                        cs[i] = MAX(cs[i], fabs(pai[v]));
                     }
                 }
 
@@ -76,15 +72,17 @@ namespace sfem {
 #ifndef NDEBUG
                 ptrdiff_t num_nans = 0;
 #endif
-                for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
 #pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < n_elements; i++) {
-                        pac[v][i] = pa[v][i] / cs[i];
+                for (ptrdiff_t i = 0; i < n_elements; i++) {
+                    auto pai = &pa[i * TET4_S_IKMN_SIZE];
+                    auto paci = &pac[i * TET4_S_IKMN_SIZE];
+                    for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
+                        paci[v] = pai[v] / cs[i];
 
 #ifndef NDEBUG
                         assert(cs[i] > 0);
-                        assert(std::isfinite(pac[v][i]));
-                        num_nans += !std::isfinite(pac[v][i]);
+                        assert(std::isfinite(paci[v]));
+                        num_nans += !std::isfinite(paci[v]);
 #endif
                     }
                 }
@@ -188,7 +186,6 @@ namespace sfem {
                      impl_->element_type,
                         mesh->n_elements(),
                         mesh->elements()->data(),
-                        1,
                         impl_->partial_assembly_compressed->data(),
                         impl_->compression_scaling->data(),
                         3,
@@ -204,7 +201,6 @@ namespace sfem {
                 return neohookean_ogden_partial_assembly_apply(impl_->element_type,
                                                                mesh->n_elements(),
                                                                mesh->elements()->data(),
-                                                               1,
                                                                impl_->partial_assembly_buffer->data(),
                                                                3,
                                                                &h[0],
@@ -241,7 +237,7 @@ namespace sfem {
             auto mesh = impl_->space->mesh_ptr();
 
             if (!impl_->partial_assembly_buffer) {
-                impl_->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(TET4_S_IKMN_SIZE, mesh->n_elements());
+                impl_->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(mesh->n_elements() * TET4_S_IKMN_SIZE);
             }
 
             int ok = neohookean_ogden_hessian_partial_assembly(impl_->element_type,
@@ -254,7 +250,6 @@ namespace sfem {
                                                                &u[0],
                                                                &u[1],
                                                                &u[2],
-                                                               1,
                                                                impl_->partial_assembly_buffer->data());
 
             return impl_->compress_partial_assembly();
