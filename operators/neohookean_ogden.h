@@ -115,6 +115,7 @@ int neohookean_ogden_diag_aos(const enum ElemType               element_type,
 
 int neohookean_ogden_hessian_partial_assembly(const enum ElemType                   element_type,
                                               const ptrdiff_t                       nelements,
+                                              const ptrdiff_t                       stride,
                                               idx_t **const SFEM_RESTRICT           elements,
                                               geom_t **const SFEM_RESTRICT          points,
                                               const real_t                          mu,
@@ -127,6 +128,7 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
 
 int neohookean_ogden_partial_assembly_apply(const enum ElemType                   element_type,
                                             const ptrdiff_t                       nelements,
+                                            const ptrdiff_t                       stride,
                                             idx_t **const SFEM_RESTRICT           elements,
                                             const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
                                             const ptrdiff_t                       h_stride,
@@ -140,6 +142,7 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
 
 int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                  element_type,
                                                        const ptrdiff_t                      nelements,
+                                                       const ptrdiff_t                      stride,
                                                        idx_t **const SFEM_RESTRICT          elements,
                                                        const compressed_t *const SFEM_RESTRICT   partial_assembly,
                                                        const scaling_t *const SFEM_RESTRICT scaling,

@@ -748,15 +748,16 @@ int tet4_neohookean_ogden_hessian(const ptrdiff_t                   nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t                       nelements,
-                                                   idx_t **const SFEM_RESTRICT           elements,
-                                                   geom_t **const SFEM_RESTRICT          points,
-                                                   const real_t                          mu,
-                                                   const real_t                          lambda,
-                                                   const ptrdiff_t                       u_stride,
-                                                   const real_t *const SFEM_RESTRICT     ux,
-                                                   const real_t *const SFEM_RESTRICT     uy,
-                                                   const real_t *const SFEM_RESTRICT     uz,
+int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t                      nelements,
+                                                   const ptrdiff_t                      stride,
+                                                   idx_t **const SFEM_RESTRICT          elements,
+                                                   geom_t **const SFEM_RESTRICT         points,
+                                                   const real_t                         mu,
+                                                   const real_t                         lambda,
+                                                   const ptrdiff_t                      u_stride,
+                                                   const real_t *const SFEM_RESTRICT    ux,
+                                                   const real_t *const SFEM_RESTRICT    uy,
+                                                   const real_t *const SFEM_RESTRICT    uz,
                                                    metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
@@ -773,7 +774,7 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
         scalar_t jacobian_determinant = 0;
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elements[v][i];
+            ev[v] = elements[v][i * stride];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -817,17 +818,18 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
 }
 
 // Apply partially assembled operator
-int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                       nelements,
-                                                         idx_t **const SFEM_RESTRICT           elements,
+int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                            nelements,
+                                                         const ptrdiff_t                            stride,
+                                                         idx_t **const SFEM_RESTRICT                elements,
                                                          const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
-                                                         const ptrdiff_t                       h_stride,
-                                                         const real_t *const                   hx,
-                                                         const real_t *const                   hy,
-                                                         const real_t *const                   hz,
-                                                         const ptrdiff_t                       out_stride,
-                                                         real_t *const                         outx,
-                                                         real_t *const                         outy,
-                                                         real_t *const                         outz) {
+                                                         const ptrdiff_t                            h_stride,
+                                                         const real_t *const                        hx,
+                                                         const real_t *const                        hy,
+                                                         const real_t *const                        hz,
+                                                         const ptrdiff_t                            out_stride,
+                                                         real_t *const                              outx,
+                                                         real_t *const                              outy,
+                                                         real_t *const                              outz) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
@@ -841,7 +843,7 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
         accumulator_t element_outz[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elements[v][i];
+            ev[v] = elements[v][i * stride];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -855,7 +857,7 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
         tet4_ref_inc_grad(element_hx, element_hy, element_hz, inc_grad);
 
         const metric_tensor_t *const pai = &partial_assembly[i * TET4_S_IKMN_SIZE];
-        scalar_t S_ikmn[TET4_S_IKMN_SIZE];
+        scalar_t                     S_ikmn[TET4_S_IKMN_SIZE];
         for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
             S_ikmn[k] = pai[k];
         }
@@ -880,18 +882,19 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
 }
 
 // Apply partially assembled operator
-int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                      nelements,
-                                                                    idx_t **const SFEM_RESTRICT          elements,
-                                                                    const compressed_t *const SFEM_RESTRICT   partial_assembly,
-                                                                    const scaling_t *const SFEM_RESTRICT scaling,
-                                                                    const ptrdiff_t                      h_stride,
-                                                                    const real_t *const                  hx,
-                                                                    const real_t *const                  hy,
-                                                                    const real_t *const                  hz,
-                                                                    const ptrdiff_t                      out_stride,
-                                                                    real_t *const                        outx,
-                                                                    real_t *const                        outy,
-                                                                    real_t *const                        outz) {
+int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
+                                                                    const ptrdiff_t                         stride,
+                                                                    idx_t **const SFEM_RESTRICT             elements,
+                                                                    const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                                    const scaling_t *const SFEM_RESTRICT    scaling,
+                                                                    const ptrdiff_t                         h_stride,
+                                                                    const real_t *const                     hx,
+                                                                    const real_t *const                     hy,
+                                                                    const real_t *const                     hz,
+                                                                    const ptrdiff_t                         out_stride,
+                                                                    real_t *const                           outx,
+                                                                    real_t *const                           outy,
+                                                                    real_t *const                           outz) {
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
@@ -905,7 +908,7 @@ int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
         accumulator_t element_outz[4];
 
         for (int v = 0; v < 4; ++v) {
-            ev[v] = elements[v][i];
+            ev[v] = elements[v][i * stride];
         }
 
         for (int v = 0; v < 4; ++v) {
@@ -916,9 +919,9 @@ int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
         }
 
         // Load and decompress low precision tensor
-        const scalar_t s = scaling[i];
+        const scalar_t            s   = scaling[i];
         const compressed_t *const pai = &partial_assembly[i * TET4_S_IKMN_SIZE];
-        scalar_t S_ikmn[TET4_S_IKMN_SIZE];
+        scalar_t                  S_ikmn[TET4_S_IKMN_SIZE];
         for (int k = 0; k < TET4_S_IKMN_SIZE; k++) {
             S_ikmn[k] = s * (scalar_t)(pai[k]);
             assert(S_ikmn[k] == S_ikmn[k]);

@@ -154,7 +154,6 @@ int main(int argc, char *argv[]) {
             double stop = MPI_Wtime();
             op_desc.setup = stop - start;
 
-
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }
 
