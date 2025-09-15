@@ -234,6 +234,49 @@ namespace sfem {
     }
 
     template <typename T>
+    std::shared_ptr<Buffer<T *>> convert_host_buffer_to_fake_SoA(const ptrdiff_t n0, const std::shared_ptr<Buffer<T>> &in) {
+        T **data = (T **)malloc(n0 * sizeof(T *));
+        for (int i = 0; i < n0; ++i) {
+            data[i] = &in->data()[i];
+        }
+
+        assert(in->size() % n0 == 0);
+
+        auto ret = std::make_shared<Buffer<T *>>(
+                n0,
+                in->size() / n0,
+                data,
+                [lifetime = in](int n, void **x) {
+                    free(x);
+                },
+                MEMORY_SPACE_HOST);
+        return ret;
+    }
+
+    template <typename T>
+    static std::shared_ptr<Buffer<T>> soa_to_aos(const ptrdiff_t                     in_stride0,
+                                                 const ptrdiff_t                     in_stride1,
+                                                 const std::shared_ptr<Buffer<T *>> &in) {
+        auto n0 = in->extent(0);
+        auto n1 = in->extent(1);
+
+        auto out = sfem::create_host_buffer<T>(n0 * n1);
+
+        {
+            auto d_in  = in->data();
+            auto d_out = out->data();
+
+            for (ptrdiff_t i = 0; i < n0; i++) {
+                for (ptrdiff_t j = 0; j < n1; j++) {
+                    d_out[i * in_stride0 + j * in_stride1] = d_in[i][j];
+                }
+            }
+        }
+
+        return out;
+    }
+
+    template <typename T>
     std::shared_ptr<Buffer<T>> manage_host_buffer(const ptrdiff_t n, T *data) {
         return Buffer<T>::own(n, data, &free, MEMORY_SPACE_HOST);
     }

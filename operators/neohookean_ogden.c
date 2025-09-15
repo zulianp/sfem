@@ -216,6 +216,7 @@ int neohookean_ogden_diag_aos(const enum ElemType               element_type,
 
 int neohookean_ogden_hessian_partial_assembly(const enum ElemType                   element_type,
                                               const ptrdiff_t                       nelements,
+                                              const ptrdiff_t                       stride,
                                               idx_t **const SFEM_RESTRICT           elements,
                                               geom_t **const SFEM_RESTRICT          points,
                                               const real_t                          mu,
@@ -228,12 +229,12 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_hessian_partial_assembly(
-                    nelements, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
+                    nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
         }
-        case HEX8: {
-            return hex8_neohookean_ogden_hessian_partial_assembly(
-                    nelements, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
-        }
+        // case HEX8: {
+        //     return hex8_neohookean_ogden_hessian_partial_assembly(
+        //             nelements, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
+        // }
         default: {
             SFEM_ERROR("neohookean_ogden_hessian_partial_assembly not implemented for type %s\n", type_to_string(element_type));
         }
@@ -243,6 +244,7 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
 
 int neohookean_ogden_partial_assembly_apply(const enum ElemType                   element_type,
                                             const ptrdiff_t                       nelements,
+                                            const ptrdiff_t                       stride,
                                             idx_t **const SFEM_RESTRICT           elements,
                                             const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
                                             const ptrdiff_t                       h_stride,
@@ -256,7 +258,7 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_partial_assembly_apply(
-                    nelements, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+                    nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         // case HEX8: {
         //     return hex8_neohookean_ogden_partial_assembly_apply(
@@ -271,6 +273,7 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
 
 int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                  element_type,
                                                        const ptrdiff_t                      nelements,
+                                                       const ptrdiff_t                      stride,
                                                        idx_t **const SFEM_RESTRICT          elements,
                                                        const compressed_t *const SFEM_RESTRICT   partial_assembly,
                                                        const scaling_t *const SFEM_RESTRICT scaling,
@@ -286,12 +289,12 @@ int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType      
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_compressed_partial_assembly_apply(
-                    nelements, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
-        case HEX8: {
-            return hex8_neohookean_ogden_compressed_partial_assembly_apply(
-                    nelements, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        }
+        // case HEX8: {
+        //     return hex8_neohookean_ogden_compressed_partial_assembly_apply(
+        //             nelements, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        // }
         default: {
             SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n", type_to_string(element_type));
         }
