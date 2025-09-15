@@ -334,7 +334,7 @@ tet10_edge_lengths(const real_t* x,               //
     }
 
     return max_length;
-}
+}  // END tet10_edge_lengths
 
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field
@@ -444,7 +444,7 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
         data[indices[6]] += d6;
         data[indices[7]] += d7;
     }
-}
+}  // END hex8_to_isoparametric_tet10_resample_tet_adjoint
 
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_refine_adjoint
@@ -588,8 +588,11 @@ hex8_to_isoparametric_tet10_resample_field_refine_adjoint(    //
 #endif
 
     RETURN_FROM_FUNCTION(ret);
-}
+}  // END hex8_to_isoparametric_tet10_resample_field_refine_adjoint
 
+///////////////////////////////////////////////////////////////////////
+// insert_tet10_in_output_array
+///////////////////////////////////////////////////////////////////////
 int                                                                 //
 insert_tet10_in_output_array(struct tet10_vertices*  tet10_head,    //
                              struct tet10_vertices** rTets_out,     //
@@ -611,7 +614,7 @@ insert_tet10_in_output_array(struct tet10_vertices*  tet10_head,    //
 
     // Incrementa e restituisci il nuovo contatore
     return tets_size + 1;
-}
+}  // END insert_tet10_in_output_array
 
 ///////////////////////////////////////////////////////////////////////
 // tet10_iterative_refinement
@@ -781,7 +784,7 @@ tet10_iterative_refinement(const real_t* const           x,                     
     stack = NULL;
 
     return tets_size;
-}
+}  // END tet10_iterative_refinement
 
 ///////////////////////////////////////////////////////////////////////
 // hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint
@@ -898,4 +901,4 @@ hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint(const ptrdiff_t
     printf("max_refinements_cnt: %d, %s:%d\n", max_refinements_cnt, __FILE__, __LINE__);
 
     return 0;
-}
+}  // END hex8_to_isoparametric_tet10_resample_field_iterative_ref_adjoint

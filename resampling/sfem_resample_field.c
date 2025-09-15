@@ -1494,7 +1494,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 
     const real_t alpha_th = 2.0;
 
-#define TEST_REFINE_ADJOINT 1
+#define TEST_REFINE_ADJOINT 0
 #if TEST_REFINE_ADJOINT == 0
 
     hex8_to_isoparametric_tet10_resample_field_adjoint(0,                //

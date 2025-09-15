@@ -140,7 +140,7 @@ else
 	raw_to_xdmf.py $sdf
 fi
 
-sdf_test.py $sdf 900
+sdf_test.py $sdf 125
 # raw_to_xdmf.py $sdf
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
@@ -203,7 +203,7 @@ export SFEM_ENABLE_ISOPARAMETRIC=1
 set -x
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
-export SFEM_ADJOINT=0
+export SFEM_ADJOINT=1
 
 set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET10 CUDA
