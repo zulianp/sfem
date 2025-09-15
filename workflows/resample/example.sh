@@ -27,10 +27,10 @@ field=field.raw
 
 mesh=mesh
 
-refine torus torus2
+refine torus_cut torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=torus3
+mesh=torus2
 # mesh=impeller_tet4
 
 out=resampled
@@ -132,7 +132,8 @@ fi
 
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=float32
+PRECISION=float32
+raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION
 
 
 # Function to create metadata and convert raw files to XDMF format
@@ -157,7 +158,7 @@ process_raw_file test_field
 process_raw_file test_field_alpha
 process_raw_file test_field_volume
 
-if [[ -f "test_field.xdmf" ]]; then
+if [[ -f "test_field.xdmf" && $PRECISION == "float64" ]]; then
     sed -i 's/Precision="4"/Precision="8"/' test_field.xdmf
 fi
 

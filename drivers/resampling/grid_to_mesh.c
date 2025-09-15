@@ -789,7 +789,7 @@ int main(int argc, char* argv[]) {
                     mini_tet_parameters.alpha_min_threshold = 1.0;
                     mini_tet_parameters.alpha_max_threshold = 8.0;
                     mini_tet_parameters.min_refinement_L    = 1;
-                    mini_tet_parameters.max_refinement_L    = 22;
+                    mini_tet_parameters.max_refinement_L    = 4;
 
 #if SFEM_LOG_LEVEL >= 5
                     printf("info.adjoint_refine_type = %d, %s:%d\n", info.adjoint_refine_type, __FILE__, __LINE__);
