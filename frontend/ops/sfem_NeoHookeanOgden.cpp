@@ -130,7 +130,7 @@ namespace sfem {
         if (ret->impl_->element_type == HEX8) {
             // This is the only implementation available for HEX8
             ret->impl_->use_partial_assembly = true;
-            ret->impl_->use_compression      = true;
+            // ret->impl_->use_compression      = true;
         }
 
         return ret;
@@ -245,7 +245,7 @@ namespace sfem {
 
         if (!impl_->use_partial_assembly) return SFEM_SUCCESS;
 
-        if (impl_->element_type == TET4) {
+        if (impl_->element_type == TET4 || impl_->element_type == HEX8) {
             // FIXME: Add support for other element types
             auto mesh = impl_->space->mesh_ptr();
 
