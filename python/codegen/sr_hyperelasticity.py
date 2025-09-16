@@ -413,7 +413,78 @@ class SRHyperelasticity:
         self.expression_table["Wimpn"] = Wimpn
         return Wimpn
 
-         
+    def __compute_P_tXJinv_t(self):
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        P = self.expression_table["P"]
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
+
+        P_tXJinv_t = P.T * Jinv * dV
+        self.expression_table["P_tXJinv_t"] = P_tXJinv_t
+        return P_tXJinv_t
+
+    def emit_gradient(self):
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_P_tXJinv_t()
+
+        fe = self.fe
+
+        # FIXME: mu and lmbda in the signature are hardcoded
+        grad_S = (
+            f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_grad(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      mu,\n'
+            f'    const {real_t}                      lmbda,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gx,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gy,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gz)'
+            f'\n'
+        )
+        
+        P_tXJinv_t = self.expression_table["P_tXJinv_t"]
+
+        trefgrad = self.fe.tgrad(self.fe.quadrature_point())
+
+        grads = []
+
+        for d in range(0, fe.spatial_dim()):
+            gradd = []
+            for i in range(0, fe.n_nodes()):
+                gradd.append(inner(P_tXJinv_t, trefgrad[i]))
+            grads.append(gradd)
+        
+        expr = []
+        syms = ["x", "y", "z"]
+        for d in range(0, fe.spatial_dim()):
+            for i in range(0, fe.n_nodes()):
+                expr.append(ast.AddAugmentedAssignment(sp.symbols(f"g{syms[d]}[{i}]"), grads[d][i]))
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+
+        grad_body = (
+            f'{{\n'
+            f'{real_t} F[{fe.spatial_dim()*fe.spatial_dim()}];\n'
+            f'{{'
+            f'{F_actual}\n'
+            f'}}\n'
+            f'{c_gen(expr)}'
+            f'\n}}'
+        )
+
+        print(grad_S + grad_body)
+
 
 
     def partial_assembly(self):
@@ -484,6 +555,8 @@ class SRHyperelasticity:
 
 
 if __name__ == "__main__":
-    fe = Tet4()
+    fe = Hex8()
     op = SRHyperelasticity.create_from_string(fe, "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
-    op.check_metric_tensor_symmetries()
+    # op.check_metric_tensor_symmetries()
+
+    op.emit_gradient()

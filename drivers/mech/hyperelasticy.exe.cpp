@@ -12,9 +12,8 @@
 #include "matrixio_array.h"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
 #include "sfem_DirichletConditions.hpp"
-
+#include "sfem_Env.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -26,15 +25,15 @@
 
 int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("solve_hyperelasticity");
-    
+
     if (argc != 4) {
         fprintf(stderr, "usage: %s <mesh> <dirichlet_conditions> <output>\n", argv[0]);
         return SFEM_FAILURE;
     }
 
-    const char *mesh_path             = argv[1];
-    const char *dirichlet_path        = argv[2];
-    std::string output_path           = argv[3];
+    const char *mesh_path      = argv[1];
+    const char *dirichlet_path = argv[2];
+    std::string output_path    = argv[3];
 
     // int SFEM_ELEMENT_REFINE_LEVEL = 2;
 
@@ -44,7 +43,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const char *SFEM_OPERATOR = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
-    const bool SFEM_VERBOSE = sfem::Env::read("SFEM_VERBOSE", 0);
+    const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-4);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
@@ -56,13 +55,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         }
     }
 
-    
-    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
-    const int block_size = mesh->spatial_dimension();
-    auto fs = sfem::FunctionSpace::create(mesh, block_size);
-    auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-
-    
+    auto      mesh                 = sfem::Mesh::create_from_file(comm, mesh_path);
+    const int block_size           = mesh->spatial_dimension();
+    auto      fs                   = sfem::FunctionSpace::create(mesh, block_size);
+    auto      dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA
@@ -81,33 +77,49 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     f->add_operator(op);
     f->add_constraint(dirichlet_conditions);
 
-    const ptrdiff_t ndofs = fs->n_dofs();
-    auto            displacement     = sfem::create_buffer<real_t>(ndofs, es);
-    auto            increment     = sfem::create_buffer<real_t>(ndofs, es);
-    auto            rhs   = sfem::create_buffer<real_t>(ndofs, es);
+    const ptrdiff_t ndofs        = fs->n_dofs();
+    auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
+    auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
 
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
-    auto cg = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose = SFEM_VERBOSE;
+    auto cg        = sfem::create_cg<real_t>(linear_op, es);
+    cg->verbose    = SFEM_VERBOSE;
     cg->set_max_it(10000);
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
     cg->set_atol(1e-10);
 
     // Newton iteration
-    int nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 20);
-    real_t alpha = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
-    auto blas = sfem::blas<real_t>(es);
-    for(int i = 0; i < nl_max_it; i++) {
-        f->update(displacement->data());
-        blas->zeros(ndofs, rhs->data());
-        f->gradient(displacement->data(), rhs->data());
-        blas->zeros(ndofs, increment->data());
-        f->copy_constrained_dofs(rhs->data(), increment->data());
-        cg->apply(rhs->data(), increment->data());
-        blas->axpy(ndofs, -alpha, increment->data(), displacement->data());
+    int    nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 20);
+    real_t alpha     = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
+    auto   blas      = sfem::blas<real_t>(es);
+
+    if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
+        for (int i = 0; i < nl_max_it; i++) {
+            blas->zeros(ndofs, rhs->data());
+            f->gradient(displacement->data(), rhs->data());
+
+            const real_t gnorm = blas->norm2(ndofs, rhs->data());
+            printf("gnorm = %g\n", gnorm);
+            blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
+        }
+    } else {
+        for (int i = 0; i < nl_max_it; i++) {
+            f->update(displacement->data());
+            blas->zeros(ndofs, rhs->data());
+            f->gradient(displacement->data(), rhs->data());
+
+            const real_t gnorm = blas->norm2(ndofs, rhs->data());
+            printf("gnorm = %g\n", gnorm);
+
+            blas->zeros(ndofs, increment->data());
+            f->copy_constrained_dofs(rhs->data(), increment->data());
+            cg->apply(rhs->data(), increment->data());
+            blas->axpy(ndofs, -alpha, increment->data(), displacement->data());
+        }
     }
-   
+
     // Output to disk
     sfem::create_directory(output_path.c_str());
 
@@ -119,9 +131,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     out->set_output_dir((output_path + "/out").c_str());
     out->enable_AoS_to_SoA(true);
 
-    out->write("rhs",  sfem::to_host(rhs)->data());
+    out->write("rhs", sfem::to_host(rhs)->data());
     out->write("disp", sfem::to_host(displacement)->data());
-
 
     return SFEM_SUCCESS;
 }

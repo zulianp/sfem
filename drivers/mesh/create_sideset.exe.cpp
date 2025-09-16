@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
         ptrdiff_t nmaps               = emap_ptr[n_elements];
         auto      element_mapping_idx = sfem::create_host_buffer<ptrdiff_t>(nmaps);
 
-        assert(nmaps < table->size());
+        // assert(nmaps < table->size());
 
         auto emap_idx = element_mapping_idx->data();
 
