@@ -105,6 +105,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
     } else {
+        // Newton solver
         for (int i = 0; i < nl_max_it; i++) {
             f->update(displacement->data());
             blas->zeros(ndofs, rhs->data());
