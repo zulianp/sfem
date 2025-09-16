@@ -232,13 +232,13 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
         scalar_t ly[8];
         scalar_t lz[8];
 
-        scalar_t element_dispx[8];
-        scalar_t element_dispy[8];
-        scalar_t element_dispz[8];
+        scalar_t edispx[8];
+        scalar_t edispy[8];
+        scalar_t edispz[8];
 
-        accumulator_t element_outx[8];
-        accumulator_t element_outy[8];
-        accumulator_t element_outz[8];
+        accumulator_t eoutx[8] = {0};
+        accumulator_t eouty[8] = {0};
+        accumulator_t eoutz[8] = {0};
 
         scalar_t jacobian_adjugate[9];
         scalar_t jacobian_determinant = 0;
@@ -255,9 +255,9 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
 
         for (int v = 0; v < 8; ++v) {
             const ptrdiff_t idx = ev[v] * u_stride;
-            element_dispx[v]    = ux[idx];
-            element_dispy[v]    = uy[idx];
-            element_dispz[v]    = uz[idx];
+            edispx[v]           = ux[idx];
+            edispy[v]           = uy[idx];
+            edispz[v]           = uz[idx];
         }
 
         for (int kz = 0; kz < n_qp; kz++) {
@@ -272,15 +272,15 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
                                          qx[kx],
                                          qx[ky],
                                          qx[kz],
-                                         qw[kx],
+                                         qw[kx] * qw[ky] * qw[kz],
                                          mu,
                                          lambda,
-                                         element_dispx,
-                                         element_dispy,
-                                         element_dispz,
-                                         element_outx,
-                                         element_outy,
-                                         element_outz);
+                                         edispx,
+                                         edispy,
+                                         edispz,
+                                         eoutx,
+                                         eouty,
+                                         eoutz);
                 }
             }
         }
@@ -288,18 +288,18 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
 
-            assert(element_outx[edof_i] == element_outx[edof_i]);
-            assert(element_outy[edof_i] == element_outy[edof_i]);
-            assert(element_outz[edof_i] == element_outz[edof_i]);
+            assert(eoutx[edof_i] == eoutx[edof_i]);
+            assert(eouty[edof_i] == eouty[edof_i]);
+            assert(eoutz[edof_i] == eoutz[edof_i]);
 
 #pragma omp atomic update
-            outx[idx] += element_outx[edof_i];
+            outx[idx] += eoutx[edof_i];
 
 #pragma omp atomic update
-            outy[idx] += element_outy[edof_i];
+            outy[idx] += eouty[edof_i];
 
 #pragma omp atomic update
-            outz[idx] += element_outz[edof_i];
+            outz[idx] += eoutz[edof_i];
         }
     }
 
@@ -393,9 +393,9 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
         scalar_t element_hy[8];
         scalar_t element_hz[8];
 
-        accumulator_t element_outx[8];
-        accumulator_t element_outy[8];
-        accumulator_t element_outz[8];
+        accumulator_t eoutx[8];
+        accumulator_t eouty[8];
+        accumulator_t eoutz[8];
 
         for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v][i * stride];
@@ -415,23 +415,23 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
             assert(S_ikmn[k] == S_ikmn[k]);
         }
 
-        hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, element_outx, element_outy, element_outz);
+        hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, eoutx, eouty, eoutz);
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
 
-            assert(element_outx[edof_i] == element_outx[edof_i]);
-            assert(element_outy[edof_i] == element_outy[edof_i]);
-            assert(element_outz[edof_i] == element_outz[edof_i]);
+            assert(eoutx[edof_i] == eoutx[edof_i]);
+            assert(eouty[edof_i] == eouty[edof_i]);
+            assert(eoutz[edof_i] == eoutz[edof_i]);
 
 #pragma omp atomic update
-            outx[idx] += element_outx[edof_i];
+            outx[idx] += eoutx[edof_i];
 
 #pragma omp atomic update
-            outy[idx] += element_outy[edof_i];
+            outy[idx] += eouty[edof_i];
 
 #pragma omp atomic update
-            outz[idx] += element_outz[edof_i];
+            outz[idx] += eoutz[edof_i];
         }
     }
 
@@ -463,9 +463,9 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
         scalar_t element_hy[8];
         scalar_t element_hz[8];
 
-        accumulator_t element_outx[8] = {0};
-        accumulator_t element_outy[8] = {0};
-        accumulator_t element_outz[8] = {0};
+        accumulator_t eoutx[8];
+        accumulator_t eouty[8];
+        accumulator_t eoutz[8];
 
         for (int v = 0; v < 8; ++v) {
             ev[v] = elements[v][i * stride];
@@ -487,23 +487,23 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
             assert(S_ikmn[k] == S_ikmn[k]);
         }
 
-        hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, element_outx, element_outy, element_outz);
+        hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, eoutx, eouty, eoutz);
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
 
-            assert(element_outx[edof_i] == element_outx[edof_i]);
-            assert(element_outy[edof_i] == element_outy[edof_i]);
-            assert(element_outz[edof_i] == element_outz[edof_i]);
+            assert(eoutx[edof_i] == eoutx[edof_i]);
+            assert(eouty[edof_i] == eouty[edof_i]);
+            assert(eoutz[edof_i] == eoutz[edof_i]);
 
 #pragma omp atomic update
-            outx[idx] += element_outx[edof_i];
+            outx[idx] += eoutx[edof_i];
 
 #pragma omp atomic update
-            outy[idx] += element_outy[edof_i];
+            outy[idx] += eouty[edof_i];
 
 #pragma omp atomic update
-            outz[idx] += element_outz[edof_i];
+            outz[idx] += eoutz[edof_i];
         }
     }
 
