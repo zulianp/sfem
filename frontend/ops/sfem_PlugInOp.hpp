@@ -28,6 +28,8 @@ namespace sfem {
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
+        int update(const real_t *const x) override;
+
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
