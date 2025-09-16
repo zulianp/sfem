@@ -80,229 +80,558 @@ static SFEM_INLINE void hex8_SdotHdotG(const scalar_t *const SFEM_RESTRICT S_ikm
                                        scalar_t *const SFEM_RESTRICT       outx,
                                        scalar_t *const SFEM_RESTRICT       outy,
                                        scalar_t *const SFEM_RESTRICT       outz) {
-    // mundane ops: 1212 divs: 0 sqrts: 0
-    // total ops: 1212
-    const scalar_t x0 = Wimpn_compressed[1] + Wimpn_compressed[4] + Wimpn_compressed[5] + Wimpn_compressed[8];
-    const scalar_t x1 = 2 * x0;
-    const scalar_t x2 = incy[0] * x1;
-    const scalar_t x3 = incz[0] * x1;
-    const scalar_t x4 = 4 * x0;
-    const scalar_t x5 = incx[0] * x4;
-    const scalar_t x6 = Wimpn_compressed[0] + Wimpn_compressed[2] + 2 * Wimpn_compressed[3] + 2 * Wimpn_compressed[6] +
-                        Wimpn_compressed[7] + Wimpn_compressed[9];
-    const scalar_t x7  = incx[0] * x6;
-    const scalar_t x8  = incy[0] * x6;
-    const scalar_t x9  = incz[0] * x6;
-    const scalar_t x10 = incy[1] * x1;
-    const scalar_t x11 = incz[1] * x1;
-    const scalar_t x12 = incx[1] * x4;
-    const scalar_t x13 = incx[1] * x6;
-    const scalar_t x14 = incy[1] * x6;
-    const scalar_t x15 = incz[1] * x6;
-    const scalar_t x16 = incy[2] * x1;
-    const scalar_t x17 = incz[2] * x1;
-    const scalar_t x18 = incx[2] * x4;
-    const scalar_t x19 = incx[2] * x6;
-    const scalar_t x20 = incy[2] * x6;
-    const scalar_t x21 = incz[2] * x6;
-    const scalar_t x22 = incy[3] * x1;
-    const scalar_t x23 = incz[3] * x1;
-    const scalar_t x24 = incx[3] * x4;
-    const scalar_t x25 = incx[3] * x6;
-    const scalar_t x26 = incy[3] * x6;
-    const scalar_t x27 = incz[3] * x6;
-    const scalar_t x28 = incy[4] * x1;
-    const scalar_t x29 = incz[4] * x1;
-    const scalar_t x30 = incx[4] * x4;
-    const scalar_t x31 = incx[4] * x6;
-    const scalar_t x32 = incy[4] * x6;
-    const scalar_t x33 = incz[4] * x6;
-    const scalar_t x34 = incy[5] * x1;
-    const scalar_t x35 = incz[5] * x1;
-    const scalar_t x36 = incx[5] * x4;
-    const scalar_t x37 = incx[5] * x6;
-    const scalar_t x38 = incy[5] * x6;
-    const scalar_t x39 = incz[5] * x6;
-    const scalar_t x40 = incy[6] * x1;
-    const scalar_t x41 = incz[6] * x1;
-    const scalar_t x42 = incx[6] * x4;
-    const scalar_t x43 = incx[6] * x6;
-    const scalar_t x44 = incy[6] * x6;
-    const scalar_t x45 = incz[6] * x6;
-    const scalar_t x46 = incy[7] * x1;
-    const scalar_t x47 = incz[7] * x1;
-    const scalar_t x48 = incx[7] * x4;
-    const scalar_t x49 = incx[7] * x6;
-    const scalar_t x50 = incy[7] * x6;
-    const scalar_t x51 = incz[7] * x6;
-    const scalar_t x52 = incx[0] * x1;
-    const scalar_t x53 = incy[0] * x4;
-    const scalar_t x54 = incx[1] * x1;
-    const scalar_t x55 = incy[1] * x4;
-    const scalar_t x56 = incx[2] * x1;
-    const scalar_t x57 = incy[2] * x4;
-    const scalar_t x58 = incx[3] * x1;
-    const scalar_t x59 = incy[3] * x4;
-    const scalar_t x60 = incx[4] * x1;
-    const scalar_t x61 = incy[4] * x4;
-    const scalar_t x62 = incx[5] * x1;
-    const scalar_t x63 = incy[5] * x4;
-    const scalar_t x64 = incx[6] * x1;
-    const scalar_t x65 = incy[6] * x4;
-    const scalar_t x66 = incx[7] * x1;
-    const scalar_t x67 = incy[7] * x4;
-    const scalar_t x68 = incz[0] * x4;
-    const scalar_t x69 = incz[1] * x4;
-    const scalar_t x70 = incz[2] * x4;
-    const scalar_t x71 = incz[3] * x4;
-    const scalar_t x72 = incz[4] * x4;
-    const scalar_t x73 = incz[5] * x4;
-    const scalar_t x74 = incz[6] * x4;
-    const scalar_t x75 = incz[7] * x4;
-    outx[0] = S_ikmn_canonical[0] * x7 + S_ikmn_canonical[10] * x8 + S_ikmn_canonical[11] * x2 + S_ikmn_canonical[12] * x2 +
-              S_ikmn_canonical[13] * x2 + S_ikmn_canonical[14] * x8 + S_ikmn_canonical[15] * x9 + S_ikmn_canonical[16] * x3 +
-              S_ikmn_canonical[17] * x3 + S_ikmn_canonical[18] * x3 + S_ikmn_canonical[19] * x9 + S_ikmn_canonical[1] * x5 +
-              S_ikmn_canonical[20] * x3 + S_ikmn_canonical[21] * x3 + S_ikmn_canonical[22] * x3 + S_ikmn_canonical[23] * x9 +
-              S_ikmn_canonical[2] * x5 + S_ikmn_canonical[3] * x7 + S_ikmn_canonical[4] * x5 + S_ikmn_canonical[5] * x7 +
-              S_ikmn_canonical[6] * x8 + S_ikmn_canonical[7] * x2 + S_ikmn_canonical[8] * x2 + S_ikmn_canonical[9] * x2;
-    outx[1] = S_ikmn_canonical[0] * x13 + S_ikmn_canonical[10] * x14 + S_ikmn_canonical[11] * x10 + S_ikmn_canonical[12] * x10 +
-              S_ikmn_canonical[13] * x10 + S_ikmn_canonical[14] * x14 + S_ikmn_canonical[15] * x15 + S_ikmn_canonical[16] * x11 +
-              S_ikmn_canonical[17] * x11 + S_ikmn_canonical[18] * x11 + S_ikmn_canonical[19] * x15 + S_ikmn_canonical[1] * x12 +
-              S_ikmn_canonical[20] * x11 + S_ikmn_canonical[21] * x11 + S_ikmn_canonical[22] * x11 + S_ikmn_canonical[23] * x15 +
-              S_ikmn_canonical[2] * x12 + S_ikmn_canonical[3] * x13 + S_ikmn_canonical[4] * x12 + S_ikmn_canonical[5] * x13 +
-              S_ikmn_canonical[6] * x14 + S_ikmn_canonical[7] * x10 + S_ikmn_canonical[8] * x10 + S_ikmn_canonical[9] * x10;
-    outx[2] = S_ikmn_canonical[0] * x19 + S_ikmn_canonical[10] * x20 + S_ikmn_canonical[11] * x16 + S_ikmn_canonical[12] * x16 +
-              S_ikmn_canonical[13] * x16 + S_ikmn_canonical[14] * x20 + S_ikmn_canonical[15] * x21 + S_ikmn_canonical[16] * x17 +
-              S_ikmn_canonical[17] * x17 + S_ikmn_canonical[18] * x17 + S_ikmn_canonical[19] * x21 + S_ikmn_canonical[1] * x18 +
-              S_ikmn_canonical[20] * x17 + S_ikmn_canonical[21] * x17 + S_ikmn_canonical[22] * x17 + S_ikmn_canonical[23] * x21 +
-              S_ikmn_canonical[2] * x18 + S_ikmn_canonical[3] * x19 + S_ikmn_canonical[4] * x18 + S_ikmn_canonical[5] * x19 +
-              S_ikmn_canonical[6] * x20 + S_ikmn_canonical[7] * x16 + S_ikmn_canonical[8] * x16 + S_ikmn_canonical[9] * x16;
-    outx[3] = S_ikmn_canonical[0] * x25 + S_ikmn_canonical[10] * x26 + S_ikmn_canonical[11] * x22 + S_ikmn_canonical[12] * x22 +
-              S_ikmn_canonical[13] * x22 + S_ikmn_canonical[14] * x26 + S_ikmn_canonical[15] * x27 + S_ikmn_canonical[16] * x23 +
-              S_ikmn_canonical[17] * x23 + S_ikmn_canonical[18] * x23 + S_ikmn_canonical[19] * x27 + S_ikmn_canonical[1] * x24 +
-              S_ikmn_canonical[20] * x23 + S_ikmn_canonical[21] * x23 + S_ikmn_canonical[22] * x23 + S_ikmn_canonical[23] * x27 +
-              S_ikmn_canonical[2] * x24 + S_ikmn_canonical[3] * x25 + S_ikmn_canonical[4] * x24 + S_ikmn_canonical[5] * x25 +
-              S_ikmn_canonical[6] * x26 + S_ikmn_canonical[7] * x22 + S_ikmn_canonical[8] * x22 + S_ikmn_canonical[9] * x22;
-    outx[4] = S_ikmn_canonical[0] * x31 + S_ikmn_canonical[10] * x32 + S_ikmn_canonical[11] * x28 + S_ikmn_canonical[12] * x28 +
-              S_ikmn_canonical[13] * x28 + S_ikmn_canonical[14] * x32 + S_ikmn_canonical[15] * x33 + S_ikmn_canonical[16] * x29 +
-              S_ikmn_canonical[17] * x29 + S_ikmn_canonical[18] * x29 + S_ikmn_canonical[19] * x33 + S_ikmn_canonical[1] * x30 +
-              S_ikmn_canonical[20] * x29 + S_ikmn_canonical[21] * x29 + S_ikmn_canonical[22] * x29 + S_ikmn_canonical[23] * x33 +
-              S_ikmn_canonical[2] * x30 + S_ikmn_canonical[3] * x31 + S_ikmn_canonical[4] * x30 + S_ikmn_canonical[5] * x31 +
-              S_ikmn_canonical[6] * x32 + S_ikmn_canonical[7] * x28 + S_ikmn_canonical[8] * x28 + S_ikmn_canonical[9] * x28;
-    outx[5] = S_ikmn_canonical[0] * x37 + S_ikmn_canonical[10] * x38 + S_ikmn_canonical[11] * x34 + S_ikmn_canonical[12] * x34 +
-              S_ikmn_canonical[13] * x34 + S_ikmn_canonical[14] * x38 + S_ikmn_canonical[15] * x39 + S_ikmn_canonical[16] * x35 +
-              S_ikmn_canonical[17] * x35 + S_ikmn_canonical[18] * x35 + S_ikmn_canonical[19] * x39 + S_ikmn_canonical[1] * x36 +
-              S_ikmn_canonical[20] * x35 + S_ikmn_canonical[21] * x35 + S_ikmn_canonical[22] * x35 + S_ikmn_canonical[23] * x39 +
-              S_ikmn_canonical[2] * x36 + S_ikmn_canonical[3] * x37 + S_ikmn_canonical[4] * x36 + S_ikmn_canonical[5] * x37 +
-              S_ikmn_canonical[6] * x38 + S_ikmn_canonical[7] * x34 + S_ikmn_canonical[8] * x34 + S_ikmn_canonical[9] * x34;
-    outx[6] = S_ikmn_canonical[0] * x43 + S_ikmn_canonical[10] * x44 + S_ikmn_canonical[11] * x40 + S_ikmn_canonical[12] * x40 +
-              S_ikmn_canonical[13] * x40 + S_ikmn_canonical[14] * x44 + S_ikmn_canonical[15] * x45 + S_ikmn_canonical[16] * x41 +
-              S_ikmn_canonical[17] * x41 + S_ikmn_canonical[18] * x41 + S_ikmn_canonical[19] * x45 + S_ikmn_canonical[1] * x42 +
-              S_ikmn_canonical[20] * x41 + S_ikmn_canonical[21] * x41 + S_ikmn_canonical[22] * x41 + S_ikmn_canonical[23] * x45 +
-              S_ikmn_canonical[2] * x42 + S_ikmn_canonical[3] * x43 + S_ikmn_canonical[4] * x42 + S_ikmn_canonical[5] * x43 +
-              S_ikmn_canonical[6] * x44 + S_ikmn_canonical[7] * x40 + S_ikmn_canonical[8] * x40 + S_ikmn_canonical[9] * x40;
-    outx[7] = S_ikmn_canonical[0] * x49 + S_ikmn_canonical[10] * x50 + S_ikmn_canonical[11] * x46 + S_ikmn_canonical[12] * x46 +
-              S_ikmn_canonical[13] * x46 + S_ikmn_canonical[14] * x50 + S_ikmn_canonical[15] * x51 + S_ikmn_canonical[16] * x47 +
-              S_ikmn_canonical[17] * x47 + S_ikmn_canonical[18] * x47 + S_ikmn_canonical[19] * x51 + S_ikmn_canonical[1] * x48 +
-              S_ikmn_canonical[20] * x47 + S_ikmn_canonical[21] * x47 + S_ikmn_canonical[22] * x47 + S_ikmn_canonical[23] * x51 +
-              S_ikmn_canonical[2] * x48 + S_ikmn_canonical[3] * x49 + S_ikmn_canonical[4] * x48 + S_ikmn_canonical[5] * x49 +
-              S_ikmn_canonical[6] * x50 + S_ikmn_canonical[7] * x46 + S_ikmn_canonical[8] * x46 + S_ikmn_canonical[9] * x46;
-    outy[0] = S_ikmn_canonical[10] * x7 + S_ikmn_canonical[11] * x52 + S_ikmn_canonical[12] * x52 + S_ikmn_canonical[13] * x52 +
-              S_ikmn_canonical[14] * x7 + S_ikmn_canonical[24] * x8 + S_ikmn_canonical[25] * x53 + S_ikmn_canonical[26] * x53 +
-              S_ikmn_canonical[27] * x8 + S_ikmn_canonical[28] * x53 + S_ikmn_canonical[29] * x8 + S_ikmn_canonical[30] * x9 +
-              S_ikmn_canonical[31] * x3 + S_ikmn_canonical[32] * x3 + S_ikmn_canonical[33] * x3 + S_ikmn_canonical[34] * x9 +
-              S_ikmn_canonical[35] * x3 + S_ikmn_canonical[36] * x3 + S_ikmn_canonical[37] * x3 + S_ikmn_canonical[38] * x9 +
-              S_ikmn_canonical[6] * x7 + S_ikmn_canonical[7] * x52 + S_ikmn_canonical[8] * x52 + S_ikmn_canonical[9] * x52;
-    outy[1] = S_ikmn_canonical[10] * x13 + S_ikmn_canonical[11] * x54 + S_ikmn_canonical[12] * x54 + S_ikmn_canonical[13] * x54 +
-              S_ikmn_canonical[14] * x13 + S_ikmn_canonical[24] * x14 + S_ikmn_canonical[25] * x55 + S_ikmn_canonical[26] * x55 +
-              S_ikmn_canonical[27] * x14 + S_ikmn_canonical[28] * x55 + S_ikmn_canonical[29] * x14 + S_ikmn_canonical[30] * x15 +
-              S_ikmn_canonical[31] * x11 + S_ikmn_canonical[32] * x11 + S_ikmn_canonical[33] * x11 + S_ikmn_canonical[34] * x15 +
-              S_ikmn_canonical[35] * x11 + S_ikmn_canonical[36] * x11 + S_ikmn_canonical[37] * x11 + S_ikmn_canonical[38] * x15 +
-              S_ikmn_canonical[6] * x13 + S_ikmn_canonical[7] * x54 + S_ikmn_canonical[8] * x54 + S_ikmn_canonical[9] * x54;
-    outy[2] = S_ikmn_canonical[10] * x19 + S_ikmn_canonical[11] * x56 + S_ikmn_canonical[12] * x56 + S_ikmn_canonical[13] * x56 +
-              S_ikmn_canonical[14] * x19 + S_ikmn_canonical[24] * x20 + S_ikmn_canonical[25] * x57 + S_ikmn_canonical[26] * x57 +
-              S_ikmn_canonical[27] * x20 + S_ikmn_canonical[28] * x57 + S_ikmn_canonical[29] * x20 + S_ikmn_canonical[30] * x21 +
-              S_ikmn_canonical[31] * x17 + S_ikmn_canonical[32] * x17 + S_ikmn_canonical[33] * x17 + S_ikmn_canonical[34] * x21 +
-              S_ikmn_canonical[35] * x17 + S_ikmn_canonical[36] * x17 + S_ikmn_canonical[37] * x17 + S_ikmn_canonical[38] * x21 +
-              S_ikmn_canonical[6] * x19 + S_ikmn_canonical[7] * x56 + S_ikmn_canonical[8] * x56 + S_ikmn_canonical[9] * x56;
-    outy[3] = S_ikmn_canonical[10] * x25 + S_ikmn_canonical[11] * x58 + S_ikmn_canonical[12] * x58 + S_ikmn_canonical[13] * x58 +
-              S_ikmn_canonical[14] * x25 + S_ikmn_canonical[24] * x26 + S_ikmn_canonical[25] * x59 + S_ikmn_canonical[26] * x59 +
-              S_ikmn_canonical[27] * x26 + S_ikmn_canonical[28] * x59 + S_ikmn_canonical[29] * x26 + S_ikmn_canonical[30] * x27 +
-              S_ikmn_canonical[31] * x23 + S_ikmn_canonical[32] * x23 + S_ikmn_canonical[33] * x23 + S_ikmn_canonical[34] * x27 +
-              S_ikmn_canonical[35] * x23 + S_ikmn_canonical[36] * x23 + S_ikmn_canonical[37] * x23 + S_ikmn_canonical[38] * x27 +
-              S_ikmn_canonical[6] * x25 + S_ikmn_canonical[7] * x58 + S_ikmn_canonical[8] * x58 + S_ikmn_canonical[9] * x58;
-    outy[4] = S_ikmn_canonical[10] * x31 + S_ikmn_canonical[11] * x60 + S_ikmn_canonical[12] * x60 + S_ikmn_canonical[13] * x60 +
-              S_ikmn_canonical[14] * x31 + S_ikmn_canonical[24] * x32 + S_ikmn_canonical[25] * x61 + S_ikmn_canonical[26] * x61 +
-              S_ikmn_canonical[27] * x32 + S_ikmn_canonical[28] * x61 + S_ikmn_canonical[29] * x32 + S_ikmn_canonical[30] * x33 +
-              S_ikmn_canonical[31] * x29 + S_ikmn_canonical[32] * x29 + S_ikmn_canonical[33] * x29 + S_ikmn_canonical[34] * x33 +
-              S_ikmn_canonical[35] * x29 + S_ikmn_canonical[36] * x29 + S_ikmn_canonical[37] * x29 + S_ikmn_canonical[38] * x33 +
-              S_ikmn_canonical[6] * x31 + S_ikmn_canonical[7] * x60 + S_ikmn_canonical[8] * x60 + S_ikmn_canonical[9] * x60;
-    outy[5] = S_ikmn_canonical[10] * x37 + S_ikmn_canonical[11] * x62 + S_ikmn_canonical[12] * x62 + S_ikmn_canonical[13] * x62 +
-              S_ikmn_canonical[14] * x37 + S_ikmn_canonical[24] * x38 + S_ikmn_canonical[25] * x63 + S_ikmn_canonical[26] * x63 +
-              S_ikmn_canonical[27] * x38 + S_ikmn_canonical[28] * x63 + S_ikmn_canonical[29] * x38 + S_ikmn_canonical[30] * x39 +
-              S_ikmn_canonical[31] * x35 + S_ikmn_canonical[32] * x35 + S_ikmn_canonical[33] * x35 + S_ikmn_canonical[34] * x39 +
-              S_ikmn_canonical[35] * x35 + S_ikmn_canonical[36] * x35 + S_ikmn_canonical[37] * x35 + S_ikmn_canonical[38] * x39 +
-              S_ikmn_canonical[6] * x37 + S_ikmn_canonical[7] * x62 + S_ikmn_canonical[8] * x62 + S_ikmn_canonical[9] * x62;
-    outy[6] = S_ikmn_canonical[10] * x43 + S_ikmn_canonical[11] * x64 + S_ikmn_canonical[12] * x64 + S_ikmn_canonical[13] * x64 +
-              S_ikmn_canonical[14] * x43 + S_ikmn_canonical[24] * x44 + S_ikmn_canonical[25] * x65 + S_ikmn_canonical[26] * x65 +
-              S_ikmn_canonical[27] * x44 + S_ikmn_canonical[28] * x65 + S_ikmn_canonical[29] * x44 + S_ikmn_canonical[30] * x45 +
-              S_ikmn_canonical[31] * x41 + S_ikmn_canonical[32] * x41 + S_ikmn_canonical[33] * x41 + S_ikmn_canonical[34] * x45 +
-              S_ikmn_canonical[35] * x41 + S_ikmn_canonical[36] * x41 + S_ikmn_canonical[37] * x41 + S_ikmn_canonical[38] * x45 +
-              S_ikmn_canonical[6] * x43 + S_ikmn_canonical[7] * x64 + S_ikmn_canonical[8] * x64 + S_ikmn_canonical[9] * x64;
-    outy[7] = S_ikmn_canonical[10] * x49 + S_ikmn_canonical[11] * x66 + S_ikmn_canonical[12] * x66 + S_ikmn_canonical[13] * x66 +
-              S_ikmn_canonical[14] * x49 + S_ikmn_canonical[24] * x50 + S_ikmn_canonical[25] * x67 + S_ikmn_canonical[26] * x67 +
-              S_ikmn_canonical[27] * x50 + S_ikmn_canonical[28] * x67 + S_ikmn_canonical[29] * x50 + S_ikmn_canonical[30] * x51 +
-              S_ikmn_canonical[31] * x47 + S_ikmn_canonical[32] * x47 + S_ikmn_canonical[33] * x47 + S_ikmn_canonical[34] * x51 +
-              S_ikmn_canonical[35] * x47 + S_ikmn_canonical[36] * x47 + S_ikmn_canonical[37] * x47 + S_ikmn_canonical[38] * x51 +
-              S_ikmn_canonical[6] * x49 + S_ikmn_canonical[7] * x66 + S_ikmn_canonical[8] * x66 + S_ikmn_canonical[9] * x66;
-    outz[0] = S_ikmn_canonical[15] * x7 + S_ikmn_canonical[16] * x52 + S_ikmn_canonical[17] * x52 + S_ikmn_canonical[18] * x52 +
-              S_ikmn_canonical[19] * x7 + S_ikmn_canonical[20] * x52 + S_ikmn_canonical[21] * x52 + S_ikmn_canonical[22] * x52 +
-              S_ikmn_canonical[23] * x7 + S_ikmn_canonical[30] * x8 + S_ikmn_canonical[31] * x2 + S_ikmn_canonical[32] * x2 +
-              S_ikmn_canonical[33] * x2 + S_ikmn_canonical[34] * x8 + S_ikmn_canonical[35] * x2 + S_ikmn_canonical[36] * x2 +
-              S_ikmn_canonical[37] * x2 + S_ikmn_canonical[38] * x8 + S_ikmn_canonical[39] * x9 + S_ikmn_canonical[40] * x68 +
-              S_ikmn_canonical[41] * x68 + S_ikmn_canonical[42] * x9 + S_ikmn_canonical[43] * x68 + S_ikmn_canonical[44] * x9;
-    outz[1] = S_ikmn_canonical[15] * x13 + S_ikmn_canonical[16] * x54 + S_ikmn_canonical[17] * x54 + S_ikmn_canonical[18] * x54 +
-              S_ikmn_canonical[19] * x13 + S_ikmn_canonical[20] * x54 + S_ikmn_canonical[21] * x54 + S_ikmn_canonical[22] * x54 +
-              S_ikmn_canonical[23] * x13 + S_ikmn_canonical[30] * x14 + S_ikmn_canonical[31] * x10 + S_ikmn_canonical[32] * x10 +
-              S_ikmn_canonical[33] * x10 + S_ikmn_canonical[34] * x14 + S_ikmn_canonical[35] * x10 + S_ikmn_canonical[36] * x10 +
-              S_ikmn_canonical[37] * x10 + S_ikmn_canonical[38] * x14 + S_ikmn_canonical[39] * x15 + S_ikmn_canonical[40] * x69 +
-              S_ikmn_canonical[41] * x69 + S_ikmn_canonical[42] * x15 + S_ikmn_canonical[43] * x69 + S_ikmn_canonical[44] * x15;
-    outz[2] = S_ikmn_canonical[15] * x19 + S_ikmn_canonical[16] * x56 + S_ikmn_canonical[17] * x56 + S_ikmn_canonical[18] * x56 +
-              S_ikmn_canonical[19] * x19 + S_ikmn_canonical[20] * x56 + S_ikmn_canonical[21] * x56 + S_ikmn_canonical[22] * x56 +
-              S_ikmn_canonical[23] * x19 + S_ikmn_canonical[30] * x20 + S_ikmn_canonical[31] * x16 + S_ikmn_canonical[32] * x16 +
-              S_ikmn_canonical[33] * x16 + S_ikmn_canonical[34] * x20 + S_ikmn_canonical[35] * x16 + S_ikmn_canonical[36] * x16 +
-              S_ikmn_canonical[37] * x16 + S_ikmn_canonical[38] * x20 + S_ikmn_canonical[39] * x21 + S_ikmn_canonical[40] * x70 +
-              S_ikmn_canonical[41] * x70 + S_ikmn_canonical[42] * x21 + S_ikmn_canonical[43] * x70 + S_ikmn_canonical[44] * x21;
-    outz[3] = S_ikmn_canonical[15] * x25 + S_ikmn_canonical[16] * x58 + S_ikmn_canonical[17] * x58 + S_ikmn_canonical[18] * x58 +
-              S_ikmn_canonical[19] * x25 + S_ikmn_canonical[20] * x58 + S_ikmn_canonical[21] * x58 + S_ikmn_canonical[22] * x58 +
-              S_ikmn_canonical[23] * x25 + S_ikmn_canonical[30] * x26 + S_ikmn_canonical[31] * x22 + S_ikmn_canonical[32] * x22 +
-              S_ikmn_canonical[33] * x22 + S_ikmn_canonical[34] * x26 + S_ikmn_canonical[35] * x22 + S_ikmn_canonical[36] * x22 +
-              S_ikmn_canonical[37] * x22 + S_ikmn_canonical[38] * x26 + S_ikmn_canonical[39] * x27 + S_ikmn_canonical[40] * x71 +
-              S_ikmn_canonical[41] * x71 + S_ikmn_canonical[42] * x27 + S_ikmn_canonical[43] * x71 + S_ikmn_canonical[44] * x27;
-    outz[4] = S_ikmn_canonical[15] * x31 + S_ikmn_canonical[16] * x60 + S_ikmn_canonical[17] * x60 + S_ikmn_canonical[18] * x60 +
-              S_ikmn_canonical[19] * x31 + S_ikmn_canonical[20] * x60 + S_ikmn_canonical[21] * x60 + S_ikmn_canonical[22] * x60 +
-              S_ikmn_canonical[23] * x31 + S_ikmn_canonical[30] * x32 + S_ikmn_canonical[31] * x28 + S_ikmn_canonical[32] * x28 +
-              S_ikmn_canonical[33] * x28 + S_ikmn_canonical[34] * x32 + S_ikmn_canonical[35] * x28 + S_ikmn_canonical[36] * x28 +
-              S_ikmn_canonical[37] * x28 + S_ikmn_canonical[38] * x32 + S_ikmn_canonical[39] * x33 + S_ikmn_canonical[40] * x72 +
-              S_ikmn_canonical[41] * x72 + S_ikmn_canonical[42] * x33 + S_ikmn_canonical[43] * x72 + S_ikmn_canonical[44] * x33;
-    outz[5] = S_ikmn_canonical[15] * x37 + S_ikmn_canonical[16] * x62 + S_ikmn_canonical[17] * x62 + S_ikmn_canonical[18] * x62 +
-              S_ikmn_canonical[19] * x37 + S_ikmn_canonical[20] * x62 + S_ikmn_canonical[21] * x62 + S_ikmn_canonical[22] * x62 +
-              S_ikmn_canonical[23] * x37 + S_ikmn_canonical[30] * x38 + S_ikmn_canonical[31] * x34 + S_ikmn_canonical[32] * x34 +
-              S_ikmn_canonical[33] * x34 + S_ikmn_canonical[34] * x38 + S_ikmn_canonical[35] * x34 + S_ikmn_canonical[36] * x34 +
-              S_ikmn_canonical[37] * x34 + S_ikmn_canonical[38] * x38 + S_ikmn_canonical[39] * x39 + S_ikmn_canonical[40] * x73 +
-              S_ikmn_canonical[41] * x73 + S_ikmn_canonical[42] * x39 + S_ikmn_canonical[43] * x73 + S_ikmn_canonical[44] * x39;
-    outz[6] = S_ikmn_canonical[15] * x43 + S_ikmn_canonical[16] * x64 + S_ikmn_canonical[17] * x64 + S_ikmn_canonical[18] * x64 +
-              S_ikmn_canonical[19] * x43 + S_ikmn_canonical[20] * x64 + S_ikmn_canonical[21] * x64 + S_ikmn_canonical[22] * x64 +
-              S_ikmn_canonical[23] * x43 + S_ikmn_canonical[30] * x44 + S_ikmn_canonical[31] * x40 + S_ikmn_canonical[32] * x40 +
-              S_ikmn_canonical[33] * x40 + S_ikmn_canonical[34] * x44 + S_ikmn_canonical[35] * x40 + S_ikmn_canonical[36] * x40 +
-              S_ikmn_canonical[37] * x40 + S_ikmn_canonical[38] * x44 + S_ikmn_canonical[39] * x45 + S_ikmn_canonical[40] * x74 +
-              S_ikmn_canonical[41] * x74 + S_ikmn_canonical[42] * x45 + S_ikmn_canonical[43] * x74 + S_ikmn_canonical[44] * x45;
-    outz[7] = S_ikmn_canonical[15] * x49 + S_ikmn_canonical[16] * x66 + S_ikmn_canonical[17] * x66 + S_ikmn_canonical[18] * x66 +
-              S_ikmn_canonical[19] * x49 + S_ikmn_canonical[20] * x66 + S_ikmn_canonical[21] * x66 + S_ikmn_canonical[22] * x66 +
-              S_ikmn_canonical[23] * x49 + S_ikmn_canonical[30] * x50 + S_ikmn_canonical[31] * x46 + S_ikmn_canonical[32] * x46 +
-              S_ikmn_canonical[33] * x46 + S_ikmn_canonical[34] * x50 + S_ikmn_canonical[35] * x46 + S_ikmn_canonical[36] * x46 +
-              S_ikmn_canonical[37] * x46 + S_ikmn_canonical[38] * x50 + S_ikmn_canonical[39] * x51 + S_ikmn_canonical[40] * x75 +
-              S_ikmn_canonical[41] * x75 + S_ikmn_canonical[42] * x51 + S_ikmn_canonical[43] * x75 + S_ikmn_canonical[44] * x51;
+    // mundane ops: 1558 divs: 0 sqrts: 0
+    // total ops: 1558
+    const scalar_t x0  = Wimpn_compressed[0] * incx[0];
+    const scalar_t x1  = Wimpn_compressed[7] * incx[6];
+    const scalar_t x2  = Wimpn_compressed[3] * incx[2] + Wimpn_compressed[6] * incx[4];
+    const scalar_t x3  = x0 + x1 + x2;
+    const scalar_t x4  = Wimpn_compressed[2] * incx[1];
+    const scalar_t x5  = Wimpn_compressed[9] * incx[7];
+    const scalar_t x6  = Wimpn_compressed[3] * incx[5] + Wimpn_compressed[6] * incx[3];
+    const scalar_t x7  = x4 + x5 + x6;
+    const scalar_t x8  = x3 + x7;
+    const scalar_t x9  = Wimpn_compressed[0] * incy[0];
+    const scalar_t x10 = Wimpn_compressed[7] * incy[6];
+    const scalar_t x11 = Wimpn_compressed[3] * incy[7] + Wimpn_compressed[6] * incy[1];
+    const scalar_t x12 = x10 + x11 + x9;
+    const scalar_t x13 = Wimpn_compressed[3] * incy[2] + Wimpn_compressed[6] * incy[4];
+    const scalar_t x14 = Wimpn_compressed[2] * incy[3] + Wimpn_compressed[9] * incy[5];
+    const scalar_t x15 = x13 + x14;
+    const scalar_t x16 = x12 + x15;
+    const scalar_t x17 = Wimpn_compressed[3] * incy[5] + Wimpn_compressed[6] * incy[3];
+    const scalar_t x18 = Wimpn_compressed[2] * incy[4] + Wimpn_compressed[9] * incy[2];
+    const scalar_t x19 = x17 + x18;
+    const scalar_t x20 = x12 + x19;
+    const scalar_t x21 = Wimpn_compressed[0] * incz[0];
+    const scalar_t x22 = Wimpn_compressed[7] * incz[6];
+    const scalar_t x23 = Wimpn_compressed[3] * incz[2] + Wimpn_compressed[6] * incz[4];
+    const scalar_t x24 = x21 + x22 + x23;
+    const scalar_t x25 = Wimpn_compressed[2] * incz[1];
+    const scalar_t x26 = Wimpn_compressed[9] * incz[7];
+    const scalar_t x27 = Wimpn_compressed[3] * incz[5] + Wimpn_compressed[6] * incz[3];
+    const scalar_t x28 = x25 + x26 + x27;
+    const scalar_t x29 = x24 + x28;
+    const scalar_t x30 = Wimpn_compressed[3] * incz[7] + Wimpn_compressed[6] * incz[1];
+    const scalar_t x31 = Wimpn_compressed[2] * incz[3] + Wimpn_compressed[9] * incz[5];
+    const scalar_t x32 = x30 + x31;
+    const scalar_t x33 = x24 + x32;
+    const scalar_t x34 = x27 + x30;
+    const scalar_t x35 = Wimpn_compressed[2] * incz[4] + Wimpn_compressed[9] * incz[2];
+    const scalar_t x36 = x21 + x22 + x34 + x35;
+    const scalar_t x37 = Wimpn_compressed[3] * incx[7] + Wimpn_compressed[6] * incx[1];
+    const scalar_t x38 = Wimpn_compressed[2] * incx[3] + Wimpn_compressed[9] * incx[5];
+    const scalar_t x39 = x37 + x38;
+    const scalar_t x40 = x3 + x39;
+    const scalar_t x41 = x37 + x6;
+    const scalar_t x42 = Wimpn_compressed[2] * incx[4] + Wimpn_compressed[9] * incx[2];
+    const scalar_t x43 = x0 + x1 + x41 + x42;
+    const scalar_t x44 = x13 + x17;
+    const scalar_t x45 = Wimpn_compressed[2] * incy[1] + Wimpn_compressed[9] * incy[7];
+    const scalar_t x46 = x10 + x44 + x45 + x9;
+    const scalar_t x47 = Wimpn_compressed[1] * incz[0] + Wimpn_compressed[8] * incz[6];
+    const scalar_t x48 = Wimpn_compressed[4] * incz[1] + Wimpn_compressed[5] * incz[7];
+    const scalar_t x49 = x47 + x48;
+    const scalar_t x50 = Wimpn_compressed[4] * incz[2] + Wimpn_compressed[5] * incz[4];
+    const scalar_t x51 = Wimpn_compressed[1] * incz[3] + Wimpn_compressed[8] * incz[5];
+    const scalar_t x52 = x50 + x51;
+    const scalar_t x53 = x49 + x52;
+    const scalar_t x54 = Wimpn_compressed[1] * incz[4] + Wimpn_compressed[8] * incz[2];
+    const scalar_t x55 = Wimpn_compressed[4] * incz[5] + Wimpn_compressed[5] * incz[3];
+    const scalar_t x56 = x54 + x55;
+    const scalar_t x57 = x49 + x56;
+    const scalar_t x58 = Wimpn_compressed[1] * incx[0] + Wimpn_compressed[8] * incx[6];
+    const scalar_t x59 = Wimpn_compressed[4] * incx[2] + Wimpn_compressed[5] * incx[4];
+    const scalar_t x60 = x58 + x59;
+    const scalar_t x61 = Wimpn_compressed[4] * incx[1] + Wimpn_compressed[5] * incx[7];
+    const scalar_t x62 = Wimpn_compressed[1] * incx[3] + Wimpn_compressed[8] * incx[5];
+    const scalar_t x63 = x61 + x62;
+    const scalar_t x64 = x60 + x63;
+    const scalar_t x65 = Wimpn_compressed[4] * incx[5] + Wimpn_compressed[5] * incx[3];
+    const scalar_t x66 = x58 + x65;
+    const scalar_t x67 = Wimpn_compressed[1] * incx[4] + Wimpn_compressed[8] * incx[2];
+    const scalar_t x68 = x61 + x67;
+    const scalar_t x69 = x66 + x68;
+    const scalar_t x70 = Wimpn_compressed[1] * incy[0] + Wimpn_compressed[8] * incy[6];
+    const scalar_t x71 = Wimpn_compressed[4] * incy[2] + Wimpn_compressed[5] * incy[4];
+    const scalar_t x72 = x70 + x71;
+    const scalar_t x73 = Wimpn_compressed[1] * incy[3] + Wimpn_compressed[8] * incy[5];
+    const scalar_t x74 = Wimpn_compressed[4] * incy[1] + Wimpn_compressed[5] * incy[7];
+    const scalar_t x75 = x73 + x74;
+    const scalar_t x76 = x72 + x75;
+    const scalar_t x77 = Wimpn_compressed[4] * incy[5] + Wimpn_compressed[5] * incy[3];
+    const scalar_t x78 = x70 + x77;
+    const scalar_t x79 = Wimpn_compressed[1] * incy[4] + Wimpn_compressed[8] * incy[2];
+    const scalar_t x80 = x74 + x79;
+    const scalar_t x81 = x78 + x80;
+    const scalar_t x82 = S_ikmn_canonical[16] * x53 + S_ikmn_canonical[17] * x57 + S_ikmn_canonical[1] * x64 +
+                         S_ikmn_canonical[2] * x69 + S_ikmn_canonical[7] * x76 + S_ikmn_canonical[8] * x81;
+    const scalar_t x83  = Wimpn_compressed[4] * incy[7] + Wimpn_compressed[5] * incy[1];
+    const scalar_t x84  = x70 + x83;
+    const scalar_t x85  = Wimpn_compressed[4] * incy[3] + Wimpn_compressed[5] * incy[5];
+    const scalar_t x86  = x79 + x85;
+    const scalar_t x87  = x84 + x86;
+    const scalar_t x88  = Wimpn_compressed[4] * incz[3] + Wimpn_compressed[5] * incz[5];
+    const scalar_t x89  = x47 + x88;
+    const scalar_t x90  = Wimpn_compressed[1] * incz[1] + Wimpn_compressed[8] * incz[7];
+    const scalar_t x91  = x50 + x90;
+    const scalar_t x92  = x89 + x91;
+    const scalar_t x93  = Wimpn_compressed[1] * incx[1] + Wimpn_compressed[8] * incx[7];
+    const scalar_t x94  = Wimpn_compressed[4] * incx[3] + Wimpn_compressed[5] * incx[5];
+    const scalar_t x95  = x93 + x94;
+    const scalar_t x96  = x60 + x95;
+    const scalar_t x97  = Wimpn_compressed[4] * incz[7] + Wimpn_compressed[5] * incz[1];
+    const scalar_t x98  = x54 + x97;
+    const scalar_t x99  = x89 + x98;
+    const scalar_t x100 = Wimpn_compressed[4] * incx[7] + Wimpn_compressed[5] * incx[1];
+    const scalar_t x101 = x100 + x58;
+    const scalar_t x102 = x67 + x94;
+    const scalar_t x103 = x101 + x102;
+    const scalar_t x104 = Wimpn_compressed[1] * incy[1] + Wimpn_compressed[8] * incy[7];
+    const scalar_t x105 = x104 + x85;
+    const scalar_t x106 = x105 + x72;
+    const scalar_t x107 = S_ikmn_canonical[11] * x87 + S_ikmn_canonical[18] * x92 + S_ikmn_canonical[1] * x96 +
+                          S_ikmn_canonical[20] * x99 + S_ikmn_canonical[4] * x103 + S_ikmn_canonical[9] * x106;
+    const scalar_t x108 = Wimpn_compressed[4] * incy[4] + Wimpn_compressed[5] * incy[2];
+    const scalar_t x109 = x104 + x108;
+    const scalar_t x110 = x109 + x78;
+    const scalar_t x111 = x108 + x73;
+    const scalar_t x112 = x111 + x84;
+    const scalar_t x113 = x55 + x90;
+    const scalar_t x114 = Wimpn_compressed[4] * incz[4] + Wimpn_compressed[5] * incz[2];
+    const scalar_t x115 = x114 + x47;
+    const scalar_t x116 = x113 + x115;
+    const scalar_t x117 = x51 + x97;
+    const scalar_t x118 = x115 + x117;
+    const scalar_t x119 = Wimpn_compressed[4] * incx[4] + Wimpn_compressed[5] * incx[2];
+    const scalar_t x120 = x119 + x93;
+    const scalar_t x121 = x120 + x66;
+    const scalar_t x122 = x119 + x62;
+    const scalar_t x123 = x101 + x122;
+    const scalar_t x124 = S_ikmn_canonical[12] * x110 + S_ikmn_canonical[13] * x112 + S_ikmn_canonical[21] * x116 +
+                          S_ikmn_canonical[22] * x118 + S_ikmn_canonical[2] * x121 + S_ikmn_canonical[4] * x123;
+    const scalar_t x125 = Wimpn_compressed[0] * incx[1];
+    const scalar_t x126 = Wimpn_compressed[7] * incx[7];
+    const scalar_t x127 = Wimpn_compressed[3] * incx[3] + Wimpn_compressed[6] * incx[5];
+    const scalar_t x128 = x125 + x126 + x127;
+    const scalar_t x129 = Wimpn_compressed[2] * incx[0];
+    const scalar_t x130 = Wimpn_compressed[9] * incx[6];
+    const scalar_t x131 = Wimpn_compressed[3] * incx[4] + Wimpn_compressed[6] * incx[2];
+    const scalar_t x132 = x129 + x130 + x131;
+    const scalar_t x133 = x128 + x132;
+    const scalar_t x134 = Wimpn_compressed[0] * incy[1];
+    const scalar_t x135 = Wimpn_compressed[7] * incy[7];
+    const scalar_t x136 = Wimpn_compressed[3] * incy[6] + Wimpn_compressed[6] * incy[0];
+    const scalar_t x137 = x134 + x135 + x136;
+    const scalar_t x138 = Wimpn_compressed[3] * incy[3] + Wimpn_compressed[6] * incy[5];
+    const scalar_t x139 = Wimpn_compressed[2] * incy[2] + Wimpn_compressed[9] * incy[4];
+    const scalar_t x140 = x138 + x139;
+    const scalar_t x141 = x137 + x140;
+    const scalar_t x142 = Wimpn_compressed[3] * incy[4] + Wimpn_compressed[6] * incy[2];
+    const scalar_t x143 = Wimpn_compressed[2] * incy[5] + Wimpn_compressed[9] * incy[3];
+    const scalar_t x144 = x142 + x143;
+    const scalar_t x145 = x137 + x144;
+    const scalar_t x146 = Wimpn_compressed[0] * incz[1];
+    const scalar_t x147 = Wimpn_compressed[7] * incz[7];
+    const scalar_t x148 = Wimpn_compressed[3] * incz[3] + Wimpn_compressed[6] * incz[5];
+    const scalar_t x149 = x146 + x147 + x148;
+    const scalar_t x150 = Wimpn_compressed[2] * incz[0];
+    const scalar_t x151 = Wimpn_compressed[9] * incz[6];
+    const scalar_t x152 = Wimpn_compressed[3] * incz[4] + Wimpn_compressed[6] * incz[2];
+    const scalar_t x153 = x150 + x151 + x152;
+    const scalar_t x154 = x149 + x153;
+    const scalar_t x155 = Wimpn_compressed[3] * incz[6] + Wimpn_compressed[6] * incz[0];
+    const scalar_t x156 = Wimpn_compressed[2] * incz[2] + Wimpn_compressed[9] * incz[4];
+    const scalar_t x157 = x155 + x156;
+    const scalar_t x158 = x149 + x157;
+    const scalar_t x159 = x152 + x155;
+    const scalar_t x160 = Wimpn_compressed[2] * incz[5] + Wimpn_compressed[9] * incz[3];
+    const scalar_t x161 = x146 + x147 + x159 + x160;
+    const scalar_t x162 = Wimpn_compressed[3] * incx[6] + Wimpn_compressed[6] * incx[0];
+    const scalar_t x163 = Wimpn_compressed[2] * incx[2] + Wimpn_compressed[9] * incx[4];
+    const scalar_t x164 = x162 + x163;
+    const scalar_t x165 = x128 + x164;
+    const scalar_t x166 = x131 + x162;
+    const scalar_t x167 = Wimpn_compressed[2] * incx[5] + Wimpn_compressed[9] * incx[3];
+    const scalar_t x168 = x125 + x126 + x166 + x167;
+    const scalar_t x169 = x138 + x142;
+    const scalar_t x170 = Wimpn_compressed[2] * incy[0] + Wimpn_compressed[9] * incy[6];
+    const scalar_t x171 = x134 + x135 + x169 + x170;
+    const scalar_t x172 = Wimpn_compressed[4] * incy[6] + Wimpn_compressed[5] * incy[0];
+    const scalar_t x173 = x104 + x172;
+    const scalar_t x174 = Wimpn_compressed[1] * incy[5] + Wimpn_compressed[8] * incy[3];
+    const scalar_t x175 = x174 + x71;
+    const scalar_t x176 = x173 + x175;
+    const scalar_t x177 = Wimpn_compressed[1] * incz[2] + Wimpn_compressed[8] * incz[4];
+    const scalar_t x178 = Wimpn_compressed[4] * incz[0] + Wimpn_compressed[5] * incz[6];
+    const scalar_t x179 = x178 + x48;
+    const scalar_t x180 = x177 + x179 + x51;
+    const scalar_t x181 = Wimpn_compressed[4] * incx[0] + Wimpn_compressed[5] * incx[6];
+    const scalar_t x182 = Wimpn_compressed[1] * incx[2] + Wimpn_compressed[8] * incx[4];
+    const scalar_t x183 = x181 + x182;
+    const scalar_t x184 = x183 + x63;
+    const scalar_t x185 = Wimpn_compressed[1] * incz[5] + Wimpn_compressed[8] * incz[3];
+    const scalar_t x186 = Wimpn_compressed[4] * incz[6] + Wimpn_compressed[5] * incz[0];
+    const scalar_t x187 = x185 + x186;
+    const scalar_t x188 = x187 + x91;
+    const scalar_t x189 = Wimpn_compressed[4] * incx[6] + Wimpn_compressed[5] * incx[0];
+    const scalar_t x190 = x189 + x93;
+    const scalar_t x191 = Wimpn_compressed[1] * incx[5] + Wimpn_compressed[8] * incx[3];
+    const scalar_t x192 = x191 + x59;
+    const scalar_t x193 = x190 + x192;
+    const scalar_t x194 = Wimpn_compressed[4] * incy[0] + Wimpn_compressed[5] * incy[6];
+    const scalar_t x195 = Wimpn_compressed[1] * incy[2] + Wimpn_compressed[8] * incy[4];
+    const scalar_t x196 = x194 + x195;
+    const scalar_t x197 = x196 + x75;
+    const scalar_t x198 = S_ikmn_canonical[11] * x176 + S_ikmn_canonical[18] * x180 + S_ikmn_canonical[1] * x184 +
+                          S_ikmn_canonical[20] * x188 + S_ikmn_canonical[4] * x193 + S_ikmn_canonical[9] * x197;
+    const scalar_t x199 = x174 + x194;
+    const scalar_t x200 = x199 + x80;
+    const scalar_t x201 = x195 + x77;
+    const scalar_t x202 = x173 + x201;
+    const scalar_t x203 = x179 + x185 + x54;
+    const scalar_t x204 = x177 + x186;
+    const scalar_t x205 = x113 + x204;
+    const scalar_t x206 = x181 + x191;
+    const scalar_t x207 = x206 + x68;
+    const scalar_t x208 = x182 + x65;
+    const scalar_t x209 = x190 + x208;
+    const scalar_t x210 = S_ikmn_canonical[12] * x200 + S_ikmn_canonical[13] * x202 + S_ikmn_canonical[21] * x203 +
+                          S_ikmn_canonical[22] * x205 + S_ikmn_canonical[2] * x207 + S_ikmn_canonical[4] * x209;
+    const scalar_t x211 = Wimpn_compressed[0] * incx[2] + Wimpn_compressed[7] * incx[4];
+    const scalar_t x212 = Wimpn_compressed[3] * incx[0] + Wimpn_compressed[6] * incx[6];
+    const scalar_t x213 = x211 + x212;
+    const scalar_t x214 = x213 + x39;
+    const scalar_t x215 = Wimpn_compressed[0] * incy[2];
+    const scalar_t x216 = Wimpn_compressed[7] * incy[4];
+    const scalar_t x217 = x17 + x215 + x216;
+    const scalar_t x218 = Wimpn_compressed[3] * incy[0] + Wimpn_compressed[6] * incy[6];
+    const scalar_t x219 = x218 + x45;
+    const scalar_t x220 = x217 + x219;
+    const scalar_t x221 = Wimpn_compressed[2] * incy[6] + Wimpn_compressed[9] * incy[0];
+    const scalar_t x222 = x11 + x221;
+    const scalar_t x223 = x217 + x222;
+    const scalar_t x224 = Wimpn_compressed[0] * incz[2] + Wimpn_compressed[7] * incz[4];
+    const scalar_t x225 = Wimpn_compressed[3] * incz[0] + Wimpn_compressed[6] * incz[6];
+    const scalar_t x226 = x224 + x225;
+    const scalar_t x227 = x226 + x32;
+    const scalar_t x228 = x226 + x28;
+    const scalar_t x229 = Wimpn_compressed[2] * incz[6] + Wimpn_compressed[9] * incz[0];
+    const scalar_t x230 = x224 + x229 + x34;
+    const scalar_t x231 = x213 + x7;
+    const scalar_t x232 = Wimpn_compressed[2] * incx[6] + Wimpn_compressed[9] * incx[0];
+    const scalar_t x233 = x211 + x232 + x41;
+    const scalar_t x234 = x11 + x218;
+    const scalar_t x235 = x14 + x215 + x216 + x234;
+    const scalar_t x236 = x178 + x88;
+    const scalar_t x237 = x177 + x236 + x90;
+    const scalar_t x238 = Wimpn_compressed[1] * incz[7] + Wimpn_compressed[8] * incz[1];
+    const scalar_t x239 = x186 + x238;
+    const scalar_t x240 = x239 + x52;
+    const scalar_t x241 = x183 + x95;
+    const scalar_t x242 = x189 + x62;
+    const scalar_t x243 = Wimpn_compressed[1] * incx[7] + Wimpn_compressed[8] * incx[1];
+    const scalar_t x244 = x243 + x59;
+    const scalar_t x245 = x242 + x244;
+    const scalar_t x246 = x105 + x196;
+    const scalar_t x247 = Wimpn_compressed[1] * incy[7] + Wimpn_compressed[8] * incy[1];
+    const scalar_t x248 = x247 + x71;
+    const scalar_t x249 = x172 + x73;
+    const scalar_t x250 = x248 + x249;
+    const scalar_t x251 = S_ikmn_canonical[16] * x237 + S_ikmn_canonical[17] * x240 + S_ikmn_canonical[1] * x241 +
+                          S_ikmn_canonical[2] * x245 + S_ikmn_canonical[7] * x246 + S_ikmn_canonical[8] * x250;
+    const scalar_t x252 = Wimpn_compressed[1] * incy[6] + Wimpn_compressed[8] * incy[0];
+    const scalar_t x253 = x252 + x85;
+    const scalar_t x254 = x248 + x253;
+    const scalar_t x255 = x252 + x74;
+    const scalar_t x256 = x175 + x255;
+    const scalar_t x257 = Wimpn_compressed[1] * incz[6] + Wimpn_compressed[8] * incz[0];
+    const scalar_t x258 = x257 + x50;
+    const scalar_t x259 = x238 + x258 + x88;
+    const scalar_t x260 = x185 + x258 + x48;
+    const scalar_t x261 = Wimpn_compressed[1] * incx[6] + Wimpn_compressed[8] * incx[0];
+    const scalar_t x262 = x261 + x94;
+    const scalar_t x263 = x244 + x262;
+    const scalar_t x264 = x261 + x61;
+    const scalar_t x265 = x192 + x264;
+    const scalar_t x266 = S_ikmn_canonical[12] * x254 + S_ikmn_canonical[13] * x256 + S_ikmn_canonical[21] * x259 +
+                          S_ikmn_canonical[22] * x260 + S_ikmn_canonical[2] * x263 + S_ikmn_canonical[4] * x265;
+    const scalar_t x267 = Wimpn_compressed[0] * incx[3] + Wimpn_compressed[7] * incx[5];
+    const scalar_t x268 = Wimpn_compressed[3] * incx[1] + Wimpn_compressed[6] * incx[7];
+    const scalar_t x269 = x267 + x268;
+    const scalar_t x270 = x164 + x269;
+    const scalar_t x271 = Wimpn_compressed[0] * incy[3];
+    const scalar_t x272 = Wimpn_compressed[7] * incy[5];
+    const scalar_t x273 = x142 + x271 + x272;
+    const scalar_t x274 = Wimpn_compressed[3] * incy[1] + Wimpn_compressed[6] * incy[7];
+    const scalar_t x275 = x170 + x274;
+    const scalar_t x276 = x273 + x275;
+    const scalar_t x277 = Wimpn_compressed[2] * incy[7] + Wimpn_compressed[9] * incy[1];
+    const scalar_t x278 = x136 + x277;
+    const scalar_t x279 = x273 + x278;
+    const scalar_t x280 = Wimpn_compressed[0] * incz[3] + Wimpn_compressed[7] * incz[5];
+    const scalar_t x281 = Wimpn_compressed[3] * incz[1] + Wimpn_compressed[6] * incz[7];
+    const scalar_t x282 = x280 + x281;
+    const scalar_t x283 = x157 + x282;
+    const scalar_t x284 = x153 + x282;
+    const scalar_t x285 = Wimpn_compressed[2] * incz[7] + Wimpn_compressed[9] * incz[1];
+    const scalar_t x286 = x159 + x280 + x285;
+    const scalar_t x287 = x132 + x269;
+    const scalar_t x288 = Wimpn_compressed[2] * incx[7] + Wimpn_compressed[9] * incx[1];
+    const scalar_t x289 = x166 + x267 + x288;
+    const scalar_t x290 = x136 + x274;
+    const scalar_t x291 = x139 + x271 + x272 + x290;
+    const scalar_t x292 = x195 + x83;
+    const scalar_t x293 = x249 + x292;
+    const scalar_t x294 = x194 + x247;
+    const scalar_t x295 = x294 + x86;
+    const scalar_t x296 = x117 + x204;
+    const scalar_t x297 = x236 + x238 + x54;
+    const scalar_t x298 = x100 + x182;
+    const scalar_t x299 = x242 + x298;
+    const scalar_t x300 = x181 + x243;
+    const scalar_t x301 = x102 + x300;
+    const scalar_t x302 = S_ikmn_canonical[12] * x293 + S_ikmn_canonical[13] * x295 + S_ikmn_canonical[21] * x296 +
+                          S_ikmn_canonical[22] * x297 + S_ikmn_canonical[2] * x299 + S_ikmn_canonical[4] * x301;
+    const scalar_t x303 = x167 + x268;
+    const scalar_t x304 = Wimpn_compressed[0] * incx[4];
+    const scalar_t x305 = Wimpn_compressed[7] * incx[2];
+    const scalar_t x306 = x162 + x304 + x305;
+    const scalar_t x307 = x303 + x306;
+    const scalar_t x308 = Wimpn_compressed[0] * incy[4] + Wimpn_compressed[7] * incy[2];
+    const scalar_t x309 = x138 + x308;
+    const scalar_t x310 = x278 + x309;
+    const scalar_t x311 = x275 + x309;
+    const scalar_t x312 = x160 + x281;
+    const scalar_t x313 = Wimpn_compressed[0] * incz[4];
+    const scalar_t x314 = Wimpn_compressed[7] * incz[2];
+    const scalar_t x315 = x155 + x313 + x314;
+    const scalar_t x316 = x312 + x315;
+    const scalar_t x317 = x148 + x285;
+    const scalar_t x318 = x315 + x317;
+    const scalar_t x319 = x148 + x281;
+    const scalar_t x320 = x150 + x151 + x313 + x314 + x319;
+    const scalar_t x321 = x127 + x288;
+    const scalar_t x322 = x306 + x321;
+    const scalar_t x323 = x127 + x268;
+    const scalar_t x324 = x129 + x130 + x304 + x305 + x323;
+    const scalar_t x325 = x143 + x290 + x308;
+    const scalar_t x326 = x239 + x56;
+    const scalar_t x327 = x114 + x178;
+    const scalar_t x328 = x185 + x327 + x90;
+    const scalar_t x329 = x189 + x67;
+    const scalar_t x330 = x243 + x65;
+    const scalar_t x331 = x329 + x330;
+    const scalar_t x332 = x120 + x206;
+    const scalar_t x333 = x172 + x79;
+    const scalar_t x334 = x247 + x77;
+    const scalar_t x335 = x333 + x334;
+    const scalar_t x336 = x109 + x199;
+    const scalar_t x337 = S_ikmn_canonical[16] * x326 + S_ikmn_canonical[17] * x328 + S_ikmn_canonical[1] * x331 +
+                          S_ikmn_canonical[2] * x332 + S_ikmn_canonical[7] * x335 + S_ikmn_canonical[8] * x336;
+    const scalar_t x338 = x111 + x294;
+    const scalar_t x339 = x187 + x98;
+    const scalar_t x340 = x100 + x191;
+    const scalar_t x341 = x329 + x340;
+    const scalar_t x342 = x238 + x327 + x51;
+    const scalar_t x343 = x122 + x300;
+    const scalar_t x344 = x174 + x83;
+    const scalar_t x345 = x333 + x344;
+    const scalar_t x346 = S_ikmn_canonical[11] * x338 + S_ikmn_canonical[18] * x339 + S_ikmn_canonical[1] * x341 +
+                          S_ikmn_canonical[20] * x342 + S_ikmn_canonical[4] * x343 + S_ikmn_canonical[9] * x345;
+    const scalar_t x347 = x212 + x42;
+    const scalar_t x348 = Wimpn_compressed[0] * incx[5];
+    const scalar_t x349 = Wimpn_compressed[7] * incx[3];
+    const scalar_t x350 = x348 + x349 + x37;
+    const scalar_t x351 = x347 + x350;
+    const scalar_t x352 = Wimpn_compressed[0] * incy[5] + Wimpn_compressed[7] * incy[3];
+    const scalar_t x353 = x13 + x352;
+    const scalar_t x354 = x222 + x353;
+    const scalar_t x355 = x219 + x353;
+    const scalar_t x356 = x225 + x35;
+    const scalar_t x357 = Wimpn_compressed[0] * incz[5];
+    const scalar_t x358 = Wimpn_compressed[7] * incz[3];
+    const scalar_t x359 = x30 + x357 + x358;
+    const scalar_t x360 = x356 + x359;
+    const scalar_t x361 = x229 + x23;
+    const scalar_t x362 = x359 + x361;
+    const scalar_t x363 = x225 + x23;
+    const scalar_t x364 = x25 + x26 + x357 + x358 + x363;
+    const scalar_t x365 = x2 + x232;
+    const scalar_t x366 = x350 + x365;
+    const scalar_t x367 = x2 + x212;
+    const scalar_t x368 = x348 + x349 + x367 + x4 + x5;
+    const scalar_t x369 = x18 + x234 + x352;
+    const scalar_t x370 = x201 + x255;
+    const scalar_t x371 = x257 + x55;
+    const scalar_t x372 = x114 + x238 + x371;
+    const scalar_t x373 = x119 + x261;
+    const scalar_t x374 = x330 + x373;
+    const scalar_t x375 = x177 + x371 + x48;
+    const scalar_t x376 = x208 + x264;
+    const scalar_t x377 = x108 + x252;
+    const scalar_t x378 = x334 + x377;
+    const scalar_t x379 = S_ikmn_canonical[11] * x370 + S_ikmn_canonical[18] * x372 + S_ikmn_canonical[1] * x374 +
+                          S_ikmn_canonical[20] * x375 + S_ikmn_canonical[4] * x376 + S_ikmn_canonical[9] * x378;
+    const scalar_t x380 = Wimpn_compressed[0] * incx[6] + Wimpn_compressed[7] * incx[0];
+    const scalar_t x381 = x131 + x380;
+    const scalar_t x382 = x321 + x381;
+    const scalar_t x383 = Wimpn_compressed[0] * incy[6] + Wimpn_compressed[7] * incy[0];
+    const scalar_t x384 = x274 + x383;
+    const scalar_t x385 = x144 + x384;
+    const scalar_t x386 = x140 + x384;
+    const scalar_t x387 = Wimpn_compressed[0] * incz[6] + Wimpn_compressed[7] * incz[0];
+    const scalar_t x388 = x152 + x387;
+    const scalar_t x389 = x317 + x388;
+    const scalar_t x390 = x312 + x388;
+    const scalar_t x391 = x156 + x319 + x387;
+    const scalar_t x392 = x303 + x381;
+    const scalar_t x393 = x163 + x323 + x380;
+    const scalar_t x394 = x169 + x277 + x383;
+    const scalar_t x395 = x257 + x97;
+    const scalar_t x396 = x114 + x185 + x395;
+    const scalar_t x397 = x177 + x395 + x88;
+    const scalar_t x398 = x340 + x373;
+    const scalar_t x399 = x262 + x298;
+    const scalar_t x400 = x344 + x377;
+    const scalar_t x401 = x253 + x292;
+    const scalar_t x402 = S_ikmn_canonical[16] * x396 + S_ikmn_canonical[17] * x397 + S_ikmn_canonical[1] * x398 +
+                          S_ikmn_canonical[2] * x399 + S_ikmn_canonical[7] * x400 + S_ikmn_canonical[8] * x401;
+    const scalar_t x403 = Wimpn_compressed[0] * incx[7] + Wimpn_compressed[7] * incx[1];
+    const scalar_t x404 = x403 + x6;
+    const scalar_t x405 = x365 + x404;
+    const scalar_t x406 = Wimpn_compressed[0] * incy[7] + Wimpn_compressed[7] * incy[1];
+    const scalar_t x407 = x218 + x406;
+    const scalar_t x408 = x19 + x407;
+    const scalar_t x409 = x15 + x407;
+    const scalar_t x410 = Wimpn_compressed[0] * incz[7] + Wimpn_compressed[7] * incz[1];
+    const scalar_t x411 = x27 + x410;
+    const scalar_t x412 = x361 + x411;
+    const scalar_t x413 = x356 + x411;
+    const scalar_t x414 = x31 + x363 + x410;
+    const scalar_t x415 = x347 + x404;
+    const scalar_t x416 = x367 + x38 + x403;
+    const scalar_t x417 = x221 + x406 + x44;
+    const scalar_t x418 = S_ikmn_canonical[12] * x69 + S_ikmn_canonical[25] * x76 + S_ikmn_canonical[26] * x81 +
+                          S_ikmn_canonical[31] * x53 + S_ikmn_canonical[32] * x57 + S_ikmn_canonical[9] * x64;
+    const scalar_t x419 = S_ikmn_canonical[13] * x103 + S_ikmn_canonical[25] * x106 + S_ikmn_canonical[28] * x87 +
+                          S_ikmn_canonical[33] * x92 + S_ikmn_canonical[35] * x99 + S_ikmn_canonical[7] * x96;
+    const scalar_t x420 = S_ikmn_canonical[11] * x123 + S_ikmn_canonical[26] * x110 + S_ikmn_canonical[28] * x112 +
+                          S_ikmn_canonical[36] * x116 + S_ikmn_canonical[37] * x118 + S_ikmn_canonical[8] * x121;
+    const scalar_t x421 = S_ikmn_canonical[13] * x193 + S_ikmn_canonical[25] * x197 + S_ikmn_canonical[28] * x176 +
+                          S_ikmn_canonical[33] * x180 + S_ikmn_canonical[35] * x188 + S_ikmn_canonical[7] * x184;
+    const scalar_t x422 = S_ikmn_canonical[11] * x209 + S_ikmn_canonical[26] * x200 + S_ikmn_canonical[28] * x202 +
+                          S_ikmn_canonical[36] * x203 + S_ikmn_canonical[37] * x205 + S_ikmn_canonical[8] * x207;
+    const scalar_t x423 = S_ikmn_canonical[12] * x245 + S_ikmn_canonical[25] * x246 + S_ikmn_canonical[26] * x250 +
+                          S_ikmn_canonical[31] * x237 + S_ikmn_canonical[32] * x240 + S_ikmn_canonical[9] * x241;
+    const scalar_t x424 = S_ikmn_canonical[11] * x265 + S_ikmn_canonical[26] * x254 + S_ikmn_canonical[28] * x256 +
+                          S_ikmn_canonical[36] * x259 + S_ikmn_canonical[37] * x260 + S_ikmn_canonical[8] * x263;
+    const scalar_t x425 = S_ikmn_canonical[11] * x301 + S_ikmn_canonical[26] * x293 + S_ikmn_canonical[28] * x295 +
+                          S_ikmn_canonical[36] * x296 + S_ikmn_canonical[37] * x297 + S_ikmn_canonical[8] * x299;
+    const scalar_t x426 = S_ikmn_canonical[12] * x332 + S_ikmn_canonical[25] * x335 + S_ikmn_canonical[26] * x336 +
+                          S_ikmn_canonical[31] * x326 + S_ikmn_canonical[32] * x328 + S_ikmn_canonical[9] * x331;
+    const scalar_t x427 = S_ikmn_canonical[13] * x343 + S_ikmn_canonical[25] * x345 + S_ikmn_canonical[28] * x338 +
+                          S_ikmn_canonical[33] * x339 + S_ikmn_canonical[35] * x342 + S_ikmn_canonical[7] * x341;
+    const scalar_t x428 = S_ikmn_canonical[13] * x376 + S_ikmn_canonical[25] * x378 + S_ikmn_canonical[28] * x370 +
+                          S_ikmn_canonical[33] * x372 + S_ikmn_canonical[35] * x375 + S_ikmn_canonical[7] * x374;
+    const scalar_t x429 = S_ikmn_canonical[12] * x399 + S_ikmn_canonical[25] * x400 + S_ikmn_canonical[26] * x401 +
+                          S_ikmn_canonical[31] * x396 + S_ikmn_canonical[32] * x397 + S_ikmn_canonical[9] * x398;
+    const scalar_t x430 = S_ikmn_canonical[18] * x64 + S_ikmn_canonical[21] * x69 + S_ikmn_canonical[33] * x76 +
+                          S_ikmn_canonical[36] * x81 + S_ikmn_canonical[40] * x53 + S_ikmn_canonical[41] * x57;
+    const scalar_t x431 = S_ikmn_canonical[16] * x96 + S_ikmn_canonical[22] * x103 + S_ikmn_canonical[31] * x106 +
+                          S_ikmn_canonical[37] * x87 + S_ikmn_canonical[40] * x92 + S_ikmn_canonical[43] * x99;
+    const scalar_t x432 = S_ikmn_canonical[17] * x121 + S_ikmn_canonical[20] * x123 + S_ikmn_canonical[32] * x110 +
+                          S_ikmn_canonical[35] * x112 + S_ikmn_canonical[41] * x116 + S_ikmn_canonical[43] * x118;
+    const scalar_t x433 = S_ikmn_canonical[16] * x184 + S_ikmn_canonical[22] * x193 + S_ikmn_canonical[31] * x197 +
+                          S_ikmn_canonical[37] * x176 + S_ikmn_canonical[40] * x180 + S_ikmn_canonical[43] * x188;
+    const scalar_t x434 = S_ikmn_canonical[17] * x207 + S_ikmn_canonical[20] * x209 + S_ikmn_canonical[32] * x200 +
+                          S_ikmn_canonical[35] * x202 + S_ikmn_canonical[41] * x203 + S_ikmn_canonical[43] * x205;
+    const scalar_t x435 = S_ikmn_canonical[18] * x241 + S_ikmn_canonical[21] * x245 + S_ikmn_canonical[33] * x246 +
+                          S_ikmn_canonical[36] * x250 + S_ikmn_canonical[40] * x237 + S_ikmn_canonical[41] * x240;
+    const scalar_t x436 = S_ikmn_canonical[17] * x263 + S_ikmn_canonical[20] * x265 + S_ikmn_canonical[32] * x254 +
+                          S_ikmn_canonical[35] * x256 + S_ikmn_canonical[41] * x259 + S_ikmn_canonical[43] * x260;
+    const scalar_t x437 = S_ikmn_canonical[17] * x299 + S_ikmn_canonical[20] * x301 + S_ikmn_canonical[32] * x293 +
+                          S_ikmn_canonical[35] * x295 + S_ikmn_canonical[41] * x296 + S_ikmn_canonical[43] * x297;
+    const scalar_t x438 = S_ikmn_canonical[18] * x331 + S_ikmn_canonical[21] * x332 + S_ikmn_canonical[33] * x335 +
+                          S_ikmn_canonical[36] * x336 + S_ikmn_canonical[40] * x326 + S_ikmn_canonical[41] * x328;
+    const scalar_t x439 = S_ikmn_canonical[16] * x341 + S_ikmn_canonical[22] * x343 + S_ikmn_canonical[31] * x345 +
+                          S_ikmn_canonical[37] * x338 + S_ikmn_canonical[40] * x339 + S_ikmn_canonical[43] * x342;
+    const scalar_t x440 = S_ikmn_canonical[16] * x374 + S_ikmn_canonical[22] * x376 + S_ikmn_canonical[31] * x378 +
+                          S_ikmn_canonical[37] * x370 + S_ikmn_canonical[40] * x372 + S_ikmn_canonical[43] * x375;
+    const scalar_t x441 = S_ikmn_canonical[18] * x398 + S_ikmn_canonical[21] * x399 + S_ikmn_canonical[33] * x400 +
+                          S_ikmn_canonical[36] * x401 + S_ikmn_canonical[40] * x396 + S_ikmn_canonical[41] * x397;
+    outx[0] = S_ikmn_canonical[0] * x8 + S_ikmn_canonical[10] * x16 + S_ikmn_canonical[14] * x20 + S_ikmn_canonical[15] * x29 +
+              S_ikmn_canonical[19] * x33 + S_ikmn_canonical[23] * x36 + S_ikmn_canonical[3] * x40 + S_ikmn_canonical[5] * x43 +
+              S_ikmn_canonical[6] * x46 + x107 + x124 + x82;
+    outx[1] = S_ikmn_canonical[0] * x133 + S_ikmn_canonical[10] * x141 + S_ikmn_canonical[14] * x145 +
+              S_ikmn_canonical[15] * x154 + S_ikmn_canonical[19] * x158 + S_ikmn_canonical[23] * x161 +
+              S_ikmn_canonical[3] * x165 + S_ikmn_canonical[5] * x168 + S_ikmn_canonical[6] * x171 + x198 + x210 + x82;
+    outx[2] = S_ikmn_canonical[0] * x214 + S_ikmn_canonical[10] * x220 + S_ikmn_canonical[14] * x223 +
+              S_ikmn_canonical[15] * x227 + S_ikmn_canonical[19] * x228 + S_ikmn_canonical[23] * x230 +
+              S_ikmn_canonical[3] * x231 + S_ikmn_canonical[5] * x233 + S_ikmn_canonical[6] * x235 + x198 + x251 + x266;
+    outx[3] = S_ikmn_canonical[0] * x270 + S_ikmn_canonical[10] * x276 + S_ikmn_canonical[14] * x279 +
+              S_ikmn_canonical[15] * x283 + S_ikmn_canonical[19] * x284 + S_ikmn_canonical[23] * x286 +
+              S_ikmn_canonical[3] * x287 + S_ikmn_canonical[5] * x289 + S_ikmn_canonical[6] * x291 + x107 + x251 + x302;
+    outx[4] = S_ikmn_canonical[0] * x307 + S_ikmn_canonical[10] * x310 + S_ikmn_canonical[14] * x311 +
+              S_ikmn_canonical[15] * x316 + S_ikmn_canonical[19] * x318 + S_ikmn_canonical[23] * x320 +
+              S_ikmn_canonical[3] * x322 + S_ikmn_canonical[5] * x324 + S_ikmn_canonical[6] * x325 + x124 + x337 + x346;
+    outx[5] = S_ikmn_canonical[0] * x351 + S_ikmn_canonical[10] * x354 + S_ikmn_canonical[14] * x355 +
+              S_ikmn_canonical[15] * x360 + S_ikmn_canonical[19] * x362 + S_ikmn_canonical[23] * x364 +
+              S_ikmn_canonical[3] * x366 + S_ikmn_canonical[5] * x368 + S_ikmn_canonical[6] * x369 + x210 + x337 + x379;
+    outx[6] = S_ikmn_canonical[0] * x382 + S_ikmn_canonical[10] * x385 + S_ikmn_canonical[14] * x386 +
+              S_ikmn_canonical[15] * x389 + S_ikmn_canonical[19] * x390 + S_ikmn_canonical[23] * x391 +
+              S_ikmn_canonical[3] * x392 + S_ikmn_canonical[5] * x393 + S_ikmn_canonical[6] * x394 + x266 + x379 + x402;
+    outx[7] = S_ikmn_canonical[0] * x405 + S_ikmn_canonical[10] * x408 + S_ikmn_canonical[14] * x409 +
+              S_ikmn_canonical[15] * x412 + S_ikmn_canonical[19] * x413 + S_ikmn_canonical[23] * x414 +
+              S_ikmn_canonical[3] * x415 + S_ikmn_canonical[5] * x416 + S_ikmn_canonical[6] * x417 + x302 + x346 + x402;
+    outy[0] = S_ikmn_canonical[10] * x40 + S_ikmn_canonical[14] * x43 + S_ikmn_canonical[24] * x46 + S_ikmn_canonical[27] * x16 +
+              S_ikmn_canonical[29] * x20 + S_ikmn_canonical[30] * x29 + S_ikmn_canonical[34] * x33 + S_ikmn_canonical[38] * x36 +
+              S_ikmn_canonical[6] * x8 + x418 + x419 + x420;
+    outy[1] = S_ikmn_canonical[10] * x165 + S_ikmn_canonical[14] * x168 + S_ikmn_canonical[24] * x171 +
+              S_ikmn_canonical[27] * x141 + S_ikmn_canonical[29] * x145 + S_ikmn_canonical[30] * x154 +
+              S_ikmn_canonical[34] * x158 + S_ikmn_canonical[38] * x161 + S_ikmn_canonical[6] * x133 + x418 + x421 + x422;
+    outy[2] = S_ikmn_canonical[10] * x231 + S_ikmn_canonical[14] * x233 + S_ikmn_canonical[24] * x235 +
+              S_ikmn_canonical[27] * x220 + S_ikmn_canonical[29] * x223 + S_ikmn_canonical[30] * x227 +
+              S_ikmn_canonical[34] * x228 + S_ikmn_canonical[38] * x230 + S_ikmn_canonical[6] * x214 + x421 + x423 + x424;
+    outy[3] = S_ikmn_canonical[10] * x287 + S_ikmn_canonical[14] * x289 + S_ikmn_canonical[24] * x291 +
+              S_ikmn_canonical[27] * x276 + S_ikmn_canonical[29] * x279 + S_ikmn_canonical[30] * x283 +
+              S_ikmn_canonical[34] * x284 + S_ikmn_canonical[38] * x286 + S_ikmn_canonical[6] * x270 + x419 + x423 + x425;
+    outy[4] = S_ikmn_canonical[10] * x322 + S_ikmn_canonical[14] * x324 + S_ikmn_canonical[24] * x325 +
+              S_ikmn_canonical[27] * x310 + S_ikmn_canonical[29] * x311 + S_ikmn_canonical[30] * x316 +
+              S_ikmn_canonical[34] * x318 + S_ikmn_canonical[38] * x320 + S_ikmn_canonical[6] * x307 + x420 + x426 + x427;
+    outy[5] = S_ikmn_canonical[10] * x366 + S_ikmn_canonical[14] * x368 + S_ikmn_canonical[24] * x369 +
+              S_ikmn_canonical[27] * x354 + S_ikmn_canonical[29] * x355 + S_ikmn_canonical[30] * x360 +
+              S_ikmn_canonical[34] * x362 + S_ikmn_canonical[38] * x364 + S_ikmn_canonical[6] * x351 + x422 + x426 + x428;
+    outy[6] = S_ikmn_canonical[10] * x392 + S_ikmn_canonical[14] * x393 + S_ikmn_canonical[24] * x394 +
+              S_ikmn_canonical[27] * x385 + S_ikmn_canonical[29] * x386 + S_ikmn_canonical[30] * x389 +
+              S_ikmn_canonical[34] * x390 + S_ikmn_canonical[38] * x391 + S_ikmn_canonical[6] * x382 + x424 + x428 + x429;
+    outy[7] = S_ikmn_canonical[10] * x415 + S_ikmn_canonical[14] * x416 + S_ikmn_canonical[24] * x417 +
+              S_ikmn_canonical[27] * x408 + S_ikmn_canonical[29] * x409 + S_ikmn_canonical[30] * x412 +
+              S_ikmn_canonical[34] * x413 + S_ikmn_canonical[38] * x414 + S_ikmn_canonical[6] * x405 + x425 + x427 + x429;
+    outz[0] = S_ikmn_canonical[15] * x8 + S_ikmn_canonical[19] * x40 + S_ikmn_canonical[23] * x43 + S_ikmn_canonical[30] * x46 +
+              S_ikmn_canonical[34] * x16 + S_ikmn_canonical[38] * x20 + S_ikmn_canonical[39] * x29 + S_ikmn_canonical[42] * x33 +
+              S_ikmn_canonical[44] * x36 + x430 + x431 + x432;
+    outz[1] = S_ikmn_canonical[15] * x133 + S_ikmn_canonical[19] * x165 + S_ikmn_canonical[23] * x168 +
+              S_ikmn_canonical[30] * x171 + S_ikmn_canonical[34] * x141 + S_ikmn_canonical[38] * x145 +
+              S_ikmn_canonical[39] * x154 + S_ikmn_canonical[42] * x158 + S_ikmn_canonical[44] * x161 + x430 + x433 + x434;
+    outz[2] = S_ikmn_canonical[15] * x214 + S_ikmn_canonical[19] * x231 + S_ikmn_canonical[23] * x233 +
+              S_ikmn_canonical[30] * x235 + S_ikmn_canonical[34] * x220 + S_ikmn_canonical[38] * x223 +
+              S_ikmn_canonical[39] * x227 + S_ikmn_canonical[42] * x228 + S_ikmn_canonical[44] * x230 + x433 + x435 + x436;
+    outz[3] = S_ikmn_canonical[15] * x270 + S_ikmn_canonical[19] * x287 + S_ikmn_canonical[23] * x289 +
+              S_ikmn_canonical[30] * x291 + S_ikmn_canonical[34] * x276 + S_ikmn_canonical[38] * x279 +
+              S_ikmn_canonical[39] * x283 + S_ikmn_canonical[42] * x284 + S_ikmn_canonical[44] * x286 + x431 + x435 + x437;
+    outz[4] = S_ikmn_canonical[15] * x307 + S_ikmn_canonical[19] * x322 + S_ikmn_canonical[23] * x324 +
+              S_ikmn_canonical[30] * x325 + S_ikmn_canonical[34] * x310 + S_ikmn_canonical[38] * x311 +
+              S_ikmn_canonical[39] * x316 + S_ikmn_canonical[42] * x318 + S_ikmn_canonical[44] * x320 + x432 + x438 + x439;
+    outz[5] = S_ikmn_canonical[15] * x351 + S_ikmn_canonical[19] * x366 + S_ikmn_canonical[23] * x368 +
+              S_ikmn_canonical[30] * x369 + S_ikmn_canonical[34] * x354 + S_ikmn_canonical[38] * x355 +
+              S_ikmn_canonical[39] * x360 + S_ikmn_canonical[42] * x362 + S_ikmn_canonical[44] * x364 + x434 + x438 + x440;
+    outz[6] = S_ikmn_canonical[15] * x382 + S_ikmn_canonical[19] * x392 + S_ikmn_canonical[23] * x393 +
+              S_ikmn_canonical[30] * x394 + S_ikmn_canonical[34] * x385 + S_ikmn_canonical[38] * x386 +
+              S_ikmn_canonical[39] * x389 + S_ikmn_canonical[42] * x390 + S_ikmn_canonical[44] * x391 + x436 + x440 + x441;
+    outz[7] = S_ikmn_canonical[15] * x405 + S_ikmn_canonical[19] * x415 + S_ikmn_canonical[23] * x416 +
+              S_ikmn_canonical[30] * x417 + S_ikmn_canonical[34] * x408 + S_ikmn_canonical[38] * x409 +
+              S_ikmn_canonical[39] * x412 + S_ikmn_canonical[42] * x413 + S_ikmn_canonical[44] * x414 + x437 + x439 + x441;
 }
 
 static SFEM_INLINE void hex8_ref_inc_grad(const scalar_t                      qx,
