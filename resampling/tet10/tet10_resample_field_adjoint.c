@@ -400,16 +400,6 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
         const real_t measure = tet10_measure_real_t(x, y, z, tet_qx[q], tet_qy[q], tet_qz[q]);
         const real_t dV      = measure * tet_qw[q];
 
-        // if (dV < 0) {
-        //     fprintf(stderr, "warning: negative volume %g!\n", dV);
-        //     continue;
-        // }
-
-        // if(wf_tet10[0] <  0) {
-        //     fprintf(stderr, "warning: negative wf_tet10[0] %g!\n", wf_tet10[0]);
-        //     continue;
-        // }
-
         const real_t It = (tet10_f[0] * wf_tet10[0] +  //
                            tet10_f[1] * wf_tet10[1] +  //
                            tet10_f[2] * wf_tet10[2] +  //
@@ -420,11 +410,6 @@ hex8_to_isoparametric_tet10_resample_tet_adjoint(const real_t* const SFEM_RESTRI
                            tet10_f[7] * wf_tet10[7] +  //
                            tet10_f[8] * wf_tet10[8] +  //
                            tet10_f[9] * wf_tet10[9]);  //
-
-        // if (It < -1e-9) {
-        //     fprintf(stderr, "warning: negative integral %g!\n", It);
-        //     continue;
-        // }
 
         const real_t d0 = It * hex8_f[0] * dV;
         const real_t d1 = It * hex8_f[1] * dV;

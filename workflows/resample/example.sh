@@ -27,10 +27,10 @@ field=field.raw
 
 mesh=mesh
 
-refine torus_cut torus2
+refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=torus2
+mesh=torus3
 # mesh=impeller_tet4
 
 out=resampled
@@ -64,7 +64,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 125
+sdf_test.py $sdf 200
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')

@@ -197,19 +197,19 @@ hex8_to_isoparametric_tet10_resample_field_adjoint(const ptrdiff_t              
  * @param data
  * @return int
  */
-int                                                                                                              //
-hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                                                           const ptrdiff_t                      end_element,     //
-                                                           const ptrdiff_t                      nnodes,          //
-                                                           const idx_t** const SFEM_RESTRICT    elems,           //
-                                                           const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                           const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                                                           const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                                                           const geom_t* const SFEM_RESTRICT    origin,          //
-                                                           const geom_t* const SFEM_RESTRICT    delta,           //
-                                                           const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
-                                                           real_t* const SFEM_RESTRICT          data,            //
-                                                           const mini_tet_parameters_t          mini_tet_parameters);
+int                                                                                                               //
+hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                            const ptrdiff_t                      end_element,     //
+                                                            const ptrdiff_t                      nnodes,          //
+                                                            const idx_t** const SFEM_RESTRICT    elems,           //
+                                                            const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                            const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                            const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                            const geom_t* const SFEM_RESTRICT    origin,          //
+                                                            const geom_t* const SFEM_RESTRICT    delta,           //
+                                                            const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                            real_t* const SFEM_RESTRICT          data,            //
+                                                            const mini_tet_parameters_t          mini_tet_parameters);
 
 /**
  * @brief Resamples a field from a 10-node tetrahedral mesh back to a structured hexahedral grid with adaptive refinement.

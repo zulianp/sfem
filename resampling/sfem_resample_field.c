@@ -1494,7 +1494,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
 
     const real_t alpha_th = 2.0;
 
-#define TEST_REFINE_ADJOINT 0
+#define TEST_REFINE_ADJOINT 3
 #if TEST_REFINE_ADJOINT == 0
 
     hex8_to_isoparametric_tet10_resample_field_adjoint(0,                //
@@ -1526,7 +1526,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                                                                      alpha_th,                             //
                                                                      data);                                //
 
-#else
+#elif TEST_REFINE_ADJOINT == 2
 
     hex8_to_isoparametric_tet10_resample_field_refine_adjoint(0,                //
                                                               mesh->nelements,  //
@@ -1540,6 +1540,28 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                                                               weighted_field,   //
                                                               alpha_th,         //
                                                               data);            //
+
+#else
+
+    mini_tet_parameters_t mini_tet_parameters;
+
+    mini_tet_parameters.alpha_min_threshold = 1.0;
+    mini_tet_parameters.alpha_max_threshold = 8.0;
+    mini_tet_parameters.min_refinement_L    = 1;
+    mini_tet_parameters.max_refinement_L    = 2;
+
+    hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(0,                     //
+                                                                mesh->nelements,       //
+                                                                mesh->nnodes,          //
+                                                                mesh->elements,        //
+                                                                mesh->points,          //
+                                                                n,                     //
+                                                                stride,                //
+                                                                origin,                //
+                                                                delta,                 //
+                                                                weighted_field,        //
+                                                                data,                  //
+                                                                mini_tet_parameters);  //
 
 #endif
 

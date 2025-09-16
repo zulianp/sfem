@@ -20,7 +20,8 @@
 #include "tet10_resample_field_V2.h"
 #include "tet10_weno.h"
 
-hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
+real_t                                                                                  //
+hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,             //
                                                    const real_t const*   bc,            // transposition vector for category
                                                    const real_t const    J_phys[9],     // Jacobian matrix
                                                    const real_t const    J_ref[9],      // Jacobian matrix
@@ -47,9 +48,9 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
     real_t hex8_f[8];
     real_t tet10_f[10];
 
-    const real_t fx0 = (real_t)x[0];
-    const real_t fy0 = (real_t)y[0];
-    const real_t fz0 = (real_t)z[0];
+    const real_t fx0 = (real_t)x[0];  // Tetrahedron Origin X-coordinate
+    const real_t fy0 = (real_t)y[0];  // Tetrahedron Origin Y-coordinate
+    const real_t fz0 = (real_t)z[0];  // Tetrahedron Origin Z-coordinate
 
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
@@ -58,19 +59,14 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
         const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
         const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
 
-        // printf("Quadrature point in the reference space: xq_mref = %e, yq_mref = %e, zq_mref = %e\n", xq_mref, yq_mref,
-        // zq_mref);
-
-        const real_t xq_phys = J_phys[0] * xq_mref + J_phys[1] * yq_mref + J_phys[2] * zq_mref + fx0;  // Physical X-coordinate
-        const real_t yq_phys = J_phys[3] * xq_mref + J_phys[4] * yq_mref + J_phys[5] * zq_mref + fy0;  // Physical Y-coordinate
-        const real_t zq_phys = J_phys[6] * xq_mref + J_phys[7] * yq_mref + J_phys[8] * zq_mref + fz0;  // Physical Z-coordinate
-
         real_t g_qx;
         real_t g_qy;
         real_t g_qz;
 
-        tet10_transform_real_t(x, y, z, xq_phys, yq_phys, zq_phys, &g_qx, &g_qy, &g_qz);
-        tet10_Lagrange_basis(xq_phys, yq_phys, zq_phys, tet10_f);
+        tet10_transform_real_t(x, y, z, xq_mref, yq_mref, zq_mref, &g_qx, &g_qy, &g_qz);
+
+        // tet10_dual_basis_hrt(tet_qx[q], tet_qy[q], tet_qz[q], tet10_f);
+        tet10_Lagrange_basis(xq_mref, yq_mref, zq_mref, tet10_f);
 
         const real_t grid_x = (g_qx - ox) / dx;
         const real_t grid_y = (g_qy - oy) / dy;
@@ -81,14 +77,24 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
         const ptrdiff_t k = floor(grid_z);
 
         // Get the reminder [0, 1]
-        const real_t l_x = (grid_x - i);
-        const real_t l_y = (grid_y - j);
-        const real_t l_z = (grid_z - k);
+        real_t l_x = (grid_x - i);
+        real_t l_y = (grid_y - j);
+        real_t l_z = (grid_z - k);
+
+        assert(l_x >= -1e-8);
+        assert(l_y >= -1e-8);
+        assert(l_z >= -1e-8);
+
+        assert(l_x <= 1 + 1e-8);
+        assert(l_y <= 1 + 1e-8);
+        assert(l_z <= 1 + 1e-8);
 
         ptrdiff_t indices[10];
         hex_aa_8_collect_indices(stride, i, j, k, indices);
 
-        const real_t measure = tet10_measure_real_t(x, y, z, xq_phys, yq_phys, zq_phys);
+        hex_aa_8_eval_fun(l_x, l_y, l_z, hex8_f);
+
+        const real_t measure = tet10_measure_real_t(x, y, z, xq_mref, yq_mref, zq_mref);
         const real_t dV      = measure * tet_qw[quad_i] * inv_N_micro_tet;
 
         const real_t It = (tet10_f[0] * wf_tet10[0] +  //
@@ -119,6 +125,81 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
         data[indices[5]] += d5;
         data[indices[6]] += d6;
         data[indices[7]] += d7;
+
+        // // Mapping the quadrature point from the reference space to the mini-tetrahedron
+        // const real_t xq_mref = J_ref[0] * tet_qx[quad_i] + J_ref[1] * tet_qy[quad_i] + J_ref[2] * tet_qz[quad_i] + bc[0];
+        // const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
+        // const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
+
+        // // printf("Quadrature point in the reference space: xq_mref = %e, yq_mref = %e, zq_mref = %e, bc = [%e, %e, %e]\n",
+        // //        xq_mref,
+        // //        yq_mref,
+        // //        zq_mref,
+        // //        bc[0],
+        // //        bc[1],
+        // //        bc[2]);
+
+        // //        printf("Jacobian ref = [%e, %e, %e, %e, %e, %e, %e, %e, %e]\n",
+        // //        J_ref[0], J_ref[1], J_ref[2], J_ref[3], J_ref[4], J_ref[5], J_ref[6], J_ref[7], J_ref[8]);
+
+        // const real_t xq_phys = J_phys[0] * xq_mref + J_phys[1] * yq_mref + J_phys[2] * zq_mref + fx0;  // Physical X-coordinate
+        // const real_t yq_phys = J_phys[3] * xq_mref + J_phys[4] * yq_mref + J_phys[5] * zq_mref + fy0;  // Physical Y-coordinate
+        // const real_t zq_phys = J_phys[6] * xq_mref + J_phys[7] * yq_mref + J_phys[8] * zq_mref + fz0;  // Physical Z-coordinate
+
+        // real_t g_qx;
+        // real_t g_qy;
+        // real_t g_qz;
+
+        // tet10_transform_real_t(x, y, z, xq_mref, yq_mref, zq_mref, &g_qx, &g_qy, &g_qz);
+        // tet10_Lagrange_basis(xq_mref, yq_mref, zq_mref, tet10_f);
+
+        // const real_t grid_x = (g_qx - ox) / dx;
+        // const real_t grid_y = (g_qy - oy) / dy;
+        // const real_t grid_z = (g_qz - oz) / dz;
+
+        // const ptrdiff_t i = floor(grid_x);
+        // const ptrdiff_t j = floor(grid_y);
+        // const ptrdiff_t k = floor(grid_z);
+
+        // // Get the reminder [0, 1]
+        // const real_t l_x = (grid_x - i);
+        // const real_t l_y = (grid_y - j);
+        // const real_t l_z = (grid_z - k);
+
+        // ptrdiff_t indices[10];
+        // hex_aa_8_collect_indices(stride, i, j, k, indices);
+
+        // const real_t measure = tet10_measure_real_t(x, y, z, xq_mref, yq_mref, zq_mref);
+        // const real_t dV      = measure * tet_qw[quad_i] * inv_N_micro_tet;
+
+        // const real_t It = (tet10_f[0] * wf_tet10[0] +  //
+        //                    tet10_f[1] * wf_tet10[1] +  //
+        //                    tet10_f[2] * wf_tet10[2] +  //
+        //                    tet10_f[3] * wf_tet10[3] +  //
+        //                    tet10_f[4] * wf_tet10[4] +  //
+        //                    tet10_f[5] * wf_tet10[5] +  //
+        //                    tet10_f[6] * wf_tet10[6] +  //
+        //                    tet10_f[7] * wf_tet10[7] +  //
+        //                    tet10_f[8] * wf_tet10[8] +  //
+        //                    tet10_f[9] * wf_tet10[9]);  //
+
+        // const real_t d0 = It * hex8_f[0] * dV;
+        // const real_t d1 = It * hex8_f[1] * dV;
+        // const real_t d2 = It * hex8_f[2] * dV;
+        // const real_t d3 = It * hex8_f[3] * dV;
+        // const real_t d4 = It * hex8_f[4] * dV;
+        // const real_t d5 = It * hex8_f[5] * dV;
+        // const real_t d6 = It * hex8_f[6] * dV;
+        // const real_t d7 = It * hex8_f[7] * dV;
+
+        // data[indices[0]] += d0;
+        // data[indices[1]] += d1;
+        // data[indices[2]] += d2;
+        // data[indices[3]] += d3;
+        // data[indices[4]] += d4;
+        // data[indices[5]] += d5;
+        // data[indices[6]] += d6;
+        // data[indices[7]] += d7;
     }
 }
 
@@ -138,19 +219,19 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,
  * @param data
  * @return int
  */
-int                                                                                                              //
-hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t                      start_element,   // Mesh
-                                                           const ptrdiff_t                      end_element,     //
-                                                           const ptrdiff_t                      nnodes,          //
-                                                           const idx_t** const SFEM_RESTRICT    elems,           //
-                                                           const geom_t** const SFEM_RESTRICT   xyz,             //
-                                                           const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
-                                                           const ptrdiff_t* const SFEM_RESTRICT stride,          //
-                                                           const geom_t* const SFEM_RESTRICT    origin,          //
-                                                           const geom_t* const SFEM_RESTRICT    delta,           //
-                                                           const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
-                                                           real_t* const SFEM_RESTRICT          data,            //
-                                                           const mini_tet_parameters_t          mini_tet_parameters) {    // Output
+int                                                                                                               //
+hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t                      start_element,   // Mesh
+                                                            const ptrdiff_t                      end_element,     //
+                                                            const ptrdiff_t                      nnodes,          //
+                                                            const idx_t** const SFEM_RESTRICT    elems,           //
+                                                            const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                            const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                            const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                            const geom_t* const SFEM_RESTRICT    origin,          //
+                                                            const geom_t* const SFEM_RESTRICT    delta,           //
+                                                            const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                            real_t* const SFEM_RESTRICT          data,            //
+                                                            const mini_tet_parameters_t          mini_tet_parameters) {    // Output
     //
     PRINT_CURRENT_FUNCTION;
 
@@ -220,6 +301,22 @@ hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t      
             z[v] = (geom_t)(xyz[2][ev[v]]);  // z-coordinates
         }
 
+        const real_t det_J_phys =               //
+                fabs(make_Jacobian_matrix_tet(  //
+                        x[0],                   // Tetrahedron vertices X-coordinates
+                        x[1],                   //
+                        x[2],                   //
+                        x[3],                   //
+                        y[0],                   // Tetrahedron vertices Y-coordinates
+                        y[1],                   //
+                        y[2],                   //
+                        y[3],                   //
+                        z[0],                   // Tetrahedron vertices Z-coordinates
+                        z[1],                   //
+                        z[2],                   //
+                        z[3],                   // Vertex 3 coordinates
+                        J_phy));                // Output Jacobian matrix
+
         // memset(element_field, 0, 10 * sizeof(real_t));
 
         // set to zero the element field
@@ -246,16 +343,46 @@ hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t      
                                                        &vertex_b,      //
                                                        edges_length);  //
 
-        const real_t alpha = max_edge_len / dx;
+        const real_t alpha = max_edge_len / d_min;
 
-        const int    L = alpha_to_hyteg_level(alpha,                                    //
+        const int L = alpha_to_hyteg_level(alpha,                                    //
                                            mini_tet_parameters.alpha_min_threshold,  //
                                            mini_tet_parameters.alpha_max_threshold,  //
                                            mini_tet_parameters.min_refinement_L,     //
                                            mini_tet_parameters.max_refinement_L);    //
+
+        // printf("Element %td: max_edge_len = %e, d_min = %e, alpha = %e, L = %d, J = %e\n",
+        //        element_i,
+        //        max_edge_len,
+        //        d_min,
+        //        alpha,
+        //        L,
+        //        det_J_phys);
+
         const real_t h = 1.0 / (real_t)(L);  // Size of the mini-tetrahedra in the reference space
 
         real_t theta_volume_main = 0.0;  // Volume of the HyTeg tetrahedron
+
+        // Calculate the Jacobian matrices for the 6 categories of tetrahedra for the reference element
+        for (int cat_i = 0; cat_i < 6; cat_i++) {
+            // Calculate the Jacobian matrix for the current category
+            jacobian_matrix_real_t(cat_i,               // Category of the tetrahedron
+                                   x0_unit,             //
+                                   y0_unit,             //
+                                   z0_unit,             //
+                                   x1_unit,             //
+                                   y1_unit,             //
+                                   z1_unit,             //
+                                   x2_unit,             //
+                                   y2_unit,             //
+                                   z2_unit,             //
+                                   x3_unit,             //
+                                   y3_unit,             //
+                                   z3_unit,             // Vertex 3 coordinates
+                                   (real_t)(L),         // Refinement level
+                                   J_vec_mini[cat_i]);  // Output Jacobian matrix
+
+        }  // END of for (int cat_i = 0; cat_i < 6; cat_i++)
 
         for (int k = 0; k < L + 1; k++) {  // Loop over the refinement levels
 
@@ -269,12 +396,75 @@ hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t      
                                           (real_t)(i)*h,   //
                                           (real_t)(k)*h};  //
 
-                    { const unsigned int cat0 = 0; }
+                    {  // BEGIN: Cat 0
+                        const unsigned int cat0 = 0;
 
-                    for (int cat_i = 1; cat_i < 5; cat_i++) {
+                        hex8_to_isoparametric_tet10_local_adjoint_category(  //
+                                L,                                           //
+                                b0,                                          // Translation vector for category 0
+                                J_phy,                                       // Jacobian matrix
+                                J_vec_mini[cat0],                            // Reference Jacobian matrix
+                                det_J_phys,                                  // Determinant of the Jacobian matrix
+                                x,                                           // Tetrahedron vertices X-coordinates
+                                y,                                           //
+                                z,                                           // Tetrahedron vertices Z-coordinates
+                                ox,                                          // Origin of the grid
+                                oy,                                          //
+                                oz,                                          //
+                                dx,                                          // Spacing of the grid
+                                dy,                                          //
+                                dz,                                          //
+                                wf_tet10,                                    // Weighted field at the vertices
+                                stride,                                      // Stride
+                                data);                                       // Size of the grid
                     }
 
-                    { const unsigned int cat5 = 5; }
+                    if (j >= 1) {
+                        for (int cat_i = 1; cat_i < 5; cat_i++) {
+                            hex8_to_isoparametric_tet10_local_adjoint_category(  //
+                                    L,                                           //
+                                    b0,                                          // Translation vector for category 0
+                                    J_phy,                                       // Jacobian matrix
+                                    J_vec_mini[cat_i],                           // Reference Jacobian matrix
+                                    det_J_phys,                                  // Determinant of the Jacobian matrix
+                                    x,                                           // Tetrahedron vertices X-coordinates
+                                    y,                                           //
+                                    z,                                           // Tetrahedron vertices Z-coordinates
+                                    ox,                                          // Origin of the grid
+                                    oy,                                          //
+                                    oz,                                          //
+                                    dx,                                          // Spacing of the grid
+                                    dy,                                          //
+                                    dz,                                          //
+                                    wf_tet10,                                    // Weighted field at the vertices
+                                    stride,                                      // Stride
+                                    data);                                       // Size of the grid
+                        }
+                    }
+
+                    {
+                        const unsigned int cat5 = 5;
+                        if (j >= 1 && i >= 1) {
+                            hex8_to_isoparametric_tet10_local_adjoint_category(  //
+                                    L,                                           //
+                                    b0,                                          // Translation vector for category 5
+                                    J_phy,                                       // Jacobian matrix
+                                    J_vec_mini[cat5],                            // Reference Jacobian matrix
+                                    det_J_phys,                                  // Determinant of the Jacobian matrix
+                                    x,                                           // Tetrahedron vertices X-coordinates
+                                    y,                                           //
+                                    z,                                           // Tetrahedron vertices Z-coordinates
+                                    ox,                                          // Origin of the grid
+                                    oy,                                          //
+                                    oz,                                          //
+                                    dx,                                          // Spacing of the grid
+                                    dy,                                          //
+                                    dz,                                          //
+                                    wf_tet10,                                    // Weighted field at the vertices
+                                    stride,                                      // Stride
+                                    data);                                       // Size of the grid
+                        }
+                    }
                 }
             }
         }
