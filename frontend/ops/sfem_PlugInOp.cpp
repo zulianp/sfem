@@ -57,6 +57,8 @@ namespace sfem {
                              const ptrdiff_t, const real_t *const, const real_t *const, const real_t *const,
                              const ptrdiff_t, real_t *const, real_t *const, real_t *const);
 
+    using update_fn = int (*)(const real_t *const);
+
     class PlugInOp::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -70,6 +72,7 @@ namespace sfem {
 
         std::map<enum ElemType, grad_fn>  grad;
         std::map<enum ElemType, apply_fn> apply;
+        std::map<enum ElemType, update_fn> update;
 
         Impl(const std::shared_ptr<FunctionSpace> &s, const std::string &n) : space(s), opname(n) {}
 
@@ -111,6 +114,16 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 apply[t] = reinterpret_cast<apply_fn>(fn);
+            }
+
+            if (!update.count(t)) {
+                std::string sym = opname + "_" + tag + "_update";
+                void       *fn  = dlsym(handle, sym.c_str());
+                if (!fn) {
+                    SFEM_ERROR("[PlugInOp] Missing symbol %s in plugin '%s'\n", sym.c_str(), opname.c_str());
+                    return SFEM_FAILURE;
+                }
+                update[t] = reinterpret_cast<update_fn>(fn);
             }
 
             return SFEM_SUCCESS;
@@ -163,6 +176,17 @@ namespace sfem {
     int PlugInOp::hessian_diag(const real_t *const, real_t *const) {
         SFEM_ERROR("PlugInOp::hessian_diag not implemented");
         return SFEM_FAILURE;
+    }
+    int PlugInOp::update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("PlugInOp::update");
+
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            auto block        = domain.block;
+            auto element_type = domain.element_type;
+            if(impl_->ensure_loaded(element_type) != SFEM_SUCCESS) return SFEM_FAILURE;
+            return impl_->update[element_type](x);
+        });
     }
 
     int PlugInOp::gradient(const real_t *const x, real_t *const out) {
