@@ -179,6 +179,23 @@ int neohookean_ogden_gradient_aos(const enum ElemType               element_type
                                                   &values[1],
                                                   &values[2]);
         }
+        case HEX8: {
+            return hex8_neohookean_ogden_gradient(nelements,
+                                                  1,
+                                                  nnodes,
+                                                  elements,
+                                                  points,
+                                                  mu,
+                                                  lambda,
+                                                  3,
+                                                  &u[0],
+                                                  &u[1],
+                                                  &u[2],
+                                                  3,
+                                                  &values[0],
+                                                  &values[1],
+                                                  &values[2]);
+        }
         default: {
             SFEM_ERROR("neohookean_ogden_gradient_aos not implemented for type %s\n", type_to_string(element_type));
         }
