@@ -7,6 +7,7 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
+#include "sfem_resample_field_adjoint_hyteg.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -207,7 +208,8 @@ hex8_to_isoparametric_tet10_resample_field_minitet_adjoint(const ptrdiff_t      
                                                            const geom_t* const SFEM_RESTRICT    origin,          //
                                                            const geom_t* const SFEM_RESTRICT    delta,           //
                                                            const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
-                                                           real_t* const SFEM_RESTRICT          data);
+                                                           real_t* const SFEM_RESTRICT          data,            //
+                                                           const mini_tet_parameters_t          mini_tet_parameters);
 
 /**
  * @brief Resamples a field from a 10-node tetrahedral mesh back to a structured hexahedral grid with adaptive refinement.

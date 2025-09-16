@@ -1079,7 +1079,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 //                     const real_t const* bc,          // transposition vector for category
 //                     const real_t        J_phys[9],   // Jacobian matrix
 //                     const real_t        J_ref[9],    // Jacobian matrix
-//                     const real_t        del_J_phys,  // Determinant of the Jacobian matrix
+//                     const real_t        det_J_phys,  // Determinant of the Jacobian matrix
 //                     const real_t        fx0,         // Tetrahedron vertices X-coordinates
 //                     const real_t        fy0,         // Tetrahedron vertices Y-coordinates
 //                     const real_t        fz0) {              // Tetrahedron vertices Z-coordinates)
@@ -1087,7 +1087,7 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
 //     const real_t N_micro_tet     = pow(L, 3);          // Number of micro-tetrahedra in the HyTeg tetrahedron
 //     const real_t inv_N_micro_tet = 1.0 / N_micro_tet;  // Inverse of the number of micro-tetrahedra
 
-//     const real_t theta_volume = del_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
+//     const real_t theta_volume = det_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
 
 //     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
@@ -1113,7 +1113,7 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
                                                  const real_t const*    bc,          // transposition vector for category
                                                  const real_t           J_phys[9],   // Jacobian matrix
                                                  const real_t           J_ref[9],    // Jacobian matrix
-                                                 const real_t           del_J_phys,  // Determinant of the Jacobian matrix
+                                                 const real_t           det_J_phys,  // Determinant of the Jacobian matrix
                                                  const real_t           fx0,         // Tetrahedron vertices X-coordinates
                                                  const real_t           fy0,         // Tetrahedron vertices Y-coordinates
                                                  const real_t           fz0,         // Tetrahedron vertices Z-coordinates
@@ -1136,7 +1136,7 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
     const real_t N_micro_tet     = pow((double)(L), 3.0);  // Number of micro-tetrahedra in the HyTeg tetrahedron
     const real_t inv_N_micro_tet = 1.0 / N_micro_tet;      // Inverse of the number of micro-tetrahedra
 
-    const real_t theta_volume = del_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
+    const real_t theta_volume = det_J_phys / ((real_t)(6.0));  // Volume of the mini-tetrahedron in the physical space
 
     real_t cumulated_dV = 0.0;  // Cumulative volume for debugging
 
@@ -1244,7 +1244,7 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         //            L,
         //            quad_i,
         //            (double)dV,
-        //            (double)del_J_phys,
+        //            (double)det_J_phys,
         //            (double)theta_volume,
         //            (double)inv_N_micro_tet);
         //     printf("Quad point (ref space): %e, %e, %e, weight: %e\n",
