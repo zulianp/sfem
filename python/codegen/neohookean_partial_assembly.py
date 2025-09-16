@@ -402,7 +402,7 @@ class PAKernelGenerator:
                     for n in range(dim):
                         acc = 0
                         for i in range(nfun):
-                            acc += hki[k,p] * Wimpn[i,m,p,n]
+                            acc += hki[k, i] * Wimpn[i, m, p, n]
                         Zpkmn_terms.append(acc)
         Zpkmn = Array(Zpkmn_terms, shape=(nfun, dim, dim, dim))
 
