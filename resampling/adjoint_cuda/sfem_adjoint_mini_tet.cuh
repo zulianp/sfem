@@ -582,34 +582,6 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
                                                     z3_n,
                                                     Jacobian_phys));
 
-    // if (element_i == 37078) {
-    //     printf("---- Debug info (sfem_adjoint_mini_tet_kernel_gpu) ----\n");
-    //     printf("Element %ld / %ld\n", element_i, end_element);
-    //     printf("Vertex indices: %ld, %ld, %ld, %ld\n", (long)ev[0], (long)ev[1], (long)ev[2], (long)ev[3]);
-    //     printf("Vertex coordinates:\n");
-    //     printf("V0: (%e, %e, %e), wf0: %e\n", (double)x0_n, (double)y0_n, (double)z0_n, (double)wf0);
-    //     printf("V1: (%e, %e, %e), wf1: %e\n", (double)x1_n, (double)y1_n, (double)z1_n, (double)wf1);
-    //     printf("V2: (%e, %e, %e), wf2: %e\n", (double)x2_n, (double)y2_n, (double)z2_n, (double)wf2);
-    //     printf("V3: (%e, %e, %e), wf3: %e\n", (double)x3_n, (double)y3_n, (double)z3_n, (double)wf3);
-    //     printf("det_J_phys = %e\n", (double)det_J_phys);
-    //     printf("Jacobian_phys[0] = (%e, %e, %e)\n",
-    //            (double)Jacobian_phys[0].x,
-    //            (double)Jacobian_phys[0].y,
-    //            (double)Jacobian_phys[0].z);
-    //     printf("Jacobian_phys[1] = (%e, %e, %e)\n",
-    //            (double)Jacobian_phys[1].x,
-    //            (double)Jacobian_phys[1].y,
-    //            (double)Jacobian_phys[1].z);
-    //     printf("Jacobian_phys[2] = (%e, %e, %e)\n",
-    //            (double)Jacobian_phys[2].x,
-    //            (double)Jacobian_phys[2].y,
-    //            (double)Jacobian_phys[2].z);
-    //     printf("Max edge length: %e (between vertices %d and %d)\n", (double)max_edges_length, vertex_a, vertex_b);
-
-    //     printf("---------------------------------------------------\n");
-    //     __trap();
-    // }
-
     main_tet_loop_gpu<FloatType>(L,                                          //
                                  Jacobian_phys,                              //
                                  det_J_phys,                                 //
@@ -631,6 +603,148 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
                                  n1,                                         //
                                  n2,                                         //
                                  data);                                      //
+}
+/////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////
+// Kernel to perform adjoint mini-tetrahedron resampling
+/////////////////////////////////////////////////////////////////////////////////
+template <typename FloatType>
+__global__ void  //
+sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster_size,
+                                         const ptrdiff_t             start_element,        // Mesh
+                                         const ptrdiff_t             end_element,          //
+                                         const ptrdiff_t             nnodes,               //
+                                         const elems_tet4_device     elems,                //
+                                         const xyz_tet4_device       xyz,                  //
+                                         const ptrdiff_t             n0,                   // SDF
+                                         const ptrdiff_t             n1,                   //
+                                         const ptrdiff_t             n2,                   //
+                                         const ptrdiff_t             stride0,              // Stride
+                                         const ptrdiff_t             stride1,              //
+                                         const ptrdiff_t             stride2,              //
+                                         const geom_t                origin0,              // Origin
+                                         const geom_t                origin1,              //
+                                         const geom_t                origin2,              //
+                                         const geom_t                dx,                   // Delta
+                                         const geom_t                dy,                   //
+                                         const geom_t                dz,                   //
+                                         const FloatType* const      weighted_field,       // Input weighted field
+                                         const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
+                                         FloatType* const            data) {                          //
+
+    const int warp_id       = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+    const int cluster_begin = start_element + warp_id;
+    const int cluster_end   = cluster_begin + tet_cluster_size;
+
+    for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
+        if (element_i >= end_element) break;  // Out of range
+
+        // printf("Processing element %ld / %ld\n", element_i, end_element);
+
+        const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+        const FloatType hexahedron_volume = dx * dy * dz;
+
+        // printf("Exaedre volume: %e\n", hexahedron_volume);
+
+        idx_t ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
+
+        ev[0] = elems.elems_v0[element_i];
+        ev[1] = elems.elems_v1[element_i];
+        ev[2] = elems.elems_v2[element_i];
+        ev[3] = elems.elems_v3[element_i];
+
+        // Read the coordinates of the vertices of the tetrahedron
+        // In the physical space
+        const FloatType x0_n = FloatType(xyz.x[ev[0]]);
+        const FloatType x1_n = FloatType(xyz.x[ev[1]]);
+        const FloatType x2_n = FloatType(xyz.x[ev[2]]);
+        const FloatType x3_n = FloatType(xyz.x[ev[3]]);
+
+        const FloatType y0_n = FloatType(xyz.y[ev[0]]);
+        const FloatType y1_n = FloatType(xyz.y[ev[1]]);
+        const FloatType y2_n = FloatType(xyz.y[ev[2]]);
+        const FloatType y3_n = FloatType(xyz.y[ev[3]]);
+
+        const FloatType z0_n = FloatType(xyz.z[ev[0]]);
+        const FloatType z1_n = FloatType(xyz.z[ev[1]]);
+        const FloatType z2_n = FloatType(xyz.z[ev[2]]);
+        const FloatType z3_n = FloatType(xyz.z[ev[3]]);
+
+        const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+        const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+        const FloatType wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+        const FloatType wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+        FloatType edges_length[6];
+
+        int vertex_a = -1;
+        int vertex_b = -1;
+
+        const FloatType max_edges_length =              //
+                tet_edge_max_length_gpu(x0_n,           //
+                                        y0_n,           //
+                                        z0_n,           //
+                                        x1_n,           //
+                                        y1_n,           //
+                                        z1_n,           //
+                                        x2_n,           //
+                                        y2_n,           //
+                                        z2_n,           //
+                                        x3_n,           //
+                                        y3_n,           //
+                                        z3_n,           //
+                                        &vertex_a,      // Output
+                                        &vertex_b,      // Output
+                                        edges_length);  // Output
+
+        const FloatType alpha_tet = max_edges_length / d_min;
+
+        const int L = alpha_to_hyteg_level_gpu(alpha_tet,                                           //
+                                               FloatType(mini_tet_parameters.alpha_min_threshold),  //
+                                               FloatType(mini_tet_parameters.alpha_max_threshold),  //
+                                               mini_tet_parameters.min_refinement_L,                //
+                                               mini_tet_parameters.max_refinement_L);               //
+
+        typename Float3<FloatType>::type Jacobian_phys[3];
+
+        const FloatType det_J_phys = fast_abs(                 //
+                make_Jacobian_matrix_tet_gpu<FloatType>(x0_n,  //
+                                                        x1_n,  //
+                                                        x2_n,
+                                                        x3_n,
+                                                        y0_n,
+                                                        y1_n,
+                                                        y2_n,
+                                                        y3_n,
+                                                        z0_n,
+                                                        z1_n,
+                                                        z2_n,
+                                                        z3_n,
+                                                        Jacobian_phys));
+
+        main_tet_loop_gpu<FloatType>(L,                                          //
+                                     Jacobian_phys,                              //
+                                     det_J_phys,                                 //
+                                     Float3<FloatType>::make(x0_n, y0_n, z0_n),  //
+                                     wf0,                                        //
+                                     wf1,                                        //
+                                     wf2,                                        //
+                                     wf3,                                        //
+                                     origin0,                                    //
+                                     origin1,                                    //
+                                     origin2,                                    //
+                                     dx,                                         //
+                                     dy,                                         //
+                                     dz,                                         //
+                                     stride0,                                    //
+                                     stride1,                                    //
+                                     stride2,                                    //
+                                     n0,                                         //
+                                     n1,                                         //
+                                     n2,                                         //
+                                     data);                                      //
+    }
 }
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -679,5 +793,28 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
                                                   const real_t* const         weighted_field,       // Input weighted field
                                                   const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
                                                   real_t* const               data);
+
+extern "C" void                                                                                 //
+call_sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             start_element,        // Mesh
+                                              const ptrdiff_t             end_element,          //
+                                              const ptrdiff_t             nelements,            //
+                                              const ptrdiff_t             nnodes,               //
+                                              const idx_t** const         elems,                //
+                                              const geom_t** const        xyz,                  //
+                                              const ptrdiff_t             n0,                   // SDF
+                                              const ptrdiff_t             n1,                   //
+                                              const ptrdiff_t             n2,                   //
+                                              const ptrdiff_t             stride0,              // Stride
+                                              const ptrdiff_t             stride1,              //
+                                              const ptrdiff_t             stride2,              //
+                                              const geom_t                origin0,              // Origin
+                                              const geom_t                origin1,              //
+                                              const geom_t                origin2,              //
+                                              const geom_t                dx,                   // Delta
+                                              const geom_t                dy,                   //
+                                              const geom_t                dz,                   //
+                                              const real_t* const         weighted_field,       // Input weighted field
+                                              const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
+                                              real_t* const               data);                              //
 
 #endif  // __SFEM_ADJOINT_MINI_TET_CUH__

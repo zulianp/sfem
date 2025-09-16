@@ -304,32 +304,33 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
         const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
         const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
 
-        sfem_adjoint_mini_tet_shared_loc_kernel_gpu<real_t><<<blocks_per_grid,                       //
-                                                              threads_per_block,                     //
-                                                              sizeof(real_t) * shared_memory_size,   //
-                                                              cuda_stream>>>(shared_memory_size,     //
-                                                                             tets_per_block,         //
-                                                                             start_element,          // Mesh
-                                                                             end_element,            //
-                                                                             nnodes,                 //
-                                                                             elements_device,        //
-                                                                             xyz_device,             //
-                                                                             n0,                     // SDF
-                                                                             n1,                     //
-                                                                             n2,                     //
-                                                                             stride0,                // Stride
-                                                                             stride1,                //
-                                                                             stride2,                //
-                                                                             origin0,                // Origin
-                                                                             origin1,                //
-                                                                             origin2,                //
-                                                                             dx,                     // Delta
-                                                                             dy,                     //
-                                                                             dz,                     //
-                                                                             weighted_field_device,  // Input weighted field
-                                                                             mini_tet_parameters,    // Threshold for alpha
-                                                                             tet_properties_info,    //
-                                                                             data_device);           //
+        sfem_adjoint_mini_tet_shared_loc_kernel_gpu<real_t>  //
+                <<<blocks_per_grid,                          //
+                   threads_per_block,                        //
+                   sizeof(real_t) * shared_memory_size,      //
+                   cuda_stream>>>(shared_memory_size,        //
+                                  tets_per_block,            //
+                                  start_element,             // Mesh
+                                  end_element,               //
+                                  nnodes,                    //
+                                  elements_device,           //
+                                  xyz_device,                //
+                                  n0,                        // SDF
+                                  n1,                        //
+                                  n2,                        //
+                                  stride0,                   // Stride
+                                  stride1,                   //
+                                  stride2,                   //
+                                  origin0,                   // Origin
+                                  origin1,                   //
+                                  origin2,                   //
+                                  dx,                        // Delta
+                                  dy,                        //
+                                  dz,                        //
+                                  weighted_field_device,     // Input weighted field
+                                  mini_tet_parameters,       // Threshold for alpha
+                                  tet_properties_info,       //
+                                  data_device);              //
     }
 
     cudaEventRecord(stop_event, cuda_stream);
@@ -373,3 +374,5 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
     cudaFreeAsync(data_device, cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
 }
+
+//
