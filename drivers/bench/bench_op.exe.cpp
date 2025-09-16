@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
             }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
 
-            if(m->element_type() == TET4) {
+            if(m->element_type() == TET4 || m->element_type() == HEX8) {
                 ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
             }
         }

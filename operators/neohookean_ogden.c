@@ -231,10 +231,10 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
             return tet4_neohookean_ogden_hessian_partial_assembly(
                     nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
         }
-        // case HEX8: {
-        //     return hex8_neohookean_ogden_hessian_partial_assembly(
-        //             nelements, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
-        // }
+        case HEX8: {
+            return hex8_neohookean_ogden_hessian_partial_assembly(
+                    nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
+        }
         default: {
             SFEM_ERROR("neohookean_ogden_hessian_partial_assembly not implemented for type %s\n", type_to_string(element_type));
         }
@@ -260,10 +260,10 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
             return tet4_neohookean_ogden_partial_assembly_apply(
                     nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
-        // case HEX8: {
-        //     return hex8_neohookean_ogden_partial_assembly_apply(
-        //             nelements, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        // }
+        case HEX8: {
+            return hex8_neohookean_ogden_partial_assembly_apply(
+                    nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
         default: {
             SFEM_ERROR("neohookean_ogden_partial_assembly_apply not implemented for type %s\n", type_to_string(element_type));
         }
@@ -291,10 +291,10 @@ int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType      
             return tet4_neohookean_ogden_compressed_partial_assembly_apply(
                     nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
-        // case HEX8: {
-        //     return hex8_neohookean_ogden_compressed_partial_assembly_apply(
-        //             nelements, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        // }
+        case HEX8: {
+            return hex8_neohookean_ogden_compressed_partial_assembly_apply(
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
         default: {
             SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n", type_to_string(element_type));
         }
