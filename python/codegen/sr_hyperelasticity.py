@@ -413,14 +413,14 @@ class SRHyperelasticity:
         self.expression_table["Wimpn"] = Wimpn
         return Wimpn
 
-    def __compute_P_tXJinv_t(self):
+    def __compute_loperand(self):
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         P = self.expression_table["P"]
         dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
 
-        P_tXJinv_t = P.T * Jinv * dV
-        self.expression_table["P_tXJinv_t"] = P_tXJinv_t
-        return P_tXJinv_t
+        loperand = P * Jinv.T * dV
+        self.expression_table["loperand"] = loperand
+        return loperand
 
     def emit_gradient(self):
         self.__compute_dV()
@@ -429,7 +429,7 @@ class SRHyperelasticity:
         self.__compute_disp_grad()
         self.__compute_F()
         self.__compute_piola_stress()
-        self.__compute_P_tXJinv_t()
+        self.__compute_loperand()
 
         fe = self.fe
 
@@ -453,16 +453,15 @@ class SRHyperelasticity:
             f'\n'
         )
         
-        P_tXJinv_t = self.expression_table["P_tXJinv_t"]
+        loperand = self.expression_table["loperand"]
 
-        trefgrad = self.fe.tgrad(self.fe.quadrature_point())
-
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
         grads = []
 
         for d in range(0, fe.spatial_dim()):
             gradd = []
             for i in range(0, fe.n_nodes()):
-                gradd.append(inner(P_tXJinv_t, trefgrad[i]))
+                gradd.append(inner(loperand, refgrad[d * fe.n_nodes() + i]))
             grads.append(gradd)
         
         expr = []
