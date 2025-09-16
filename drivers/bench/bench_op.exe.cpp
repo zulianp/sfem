@@ -157,6 +157,7 @@ int main(int argc, char *argv[]) {
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }
 
+        std::cout << "#elements " << m->n_elements() << "\n";
         std::cout << "#nodes " << m->n_nodes() << "\n";
         std::cout << OpDesc_t::header();
         for (auto &op_desc : ops) {

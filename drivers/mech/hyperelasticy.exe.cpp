@@ -45,6 +45,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-4);
+    const real_t SFEM_NL_TOL = sfem::Env::read("SFEM_NL_TOL", 1e-10); 
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -101,7 +102,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            printf("gnorm = %g\n", gnorm);
+            printf("%d) gnorm = %g\n", i, gnorm);
+            if(gnorm < SFEM_NL_TOL) 
+                break;
+
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
     } else {
@@ -112,7 +116,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            printf("gnorm = %g\n", gnorm);
+            printf("%d) gnorm = %g\n", i, gnorm);
+            if(gnorm < SFEM_NL_TOL) 
+                break;
 
             blas->zeros(ndofs, increment->data());
             f->copy_constrained_dofs(rhs->data(), increment->data());
