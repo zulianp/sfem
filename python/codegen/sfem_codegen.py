@@ -228,8 +228,8 @@ def c_gen(expr, dump=False, optimizations="basic"):
     # code_string = f'//{cost}\n' + code_string
     # code_string = f'//TODO COST\n' + code_string
 
-    if dump:
-        console.print(
+    
+    op_cost =(
             """
 // mundane ops: %d divs: %d sqrts: %d 
 // total ops: %d
@@ -237,6 +237,9 @@ def c_gen(expr, dump=False, optimizations="basic"):
             % (tuple(opcounts) + (flopcount(opcounts),))
         )
 
+    code_string = op_cost + code_string
+
+    if dump:
         console.print(code_string)
 
     return code_string

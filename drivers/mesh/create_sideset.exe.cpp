@@ -258,35 +258,38 @@ int main(int argc, char *argv[]) {
         ///////////////////////////////////////////////////////////////////////////////
 
         // Build node-to-element CSR once, to walk boundary by shared nodes/edges
-        count_t *n2e_ptr = nullptr;
-        element_idx_t *n2e_el = nullptr;
-        const int nxe_full = elem_num_nodes(mesh->element_type());
+        count_t       *n2e_ptr  = nullptr;
+        element_idx_t *n2e_el   = nullptr;
+        const int      nxe_full = elem_num_nodes(mesh->element_type());
         if (build_n2e(n_elements, n_nodes, nxe_full, elements, &n2e_ptr, &n2e_el) != SFEM_SUCCESS) {
             SFEM_ERROR("Failed to build node->element incidence\n");
         }
 
         if (dim == 2) {
             for (ptrdiff_t q = 0; equeue[q] >= 0; q = (q + 1) % size_queue) {
-                const ptrdiff_t e = equeue[q];
+                const ptrdiff_t     e  = equeue[q];
                 const element_idx_t sp = surf_parents[e];
                 const int16_t       s  = surf_idx[e];
-                if (eselect[e]) { equeue[q] = SFEM_PTRDIFF_INVALID; continue; }
+                if (eselect[e]) {
+                    equeue[q] = SFEM_PTRDIFF_INVALID;
+                    continue;
+                }
 
                 // face normal
-                real_t n2[2];
-                const idx_t e_nodes[2] = {
-                    elements[lst[s * nnxs + 0]][sp],
-                    elements[lst[s * nnxs + 1]][sp]
-                };
+                real_t      n2[2];
+                const idx_t e_nodes[2] = {elements[lst[s * nnxs + 0]][sp], elements[lst[s * nnxs + 1]][sp]};
                 {
                     real_t p0[2], p1[2];
-                    for (int d = 0; d < 2; ++d) { p0[d] = points[d][e_nodes[0]]; p1[d] = points[d][e_nodes[1]]; }
+                    for (int d = 0; d < 2; ++d) {
+                        p0[d] = points[d][e_nodes[0]];
+                        p1[d] = points[d][e_nodes[1]];
+                    }
                     normal2(p0, p1, n2);
                 }
 
                 // candidate neighbors: faces on elements incident to either node
                 for (int vn = 0; vn < 2; ++vn) {
-                    const idx_t vtx = e_nodes[vn];
+                    const idx_t   vtx = e_nodes[vn];
                     const count_t beg = n2e_ptr[vtx];
                     const count_t end = n2e_ptr[vtx + 1];
                     for (count_t it = beg; it < end; ++it) {
@@ -294,18 +297,18 @@ int main(int argc, char *argv[]) {
                         for (ptrdiff_t k = emap_ptr[esp]; k < emap_ptr[esp + 1]; ++k) {
                             const element_idx_t ne = emap_idx[k];
                             if (ne == e || ne == SFEM_ELEMENT_IDX_INVALID || eselect[ne]) continue;
-                            const int16_t ns = surf_idx[ne];
-                            const idx_t n_nodes[2] = {
-                                elements[lst[ns * nnxs + 0]][esp],
-                                elements[lst[ns * nnxs + 1]][esp]
-                            };
+                            const int16_t ns         = surf_idx[ne];
+                            const idx_t   n_nodes[2] = {elements[lst[ns * nnxs + 0]][esp], elements[lst[ns * nnxs + 1]][esp]};
                             // share at least 1 node
-                            int shared = (n_nodes[0] == e_nodes[0]) || (n_nodes[0] == e_nodes[1]) ||
-                                         (n_nodes[1] == e_nodes[0]) || (n_nodes[1] == e_nodes[1]);
+                            int shared = (n_nodes[0] == e_nodes[0]) || (n_nodes[0] == e_nodes[1]) || (n_nodes[1] == e_nodes[0]) ||
+                                         (n_nodes[1] == e_nodes[1]);
                             if (!shared) continue;
                             // angle check
                             real_t p0a[2], p1a[2], na2[2];
-                            for (int d = 0; d < 2; ++d) { p0a[d] = points[d][n_nodes[0]]; p1a[d] = points[d][n_nodes[1]]; }
+                            for (int d = 0; d < 2; ++d) {
+                                p0a[d] = points[d][n_nodes[0]];
+                                p1a[d] = points[d][n_nodes[1]];
+                            }
                             normal2(p0a, p1a, na2);
                             const real_t cos_angle = fabs(n2[0] * na2[0] + n2[1] * na2[1]);
                             if (cos_angle > angle_threshold) {
@@ -320,18 +323,18 @@ int main(int argc, char *argv[]) {
             }
         } else {
             for (ptrdiff_t q = 0; equeue[q] >= 0; q = (q + 1) % size_queue) {
-                const ptrdiff_t e = equeue[q];
+                const ptrdiff_t     e  = equeue[q];
                 const element_idx_t sp = surf_parents[e];
                 const int16_t       s  = surf_idx[e];
-                if (eselect[e]) { equeue[q] = SFEM_PTRDIFF_INVALID; continue; }
+                if (eselect[e]) {
+                    equeue[q] = SFEM_PTRDIFF_INVALID;
+                    continue;
+                }
 
                 // face normal
-                real_t n3[3];
+                real_t      n3[3];
                 const idx_t e_nodes[3] = {
-                    elements[lst[s * nnxs + 0]][sp],
-                    elements[lst[s * nnxs + 1]][sp],
-                    elements[lst[s * nnxs + 2]][sp]
-                };
+                        elements[lst[s * nnxs + 0]][sp], elements[lst[s * nnxs + 1]][sp], elements[lst[s * nnxs + 2]][sp]};
                 {
                     real_t u[3], v[3];
                     for (int d = 0; d < 3; ++d) {
@@ -342,8 +345,8 @@ int main(int argc, char *argv[]) {
                 }
 
                 // candidate neighbors: faces on elements incident to any face node
-                for (int vn = 0; vn < 3; ++vn) {
-                    const idx_t vtx = e_nodes[vn];
+                for (int vn = 0; vn < nnxs; ++vn) {
+                    const idx_t   vtx = elements[lst[s * nnxs + vn]][sp];
                     const count_t beg = n2e_ptr[vtx];
                     const count_t end = n2e_ptr[vtx + 1];
                     for (count_t it = beg; it < end; ++it) {
@@ -352,17 +355,20 @@ int main(int argc, char *argv[]) {
                             const element_idx_t ne = emap_idx[k];
                             if (ne == e || ne == SFEM_ELEMENT_IDX_INVALID || eselect[ne]) continue;
                             const int16_t ns = surf_idx[ne];
-                            const idx_t n_nodes[3] = {
-                                elements[lst[ns * nnxs + 0]][esp],
-                                elements[lst[ns * nnxs + 1]][esp],
-                                elements[lst[ns * nnxs + 2]][esp]
-                            };
+
                             // count shared nodes (edge adjacency requires >=2)
                             int shared = 0;
-                            for (int a = 0; a < 3; ++a) {
-                                for (int b = 0; b < 3; ++b) shared += (e_nodes[a] == n_nodes[b]);
+                            for (int a = 0; a < nnxs; ++a) {
+                                for (int b = 0; b < nnxs; ++b) {
+                                    shared += (elements[lst[s * nnxs + a]][sp] == elements[lst[ns * nnxs + b]][esp]);
+                                }
                             }
                             if (shared < 2) continue;
+
+                            const idx_t n_nodes[3] = {elements[lst[ns * nnxs + 0]][esp],
+                                                      elements[lst[ns * nnxs + 1]][esp],
+                                                      elements[lst[ns * nnxs + 2]][esp]};
+
                             // angle check
                             real_t ua[3], va[3], na[3];
                             for (int d = 0; d < 3; ++d) {

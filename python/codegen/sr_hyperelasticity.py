@@ -238,6 +238,7 @@ class SRHyperelasticity:
         # Reference Gradient
         self.expression_table["inc_grad"] = inc_grad
         return inc_grad
+        
 
     def __compute_F(self):
         dims = self.fe.manifold_dim()
@@ -394,6 +395,27 @@ class SRHyperelasticity:
         self.expression_table["eoutz"] = eoutz
         return SdotH_km_canonical
 
+    def __compute_constant_grad_tp(self):
+        dims = self.fe.spatial_dim()
+        nfun = self.fe.n_nodes()
+        g = self.fe.grad(self.fe.quadrature_point())
+
+        terms = []
+        for i in range(0, nfun):
+            for m in range(0, dims):
+                for p in range(0, nfun):
+                    for n in range(0, dims):
+                        expr = g[i][m] * g[p][n] / self.fe.reference_measure()
+                        integr = self.fe.integrate(self.fe.quadrature_point(), expr)
+                        terms.append(integr)
+
+        Wimpn = Array(terms, shape=(nfun, dims, nfun, dims))
+        self.expression_table["Wimpn"] = Wimpn
+        return Wimpn
+
+         
+
+
     def partial_assembly(self):
         self.__compute_dV()
         self.__compute_jacobian_adjugate()
@@ -410,6 +432,8 @@ class SRHyperelasticity:
         self.__compute_metric_tensor_canonical()
         self.__compute_SdotH_km_canonical()
         self.__compute_apply_canonical()
+
+        self.__compute_constant_grad_tp()
 
     def check_metric_tensor_symmetries(self):
         self.partial_assembly()
