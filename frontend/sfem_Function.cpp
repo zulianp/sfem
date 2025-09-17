@@ -67,8 +67,8 @@
 
 #include <map>
 
-#include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
+#include "sfem_NeumannConditions.hpp"
 
 namespace sfem {
 
@@ -237,11 +237,10 @@ namespace sfem {
 
     Function::~Function() {}
 
-    void Function::remove_operator(const std::shared_ptr<Op> &op)
-    {
+    void Function::remove_operator(const std::shared_ptr<Op> &op) {
         auto it = std::find(impl_->ops.begin(), impl_->ops.end(), op);
 
-        if(it == impl_->ops.end()) {
+        if (it == impl_->ops.end()) {
             SFEM_ERROR("remove_operator: op does not exist!");
         }
 
@@ -455,6 +454,21 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int Function::value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) {
+        SFEM_TRACE_SCOPE("Function::value_steps");
+        for (auto &op : impl_->ops) {
+            if (op->value_steps(x, h, nsteps, steps, out) != SFEM_SUCCESS) {
+                std::cerr << "Failed value_steps in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        for (auto &c : impl_->constraints) {
+            c->value_steps(x, h, nsteps, steps, out);
+        }
+        return SFEM_SUCCESS;
+    }
+
     int Function::apply_constraints(real_t *const x) {
         SFEM_TRACE_SCOPE("Function::apply_constraints");
 
@@ -564,9 +578,9 @@ namespace sfem {
         ret->impl_->handle_constraints = impl_->handle_constraints;
 
         return ret;
-    }  
+    }
 
-    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(const std::shared_ptr<Communicator>& comm, const char *folder) {
+    std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(const std::shared_ptr<Communicator> &comm, const char *folder) {
         char pattern[1024 * 10];
         snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
@@ -613,4 +627,3 @@ namespace sfem {
     }
 
 }  // namespace sfem
-

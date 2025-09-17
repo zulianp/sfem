@@ -110,19 +110,19 @@ static SFEM_INLINE void hex8_neohookean_ogden_objective_steps_integral(const sca
     }
 }
 
-int hex8_neohookean_ogden_objective(const ptrdiff_t              nelements,
-                                    const ptrdiff_t              stride,
-                                    const ptrdiff_t              nnodes,
-                                    idx_t **const SFEM_RESTRICT  elements,
-                                    geom_t **const SFEM_RESTRICT points,
-                                    const real_t                 mu,
-                                    const real_t                 lambda,
-                                    const ptrdiff_t              u_stride,
-                                    const real_t *const          ux,
-                                    const real_t *const          uy,
-                                    const real_t *const          uz,
-                                    const int                    is_element_wise,
-                                    real_t *const                out) {
+int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
+                                    const ptrdiff_t                   stride,
+                                    const ptrdiff_t                   nnodes,
+                                    idx_t **const SFEM_RESTRICT       elements,
+                                    geom_t **const SFEM_RESTRICT      points,
+                                    const real_t                      mu,
+                                    const real_t                      lambda,
+                                    const ptrdiff_t                   u_stride,
+                                    const real_t *const SFEM_RESTRICT ux,
+                                    const real_t *const SFEM_RESTRICT uy,
+                                    const real_t *const SFEM_RESTRICT uz,
+                                    const int                         is_element_wise,
+                                    real_t *const SFEM_RESTRICT       out) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
@@ -178,24 +178,24 @@ int hex8_neohookean_ogden_objective(const ptrdiff_t              nelements,
     return SFEM_SUCCESS;
 }
 
-int hex8_neohookean_ogden_objective_steps(const ptrdiff_t              nelements,
-                                          const ptrdiff_t              stride,
-                                          const ptrdiff_t              nnodes,
-                                          idx_t **const SFEM_RESTRICT  elements,
-                                          geom_t **const SFEM_RESTRICT points,
-                                          const real_t                 mu,
-                                          const real_t                 lambda,
-                                          const ptrdiff_t              u_stride,
-                                          const real_t *const          ux,
-                                          const real_t *const          uy,
-                                          const real_t *const          uz,
-                                          const ptrdiff_t              inc_stride,
-                                          const real_t *const          incx,
-                                          const real_t *const          incy,
-                                          const real_t *const          incz,
-                                          const int                    nsteps,
-                                          const real_t *const          steps,
-                                          real_t *const                out) {
+int hex8_neohookean_ogden_objective_steps(const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   inc_stride,
+                                          const real_t *const SFEM_RESTRICT incx,
+                                          const real_t *const SFEM_RESTRICT incy,
+                                          const real_t *const SFEM_RESTRICT incz,
+                                          const int                         nsteps,
+                                          const real_t *const               steps,
+                                          real_t *const SFEM_RESTRICT       out) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
@@ -208,6 +208,7 @@ int hex8_neohookean_ogden_objective_steps(const ptrdiff_t              nelements
     {
         scalar_t *out_local = (scalar_t *)calloc(nsteps, sizeof(scalar_t));
 
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t ev[8];
 
@@ -255,6 +256,8 @@ int hex8_neohookean_ogden_objective_steps(const ptrdiff_t              nelements
 #pragma omp atomic update
             out[s] += out_local[s];
         }
+
+        free(out_local);
     }
 
     return SFEM_SUCCESS;
@@ -445,21 +448,21 @@ static SFEM_INLINE void hex8_neohookean_grad(const scalar_t *const SFEM_RESTRICT
     gz[7] += -qw * (x87 + x89 + x93);
 }
 
-int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
-                                   const ptrdiff_t              stride,
-                                   const ptrdiff_t              nnodes,
-                                   idx_t **const SFEM_RESTRICT  elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   const real_t                 mu,
-                                   const real_t                 lambda,
-                                   const ptrdiff_t              u_stride,
-                                   const real_t *const          ux,
-                                   const real_t *const          uy,
-                                   const real_t *const          uz,
-                                   const ptrdiff_t              out_stride,
-                                   real_t *const                outx,
-                                   real_t *const                outy,
-                                   real_t *const                outz) {
+int hex8_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
+                                   const ptrdiff_t                   stride,
+                                   const ptrdiff_t                   nnodes,
+                                   idx_t **const SFEM_RESTRICT       elements,
+                                   geom_t **const SFEM_RESTRICT      points,
+                                   const real_t                      mu,
+                                   const real_t                      lambda,
+                                   const ptrdiff_t                   u_stride,
+                                   const real_t *const SFEM_RESTRICT ux,
+                                   const real_t *const SFEM_RESTRICT uy,
+                                   const real_t *const SFEM_RESTRICT uz,
+                                   const ptrdiff_t                   out_stride,
+                                   real_t *const SFEM_RESTRICT       outx,
+                                   real_t *const SFEM_RESTRICT       outy,
+                                   real_t *const SFEM_RESTRICT       outz) {
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
