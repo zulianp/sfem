@@ -20,6 +20,9 @@
 #include "tet10_resample_field_V2.h"
 #include "tet10_weno.h"
 
+////////////////////////////////////////////////////////////////////////////////
+// Hex8 to isoparametric tet10 local adjoint category
+////////////////////////////////////////////////////////////////////////////////
 real_t                                                                                  //
 hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,             //
                                                    const real_t const*   bc,            // transposition vector for category
@@ -125,81 +128,6 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,     
         data[indices[5]] += d5;
         data[indices[6]] += d6;
         data[indices[7]] += d7;
-
-        // // Mapping the quadrature point from the reference space to the mini-tetrahedron
-        // const real_t xq_mref = J_ref[0] * tet_qx[quad_i] + J_ref[1] * tet_qy[quad_i] + J_ref[2] * tet_qz[quad_i] + bc[0];
-        // const real_t yq_mref = J_ref[3] * tet_qx[quad_i] + J_ref[4] * tet_qy[quad_i] + J_ref[5] * tet_qz[quad_i] + bc[1];
-        // const real_t zq_mref = J_ref[6] * tet_qx[quad_i] + J_ref[7] * tet_qy[quad_i] + J_ref[8] * tet_qz[quad_i] + bc[2];
-
-        // // printf("Quadrature point in the reference space: xq_mref = %e, yq_mref = %e, zq_mref = %e, bc = [%e, %e, %e]\n",
-        // //        xq_mref,
-        // //        yq_mref,
-        // //        zq_mref,
-        // //        bc[0],
-        // //        bc[1],
-        // //        bc[2]);
-
-        // //        printf("Jacobian ref = [%e, %e, %e, %e, %e, %e, %e, %e, %e]\n",
-        // //        J_ref[0], J_ref[1], J_ref[2], J_ref[3], J_ref[4], J_ref[5], J_ref[6], J_ref[7], J_ref[8]);
-
-        // const real_t xq_phys = J_phys[0] * xq_mref + J_phys[1] * yq_mref + J_phys[2] * zq_mref + fx0;  // Physical X-coordinate
-        // const real_t yq_phys = J_phys[3] * xq_mref + J_phys[4] * yq_mref + J_phys[5] * zq_mref + fy0;  // Physical Y-coordinate
-        // const real_t zq_phys = J_phys[6] * xq_mref + J_phys[7] * yq_mref + J_phys[8] * zq_mref + fz0;  // Physical Z-coordinate
-
-        // real_t g_qx;
-        // real_t g_qy;
-        // real_t g_qz;
-
-        // tet10_transform_real_t(x, y, z, xq_mref, yq_mref, zq_mref, &g_qx, &g_qy, &g_qz);
-        // tet10_Lagrange_basis(xq_mref, yq_mref, zq_mref, tet10_f);
-
-        // const real_t grid_x = (g_qx - ox) / dx;
-        // const real_t grid_y = (g_qy - oy) / dy;
-        // const real_t grid_z = (g_qz - oz) / dz;
-
-        // const ptrdiff_t i = floor(grid_x);
-        // const ptrdiff_t j = floor(grid_y);
-        // const ptrdiff_t k = floor(grid_z);
-
-        // // Get the reminder [0, 1]
-        // const real_t l_x = (grid_x - i);
-        // const real_t l_y = (grid_y - j);
-        // const real_t l_z = (grid_z - k);
-
-        // ptrdiff_t indices[10];
-        // hex_aa_8_collect_indices(stride, i, j, k, indices);
-
-        // const real_t measure = tet10_measure_real_t(x, y, z, xq_mref, yq_mref, zq_mref);
-        // const real_t dV      = measure * tet_qw[quad_i] * inv_N_micro_tet;
-
-        // const real_t It = (tet10_f[0] * wf_tet10[0] +  //
-        //                    tet10_f[1] * wf_tet10[1] +  //
-        //                    tet10_f[2] * wf_tet10[2] +  //
-        //                    tet10_f[3] * wf_tet10[3] +  //
-        //                    tet10_f[4] * wf_tet10[4] +  //
-        //                    tet10_f[5] * wf_tet10[5] +  //
-        //                    tet10_f[6] * wf_tet10[6] +  //
-        //                    tet10_f[7] * wf_tet10[7] +  //
-        //                    tet10_f[8] * wf_tet10[8] +  //
-        //                    tet10_f[9] * wf_tet10[9]);  //
-
-        // const real_t d0 = It * hex8_f[0] * dV;
-        // const real_t d1 = It * hex8_f[1] * dV;
-        // const real_t d2 = It * hex8_f[2] * dV;
-        // const real_t d3 = It * hex8_f[3] * dV;
-        // const real_t d4 = It * hex8_f[4] * dV;
-        // const real_t d5 = It * hex8_f[5] * dV;
-        // const real_t d6 = It * hex8_f[6] * dV;
-        // const real_t d7 = It * hex8_f[7] * dV;
-
-        // data[indices[0]] += d0;
-        // data[indices[1]] += d1;
-        // data[indices[2]] += d2;
-        // data[indices[3]] += d3;
-        // data[indices[4]] += d4;
-        // data[indices[5]] += d5;
-        // data[indices[6]] += d6;
-        // data[indices[7]] += d7;
     }
 }
 
