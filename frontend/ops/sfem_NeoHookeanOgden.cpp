@@ -14,8 +14,8 @@
 #include "sfem_glob.hpp"
 
 // FIXME
-#include "tet4_neohookean_ogden.h"
 #include "hex8_neohookean_ogden.h"
+#include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
 #include <mpi.h>
@@ -303,6 +303,39 @@ namespace sfem {
                                               x,
                                               out);
         }
+    }
+
+    int NeoHookeanOgden::value_steps(const real_t       *x,
+                                     const real_t       *h,
+                                     const int           nsteps,
+                                     const real_t *const steps,
+                                     real_t *const       out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::value_steps");
+
+        auto mesh = impl_->space->mesh_ptr();
+        if (impl_->element_type == HEX8) {
+            return hex8_neohookean_ogden_objective_steps(mesh->n_elements(),
+                                                         impl_->elements_stride,
+                                                         mesh->n_nodes(),
+                                                         impl_->elements->data(),
+                                                         mesh->points()->data(),
+                                                         this->impl_->mu,
+                                                         this->impl_->lambda,
+                                                         3,
+                                                         &x[0],
+                                                         &x[1],
+                                                         &x[2],
+                                                         3,
+                                                         &h[0],
+                                                         &h[1],
+                                                         &h[2],
+                                                         nsteps,
+                                                         steps,
+                                                         out);
+        }
+
+        SFEM_ERROR("value_steps not implemented for this element type");
+        return SFEM_FAILURE;
     }
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }

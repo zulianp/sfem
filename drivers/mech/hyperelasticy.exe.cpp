@@ -44,7 +44,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
     const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
-    const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-4);
+    const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL = sfem::Env::read("SFEM_NL_TOL", 1e-10); 
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
@@ -132,7 +132,22 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             blas->zeros(ndofs, increment->data());
             f->copy_constrained_dofs(rhs->data(), increment->data());
             cg->apply(rhs->data(), increment->data());
-            blas->axpy(ndofs, -alpha, increment->data(), displacement->data());
+
+            std::vector<real_t> alphas{-alpha, -alpha/2, -alpha/4, -alpha/8, -alpha/16};
+            std::vector<real_t> energies(alphas.size(), 0);
+
+            f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
+            for(auto &e : energies) {
+                if(e != e) {
+                    e = 1e10;
+                }
+            }
+            int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
+            
+            real_t alpha_search = alphas[min_energy_index];
+            printf("alpha = %g, energy = %g\n", alpha_search, energies[min_energy_index]);
+
+            blas->axpy(ndofs, alpha_search, increment->data(), displacement->data());
         }
     }
 

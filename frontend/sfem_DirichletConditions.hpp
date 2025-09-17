@@ -51,6 +51,8 @@ namespace sfem {
 
         int value(const real_t *const x, real_t *const out) override;
 
+        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
+
         int gradient(const real_t *const x, real_t *const g) override;
 
         int hessian_crs(const real_t *const  x,
