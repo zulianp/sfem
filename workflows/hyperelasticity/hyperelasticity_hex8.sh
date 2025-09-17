@@ -46,4 +46,4 @@ fi
 
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 $LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
-raw_to_db.py hex8_geometry/box hex8_output.vtk -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS
+raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS

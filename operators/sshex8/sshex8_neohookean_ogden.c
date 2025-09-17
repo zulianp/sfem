@@ -103,8 +103,6 @@ int sshex8_neohookean_ogden_gradient(int                               level,
         scalar_t y[8];
         scalar_t z[8];
 
-        scalar_t m_adjugate[9], adjugate[9];
-
         scalar_t      element_u[3 * 8];
         accumulator_t eout[3 * 8];
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
@@ -185,7 +183,7 @@ int sshex8_neohookean_ogden_gradient(int                               level,
                             for (int ky = 0; ky < n_qp; ky++) {
                                 for (int kx = 0; kx < n_qp; kx++) {
                                     hex8_adjugate_and_det(x, y, z, (xi + qx[kx]) * h, (yi + qx[ky]) * h, (zi + qx[kz]) * h, jacobian_adjugate, &jacobian_determinant);
-                                    hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+                                    hex8_sub_adj_0(jacobian_adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
                                     assert(jacobian_determinant == jacobian_determinant);
                                     assert(jacobian_determinant != 0);
                 
