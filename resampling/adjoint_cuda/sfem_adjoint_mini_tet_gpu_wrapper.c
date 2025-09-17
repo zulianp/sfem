@@ -19,11 +19,14 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     // printf("Strides = %ld %ld %ld ************************************************ \n", stride[0], stride[1], stride[2]);
 
-// #define TEST_LOCAL_KERNEL
-#ifndef TEST_LOCAL_KERNEL
+#define TEST_KERNEL_MODEL 2
+
+#if TEST_KERNEL_MODEL == 0
     call_sfem_adjoint_mini_tet_kernel_gpu(
-#else
+#elif TEST_KERNEL_MODEL == 1
     call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(
+#elif TEST_KERNEL_MODEL == 2
+    call_sfem_adjoint_mini_tet_cluster_kernel_gpu(
 #endif
             start_element,                  // Mesh
             end_element,                    //
