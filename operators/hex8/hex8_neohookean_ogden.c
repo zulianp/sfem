@@ -175,6 +175,10 @@ int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
         }
     }
 
+    if(*out != *out) {
+        *out = 1e10;
+    }
+
     return SFEM_SUCCESS;
 }
 
@@ -253,6 +257,9 @@ int hex8_neohookean_ogden_objective_steps(const ptrdiff_t                   nele
         }
 
         for (int s = 0; s < nsteps; s++) {
+            if(out_local[s] != out_local[s]) {
+                out_local[s] = 1e10;
+            }
 #pragma omp atomic update
             out[s] += out_local[s];
         }
