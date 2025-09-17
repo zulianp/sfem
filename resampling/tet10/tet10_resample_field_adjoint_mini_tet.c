@@ -131,6 +131,67 @@ hex8_to_isoparametric_tet10_local_adjoint_category(const int             L,     
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////
+// transform_tet10_to_mini_phys_tet10
+//////////////////////////////////////////////////////////////////////////////////
+void                                                              //
+transform_tet10_to_mini_phys_tet10(const real_t const x[10],      // Tetrahedron vertices X-coordinates
+                                   const real_t const y[10],      // Tetrahedron vertices Y-coordinates
+                                   const real_t const z[10],      // Tetrahedron vertices Z-coordinates,    //
+                                   real_t             J_phys[9],  // Jacobian matrix of the physical tetrahedron
+                                   real_t             J_ref[9],   // Jacobian matrix of the reference tetrahedron
+                                   real_t             x_m[10],    // Output mini-tetrahedra X-coordinates
+                                   real_t             y_m[10],    // Output mini-tetrahedra Y-coordinates
+                                   real_t             z_m[10]) {              // Output mini-tetrahedra Z-coordinates
+
+#define SFEM_MAT_VEC_MUL_3x3_INDEX(mat, x_in, y_in, z_in, x_out, y_out, z_out, idx)              \
+    do {                                                                                         \
+        (x_out)[idx] = (mat)[0] * (x_in)[idx] + (mat)[1] * (y_in)[idx] + (mat)[2] * (z_in)[idx]; \
+        (y_out)[idx] = (mat)[3] * (x_in)[idx] + (mat)[4] * (y_in)[idx] + (mat)[5] * (z_in)[idx]; \
+        (z_out)[idx] = (mat)[6] * (x_in)[idx] + (mat)[7] * (y_in)[idx] + (mat)[8] * (z_in)[idx]; \
+    } while (0)
+
+    real_t J_tot[9];
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            J_tot[i * 3 + j] = 0.0;
+            for (int k = 0; k < 3; k++) {
+                J_tot[i * 3 + j] += J_phys[i * 3 + k] * J_ref[k * 3 + j];
+            }
+        }
+    }
+
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 0);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 1);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 2);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 3);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 4);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 5);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 6);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 7);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 8);
+    SFEM_MAT_VEC_MUL_3x3_INDEX(J_tot, x, y, z, x_m, y_m, z_m, 9);
+}
+
+void                                                               //
+translate_tet10_to_mini_phys_tet10(const real_t const x_m[10],     // Tetrahedron vertices X-coordinates
+                                   const real_t const y_m[10],     // Tetrahedron vertices Y-coordinates
+                                   const real_t const z_m[10],     // Tetrahedron vertices Z-coordinates
+                                   const real_t       v0x,         // Jacobian matrix of the physical tetrahedron
+                                   const real_t       v0y,         //
+                                   const real_t       v0z,         //
+                                   real_t             x_m_tr[10],  // Output mini-tetrahedra X-coordinates
+                                   real_t             y_m_tr[10],  // Output mini-tetrahedra Y-coordinates
+                                   real_t             z_m_tr[10]) {            // Output mini-tetrahedra Z-coordinates
+
+    for (int i = 0; i < 10; i++) {
+        x_m_tr[i] = x_m[i] + v0x;
+        y_m_tr[i] = y_m[i] + v0y;
+        z_m_tr[i] = z_m[i] + v0z;
+    }
+}
+
 /**
  * @brief Resamples a field from a 10-node tetrahedral mesh back to a structured hexahedral grid with adaptive refinement.
  *
@@ -199,6 +260,10 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t     
     const real_t z1_unit = 0.0;
     const real_t z2_unit = 0.0;
     const real_t z3_unit = 1.0;
+
+    real_t x_mv[6][10];  // Mini-tetrahedra X-coordinates for the 6 categories of tetrahedra for the refined and reference element
+    real_t y_mv[6][10];  // Mini-tetrahedra Y-coordinates for the 6 categories of tetrahedra for the refined and reference element
+    real_t z_mv[6][10];  // Mini-tetrahedra Z-coordinates for the 6 categories of tetrahedra for the refined and reference element
 
     real_t J_vec_mini[6][9];  // Jacobian matrices for the 6 categories of tetrahedra for the refined and reference element
     real_t J_phy[9];          // Jacobian matrices for the 6 categories of tetrahedra for the physical current
@@ -309,6 +374,16 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t     
                                    z3_unit,             // Vertex 3 coordinates
                                    (real_t)(L),         // Refinement level
                                    J_vec_mini[cat_i]);  // Output Jacobian matrix
+
+            // Calculate the mini-tetrahedra coordinates for the current category
+            transform_tet10_to_mini_phys_tet10(x,                  // Tetrahedron vertices X-coordinates
+                                               y,                  // Tetrahedron vertices Y-coordinates
+                                               z,                  // Tetrahedron vertices Z-coordinates
+                                               J_phy,              // Jacobian matrix of the physical tetrahedron
+                                               J_vec_mini[cat_i],  // Jacobian matrix of the reference tetrahedron
+                                               x_mv[cat_i],        // Output mini-tetrahedra X-coordinates
+                                               y_mv[cat_i],        // Output mini-tetrahedra Y-coordinates
+                                               z_mv[cat_i]);       // Output mini-tetrahedra Z-coordinates
 
         }  // END of for (int cat_i = 0; cat_i < 6; cat_i++)
 
