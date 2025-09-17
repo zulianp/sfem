@@ -610,8 +610,8 @@ sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,     
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__global__ void  //
-sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster_size,
+__global__ void                                                                            //
+sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster_size,     // Cluster size
                                          const ptrdiff_t             start_element,        // Mesh
                                          const ptrdiff_t             end_element,          //
                                          const ptrdiff_t             nnodes,               //
@@ -634,18 +634,14 @@ sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster
                                          FloatType* const            data) {                          //
 
     const int warp_id       = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
-    const int cluster_begin = start_element + warp_id;
+    const int cluster_begin = warp_id * tet_cluster_size + start_element;
     const int cluster_end   = cluster_begin + tet_cluster_size;
 
     for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
+        // Check if the element is within the valid range
         if (element_i >= end_element) break;  // Out of range
 
         // printf("Processing element %ld / %ld\n", element_i, end_element);
-
-        const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
-        const FloatType hexahedron_volume = dx * dy * dz;
-
-        // printf("Exaedre volume: %e\n", hexahedron_volume);
 
         idx_t ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
 
@@ -653,6 +649,11 @@ sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster
         ev[1] = elems.elems_v1[element_i];
         ev[2] = elems.elems_v2[element_i];
         ev[3] = elems.elems_v3[element_i];
+
+        const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+        const FloatType hexahedron_volume = dx * dy * dz;
+
+        // printf("Exaedre volume: %e\n", hexahedron_volume);
 
         // Read the coordinates of the vertices of the tetrahedron
         // In the physical space
@@ -675,6 +676,8 @@ sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster
         const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
         const FloatType wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
         const FloatType wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+        // if (wf0 > 0.0) printf("Thread %d processing element %d / %d\n", threadIdx.x, (int)element_i, (int)end_element);
 
         FloatType edges_length[6];
 

@@ -64,7 +64,7 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 200
+sdf_test.py $sdf 125
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
@@ -117,6 +117,8 @@ set -x
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 export SFEM_ADJOINT=1
+
+export SFEM_CLUSTER_SIZE=${SFEM_CLUSTER_SIZE:-32}
 
 if [[ $SFEM_ADJOINT -eq 1 ]]
 then
