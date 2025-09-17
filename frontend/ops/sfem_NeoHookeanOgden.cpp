@@ -10,6 +10,9 @@
 #include "sfem_Env.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Mesh.hpp"
+#include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
+#include "sfem_Parameters.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -22,25 +25,19 @@
 
 namespace sfem {
 
-    class NeoHookeanOgden::Impl {
-    public:
-        std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
-        real_t                         mu{1}, lambda{1};
-        SharedBuffer<metric_tensor_t>  partial_assembly_buffer;
-
-        SharedBuffer<scaling_t>    compression_scaling;
-        SharedBuffer<compressed_t> partial_assembly_compressed;
-        SharedBuffer<idx_t *>      elements;
-        ptrdiff_t                  elements_stride{1};
+    struct AssemblyData {
+        SharedBuffer<metric_tensor_t> partial_assembly_buffer;
+        SharedBuffer<scaling_t>       compression_scaling;
+        SharedBuffer<compressed_t>    partial_assembly_compressed;
+        SharedBuffer<idx_t *>         elements;
+        ptrdiff_t                     elements_stride{1};
 
         bool use_partial_assembly{false};
         bool use_compression{false};
         bool use_AoS{false};
-        Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
-        int compress_partial_assembly() {
-            auto mesh = space->mesh_ptr();
+        int compress_partial_assembly(OpDomain &domain) {
+            auto mesh = domain.block;
 
             if (use_compression) {
                 if (!compression_scaling) {
@@ -73,9 +70,6 @@ namespace sfem {
                     }
                 }
 
-#ifndef NDEBUG
-                ptrdiff_t num_nans = 0;
-#endif
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_elements; i++) {
                     auto pai  = &pa[i * TET4_S_IKMN_SIZE];
@@ -83,57 +77,33 @@ namespace sfem {
                     for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
                         paci[v] = pai[v] / cs[i];
 
-#ifndef NDEBUG
                         assert(cs[i] > 0);
                         assert(std::isfinite(paci[v]));
-                        num_nans += !std::isfinite(paci[v]);
-#endif
                     }
                 }
-#ifndef NDEBUG
-                printf("Max scaling: %g, num_nans: %ld\n", max_scaling, num_nans);
-#endif
             }
 
             return SFEM_SUCCESS;
         }
     };
 
+    class NeoHookeanOgden::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<MultiDomainOp> domains;
+        real_t                         mu{1}, lambda{1};
+
+        Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+        int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
+    };
+
     std::unique_ptr<Op> NeoHookeanOgden::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::create");
 
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-
-        auto ret = std::make_unique<NeoHookeanOgden>(space);
-
-        ret->impl_->mu                   = sfem::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
-        ret->impl_->lambda               = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
-        ret->impl_->use_partial_assembly = sfem::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", ret->impl_->use_partial_assembly);
-        ret->impl_->use_compression      = sfem::Env::read("SFEM_USE_COMPRESSION", ret->impl_->use_compression);
-        ret->impl_->use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", ret->impl_->use_AoS);
-        if (ret->impl_->use_partial_assembly) {
-            printf("SFEM_SHEAR_MODULUS=%g\n", (double)ret->impl_->mu);
-            printf("SFEM_FIRST_LAME_PARAMETER=%g\n", (double)ret->impl_->lambda);
-            printf("sizeof(metric_tensor_t) = %lu\n", sizeof(metric_tensor_t));
-            printf("sizeof(compressed_t) = %lu\n", sizeof(compressed_t));
-        }
-
-        ret->impl_->elements        = space->mesh_ptr()->elements();
-        ret->impl_->elements_stride = 1;
-        ret->impl_->element_type    = (enum ElemType)space->element_type();
-
-        if (ret->impl_->use_AoS) {
-            auto nxe                    = space->mesh_ptr()->n_nodes_per_element();
-            ret->impl_->elements        = convert_host_buffer_to_fake_SoA(nxe, soa_to_aos(1, nxe, space->mesh_ptr()->elements()));
-            ret->impl_->elements_stride = nxe;
-        }
-
-        if (ret->impl_->element_type == HEX8) {
-            // This is the only implementation available for HEX8
-            ret->impl_->use_partial_assembly = true;
-            // ret->impl_->use_compression      = true;
-        }
-
+        auto ret           = std::make_unique<NeoHookeanOgden>(space);
+        ret->impl_->mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
+        ret->impl_->lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
         return ret;
     }
 
@@ -147,127 +117,169 @@ namespace sfem {
 
         auto mesh  = impl_->space->mesh_ptr();
         auto graph = impl_->space->node_to_node_graph();
-        return neohookean_ogden_hessian_aos(impl_->element_type,
-                                            mesh->n_elements(),
-                                            mesh->n_nodes(),
-                                            mesh->elements()->data(),
-                                            mesh->points()->data(),
-                                            this->impl_->mu,
-                                            this->impl_->lambda,
-                                            x,
-                                            graph->rowptr()->data(),
-                                            graph->colidx()->data(),
-                                            values);
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_hessian_aos(domain.element_type,
+                                                domain.block->n_elements(),
+                                                mesh->n_nodes(),
+                                                domain.block->elements()->data(),
+                                                mesh->points()->data(),
+                                                domain.parameters->get_real_value("mu", impl_->mu),
+                                                domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                x,
+                                                graph->rowptr()->data(),
+                                                graph->colidx()->data(),
+                                                values);
+        });
     }
 
     int NeoHookeanOgden::hessian_diag(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_diag");
 
         auto mesh = impl_->space->mesh_ptr();
-        return neohookean_ogden_diag_aos(impl_->element_type,
-                                         mesh->n_elements(),
-                                         mesh->n_nodes(),
-                                         mesh->elements()->data(),
-                                         mesh->points()->data(),
-                                         this->impl_->mu,
-                                         this->impl_->lambda,
-                                         x,
-                                         out);
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_diag_aos(domain.element_type,
+                                             mesh->n_elements(),
+                                             mesh->n_nodes(),
+                                             domain.block->elements()->data(),
+                                             mesh->points()->data(),
+                                             this->impl_->mu,
+                                             this->impl_->lambda,
+                                             x,
+                                             out);
+        });
     }
 
     int NeoHookeanOgden::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::gradient");
 
         auto mesh = impl_->space->mesh_ptr();
-        return neohookean_ogden_gradient_aos(impl_->element_type,
-                                             mesh->n_elements(),
-                                             mesh->n_nodes(),
-                                             mesh->elements()->data(),
-                                             mesh->points()->data(),
-                                             this->impl_->mu,
-                                             this->impl_->lambda,
-                                             x,
-                                             out);
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_gradient_aos(domain.element_type,
+                                                 domain.block->n_elements(),
+                                                 mesh->n_nodes(),
+                                                 domain.block->elements()->data(),
+                                                 mesh->points()->data(),
+                                                 domain.parameters->get_real_value("mu", impl_->mu),
+                                                 domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                 x,
+                                                 out);
+        });
     }
 
     int NeoHookeanOgden::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::apply");
-        auto mesh = impl_->space->mesh_ptr();
-        if (impl_->partial_assembly_buffer) {
-            if (impl_->use_compression) {
-                return neohookean_ogden_compressed_partial_assembly_apply(impl_->element_type,
-                                                                          mesh->n_elements(),
-                                                                          impl_->elements_stride,
-                                                                          impl_->elements->data(),
-                                                                          impl_->partial_assembly_compressed->data(),
-                                                                          impl_->compression_scaling->data(),
-                                                                          3,
-                                                                          &h[0],
-                                                                          &h[1],
-                                                                          &h[2],
-                                                                          3,
-                                                                          &out[0],
-                                                                          &out[1],
-                                                                          &out[2]);
 
-            } else {
-                return neohookean_ogden_partial_assembly_apply(impl_->element_type,
-                                                               mesh->n_elements(),
-                                                               impl_->elements_stride,
-                                                               impl_->elements->data(),
-                                                               impl_->partial_assembly_buffer->data(),
-                                                               3,
-                                                               &h[0],
-                                                               &h[1],
-                                                               &h[2],
-                                                               3,
-                                                               &out[0],
-                                                               &out[1],
-                                                               &out[2]);
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            auto ua = std::static_pointer_cast<struct AssemblyData>(domain.user_data);
+            if (ua->partial_assembly_buffer) {
+                if (ua->use_compression) {
+                    return neohookean_ogden_compressed_partial_assembly_apply(domain.element_type,
+                                                                              domain.block->n_elements(),
+                                                                              ua->elements_stride,
+                                                                              ua->elements->data(),
+                                                                              ua->partial_assembly_compressed->data(),
+                                                                              ua->compression_scaling->data(),
+                                                                              3,
+                                                                              &h[0],
+                                                                              &h[1],
+                                                                              &h[2],
+                                                                              3,
+                                                                              &out[0],
+                                                                              &out[1],
+                                                                              &out[2]);
+
+                } else {
+                    return neohookean_ogden_partial_assembly_apply(domain.element_type,
+                                                                   domain.block->n_elements(),
+                                                                   ua->elements_stride,
+                                                                   ua->elements->data(),
+                                                                   ua->partial_assembly_buffer->data(),
+                                                                   3,
+                                                                   &h[0],
+                                                                   &h[1],
+                                                                   &h[2],
+                                                                   3,
+                                                                   &out[0],
+                                                                   &out[1],
+                                                                   &out[2]);
+                }
+            }
+
+            return neohookean_ogden_apply_aos(domain.element_type,
+                                              domain.block->n_elements(),
+                                              mesh->n_nodes(),
+                                              domain.block->elements()->data(),
+                                              mesh->points()->data(),
+                                              domain.parameters->get_real_value("mu", impl_->mu),
+                                              domain.parameters->get_real_value("lambda", impl_->lambda),
+                                              x,
+                                              h,
+                                              out);
+        });
+    }
+
+    int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
+        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+
+        bool use_partial_assembly = sfem::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
+        bool use_compression      = sfem::Env::read("SFEM_USE_COMPRESSION", false);
+        bool use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
+
+        for (auto &domain : impl_->domains->domains()) {
+            auto ua                  = std::make_shared<struct AssemblyData>();
+            ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == HEX8;
+            ua->use_compression      = use_compression;
+            ua->use_AoS              = use_AoS;
+            ua->elements             = domain.second.block->elements();
+            ua->elements_stride      = 1;
+            domain.second.user_data  = ua;
+
+            if (use_AoS) {
+                auto nxe            = domain.second.block->n_nodes_per_element();
+                ua->elements        = convert_host_buffer_to_fake_SoA(nxe, soa_to_aos(1, nxe, domain.second.block->elements()));
+                ua->elements_stride = nxe;
             }
         }
 
-        return neohookean_ogden_apply_aos(impl_->element_type,
-                                          mesh->n_elements(),
-                                          mesh->n_nodes(),
-                                          mesh->elements()->data(),
-                                          mesh->points()->data(),
-                                          this->impl_->mu,
-                                          this->impl_->lambda,
-                                          x,
-                                          h,
-                                          out);
+        return SFEM_SUCCESS;
     }
-
-    int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 
     int NeoHookeanOgden::update(const real_t *const u) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::update");
 
-        if (!impl_->use_partial_assembly) return SFEM_SUCCESS;
+        auto mesh = impl_->space->mesh_ptr();
 
-        if (impl_->element_type == TET4 || impl_->element_type == HEX8) {
-            // FIXME: Add support for other element types
-            auto mesh = impl_->space->mesh_ptr();
+        for (auto &domain : impl_->domains->domains()) {
+            auto assembly_data = std::static_pointer_cast<struct AssemblyData>(domain.second.user_data);
+            if (!assembly_data->use_partial_assembly) continue;
 
-            if (!impl_->partial_assembly_buffer) {
-                impl_->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(mesh->n_elements() * TET4_S_IKMN_SIZE);
+            auto lambda       = domain.second.parameters->get_real_value("lambda", impl_->lambda);
+            auto mu           = domain.second.parameters->get_real_value("mu", impl_->mu);
+            auto element_type = domain.second.element_type;
+
+            if (element_type == TET4 || element_type == HEX8) {
+                // FIXME: Add support for other element types
+                if (!assembly_data->partial_assembly_buffer) {
+                    assembly_data->partial_assembly_buffer =
+                            sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
+                }
+
+                int ok = neohookean_ogden_hessian_partial_assembly(
+                        domain.second.element_type,
+                        domain.second.block->n_elements(),
+                        assembly_data->elements_stride,
+                        assembly_data->elements->data(),
+                        mesh->points()->data(),
+                        domain.second.parameters->get_real_value("mu", impl_->mu),
+                        domain.second.parameters->get_real_value("lambda", impl_->lambda),
+                        3,
+                        &u[0],
+                        &u[1],
+                        &u[2],
+                        assembly_data->partial_assembly_buffer->data());
+                assembly_data->compress_partial_assembly(domain.second);
             }
-
-            int ok = neohookean_ogden_hessian_partial_assembly(impl_->element_type,
-                                                               mesh->n_elements(),
-                                                               impl_->elements_stride,
-                                                               impl_->elements->data(),
-                                                               mesh->points()->data(),
-                                                               impl_->mu,
-                                                               impl_->lambda,
-                                                               3,
-                                                               &u[0],
-                                                               &u[1],
-                                                               &u[2],
-                                                               impl_->partial_assembly_buffer->data());
-
-            return impl_->compress_partial_assembly();
         }
 
         return SFEM_SUCCESS;
@@ -277,32 +289,35 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::value");
 
         auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
 
-        if (impl_->element_type == HEX8) {
-            return hex8_neohookean_ogden_objective(mesh->n_elements(),
-                                                   impl_->elements_stride,
-                                                   mesh->n_nodes(),
-                                                   impl_->elements->data(),
-                                                   mesh->points()->data(),
-                                                   this->impl_->mu,
-                                                   this->impl_->lambda,
-                                                   3,
-                                                   &x[0],
-                                                   &x[1],
-                                                   &x[2],
-                                                   false,
-                                                   out);
-        } else {
-            return neohookean_ogden_value_aos(impl_->element_type,
-                                              mesh->n_elements(),
-                                              mesh->n_nodes(),
-                                              mesh->elements()->data(),
-                                              mesh->points()->data(),
-                                              this->impl_->mu,
-                                              this->impl_->lambda,
-                                              x,
-                                              out);
-        }
+            if (domain.element_type == HEX8) {
+                return hex8_neohookean_ogden_objective(domain.block->n_elements(),
+                                                       ua->elements_stride,
+                                                       mesh->n_nodes(),
+                                                       ua->elements->data(),
+                                                       mesh->points()->data(),
+                                                       domain.parameters->get_real_value("mu", impl_->mu),
+                                                       domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                       3,
+                                                       &x[0],
+                                                       &x[1],
+                                                       &x[2],
+                                                       false,
+                                                       out);
+            } else {
+                return neohookean_ogden_value_aos(domain.element_type,
+                                                  domain.block->n_elements(),
+                                                  mesh->n_nodes(),
+                                                  domain.block->elements()->data(),
+                                                  mesh->points()->data(),
+                                                  domain.parameters->get_real_value("mu", impl_->mu),
+                                                  domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                  x,
+                                                  out);
+            }
+        });
     }
 
     int NeoHookeanOgden::value_steps(const real_t       *x,
@@ -313,29 +328,32 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::value_steps");
 
         auto mesh = impl_->space->mesh_ptr();
-        if (impl_->element_type == HEX8) {
-            return hex8_neohookean_ogden_objective_steps(mesh->n_elements(),
-                                                         impl_->elements_stride,
-                                                         mesh->n_nodes(),
-                                                         impl_->elements->data(),
-                                                         mesh->points()->data(),
-                                                         this->impl_->mu,
-                                                         this->impl_->lambda,
-                                                         3,
-                                                         &x[0],
-                                                         &x[1],
-                                                         &x[2],
-                                                         3,
-                                                         &h[0],
-                                                         &h[1],
-                                                         &h[2],
-                                                         nsteps,
-                                                         steps,
-                                                         out);
-        }
-
-        SFEM_ERROR("value_steps not implemented for this element type");
-        return SFEM_FAILURE;
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
+            if (domain.element_type == HEX8) {
+                return hex8_neohookean_ogden_objective_steps(mesh->n_elements(),
+                                                             ua->elements_stride,
+                                                             mesh->n_nodes(),
+                                                             ua->elements->data(),
+                                                             mesh->points()->data(),
+                                                             domain.parameters->get_real_value("mu", impl_->mu),
+                                                             domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                             3,
+                                                             &x[0],
+                                                             &x[1],
+                                                             &x[2],
+                                                             3,
+                                                             &h[0],
+                                                             &h[1],
+                                                             &h[2],
+                                                             nsteps,
+                                                             steps,
+                                                             out);
+            } else {
+                // Must be implemented
+                return SFEM_FAILURE;
+            }
+        });
     }
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }
@@ -343,20 +361,22 @@ namespace sfem {
     std::shared_ptr<Op> NeoHookeanOgden::lor_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::lor_op");
 
-        auto ret                 = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->element_type = macro_type_variant(impl_->element_type);
-        ret->impl_->mu           = impl_->mu;
-        ret->impl_->lambda       = impl_->lambda;
+        // FIXME: Must work for all element types and multi-block
+        auto ret            = std::make_shared<NeoHookeanOgden>(space);
+        ret->impl_->domains = impl_->domains->lor_op(space, {});
+        ret->impl_->mu      = impl_->mu;
+        ret->impl_->lambda  = impl_->lambda;
         return ret;
     }
 
     std::shared_ptr<Op> NeoHookeanOgden::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::derefine_op");
 
-        auto ret                 = std::make_shared<NeoHookeanOgden>(space);
-        ret->impl_->element_type = macro_base_elem(impl_->element_type);
-        ret->impl_->mu           = impl_->mu;
-        ret->impl_->lambda       = impl_->lambda;
+        // FIXME: Must work for all element types and multi-block
+        auto ret            = std::make_shared<NeoHookeanOgden>(space);
+        ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        ret->impl_->mu      = impl_->mu;
+        ret->impl_->lambda  = impl_->lambda;
         return ret;
     }
 
@@ -367,5 +387,13 @@ namespace sfem {
     }
 
     NeoHookeanOgden::~NeoHookeanOgden() = default;
+
+    void NeoHookeanOgden::set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) {
+        impl_->domains->set_value_in_block(block_name, var_name, value);
+    }
+
+    void NeoHookeanOgden::override_element_types(const std::vector<enum ElemType> &element_types) {
+        impl_->domains->override_element_types(element_types);
+    }
 
 }  // namespace sfem
