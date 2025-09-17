@@ -29,6 +29,7 @@ namespace sfem {
 
             const std::string           &name() const;
             enum ElemType                element_type() const;
+            int           n_nodes_per_element() const;
             const SharedBuffer<idx_t *> &elements() const;
 
             // Setters for internal use
