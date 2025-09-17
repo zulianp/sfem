@@ -396,4 +396,7 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 
+    void NeoHookeanOgden::set_mu(const real_t mu) { impl_->mu = mu; }
+    void NeoHookeanOgden::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
+
 }  // namespace sfem
