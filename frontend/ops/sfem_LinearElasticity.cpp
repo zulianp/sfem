@@ -109,6 +109,8 @@ namespace sfem {
     std::shared_ptr<Op> LinearElasticity::lor_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LinearElasticity::lor_op");
 
+        // FIXME: Must work for all element types and multi-block
+
         auto ret            = std::make_shared<LinearElasticity>(space);
         ret->impl_->domains = impl_->domains->lor_op(space, {});
         ret->impl_->mu      = impl_->mu;
@@ -118,6 +120,8 @@ namespace sfem {
 
     std::shared_ptr<Op> LinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("LinearElasticity::derefine_op");
+
+        // FIXME: Must work for all element types and multi-block
 
         auto ret            = std::make_shared<LinearElasticity>(space);
         ret->impl_->domains = impl_->domains->derefine_op(space, {});

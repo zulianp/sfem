@@ -86,10 +86,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = SFEM_VERBOSE;
-    cg->set_max_it(10000);
+    cg->set_max_it(20000);
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
-    cg->set_atol(1e-14);
+    cg->set_atol(1e-11);
 
     // Newton iteration
     int    nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 30);
@@ -117,10 +117,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         real_t selected_alpha = 0;
         f->value(displacement->data(), &energy);
 
-
+        // Newton solver with line search
         printf("%-10s %-14s %-14s %-14s\n", "Iteration", "gnorm", "energy", "alpha");
         printf("-------------------------------------------------------------\n");
-        // Newton solver with line search
+        
         for (int i = 0; i < nl_max_it; i++) {
             f->update(displacement->data());
             blas->zeros(ndofs, rhs->data());
@@ -136,25 +136,20 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->copy_constrained_dofs(rhs->data(), increment->data());
             cg->apply(rhs->data(), increment->data());
 
-            std::vector<real_t> alphas{-alpha, -0.9*alpha, -alpha/2, -alpha/4, -alpha/8};
+            std::vector<real_t> alphas{-2*alpha, -alpha, -0.9*alpha, 2*alpha/3, -alpha/2, -alpha/4, -alpha/8, -alpha/32, -alpha/128};
             std::vector<real_t> energies(alphas.size(), 0);
 
             f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
             const int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
             selected_alpha = alphas[min_energy_index];
             energy = energies[min_energy_index];
-            // for(auto e : energies) { printf("%-14.4e ", e); }
-            // printf("\n");
             blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
         }
-        printf("----------------------------------------\n");
     }
 
     // Output to disk
     sfem::create_directory(output_path.c_str());
-
     fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
-    // fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
 
     auto out = f->output();
 

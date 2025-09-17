@@ -36,6 +36,7 @@ namespace sfem {
 
     const std::string           &Mesh::Block::name() const { return impl_->name; }
     enum ElemType                Mesh::Block::element_type() const { return impl_->element_type; }
+    int                          Mesh::Block::n_nodes_per_element() const { return elem_num_nodes(impl_->element_type); }
     const SharedBuffer<idx_t *> &Mesh::Block::elements() const { return impl_->elements; }
 
     void Mesh::Block::set_name(const std::string &name) { impl_->name = name; }

@@ -26,6 +26,9 @@ namespace sfem {
         int update(const real_t *const x) override;
         int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
 
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
