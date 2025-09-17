@@ -89,10 +89,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->set_max_it(10000);
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
-    cg->set_atol(1e-10);
+    cg->set_atol(1e-14);
 
     // Newton iteration
-    int    nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 20);
+    int    nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 30);
     real_t alpha     = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
     auto   blas      = sfem::blas<real_t>(es);
 
@@ -113,18 +113,21 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
     } else {
-        
+        real_t energy = 0;
+        real_t selected_alpha = 0;
+        f->value(displacement->data(), &energy);
 
-        // Newton solver
+
+        printf("%-10s %-14s %-14s %-14s\n", "Iteration", "gnorm", "energy", "alpha");
+        printf("-------------------------------------------------------------\n");
+        // Newton solver with line search
         for (int i = 0; i < nl_max_it; i++) {
             f->update(displacement->data());
             blas->zeros(ndofs, rhs->data());
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            real_t energy = 0;
-            f->value(displacement->data(), &energy);
-            printf("%d) gnorm = %g\n, log(energy) = %g\n", i, gnorm, log(energy));
+            printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, selected_alpha);
 
             if(gnorm < SFEM_NL_TOL) 
                 break;
@@ -133,22 +136,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->copy_constrained_dofs(rhs->data(), increment->data());
             cg->apply(rhs->data(), increment->data());
 
-            std::vector<real_t> alphas{-alpha, -alpha/2, -alpha/4, -alpha/8, -alpha/16};
+            std::vector<real_t> alphas{-alpha, -0.9*alpha, -alpha/2, -alpha/4, -alpha/8};
             std::vector<real_t> energies(alphas.size(), 0);
 
             f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
-            for(auto &e : energies) {
-                if(e != e) {
-                    e = 1e10;
-                }
-            }
-            int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
-            
-            real_t alpha_search = alphas[min_energy_index];
-            printf("alpha = %g, energy = %g\n", alpha_search, energies[min_energy_index]);
-
-            blas->axpy(ndofs, alpha_search, increment->data(), displacement->data());
+            const int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
+            selected_alpha = alphas[min_energy_index];
+            energy = energies[min_energy_index];
+            // for(auto e : energies) { printf("%-14.4e ", e); }
+            // printf("\n");
+            blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
         }
+        printf("----------------------------------------\n");
     }
 
     // Output to disk
