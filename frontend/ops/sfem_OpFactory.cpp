@@ -14,6 +14,7 @@
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_SemiStructuredNeoHookeanOgden.hpp"
 #include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
 
@@ -70,6 +71,7 @@ namespace sfem {
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
+            instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
 
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }

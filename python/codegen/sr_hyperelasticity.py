@@ -465,8 +465,6 @@ class SRHyperelasticity:
         print(sig_objective + body_objective)
         
         
-
-
     def emit_gradient(self):
         self.__compute_dV()
         self.__compute_jacobian_adjugate()
@@ -529,6 +527,51 @@ class SRHyperelasticity:
 
         print(grad_S + grad_body)
 
+    def emit_hessian(self):
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_linearized_stress()
+        self.__compute_metric_tensor()
+        self.__compute_metric_tensor_canonical()
+      
+        fe = self.fe
+        dim = fe.spatial_dim()
+
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_hess(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      mu,\n'
+            f'    const {real_t}                      lmbda,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    const {real_t} *const SFEM_RESTRICT       S_ikmn_canonical,\n'
+            f'    {real_t} *const SFEM_RESTRICT       H)'
+            f'\n'
+        )
+
+        # S_vec = sp.Matrix(len(self.expression_table["S_ikmn_canonical"]), 1, self.expression_table["S_ikmn_canonical"])
+        # assignments = assign_matrix("F", self.expression_table["F"]) + assign_matrix("S_ikmn_packed", S_vec)
+        # combined_code = c_gen(assignments)
+
+        # body = (
+        #     f'{{\n'
+        #     f'{real_t} F[{dim * dim}];\n'
+        #     f'{combined_code}\n'
+        #     f'}}\n'
+        # )
+
+        # print(signature + body)
+        
 
 
     def partial_assembly(self):

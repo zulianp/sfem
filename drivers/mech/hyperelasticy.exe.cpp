@@ -35,11 +35,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const char *dirichlet_path = argv[2];
     std::string output_path    = argv[3];
 
-    // int SFEM_ELEMENT_REFINE_LEVEL = 2;
-
-    // SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-    // SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
-
+    int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
     const char *SFEM_OPERATOR = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
@@ -59,6 +55,11 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto      mesh                 = sfem::Mesh::create_from_file(comm, mesh_path);
     const int block_size           = mesh->spatial_dimension();
     auto      fs                   = sfem::FunctionSpace::create(mesh, block_size);
+
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    }
+
     auto      dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
 
 // FIXME
@@ -96,16 +97,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     real_t alpha     = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
     auto   blas      = sfem::blas<real_t>(es);
 
-    if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
+    if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false) || fs->has_semi_structured_mesh()) {
         for (int i = 0; i < nl_max_it; i++) {
             blas->zeros(ndofs, rhs->data());
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
             printf("%d) gnorm = %g\n", i, gnorm);
-            real_t energy = 0;
-            f->value(displacement->data(), &energy);
-            printf("energy = %g\n", energy);
 
             if(gnorm < SFEM_NL_TOL) 
                 break;
