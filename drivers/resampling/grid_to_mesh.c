@@ -785,11 +785,17 @@ int main(int argc, char* argv[]) {
                     info.adjoint_refine_type = ADJOINT_REFINE_HYTEG_REFINEMENT;
 
                     mini_tet_parameters_t mini_tet_parameters;
+                    {
+                        mini_tet_parameters.alpha_min_threshold = 1.0;
+                        mini_tet_parameters.alpha_max_threshold = 8.0;
+                        mini_tet_parameters.min_refinement_L    = 1;
+                        mini_tet_parameters.max_refinement_L    = 22;
 
-                    mini_tet_parameters.alpha_min_threshold = 1.0;
-                    mini_tet_parameters.alpha_max_threshold = 8.0;
-                    mini_tet_parameters.min_refinement_L    = 1;
-                    mini_tet_parameters.max_refinement_L    = 22;
+                        const char* max_refinement_L_str = getenv("MAX_REFINEMENT_L");
+                        if (max_refinement_L_str) {
+                            mini_tet_parameters.max_refinement_L = atoi(max_refinement_L_str);
+                        }
+                    }
 
 #if SFEM_LOG_LEVEL >= 5
                     printf("info.adjoint_refine_type = %d, %s:%d\n", info.adjoint_refine_type, __FILE__, __LINE__);

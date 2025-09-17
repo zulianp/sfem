@@ -1,0 +1,3 @@
+# filepath: /home/sriva/git/sfem/workflows/resample/cluster_results/.JuliaFormatter.toml
+style = "yas"
+align_call_args = true
