@@ -15,53 +15,6 @@ from sr_hyperelasticity import SRHyperelasticity
 from sympy import Array
 
 
-# This is for non HEX elements (use sum factorization for HEX)
-build_Z_pikmn_body="""
-for(int qp = 0; qp < nqp; qp++) {{
-    scalar_t Hkm[9];
-    scalar_t gx[NFUN];
-    scalar_t gy[NFUN];
-    scalar_t gz[NFUN];
-    const scalar_t qx = q_qx[qp];
-    const scalar_t qy = q_qy[qp];
-    const scalar_t qz = q_qz[qp];
-
-    // Compute grads and Hkm at qp
-    {COMPUTE_G_AND_H}
-  
-    # Tensor product of 3 * NFUN with D*D
-    for(int pi = 0; pi < NFUN; pi++) {{
-        scalar_t * const SFEM_RESTRICT Z_kmnx = &Z_pikmn[pi * (D*D*D)];
-        scalar_t * const SFEM_RESTRICT Z_kmny = &Z_kmnx[1];
-        scalar_t * const SFEM_RESTRICT Z_kmnz = &Z_kmnx[2];
-        for(int km = 0; km < (D*D); km++) {{
-            Z_kmnx[km * 3] += gx[pi] * Hkm[km];
-            Z_kmny[km * 3] += gy[pi] * Hkm[km];
-            Z_kmnz[km * 3] += gz[pi] * Hkm[km];
-        }}
-    }}
-}}
-"""
-
-# Expanded S (Can this be optimized?)
-# S = (i, k, m, n) == (k, i, n, m)
-SdotZ_body="""
-for(int p = 0; p < n_fun; p++) {
-    scalar_t acc[D] = {0};
-    const scalar_t * const SFEM_RESTRICT Zpi = &Z_pikmn[Z_IDX(p, 0, 0, 0, 0)];
-    for(int i = 0; i < D; i++) {
-        const scalar_t * const SFEM_RESTRICT Si = &S[S_IDX(i, 0, 0, 0)];
-        for(int k = 0; k < D * D * D; k++) {
-            acc[i] += Si[iter] * Zpi[iter];
-        }
-    }
-
-    outx[p] += acc[0];
-    outy[p] += acc[1];
-    outz[p] += acc[2];
-}
-"""
-
 
 class PAKernelGenerator:
     def __init__(self, name, op: SRHyperelasticity, metric_tensor_only=False):
@@ -407,6 +360,103 @@ class PAKernelGenerator:
         Zpkmn = Array(Zpkmn_terms, shape=(nfun, dim, dim, dim))
 
 
+        # Partial generation    
+        Zpkmn_symb = self._create_tensor4_symbol("Zpkmn", nfun, dim, dim, dim)
+
+        Zpkmn_S = (
+            f"static SFEM_INLINE void {elem_type_lc}_Zpkmn(\n"
+            f"    const {real_t} *const SFEM_RESTRICT Wimpn_compressed,\n"
+            f"    const {real_t} *const SFEM_RESTRICT incx,\n"
+            f"    const {real_t} *const SFEM_RESTRICT incy,\n"
+            f"    const {real_t} *const SFEM_RESTRICT incz,\n"
+            f"    {real_t} *const SFEM_RESTRICT Zpkmn)\n"
+        )
+        Zpkmn_body = (
+            f"{{\n"
+            f"{c_gen(self._assign_tensor4(Zpkmn_symb, Zpkmn))}\n"
+            f"}}\n"
+        )
+        
+        Zpkmn_fun = Zpkmn_S + Zpkmn_body
+
+        partial_out_terms = sp.zeros(dim, nfun)
+        for i in range(dim):
+            for p in range(nfun):
+                acc = 0
+                for k in range(dim):
+                    for m in range(dim):
+                        for n in range(dim):
+                            acc += self.S_ikmn_canonical_symb[i,k,m,n] * Zpkmn_symb[p, k, m, n]
+
+                partial_out_terms[i, p] = acc
+
+        
+        sig_SdotZ = (
+            f"static SFEM_INLINE void {elem_type_lc}_SdotZ(\n"
+            f"    const {real_t} *const SFEM_RESTRICT S_ikmn_canonical,\n"
+            f"    const {real_t} *const SFEM_RESTRICT Zpkmn,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outx,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outy,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outz) "
+            "\n"
+        )
+
+        out_symb = sp.zeros(dim, nfun)
+        for i in range(dim):
+            for j in range(nfun):
+                out_symb[i, j] = sp.symbols(f"out{syms[i]}[{j}]")
+
+        expr = []
+        for i in range(dim):
+            for j in range(nfun):
+                expr.append(ast.Assignment(out_symb[i, j], partial_out_terms[i, j]))
+        body_SdotZ = f'{{\n{c_gen(expr)} }}\n'
+        SdotZ_fun = sig_SdotZ + body_SdotZ
+
+
+        sig_expand_S = (
+            f"static SFEM_INLINE void {elem_type_lc}_expand_S(\n"
+            f"    const metric_tensor_t *const SFEM_RESTRICT S_ikmn_canonical,\n"
+            f"    {real_t} *const SFEM_RESTRICT S_ikmn)\n"
+        )
+
+        body_expand_S = (
+            f"{{\n"
+            f"{c_gen(self._assign_tensor4(self._create_tensor4_symbol("S_ikmn", dim, dim, dim, dim), self.S_ikmn_canonical_symb))}\n"
+            f"}}\n"
+        )
+
+        expand_S_fun = sig_expand_S + body_expand_S
+
+        SdotZ_expanded_fun=( 
+f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
+            f"    const {real_t} *const SFEM_RESTRICT S_ikmn,\n"
+            f"    const {real_t} *const SFEM_RESTRICT Zpkmn,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outx,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outy,\n"
+            f"    {real_t} *const SFEM_RESTRICT       outz)\n") + f"""
+{{
+    static const int pstride = {dim} * {dim} * {dim};
+    static const int ksize = {dim} * {dim} * {dim};
+    
+    for(int p = 0; p < {nfun}; p++) {{
+        scalar_t acc[{dim}] = {{0}};
+        const scalar_t * const SFEM_RESTRICT Zkmn = &Zpkmn[p * pstride];
+        for(int i = 0; i < {dim}; i++) {{
+            const scalar_t * const SFEM_RESTRICT Skmn = &S_ikmn[i * ksize];
+            for(int k = 0; k < ksize; k++) {{
+                acc[i] += Skmn[k] * Zkmn[k];
+            }}
+        }}
+
+        outx[p] = acc[0];
+        outy[p] = acc[1];
+        outz[p] = acc[2];
+        }}
+}}
+"""
+
+        # Full generation
         out_terms = sp.zeros(dim, nfun)
         for i in range(dim):
             for p in range(nfun):
@@ -519,6 +569,11 @@ class PAKernelGenerator:
             content.append(body_R)
             content.append("}\n")
             content.append("")
+
+            content.append(Zpkmn_fun)
+            content.append(SdotZ_fun)
+            content.append(expand_S_fun)
+            content.append(SdotZ_expanded_fun)
 
         if self.use_canonical:
             S_canonical_name = "S_ikmn_canonical"

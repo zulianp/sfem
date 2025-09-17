@@ -49,6 +49,8 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override;
         int mask(mask_t *mask) override;
 
+        int value(const real_t *const x, real_t *const out) override;
+
         int gradient(const real_t *const x, real_t *const g) override;
 
         int hessian_crs(const real_t *const  x,

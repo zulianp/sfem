@@ -16,6 +16,250 @@
 
 #include "hex8_partial_assembly_neohookean_inline.h"
 
+static SFEM_INLINE void hex8_neohookean_ogden_objective_at_qp(const scalar_t *const SFEM_RESTRICT adjugate,
+                                                              const scalar_t                      jacobian_determinant,
+                                                              const scalar_t                      qx,
+                                                              const scalar_t                      qy,
+                                                              const scalar_t                      qz,
+                                                              const scalar_t                      qw,
+                                                              const scalar_t                      mu,
+                                                              const scalar_t                      lmbda,
+                                                              const scalar_t *const SFEM_RESTRICT dispx,
+                                                              const scalar_t *const SFEM_RESTRICT dispy,
+                                                              const scalar_t *const SFEM_RESTRICT dispz,
+                                                              scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t F[9];
+    hex8_F(adjugate, jacobian_determinant, qx, qy, qz, dispx, dispy, dispz, F);
+
+    // mundane ops: 49 divs: 0 sqrts: 0
+    // total ops: 49
+    const scalar_t x0 = log(F[0] * F[4] * F[8] - F[0] * F[5] * F[7] - F[1] * F[3] * F[8] + F[1] * F[5] * F[6] +
+                            F[2] * F[3] * F[7] - F[2] * F[4] * F[6]);
+    v[0] += jacobian_determinant * qw *
+            ((1.0 / 2.0) * lmbda * POW2(x0) - mu * x0 +
+             (1.0 / 2.0) * mu *
+                     (POW2(F[0]) + POW2(F[1]) + POW2(F[2]) + POW2(F[3]) + POW2(F[4]) + POW2(F[5]) + POW2(F[6]) + POW2(F[7]) +
+                      POW2(F[8]) - 3));
+}
+
+static SFEM_INLINE void hex8_neohookean_ogden_objective_integral(const scalar_t *const SFEM_RESTRICT lx,
+                                                                 const scalar_t *const SFEM_RESTRICT ly,
+                                                                 const scalar_t *const SFEM_RESTRICT lz,
+                                                                 const int                           nqp,
+                                                                 const scalar_t *const SFEM_RESTRICT qx,
+                                                                 const scalar_t *const SFEM_RESTRICT qw,
+                                                                 const scalar_t                      mu,
+                                                                 const scalar_t                      lmbda,
+                                                                 const scalar_t *const SFEM_RESTRICT dispx,
+                                                                 const scalar_t *const SFEM_RESTRICT dispy,
+                                                                 const scalar_t *const SFEM_RESTRICT dispz,
+                                                                 scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t jacobian_adjugate[9];
+    scalar_t jacobian_determinant;
+
+    for (int kz = 0; kz < nqp; kz++) {
+        for (int ky = 0; ky < nqp; ky++) {
+            for (int kx = 0; kx < nqp; kx++) {
+                hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
+                hex8_neohookean_ogden_objective_at_qp(jacobian_adjugate,
+                                                      jacobian_determinant,
+                                                      qx[kx],
+                                                      qx[ky],
+                                                      qx[kz],
+                                                      qw[kx] * qw[ky] * qw[kz],
+                                                      mu,
+                                                      lmbda,
+                                                      dispx,
+                                                      dispy,
+                                                      dispz,
+                                                      v);
+            }
+        }
+    }
+}
+
+static SFEM_INLINE void hex8_neohookean_ogden_objective_steps_integral(const scalar_t *const SFEM_RESTRICT lx,
+                                                                       const scalar_t *const SFEM_RESTRICT ly,
+                                                                       const scalar_t *const SFEM_RESTRICT lz,
+                                                                       const int                           nqp,
+                                                                       const scalar_t *const SFEM_RESTRICT qx,
+                                                                       const scalar_t *const SFEM_RESTRICT qw,
+                                                                       const scalar_t                      mu,
+                                                                       const scalar_t                      lmbda,
+                                                                       const scalar_t *const SFEM_RESTRICT dispx,
+                                                                       const scalar_t *const SFEM_RESTRICT dispy,
+                                                                       const scalar_t *const SFEM_RESTRICT dispz,
+                                                                       const scalar_t *const SFEM_RESTRICT incx,
+                                                                       const scalar_t *const SFEM_RESTRICT incy,
+                                                                       const scalar_t *const SFEM_RESTRICT incz,
+                                                                       const int                           nsteps,
+                                                                       const scalar_t *const SFEM_RESTRICT steps,
+                                                                       scalar_t *const SFEM_RESTRICT       v) {
+    scalar_t ux[8];
+    scalar_t uy[8];
+    scalar_t uz[8];
+
+    for (int i = 0; i < nsteps; i++) {
+        for (int j = 0; j < 8; j++) {
+            ux[j] = dispx[j] + incx[j] * steps[i];
+            uy[j] = dispy[j] + incy[j] * steps[i];
+            uz[j] = dispz[j] + incz[j] * steps[i];
+        }
+
+        hex8_neohookean_ogden_objective_integral(lx, ly, lz, nqp, qx, qw, mu, lmbda, ux, uy, uz, &v[i]);
+    }
+}
+
+int hex8_neohookean_ogden_objective(const ptrdiff_t              nelements,
+                                    const ptrdiff_t              stride,
+                                    const ptrdiff_t              nnodes,
+                                    idx_t **const SFEM_RESTRICT  elements,
+                                    geom_t **const SFEM_RESTRICT points,
+                                    const real_t                 mu,
+                                    const real_t                 lambda,
+                                    const ptrdiff_t              u_stride,
+                                    const real_t *const          ux,
+                                    const real_t *const          uy,
+                                    const real_t *const          uz,
+                                    const int                    is_element_wise,
+                                    real_t *const                out) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        scalar_t edispx[8];
+        scalar_t edispy[8];
+        scalar_t edispz[8];
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int d = 0; d < 8; d++) {
+            lx[d] = x[ev[d]];
+            ly[d] = y[ev[d]];
+            lz[d] = z[ev[d]];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            edispx[v]           = ux[idx];
+            edispy[v]           = uy[idx];
+            edispz[v]           = uz[idx];
+        }
+
+        scalar_t v = 0;
+        hex8_neohookean_ogden_objective_integral(lx, ly, lz, n_qp, qx, qw, mu, lambda, edispx, edispy, edispz, &v);
+        assert(v == v);
+
+        if (is_element_wise) {
+            out[i] = v;
+        } else {
+#pragma omp atomic update
+            *out += v;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int hex8_neohookean_ogden_objective_steps(const ptrdiff_t              nelements,
+                                          const ptrdiff_t              stride,
+                                          const ptrdiff_t              nnodes,
+                                          idx_t **const SFEM_RESTRICT  elements,
+                                          geom_t **const SFEM_RESTRICT points,
+                                          const real_t                 mu,
+                                          const real_t                 lambda,
+                                          const ptrdiff_t              u_stride,
+                                          const real_t *const          ux,
+                                          const real_t *const          uy,
+                                          const real_t *const          uz,
+                                          const ptrdiff_t              inc_stride,
+                                          const real_t *const          incx,
+                                          const real_t *const          incy,
+                                          const real_t *const          incz,
+                                          const int                    nsteps,
+                                          const real_t *const          steps,
+                                          real_t *const                out) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel
+    {
+        scalar_t *out_local = (scalar_t *)calloc(nsteps, sizeof(scalar_t));
+
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[8];
+
+            scalar_t lx[8];
+            scalar_t ly[8];
+            scalar_t lz[8];
+
+            scalar_t edispx[8];
+            scalar_t edispy[8];
+            scalar_t edispz[8];
+
+            scalar_t eincx[8];
+            scalar_t eincy[8];
+            scalar_t eincz[8];
+
+            for (int v = 0; v < 8; ++v) {
+                ev[v] = elements[v][i * stride];
+            }
+
+            for (int d = 0; d < 8; d++) {
+                lx[d] = x[ev[d]];
+                ly[d] = y[ev[d]];
+                lz[d] = z[ev[d]];
+            }
+
+            for (int v = 0; v < 8; ++v) {
+                const ptrdiff_t idx = ev[v] * u_stride;
+                edispx[v]           = ux[idx];
+                edispy[v]           = uy[idx];
+                edispz[v]           = uz[idx];
+            }
+
+            for (int v = 0; v < 8; ++v) {
+                const ptrdiff_t idx = ev[v] * inc_stride;
+                eincx[v]            = incx[idx];
+                eincy[v]            = incy[idx];
+                eincz[v]            = incz[idx];
+            }
+
+            hex8_neohookean_ogden_objective_steps_integral(
+                    lx, ly, lz, n_qp, qx, qw, mu, lambda, edispx, edispy, edispz, eincx, eincy, eincz, nsteps, steps, out_local);
+        }
+
+        for (int s = 0; s < nsteps; s++) {
+#pragma omp atomic update
+            out[s] += out_local[s];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 static SFEM_INLINE void hex8_neohookean_grad(const scalar_t *const SFEM_RESTRICT adjugate,
                                              const scalar_t                      jacobian_determinant,
                                              const scalar_t                      qx,
@@ -408,6 +652,15 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
             element_hz[v]       = hz[idx];
         }
 
+#if 0 
+    // Slower than other variant
+    scalar_t                     S_ikmn[3*3*3*3];
+    hex8_expand_S(&partial_assembly[i * HEX8_S_IKMN_SIZE], S_ikmn);
+
+    scalar_t                     Zpkmn[8*3*3*3];
+    hex8_Zpkmn(Wimpn_compressed, element_hx, element_hy, element_hz, Zpkmn);
+    hex8_SdotZ_expanded(S_ikmn, Zpkmn, eoutx, eouty, eoutz);
+#else
         const metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         scalar_t                     S_ikmn[HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
@@ -416,6 +669,7 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
         }
 
         hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, eoutx, eouty, eoutz);
+#endif
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;
