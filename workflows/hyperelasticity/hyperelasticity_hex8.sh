@@ -26,7 +26,7 @@ then
 	mkdir -p hex8_geometry
 	cd hex8_geometry
 
-	box_mesh.py box --cell_type=hex8 -x 4 -y 4 -z 4
+	box_mesh.py box --cell_type=hex8 -x 50 -y 50 -z 50
 	surf_type=quad4
 	
 	skin box skin_box

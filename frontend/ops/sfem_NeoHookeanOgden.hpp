@@ -24,6 +24,7 @@ namespace sfem {
         ~NeoHookeanOgden() override;
 
         int update(const real_t *const x) override;
+        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
 
     private:
         class Impl;
