@@ -15,6 +15,7 @@
 
 // FIXME
 #include "tet4_neohookean_ogden.h"
+#include "hex8_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
 #include <mpi.h>
@@ -122,8 +123,8 @@ namespace sfem {
         ret->impl_->element_type    = (enum ElemType)space->element_type();
 
         if (ret->impl_->use_AoS) {
-            auto nxe             = space->mesh_ptr()->n_nodes_per_element();
-            ret->impl_->elements = convert_host_buffer_to_fake_SoA(nxe, soa_to_aos(1, nxe, space->mesh_ptr()->elements()));
+            auto nxe                    = space->mesh_ptr()->n_nodes_per_element();
+            ret->impl_->elements        = convert_host_buffer_to_fake_SoA(nxe, soa_to_aos(1, nxe, space->mesh_ptr()->elements()));
             ret->impl_->elements_stride = nxe;
         }
 
@@ -276,15 +277,32 @@ namespace sfem {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::value");
 
         auto mesh = impl_->space->mesh_ptr();
-        return neohookean_ogden_value_aos(impl_->element_type,
-                                          mesh->n_elements(),
-                                          mesh->n_nodes(),
-                                          mesh->elements()->data(),
-                                          mesh->points()->data(),
-                                          this->impl_->mu,
-                                          this->impl_->lambda,
-                                          x,
-                                          out);
+
+        if (impl_->element_type == HEX8) {
+            return hex8_neohookean_ogden_objective(mesh->n_elements(),
+                                                   impl_->elements_stride,
+                                                   mesh->n_nodes(),
+                                                   impl_->elements->data(),
+                                                   mesh->points()->data(),
+                                                   this->impl_->mu,
+                                                   this->impl_->lambda,
+                                                   3,
+                                                   &x[0],
+                                                   &x[1],
+                                                   &x[2],
+                                                   false,
+                                                   out);
+        } else {
+            return neohookean_ogden_value_aos(impl_->element_type,
+                                              mesh->n_elements(),
+                                              mesh->n_nodes(),
+                                              mesh->elements()->data(),
+                                              mesh->points()->data(),
+                                              this->impl_->mu,
+                                              this->impl_->lambda,
+                                              x,
+                                              out);
+        }
     }
 
     int NeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }

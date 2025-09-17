@@ -103,12 +103,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
             printf("%d) gnorm = %g\n", i, gnorm);
+            real_t energy = 0;
+            f->value(displacement->data(), &energy);
+            printf("energy = %g\n", energy);
+
             if(gnorm < SFEM_NL_TOL) 
                 break;
 
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
     } else {
+        
+
         // Newton solver
         for (int i = 0; i < nl_max_it; i++) {
             f->update(displacement->data());
@@ -116,7 +122,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            printf("%d) gnorm = %g\n", i, gnorm);
+            real_t energy = 0;
+            f->value(displacement->data(), &energy);
+            printf("%d) gnorm = %g\n, log(energy) = %g\n", i, gnorm, log(energy));
+
             if(gnorm < SFEM_NL_TOL) 
                 break;
 

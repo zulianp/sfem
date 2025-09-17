@@ -477,6 +477,19 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int DirichletConditions::value(const real_t *const x, real_t *const out) 
+    {
+        SFEM_TRACE_SCOPE("DirichletConditions::value");
+
+        // This is pure algebraic energy (may need to scale with boundary mass matrix for proper energy)
+        for (auto &c : impl_->conditions) {
+            constraint_objective_nodes_to_value_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, out);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     int DirichletConditions::gradient(const real_t *const x, real_t *const g) {
         SFEM_TRACE_SCOPE("DirichletConditions::gradient");
 
