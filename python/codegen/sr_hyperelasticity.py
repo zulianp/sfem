@@ -422,6 +422,51 @@ class SRHyperelasticity:
         self.expression_table["loperand"] = loperand
         return loperand
 
+
+    def emit_objective(self):
+        self.__compute_dV()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
+        fun = self.fun * dV
+
+
+        fe = self.fe
+        dim = fe.spatial_dim()
+
+        # FIXME: mu and lmbda in the signature are hardcoded
+        sig_objective = (
+            f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_objective(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      mu,\n'
+            f'    const {real_t}                      lmbda,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       v)'
+        )
+
+    
+        body_objective = (
+            f'{{\n'
+            f'{real_t} F[{dim*dim}];\n'
+            f'{fe.name().lower()}_F(adjugate, jacobian_determinant, qx, qy, qz, dispx, dispy, dispz, F);\n'
+            f'{c_gen(ast.AddAugmentedAssignment(sp.symbols("v[0]"), fun))}\n'
+            f'}}\n'
+        )
+
+        print(sig_objective + body_objective)
+        
+        
+
+
     def emit_gradient(self):
         self.__compute_dV()
         self.__compute_jacobian_adjugate()
@@ -558,4 +603,5 @@ if __name__ == "__main__":
     op = SRHyperelasticity.create_from_string(fe, "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
     # op.check_metric_tensor_symmetries()
 
-    op.emit_gradient()
+    # op.emit_gradient()
+    op.emit_objective()

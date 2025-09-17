@@ -448,6 +448,10 @@ namespace sfem {
             }
         }
 
+        for (auto &c : impl_->constraints) {
+            c->value(x, out);
+        }
+
         return SFEM_SUCCESS;
     }
 

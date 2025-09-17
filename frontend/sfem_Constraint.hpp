@@ -12,6 +12,7 @@ namespace sfem {
 class Constraint {
 public:
     virtual ~Constraint() = default;
+    virtual int value(const real_t *const /*x*/, real_t *const /*out*/) { SFEM_ERROR("IMEPLEMENT ME"); return SFEM_FAILURE; }
     virtual int apply(real_t *const x) = 0;
     virtual int apply_value(const real_t value, real_t *const x) = 0;
     virtual int apply_zero(real_t *const x);

@@ -9,6 +9,20 @@
 extern "C" {
 #endif
 
+int hex8_neohookean_ogden_objective(const ptrdiff_t              nelements,
+    const ptrdiff_t              stride,
+    const ptrdiff_t              nnodes,
+    idx_t **const SFEM_RESTRICT  elements,
+    geom_t **const SFEM_RESTRICT points,
+    const real_t                 mu,
+    const real_t                 lambda,
+    const ptrdiff_t              u_stride,
+    const real_t *const          ux,
+    const real_t *const          uy,
+    const real_t *const          uz,
+    const int                    is_element_wise,
+    real_t *const                out);
+
 int hex8_neohookean_ogden_gradient(const ptrdiff_t              nelements,
                                    const ptrdiff_t              stride,
                                    const ptrdiff_t              nnodes,

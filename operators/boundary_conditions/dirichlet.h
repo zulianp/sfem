@@ -50,6 +50,15 @@ void constraint_nodes_to_value_vec(
     real_t *values
     );
 
+void constraint_objective_nodes_to_value_vec(
+    const ptrdiff_t n_dirichlet_nodes,
+    const idx_t * dirichlet_nodes,
+    const int block_size,
+    const int component,
+    const real_t value,
+    const real_t *const SFEM_RESTRICT x,
+    real_t *const SFEM_RESTRICT out);
+
 void constraint_gradient_nodes_to_value_vec(
     const ptrdiff_t n_dirichlet_nodes,
     const idx_t * dirichlet_nodes,
