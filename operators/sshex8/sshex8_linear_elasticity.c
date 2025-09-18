@@ -502,7 +502,7 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
         scalar_t      element_matrix[(3 * 8) * (3 * 8)];
 
         scalar_t      *X = malloc(txe * 3 * 8 * sizeof(scalar_t));
-        accumulator_t *Y = malloc(txe * 3 * 8 * sizeof(scalar_t));
+        scalar_t *Y = malloc(txe * 3 * 8 * sizeof(scalar_t));
 
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {

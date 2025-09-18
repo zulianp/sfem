@@ -507,6 +507,37 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
 
         S_ikmn_x_H_km_x_G_np_fun = sig_S_ikmn_x_H_km_x_G_np + body_S_ikmn_x_H_km_x_G_np
 
+        sig_Hessian_from_S_ikmn = (
+            f'static SFEM_INLINE void {elem_type_lc}_{self.name}_hessian_from_S_ikmn(\n'
+            f'    const metric_tensor_t *const SFEM_RESTRICT S_ikmn_canonical,\n'
+            f'    const {real_t} *const SFEM_RESTRICT Wimpn_compressed,\n'
+            f'    {real_t} *const SFEM_RESTRICT       H)'
+            f'\n'
+        )
+
+
+        H = sp.zeros(nfun * dim, nfun * dim)
+
+        for p in range(0, nfun):
+            for q in range(0, nfun):
+                for i in range(0, dim):
+                    for k in range(0, dim):
+                        acc = 0
+                        for m in range(0, dim):
+                            for n in range(0, dim):
+                                acc += self.S_ikmn_canonical_symb[i, k, m, n] * Wimpn[q, m, p, n]
+                        H[i * nfun + p, k * nfun + q] = acc
+        
+        combined_code = c_gen(self._assign_matrix("H", H))
+
+        body_Hessian_from_S_ikmn = (
+            f'{{\n'
+            f'{combined_code}\n'
+            f'}}\n'
+        )
+
+        Hessian_from_S_ikmn_fun = sig_Hessian_from_S_ikmn + body_Hessian_from_S_ikmn
+
 
         is_constant = True
         params_q = "" 
@@ -554,6 +585,7 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
         content = []
         content.append(f"#ifndef {guard}")
         content.append(f"#define {guard}")
+        content.append("\n#include \"sfem_macros.h\"\n")
         if not self.metric_tensor_only:
             content.append("")
             content.append(sigF)
@@ -574,6 +606,7 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
             content.append(SdotZ_fun)
             content.append(expand_S_fun)
             content.append(SdotZ_expanded_fun)
+            content.append(Hessian_from_S_ikmn_fun)
 
         if self.use_canonical:
             S_canonical_name = "S_ikmn_canonical"
