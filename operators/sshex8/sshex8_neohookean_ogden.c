@@ -9,6 +9,7 @@
 #include "sshex8.h"
 
 #include "hex8_neohookean_ogden_local.h"
+#include "packed_elements.h"
 
 int sshex8_neohookean_ogden_objective(int                               level,
                                       const ptrdiff_t                   nelements,
@@ -470,6 +471,11 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
         scalar_t *eouty = &eout[1 * 8];
         scalar_t *eoutz = &eout[2 * 8];
 
+#ifdef SFEM_ENABLE_BLAS
+        scalar_t *X = malloc(txe * 3 * 8 * sizeof(scalar_t));
+        scalar_t *Y = malloc(txe * 3 * 8 * sizeof(scalar_t));
+#endif
+
 #pragma omp for
         for (ptrdiff_t e = 0; e < nelements; ++e) {
             {
@@ -485,19 +491,19 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                     eh[2][d]            = hz[idx];
                 }
 
-
                 for (int d = 0; d < 3; d++) {
                     memset(v[d], 0, nxe * sizeof(scalar_t));
                 }
             }
 
-            scalar_t partial_assembly_local[HEX8_S_IKMN_SIZE];
-            for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
-                partial_assembly_local[d] = partial_assembly[e * HEX8_S_IKMN_SIZE + d];
-            }
+            scalar_t element_matrix[24 * 24];
+            hex8_neohookean_hessian_from_S_ikmn(&partial_assembly[e * HEX8_S_IKMN_SIZE], Wimpn_compressed, element_matrix);
 
-            //TODO: Create elemental matrix
-
+#ifdef SFEM_ENABLE_BLAS
+            sshex8_SoA_pack_elements(level, eh, X);
+            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            sshex8_SoA_unpack_add_elements(level, Y, v);
+#else
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
                 for (int yi = 0; yi < level; yi++) {
@@ -520,14 +526,17 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                             element_hz[d]  = eh[2][lidx];
                         }
 
-                        hex8_SdotHdotG(partial_assembly_local,
-                                       Wimpn_compressed,
-                                       element_hx,
-                                       element_hy,
-                                       element_hz,
-                                       eoutx,
-                                       eouty,
-                                       eoutz);
+                        for (int d = 0; d < 3 * 8; d++) {
+                            eout[d] = 0;
+                        }
+
+                        for (int i = 0; i < 3 * 8; i++) {
+                            const scalar_t *const col = &element_matrix[i * 3 * 8];
+                            const scalar_t        ui  = element_h[i];
+                            for (int j = 0; j < 3 * 8; j++) {
+                                eout[j] += ui * col[j];
+                            }
+                        }
 
                         for (int d = 0; d < 8; d++) {
                             const int lidx = lev[d];
@@ -538,6 +547,7 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                     }
                 }
             }
+#endif
 
             {
                 // Scatter elemental data
@@ -563,6 +573,11 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
             free(eh[d]);
             free(v[d]);
         }
+
+#ifdef SFEM_ENABLE_BLAS
+        free(X);
+        free(Y);
+#endif
     }
 
     return SFEM_SUCCESS;
