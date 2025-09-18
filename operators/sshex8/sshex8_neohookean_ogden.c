@@ -496,6 +496,8 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                 partial_assembly_local[d] = partial_assembly[e * HEX8_S_IKMN_SIZE + d];
             }
 
+            //TODO: Create elemental matrix
+
             // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
                 for (int yi = 0; yi < level; yi++) {

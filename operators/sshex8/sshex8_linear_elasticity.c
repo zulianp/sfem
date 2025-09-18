@@ -578,8 +578,8 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                       sshex8_lidx(level, xi, yi + 1, zi + 1)};
 
                         scalar_t *Xex = &X[ledix * 24];
-                        scalar_t *Xey = &Xex[8];
-                        scalar_t *Xez = &Xex[16];
+                        scalar_t *Xey = &X[ledix * 24 + 8];
+                        scalar_t *Xez = &X[ledix * 24 + 16];
 
                         for (int i = 0; i < 8; i++) {
                             int lidx = lev[i];
@@ -606,19 +606,19 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                 }
             }
 #else
-            // Y = A * X^T
+            // Y = A * X^T (interpret row-major buffers via transpose trick)
             char     transa = 'N';
-            char     transb = 'N';
-            int      m      = 24;
-            int      n      = txe;
+            char     transb = 'T';
+            int      m      = txe;
+            int      n      = 24;
             int      k      = 24;
             scalar_t alpha  = 1.0;
             scalar_t beta   = 0.0;
-            int      lda    = 24;
-            int      ldx    = 24;
-            int      ldy    = 24;
+            int      lda    = txe;  // leading dimension of X (txe rows in column-major view)
+            int      ldb    = 24;   // leading dimension of A (24 rows)
+            int      ldc    = txe;  // leading dimension of Y (txe rows)
 
-            dgemm_(&transa, &transb, &m, &n, &k, &alpha, element_matrix, &lda, X, &ldx, &beta, Y, &ldy);
+            dgemm_(&transa, &transb, &m, &n, &k, &alpha, X, &lda, element_matrix, &ldb, &beta, Y, &ldc);
 #endif
 
             for (int d = 0; d < 3; d++) {
