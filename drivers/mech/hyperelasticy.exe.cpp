@@ -134,7 +134,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->copy_constrained_dofs(rhs->data(), increment->data());
             cg->apply(rhs->data(), increment->data());
 
-            std::vector<real_t> alphas{-2*alpha, -alpha, -0.9*alpha, 2*alpha/3, -alpha/2, -alpha/4, -alpha/8, -alpha/32, -alpha/128};
+            std::vector<real_t> alphas{-2*alpha, -alpha, -(real_t)0.9*alpha, 2*alpha/3, -alpha/2, -alpha/4, -alpha/8, -alpha/32, -alpha/128};
             std::vector<real_t> energies(alphas.size(), 0);
 
             f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
