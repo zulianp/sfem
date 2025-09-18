@@ -119,7 +119,7 @@ then
 else
 	# create_sphere.sh 5
 	export SFEM_ORDER_WITH_COORDINATE=2
-	create_sphere.sh 5 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	create_sphere.sh 3 # Visibily see the curvy surface <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	sfc $mesh temp_mesh
 	SFEM_ORDER_WITH_COORDINATE=2 sfc temp_mesh $mesh_sorted
 	

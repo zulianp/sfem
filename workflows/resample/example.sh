@@ -30,7 +30,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=torus3
+mesh=torus4
 # mesh=impeller_tet4
 
 out=resampled

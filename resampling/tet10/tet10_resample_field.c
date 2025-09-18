@@ -220,44 +220,6 @@ tet10_dual_basis_hrt(const real_t qx, const real_t qy, const real_t qz, real_t* 
     f[9] = qx * x39 + (460.0 / 27.0) * x12 + x44 + x46 + x48 + x50 + x51;
 }
 
-// /**
-//  * @brief Compute the dual basis of the tet10 element
-//  *
-//  * @param qx
-//  * @param qy
-//  * @param qz
-//  * @param f
-//  */
-// real_t  //
-// tet4_measure(
-//         // X-coordinates
-//         const real_t px0, const real_t px1, const real_t px2, const real_t px3,
-//         // Y-coordinates
-//         const real_t py0, const real_t py1, const real_t py2, const real_t py3,
-//         // Z-coordinates
-//         const real_t pz0, const real_t pz1, const real_t pz2, const real_t pz3) {
-//     //
-//     // determinant of the Jacobian
-//     // M = [px0, py0, pz0, 1]
-//     //     [px1, py1, pz1, 1]
-//     //     [px2, py2, pz2, 1]
-//     //     [px3, py3, pz3, 1]
-//     //
-//     // V = (1/6) * det(M)
-
-//     const real_t x0 = -pz0 + pz3;
-//     const real_t x1 = -py0 + py2;
-//     const real_t x2 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px1;
-//     const real_t x3 = -py0 + py3;
-//     const real_t x4 = -pz0 + pz2;
-//     const real_t x5 = -py0 + py1;
-//     const real_t x6 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px2;
-//     const real_t x7 = -pz0 + pz1;
-//     const real_t x8 = -1.0 / 6.0 * px0 + (1.0 / 6.0) * px3;
-
-//     return x0 * x1 * x2 - x0 * x5 * x6 - x1 * x7 * x8 - x2 * x3 * x4 + x3 * x6 * x7 + x4 * x5 * x8;
-// }
-
 SFEM_INLINE static void tet4_transform(
         /**
          ****************************************************************************************
@@ -303,24 +265,6 @@ SFEM_INLINE static void tet4_transform(
     *out_y = py0 + qx * (-py0 + py1) + qy * (-py0 + py2) + qz * (-py0 + py3);
     *out_z = pz0 + qx * (-pz0 + pz1) + qy * (-pz0 + pz2) + qz * (-pz0 + pz3);
 }
-
-// void hex_aa_8_eval_fun(
-//         // Quadrature point (local coordinates)
-//         // With respect to the hat functions of a cube element
-//         // In a local coordinate system
-//         const real_t x, const real_t y, const real_t z,
-//         // Output
-//         real_t* const SFEM_RESTRICT f) {
-//     //
-//     f[0] = (1.0 - x) * (1.0 - y) * (1.0 - z);
-//     f[1] = x * (1.0 - y) * (1.0 - z);
-//     f[2] = x * y * (1.0 - z);
-//     f[3] = (1.0 - x) * y * (1.0 - z);
-//     f[4] = (1.0 - x) * (1.0 - y) * z;
-//     f[5] = x * (1.0 - y) * z;
-//     f[6] = x * y * z;
-//     f[7] = (1.0 - x) * y * z;
-// }
 
 ////////////////////////////////////////////////////////////////////////
 // hex_aa_8_collect_coeffs
