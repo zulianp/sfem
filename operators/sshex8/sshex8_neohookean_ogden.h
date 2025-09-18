@@ -61,7 +61,7 @@ int sshex8_neohookean_ogden_gradient(int                               level,
                                      real_t *const SFEM_RESTRICT       outy,
                                      real_t *const SFEM_RESTRICT       outz);
 
-int SShex8_neohookean_ogden_hessian_partial_assembly(int                                  level,
+int sshex8_neohookean_ogden_hessian_partial_assembly(int                                  level,
                                                      const ptrdiff_t                      nelements,
                                                      const ptrdiff_t                      stride,
                                                      idx_t **const SFEM_RESTRICT          elements,
