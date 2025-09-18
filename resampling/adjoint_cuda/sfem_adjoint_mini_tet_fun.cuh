@@ -391,30 +391,20 @@ make_Jacobian_matrix_tet_c_gpu(const FloatType fx0,  // Tetrahedron vertices X-c
     J[1] = fx2 - fx0;  // dx/deta
     J[2] = fx3 - fx0;  // dx/dzeta
 
-    // J[0] = Float3<FloatType>::make(fx1 - fx0, fx2 - fx0, fx3 - fx0);
-
     // Row 1: y-components (indices 3,4,5)
     J[3] = fy1 - fy0;  // dy/dxi
     J[4] = fy2 - fy0;  // dy/deta
     J[5] = fy3 - fy0;  // dy/dzeta
-
-    // J[1] = Float3<FloatType>::make(fy1 - fy0, fy2 - fy0, fy3 - fy0);
 
     // Row 2: z-components (indices 6,7,8)
     J[6] = fz1 - fz0;  // dz/dxi
     J[7] = fz2 - fz0;  // dz/deta
     J[8] = fz3 - fz0;  // dz/dzeta
 
-    // J[2] = Float3<FloatType>::make(fz1 - fz0, fz2 - fz0, fz3 - fz0);
-
     // Compute determinant of the 3x3 Jacobian matrix
     const FloatType det = J[0] * (J[4] * J[8] - J[5] * J[7]) -  //
                           J[1] * (J[3] * J[8] - J[5] * J[6]) +  //
                           J[2] * (J[3] * J[7] - J[4] * J[6]);   //
-
-    // const FloatType det = J[0].x * (J[1].y * J[2].z - J[1].z * J[2].y) -  //
-    //                       J[0].y * (J[1].x * J[2].z - J[1].z * J[2].x) +  //
-    //                       J[0].z * (J[1].x * J[2].y - J[1].y * J[2].x);   //
 
     return det;
 }
@@ -438,36 +428,10 @@ make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahed
                              const FloatType                   fz2,  //
                              const FloatType                   fz3,
                              typename Float3<FloatType>::type* J) {  // Jacobian matrix
-    // Compute the Jacobian matrix for tetrahedron transformation
-    // J = [x1-x0, x2-x0, x3-x0]   <- Row 0: indices 0,1,2
-    //     [y1-y0, y2-y0, y3-y0]   <- Row 1: indices 3,4,5
-    //     [z1-z0, z2-z0, z3-z0]   <- Row 2: indices 6,7,8
-
-    // Row 0: x-components (indices 0,1,2)
-    // J[0] = fx1 - fx0;  // dx/dxi
-    // J[1] = fx2 - fx0;  // dx/deta
-    // J[2] = fx3 - fx0;  // dx/dzeta
 
     J[0] = Float3<FloatType>::make(fx1 - fx0, fx2 - fx0, fx3 - fx0);
-
-    // Row 1: y-components (indices 3,4,5)
-    // J[3] = fy1 - fy0;  // dy/dxi
-    // J[4] = fy2 - fy0;  // dy/deta
-    // J[5] = fy3 - fy0;  // dy/dzeta
-
     J[1] = Float3<FloatType>::make(fy1 - fy0, fy2 - fy0, fy3 - fy0);
-
-    // Row 2: z-components (indices 6,7,8)
-    // J[6] = fz1 - fz0;  // dz/dxi
-    // J[7] = fz2 - fz0;  // dz/deta
-    // J[8] = fz3 - fz0;  // dz/dzeta
-
     J[2] = Float3<FloatType>::make(fz1 - fz0, fz2 - fz0, fz3 - fz0);
-
-    // Compute determinant of the 3x3 Jacobian matrix
-    // const FloatType det = J[0] * (J[4] * J[8] - J[5] * J[7]) -  //
-    //                      J[1] * (J[3] * J[8] - J[5] * J[6]) +  //
-    //                      J[2] * (J[3] * J[7] - J[4] * J[6]);   //
 
     // FMA-accelerated evaluation
     const FloatType m00 = fast_fma(J[1].y, J[2].z, -(J[1].z * J[2].y));  // J[1].y*J[2].z - J[1].z*J[2].y
@@ -674,48 +638,6 @@ __device__ __forceinline__ void store_add(T* dst, T v) {
 #else
     atomicAdd(dst, v);  // default: safe atomic add
 #endif
-}
-
-__global__ void setup_kernel(curandState* state, unsigned long seed, int n) {
-    int id = threadIdx.x + blockDim.x * blockIdx.x;
-    if (id < n) curand_init(seed, id, 0, &state[id]);
-}
-
-template <typename FloatType>
-__global__ void generate(curandState* globalState, FloatType* result, int count) {
-    int ind = threadIdx.x + blockDim.x * blockIdx.x;
-    if (ind < count) {
-        curandState localState = globalState[ind];
-        FloatType   RANDOM     = curand_uniform(&localState);
-        globalState[ind]       = localState;
-        result[ind]            = RANDOM;
-    }
-}
-
-template <typename FloatType>
-inline int generate_unique_random_numbers(const int                   N,          //
-                                          curandState*                devStates,  //
-                                          thrust::device_vector<int>& d_r,        //
-                                          int*                        d_result) {                        //
-    const int R = N;
-
-    if (R <= 0) return 1;
-
-    // setup seeds
-    dim3 block(256);
-    dim3 grid((R + block.x - 1) / block.x);
-    setup_kernel<<<grid, block>>>(devStates, (unsigned long)time(NULL), R);
-
-    // generate random numbers
-    generate<<<grid, block>>>(devStates, d_result, R);
-    cudaDeviceSynchronize();
-
-    thrust::sequence(d_r.begin(), d_r.end(), 0);
-
-    thrust::device_ptr<int> dp_res = thrust::device_pointer_cast(d_result);
-    thrust::sort_by_key(dp_res, dp_res + R, d_r.begin());
-
-    return 0;
 }
 
 #endif  // __SFEM_ADJOINT_MINI_TET_FUN_CUH__
