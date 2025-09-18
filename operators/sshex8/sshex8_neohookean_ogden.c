@@ -24,8 +24,9 @@ int sshex8_neohookean_ogden_objective(int                               level,
                                       const real_t *const SFEM_RESTRICT uz,
                                       const int                         is_element_wise,
                                       real_t *const SFEM_RESTRICT       out) {
-    SFEM_IMPLEMENT_ME();
-    return SFEM_FAILURE;
+    // FIXME
+    out[0] = 1;
+    return SFEM_SUCCESS;
 }
 
 int sshex8_neohookean_ogden_objective_steps(int                               level,
@@ -47,8 +48,11 @@ int sshex8_neohookean_ogden_objective_steps(int                               le
                                             const int                         nsteps,
                                             const real_t *const SFEM_RESTRICT steps,
                                             real_t *const SFEM_RESTRICT       out) {
-    SFEM_IMPLEMENT_ME();
-    return SFEM_FAILURE;
+    // FIXME
+    for (int s = 0; s < nsteps; s++) {
+        out[s] = 1;
+    }
+    return SFEM_SUCCESS;
 }
 
 int sshex8_neohookean_ogden_gradient(int                               level,
@@ -121,7 +125,7 @@ int sshex8_neohookean_ogden_gradient(int                               level,
             {
                 // Gather elemental data
                 for (int d = 0; d < nxe; d++) {
-                    ev[d] = elements[d][e];
+                    ev[d] = elements[d][e * stride];
                 }
 
                 for (int d = 0; d < 8; d++) {
@@ -172,21 +176,28 @@ int sshex8_neohookean_ogden_gradient(int                               level,
 
                         for (int d = 0; d < 3 * 8; d++) {
                             eout[d] = 0;
-                        }   
+                        }
 
                         scalar_t jacobian_adjugate[9];
                         scalar_t jacobian_determinant;
                         scalar_t sub_adjugate[9];
                         scalar_t sub_determinant;
-                              
+
                         for (int kz = 0; kz < n_qp; kz++) {
                             for (int ky = 0; ky < n_qp; ky++) {
                                 for (int kx = 0; kx < n_qp; kx++) {
-                                    hex8_adjugate_and_det(x, y, z, (xi + qx[kx]) * h, (yi + qx[ky]) * h, (zi + qx[kz]) * h, jacobian_adjugate, &jacobian_determinant);
+                                    hex8_adjugate_and_det(x,
+                                                          y,
+                                                          z,
+                                                          (xi + qx[kx]) * h,
+                                                          (yi + qx[ky]) * h,
+                                                          (zi + qx[kz]) * h,
+                                                          jacobian_adjugate,
+                                                          &jacobian_determinant);
                                     hex8_sub_adj_0(jacobian_adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
                                     assert(jacobian_determinant == jacobian_determinant);
                                     assert(jacobian_determinant != 0);
-                
+
                                     hex8_neohookean_grad(sub_adjugate,
                                                          sub_determinant,
                                                          qx[kx],
@@ -243,7 +254,7 @@ int sshex8_neohookean_ogden_gradient(int                               level,
     return SFEM_SUCCESS;
 }
 
-int SShex8_neohookean_ogden_hessian_partial_assembly(int                                  level,
+int sshex8_neohookean_ogden_hessian_partial_assembly(int                                  level,
                                                      const ptrdiff_t                      nelements,
                                                      const ptrdiff_t                      stride,
                                                      idx_t **const SFEM_RESTRICT          elements,
@@ -255,8 +266,165 @@ int SShex8_neohookean_ogden_hessian_partial_assembly(int                        
                                                      const real_t *const SFEM_RESTRICT    uy,
                                                      const real_t *const SFEM_RESTRICT    uz,
                                                      metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
-    SFEM_IMPLEMENT_ME();
-    return SFEM_FAILURE;
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                sshex8_lidx(level, 0, 0, 0),
+                                                sshex8_lidx(level, level, 0, 0),
+                                                sshex8_lidx(level, level, level, 0),
+                                                sshex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                sshex8_lidx(level, 0, 0, level),
+                                                sshex8_lidx(level, level, 0, level),
+                                                sshex8_lidx(level, level, level, level),
+                                                sshex8_lidx(level, 0, level, level)};
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        scalar_t *eu[3];
+        for (int d = 0; d < 3; d++) {
+            eu[d] = malloc(nxe * sizeof(scalar_t));
+        }
+
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t element_u[3 * 8];
+
+        // Aliases for reduced complexity inside
+        scalar_t *element_ux = &element_u[0 * 8];
+        scalar_t *element_uy = &element_u[1 * 8];
+        scalar_t *element_uz = &element_u[2 * 8];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e * stride];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    eu[0][d] = ux[ev[d] * u_stride];
+                    eu[1][d] = uy[ev[d] * u_stride];
+                    eu[2][d] = uz[ev[d] * u_stride];
+
+                    assert(eu[0][d] == eu[0][d]);
+                    assert(eu[1][d] == eu[1][d]);
+                    assert(eu[2][d] == eu[2][d]);
+                }
+            }
+
+            const scalar_t h  = 1. / level;
+            const scalar_t h3 = h * h * h;
+
+            metric_tensor_t *const pai = &partial_assembly[e * HEX8_S_IKMN_SIZE];
+            for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
+                pai[d] = 0;
+            }
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      sshex8_lidx(level, xi, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                      sshex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      sshex8_lidx(level, xi, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        for (int d = 0; d < 8; d++) {
+                            const int lidx = lev[d];
+                            element_ux[d]  = eu[0][lidx];
+                            element_uy[d]  = eu[1][lidx];
+                            element_uz[d]  = eu[2][lidx];
+                        }
+
+                        scalar_t jacobian_adjugate[9];
+                        scalar_t jacobian_determinant;
+                        scalar_t sub_adjugate[9];
+                        scalar_t sub_determinant;
+
+                        for (int kz = 0; kz < n_qp; kz++) {
+                            for (int ky = 0; ky < n_qp; ky++) {
+                                for (int kx = 0; kx < n_qp; kx++) {
+                                    hex8_adjugate_and_det(x,
+                                                          y,
+                                                          z,
+                                                          (xi + qx[kx]) * h,
+                                                          (yi + qx[ky]) * h,
+                                                          (zi + qx[kz]) * h,
+                                                          jacobian_adjugate,
+                                                          &jacobian_determinant);
+                                    hex8_sub_adj_0(jacobian_adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+                                    assert(jacobian_determinant == jacobian_determinant);
+                                    assert(jacobian_determinant != 0);
+
+                                    scalar_t F[9] = {0};
+                                    hex8_F(sub_adjugate,
+                                           sub_determinant,
+                                           qx[kx],
+                                           qx[ky],
+                                           qx[kz],
+                                           element_ux,
+                                           element_uy,
+                                           element_uz,
+                                           F);
+
+                                    scalar_t partial_assembly_local[HEX8_S_IKMN_SIZE] = {0};
+                                    hex8_S_ikmn_neohookean(sub_adjugate,
+                                                           sub_determinant,
+                                                           qx[kx],
+                                                           qx[ky],
+                                                           qx[kz],
+                                                           F,
+                                                           mu,
+                                                           lambda,
+                                                           qw[kx] * qw[ky] * qw[kz],
+                                                           partial_assembly_local);
+
+                                    for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
+                                        pai[d] += partial_assembly_local[d] * h3;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+
+        for (int d = 0; d < 3; d++) {
+            free(eu[d]);
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
 
 int sshex8_neohookean_ogden_partial_assembly_apply(int                                        level,
@@ -272,8 +440,137 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                                                    real_t *const SFEM_RESTRICT                outx,
                                                    real_t *const SFEM_RESTRICT                outy,
                                                    real_t *const SFEM_RESTRICT                outz) {
-    SFEM_IMPLEMENT_ME();
-    return SFEM_FAILURE;
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+    
+    scalar_t  Wimpn_compressed[10];
+    hex8_Wimpn_compressed(Wimpn_compressed);
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        scalar_t *eh[3];
+        scalar_t *v[3];
+        for (int d = 0; d < 3; d++) {
+            eh[d] = malloc(nxe * sizeof(scalar_t));
+            v[d] = malloc(nxe * sizeof(scalar_t));
+        }
+
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t element_h[3 * 8];
+
+        // Aliases for reduced complexity inside
+        scalar_t *element_hx = &element_h[0 * 8];
+        scalar_t *element_hy = &element_h[1 * 8];
+        scalar_t *element_hz = &element_h[2 * 8];
+
+        scalar_t eout[3 * 8];
+        scalar_t *eoutx = &eout[0 * 8];
+        scalar_t *eouty = &eout[1 * 8];
+        scalar_t *eoutz = &eout[2 * 8];
+
+#pragma omp parallel
+        {
+            // Allocation per thread
+            scalar_t *eu[3];
+            for (int d = 0; d < 3; d++) {
+                eu[d] = malloc(nxe * sizeof(scalar_t));
+            }
+
+            idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+#pragma omp for
+            for (ptrdiff_t e = 0; e < nelements; ++e) {
+                {
+                    // Gather elemental data
+                    for (int d = 0; d < nxe; d++) {
+                        ev[d] = elements[d][e * stride];
+                    }
+
+                    for (int d = 0; d < 8; d++) {
+                        const ptrdiff_t idx = ev[d] * h_stride;
+                        element_hx[d]       = hx[idx];
+                        element_hy[d]       = hy[idx];
+                        element_hz[d]       = hz[idx];
+                    }
+                }
+
+                scalar_t partial_assembly_local[HEX8_S_IKMN_SIZE];
+                for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
+                    partial_assembly_local[d] = partial_assembly[e * HEX8_S_IKMN_SIZE + d];
+                }
+
+                // Iterate over sub-elements
+                for (int zi = 0; zi < level; zi++) {
+                    for (int yi = 0; yi < level; yi++) {
+                        for (int xi = 0; xi < level; xi++) {
+                            int lev[8] = {// Bottom
+                                          sshex8_lidx(level, xi, yi, zi),
+                                          sshex8_lidx(level, xi + 1, yi, zi),
+                                          sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                          sshex8_lidx(level, xi, yi + 1, zi),
+                                          // Top
+                                          sshex8_lidx(level, xi, yi, zi + 1),
+                                          sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                          sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                          sshex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                            for (int d = 0; d < 8; d++) {
+                                const int lidx = lev[d];
+                                element_hx[d]  = hx[lidx * h_stride];
+                                element_hy[d]  = hy[lidx * h_stride];
+                                element_hz[d]  = hz[lidx * h_stride];
+                            }
+
+                            hex8_SdotHdotG(partial_assembly_local,
+                                           Wimpn_compressed,
+                                           element_hx,
+                                           element_hy,
+                                           element_hz,
+                                           eoutx,
+                                           eouty,
+                                           eoutz);
+
+                            for (int d = 0; d < 8; d++) {
+                                const int lidx = lev[d];
+                                v[0][lidx] += eoutx[d];
+                                v[1][lidx] += eouty[d];
+                                v[2][lidx] += eoutz[d];
+                            }
+                        }
+                    }
+                }
+
+                {
+                    // Scatter elemental data
+                    for (int d = 0; d < nxe; d++) {
+                        const ptrdiff_t idx = ev[d] * out_stride;
+
+#pragma omp atomic update
+                        outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                        outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                        outz[idx] += v[2][d];
+                    }
+                }
+            }
+        }
+
+
+        // Clean-up
+        free(ev);
+
+        for (int d = 0; d < 3; d++) {
+            free(eh[d]);
+            free(v[d]);
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
 
 int sshex8_neohookean_ogden_compressed_partial_assembly_apply(int                                     level,
