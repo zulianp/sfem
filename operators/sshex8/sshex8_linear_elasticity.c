@@ -6,24 +6,8 @@
 #include "hex8_linear_elasticity_inline_cpu.h"
 // #include "hex8_quadrature.h"
 #include "line_quadrature.h"
+#include "packed_elements.h"
 #include "sshex8.h"
-
-// BLAS function declaration
-#ifdef SFEM_ENABLE_BLAS
-extern void dgemm_(const char   *transa,
-                   const char   *transb,
-                   const int    *m,
-                   const int    *n,
-                   const int    *k,
-                   const double *alpha,
-                   const double *a,
-                   const int    *lda,
-                   const double *b,
-                   const int    *ldb,
-                   const double *beta,
-                   double       *c,
-                   const int    *ldc);
-#endif
 
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))
@@ -284,7 +268,7 @@ int sshex8_linear_elasticity_apply(const int                    level,
 
 // ---------------
 
-#if 0
+#ifndef SFEM_ENABLE_BLAS
 
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
@@ -488,7 +472,6 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
                                                 sshex8_lidx(level, level, 0, 0),
                                                 sshex8_lidx(level, level, level, 0),
                                                 sshex8_lidx(level, 0, level, 0),
-
                                                 // Top
                                                 sshex8_lidx(level, 0, 0, level),
                                                 sshex8_lidx(level, level, 0, level),
@@ -560,103 +543,12 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
             hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
             hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
 
-            // Iterate over sub-elements
-            int ledix = 0;
-            for (int zi = 0; zi < level; zi++) {
-                for (int yi = 0; yi < level; yi++) {
-                    for (int xi = 0; xi < level; xi++) {
-                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
-                        int lev[8] = {// Bottom
-                                      sshex8_lidx(level, xi, yi, zi),
-                                      sshex8_lidx(level, xi + 1, yi, zi),
-                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
-                                      sshex8_lidx(level, xi, yi + 1, zi),
-                                      // Top
-                                      sshex8_lidx(level, xi, yi, zi + 1),
-                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
-                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
-                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
-
-                        scalar_t *Xex = &X[ledix * 24];
-                        scalar_t *Xey = &X[ledix * 24 + 8];
-                        scalar_t *Xez = &X[ledix * 24 + 16];
-
-                        for (int i = 0; i < 8; i++) {
-                            int lidx = lev[i];
-                            Xex[i]   = eu[0][lidx];
-                            Xey[i]   = eu[1][lidx];
-                            Xez[i]   = eu[2][lidx];
-                        }
-
-                        ledix++;
-                    }
-                }
-            }
-
-#ifndef SFEM_ENABLE_BLAS
-            memset(Y, 0, 24 * txe * sizeof(scalar_t));
-            // Y = A * X^T
-            for (int j = 0; j < txe; j++) {
-                for (int i = 0; i < 24; i++) {
-                    scalar_t acc = 0;
-                    for (int k = 0; k < 24; k++) {
-                        acc += element_matrix[i * 24 + k] * X[j * 24 + k];
-                    }
-                    Y[i * txe + j] += acc;
-                }
-            }
-#else
-            // Y = A * X^T (interpret row-major buffers via transpose trick)
-            char     transa = 'N';
-            char     transb = 'T';
-            int      m      = txe;
-            int      n      = 24;
-            int      k      = 24;
-            scalar_t alpha  = 1.0;
-            scalar_t beta   = 0.0;
-            int      lda    = txe;  // leading dimension of X (txe rows in column-major view)
-            int      ldb    = 24;   // leading dimension of A (24 rows)
-            int      ldc    = txe;  // leading dimension of Y (txe rows)
-
-            dgemm_(&transa, &transb, &m, &n, &k, &alpha, X, &lda, element_matrix, &ldb, &beta, Y, &ldc);
-#endif
-
+            sshex8_SoA_pack_elements(level, eu, X);
+            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
             for (int d = 0; d < 3; d++) {
                 memset(v[d], 0, nxe * sizeof(accumulator_t));
             }
-
-            // Iterate over sub-elements
-            ledix = 0;
-            for (int zi = 0; zi < level; zi++) {
-                for (int yi = 0; yi < level; yi++) {
-                    for (int xi = 0; xi < level; xi++) {
-                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
-                        int lev[8] = {// Bottom
-                                      sshex8_lidx(level, xi, yi, zi),
-                                      sshex8_lidx(level, xi + 1, yi, zi),
-                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
-                                      sshex8_lidx(level, xi, yi + 1, zi),
-                                      // Top
-                                      sshex8_lidx(level, xi, yi, zi + 1),
-                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
-                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
-                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
-
-                        scalar_t *Yex = &Y[0 * txe + ledix];
-                        scalar_t *Yey = &Y[8 * txe + ledix];
-                        scalar_t *Yez = &Y[16 * txe + ledix];
-
-                        for (int i = 0; i < 8; i++) {
-                            int lidx = lev[i];
-                            v[0][lidx] += Yex[i * txe];
-                            v[1][lidx] += Yey[i * txe];
-                            v[2][lidx] += Yez[i * txe];
-                        }
-
-                        ledix++;
-                    }
-                }
-            }
+            sshex8_SoA_unpack_add_elements(level, Y, v);
 
             {
                 // Scatter elemental data
