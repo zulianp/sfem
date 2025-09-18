@@ -35,13 +35,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const char *dirichlet_path = argv[2];
     std::string output_path    = argv[3];
 
-    int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
-    const char *SFEM_OPERATOR = "NeoHookeanOgden";
+    int         SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+    const char *SFEM_OPERATOR             = "NeoHookeanOgden";
     SFEM_READ_ENV(SFEM_OPERATOR, );
 
     const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
-    const real_t SFEM_NL_TOL = sfem::Env::read("SFEM_NL_TOL", 1e-10); 
+    const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-10);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -52,15 +52,15 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         }
     }
 
-    auto      mesh                 = sfem::Mesh::create_from_file(comm, mesh_path);
-    const int block_size           = mesh->spatial_dimension();
-    auto      fs                   = sfem::FunctionSpace::create(mesh, block_size);
+    auto      mesh       = sfem::Mesh::create_from_file(comm, mesh_path);
+    const int block_size = mesh->spatial_dimension();
+    auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     }
 
-    auto      dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+    auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA
@@ -93,9 +93,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->set_atol(1e-11);
 
     // Newton iteration
-    int    nl_max_it = sfem::Env::read("SFEM_NL_MAX_IT", 30);
-    real_t alpha     = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
-    auto   blas      = sfem::blas<real_t>(es);
+    int    nl_max_it          = sfem::Env::read("SFEM_NL_MAX_IT", 30);
+    real_t alpha              = sfem::Env::read("SFEM_NL_ALPHA", 1.0);
+    bool   enable_line_search = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
+    auto   blas               = sfem::blas<real_t>(es);
 
     if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
@@ -105,20 +106,19 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
             printf("%d) gnorm = %g\n", i, gnorm);
 
-            if(gnorm < SFEM_NL_TOL) 
-                break;
+            if (gnorm < SFEM_NL_TOL) break;
 
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
     } else {
-        real_t energy = 0;
+        real_t energy         = 0;
         real_t selected_alpha = 0;
         f->value(displacement->data(), &energy);
 
         // Newton solver with line search
         printf("%-10s %-14s %-14s %-14s\n", "Iteration", "gnorm", "energy", "alpha");
         printf("-------------------------------------------------------------\n");
-        
+
         for (int i = 0; i < nl_max_it; i++) {
             f->update(displacement->data());
             blas->zeros(ndofs, rhs->data());
@@ -127,23 +127,37 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
             printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, selected_alpha);
 
-            if(gnorm < SFEM_NL_TOL) 
-                break;
+            if (gnorm < SFEM_NL_TOL) break;
 
             blas->zeros(ndofs, increment->data());
             f->copy_constrained_dofs(rhs->data(), increment->data());
             cg->apply(rhs->data(), increment->data());
 
-            std::vector<real_t> alphas{-2*alpha, -alpha, -(real_t)0.9*alpha, 2*alpha/3, -alpha/2, -alpha/4, -alpha/8, -alpha/32, -alpha/128};
-            std::vector<real_t> energies(alphas.size(), 0);
+            if (enable_line_search) {
+                std::vector<real_t> alphas{-2 * alpha,
+                                           -alpha,
+                                           -(real_t)0.9 * alpha,
+                                           2 * alpha / 3,
+                                           -alpha / 2,
+                                           -alpha / 4,
+                                           -alpha / 8,
+                                           -alpha / 32,
+                                           -alpha / 128};
+                std::vector<real_t> energies(alphas.size(), 0);
 
-            f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
-            const int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
-            selected_alpha = alphas[min_energy_index];
-            energy = energies[min_energy_index];
-            blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+                f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
+                const int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
+                selected_alpha             = alphas[min_energy_index];
+                energy                     = energies[min_energy_index];
+                blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+            } else {
+                selected_alpha = -alpha;
+                blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+                f->value(displacement->data(), &energy);
+            }
         }
     }
+    
 
     // Output to disk
     sfem::create_directory(output_path.c_str());
