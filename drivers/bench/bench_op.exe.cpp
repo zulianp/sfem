@@ -124,10 +124,10 @@ int main(int argc, char *argv[]) {
                 ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim}); //FIXME
             }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
+        }
 
-            if(m->element_type() == TET4 || m->element_type() == HEX8) {
-                ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
-            }
+        if((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
+            ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
         }
 
         for (auto &op_desc : ops) {
