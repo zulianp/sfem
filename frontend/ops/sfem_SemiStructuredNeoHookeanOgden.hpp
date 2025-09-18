@@ -6,13 +6,7 @@
 
      class SemiStructuredNeoHookeanOgden : public Op {
      public:
-         std::shared_ptr<FunctionSpace> space;                           ///< Function space for the operator
-         enum ElemType                  element_type { INVALID };        ///< Element type
-         real_t                         mu{1}, lambda{1};                ///< Lamé parameters
-         bool                           use_affine_approximation{true};  ///< Use affine approximation for performance
-         long                           calls{0};                        ///< Number of apply() calls for performance tracking
-         double                         total_time{0};                   ///< Total time spent in apply() for performance tracking
- 
+      
          /**
           * @brief Destructor
           *
@@ -104,8 +98,15 @@
          int gradient(const real_t *const x, real_t *const out) override;
          int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
          int value(const real_t *x, real_t *const out) override;
+         int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
  
          int report(const real_t *const) override;
+
+         int update(const real_t *const x) override;
+
+         private:
+         class Impl;
+         std::unique_ptr<Impl> impl_;
      };
  
  }  // namespace sfem
