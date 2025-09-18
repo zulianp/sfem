@@ -402,6 +402,23 @@ real_t mesh_fun_trig_pos(real_t x, real_t y, real_t z) { return 8.0 + mesh_fun_t
 
 real_t mesh_fun_ones(real_t x, real_t y, real_t z) { return 1.0; }
 
+real_t mesh_fun_linear_step(real_t x, real_t y, real_t z) {
+    real_t dd = -0.2;
+    if (x - dd < 0.0)
+        return 0.0;
+    else if ((x - dd) < 0.5)
+        return 2.0 * (x - dd);
+    else
+        return 1.0;
+}
+
+real_t mesh_fun_chainsaw(real_t x, real_t y, real_t z) {
+    real_t period = 0.1;
+    real_t amp    = 1.0;
+    real_t val    = fmod(fabs(x), period);
+    return (amp / period) * val;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 // main ////////////////////////////////////////////////////////////////////////////////
@@ -724,7 +741,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_ones,                //
+                              mesh_fun_chainsaw,            //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
