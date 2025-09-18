@@ -4,6 +4,7 @@
 #cmakedefine SFEM_ENABLE_AMG
 #cmakedefine SFEM_ENABLE_AVX2
 #cmakedefine SFEM_ENABLE_AVX512
+#cmakedefine SFEM_ENABLE_BLAS
 #cmakedefine SFEM_ENABLE_CUBLAS
 #cmakedefine SFEM_ENABLE_CUDA
 #cmakedefine SFEM_ENABLE_CUSPARSE
