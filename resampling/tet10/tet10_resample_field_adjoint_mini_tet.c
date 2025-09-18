@@ -181,9 +181,12 @@ compute_tet10_phys_mini(const real_t const J_fc[9],    //
     return;
 }
 
+/////////////////////////////////////////////////////////////////////////////
+// Compute the weights at the mini-tetrahedra vertices
+/////////////////////////////////////////////////////////////////////////////
 void                                                    //
 compute_wf_tet10_mini(const real_t const wf_tet10[10],  //
-                      const real_t const J_fc[9],       //
+                      const real_t const J_ref_c[9],    //
                       const real_t const b0[3],         //
                       real_t             wf_tet10_mini[10]) {       //
 
@@ -196,9 +199,9 @@ compute_wf_tet10_mini(const real_t const wf_tet10[10],  //
     real_t z_mini[10];
 
     for (int i = 0; i < 10; i++) {
-        x_mini[i] = J_fc[0] * x_unit[i] + J_fc[1] * y_unit[i] + J_fc[2] * z_unit[i] + b0[0];
-        y_mini[i] = J_fc[3] * x_unit[i] + J_fc[4] * y_unit[i] + J_fc[5] * z_unit[i] + b0[1];
-        z_mini[i] = J_fc[6] * x_unit[i] + J_fc[7] * y_unit[i] + J_fc[8] * z_unit[i] + b0[2];
+        x_mini[i] = J_ref_c[0] * x_unit[i] + J_ref_c[1] * y_unit[i] + J_ref_c[2] * z_unit[i] + b0[0];
+        y_mini[i] = J_ref_c[3] * x_unit[i] + J_ref_c[4] * y_unit[i] + J_ref_c[5] * z_unit[i] + b0[1];
+        z_mini[i] = J_ref_c[6] * x_unit[i] + J_ref_c[7] * y_unit[i] + J_ref_c[8] * z_unit[i] + b0[2];
     }
 
     real_t tet10_f[10];
@@ -268,6 +271,11 @@ hex8_to_isoparametric_tet10_local_adjoint_category_II(const int             L,  
 
     real_t wf_tet10_mini[10];
 
+    compute_wf_tet10_mini(wf_tet10,  //
+                          J_ref,     //
+                          bc,        //
+                          wf_tet10_mini);
+
     for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++) {  // loop over the quadrature points
 
         // Mapping the quadrature point from the reference space to the mini-tetrahedron
@@ -318,16 +326,16 @@ hex8_to_isoparametric_tet10_local_adjoint_category_II(const int             L,  
         const real_t measure = tet10_measure_real_t(x_m, y_m, z_m, xq, yq, zq);
         const real_t dV      = measure * tet_qw[quad_i];
 
-        const real_t It = (tet10_f[0] * wf_tet10[0] +  //
-                           tet10_f[1] * wf_tet10[1] +  //
-                           tet10_f[2] * wf_tet10[2] +  //
-                           tet10_f[3] * wf_tet10[3] +  //
-                           tet10_f[4] * wf_tet10[4] +  //
-                           tet10_f[5] * wf_tet10[5] +  //
-                           tet10_f[6] * wf_tet10[6] +  //
-                           tet10_f[7] * wf_tet10[7] +  //
-                           tet10_f[8] * wf_tet10[8] +  //
-                           tet10_f[9] * wf_tet10[9]);  //
+        const real_t It = (tet10_f[0] * wf_tet10_mini[0] +  //
+                           tet10_f[1] * wf_tet10_mini[1] +  //
+                           tet10_f[2] * wf_tet10_mini[2] +  //
+                           tet10_f[3] * wf_tet10_mini[3] +  //
+                           tet10_f[4] * wf_tet10_mini[4] +  //
+                           tet10_f[5] * wf_tet10_mini[5] +  //
+                           tet10_f[6] * wf_tet10_mini[6] +  //
+                           tet10_f[7] * wf_tet10_mini[7] +  //
+                           tet10_f[8] * wf_tet10_mini[8] +  //
+                           tet10_f[9] * wf_tet10_mini[9]);  //
 
         const real_t d0 = It * hex8_f[0] * dV;
         const real_t d1 = It * hex8_f[1] * dV;
@@ -578,70 +586,73 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t     
                     {  // BEGIN: Cat 0
                         const unsigned int cat0 = 0;
 
-                        hex8_to_isoparametric_tet10_local_adjoint_category(  //
-                                L,                                           //
-                                b0,                                          // Translation vector for category 0
-                                J_phy,                                       // Jacobian matrix
-                                J_vec_mini[cat0],                            // Reference Jacobian matrix
-                                det_J_phys,                                  // Determinant of the Jacobian matrix
-                                x,                                           // Tetrahedron vertices X-coordinates
-                                y,                                           //
-                                z,                                           // Tetrahedron vertices Z-coordinates
-                                ox,                                          // Origin of the grid
-                                oy,                                          //
-                                oz,                                          //
-                                dx,                                          // Spacing of the grid
-                                dy,                                          //
-                                dz,                                          //
-                                wf_tet10,                                    // Weighted field at the vertices
-                                stride,                                      // Stride
-                                data);                                       // Size of the grid
+                        hex8_to_isoparametric_tet10_local_adjoint_category_II(  //
+                                L,                                              //
+                                b0,                                             // Translation vector for category 0
+                                J_phy,                                          // Jacobian matrix
+                                J_fc[cat0],                                     // Jacobian matrix for the physical current
+                                J_vec_mini[cat0],                               // Reference Jacobian matrix
+                                det_J_phys,                                     // Determinant of the Jacobian matrix
+                                x,                                              // Tetrahedron vertices X-coordinates
+                                y,                                              //
+                                z,                                              // Tetrahedron vertices Z-coordinates
+                                ox,                                             // Origin of the grid
+                                oy,                                             //
+                                oz,                                             //
+                                dx,                                             // Spacing of the grid
+                                dy,                                             //
+                                dz,                                             //
+                                wf_tet10,                                       // Weighted field at the vertices
+                                stride,                                         // Stride
+                                data);                                          // Size of the grid
                     }
 
                     if (j >= 1) {
                         for (int cat_i = 1; cat_i < 5; cat_i++) {
-                            hex8_to_isoparametric_tet10_local_adjoint_category(  //
-                                    L,                                           //
-                                    b0,                                          // Translation vector for category 0
-                                    J_phy,                                       // Jacobian matrix
-                                    J_vec_mini[cat_i],                           // Reference Jacobian matrix
-                                    det_J_phys,                                  // Determinant of the Jacobian matrix
-                                    x,                                           // Tetrahedron vertices X-coordinates
-                                    y,                                           //
-                                    z,                                           // Tetrahedron vertices Z-coordinates
-                                    ox,                                          // Origin of the grid
-                                    oy,                                          //
-                                    oz,                                          //
-                                    dx,                                          // Spacing of the grid
-                                    dy,                                          //
-                                    dz,                                          //
-                                    wf_tet10,                                    // Weighted field at the vertices
-                                    stride,                                      // Stride
-                                    data);                                       // Size of the grid
+                            hex8_to_isoparametric_tet10_local_adjoint_category_II(  //
+                                    L,                                              //
+                                    b0,                                             // Translation vector for category 0
+                                    J_phy,                                          // Jacobian matrix
+                                    J_fc[cat_i],                                    // Jacobian matrix for the physical current
+                                    J_vec_mini[cat_i],                              // Reference Jacobian matrix
+                                    det_J_phys,                                     // Determinant of the Jacobian matrix
+                                    x,                                              // Tetrahedron vertices X-coordinates
+                                    y,                                              //
+                                    z,                                              // Tetrahedron vertices Z-coordinates
+                                    ox,                                             // Origin of the grid
+                                    oy,                                             //
+                                    oz,                                             //
+                                    dx,                                             // Spacing of the grid
+                                    dy,                                             //
+                                    dz,                                             //
+                                    wf_tet10,                                       // Weighted field at the vertices
+                                    stride,                                         // Stride
+                                    data);                                          // Size of the grid
                         }
                     }
 
                     {
                         const unsigned int cat5 = 5;
                         if (j >= 1 && i >= 1) {
-                            hex8_to_isoparametric_tet10_local_adjoint_category(  //
-                                    L,                                           //
-                                    b0,                                          // Translation vector for category 5
-                                    J_phy,                                       // Jacobian matrix
-                                    J_vec_mini[cat5],                            // Reference Jacobian matrix
-                                    det_J_phys,                                  // Determinant of the Jacobian matrix
-                                    x,                                           // Tetrahedron vertices X-coordinates
-                                    y,                                           //
-                                    z,                                           // Tetrahedron vertices Z-coordinates
-                                    ox,                                          // Origin of the grid
-                                    oy,                                          //
-                                    oz,                                          //
-                                    dx,                                          // Spacing of the grid
-                                    dy,                                          //
-                                    dz,                                          //
-                                    wf_tet10,                                    // Weighted field at the vertices
-                                    stride,                                      // Stride
-                                    data);                                       // Size of the grid
+                            hex8_to_isoparametric_tet10_local_adjoint_category_II(  //
+                                    L,                                              //
+                                    b0,                                             // Translation vector for category 0
+                                    J_phy,                                          // Jacobian matrix
+                                    J_fc[cat5],                                     // Jacobian matrix for the physical current
+                                    J_vec_mini[cat5],                               // Reference Jacobian matrix
+                                    det_J_phys,                                     // Determinant of the Jacobian matrix
+                                    x,                                              // Tetrahedron vertices X-coordinates
+                                    y,                                              //
+                                    z,                                              // Tetrahedron vertices Z-coordinates
+                                    ox,                                             // Origin of the grid
+                                    oy,                                             //
+                                    oz,                                             //
+                                    dx,                                             // Spacing of the grid
+                                    dy,                                             //
+                                    dz,                                             //
+                                    wf_tet10,                                       // Weighted field at the vertices
+                                    stride,                                         // Stride
+                                    data);                                          // Size of the grid
                         }
                     }
                 }
