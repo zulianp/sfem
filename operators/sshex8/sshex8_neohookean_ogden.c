@@ -442,8 +442,8 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                                                    real_t *const SFEM_RESTRICT                outz) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
-    
-    scalar_t  Wimpn_compressed[10];
+
+    scalar_t Wimpn_compressed[10];
     hex8_Wimpn_compressed(Wimpn_compressed);
 
 #pragma omp parallel
@@ -453,7 +453,7 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
         scalar_t *v[3];
         for (int d = 0; d < 3; d++) {
             eh[d] = malloc(nxe * sizeof(scalar_t));
-            v[d] = malloc(nxe * sizeof(scalar_t));
+            v[d]  = malloc(nxe * sizeof(scalar_t));
         }
 
         idx_t *ev = malloc(nxe * sizeof(idx_t));
@@ -465,101 +465,94 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
         scalar_t *element_hy = &element_h[1 * 8];
         scalar_t *element_hz = &element_h[2 * 8];
 
-        scalar_t eout[3 * 8];
+        scalar_t  eout[3 * 8];
         scalar_t *eoutx = &eout[0 * 8];
         scalar_t *eouty = &eout[1 * 8];
         scalar_t *eoutz = &eout[2 * 8];
 
-#pragma omp parallel
-        {
-            // Allocation per thread
-            scalar_t *eu[3];
-            for (int d = 0; d < 3; d++) {
-                eu[d] = malloc(nxe * sizeof(scalar_t));
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e * stride];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * h_stride;
+                    eh[0][d]            = hx[idx];
+                    eh[1][d]            = hy[idx];
+                    eh[2][d]            = hz[idx];
+                }
+
+
+                for (int d = 0; d < 3; d++) {
+                    memset(v[d], 0, nxe * sizeof(scalar_t));
+                }
             }
 
-            idx_t *ev = malloc(nxe * sizeof(idx_t));
+            scalar_t partial_assembly_local[HEX8_S_IKMN_SIZE];
+            for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
+                partial_assembly_local[d] = partial_assembly[e * HEX8_S_IKMN_SIZE + d];
+            }
 
-#pragma omp for
-            for (ptrdiff_t e = 0; e < nelements; ++e) {
-                {
-                    // Gather elemental data
-                    for (int d = 0; d < nxe; d++) {
-                        ev[d] = elements[d][e * stride];
-                    }
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        int lev[8] = {// Bottom
+                                      sshex8_lidx(level, xi, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                      sshex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      sshex8_lidx(level, xi, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
 
-                    for (int d = 0; d < 8; d++) {
-                        const ptrdiff_t idx = ev[d] * h_stride;
-                        element_hx[d]       = hx[idx];
-                        element_hy[d]       = hy[idx];
-                        element_hz[d]       = hz[idx];
-                    }
-                }
+                        for (int d = 0; d < 8; d++) {
+                            const int lidx = lev[d];
+                            element_hx[d]  = eh[0][lidx];
+                            element_hy[d]  = eh[1][lidx];
+                            element_hz[d]  = eh[2][lidx];
+                        }
 
-                scalar_t partial_assembly_local[HEX8_S_IKMN_SIZE];
-                for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
-                    partial_assembly_local[d] = partial_assembly[e * HEX8_S_IKMN_SIZE + d];
-                }
+                        hex8_SdotHdotG(partial_assembly_local,
+                                       Wimpn_compressed,
+                                       element_hx,
+                                       element_hy,
+                                       element_hz,
+                                       eoutx,
+                                       eouty,
+                                       eoutz);
 
-                // Iterate over sub-elements
-                for (int zi = 0; zi < level; zi++) {
-                    for (int yi = 0; yi < level; yi++) {
-                        for (int xi = 0; xi < level; xi++) {
-                            int lev[8] = {// Bottom
-                                          sshex8_lidx(level, xi, yi, zi),
-                                          sshex8_lidx(level, xi + 1, yi, zi),
-                                          sshex8_lidx(level, xi + 1, yi + 1, zi),
-                                          sshex8_lidx(level, xi, yi + 1, zi),
-                                          // Top
-                                          sshex8_lidx(level, xi, yi, zi + 1),
-                                          sshex8_lidx(level, xi + 1, yi, zi + 1),
-                                          sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
-                                          sshex8_lidx(level, xi, yi + 1, zi + 1)};
-
-                            for (int d = 0; d < 8; d++) {
-                                const int lidx = lev[d];
-                                element_hx[d]  = hx[lidx * h_stride];
-                                element_hy[d]  = hy[lidx * h_stride];
-                                element_hz[d]  = hz[lidx * h_stride];
-                            }
-
-                            hex8_SdotHdotG(partial_assembly_local,
-                                           Wimpn_compressed,
-                                           element_hx,
-                                           element_hy,
-                                           element_hz,
-                                           eoutx,
-                                           eouty,
-                                           eoutz);
-
-                            for (int d = 0; d < 8; d++) {
-                                const int lidx = lev[d];
-                                v[0][lidx] += eoutx[d];
-                                v[1][lidx] += eouty[d];
-                                v[2][lidx] += eoutz[d];
-                            }
+                        for (int d = 0; d < 8; d++) {
+                            const int lidx = lev[d];
+                            v[0][lidx] += eoutx[d];
+                            v[1][lidx] += eouty[d];
+                            v[2][lidx] += eoutz[d];
                         }
                     }
                 }
+            }
 
-                {
-                    // Scatter elemental data
-                    for (int d = 0; d < nxe; d++) {
-                        const ptrdiff_t idx = ev[d] * out_stride;
-
-#pragma omp atomic update
-                        outx[idx] += v[0][d];
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
 
 #pragma omp atomic update
-                        outy[idx] += v[1][d];
+                    outx[idx] += v[0][d];
 
 #pragma omp atomic update
-                        outz[idx] += v[2][d];
-                    }
+                    outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                    outz[idx] += v[2][d];
                 }
             }
         }
-
 
         // Clean-up
         free(ev);
