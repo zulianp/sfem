@@ -246,7 +246,7 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                     assert(jacobian_determinant == jacobian_determinant);
                     assert(jacobian_determinant != 0);
 
-                    hex8_neohookean_grad(jacobian_adjugate,
+                    hex8_neohookean_ogden_grad(jacobian_adjugate,
                                          jacobian_determinant,
                                          qx[kx],
                                          qx[ky],

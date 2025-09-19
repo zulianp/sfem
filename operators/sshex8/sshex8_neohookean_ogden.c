@@ -194,7 +194,6 @@ int sshex8_neohookean_ogden_objective_steps(int                               le
         free(x);
         free(y);
         free(z);
-
     }
 
     for (int s = 0; s < nsteps; s++) {
@@ -349,10 +348,10 @@ int sshex8_neohookean_ogden_gradient(int                               level,
                                     assert(jacobian_determinant == jacobian_determinant);
                                     assert(jacobian_determinant != 0);
 
-                                    hex8_neohookean_grad(sub_adjugate,
-                                                         sub_determinant,
-                                                         qx[kx],
-                                                         qx[ky],
+                                    hex8_neohookean_ogden_grad(sub_adjugate,
+                                                               sub_determinant,
+                                                               qx[kx],
+                                                               qx[ky],
                                                          qx[kz],
                                                          qw[kx] * qw[ky] * qw[kz],
                                                          mu,
