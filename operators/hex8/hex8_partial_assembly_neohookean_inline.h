@@ -2,6 +2,7 @@
 #define SFEM_HEX8_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H
 
 #include "sfem_macros.h"
+#include <math.h>
 
 static SFEM_INLINE void hex8_F(const scalar_t *const SFEM_RESTRICT adjugate,
                                const scalar_t                      jacobian_determinant,

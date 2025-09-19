@@ -1,6 +1,8 @@
 #ifndef SFEM_TET4_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H
 #define SFEM_TET4_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H
 
+#include <math.h>
+
 static SFEM_INLINE void tet4_F(const scalar_t *const SFEM_RESTRICT adjugate,
                                const scalar_t                      jacobian_determinant,
                                const scalar_t *const SFEM_RESTRICT dispx,

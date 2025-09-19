@@ -22,6 +22,7 @@
 #include "tet4_partial_assembly_neohookean_inline.h"
 
 #include <mpi.h>
+#include <math.h>
 
 namespace sfem {
 
@@ -75,7 +76,7 @@ namespace sfem {
                     auto pai  = &pa[i * TET4_S_IKMN_SIZE];
                     auto paci = &pac[i * TET4_S_IKMN_SIZE];
                     for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
-                        paci[v] = pai[v] / cs[i];
+                        paci[v] = (compressed_t)(pai[v] / cs[i]);
 
                         assert(cs[i] > 0);
                         assert(std::isfinite(paci[v]));
