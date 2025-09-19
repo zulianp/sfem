@@ -45,7 +45,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
-    const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-10);
+    const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-9);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {

@@ -22,26 +22,26 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 
-rm -rf hex8_geometry
-if [[ ! -d hex8_geometry ]]
+rm -rf blade_geometry
+if [[ ! -d blade_geometry ]]
 then
-	mkdir -p hex8_geometry
-	cd hex8_geometry
+	mkdir -p blade_geometry
+	cd blade_geometry
 
-	box_mesh.py box --cell_type=hex8 -x 40 -y 40 -z 40
+	db_to_raw.py ../Blade_hex.vtk blade
 	surf_type=quad4
 	
-	skin box skin_box
-	raw_to_db.py skin_box skin_box.vtk
+	skin blade skin_blade
+	raw_to_db.py skin_blade skin_blade.vtk
 
 	set -x
 
-	SFEM_DEBUG=1 create_sideset box  -0.001 0.5 0.5  0.8 	inlet
-	SFEM_DEBUG=1 create_sideset box   1.001 0.5 0.5  0.8 	outlet
+	SFEM_DEBUG=1 create_sideset blade   0.19 -0.5 -0.036   0.99 	inlet
+	SFEM_DEBUG=1 create_sideset blade  -0.20  -0.5  0.0115  0.99 	outlet
 
-	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=box --cell_type=$surf_type
-	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=box --cell_type=$surf_type
-	raw_to_db.py box 					box.vtk 
+	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=blade --cell_type=$surf_type
+	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=blade --cell_type=$surf_type
+	raw_to_db.py blade 					blade.vtk 
 
 	cd $HERE
 fi
@@ -49,7 +49,7 @@ fi
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
-rm -rf hex8_output
+rm -rf blade_output
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-$LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
-raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS
+$LAUNCH hyperelasticy blade_geometry/blade dirichlet_blade.yaml blade_output
+raw_to_db.py blade_output/mesh blade_output.vtk -p 'blade_output/out/*.raw' $EXTRA_OPTIONS
