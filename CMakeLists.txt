@@ -112,6 +112,7 @@ list(APPEND SFEM_MODULES
 list(APPEND SFEM_MODULES 
     frontend
     frontend/ops
+    frontend/mesh
 )
 
 if(SFEM_ENABLE_METIS)
@@ -237,7 +238,7 @@ endif()
 ######################################################
 # link
 
-target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES})
+target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
 # message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
@@ -249,6 +250,11 @@ set_target_properties(
     SOVERSION ${SFEM_VERSION_MAJOR})
 
 set(SFEM_TARGETS sfem)
+
+# Optional generated operator plug-ins (not built by default)
+if(SFEM_ENABLE_CODEGEN)
+    add_subdirectory(operators/generated)
+endif() 
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
 
@@ -267,7 +273,7 @@ endif()
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech) 
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
