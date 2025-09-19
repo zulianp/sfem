@@ -14,10 +14,6 @@ public:
     ptrdiff_t* min_grid_1 = nullptr;
     ptrdiff_t* min_grid_2 = nullptr;
 
-    // ptrdiff_t* size0_local;
-    // ptrdiff_t* size1_local;
-    // ptrdiff_t* size2_local;
-
     ptrdiff_t* total_size_local;
 
     ptrdiff_t* stride0_local = nullptr;
@@ -27,18 +23,6 @@ public:
     ptrdiff_t* n0_local = nullptr;
     ptrdiff_t* n1_local = nullptr;
     ptrdiff_t* n2_local = nullptr;
-
-    // FloatType* min_x = nullptr;
-    // FloatType* min_y = nullptr;
-    // FloatType* min_z = nullptr;
-
-    // FloatType* max_x = nullptr;
-    // FloatType* max_y = nullptr;
-    // FloatType* max_z = nullptr;
-
-    // FloatType* min_grid_x = nullptr;  // Minimum grid coordinates covered by the tet
-    // FloatType* min_grid_y = nullptr;
-    // FloatType* min_grid_z = nullptr;
 
     // Host-side meta
     size_t count = 0;
@@ -64,11 +48,6 @@ public:
         if ((err = cudaMallocAsync((void**)&min_grid_1, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
         if ((err = cudaMallocAsync((void**)&min_grid_2, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        // if ((err = cudaMallocAsync((void**)&size0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return
-        // fail_cleanup(err); if ((err = cudaMallocAsync((void**)&size1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
-        // return fail_cleanup(err); if ((err = cudaMallocAsync((void**)&size2_local, n * sizeof(ptrdiff_t), stream)) !=
-        // cudaSuccess) return fail_cleanup(err);
-
         if ((err = cudaMallocAsync((void**)&total_size_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
             return fail_cleanup(err);
 
@@ -83,20 +62,6 @@ public:
         if ((err = cudaMallocAsync((void**)&n1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
         if ((err = cudaMallocAsync((void**)&n2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        // // FloatType arrays
-        // if ((err = cudaMallocAsync((void**)&min_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        // if ((err = cudaMallocAsync((void**)&min_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        // if ((err = cudaMallocAsync((void**)&min_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-
-        // if ((err = cudaMallocAsync((void**)&max_x, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        // if ((err = cudaMallocAsync((void**)&max_y, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-        // if ((err = cudaMallocAsync((void**)&max_z, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
-
-        // if ((err = cudaMallocAsync((void**)&min_grid_x, n * sizeof(FloatType), stream)) != cudaSuccess) return
-        // fail_cleanup(err); if ((err = cudaMallocAsync((void**)&min_grid_y, n * sizeof(FloatType), stream)) != cudaSuccess)
-        // return fail_cleanup(err); if ((err = cudaMallocAsync((void**)&min_grid_z, n * sizeof(FloatType), stream)) !=
-        // cudaSuccess) return fail_cleanup(err);
-
         return cudaSuccess;
     }
 
@@ -110,10 +75,6 @@ public:
         free_if(min_grid_1);
         free_if(min_grid_2);
 
-        // free_if(size0_local);
-        // free_if(size1_local);
-        // free_if(size2_local);
-
         free_if(total_size_local);
 
         free_if(stride0_local);
@@ -124,18 +85,6 @@ public:
         free_if(n1_local);
         free_if(n2_local);
 
-        // free_if(min_x);
-        // free_if(min_y);
-        // free_if(min_z);
-
-        // free_if(max_x);
-        // free_if(max_y);
-        // free_if(max_z);
-
-        // free_if(min_grid_x);
-        // free_if(min_grid_y);
-        // free_if(min_grid_z);
-
         reset();
         // Optionally, user can cudaStreamSynchronize(stream) after this
         return cudaSuccess;
@@ -144,13 +93,10 @@ public:
 private:
     __host__ void reset() {
         min_grid_0 = min_grid_1 = min_grid_2 = nullptr;
-        // size0_local = size1_local = size2_local = nullptr;
-        total_size_local = nullptr;
+        total_size_local                     = nullptr;
         stride0_local = stride1_local = stride2_local = nullptr;
         n0_local = n1_local = n2_local = nullptr;
-        // min_x = min_y = min_z = nullptr;
-        // max_x = max_y = max_z = nullptr;
-        // min_grid_x = min_grid_y = min_grid_z = nullptr;
+
         count = 0;
     }
 };
