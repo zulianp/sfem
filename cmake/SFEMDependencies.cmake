@@ -40,20 +40,6 @@ endif()
 
 # ##############################################################################
 
-if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
-    if(TPL_LAPACK_LIBRARIES)
-        list(APPEND SFEM_DEP_LIBRARIES ${TPL_LAPACK_LIBRARIES})
-        set(SFEM_HAVE_LAPACK TRUE)
-    else()
-        find_package(LAPACK)
-        if(LAPACK_FOUND)
-            set(SFEM_HAVE_LAPACK TRUE)
-            list(APPEND SFEM_DEP_LIBRARIES ${LAPACK_LIBRARIES})
-        endif()
-    endif()
-endif()
-
-# ##############################################################################
 
 if(SFEM_ENABLE_MPI)
     find_package(MPI REQUIRED)
@@ -209,7 +195,11 @@ endif()
 if(SFEM_ENABLE_LAPACK)
     find_package(LAPACK REQUIRED)
     list(APPEND SFEM_DEP_LIBRARIES  LAPACK::LAPACK)
+    # list(APPEND SFEM_DEP_LIBRARIES ${TPL_LAPACK_LIBRARIES})
 endif()
+
+
+# ##############################################################################
 
 # if(SFEM_ENABLE_HIP)
 # # TODO

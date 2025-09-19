@@ -98,6 +98,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     bool   enable_line_search = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
     auto   blas               = sfem::blas<real_t>(es);
 
+    printf("Solving hyperelasticity for %ld dofs\n", (long)fs->n_dofs());
+
     if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
             blas->zeros(ndofs, rhs->data());

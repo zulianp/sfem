@@ -6,6 +6,7 @@ option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512_SORT "Enable AVX512 sort" OFF)
+option(SFEM_ENABLE_BLAS "Enable BLAS" OFF)
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_CUDA_LINEINFO "Enable cuda line info for profiling" OFF)
 option(SFEM_ENABLE_DEV_MODE "Add additional flags for more strict compilation" OFF)
@@ -30,12 +31,7 @@ if(WIN32)
 endif()
 
 
-
-
-
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
-# option(SFEM_ENABLE_AVX512 "Enable AVX2 intrinsics" OFF) # TODO
-
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" ON)
 option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
 
