@@ -61,6 +61,8 @@ namespace sfem {
          */
         virtual int initialize(const std::vector<std::string> &block_names = {}) { return SFEM_SUCCESS; }
 
+        virtual int update(const real_t *const x) { return SFEM_SUCCESS; }
+
         /**
          * @brief Assemble the Hessian matrix in CRS format
          * @param x Current solution vector
@@ -196,6 +198,21 @@ namespace sfem {
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          */
         virtual int value(const real_t *x, real_t *const out) = 0;
+
+        /**
+         * @brief Compute the value/energy of the operator
+         * @param x Current solution vector
+         * @param h Input vector
+         * @param nsteps Number of steps
+         * @param steps Steps
+         * @param out Energy values per step (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out)
+        {
+            SFEM_ERROR("value_steps not implemented for this operator");
+            return SFEM_FAILURE;
+        }
 
         /**
          * @brief Report operator statistics or debug information

@@ -196,6 +196,16 @@ if(WIN32)
     list(APPEND SFEM_SUBMODULES Glob)
 endif()
 
+if(SFEM_ENABLE_BLAS)
+    if(APPLE)
+        # Add Accelerate framework for macOS BLAS/LAPACK
+        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+        list(APPEND SFEM_DEP_LIBRARIES ${ACCELERATE_FRAMEWORK})
+    else()
+        find_package(BLAS REQUIRED)
+    endif()
+endif()
+
 if(SFEM_ENABLE_LAPACK)
     find_package(LAPACK REQUIRED)
     list(APPEND SFEM_DEP_LIBRARIES  LAPACK::LAPACK)

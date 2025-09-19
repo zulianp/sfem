@@ -1023,31 +1023,36 @@ namespace sfem {
 
     static std::shared_ptr<sfem::Operator<real_t>> create_linear_operator(const std::string                           &format,
                                                                           const std::shared_ptr<sfem::Function>       &f,
-                                                                          const std::shared_ptr<sfem::Buffer<real_t>> &x,
+                                                                          const std::shared_ptr<sfem::Buffer<real_t>> &u,
                                                                           enum sfem::ExecutionSpace                    es) {
         if (format == MATRIX_FREE) {
-            return sfem::make_linear_op(f);
+            return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) { f->apply((u? u->data() : nullptr), x, y); },
+                f->execution_space());
+    
         }
 
         if (f->space()->block_size() == 1) {
             if (format == CRS_SYM)
-                return sfem::hessian_crs_sym(f, nullptr, es);
+                return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
-                return sfem::hessian_coo_sym(f, nullptr, es);
+                return sfem::hessian_coo_sym(f, u, es);
 
             if (format != CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
-            return sfem::hessian_crs(f, nullptr, es);
+            return sfem::hessian_crs(f, u, es);
         }
 
-        if (format == BSR) return sfem::hessian_bsr(f, nullptr, es);
+        if (format == BSR) return sfem::hessian_bsr(f, u, es);
         if (format != BSR_SYM) {
             fprintf(stderr, "[Warning] fallback to BCRS_SYM format as \"%s\" is not supported!\n", format.c_str());
         }
 
-        return sfem::hessian_bcrs_sym(f, nullptr, es);
+        return sfem::hessian_bcrs_sym(f, u, es);
     }
 
     static SharedBuffer<idx_t *> sshex8_derefine_element_connectivity(const int                    from_level,

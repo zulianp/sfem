@@ -16,6 +16,13 @@ int build_n2e(const ptrdiff_t nelements,
               count_t **out_n2eptr,
               element_idx_t **out_elindex);
 
+int build_n2ln(const ptrdiff_t nelements,
+              const ptrdiff_t nnodes,
+              const int nnodesxelem,
+              idx_t **const elems,
+              count_t **out_n2ln_ptr,
+              count_t **out_ln_index);
+
 int build_crs_graph_for_elem_type(const int element_type,
                                   const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,

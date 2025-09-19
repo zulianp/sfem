@@ -14,6 +14,8 @@
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_SemiStructuredNeoHookeanOgden.hpp"
+#include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
 
 
@@ -69,6 +71,7 @@ namespace sfem {
             instance_.private_register_op("CVFEMMass", CVFEMMass::create);
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
+            instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
 
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
@@ -101,6 +104,15 @@ namespace sfem {
         auto  it  = ntc.find(m_name);
 
         if (it == ntc.end()) {
+            // Try dynamic plug-in: prefix "plugin:"
+            const std::string prefix = "plugin:";
+            if (m_name.rfind(prefix, 0) == 0) {
+                std::string opname = m_name.substr(prefix.size());
+                auto        uop    = PlugInOp::create(space, opname);
+                if (!uop) return nullptr;
+                return std::shared_ptr<Op>(uop.release());
+            }
+
             std::cerr << "Unable to find op " << m_name << "\n";
             return nullptr;
         }
