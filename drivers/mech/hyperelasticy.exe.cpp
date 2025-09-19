@@ -31,6 +31,10 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         return SFEM_FAILURE;
     }
 
+    if(comm->size() > 1) {
+        SFEM_ERROR("MPI runtimes are not supported!\n");
+    }
+
     const char *mesh_path      = argv[1];
     const char *dirichlet_path = argv[2];
     std::string output_path    = argv[3];
@@ -98,7 +102,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     bool   enable_line_search = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
     auto   blas               = sfem::blas<real_t>(es);
 
-    printf("Solving hyperelasticity for %ld dofs\n", (long)fs->n_dofs());
+    printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
 
     if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
@@ -127,7 +131,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             f->gradient(displacement->data(), rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, selected_alpha);
+            printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, -selected_alpha);
 
             if (gnorm < SFEM_NL_TOL) break;
 
