@@ -20,6 +20,17 @@ xyz_tet10_device make_xyz_tet10_device(const ptrdiff_t nnodes) {  //
 }
 // end make_xyz_tet10_device
 
+xyz_tet10_device                                                            //
+make_xyz_tet10_device_async(const ptrdiff_t nnodes, cudaStream_t stream) {  //
+    //
+    xyz_tet10_device xyz;
+
+    cudaMallocAsync(&xyz.x, nnodes * sizeof(geom_t), stream);
+    cudaMallocAsync(&xyz.y, nnodes * sizeof(geom_t), stream);
+    cudaMallocAsync(&xyz.z, nnodes * sizeof(geom_t), stream);
+    return xyz;
+}  // end make_xyz_tet10_device_async
+
 //////////////////////////////////////////////////////////
 // copy_xyz_tet10_device
 //////////////////////////////////////////////////////////
@@ -290,6 +301,30 @@ make_elems_tet10_device(const ptrdiff_t nelements) {  //
     return elems;
 }  // end make_elems_tet10_device
 
+elems_tet10_device                                                               //
+make_elems_tet10_device_async(const ptrdiff_t nelements, cudaStream_t stream) {  //
+    elems_tet10_device elems;
+
+    cudaError_t err0 = cudaMallocAsync(&elems.elems_v0, nelements * sizeof(idx_t), stream);
+    cudaError_t err1 = cudaMallocAsync(&elems.elems_v1, nelements * sizeof(idx_t), stream);
+    cudaError_t err2 = cudaMallocAsync(&elems.elems_v2, nelements * sizeof(idx_t), stream);
+    cudaError_t err3 = cudaMallocAsync(&elems.elems_v3, nelements * sizeof(idx_t), stream);
+    cudaError_t err4 = cudaMallocAsync(&elems.elems_v4, nelements * sizeof(idx_t), stream);
+    cudaError_t err5 = cudaMallocAsync(&elems.elems_v5, nelements * sizeof(idx_t), stream);
+    cudaError_t err6 = cudaMallocAsync(&elems.elems_v6, nelements * sizeof(idx_t), stream);
+    cudaError_t err7 = cudaMallocAsync(&elems.elems_v7, nelements * sizeof(idx_t), stream);
+    cudaError_t err8 = cudaMallocAsync(&elems.elems_v8, nelements * sizeof(idx_t), stream);
+    cudaError_t err9 = cudaMallocAsync(&elems.elems_v9, nelements * sizeof(idx_t), stream);
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
+        err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
+        printf("ERROR: allocating memory for elems_tet10_device async\n");
+        // Handle error
+    }
+
+    return elems;
+}
+
 //////////////////////////////////////////////////////////
 // copy_elems_tet10_device
 //////////////////////////////////////////////////////////
@@ -316,6 +351,35 @@ cudaError_t copy_elems_tet10_device(const ptrdiff_t     nelements,  //
 
     return cudaSuccess;
 }  // end copy_elems_tet10_device
+
+///////////////////////////////////////////////////////////
+// copy_elems_tet10_device_async
+///////////////////////////////////////////////////////////
+cudaError_t                                                    //
+copy_elems_tet10_device_async(const ptrdiff_t     nelements,   //
+                              elems_tet10_device* elems,       //
+                              const idx_t**       elems_host,  //
+                              cudaStream_t        stream) {           //
+
+    cudaError_t err0 = cudaMemcpyAsync(elems->elems_v0, elems_host[0], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err1 = cudaMemcpyAsync(elems->elems_v1, elems_host[1], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err2 = cudaMemcpyAsync(elems->elems_v2, elems_host[2], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err3 = cudaMemcpyAsync(elems->elems_v3, elems_host[3], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err4 = cudaMemcpyAsync(elems->elems_v4, elems_host[4], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err5 = cudaMemcpyAsync(elems->elems_v5, elems_host[5], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err6 = cudaMemcpyAsync(elems->elems_v6, elems_host[6], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err7 = cudaMemcpyAsync(elems->elems_v7, elems_host[7], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err8 = cudaMemcpyAsync(elems->elems_v8, elems_host[8], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err9 = cudaMemcpyAsync(elems->elems_v9, elems_host[9], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
+        err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
+        printf("ERROR: copying elements to device async: %s\n", cudaGetErrorString(cudaGetLastError()));
+        return cudaGetLastError();
+    }
+
+    return cudaSuccess;
+}
 
 //////////////////////////////////////////////////////////
 // free_elems_tet10_device

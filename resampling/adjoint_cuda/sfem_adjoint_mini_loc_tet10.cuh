@@ -688,4 +688,27 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
     return;
 }
 
+extern "C" void  //                                                                                               //
+call_hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
+        const ptrdiff_t          start_element,                           // Mesh
+        const ptrdiff_t          end_element,                             //
+        const ptrdiff_t          nnodes,                                  //
+        const elems_tet10_device elems,                                   //
+        const xyz_tet10_device   xyz,                                     //
+        const ptrdiff_t          n0,                                      // SDF
+        const ptrdiff_t          n1,                                      //
+        const ptrdiff_t          n2,                                      //
+        const ptrdiff_t          stride0,                                 //
+        const ptrdiff_t          stride1,                                 //
+        const ptrdiff_t          stride2,                                 //
+        const geom_t             ox,                                      //
+        const geom_t             oy,                                      //
+        const geom_t             oz,                                      //
+        const geom_t             dx,                                      //
+        const geom_t             dy,                                      //
+        const geom_t             dz,                                      //
+        const real_t* const __restrict__ weighted_field,                  // Input WF
+        real_t* const __restrict__ data,                                  // Output
+        const mini_tet_parameters_t mini_tet_parameters);                 //
+
 #endif  // __SFEM_ADJOINT_MINI_LOC_TET10_CUH__

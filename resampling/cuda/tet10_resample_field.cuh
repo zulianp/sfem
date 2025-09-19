@@ -31,6 +31,16 @@ make_xyz_tet10_device(const ptrdiff_t nnodes);  //
  * @brief
  *
  * @param nnodes
+ * @param stream
+ * @return xyz_tet10_device
+ */
+xyz_tet10_device                                                           //
+make_xyz_tet10_device_async(const ptrdiff_t nnodes, cudaStream_t stream);  //
+
+/**
+ * @brief
+ *
+ * @param nnodes
  * @param xyz
  * @param xyz_host
  */
@@ -169,6 +179,16 @@ make_elems_tet10_device(const ptrdiff_t nelements);  //
  * @brief
  *
  * @param nelements
+ * @param stream
+ * @return elems_tet10_device
+ */
+elems_tet10_device                                                              //
+make_elems_tet10_device_async(const ptrdiff_t nelements, cudaStream_t stream);  //
+
+/**
+ * @brief
+ *
+ * @param nelements
  * @param elems
  * @param elems_host
  * @return cudaError_t
@@ -177,6 +197,20 @@ cudaError_t                                             //
 copy_elems_tet10_device(const ptrdiff_t     nelements,  //
                         elems_tet10_device* elems,      //
                         const idx_t**       elems_host);      //
+
+/**
+ * @brief
+ * @param nelements
+ * @param elems
+ * @param elems_host
+ * @param stream
+ * @return cudaError_t
+ */
+cudaError_t                                                    //
+copy_elems_tet10_device_async(const ptrdiff_t     nelements,   //
+                              elems_tet10_device* elems,       //
+                              const idx_t**       elems_host,  //
+                              cudaStream_t        stream);            //
 
 /**
  * @brief
