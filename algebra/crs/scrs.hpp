@@ -69,6 +69,7 @@ namespace sfem {
 
         return ret;
     }
+    
     template <typename R, typename C, typename T, typename S, typename TOp = T>
     class SCRS : public Operator<TOp> {
     public:
@@ -85,7 +86,8 @@ namespace sfem {
         static const int  BLOCK_SPAN = std::numeric_limits<S>::max() + 1;
         static const int  VEC_SIZE   = 8;  // 8 * sizeof(double) / sizeof(T);
         static const bool PAD        = true;
-        size_t            nbytes() const {
+
+        size_t nbytes() const {
             size_t ret = 0;
             if (diag_rowptr) ret += diag_rowptr->nbytes();
             if (diag_colidx) ret += diag_colidx->nbytes();
@@ -101,6 +103,7 @@ namespace sfem {
 
             assert(BLOCK_SPAN > 0);
             if (!diag_rowptr || !offdiag_rowptr) {
+                SFEM_ERROR("SCRS in invalid state!\n");
                 return SFEM_FAILURE;
             }
 
