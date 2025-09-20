@@ -10,6 +10,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
 
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -118,6 +119,7 @@ int main(int argc, char *argv[]) {
 
         } else {
             ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
+            ops.push_back({.name = "Laplacian", .type = SMALLCRS, .block_size = 1});
             if(m->element_type() == HEX8) {
                 // FIXME
                 ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});

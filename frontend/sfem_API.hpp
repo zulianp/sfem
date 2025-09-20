@@ -34,6 +34,7 @@
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
+#include "scrs.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
@@ -1039,6 +1040,10 @@ namespace sfem {
                 return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
+            else if(format == SMALLCRS) {
+                auto temp = sfem::hessian_crs(f, u, es);
+                return sfem::scrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+            }
 
             if (format != CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
