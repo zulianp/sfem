@@ -25,6 +25,8 @@ namespace sfem {
         std::ptrdiff_t rows() const override { return row_ptr->size() - 1; }
         std::ptrdiff_t cols() const override { return cols_; }
 
+        size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
+
         SharedBuffer<R> row_ptr;
         SharedBuffer<C> col_idx;
         SharedBuffer<T> values;
