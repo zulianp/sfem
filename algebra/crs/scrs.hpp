@@ -90,12 +90,12 @@ namespace sfem {
                     const ptrdiff_t rs     = b * small_max;
                     const ptrdiff_t extent = MIN(small_max, nrows - rs);
                     const auto      rpi    = &d_rowptr[rs];
-                    const auto      ai     = &d_values[rs];
                     auto            yi     = &y[rs];
 
                     for (ptrdiff_t i = 0; i < extent; i++) {
                         const ptrdiff_t ncols = rpi[i + 1] - rpi[i];
-                        auto            cols  = &d_colidx[rpi[i]];
+                        const auto      row_vals = &d_values[rpi[i]];
+                        const auto      cols     = &d_colidx[rpi[i]];
 
                         const static int VECTOR_SIZE       = 8;
                         const auto       nvecs             = ncols / VECTOR_SIZE;
@@ -105,11 +105,11 @@ namespace sfem {
                         for (ptrdiff_t k = 0; k < bextent; k += VECTOR_SIZE) {
 #pragma unroll(VECTOR_SIZE)
                             for (int v = 0; v < VECTOR_SIZE; v++) {
-                                buff[v] += ai[k + v] * d_gather[cols[k + v]];
+                                buff[v] += static_cast<TOp>(row_vals[k + v]) * d_gather[cols[k + v]];
                             }
                         }
 
-                        T acc = yi[i];
+                        TOp acc = yi[i];
                         if (bextent) {
                             for (int b = 0; b < VECTOR_SIZE; b++) {
                                 acc += buff[b];
@@ -117,8 +117,7 @@ namespace sfem {
                         }
 
                         for (ptrdiff_t k = bextent; k < ncols; k++) {
-                            const C col = cols[k];
-                            acc += ai[k] * d_gather[col];
+                            acc += static_cast<TOp>(row_vals[k]) * d_gather[cols[k]];
                         }
 
                         yi[i] = acc;
