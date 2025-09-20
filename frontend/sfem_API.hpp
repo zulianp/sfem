@@ -14,11 +14,13 @@
 #include "ssquad4.h"
 
 // C++ includes
+#include "scrs.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
 #include "sfem_Context.hpp"
 #include "sfem_CooSym.hpp"
+#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
@@ -34,7 +36,6 @@
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
-#include "scrs.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
@@ -99,7 +100,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
+    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
 #endif  // SFEM_ENABLE_CUDA
@@ -107,7 +108,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
+    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
 #endif  // SFEM_ENABLE_CUDA
@@ -1028,11 +1029,10 @@ namespace sfem {
                                                                           enum sfem::ExecutionSpace                    es) {
         if (format == MATRIX_FREE) {
             return sfem::make_op<real_t>(
-                f->space()->n_dofs(),
-                f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { f->apply((u? u->data() : nullptr), x, y); },
-                f->execution_space());
-    
+                    f->space()->n_dofs(),
+                    f->space()->n_dofs(),
+                    [=](const real_t *const x, real_t *const y) { f->apply((u ? u->data() : nullptr), x, y); },
+                    f->execution_space());
         }
 
         if (f->space()->block_size() == 1) {
@@ -1040,9 +1040,20 @@ namespace sfem {
                 return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
-            else if(format == SPLITCRS) {
+            else if (format == SPLITCRS) {
                 auto temp = sfem::hessian_crs(f, u, es);
-                return sfem::scrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+                int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+                switch (prec) {
+                    case 2:
+                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, half_t>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                    case 4:
+                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, float>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                    default:
+                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                }
             }
 
             if (format != CRS) {
@@ -1191,9 +1202,7 @@ namespace sfem {
 
     static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
         return make_in_place_op<real_t>(
-                f->space()->n_dofs(),
-                [=](real_t *const x) { f->apply_zero_constraints(x); },
-                f->execution_space());
+                f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
     }
 
 }  // namespace sfem
