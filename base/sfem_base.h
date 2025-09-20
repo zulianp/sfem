@@ -68,8 +68,10 @@
 
 #ifdef NDEBUG
 #define SFEM_INLINE inline
+#define SFEM_FORCE_INLINE inline __attribute__((always_inline))
 #else
 #define SFEM_INLINE
+#define SFEM_FORCE_INLINE
 #endif
 
 #define SFEM_UNUSED(var) (void)var
