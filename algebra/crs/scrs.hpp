@@ -23,6 +23,14 @@ namespace sfem {
         SharedBuffer<T>                values;
         std::vector<SharedBuffer<TOp>> gather;
 
+        size_t nbytes() const {
+            size_t ret = rowptr->nbytes() + mapptr->nbytes() + mapidx->nbytes() + colidx->nbytes() + values->nbytes();
+            for (auto &g : gather) {
+                ret += g->nbytes();
+            }
+            return ret;
+        }
+
         void init_gather() {
             auto d_mapptr    = mapptr->data();
             int  num_threads = 1;
@@ -30,7 +38,9 @@ namespace sfem {
 #pragma omp parallel
             {
 #pragma omp single
-                { num_threads = omp_get_num_threads(); }
+                {
+                    num_threads = omp_get_num_threads();
+                }
             }
 #endif
             gather.resize(num_threads);
@@ -93,7 +103,7 @@ namespace sfem {
                     auto            yi     = &y[rs];
 
                     for (ptrdiff_t i = 0; i < extent; i++) {
-                        const ptrdiff_t ncols = rpi[i + 1] - rpi[i];
+                        const ptrdiff_t ncols    = rpi[i + 1] - rpi[i];
                         const auto      row_vals = &d_values[rpi[i]];
                         const auto      cols     = &d_colidx[rpi[i]];
 
@@ -133,7 +143,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
     };
 
-    template <typename R, typename C, typename T, typename S = uint16_t, typename TOp = T>
+    template <typename R, typename C, typename T, typename S = int16_t, typename TOp = T>
     std::shared_ptr<SCRS<R, C, T, S, TOp>> scrs_from_crs(const SharedBuffer<R> &rowptr,
                                                          const SharedBuffer<C> &colidx,
                                                          const SharedBuffer<T> &values,
@@ -160,13 +170,14 @@ namespace sfem {
             const ptrdiff_t extent = MIN(small_max, nrows - rs);
             const auto      rpi    = &d_rowptr[rs];
 
-            S nmaps = 0;
+            R nmaps = 0;
             for (ptrdiff_t i = 0; i < extent; i++) {
                 const ptrdiff_t ncols = rpi[i + 1] - rpi[i];
                 const auto      cols  = &d_colidx[rpi[i]];
 
                 for (ptrdiff_t k = 0; k < ncols; k++) {
                     const C col = cols[k];
+                    assert(col < nrows);
                     if (!d_inv_map[col]) {
                         d_inv_map[col] = ++nmaps;
                     }
@@ -174,8 +185,20 @@ namespace sfem {
             }
 
             d_mapptr[b + 1] = nmaps + d_mapptr[b];
+
+            // Clean-up
+            for (ptrdiff_t i = 0; i < extent; i++) {
+                const ptrdiff_t ncols = rpi[i + 1] - rpi[i];
+                const auto      cols  = &d_colidx[rpi[i]];
+                for (ptrdiff_t k = 0; k < ncols; k++) {
+                    d_inv_map[cols[k]] = 0;
+                }
+            }
         }
 
+        memset(d_inv_map, 0, nrows * sizeof(S));
+
+        assert(d_mapptr[n_blocks] > 0);
         auto mapidx    = sfem::create_host_buffer<C>(d_mapptr[n_blocks]);
         auto d_map_idx = mapidx->data();
 
@@ -183,7 +206,8 @@ namespace sfem {
             const ptrdiff_t rs     = b * small_max;
             const ptrdiff_t extent = MIN(small_max, nrows - rs);
             const auto      rpi    = &d_rowptr[rs];
-            const ptrdiff_t offset = d_mapptr[b];
+            const ptrdiff_t start = d_mapptr[b];
+            const ptrdiff_t end   = d_mapptr[b + 1];
 
             S nmaps = 0;
             for (ptrdiff_t i = 0; i < extent; i++) {
@@ -193,8 +217,10 @@ namespace sfem {
 
                 for (ptrdiff_t k = 0; k < ncols; k++) {
                     const C col = cols[k];
+                    assert(col < nrows);
                     if (!d_inv_map[col]) {
-                        d_map_idx[offset + nmaps] = col;
+                        assert(start + nmaps < end);
+                        d_map_idx[start + nmaps] = col;
                         d_inv_map[col]            = ++nmaps;
                     }
 
@@ -203,7 +229,7 @@ namespace sfem {
             }
 
             // Clean-up
-            for (ptrdiff_t i = offset; i < d_mapptr[b + 1]; i++) {
+            for (ptrdiff_t i = start; i < end; i++) {
                 d_inv_map[d_map_idx[i]] = 0;
             }
         }
@@ -215,6 +241,9 @@ namespace sfem {
         scrs->mapptr           = mapptr;
         scrs->execution_space_ = es;
         scrs->init_gather();
+
+        printf("CRS nbytes: %zu\n", rowptr->nbytes() + colidx->nbytes() + values->nbytes());
+        printf("SCRS nbytes: %zu\n", scrs->nbytes());
         return scrs;
     }
 }  // namespace sfem

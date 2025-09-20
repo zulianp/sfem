@@ -50,6 +50,8 @@ namespace sfem {
             }
         }
 
+        inline size_t nbytes() const { return n_ * sizeof(T); }
+
         inline T *const       data() { return ptr_; }
         inline const T *const data() const { return ptr_; }
         inline size_t         size() const { return n_; }
@@ -119,6 +121,8 @@ namespace sfem {
         inline const T **const data() const { return ptr_; }
         inline size_t          extent(int i) const { return extent_[i]; }
         inline MemorySpace     mem_space() const { return mem_space_; }
+
+        inline size_t nbytes() const { return extent_[0] * extent_[1] * sizeof(T); }
 
         void print(std::ostream &os) {
             if (mem_space_ == MEMORY_SPACE_DEVICE) {
