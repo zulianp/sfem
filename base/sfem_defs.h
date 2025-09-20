@@ -16,6 +16,7 @@ enum IntegerType { SFEM_INT16 = 20, SFEM_INT32 = 40, SFEM_INT64 = 80, SFEM_INT_D
 typedef const char* OperatorType;
 static OperatorType MATRIX_FREE = "MF";
 static OperatorType CRS = "CRS";
+static OperatorType SMALLCRS = "SMALLCRS";
 static OperatorType CRS_SYM = "CRS_SYM";
 static OperatorType BSR = "BSR";
 static OperatorType BSR_SYM = "BSR_SYM";

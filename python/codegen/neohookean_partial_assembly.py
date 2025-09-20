@@ -666,8 +666,8 @@ static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
         print(f"Wrote {out_path}")
 
 
-def neohookean(fe):
-    name = "neohookean"
+def neohookean_ogden(fe):
+    name = "neohookean_ogden"
     strain_energy_function = "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2"
 
     op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function)
@@ -703,5 +703,5 @@ if __name__ == "__main__":
     # fe = Tet4()
     fe = Hex8()
     # fe = Tet10()
-    neohookean(fe)
+    neohookean_ogden(fe)
     # compressible_mooney_rivlin(fe)
