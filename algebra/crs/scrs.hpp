@@ -3,6 +3,7 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_Operator.hpp"
+#include "sfem_Tracer.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -69,7 +70,7 @@ namespace sfem {
 
         return ret;
     }
-    
+
     template <typename R, typename C, typename T, typename S, typename TOp = T>
     class SCRS : public Operator<TOp> {
     public:
@@ -117,6 +118,47 @@ namespace sfem {
             const ptrdiff_t nrows   = diag_rowptr->size() - 1;
             const ptrdiff_t nblocks = (nrows + BLOCK_SPAN - 1) / BLOCK_SPAN;
 
+            int nthreads = 1;
+
+#ifdef _OPENMP
+#pragma omp parallel
+            {
+#pragma omp master
+                {
+                    nthreads = omp_get_num_threads();
+                }
+            }
+#endif
+
+#if 1
+#pragma omp parallel for
+            for (ptrdiff_t row = 0; row < nrows; ++row) {
+                const ptrdiff_t block_base = row / BLOCK_SPAN * BLOCK_SPAN;
+
+                TOp acc = y[row];
+                {
+                    auto            cols   = &d_diag_colidx[d_diag_rowptr[row]];
+                    auto            vals   = &d_diag_values[d_diag_rowptr[row]];
+                    const ptrdiff_t extent = d_diag_rowptr[row + 1] - d_diag_rowptr[row];
+                    if (PAD) {
+                        acc += sdot_padded<VEC_SIZE>(extent, block_base, cols, vals, x);
+                    } else {
+                        acc += sdot<VEC_SIZE>(extent, block_base, cols, vals, x);
+                    }
+                }
+                {
+                    auto            cols   = &d_offdiag_colidx[d_offdiag_rowptr[row]];
+                    auto            vals   = &d_offdiag_values[d_offdiag_rowptr[row]];
+                    const ptrdiff_t extent = d_offdiag_rowptr[row + 1] - d_offdiag_rowptr[row];
+                    if (PAD) {
+                        acc += sdot_padded<VEC_SIZE>(extent, 0, cols, vals, x);
+                    } else {
+                        acc += sdot<VEC_SIZE>(extent, 0, cols, vals, x);
+                    }
+                }
+                y[row] = acc;
+            }
+#else
 #pragma omp parallel for
             for (ptrdiff_t b = 0; b < nblocks; b++) {
                 const ptrdiff_t block_base = b * BLOCK_SPAN;
@@ -147,6 +189,7 @@ namespace sfem {
                     y[row] = acc;
                 }
             }
+#endif
 
             return SFEM_SUCCESS;
         }
@@ -156,13 +199,13 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
     };
 
-    template <typename R, typename C, typename T, typename S = uint16_t, typename TOp = T>
-    std::shared_ptr<SCRS<R, C, T, S, TOp>> scrs_from_crs(const SharedBuffer<R> &rowptr,
-                                                         const SharedBuffer<C> &colidx,
-                                                         const SharedBuffer<T> &values,
-                                                         const ExecutionSpace   es) {
+    template <typename R, typename C, typename T, typename S = uint16_t, typename TOp = T, typename TStorage = T>
+    std::shared_ptr<SCRS<R, C, TStorage, S, TOp>> scrs_from_crs(const SharedBuffer<R> &rowptr,
+                                                                const SharedBuffer<C> &colidx,
+                                                                const SharedBuffer<T> &values,
+                                                                const ExecutionSpace   es) {
         assert(es == EXECUTION_SPACE_HOST);
-        using SCRS_t = SCRS<R, C, T, S, TOp>;
+        using SCRS_t = SCRS<R, C, TStorage, S, TOp>;
 
         static const bool PAD        = SCRS_t::PAD;
         static const int  VEC_SIZE   = SCRS_t::VEC_SIZE;
@@ -218,9 +261,9 @@ namespace sfem {
         const ptrdiff_t offdiag_nnz = static_cast<ptrdiff_t>(d_orp[nrows]);
 
         auto diag_colidx = sfem::create_host_buffer<S>(diag_nnz);
-        auto diag_values = sfem::create_host_buffer<T>(diag_nnz);
+        auto diag_values = sfem::create_host_buffer<TStorage>(diag_nnz);
         auto off_colidx  = sfem::create_host_buffer<C>(offdiag_nnz);
-        auto off_values  = sfem::create_host_buffer<T>(offdiag_nnz);
+        auto off_values  = sfem::create_host_buffer<TStorage>(offdiag_nnz);
 
         auto d_diag_colidx = diag_colidx->data();
         auto d_diag_values = diag_values->data();
@@ -284,7 +327,7 @@ namespace sfem {
         size_t crs_bytes  = rowptr->nbytes() + colidx->nbytes() + values->nbytes();
         size_t scrs_bytes = scrs->nbytes();
 
-        if (0) {
+        if (true) {
             printf("CRS KB: %zu\n", crs_bytes / 1024);
             printf("SCRS KB: %zu\n", scrs_bytes / 1024);
             printf("DIAG NNZ: %zu\n", diag_values->size());
@@ -292,6 +335,7 @@ namespace sfem {
             printf("CRS NNZ: %zu\n", values->size());
             printf("SCRS/CRS: %f\n", static_cast<double>(scrs_bytes) / crs_bytes);
         }
+
         return scrs;
     }
 }  // namespace sfem

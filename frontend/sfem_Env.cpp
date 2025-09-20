@@ -24,8 +24,18 @@ namespace sfem {
     };
 
     template <>
+    struct FromString<uint64_t> {
+        static uint64_t parse(const std::string& str_value) { return std::stoull(str_value); }
+    };
+
+    template <>
     struct FromString<int32_t> {
         static int32_t parse(const std::string& str_value) { return static_cast<int32_t>(std::stoll(str_value)); }
+    };
+    
+    template <>
+    struct FromString<uint32_t> {
+        static uint32_t parse(const std::string& str_value) { return static_cast<uint32_t>(std::stoull(str_value)); }
     };
 
     template <>
@@ -67,7 +77,9 @@ namespace sfem {
     template double from_string<double>(const std::string& str_value);
     template float from_string<float>(const std::string& str_value);
     template int64_t from_string<int64_t>(const std::string& str_value);
+    template uint64_t from_string<uint64_t>(const std::string& str_value);
     template int32_t from_string<int32_t>(const std::string& str_value);
+    template uint32_t from_string<uint32_t>(const std::string& str_value);
     template int16_t from_string<int16_t>(const std::string& str_value);
     template int8_t from_string<int8_t>(const std::string& str_value);
     template bool from_string<bool>(const std::string& str_value);
