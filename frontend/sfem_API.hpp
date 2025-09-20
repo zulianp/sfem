@@ -1040,7 +1040,7 @@ namespace sfem {
                 return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
-            else if(format == SMALLCRS) {
+            else if(format == SPLITCRS) {
                 auto temp = sfem::hessian_crs(f, u, es);
                 return sfem::scrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
             }

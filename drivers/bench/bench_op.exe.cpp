@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 
         } else {
             ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-            ops.push_back({.name = "Laplacian", .type = SMALLCRS, .block_size = 1});
+            ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
             if(m->element_type() == HEX8) {
                 // FIXME
                 ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
