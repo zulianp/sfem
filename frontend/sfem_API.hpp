@@ -15,6 +15,7 @@
 
 // C++ includes
 #include "scrs.hpp"
+#include "acrs.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
@@ -1035,6 +1036,8 @@ namespace sfem {
                     f->execution_space());
         }
 
+        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+
         if (f->space()->block_size() == 1) {
             if (format == CRS_SYM)
                 return sfem::hessian_crs_sym(f, u, es);
@@ -1042,7 +1045,6 @@ namespace sfem {
                 return sfem::hessian_coo_sym(f, u, es);
             else if (format == SPLITCRS) {
                 auto temp = sfem::hessian_crs(f, u, es);
-                int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
                 switch (prec) {
                     case 2:
                         return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, half_t>(
@@ -1052,6 +1054,19 @@ namespace sfem {
                                 temp->row_ptr, temp->col_idx, temp->values, es);
                     default:
                         return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                }
+            } else if (format == ALIGNEDCRS) {
+                auto temp = sfem::hessian_crs(f, u, es);
+                switch (prec) {
+                    case 2:
+                        return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, half_t>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                    case 4:
+                        return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, float>(
+                                temp->row_ptr, temp->col_idx, temp->values, es);
+                    default:
+                        return sfem::acrs_from_crs<count_t, idx_t, real_t>(
                                 temp->row_ptr, temp->col_idx, temp->values, es);
                 }
             }
