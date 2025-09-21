@@ -17,6 +17,7 @@ typedef const char* OperatorType;
 static OperatorType MATRIX_FREE = "MF";
 static OperatorType CRS = "CRS";
 static OperatorType SPLITCRS = "SPLITCRS";
+static OperatorType ALIGNEDCRS = "ALIGNEDCRS";
 static OperatorType CRS_SYM = "CRS_SYM";
 static OperatorType BSR = "BSR";
 static OperatorType BSR_SYM = "BSR_SYM";
