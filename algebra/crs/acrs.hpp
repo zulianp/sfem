@@ -131,6 +131,7 @@ namespace sfem {
         auto acrs_rowptr   = sfem::create_host_buffer<R>(nrows + 1);
         auto d_acrs_rowptr = acrs_rowptr->data();
 
+#pragma omp parallel for
         for (ptrdiff_t i = 0; i < nrows; i++) {
             auto            cols  = &d_colidx[d_rowptr[i]];
             const ptrdiff_t ncols = d_rowptr[i + 1] - d_rowptr[i];
@@ -151,8 +152,13 @@ namespace sfem {
                 }
             }
 
-            d_acrs_rowptr[i + 1] = d_acrs_rowptr[i] + nbuckets;
+            d_acrs_rowptr[i + 1] = nbuckets;
         }
+
+        for (ptrdiff_t i = 0; i < nrows; i++) {
+            d_acrs_rowptr[i + 1] += d_acrs_rowptr[i]; 
+        }
+
 
         auto acrs_colidx   = sfem::create_host_buffer<C>(d_acrs_rowptr[nrows]);
         auto acrs_values   = sfem::create_host_buffer<TStorage>(d_acrs_rowptr[nrows] * VEC_SIZE);
