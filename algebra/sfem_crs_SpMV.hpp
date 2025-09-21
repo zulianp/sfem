@@ -35,6 +35,23 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         ExecutionSpace execution_space() const override { return execution_space_; }
+
+        void print(std::ostream& os = std::cout) const {
+            if (execution_space_ == EXECUTION_SPACE_HOST) {
+                os << "CRSSpMV (" << rows() << " rows, " << cols() << " cols)\n";
+
+                const ptrdiff_t nrows = row_ptr->size() - 1;
+                for (ptrdiff_t i = 0; i < nrows; i++) {
+                    os << i << ") ";
+                    for (ptrdiff_t j = row_ptr->data()[i]; j < row_ptr->data()[i + 1]; j++) {
+                        os << col_idx->data()[j] << " -> (" << values->data()[j] << "), ";
+                    }
+                    os << "\n";
+                }
+
+                os << "\n";
+            }
+        }
     };
 
     template <typename R, typename C, typename T>
@@ -91,7 +108,7 @@ namespace sfem {
 
                     y[i] = val;
                 }
-#else // 20-27% faster on M1
+#else                     // 20-27% faster on M1
 #pragma omp parallel for  // nowait
                 for (ptrdiff_t i = 0; i < rows; i++) {
                     const R row_begin = rowptr_[i];

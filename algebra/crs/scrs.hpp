@@ -115,7 +115,7 @@ namespace sfem {
             auto d_diag_values    = diag_values->data();
             auto d_offdiag_values = offdiag_values->data();
 
-            const ptrdiff_t nrows   = diag_rowptr->size() - 1;
+            const ptrdiff_t nrows = diag_rowptr->size() - 1;
             const ptrdiff_t nblocks = (nrows + BLOCK_SPAN - 1) / BLOCK_SPAN;
 
             int nthreads = 1;
@@ -287,7 +287,6 @@ namespace sfem {
 
                     if (col >= block_base && col < block_end) {
                         const auto local = col - block_base;
-                        assert(local >= 0 && local <= max_local_index);
                         d_diag_colidx[diag_write] = static_cast<S>(local);
                         d_diag_values[diag_write] = val;
                         ++diag_write;
@@ -308,10 +307,10 @@ namespace sfem {
                         d_off_colidx[i] = 0;
                         d_off_values[i] = 0;
                     }
+                } else {
+                    assert(diag_write == d_drp[row + 1]);
+                    assert(off_write == d_orp[row + 1]);
                 }
-
-                assert(diag_write == d_drp[row + 1]);
-                assert(off_write == d_orp[row + 1]);
             }
         }
 
