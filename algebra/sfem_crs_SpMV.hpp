@@ -11,7 +11,7 @@
 
 namespace sfem {
 
-    template <typename R, typename C, typename T>
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
     class CRSSpMV : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
@@ -29,7 +29,7 @@ namespace sfem {
 
         SharedBuffer<R> row_ptr;
         SharedBuffer<C> col_idx;
-        SharedBuffer<T> values;
+        SharedBuffer<TStorage> values;
         ptrdiff_t       cols_{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
@@ -54,14 +54,14 @@ namespace sfem {
         }
     };
 
-    template <typename R, typename C, typename T>
-    std::shared_ptr<CRSSpMV<R, C, T>> h_crs_spmv(const ptrdiff_t        rows,
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<CRSSpMV<R, C, TStorage, T>> h_crs_spmv(const ptrdiff_t        rows,
                                                  const ptrdiff_t        cols,
                                                  const SharedBuffer<R>& rowptr,
                                                  const SharedBuffer<C>& colidx,
-                                                 const SharedBuffer<T>& values,
+                                                 const SharedBuffer<TStorage>& values,
                                                  const T                scale_output) {
-        auto ret     = std::make_shared<CRSSpMV<R, C, T>>();
+        auto ret     = std::make_shared<CRSSpMV<R, C, TStorage, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values  = values;
