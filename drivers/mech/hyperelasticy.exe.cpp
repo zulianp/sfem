@@ -23,6 +23,96 @@
 
 #include "sfem_ssmgc.hpp"
 
+struct Rotate {
+    std::shared_ptr<sfem::FunctionSpace>  space;
+    int                                   steps;
+    real_t                                angle;
+    std::shared_ptr<sfem::Sideset>        sideset;
+    sfem::SharedBuffer<idx_t>             nodeset;
+    std::shared_ptr<sfem::Buffer<real_t>> uy;
+    std::shared_ptr<sfem::Buffer<real_t>> uz;
+    sfem::ExecutionSpace                  execution_space;
+
+    Rotate(  //
+            const std::shared_ptr<sfem::FunctionSpace>  &space,
+            const int                                    steps,
+            const real_t                                 angle,
+            const std::shared_ptr<sfem::Sideset>        &sideset,
+            const sfem::SharedBuffer<idx_t>             &nodeset,
+            const std::shared_ptr<sfem::Buffer<real_t>> &uy,
+            const std::shared_ptr<sfem::Buffer<real_t>> &uz,
+            const sfem::ExecutionSpace                   execution_space)
+        : space(space),
+          steps(steps),
+          angle(angle),
+          sideset(sideset),
+          nodeset(nodeset),
+          uy(uy),
+          uz(uz),
+          execution_space(execution_space) {}
+
+    std::shared_ptr<sfem::Constraint> create_constraint() {
+        sfem::DirichletConditions::Condition yrot{
+                .sidesets = {sideset}, .nodeset = nodeset, .values = uy, .value = 0, .component = 1};
+        sfem::DirichletConditions::Condition zrot{
+                .sidesets = {sideset}, .nodeset = nodeset, .values = uz, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(space, {yrot, zrot}, execution_space);
+        return conds;
+    }
+
+    void update(int step) {
+        auto   points        = space->mesh_ptr()->points()->data();
+        real_t current_angle = step * angle / steps;
+        printf("%d) current_angle = %g\n", step, current_angle);
+        real_t mat[4]        = {
+                cos(current_angle),
+                -sin(current_angle),
+                sin(current_angle),
+                cos(current_angle),
+        };
+
+        for (ptrdiff_t i = 0; i < nodeset->size(); i++) {
+            const ptrdiff_t dof = nodeset->data()[i];
+
+            geom_t ypos = points[1][dof] - 0.5;
+            geom_t zpos = points[2][dof] - 0.5;
+
+            geom_t ypos_rot = mat[0] * ypos + mat[1] * zpos;
+            geom_t zpos_rot = mat[2] * ypos + mat[3] * zpos;
+
+            uy->data()[i] = ypos_rot - ypos;
+            uz->data()[i] = zpos_rot - zpos;
+        }
+    }
+
+    static std::shared_ptr<Rotate> create(const std::shared_ptr<sfem::FunctionSpace> &space,
+                                          const std::shared_ptr<sfem::Sideset>       &sideset,
+                                          const int                                   steps,
+                                          const real_t                                angle,
+                                          const sfem::ExecutionSpace                  execution_space) {
+        auto nodeset = sfem::create_nodeset_from_sideset(space, sideset);
+
+        auto uy  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
+        auto uz  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
+        auto ret = std::make_shared<Rotate>(space, steps, angle, sideset, nodeset, uy, uz, execution_space);
+        // ret->update(1);
+        return ret;
+    }
+
+    static std::shared_ptr<Rotate> create_from_env(const std::shared_ptr<sfem::FunctionSpace> &space,
+                                                   const sfem::ExecutionSpace                  execution_space) {
+        const real_t      angle        = sfem::Env::read("SFEM_ROTATE_ANGLE", 0.0);
+        const std::string sideset_path = sfem::Env::read_string("SFEM_ROTATE_SIDESET", "");
+        const int         steps        = sfem::Env::read("SFEM_ROTATE_STEPS", 10);
+        if (!sideset_path.empty()) {
+            printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
+            auto sideset = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
+            return Rotate::create(space, sideset, steps, angle, execution_space);
+        }
+        return nullptr;
+    }
+};
+
 int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     SFEM_TRACE_SCOPE("solve_hyperelasticity");
 
@@ -31,7 +121,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         return SFEM_FAILURE;
     }
 
-    if(comm->size() > 1) {
+    if (comm->size() > 1) {
         SFEM_ERROR("MPI runtimes are not supported!\n");
     }
 
@@ -83,6 +173,11 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     f->add_operator(op);
     f->add_constraint(dirichlet_conditions);
 
+    auto rotate_conds = Rotate::create_from_env(fs, es);
+    if (rotate_conds) {
+        f->add_constraint(rotate_conds->create_constraint());
+    }
+
     const ptrdiff_t ndofs        = fs->n_dofs();
     auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
     auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
@@ -104,6 +199,21 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
 
+
+    // Output to disk
+    sfem::create_directory(output_path.c_str());
+    if (fs->has_semi_structured_mesh()) {
+        fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
+        fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
+    } else {
+        fs->mesh_ptr()->write((output_path + "/mesh").c_str());
+    }
+
+    auto out = f->output();
+    sfem::create_directory((output_path + "/out").c_str());
+    out->set_output_dir((output_path + "/out").c_str());
+    out->enable_AoS_to_SoA(true);
+
     if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {
             blas->zeros(ndofs, rhs->data());
@@ -116,6 +226,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
             blas->axpy(ndofs, -alpha, rhs->data(), displacement->data());
         }
+
+        out->write("rhs", sfem::to_host(rhs)->data());
+        out->write("disp", sfem::to_host(displacement)->data());
     } else {
         real_t energy         = 0;
         real_t selected_alpha = 0;
@@ -125,62 +238,64 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         printf("%-10s %-14s %-14s %-14s\n", "Iteration", "gnorm", "energy", "alpha");
         printf("-------------------------------------------------------------\n");
 
-        for (int i = 0; i < nl_max_it; i++) {
-            f->update(displacement->data());
-            blas->zeros(ndofs, rhs->data());
-            f->gradient(displacement->data(), rhs->data());
+        int steps = rotate_conds ? rotate_conds->steps : 1;
+        if (rotate_conds) {
+            out->write_time_step("rhs", 0, sfem::to_host(rhs)->data());
+            out->write_time_step("disp", 0, sfem::to_host(displacement)->data());
+        }
+        for (int step = 1; step <= steps; step++) {
+            if (rotate_conds) {
+                rotate_conds->update(step);
+            }
 
-            const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, -selected_alpha);
+            for (int i = 0; i < nl_max_it; i++) {
+                f->update(displacement->data());
+                blas->zeros(ndofs, rhs->data());
+                f->gradient(displacement->data(), rhs->data());
 
-            if (gnorm < SFEM_NL_TOL) break;
+                const real_t gnorm = blas->norm2(ndofs, rhs->data());
+                printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, -selected_alpha);
 
-            blas->zeros(ndofs, increment->data());
-            f->copy_constrained_dofs(rhs->data(), increment->data());
-            cg->apply(rhs->data(), increment->data());
+                if (gnorm < SFEM_NL_TOL) break;
 
-            if (enable_line_search) {
-                std::vector<real_t> alphas{-2 * alpha,
-                                           -alpha,
-                                           -(real_t)0.9 * alpha,
-                                           2 * alpha / 3,
-                                           -alpha / 2,
-                                           -alpha / 4,
-                                           -alpha / 8,
-                                           -alpha / 32,
-                                           -alpha / 128};
-                std::vector<real_t> energies(alphas.size(), 0);
+                blas->zeros(ndofs, increment->data());
+                f->copy_constrained_dofs(rhs->data(), increment->data());
+                cg->apply(rhs->data(), increment->data());
 
-                f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
-                const int min_energy_index = std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
-                selected_alpha             = alphas[min_energy_index];
-                energy                     = energies[min_energy_index];
-                blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+                if (enable_line_search) {
+                    std::vector<real_t> alphas{-2 * alpha,
+                                               -alpha,
+                                               -(real_t)0.9 * alpha,
+                                               2 * alpha / 3,
+                                               -alpha / 2,
+                                               -alpha / 4,
+                                               -alpha / 8,
+                                               -alpha / 32,
+                                               -alpha / 128};
+                    std::vector<real_t> energies(alphas.size(), 0);
+
+                    f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
+                    const int min_energy_index =
+                            std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
+                    selected_alpha = alphas[min_energy_index];
+                    energy         = energies[min_energy_index];
+                    blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+                } else {
+                    selected_alpha = -alpha;
+                    blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
+                    f->value(displacement->data(), &energy);
+                }
+            }
+
+            if (rotate_conds) {
+                out->write_time_step("rhs", step, sfem::to_host(rhs)->data());
+                out->write_time_step("disp", step, sfem::to_host(displacement)->data());
             } else {
-                selected_alpha = -alpha;
-                blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
-                f->value(displacement->data(), &energy);
+                out->write("rhs", sfem::to_host(rhs)->data());
+                out->write("disp", sfem::to_host(displacement)->data());
             }
         }
     }
-    
-
-    // Output to disk
-    sfem::create_directory(output_path.c_str());
-    if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
-        fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
-    } else {
-        fs->mesh_ptr()->write((output_path + "/mesh").c_str());
-    }
-
-    auto out = f->output();
-
-    out->set_output_dir((output_path + "/out").c_str());
-    out->enable_AoS_to_SoA(true);
-
-    out->write("rhs", sfem::to_host(rhs)->data());
-    out->write("disp", sfem::to_host(displacement)->data());
 
     return SFEM_SUCCESS;
 }
