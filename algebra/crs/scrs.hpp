@@ -17,7 +17,6 @@
 namespace sfem {
     template <int VEC_SIZE, typename IDX, typename VAL, typename TOp>
     static SFEM_FORCE_INLINE TOp sdot(const ptrdiff_t                n,
-                                      const ptrdiff_t                col_offset,
                                       const IDX *const SFEM_RESTRICT cols,
                                       const VAL *const SFEM_RESTRICT vals,
                                       const TOp *const SFEM_RESTRICT x) {
@@ -29,7 +28,7 @@ namespace sfem {
         for (ptrdiff_t k = 0; k < b_extent; k += VEC_SIZE) {
 #pragma unroll(VEC_SIZE)
             for (ptrdiff_t b = 0; b < VEC_SIZE; b++) {
-                buff[b] += vals[k + b] * x[col_offset + cols[k + b]];
+                buff[b] += vals[k + b] * x[cols[k + b]];
             }
         }
 
@@ -40,7 +39,7 @@ namespace sfem {
         }
 
         for (ptrdiff_t k = b_extent; k < n; k++) {
-            ret += vals[k] * x[col_offset + cols[k]];
+            ret += vals[k] * x[cols[k]];
         }
 
         return ret;
@@ -48,7 +47,6 @@ namespace sfem {
 
     template <int VEC_SIZE, typename IDX, typename VAL, typename TOp>
     static SFEM_FORCE_INLINE TOp sdot_padded(const ptrdiff_t                n,
-                                             const ptrdiff_t                col_offset,
                                              const IDX *const SFEM_RESTRICT cols,
                                              const VAL *const SFEM_RESTRICT vals,
                                              const TOp *const SFEM_RESTRICT x) {
@@ -60,7 +58,7 @@ namespace sfem {
         for (ptrdiff_t k = 0; k < b_extent; k += VEC_SIZE) {
 #pragma unroll(VEC_SIZE)
             for (ptrdiff_t b = 0; b < VEC_SIZE; b++) {
-                buff[b] += vals[k + b] * x[col_offset + cols[k + b]];
+                buff[b] += vals[k + b] * x[cols[k + b]];
             }
         }
 
@@ -141,9 +139,9 @@ namespace sfem {
                     auto            vals   = &d_diag_values[d_diag_rowptr[row]];
                     const ptrdiff_t extent = d_diag_rowptr[row + 1] - d_diag_rowptr[row];
                     if (PAD) {
-                        acc += sdot_padded<VEC_SIZE>(extent, block_base, cols, vals, x);
+                        acc += sdot_padded<VEC_SIZE>(extent, cols, vals, &x[block_base]);
                     } else {
-                        acc += sdot<VEC_SIZE>(extent, block_base, cols, vals, x);
+                        acc += sdot<VEC_SIZE>(extent, cols, vals, &x[block_base]);
                     }
                 }
                 {
@@ -151,9 +149,9 @@ namespace sfem {
                     auto            vals   = &d_offdiag_values[d_offdiag_rowptr[row]];
                     const ptrdiff_t extent = d_offdiag_rowptr[row + 1] - d_offdiag_rowptr[row];
                     if (PAD) {
-                        acc += sdot_padded<VEC_SIZE>(extent, 0, cols, vals, x);
+                        acc += sdot_padded<VEC_SIZE>(extent, cols, vals, x);
                     } else {
-                        acc += sdot<VEC_SIZE>(extent, 0, cols, vals, x);
+                        acc += sdot<VEC_SIZE>(extent, cols, vals, x);
                     }
                 }
                 y[row] = acc;
@@ -171,9 +169,9 @@ namespace sfem {
                         auto            vals   = &d_diag_values[d_diag_rowptr[row]];
                         const ptrdiff_t extent = d_diag_rowptr[row + 1] - d_diag_rowptr[row];
                         if (PAD) {
-                            acc += sdot_padded<VEC_SIZE>(extent, block_base, cols, vals, x);
+                            acc += sdot_padded<VEC_SIZE>(extent, cols, vals, &x[block_base]);
                         } else {
-                            acc += sdot<VEC_SIZE>(extent, block_base, cols, vals, x);
+                            acc += sdot<VEC_SIZE>(extent, cols, vals, &x[block_base]);
                         }
                     }
                     {
@@ -181,9 +179,9 @@ namespace sfem {
                         auto            vals   = &d_offdiag_values[d_offdiag_rowptr[row]];
                         const ptrdiff_t extent = d_offdiag_rowptr[row + 1] - d_offdiag_rowptr[row];
                         if (PAD) {
-                            acc += sdot_padded<VEC_SIZE>(extent, 0, cols, vals, x);
+                            acc += sdot_padded<VEC_SIZE>(extent, cols, vals, x);
                         } else {
-                            acc += sdot<VEC_SIZE>(extent, 0, cols, vals, x);
+                            acc += sdot<VEC_SIZE>(extent, cols, vals, x);
                         }
                     }
                     y[row] = acc;
