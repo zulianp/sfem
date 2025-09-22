@@ -52,15 +52,15 @@ typedef struct OpDesc {
     }
 
     static const char *header() {
-        return "Operation          Type      Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Setup [s]    Dimensions\n"
-               "----------------   -------   ---------   -------------    -----------    ---------    ------------\n";
+        return "Operation          Type           Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Setup [s]    Dimensions\n"
+               "----------------   ------------   ---------   -------------    -----------    ---------    ------------\n";
     }
 
     void print(std::ostream &os) {
         char buf[256];
         snprintf(buf,
                  sizeof(buf),
-                 "%-16s   %-7s   %9.3e   %13.3f    %11.3f    %9.3e    (%d, %d)\n",
+                 "%-16s   %-12s   %9.3e   %13.3f    %11.3f    %9.3e    (%d, %d)\n",
                  name.c_str(),
                  type.c_str(),
                  elapsed,

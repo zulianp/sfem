@@ -364,6 +364,25 @@ namespace sfem {
         return out;
     }
 
+    template<typename O, typename I>
+    std::shared_ptr<Buffer<O*>> astype(const std::shared_ptr<Buffer<I*>> &in) 
+    {
+        const ptrdiff_t n0 = in->extent(0);
+        const ptrdiff_t n1 = in->extent(1);
+        auto out = create_host_buffer<O>(n0, n1);
+
+        auto din = in->data();
+        auto dout = out->data();
+
+        for(ptrdiff_t i = 0; i < n0; i++) {
+            for(ptrdiff_t j = 0; j < n1; j++) {
+                dout[i][j] = din[i][j];
+            }
+        }
+
+        return out;
+    }
+
     template <typename T>
     std::shared_ptr<Buffer<T *>> copy(const std::shared_ptr<Buffer<T *>> &buffer) {
         if(buffer->mem_space() == MEMORY_SPACE_DEVICE) {

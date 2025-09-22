@@ -11,7 +11,7 @@
 
 namespace sfem {
 
-    template <typename R, typename C, typename T>
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
     class BSRSpMV : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
@@ -29,7 +29,7 @@ namespace sfem {
 
         SharedBuffer<R> row_ptr;
         SharedBuffer<C> col_idx;
-        SharedBuffer<T> values;
+        SharedBuffer<TStorage> values;
 
         int block_size_{0};
         ptrdiff_t block_cols_{0};
@@ -66,15 +66,15 @@ namespace sfem {
         }
     };
 
-    template <typename R, typename C, typename T>
-    std::shared_ptr<BSRSpMV<R, C, T>> h_bsr_spmv(const ptrdiff_t block_rows,
+    template <typename R, typename C, typename TStorage, typename T = TStorage>
+    std::shared_ptr<BSRSpMV<R, C, TStorage, T>> h_bsr_spmv(const ptrdiff_t block_rows,
                                                   const ptrdiff_t block_cols,
                                                   const int block_size,
                                                   const SharedBuffer<R>& rowptr,
                                                   const SharedBuffer<C>& colidx,
-                                                  const SharedBuffer<T>& values,
+                                                  const SharedBuffer<TStorage>& values,
                                                   const T scale_output) {
-        auto ret = std::make_shared<BSRSpMV<R, C, T>>();
+        auto ret = std::make_shared<BSRSpMV<R, C, TStorage, T>>();
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values = values;
@@ -103,13 +103,13 @@ namespace sfem {
                 for (ptrdiff_t i = 0; i < block_rows; i++) {
                     const R row_begin = rowptr_[i];
                     const R row_end = rowptr_[i + 1];
-                    T* const block_y = &y[i * 3];
+                    auto* const block_y = &y[i * 3];
 
                     for (R k = row_begin; k < row_end; k++) {
                         const C j = colidx_[k];
 
-                        const T* const block_x = &x[j * 3];
-                        const T* const aij = &values_[k * block_matrix_size];
+                        const auto* const block_x = &x[j * 3];
+                        const auto* const aij = &values_[k * block_matrix_size];
 #pragma unroll(3)
                         for (int d1 = 0; d1 < 3; d1++) {
 #pragma unroll(3)
@@ -125,13 +125,13 @@ namespace sfem {
                 for (ptrdiff_t i = 0; i < block_rows; i++) {
                     const R row_begin = rowptr_[i];
                     const R row_end = rowptr_[i + 1];
-                    T* const block_y = &y[i * block_size];
+                    auto* const block_y = &y[i * block_size];
 
                     for (R k = row_begin; k < row_end; k++) {
                         const C j = colidx_[k];
 
-                        const T* const block_x = &x[j * block_size];
-                        const T* const aij = &values_[k * block_matrix_size];
+                        const auto* const block_x = &x[j * block_size];
+                        const auto* const aij = &values_[k * block_matrix_size];
 
                         for (int d1 = 0; d1 < block_size; d1++) {
                             for (int d2 = 0; d2 < block_size; d2++) {
