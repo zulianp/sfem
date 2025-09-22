@@ -6,8 +6,8 @@
 #include <thrust/extrema.h>
 
 #include "sfem_adjoint_mini_loc_tet.cuh"
-#include "sfem_adjoint_mini_loc_tet10.cuh"
 #include "sfem_adjoint_mini_tet.cuh"
+#include "sfem_adjoint_mini_tet10.cuh"
 #include "sfem_adjoint_mini_tet_fun.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
