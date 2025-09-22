@@ -6,6 +6,7 @@
 #include "hex8_linear_elasticity_inline_cpu.h"
 // #include "hex8_quadrature.h"
 #include "line_quadrature.h"
+#include "packed_elements.h"
 #include "sshex8.h"
 
 #ifndef POW3
@@ -267,6 +268,8 @@ int sshex8_linear_elasticity_apply(const int                    level,
 
 // ---------------
 
+#ifndef SFEM_ENABLE_BLAS
+
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
                                           const ptrdiff_t              nnodes,
@@ -444,6 +447,141 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
 
     return SFEM_SUCCESS;
 }
+#else
+
+int affine_sshex8_linear_elasticity_apply(const int                    level,
+                                          const ptrdiff_t              nelements,
+                                          const ptrdiff_t              nnodes,
+                                          idx_t **const SFEM_RESTRICT  elements,
+                                          geom_t **const SFEM_RESTRICT points,
+                                          const real_t                 mu,
+                                          const real_t                 lambda,
+                                          const ptrdiff_t              u_stride,
+                                          const real_t *const          ux,
+                                          const real_t *const          uy,
+                                          const real_t *const          uz,
+                                          const ptrdiff_t              out_stride,
+                                          real_t *const                outx,
+                                          real_t *const                outy,
+                                          real_t *const                outz) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                sshex8_lidx(level, 0, 0, 0),
+                                                sshex8_lidx(level, level, 0, 0),
+                                                sshex8_lidx(level, level, level, 0),
+                                                sshex8_lidx(level, 0, level, 0),
+                                                // Top
+                                                sshex8_lidx(level, 0, 0, level),
+                                                sshex8_lidx(level, level, 0, level),
+                                                sshex8_lidx(level, level, level, level),
+                                                sshex8_lidx(level, 0, level, level)};
+
+#pragma omp parallel
+    {
+        // Allocation per thread
+        scalar_t      *eu[3];
+        accumulator_t *v[3];
+
+        for (int d = 0; d < 3; d++) {
+            eu[d] = malloc(nxe * sizeof(scalar_t));
+            v[d]  = malloc(nxe * sizeof(accumulator_t));
+        }
+
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+        scalar_t m_adjugate[9], adjugate[9];
+
+        scalar_t      element_u[3 * 8];
+        accumulator_t element_out[3 * 8];
+        scalar_t      element_matrix[(3 * 8) * (3 * 8)];
+
+        scalar_t      *X = malloc(txe * 3 * 8 * sizeof(scalar_t));
+        scalar_t *Y = malloc(txe * 3 * 8 * sizeof(scalar_t));
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+
+                for (int d = 0; d < nxe; d++) {
+                    ptrdiff_t idx = ev[d] * u_stride;
+                    eu[0][d]      = ux[idx];
+                    eu[1][d]      = uy[idx];
+                    eu[2][d]      = uz[idx];
+
+                    assert(eu[0][d] == eu[0][d]);
+                    assert(eu[1][d] == eu[1][d]);
+                    assert(eu[2][d] == eu[2][d]);
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            // 2) Evaluate Adjugate
+            scalar_t adjugate[9];
+            scalar_t jacobian_determinant;
+            hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
+
+            // 3) Transform to sub-FFF
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+            hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+            sshex8_SoA_pack_elements(level, eu, X);
+            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            for (int d = 0; d < 3; d++) {
+                memset(v[d], 0, nxe * sizeof(accumulator_t));
+            }
+            sshex8_SoA_unpack_add_elements(level, Y, v);
+
+            {
+                // Scatter elemental data
+                for (int d = 0; d < nxe; d++) {
+                    const ptrdiff_t idx = ev[d] * out_stride;
+#pragma omp atomic update
+                    outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                    outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                    outz[idx] += v[2][d];
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
+
+        for (int d = 0; d < 3; d++) {
+            free(eu[d]);
+            free(v[d]);
+        }
+
+        free(X);
+        free(Y);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+#endif
 
 int affine_sshex8_elasticity_bsr(const int                          level,
                                  const ptrdiff_t                    nelements,

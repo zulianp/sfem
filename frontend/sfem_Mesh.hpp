@@ -29,6 +29,7 @@ namespace sfem {
 
             const std::string           &name() const;
             enum ElemType                element_type() const;
+            int           n_nodes_per_element() const;
             const SharedBuffer<idx_t *> &elements() const;
 
             // Setters for internal use
@@ -176,6 +177,10 @@ namespace sfem {
         void extract_deprecated(mesh_t *mesh);
 
         std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> compute_bounding_box();
+
+        std::shared_ptr<Mesh> clone() const;
+
+        void reorder_elements_from_tags(const SharedBuffer<idx_t> &tags);
 
     private:
         class Impl;

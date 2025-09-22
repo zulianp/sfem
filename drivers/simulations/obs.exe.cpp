@@ -30,7 +30,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 
     const char *mesh_path             = argv[1];
     const char *sdf_path              = argv[2];
-    const char *dirichlet_path        = argv[3];
+    const char *dirichlet_path        = argv[3]; //FIXME USE THEM!!!
     const char *contact_boundary_path = argv[4];
     std::string output_path           = argv[5];
 

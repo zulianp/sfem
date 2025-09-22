@@ -5,6 +5,7 @@
 #include "crs_graph.h"
 #include "multiblock_crs_graph.h"
 #include "read_mesh.h"
+#include "sfem_macros.h"
 #include "sfem_mask.h"
 #include "sfem_mesh.h"
 #include "sfem_mesh_write.h"
@@ -35,6 +36,7 @@ namespace sfem {
 
     const std::string           &Mesh::Block::name() const { return impl_->name; }
     enum ElemType                Mesh::Block::element_type() const { return impl_->element_type; }
+    int                          Mesh::Block::n_nodes_per_element() const { return elem_num_nodes(impl_->element_type); }
     const SharedBuffer<idx_t *> &Mesh::Block::elements() const { return impl_->elements; }
 
     void Mesh::Block::set_name(const std::string &name) { impl_->name = name; }
@@ -1275,7 +1277,7 @@ namespace sfem {
         auto points = this->points()->data();
         int  nxe    = n_nodes_per_element();
 
-        size_t                                                        n_blocks = this->n_blocks();
+        size_t                                                           n_blocks = this->n_blocks();
         std::vector<std::pair<block_idx_t, SharedBuffer<element_idx_t>>> selected_elements;
 
         for (size_t b = 0; b < n_blocks; b++) {
@@ -1324,5 +1326,42 @@ namespace sfem {
         }
 
         return selected_elements;
+    }
+
+    void Mesh::reorder_elements_from_tags(const SharedBuffer<idx_t> &tags) {
+        const ptrdiff_t nelems = n_elements();
+        auto            temp   = create_host_buffer<idx_t>(nelems);
+        auto            d_temp = temp->data();
+        auto            d_tags = tags->data();
+
+        auto d_elements = elements()->data();
+
+        idx_t ntags = 0;
+        for (ptrdiff_t i = 0; i < nelems; i++) {
+            ntags = MAX(ntags, d_tags[i]);
+        }
+
+        if (ntags) return;
+
+        ntags += 1;
+
+        auto bookkeeping = create_host_buffer<ptrdiff_t>(ntags);
+        auto d_bk        = bookkeeping->data();
+
+        int nxe = n_nodes_per_element();
+        for (int d = 0; d < nxe; d++) {
+            memcpy(d_temp, d_elements[d], nelems * sizeof(idx_t));
+
+            for (ptrdiff_t i = 0; i < nelems; i++) {
+                auto t                   = d_tags[i];
+                d_elements[d][d_bk[t]++] = d_temp[i];
+            }
+        }
+    }
+
+    std::shared_ptr<Mesh> Mesh::clone() const {
+        auto ret = std::make_shared<Mesh>();
+        SFEM_IMPLEMENT_ME();
+        return ret;
     }
 }  // namespace sfem

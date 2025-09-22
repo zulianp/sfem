@@ -166,6 +166,7 @@ namespace sfem {
             monitor(0, r_norm0, 1, 0);
 
             T rtr = rtr0;
+            assert(rtr0 == rtr0);
 
             if (rtr0 == 0) {
                 return SFEM_SUCCESS;
@@ -184,10 +185,14 @@ namespace sfem {
                 const T ptAp  = blas.dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
 
+                assert(ptAp == ptAp);
+                assert(alpha == alpha);
+
                 blas.axpby(n, alpha, p, 1, x);
                 blas.axpby(n, -alpha, Ap, 1, r);
 
                 assert(rtr != 0);
+                assert(rtr == rtr);
 
                 const T rtr_new = blas.dot(n, r, r);
                 const T beta    = rtr_new / rtr;
@@ -195,6 +200,7 @@ namespace sfem {
                 blas.axpby(n, 1, r, beta, p);
 
                 T r_norm = sqrt(rtr_new);
+                assert(r_norm == r_norm);
 
                 monitor(iterations_ + 1, r_norm, r_norm / r_norm0, alpha);
                 if (r_norm < atol || rtr_new == 0 || r_norm / r_norm0 < rtol) {
