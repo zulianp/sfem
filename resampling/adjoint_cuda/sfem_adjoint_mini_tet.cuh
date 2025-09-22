@@ -201,22 +201,6 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         // Base linear index for the current cell
         const ptrdiff_t base = i * stride0 + j * stride1 + k * stride2;
 
-        // printf("quad_i_tile=%ld, lane_id=%d, (i,j,k)=(%ld,%ld,%ld), base=%ld, stride0=%ld, stride1=%ld, stride2=%ld, n0=%ld, "
-        //        "n1=%ld, n2=%ld, size_hex_domain=%ld\n",
-        //        (long)quad_i_tile,
-        //        lane_id,
-        //        (long)i,
-        //        (long)j,
-        //        (long)k,
-        //        (long)base,
-        //        (long)stride0,
-        //        (long)stride1,
-        //        (long)stride2,
-        //        (long)n0,
-        //        (long)n1,
-        //        (long)n2,
-        //        (long)size_hex_domain);
-
         if (base == cache_base) {
             // Same cell as previous iteration: accumulate locally
             acc0 += d0;
@@ -230,37 +214,6 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         } else {
             // Flush previous cell if any
             if (cache_base != -1) {
-                // printf("cache_base + off0 = %ld, cache_base = %ld, off0 = %ld\n"
-                //        "cache_base + off1 = %ld, off1 = %ld\n"
-                //        "cache_base + off2 = %ld, off2 = %ld\n"
-                //        "cache_base + off3 = %ld, off3 = %ld\n"
-                //        "cache_base + off4 = %ld, off4 = %ld\n"
-                //        "cache_base + off5 = %ld, off5 = %ld\n"
-                //        "cache_base + off6 = %ld, off6 = %ld\n"
-                //        "cache_base + off7 = %ld, off7 = %ld\n, stride0 = %ld, stride1 = %ld, stride2 = %ld, n0 = %ld, n1 = %ld,
-                //        " "n2 = %ld, size_hex_domain = %ld\n", (long)(cache_base + off0), (long)cache_base, (long)off0,
-                //        (long)(cache_base + off1),
-                //        (long)off1,
-                //        (long)(cache_base + off2),
-                //        (long)off2,
-                //        (long)(cache_base + off3),
-                //        (long)off3,
-                //        (long)(cache_base + off4),
-                //        (long)off4,
-                //        (long)(cache_base + off5),
-                //        (long)off5,
-                //        (long)(cache_base + off6),
-                //        (long)off6,
-                //        (long)(cache_base + off7),
-                //        (long)off7,
-                //        (long)stride0,
-                //        (long)stride1,
-                //        (long)stride2,
-                //        (long)n0,
-                //        (long)n1,
-                //        (long)n2,
-                //        (long)size_hex_domain);
-
                 store_add(&data[cache_base + off0], acc0);
                 store_add(&data[cache_base + off1], acc1);
                 store_add(&data[cache_base + off2], acc2);
@@ -283,7 +236,7 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
             acc6       = d6;
             acc7       = d7;
         }
-    }
+    }  // End loop over the quadrature points
 
     // Flush tail
     if (cache_base != -1) {

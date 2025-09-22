@@ -8,6 +8,7 @@
 #include "sfem_adjoint_mini_loc_tet.cuh"
 #include "sfem_adjoint_mini_loc_tet10.cuh"
 #include "sfem_adjoint_mini_tet.cuh"
+#include "sfem_adjoint_mini_tet_fun.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
 void  //                                                                                               //
@@ -60,4 +61,116 @@ call_hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
                                   &elems_d,            //
                                   elems,               //
                                   cuda_stream_alloc);  //
+
+    copy_xyz_tet10_device_async(nnodes,              //
+                                &xyz_d,              //
+                                xyz,                 //
+                                cuda_stream_alloc);  //
+
+    cudaStreamSynchronize(cuda_stream_alloc);
+
+    // Optional: check for errors
+    {  // Begin: Error check block
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
+        }
+    }  // End: Error check block
+
+    const unsigned int threads_per_block      = 256;
+    const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
+    const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Kernel args: start_element: %ld, end_element: %ld, nelements: %ld, nnodes: %ld\n",
+           start_element,
+           end_element,
+           nelements,
+           nnodes);
+    printf("Kernel launch: blocks_per_grid: %u, threads_per_block: %u, total_threads_per_grid: %u\n",
+           blocks_per_grid,
+           threads_per_block,
+           total_threads_per_grid);
+#endif
+
+    cudaStream_t cuda_stream = 0;  // default stream
+    cudaStreamCreate(&cuda_stream);
+
+    cudaEvent_t start_event, stop_event;
+    cudaEventCreate(&start_event);
+    cudaEventCreate(&stop_event);
+
+    cudaEventRecord(start_event, cuda_stream);
+
+    ///////////////////////////////////
+    // Launch kernel
+    ///////////////////////////////////
+
+    hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel  //
+            <<<blocks_per_grid,                                         //
+               threads_per_block,                                       //
+               0,                                                       //
+               cuda_stream>>>(                                          //
+                    start_element,                                      //
+                    end_element,                                        //
+                    nelements,                                          //
+                    elems_d,                                            //
+                    xyz_d,                                              //
+                    n0,                                                 //
+                    n1,                                                 //
+                    n2,                                                 //
+                    stride0,                                            //
+                    stride1,                                            //
+                    stride2,                                            //
+                    ox,                                                 //
+                    oy,                                                 //
+                    oz,                                                 //
+                    dx,                                                 //
+                    dy,                                                 //
+                    dz,                                                 //
+                    weighted_field_device,                              //
+                    data_device,                                        //
+                    mini_tet_parameters);                               //
+
+    cudaStreamSynchronize(cuda_stream);
+
+    // Optional: check for errors
+    {  // Begin: Error check block
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
+        }
+    }  // End: Error check block
+
+    cudaEventRecord(stop_event, cuda_stream);
+    cudaEventSynchronize(stop_event);
+
+    float milliseconds = 0.0f;
+    cudaEventElapsedTime(&milliseconds, start_event, stop_event);
+
+    if (SFEM_LOG_LEVEL >= 5) {
+        printf("================= SFEM Adjoint Mini-Tet TET10 Kernel GPU ================\n");
+        printf("Kernel execution time: %f ms\n", milliseconds);
+        printf("  Tet per second: %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
+        printf("===================================================================\n");
+    }
+
+    cudaEventDestroy(start_event);
+    cudaEventDestroy(stop_event);
+
+    cudaStreamDestroy(cuda_stream);
+
+    cudaMemcpy((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
+
+    cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
+
+    free_xyz_tet10_device_async(&xyz_d, cuda_stream_alloc);
+
+    free_elems_tet10_async(&elems_d, cuda_stream_alloc);
+
+    cudaFreeAsync((void*)data_device, cuda_stream_alloc);
+    cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
+
+    cudaStreamSynchronize(cuda_stream_alloc);
+    cudaStreamDestroy(cuda_stream_alloc);
 }

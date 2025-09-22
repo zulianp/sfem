@@ -40,7 +40,8 @@
 //                                                    const real_t          dz,            //
 //                                                    const real_t          wf_tet10[10],  // Weighted field at the vertices
 //                                                    const ptrdiff_t const stride[3],     // Stride
-//                                                    real_t* const         data) {                // Determinant of the Jacobian matrix
+//                                                    real_t* const         data) {                // Determinant of the Jacobian
+//                                                    matrix
 //     // mini-tet parameters
 
 //     const real_t N_micro_tet = (real_t)(L) * (real_t)(L) * (real_t)(L);  // Number of micro-tetrahedra in the HyTeg tetrahedron
@@ -309,9 +310,9 @@ hex8_to_isoparametric_tet10_local_adjoint_category_II(const int             L,  
         const ptrdiff_t k = floor(grid_z);
 
         // Get the reminder [0, 1]
-        real_t l_x = (grid_x - i);
-        real_t l_y = (grid_y - j);
-        real_t l_z = (grid_z - k);
+        real_t l_x = (grid_x - (real_t)i);
+        real_t l_y = (grid_y - (real_t)j);
+        real_t l_z = (grid_z - (real_t)k);
 
         assert(l_x >= -1e-8);
         assert(l_y >= -1e-8);

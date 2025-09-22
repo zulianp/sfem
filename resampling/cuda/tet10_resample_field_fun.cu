@@ -48,6 +48,21 @@ void copy_xyz_tet10_device(const ptrdiff_t   nnodes,   //
     }
 }  // end copy_xyz_tet10_device
 
+void copy_xyz_tet10_device_async(const ptrdiff_t   nnodes,    //
+                                 xyz_tet10_device* xyz,       //
+                                 const geom_t**    xyz_host,  //
+                                 cudaStream_t      stream) {       //
+
+    cudaError_t err0 = cudaMemcpyAsync(xyz->x, xyz_host[0], nnodes * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err1 = cudaMemcpyAsync(xyz->y, xyz_host[1], nnodes * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+    cudaError_t err2 = cudaMemcpyAsync(xyz->z, xyz_host[2], nnodes * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
+        printf("ERROR: copying xyz_tet10_device to device async: %s\n", cudaGetErrorString(err0));
+        // Handle the error or exit the program
+    }
+}  // end copy_xyz_tet10_device_async
+
 //////////////////////////////////////////////////////////
 // free_xyz_tet10_device
 //////////////////////////////////////////////////////////
@@ -55,6 +70,20 @@ void free_xyz_tet10_device(xyz_tet10_device* xyz) {
     cudaFree(xyz->x);
     cudaFree(xyz->y);
     cudaFree(xyz->z);
+
+    xyz->x = NULL;
+    xyz->y = NULL;
+    xyz->z = NULL;
+}
+// end free_xyz_tet10_device
+
+//////////////////////////////////////////////////////////
+// free_xyz_tet10_device
+//////////////////////////////////////////////////////////
+void free_xyz_tet10_device_async(xyz_tet10_device* xyz, cudaStream_t stream) {
+    cudaFreeAsync(xyz->x, stream);
+    cudaFreeAsync(xyz->y, stream);
+    cudaFreeAsync(xyz->z, stream);
 
     xyz->x = NULL;
     xyz->y = NULL;
@@ -143,6 +172,37 @@ free_elems_tet10_managed(elems_tet10_device* elems) {  //
     elems->elems_v8 = NULL;
     elems->elems_v9 = NULL;
 }
+
+void                                                                      //
+free_elems_tet10_async(elems_tet10_device* elems, cudaStream_t stream) {  //
+
+    cudaError_t err0 = cudaFreeAsync(elems->elems_v0, stream);
+    cudaError_t err1 = cudaFreeAsync(elems->elems_v1, stream);
+    cudaError_t err2 = cudaFreeAsync(elems->elems_v2, stream);
+    cudaError_t err3 = cudaFreeAsync(elems->elems_v3, stream);
+    cudaError_t err4 = cudaFreeAsync(elems->elems_v4, stream);
+    cudaError_t err5 = cudaFreeAsync(elems->elems_v5, stream);
+    cudaError_t err6 = cudaFreeAsync(elems->elems_v6, stream);
+    cudaError_t err7 = cudaFreeAsync(elems->elems_v7, stream);
+    cudaError_t err8 = cudaFreeAsync(elems->elems_v8, stream);
+    cudaError_t err9 = cudaFreeAsync(elems->elems_v9, stream);
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
+        err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
+        printf("ERROR: freeing device memory for elems async: %s\n", cudaGetErrorString(cudaGetLastError()));
+    }
+
+    elems->elems_v0 = NULL;
+    elems->elems_v1 = NULL;
+    elems->elems_v2 = NULL;
+    elems->elems_v3 = NULL;
+    elems->elems_v4 = NULL;
+    elems->elems_v5 = NULL;
+    elems->elems_v6 = NULL;
+    elems->elems_v7 = NULL;
+    elems->elems_v8 = NULL;
+    elems->elems_v9 = NULL;
+}  // end free_elems_tet10_async
 
 //////////////////////////////////////////////////////////
 // make_xyz_tet10_device_unified
