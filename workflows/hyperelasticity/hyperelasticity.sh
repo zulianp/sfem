@@ -2,63 +2,50 @@
 
 set -e
 
-SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
+# export SFEM_PATH=$INSTALL_DIR/sfem
 
-source $SCRIPTPATH/../sfem_config.sh
-export PATH=$SCRIPTPATH/../../:$PATH
-export PATH=$SCRIPTPATH/../../build/:$PATH
-export PATH=$SCRIPTPATH/../../bin/:$PATH
+if [[ -z "$SFEM_PATH" ]]
+then
+	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
+	exit 1
+fi
 
-PATH=$SCRIPTPATH:$PATH
-PATH=$SCRIPTPATH/../..:$PATH
-PATH=$SCRIPTPATH/../../python/sfem:$PATH
-PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
-PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
-PATH=$SCRIPTPATH/../../../matrix.io:$PATH
+export PATH=$SFEM_PATH/bin:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
+export PATH=$SFEM_PATH/worflows/mech/:$PATH
+export PATH=$CODE_DIR/merge_git_repos/sfem/data/benchmarks/meshes:$PATH
 
-# create_cylinder.sh 6
-# create_cylinder.sh 3
+HERE=$PWD
 
-create_cylinder_p2.sh 4
-export SFEM_USE_MACRO=1
-
-export SFEM_MESH_DIR=mesh
-
-sleft=$SFEM_MESH_DIR/sidesets_aos/sinlet.raw
-sright=$SFEM_MESH_DIR/sidesets_aos/soutlet.raw
-
-# export PATH=$CODE_DIR/utopia/utopia/build_debug:$PATH
-export PATH=$CODE_DIR/utopia/utopia/build:$PATH
-
-set -x
-
-export VAR_UX=0
-export VAR_UY=1
-export VAR_UZ=2
-export SFEM_BLOCK_SIZE=3
-
-export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright"
-export SFEM_DIRICHLET_VALUE="0,0,0,0.5"
-export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX"
-
-# export SFEM_DIRICHLET_NODESET="$sleft,$sleft,$sleft,$sright,$sright,$sright"
-# export SFEM_DIRICHLET_VALUE="0,0,0,0.05,0,0"
-# export SFEM_DIRICHLET_COMPONENT="$VAR_UX,$VAR_UY,$VAR_UZ,$VAR_UX,$VAR_UY,$VAR_UZ"
-
-export SFEM_SHEAR_MODULUS="1"
-export SFEM_FIRST_LAME_PARAMETER="1"
-
-export SFEM_OUTPUT_DIR=sfem_output
-export SFEM_MATERIAL=linear
-
-# export OMP_NUM_THREADS=32
-export OMP_NUM_THREADS=16
-# export OMP_NUM_THREADS=8
-export OMP_PROC_BIND=true
+rm -rf aorta_geometry
+if [[ ! -d aorta_geometry ]]
+then
+	mkdir -p aorta_geometry
+	cd aorta_geometry
 
 
-# lldb -- 
-utopia_exec -app nlsolve -path $CODE_DIR/sfem/hyperelasticity_plugin.dylib -solver_type ConjugateGradient --verbose -max_it 10000 -apply_gradient_descent_step true -atol 1e-6 #-matrix_free false
+	cylinder.py aorta.vtk 1
+	db_to_raw.py aorta.vtk aorta --select_elem_type=tetra
+	surf_type=tri3
+	
+	skin aorta skin_aorta
+	raw_to_db.py skin_aorta skin_aorta.vtk
 
-aos_to_soa $SFEM_OUTPUT_DIR/out.raw 8 $SFEM_BLOCK_SIZE $SFEM_OUTPUT_DIR/out
-raw_to_db.py $SFEM_MESH_DIR $SFEM_OUTPUT_DIR/x.vtk -p "$SFEM_OUTPUT_DIR/out.*.raw"
+	set -x
+
+	SFEM_DEBUG=1 create_sideset aorta -0.51 0 0  0.8 	inlet
+	SFEM_DEBUG=1 create_sideset aorta  0.51 0 0  0.8 	outlet
+
+	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=aorta --cell_type=$surf_type
+	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=aorta --cell_type=$surf_type
+	raw_to_db.py aorta 					aorta.vtk 
+
+	cd $HERE
+fi
+
+
+$LAUNCH hyperelasticy aorta_geometry/aorta dirichlet.yaml output
+raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS

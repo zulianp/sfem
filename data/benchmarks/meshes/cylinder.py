@@ -74,12 +74,6 @@ def main(argv):
 
 	# Generate mesh
 	model.occ.synchronize()
-	
-	
-
-
-		
-
 	model.mesh.generate(3)
 
 	for r in range(0, nrefs):
