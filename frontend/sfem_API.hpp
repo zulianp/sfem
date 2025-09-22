@@ -14,8 +14,8 @@
 #include "ssquad4.h"
 
 // C++ includes
-#include "scrs.hpp"
 #include "acrs.hpp"
+#include "scrs.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
@@ -1066,8 +1066,7 @@ namespace sfem {
                         return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, float>(
                                 temp->row_ptr, temp->col_idx, temp->values, es);
                     default:
-                        return sfem::acrs_from_crs<count_t, idx_t, real_t>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
+                        return sfem::acrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
                 }
             }
 
@@ -1075,7 +1074,17 @@ namespace sfem {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
-            return sfem::hessian_crs(f, u, es);
+            auto crs = sfem::hessian_crs(f, u, es);
+            switch (prec) {
+                case 2:
+                    return sfem::h_crs_spmv<count_t, idx_t, half_t, real_t>(
+                            crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<half_t>(crs->values), (real_t)1);
+                case 4:
+                    return sfem::h_crs_spmv<count_t, idx_t, float, real_t>(
+                            crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<float>(crs->values), (real_t)1);
+                default:
+                    return crs;
+            }
         }
 
         if (format == BSR) return sfem::hessian_bsr(f, u, es);
