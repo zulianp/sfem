@@ -63,22 +63,40 @@ namespace sfem {
             const ptrdiff_t nrows = this->rows();
             const ptrdiff_t ncols = this->cols();
 
-            if (ncols % VEC_SIZE) {
+            // if (ncols % VEC_SIZE == 0) 
+            if (false) 
+            {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < nrows; i++) {
                     auto            cols   = &d_colidx[d_rowptr[i]];
                     const ptrdiff_t extent = d_rowptr[i + 1] - d_rowptr[i];
 
-                    TOp acc = y[i];
-                    for (ptrdiff_t j = 0; j < extent; j++) {
-                        const idx_t     bucket  = cols[j];
-                        const ptrdiff_t boffset = bucket * VEC_SIZE;
-                        const auto      vals    = &d_values[(d_rowptr[i] + j) * VEC_SIZE];
-                        const auto      xb      = &x[boffset];
+                    TOp x_buff[VEC_SIZE * 4] = {0};
 
+                    TOp acc = y[i];
+                    for (ptrdiff_t j = 0; j < extent; j += 4) {
+                        ptrdiff_t len_segment = MIN(4, extent - j);
+                        auto vals = &d_values[(d_rowptr[i] + j) * VEC_SIZE];
+
+                        for (ptrdiff_t k = 0; k < len_segment; k++) {
+                            const idx_t     bucket  = cols[j];
+                            const ptrdiff_t boffset = bucket * VEC_SIZE;
+                            
+                            for (ptrdiff_t s = 0; s < VEC_SIZE; s++) {
+                                x_buff[k*VEC_SIZE + s] = x[boffset + s];
+                            }
+                        }
+
+                        TOp lacc[VEC_SIZE] = {0};
+                        for(ptrdiff_t k = 0; k < len_segment; k++) {
 #pragma unroll(VEC_SIZE)
-                        for (ptrdiff_t k = 0; k < VEC_SIZE; k++) {
-                            acc += vals[k] * xb[k];
+                            for (ptrdiff_t s = 0; s < VEC_SIZE; s++) {
+                                lacc[s] += vals[k] * x_buff[k + s];
+                            }
+                        }
+
+                        for (ptrdiff_t s = 0; s < VEC_SIZE; s++) {
+                            acc += lacc[s];
                         }
                     }
 
