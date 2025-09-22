@@ -358,7 +358,7 @@ namespace sfem {
         auto dout = out->data();
 
         for(ptrdiff_t i = 0; i < size; i++) {
-            dout[i] = din[i];
+            dout[i] = (O)din[i];
         }
 
         return out;
@@ -376,7 +376,7 @@ namespace sfem {
 
         for(ptrdiff_t i = 0; i < n0; i++) {
             for(ptrdiff_t j = 0; j < n1; j++) {
-                dout[i][j] = din[i][j];
+                dout[i][j] = (O)din[i][j];
             }
         }
 

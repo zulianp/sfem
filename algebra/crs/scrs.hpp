@@ -286,11 +286,11 @@ namespace sfem {
                     if (col >= block_base && col < block_end) {
                         const auto local = col - block_base;
                         d_diag_colidx[diag_write] = static_cast<S>(local);
-                        d_diag_values[diag_write] = val;
+                        d_diag_values[diag_write] = (TStorage)val;
                         ++diag_write;
                     } else {
                         d_off_colidx[off_write] = static_cast<C>(col);
-                        d_off_values[off_write] = val;
+                        d_off_values[off_write] = (TStorage)val;
                         ++off_write;
                     }
                 }

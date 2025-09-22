@@ -206,7 +206,7 @@ namespace sfem {
                 }
 
                 const ptrdiff_t idx = (d_acrs_rowptr[i] + bucket_offset) * VEC_SIZE + rmnd;
-                d_acrs_values[idx] += crs_values[k];
+                d_acrs_values[idx] += (TStorage)crs_values[k];
             }
         }
 
