@@ -5,8 +5,8 @@ dirichlet_conditions:
     path: hex8_geometry/inlet
     value: [0, 0, 0]
     component: [0, 1, 2]
-  - type: sideset
-    format: file
-    path: hex8_geometry/outlet
-    value: 1
-    component: 0
+  # - type: sideset
+  #   format: file
+  #   path: hex8_geometry/outlet
+  #   value: 2
+  #   component: 0

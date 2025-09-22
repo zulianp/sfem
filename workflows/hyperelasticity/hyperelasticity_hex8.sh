@@ -28,7 +28,7 @@ then
 	mkdir -p hex8_geometry
 	cd hex8_geometry
 
-	box_mesh.py box --cell_type=hex8 -x 40 -y 40 -z 40
+	box_mesh.py box --cell_type=hex8 -x 40 -y 10 -z 10 --width=4
 	surf_type=quad4
 	
 	skin box skin_box
@@ -37,7 +37,7 @@ then
 	set -x
 
 	SFEM_DEBUG=1 create_sideset box  -0.001 0.5 0.5  0.8 	inlet
-	SFEM_DEBUG=1 create_sideset box   1.001 0.5 0.5  0.8 	outlet
+	SFEM_DEBUG=1 create_sideset box   4.001 0.5 0.5  0.8 	outlet
 
 	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=box --cell_type=$surf_type
 	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=box --cell_type=$surf_type
@@ -50,11 +50,11 @@ echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 
 export SFEM_ROTATE_SIDESET=hex8_geometry/outlet
-export SFEM_ROTATE_ANGLE=6
+export SFEM_ROTATE_ANGLE=12
 export SFEM_ROTATE_STEPS=60
 
 rm -rf hex8_output
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 $LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
 # raw_to_db.py hex8_output/mesh hex8_output.xdmf -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS
-raw_to_db.py raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.raw,hex8_output/out/disp.1.*.raw,hex8_output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.raw,hex8_output/out/disp.1.*.raw,hex8_output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 

@@ -3,6 +3,7 @@
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_defs.h"
+#include "sfem_Buffer.hpp"
 
 #include <memory>
 #include <string>
@@ -40,6 +41,8 @@ namespace sfem {
 
         bool                has_semi_structured_mesh() const;
         SemiStructuredMesh &semi_structured_mesh();
+
+        SharedBuffer<geom_t *> points();
 
         int       block_size() const;
         ptrdiff_t n_dofs() const;

@@ -225,6 +225,8 @@ namespace sfem {
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
+    SharedBuffer<geom_t *> FunctionSpace::points() { if(has_semi_structured_mesh()) { return impl_->semi_structured_mesh->points(); } return impl_->mesh->points(); }
+
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
         return std::make_shared<FunctionSpace>(
                 impl_->mesh, impl_->block_size, macro_type_variant(impl_->get_element_type_for_block(0)));
