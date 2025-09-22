@@ -61,7 +61,7 @@ struct Rotate {
     }
 
     void update(int step) {
-        auto   points        = space->mesh_ptr()->points()->data();
+        auto   points        = space->points()->data();
         real_t current_angle = step * angle / steps;
         printf("%d) current_angle = %g\n", step, current_angle);
         real_t mat[4]        = {
