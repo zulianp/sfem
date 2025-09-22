@@ -79,6 +79,10 @@ int main(int argc, char *argv[]) {
     {
         auto comm = context.communicator();
 
+        if(comm->size() > 1) {
+            SFEM_ERROR("Parallel execution not supported!\n");
+        }
+
         int SFEM_BASE_RESOLUTION = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
         int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
         int SFEM_REPEAT = sfem::Env::read("SFEM_REPEAT", 5);

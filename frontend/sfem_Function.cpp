@@ -156,6 +156,8 @@ namespace sfem {
         auto      mesh       = space->mesh_ptr();
         const int block_size = space->block_size();
 
+        sfem::create_directory(impl_->output_dir.c_str());
+
         char path[2048];
 
         if (impl_->AoS_to_SoA && block_size > 1) {
@@ -184,8 +186,6 @@ namespace sfem {
             }
 
         } else {
-            sfem::create_directory(impl_->output_dir.c_str());
-
             snprintf(path,
                      sizeof(path),
                      impl_->time_dependent_file_format.c_str(),
