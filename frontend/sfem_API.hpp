@@ -806,10 +806,10 @@ namespace sfem {
                 //                                                                                   (real_t)1));
                 // default:
                 return compose_constraints_op(f,
-                                              sfem::d_bsr_spmv<count_t, idx_t, real_t>(d_crs_graph->n_nodes(),
-                                                                                       d_crs_graph->n_nodes(),
-                                                                                       block_size,
-                                                                                       d_crs_graph->rowptr(),
+                                              sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                                               d_crs_graph->n_nodes(),
+                                                               block_size,
+                                                               d_crs_graph->rowptr(),
                                                                                        d_crs_graph->colidx(),
                                                                                        values,
                                                                                        (real_t)1));

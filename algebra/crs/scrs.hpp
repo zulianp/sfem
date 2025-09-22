@@ -86,7 +86,7 @@ namespace sfem {
 
         static const int  BLOCK_SPAN = std::numeric_limits<S>::max() + 1;
         static const int  VEC_SIZE   = 8;  // 8 * sizeof(double) / sizeof(T);
-        static const bool PAD        = true;
+        static const bool PAD        = sizeof(T) != sizeof(double); // Padding for double makes the perf worse
 
         size_t nbytes() const {
             size_t ret = 0;
