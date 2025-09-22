@@ -700,8 +700,9 @@ sfem_adjoint_mini_tet_cluster_kernel_gpu(const ptrdiff_t             tet_cluster
                                      n1,                                         //
                                      n2,                                         //
                                      data);                                      //
-    }
-}
+
+    }  // End loop over elements in the cluster
+}  // End kernel: sfem_adjoint_mini_tet_cluster_kernel_gpu
 /////////////////////////////////////////////////////////////////////////////////
 
 extern "C" void                                                                         //

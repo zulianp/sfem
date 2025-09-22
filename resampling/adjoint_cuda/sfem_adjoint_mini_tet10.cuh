@@ -1,5 +1,5 @@
-#ifndef __SFEM_ADJOINT_MINI_LOC_TET10_CUH__
-#define __SFEM_ADJOINT_MINI_LOC_TET10_CUH__
+#ifndef __SFEM_ADJOINT_MINI_TET10_CUH__
+#define __SFEM_ADJOINT_MINI_TET10_CUH__
 
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
@@ -904,4 +904,4 @@ call_hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
         real_t* const __restrict__ data,                                  // Output
         const mini_tet_parameters_t mini_tet_parameters);
 
-#endif  // __SFEM_ADJOINT_MINI_LOC_TET10_CUH__
+#endif  // __SFEM_ADJOINT_MINI_TET10_CUH__
