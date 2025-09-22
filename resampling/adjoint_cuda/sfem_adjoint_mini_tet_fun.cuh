@@ -446,7 +446,7 @@ make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahed
 // Function to evaluate the 8 trilinear shape functions of a hexahedron
 // hex_aa_8_eval_fun_T_cu
 ////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
+template <typename FloatType>                //
 __device__ void                              //
 hex_aa_8_eval_fun_T_gpu(const FloatType x,   // Local coordinates (in the unit cube)
                         const FloatType y,   //
@@ -477,7 +477,7 @@ hex_aa_8_eval_fun_T_gpu(const FloatType x,   // Local coordinates (in the unit c
 // Function to collect the indices of the 8 vertices of a hexahedron
 // hex_aa_8_collect_coeffs_indices_cu
 ////////////////////////////////////////////////////////////////////////////////
-__device__ void                                               //
+__device__ __inline__ void                                    //
 hex_aa_8_collect_coeffs_indices_gpu(const ptrdiff_t stride0,  // Stride
                                     const ptrdiff_t stride1,  //
                                     const ptrdiff_t stride2,  //

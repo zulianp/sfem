@@ -52,10 +52,42 @@ copy_xyz_tet10_device(const ptrdiff_t   nnodes,  //
 /**
  * @brief
  *
+ * @param nnodes
+ * @param xyz
+ * @param xyz_host
+ * @param stream
+ */
+void                                                     //
+copy_xyz_tet10_device_async(const ptrdiff_t   nnodes,    //
+                            xyz_tet10_device* xyz,       //
+                            const float**     xyz_host,  //
+                            cudaStream_t      stream);        //
+
+/**
+ * @brief
+ *
+ */
+void                                                     //
+copy_xyz_tet10_device_async(const ptrdiff_t   nnodes,    //
+                            xyz_tet10_device* xyz,       //
+                            const geom_t**    xyz_host,  //
+                            cudaStream_t      stream);        //
+
+/**
+ * @brief
+ *
  * @param xyz
  */
 void                                           //
 free_xyz_tet10_device(xyz_tet10_device* xyz);  //
+
+/**
+ * @brief
+ *
+ * @param xyz
+ * @param stream
+ */
+void free_xyz_tet10_device_async(xyz_tet10_device* xyz, cudaStream_t stream);
 
 /////////////////////////////////////////////////////////////////
 // xyz_tet10_device functions for managed memory
@@ -253,6 +285,15 @@ copy_elems_tet10_managed(const ptrdiff_t     nelements,  //
  */
 void                                                  //
 free_elems_tet10_managed(elems_tet10_device* elems);  //
+
+/**
+ * @brief
+ *
+ * @param elems
+ * @param stream
+ */
+void                                                                     //
+free_elems_tet10_async(elems_tet10_device* elems, cudaStream_t stream);  //
 
 /////////////////////////////////////////////////////////////////
 // Unified memory

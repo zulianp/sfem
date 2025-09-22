@@ -100,6 +100,48 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(                //
         const mini_tet_parameters_t          mini_tet_parameters,  //
         real_t* const SFEM_RESTRICT          data);                         // Output data
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TET 10
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void  //                                                                                               //
+call_hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
+        const ptrdiff_t      start_element,                               // Mesh
+        const ptrdiff_t      end_element,                                 //
+        const ptrdiff_t      nelements,                                   //
+        const ptrdiff_t      nnodes,                                      //
+        const idx_t** const  elems,                                       //
+        const geom_t** const xyz,                                         //
+        const ptrdiff_t      n0,                                          // SDF
+        const ptrdiff_t      n1,                                          //
+        const ptrdiff_t      n2,                                          //
+        const ptrdiff_t      stride0,                                     //
+        const ptrdiff_t      stride1,                                     //
+        const ptrdiff_t      stride2,                                     //
+        const geom_t         ox,                                          //
+        const geom_t         oy,                                          //
+        const geom_t         oz,                                          //
+        const geom_t         dx,                                          //
+        const geom_t         dy,                                          //
+        const geom_t         dz,                                          //
+        const real_t* const __restrict__ weighted_field,                  // Input WF
+        real_t* const __restrict__ data,                                  // Output
+        const mini_tet_parameters_t mini_tet_parameters);                 //
+
+int                                                                                                                   //
+hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_gpu(const ptrdiff_t                      start_element,   // Mesh
+                                                                const ptrdiff_t                      end_element,     //
+                                                                const ptrdiff_t                      nnodes,          //
+                                                                const idx_t** const SFEM_RESTRICT    elems,           //
+                                                                const geom_t** const SFEM_RESTRICT   xyz,             //
+                                                                const ptrdiff_t* const SFEM_RESTRICT n,               // SDF
+                                                                const ptrdiff_t* const SFEM_RESTRICT stride,          //
+                                                                const geom_t* const SFEM_RESTRICT    origin,          //
+                                                                const geom_t* const SFEM_RESTRICT    delta,           //
+                                                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input WF
+                                                                real_t* const SFEM_RESTRICT          data,            //
+                                                                const mini_tet_parameters_t          mini_tet_parameters);     //
+
 #ifdef __cplusplus
 }
 #endif

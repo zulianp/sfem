@@ -75,9 +75,6 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     const unsigned int total_threads_per_grid = (end_element - start_element + 1) * LANES_PER_TILE;
     const unsigned int blocks_per_grid        = (total_threads_per_grid + threads_per_block - 1) / threads_per_block;
 
-    cudaStream_t cuda_stream = 0;  // default stream
-    cudaStreamCreate(&cuda_stream);
-
 #if SFEM_LOG_LEVEL >= 5
     printf("Kernel args: start_element: %ld, end_element: %ld, nelements: %ld, nnodes: %ld\n",
            start_element,
@@ -89,6 +86,9 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
            threads_per_block,
            total_threads_per_grid);
 #endif
+
+    cudaStream_t cuda_stream = NULL;  // default stream
+    cudaStreamCreate(&cuda_stream);
 
     cudaEvent_t start_event, stop_event;
     cudaEventCreate(&start_event);
@@ -155,6 +155,8 @@ call_sfem_adjoint_mini_tet_kernel_gpu(const ptrdiff_t             start_element,
     free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
 
     cudaFreeAsync(data_device, cuda_stream_alloc);
+
+    cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
 
 }  // END: call_sfem_adjoint_mini_tet_kernel_gpu
