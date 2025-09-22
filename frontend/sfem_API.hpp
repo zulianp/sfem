@@ -16,6 +16,7 @@
 // C++ includes
 #include "acrs.hpp"
 #include "scrs.hpp"
+#include "sdacrs.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
@@ -810,9 +811,9 @@ namespace sfem {
                                                                d_crs_graph->n_nodes(),
                                                                block_size,
                                                                d_crs_graph->rowptr(),
-                                                                                       d_crs_graph->colidx(),
-                                                                                       values,
-                                                                                       (real_t)1));
+                                                               d_crs_graph->colidx(),
+                                                               values,
+                                                               (real_t)1));
             }
         }
 #endif
@@ -1042,6 +1043,57 @@ namespace sfem {
                 es);
     }
 
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_sdacrs(const std::shared_ptr<sfem::Function> &f,
+                                                                  const std::shared_ptr<Buffer<real_t>> &x,
+                                                                  const sfem::ExecutionSpace             es) {
+        auto crs = hessian_crs(f, x, es);
+
+        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        switch (prec) {
+            case 2:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, half_t>(
+                        crs->row_ptr, crs->col_idx, crs->values, es);
+            case 4:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, float>(
+                        crs->row_ptr, crs->col_idx, crs->values, es);
+            default:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t>(crs->row_ptr, crs->col_idx, crs->values, es);
+        }
+    }
+
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_acrs(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, half_t>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            case 4:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es);
+            default:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+        }
+    }
+
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_scrs(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, half_t>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            case 4:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, float>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            default:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+        }
+    }
+
     static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs, const real_t *const x, real_t *const r) {
 #ifdef SFEM_ENABLE_CUDA
         if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
@@ -1095,46 +1147,28 @@ namespace sfem {
                     f->execution_space());
         }
 
-        // FIXME: This is a hack to support mixed precision
-        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
-
         if (f->space()->block_size() == 1) {
             if (format == CRS_SYM)
                 return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
             else if (format == SPLITCRS) {
-                auto temp = sfem::hessian_crs(f, u, es);
-                switch (prec) {
-                    case 2:
-                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, half_t>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
-                    case 4:
-                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, float>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
-                    default:
-                        return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
-                }
+                return sfem::hessian_scrs(f, u, es);
             } else if (format == ALIGNEDCRS) {
-                auto temp = sfem::hessian_crs(f, u, es);
-                switch (prec) {
-                    case 2:
-                        return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, half_t>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
-                    case 4:
-                        return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, float>(
-                                temp->row_ptr, temp->col_idx, temp->values, es);
-                    default:
-                        return sfem::acrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
-                }
+                return hessian_acrs(f, u, es);
+            }
+
+            if (format == SPLITDACRS) {
+                return sfem::hessian_sdacrs(f, u, es);
             }
 
             if (format != CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
-            auto crs = sfem::hessian_crs(f, u, es);
+            // FIXME: This is a hack to support mixed precision
+            int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+            auto crs  = sfem::hessian_crs(f, u, es);
             switch (prec) {
                 case 2:
                     return sfem::h_crs_spmv<count_t, idx_t, half_t, real_t>(
