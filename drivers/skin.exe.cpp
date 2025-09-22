@@ -261,9 +261,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Correct normal orientation using elements with orginal indexing (only with P1 for the moment)
-    if (mesh->element_type() == TET4) {
-        correct_side_orientation(n_surf_elements, d_surf_elems, parent, mesh->elements()->data(), points);
-    }
+    // if (mesh->element_type() == TET4) {
+    //     correct_side_orientation(n_surf_elements, d_surf_elems, parent, mesh->elements()->data(), points);
+    // }
 
     // Re-index elements
     for (ptrdiff_t i = 0; i < n_surf_elements; ++i) {

@@ -2,12 +2,12 @@
 
 #include <stddef.h>
 
-#include "matrixio_array.h"
-#include "utils.h"
-#include "sfem_Function.hpp"
 #include "boundary_condition.h"
-#include "operators/hierarchical/sfem_prolongation_restriction.h"
+#include "matrixio_array.h"
 #include "operators/boundary_conditions/dirichlet.h"
+#include "operators/hierarchical/sfem_prolongation_restriction.h"
+#include "sfem_Function.hpp"
+#include "utils.h"
 
 #include "sfem_defs.h"
 #include "sfem_logger.h"
@@ -33,9 +33,14 @@
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
+#include "sfem_Communicator.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
+
+#ifdef SFEM_ENABLE_MPI
+#include <mpi.h>
+#endif
 
 #ifdef SFEM_ENABLE_RYAML
 
@@ -107,7 +112,7 @@ namespace sfem {
             idx_t    *coarse_nodeset   = nullptr;
 
             struct Condition cdc;
-            cdc.sidesets   = conds[i].sidesets;
+            cdc.sidesets  = conds[i].sidesets;
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
@@ -133,8 +138,8 @@ namespace sfem {
                 // Use first sideset to find nodeset
                 auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
                 if (it == sideset_to_nodeset.end()) {
-                    auto nodeset                         = create_nodeset_from_sidesets(coarse_space, cdc.sidesets);
-                    cdc.nodeset                          = nodeset;
+                    auto nodeset                             = create_nodeset_from_sidesets(coarse_space, cdc.sidesets);
+                    cdc.nodeset                              = nodeset;
                     sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
 
                 } else {
@@ -200,7 +205,7 @@ namespace sfem {
         if (!SFEM_DIRICHLET_NODESET && !SFEM_DIRICHLET_SIDESET) return dc;
 
         auto comm = space->mesh_ptr()->comm();
-        int      rank = comm->rank();
+        int  rank = comm->rank();
 
         auto &conds = dc->impl_->conditions;
 
@@ -274,7 +279,8 @@ namespace sfem {
 
                     real_t   *values{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    if (array_create_from_file(
+                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
 
@@ -383,7 +389,7 @@ namespace sfem {
                     c["path"] >> path;
                     idx_t    *arr{nullptr};
                     ptrdiff_t lsize, gsize;
-                    if (!array_create_from_file(comm->get(), path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
                     }
 
@@ -429,7 +435,7 @@ namespace sfem {
                 cdc.component = component[i];
                 cdc.value     = value[i];
                 cdc.sidesets.push_back(sideset);
-                cdc.nodeset   = nodeset;
+                cdc.nodeset = nodeset;
                 dc->impl_->conditions.push_back(cdc);
             }
         }
@@ -469,6 +475,39 @@ namespace sfem {
             }
         }
 
+        return SFEM_SUCCESS;
+    }
+
+    int DirichletConditions::value(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("DirichletConditions::value");
+
+        // This is pure algebraic energy (may need to scale with boundary mass matrix for proper energy)
+        for (auto &c : impl_->conditions) {
+            constraint_objective_nodes_to_value_vec(
+                    c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, out);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int DirichletConditions::value_steps(const real_t       *x,
+                                         const real_t       *h,
+                                         const int           nsteps,
+                                         const real_t *const steps,
+                                         real_t *const       out) {
+        SFEM_TRACE_SCOPE("DirichletConditions::value_steps");
+        for (auto &c : impl_->conditions) {
+            constraint_objective_nodes_to_value_vec_steps(c.nodeset->size(),
+                                                          c.nodeset->data(),
+                                                          impl_->space->block_size(),
+                                                          c.component,
+                                                          c.value,
+                                                          x,
+                                                          h,
+                                                          nsteps,
+                                                          steps,
+                                                          out);
+        }
         return SFEM_SUCCESS;
     }
 
@@ -547,4 +586,4 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-}  // namespace sfem 
+}  // namespace sfem
