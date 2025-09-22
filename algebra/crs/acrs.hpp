@@ -219,7 +219,7 @@ namespace sfem {
         size_t crs_bytes  = rowptr->nbytes() + colidx->nbytes() + values->nbytes();
         size_t acrs_bytes = acrs->nbytes();
 
-        if (true) {
+        if (false) {
             printf("CRS KB: %g\n", crs_bytes / 1024.);
             printf("ACRS KB: %g\n", acrs_bytes / 1024.);
             printf("ACRS/CRS: %f\n", static_cast<double>(acrs_bytes) / crs_bytes);

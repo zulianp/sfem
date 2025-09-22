@@ -324,7 +324,7 @@ namespace sfem {
         size_t crs_bytes  = rowptr->nbytes() + colidx->nbytes() + values->nbytes();
         size_t scrs_bytes = scrs->nbytes();
 
-        if (true) {
+        if (false) {
             printf("CRS KB: %zu\n", crs_bytes / 1024);
             printf("SCRS KB: %zu\n", scrs_bytes / 1024);
             printf("DIAG NNZ: %zu\n", diag_values->size());
