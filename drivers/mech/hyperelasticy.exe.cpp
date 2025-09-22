@@ -23,7 +23,7 @@
 
 #include "sfem_ssmgc.hpp"
 
-struct Rotate {
+struct RotateYZ {
     std::shared_ptr<sfem::FunctionSpace>  space;
     int                                   steps;
     real_t                                angle;
@@ -33,7 +33,7 @@ struct Rotate {
     std::shared_ptr<sfem::Buffer<real_t>> uz;
     sfem::ExecutionSpace                  execution_space;
 
-    Rotate(  //
+    RotateYZ(  //
             const std::shared_ptr<sfem::FunctionSpace>  &space,
             const int                                    steps,
             const real_t                                 angle,
@@ -64,7 +64,7 @@ struct Rotate {
         auto   points        = space->points()->data();
         real_t current_angle = step * angle / steps;
         printf("%d) current_angle = %g\n", step, current_angle);
-        real_t mat[4]        = {
+        real_t mat[4] = {
                 cos(current_angle),
                 -sin(current_angle),
                 sin(current_angle),
@@ -85,29 +85,28 @@ struct Rotate {
         }
     }
 
-    static std::shared_ptr<Rotate> create(const std::shared_ptr<sfem::FunctionSpace> &space,
-                                          const std::shared_ptr<sfem::Sideset>       &sideset,
-                                          const int                                   steps,
-                                          const real_t                                angle,
-                                          const sfem::ExecutionSpace                  execution_space) {
+    static std::shared_ptr<RotateYZ> create(const std::shared_ptr<sfem::FunctionSpace> &space,
+                                            const std::shared_ptr<sfem::Sideset>       &sideset,
+                                            const int                                   steps,
+                                            const real_t                                angle,
+                                            const sfem::ExecutionSpace                  execution_space) {
         auto nodeset = sfem::create_nodeset_from_sideset(space, sideset);
 
         auto uy  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
         auto uz  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
-        auto ret = std::make_shared<Rotate>(space, steps, angle, sideset, nodeset, uy, uz, execution_space);
-        // ret->update(1);
+        auto ret = std::make_shared<RotateYZ>(space, steps, angle, sideset, nodeset, uy, uz, execution_space);
         return ret;
     }
 
-    static std::shared_ptr<Rotate> create_from_env(const std::shared_ptr<sfem::FunctionSpace> &space,
-                                                   const sfem::ExecutionSpace                  execution_space) {
+    static std::shared_ptr<RotateYZ> create_from_env(const std::shared_ptr<sfem::FunctionSpace> &space,
+                                                     const sfem::ExecutionSpace                  execution_space) {
         const real_t      angle        = sfem::Env::read("SFEM_ROTATE_ANGLE", 0.0);
         const std::string sideset_path = sfem::Env::read_string("SFEM_ROTATE_SIDESET", "");
         const int         steps        = sfem::Env::read("SFEM_ROTATE_STEPS", 10);
         if (!sideset_path.empty()) {
             printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
             auto sideset = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
-            return Rotate::create(space, sideset, steps, angle, execution_space);
+            return RotateYZ::create(space, sideset, steps, angle, execution_space);
         }
         return nullptr;
     }
@@ -173,7 +172,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     f->add_operator(op);
     f->add_constraint(dirichlet_conditions);
 
-    auto rotate_conds = Rotate::create_from_env(fs, es);
+    auto rotate_conds = RotateYZ::create_from_env(fs, es);
     if (rotate_conds) {
         f->add_constraint(rotate_conds->create_constraint());
     }
@@ -198,7 +197,6 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto   blas               = sfem::blas<real_t>(es);
 
     printf("Solving hyperelasticity: #%ld dofs\n", (long)fs->n_dofs());
-
 
     // Output to disk
     sfem::create_directory(output_path.c_str());
