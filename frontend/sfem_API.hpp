@@ -805,7 +805,7 @@ namespace sfem {
                 //                                                                                   d_crs_graph->colidx(),
                 //                                                                                   astype<float>(values),
                 //                                                                                   (real_t)1));
-                // default:
+            default:
                 return compose_constraints_op(f,
                                               sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
                                                                d_crs_graph->n_nodes(),
