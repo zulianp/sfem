@@ -19,6 +19,8 @@ make_elems_tet4_device() {  //
     elems_device.elems_v2 = NULL;
     elems_device.elems_v3 = NULL;
 
+    elems_device.nelements = 0;
+
     return elems_device;
 }
 
@@ -36,6 +38,8 @@ cuda_allocate_elems_tet4_device(elems_tet4_device* elems_device,  //
     cudaMalloc((void**)&elems_device->elems_v1, nelements * sizeof(idx_t));
     cudaMalloc((void**)&elems_device->elems_v2, nelements * sizeof(idx_t));
     cudaMalloc((void**)&elems_device->elems_v3, nelements * sizeof(idx_t));
+
+    elems_device->nelements = nelements;
 }
 
 void                                                                    //
@@ -47,6 +51,8 @@ cuda_allocate_elems_tet4_device_async(elems_tet4_device* elems_device,  //
     cudaMallocAsync((void**)&elems_device->elems_v1, nelements * sizeof(idx_t), stream);
     cudaMallocAsync((void**)&elems_device->elems_v2, nelements * sizeof(idx_t), stream);
     cudaMallocAsync((void**)&elems_device->elems_v3, nelements * sizeof(idx_t), stream);
+
+    elems_device->nelements = nelements;
 }
 
 /**
@@ -63,6 +69,8 @@ cuda_allocate_elems_tet4_device_managed(elems_tet4_device* elems_device,  //
     cudaMallocManaged((void**)&elems_device->elems_v1, nelements * sizeof(idx_t));
     cudaMallocManaged((void**)&elems_device->elems_v2, nelements * sizeof(idx_t));
     cudaMallocManaged((void**)&elems_device->elems_v3, nelements * sizeof(idx_t));
+
+    elems_device->nelements = nelements;
 }
 
 /**
@@ -81,6 +89,8 @@ copy_elems_tet4_device(const idx_t**      elems,           // elements from host
     cudaMemcpy(elems_device->elems_v1, elems[1], nelements * sizeof(idx_t), cudaMemcpyHostToDevice);
     cudaMemcpy(elems_device->elems_v2, elems[2], nelements * sizeof(idx_t), cudaMemcpyHostToDevice);
     cudaMemcpy(elems_device->elems_v3, elems[3], nelements * sizeof(idx_t), cudaMemcpyHostToDevice);
+
+    elems_device->nelements = nelements;
 }
 
 void                                                           //
@@ -104,6 +114,8 @@ copy_elems_tet4_device_async(const idx_t**      elems,         // elements from 
     cudaMemcpyAsync(elems_device->elems_v1, elems[1], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(elems_device->elems_v2, elems[2], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
     cudaMemcpyAsync(elems_device->elems_v3, elems[3], nelements * sizeof(idx_t), cudaMemcpyHostToDevice, stream);
+
+    elems_device->nelements = nelements;
 }
 
 /**
@@ -122,6 +134,8 @@ copy_elems_tet4_device_unified(const idx_t**      elems,           // elements f
     elems_device->elems_v1 = (idx_t*)elems[1];
     elems_device->elems_v2 = (idx_t*)elems[2];
     elems_device->elems_v3 = (idx_t*)elems[3];
+
+    elems_device->nelements = nelements;
 }
 
 /**
@@ -137,10 +151,11 @@ free_elems_tet4_device(elems_tet4_device* elems_device) {  //
     cudaFree(elems_device->elems_v2);
     cudaFree(elems_device->elems_v3);
 
-    elems_device->elems_v0 = NULL;
-    elems_device->elems_v1 = NULL;
-    elems_device->elems_v2 = NULL;
-    elems_device->elems_v3 = NULL;
+    elems_device->elems_v0  = NULL;
+    elems_device->elems_v1  = NULL;
+    elems_device->elems_v2  = NULL;
+    elems_device->elems_v3  = NULL;
+    elems_device->nelements = 0;
 }
 
 void                                                           //
@@ -150,10 +165,11 @@ free_elems_tet4_device_async(elems_tet4_device* elems_device,  //
     cudaFreeAsync(elems_device->elems_v1, stream);
     cudaFreeAsync(elems_device->elems_v2, stream);
     cudaFreeAsync(elems_device->elems_v3, stream);
-    elems_device->elems_v0 = NULL;
-    elems_device->elems_v1 = NULL;
-    elems_device->elems_v2 = NULL;
-    elems_device->elems_v3 = NULL;
+    elems_device->elems_v0  = NULL;
+    elems_device->elems_v1  = NULL;
+    elems_device->elems_v2  = NULL;
+    elems_device->elems_v3  = NULL;
+    elems_device->nelements = 0;
 }
 
 /**
@@ -165,10 +181,11 @@ free_elems_tet4_device_async(elems_tet4_device* elems_device,  //
  */
 void                                                               //
 free_elems_tet4_device_unified(elems_tet4_device* elems_device) {  //
-    elems_device->elems_v0 = NULL;
-    elems_device->elems_v1 = NULL;
-    elems_device->elems_v2 = NULL;
-    elems_device->elems_v3 = NULL;
+    elems_device->elems_v0  = NULL;
+    elems_device->elems_v1  = NULL;
+    elems_device->elems_v2  = NULL;
+    elems_device->elems_v3  = NULL;
+    elems_device->nelements = 0;
 }
 
 ///////////////////////////////////////////////////////////////

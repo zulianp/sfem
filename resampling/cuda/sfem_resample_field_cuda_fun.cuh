@@ -11,6 +11,9 @@ typedef struct {
     idx_t* elems_v1;
     idx_t* elems_v2;
     idx_t* elems_v3;
+
+    ptrdiff_t nelements;
+
 } elems_tet4_device;
 
 /**
