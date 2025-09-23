@@ -101,6 +101,41 @@ private:
     }
 };
 
+struct buffer_cluster_t {
+public:
+    real_t*   buffer = nullptr;
+    ptrdiff_t size   = 0;
+
+    void allocate(ptrdiff_t size_, cudaStream_t stream_) {
+        if (size_ > size) {
+            if (buffer) {
+                this->clear_async(stream_);
+            }
+            cudaMallocAsync((void**)&buffer, size_ * sizeof(real_t), stream_);
+            size = size_;
+        }
+    }
+
+    void clear_async(cudaStream_t stream_) {
+        if (buffer) {
+            cudaFreeAsync(buffer, stream_);
+            buffer = nullptr;
+            size   = 0;
+        }
+    }
+
+    void clear() {
+        if (buffer) {
+            cudaFree(buffer);
+            buffer = nullptr;
+            size   = 0;
+        }
+    }
+
+    buffer_cluster_t() = default;
+    ~buffer_cluster_t() { this->clear(); }
+};
+
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
@@ -286,6 +321,16 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
     const ptrdiff_t n1_local = tet_properties_info.n1_local[element_i];
     const ptrdiff_t n2_local = tet_properties_info.n2_local[element_i];
 
+    if (element_i > 30000 and element_i < 30010)  //
+        printf("Stride local: %ld, %ld, %ld, min_grid_0: %ld, min_grid_1: %ld, min_grid_2: %ld, element_i: %ld \n",
+               stride0_local,
+               stride1_local,
+               stride2_local,
+               min_grid_0,
+               min_grid_1,
+               min_grid_2,
+               element_i);
+
     // printf("Exaedre volume: %e\n", hexahedron_volume);
 
     idx_t ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
@@ -411,6 +456,13 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 
             const ptrdiff_t g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
 
+            // printf("gi0 = %ld, gi1 = %ld, gi2 = %ld, g_index = %ld, value = %e\n",
+            //        gi0,
+            //        gi1,
+            //        gi2,
+            //        g_index,
+            //        hex_local_buffer_value);
+
             // if (gi0 >= 0 and gi0 < n0 and  //
             //     gi1 >= 0 and gi1 < n1 and  //
             //     gi2 >= 0 and gi2 < n2 and  //
@@ -431,7 +483,7 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 template <typename FloatType>
 __global__ void                                                                                       //
 sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             buffer_size,          //
-                                                    FloatType* const            buffer,               //
+                                                    buffer_cluster_t            buffer_cluster,       //
                                                     const ptrdiff_t             tets_per_block,       //
                                                     const ptrdiff_t             tet_cluster_size,     // Cluster size
                                                     const ptrdiff_t             start_element,        // Mesh
@@ -456,36 +508,43 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                                     const tet_properties_info_t<FloatType> tet_properties_info,  //
                                                     FloatType* const                       data) {                                     //
 
-    const int tet_id        = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
     const int tet_id_base   = (blockIdx.x * blockDim.x) / LANES_PER_TILE;
-    const int warp_id       = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+    const int warp_id       = threadIdx.x / LANES_PER_TILE;
     const int lane_id       = threadIdx.x % LANES_PER_TILE;
-    const int cluster_begin = warp_id * tet_cluster_size + start_element;
+    const int warp_id_abs   = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
+    const int cluster_begin = warp_id_abs * tet_cluster_size + start_element;
     const int cluster_end   = cluster_begin + tet_cluster_size;
 
-    // const int threading_block_size = blockDim.x;
-
-    FloatType* buffer_local_data = &buffer[tet_id_base * buffer_size];
-    // FloatType* buffer_local_data_base = &buffer[tet_id_base * buffer_size];
-    // FloatType*                  tet_buffer = &shared_local_data[tets_per_block];
+    FloatType* buffer_local_data = &buffer_cluster.buffer[tet_id_base * buffer_size];
 
 #define START_BUFFER_IDX_SIZE 64
 
-    for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
-        __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
+    __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
+    for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
+        //
         for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
+            // if (i + tet_id_base * buffer_size > buffer_cluster.size) {
+            //     printf("Error: buffer overflow in sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu, i = %d, tet_id_base = %d, "
+            //            "buffer_size = %ld, buffer_cluster.size = %ld\n",
+            //            i,
+            //            tet_id_base,
+            //            buffer_size,
+            //            buffer_cluster.size);
+            //     return;
+            // };
             if (i < buffer_size) buffer_local_data[i] = FloatType(0.0);
             // if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
         }
 
-        // __syncthreads();
+        __syncthreads();
 
         if (lane_id == 0) {
             tet_start_buffer_idx[warp_id] = tet_properties_info.total_size_local[element_i];
         }
 
         __syncthreads();
+        // return;
 
         if (lane_id == 0 and warp_id == 0) {
             ptrdiff_t offset = 0;
@@ -500,12 +559,11 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
         FloatType* hex_local_buffer = &buffer_local_data[tet_start_buffer_idx[warp_id]];
 
-        // Check if the element is within the valid range
-        if (element_i >= end_element) break;  // Out of range
+        // return;
 
         if (element_i >= end_element) return;  // Out of range
 
-        // printf("Processing element %ld / %ld\n", element_i, end_element);
+        // printf("Processing element %ld in range %ld - %ld\n", element_i, start_element, end_element);
 
         const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
         const FloatType hexahedron_volume = dx * dy * dz;
@@ -526,7 +584,15 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
         const ptrdiff_t n1_local = tet_properties_info.n1_local[element_i];
         const ptrdiff_t n2_local = tet_properties_info.n2_local[element_i];
 
-        // printf("Exaedre volume: %e\n", hexahedron_volume);
+        // if (element_i > 30000 and element_i < 30010)  //
+        //     printf("Stride local: %ld, %ld, %ld, min_grid_0: %ld, min_grid_1: %ld, min_grid_2: %ld, element_i: %ld \n",
+        //            stride0_local,
+        //            stride1_local,
+        //            stride2_local,
+        //            min_grid_0,
+        //            min_grid_1,
+        //            min_grid_2,
+        //            element_i);
 
         idx_t ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
 
@@ -650,6 +716,23 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                 const ptrdiff_t gi2 = i2_origin + i2 + min_grid_2;
 
                 const ptrdiff_t g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
+
+                // printf("gi0 = %ld, gi1 = %ld, gi2 = %ld, g_index = %ld, value = %e, i0 = %ld, i1 = %ld, i2 = %ld, i0_origin = "
+                //        "%ld, i1_origin = %ld, i2_origin = %ld, min_grid_0 = %ld, min_grid_1 = %ld, min_grid_2 = %ld\n",
+                //        gi0,
+                //        gi1,
+                //        gi2,
+                //        g_index,
+                //        hex_local_buffer_value,
+                //        i0,
+                //        i1,
+                //        i2,
+                //        i0_origin,
+                //        i1_origin,
+                //        i2_origin,
+                //        min_grid_0,
+                //        min_grid_1,
+                //        min_grid_2);
 
                 // if (gi0 >= 0 and gi0 < n0 and  //
                 //     gi1 >= 0 and gi1 < n1 and  //
