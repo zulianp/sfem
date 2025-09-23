@@ -264,7 +264,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                     std::vector<real_t> alphas{-2 * alpha,
                                                -alpha,
                                                -(real_t)0.9 * alpha,
-                                               2 * alpha / 3,
+                                               -2 * alpha / 3,
                                                -alpha / 2,
                                                -alpha / 4,
                                                -alpha / 8,
