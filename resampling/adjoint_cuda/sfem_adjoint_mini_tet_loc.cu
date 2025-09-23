@@ -232,41 +232,9 @@ call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(const ptrdiff_t             st
 // call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-struct buffer_cluster_t {
-public:
-    real_t*   buffer = nullptr;
-    ptrdiff_t size   = 0;
-
-    void allocate(ptrdiff_t size_, cudaStream_t stream_) {
-        if (size_ > size) {
-            if (buffer) {
-                this->clear_async(stream_);
-            }
-            cudaMallocAsync((void**)&buffer, size_ * sizeof(real_t), stream_);
-            size = size_;
-        }
-    }
-
-    void clear_async(cudaStream_t stream_) {
-        if (buffer) {
-            cudaFreeAsync(buffer, stream_);
-            buffer = nullptr;
-            size   = 0;
-        }
-    }
-
-    void clear() {
-        if (buffer) {
-            cudaFree(buffer);
-            buffer = nullptr;
-            size   = 0;
-        }
-    }
-
-    buffer_cluster_t() = default;
-    ~buffer_cluster_t() { this->clear(); }
-};
-
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu
+/////////////////////////////////////////////////////////////////////////////////////////////////
 extern "C" void                                                                                        //
 call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t             start_element,   // Mesh
                                                           const ptrdiff_t             end_element,     //
@@ -288,8 +256,8 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                                                           const geom_t                dz,              //
                                                           const real_t* const         weighted_field,  // Input weighted field
                                                           const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
-                                                          real_t* const               data) {
-    //
+                                                          real_t* const               data) {                             //
+                                                                                                            //
 
     cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
@@ -394,35 +362,29 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         auto max_it          = thrust::max_element(d_begin, d_end);
         max_total_size_local = *max_it;
         max_idx_global       = (max_it - d_begin) + start_element;
-
-        // auto min_it          = thrust::min_element(d_begin, d_end);
-        // min_total_size_local = *min_it;
-
-        // min_idx_global = (min_it - d_begin) + start_element;
     }
 
     //// launch clustered kernel ////
-    unsigned int cluster_size       = 1;
-    unsigned int elements_per_block = nelements / 22 + 1;
-
-    // cudaMemset((void*)tet_properties_info.total_size_local, 7777700087766, nelements * sizeof(ptrdiff_t));///////////
-
-    // cudaEvent_t start_event, stop_event;
-    cudaEventCreate(&start_event);
-    cudaEventCreate(&stop_event);
-
-    cudaEventRecord(start_event, cuda_stream);
+    unsigned int    cluster_size       = 1;
+    unsigned int    elements_per_block = nelements / 22 + 1;
+    const ptrdiff_t buffer_memory_size = max_total_size_local * tets_per_block + tets_per_block;
 
     buffer_cluster_t buffer_cluster;
 
-    buffer_cluster.allocate(elements_per_block * max_total_size_local, cuda_stream_alloc);
+    buffer_cluster.allocate(elements_per_block * (max_total_size_local + 1), cuda_stream_alloc);
+
+    printf("max_total_size_local = %lld \n", (long long)max_total_size_local);
+    printf("buffer_memory_size   = %lld \n", (long long)buffer_memory_size);
+    printf("buffer_cluster.size  = %lld \n", (long long)buffer_cluster.size);
+    printf("elements_per_block  = %d \n", elements_per_block);
+    printf("stride0             = %lld \n", (long long)stride0);
+    printf("stride1             = %lld \n", (long long)stride1);
+    printf("stride2             = %lld \n", (long long)stride2);
 
     cudaStreamSynchronize(cuda_stream_alloc);
 
     {  // BEGIN: Compute local grid sizes for each element
-        const unsigned int threads_per_block           = LANES_PER_TILE * tets_per_block;
-        const unsigned int total_threads_per_grid_prop = (end_element - start_element + 1);
-        const unsigned int blocks_per_grid = (total_threads_per_grid_prop + threads_per_block - 1) / threads_per_block;
+        const unsigned int threads_per_block = LANES_PER_TILE * tets_per_block;
 
         for (int start_element_local = start_element;      //
              start_element_local < end_element;            //
@@ -433,31 +395,78 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                 end_element_local = end_element;
             }
 
-            // sfem_make_local_data_tets_kernel_gpu<real_t><<<blocks_per_grid,                      //
-            //                                                threads_per_block,                    //
-            //                                                0,                                    //
-            //                                                cuda_stream>>>(start_element,         // Mesh
-            //                                                               end_element,           //
-            //                                                               nnodes,                //
-            //                                                               elements_device,       //
-            //                                                               xyz_device,            //
-            //                                                               n0,                    // SDF
-            //                                                               n1,                    //
-            //                                                               n2,                    //
-            //                                                               stride0,               // Stride
-            //                                                               stride1,               //
-            //                                                               stride2,               //
-            //                                                               origin0,               // Origin
-            //                                                               origin1,               //
-            //                                                               origin2,               //
-            //                                                               dx,                    // Delta
-            //                                                               dy,                    //
-            //                                                               dz,                    //
-            //                                                               tet_properties_info);  //
+            const unsigned int total_threads_per_grid_prop = ((end_element_local - start_element_local + 1) / cluster_size) *  //
+                                                             LANES_PER_TILE;
+
+            const unsigned int blocks_per_grid = (total_threads_per_grid_prop + threads_per_block - 1) / threads_per_block + 1;
+
+            // printf("Processing elements %lld to %lld out of %lld total elements \n",
+            //        (long long)start_element_local,
+            //        (long long)end_element_local,
+            //        (long long)nelements);
+
+            sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu<real_t>  //
+                    <<<blocks_per_grid,                                  //
+                       threads_per_block,                                //
+                       0,                                                //
+                       cuda_stream>>>(buffer_memory_size,                // Mesh
+                                      buffer_cluster,                    //
+                                      tets_per_block,                    //
+                                      cluster_size,                      //
+                                      start_element_local,               //
+                                      end_element_local,                 //
+                                      nnodes,                            //
+                                      elements_device,                   //
+                                      xyz_device,                        //
+                                      n0,                                // SDF
+                                      n1,                                //
+                                      n2,                                //
+                                      stride0,                           // Stride
+                                      stride1,                           //
+                                      stride2,                           //
+                                      origin0,                           // Origin
+                                      origin1,                           //
+                                      origin2,                           //
+                                      dx,                                // Delta
+                                      dy,                                //
+                                      dz,                                //
+                                      weighted_field_device,             // Input weighted field
+                                      mini_tet_parameters,               // Threshold for alpha
+                                      tet_properties_info,               //
+                                      data_device);                      //
 
         }  // END: Compute local grid sizes for each element
 
         cudaStreamSynchronize(cuda_stream);
+
+        cudaEventRecord(stop_event, cuda_stream);
+        cudaEventSynchronize(stop_event);
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(err), __FILE__, __LINE__);
+            exit(EXIT_FAILURE);
+        }
+
+        float milliseconds = 0.0f;
+        cudaEventElapsedTime(&milliseconds, start_event, stop_event);
+        if (SFEM_LOG_LEVEL >= 5) {
+            printf("Cluster Kernel: ================== SFEM Adjoint Mini-Tet Kernel GPU ================\n");
+            printf("Kernel execution time: %f ms\n", milliseconds);
+            printf("Throughput: %e elements/s\n", (float)(end_element - start_element) / (milliseconds / 1000.0f));
+            printf("===================================================================\n");
+
+            printf("  Max total_size_local = %lld\n", (long long)max_total_size_local);
+            printf("  Max idx global       = %lld\n", (long long)max_idx_global);
+
+            printf("  Min total_size_local = %lld\n", (long long)min_total_size_local);
+            printf("  Min idx global       = %lld\n", (long long)min_idx_global);
+            printf("===================================================================\n");
+        }
+
+        cudaEventDestroy(start_event);
+        cudaEventDestroy(stop_event);
+        cudaStreamDestroy(cuda_stream);
 
         cudaMemcpy((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
 
