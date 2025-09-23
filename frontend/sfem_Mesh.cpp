@@ -975,6 +975,22 @@ namespace sfem {
         }
     }
 
+    std::vector<std::shared_ptr<Mesh::Block>> Mesh::blocks(const std::vector<std::string> &block_names) const {
+
+        if(block_names.empty()) {
+            return impl_->blocks;
+        }
+
+        std::vector<std::shared_ptr<Mesh::Block>> ret;
+        for(auto &block : impl_->blocks) {
+            if(std::find(block_names.begin(), block_names.end(), block->name()) != block_names.end()) {
+                ret.push_back(block);
+            }
+        }
+
+        return ret;
+    }
+
     void Mesh::extract_deprecated(mesh_t *mesh) {
 #ifdef SFEM_ENABLE_MPI
         mesh->comm = impl_->comm->get();

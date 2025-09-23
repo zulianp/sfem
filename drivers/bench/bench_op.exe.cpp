@@ -136,6 +136,7 @@ int main(int argc, char *argv[]) {
 
         if((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
             ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
+            ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
         }
 
         for (auto &op_desc : ops) {
