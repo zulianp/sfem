@@ -1,15 +1,14 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
+#include "matrixio_array.h"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
-#include "matrixio_array.h"
 
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
-
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -79,13 +78,13 @@ int main(int argc, char *argv[]) {
     {
         auto comm = context.communicator();
 
-        if(comm->size() > 1) {
+        if (comm->size() > 1) {
             SFEM_ERROR("Parallel execution not supported!\n");
         }
 
-        int SFEM_BASE_RESOLUTION = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
+        int SFEM_BASE_RESOLUTION      = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
         int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
-        int SFEM_REPEAT = sfem::Env::read("SFEM_REPEAT", 5);
+        int SFEM_REPEAT               = sfem::Env::read("SFEM_REPEAT", 5);
 
         sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
@@ -95,7 +94,7 @@ int main(int argc, char *argv[]) {
             es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
 
-        std::string path = sfem::Env::read_string("SFEM_MESH", "");
+        std::string                 path = sfem::Env::read_string("SFEM_MESH", "");
         std::shared_ptr<sfem::Mesh> m;
 
         if (!path.empty()) {
@@ -105,15 +104,24 @@ int main(int argc, char *argv[]) {
                     comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
         }
 
+        // FIXME tune based on available memory
+        const bool too_large_for_matrix = m->n_nodes() > 10100100;
+
         int dim = m->spatial_dimension();
-        double start = MPI_Wtime();
-        m->node_to_node_graph();
-        double stop = MPI_Wtime();
-        std::cout << "CRS Graph creation " << (stop - start) << " [s]\n";
+
+        if (!too_large_for_matrix) {
+            double start = MPI_Wtime();
+            m->node_to_node_graph();
+            double stop = MPI_Wtime();
+            std::cout << "CRS Graph creation " << (stop - start) << " [s]\n";
+        }
 
         std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
-                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim},
-                                   {.name = "LinearElasticity", .type = BSR, .block_size = dim}});
+                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim}});
+
+        if (!too_large_for_matrix) {
+            ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
+        }
 
         std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
@@ -122,21 +130,26 @@ int main(int argc, char *argv[]) {
             ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
 
         } else {
-            ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-            ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
-            ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
-            ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
-            if(m->element_type() == HEX8) {
+            if (!too_large_for_matrix) {
+                ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
+                ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
+                ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
+                ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
+            }
+            ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
+            if (m->element_type() == HEX8) {
                 // FIXME
                 ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
-                ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim}); //FIXME
+
+                if (!too_large_for_matrix) {
+                    ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim});  // FIXME
+                }
             }
             // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
         }
 
-        if((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
+        if ((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
             ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
-            ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
         }
 
         for (auto &op_desc : ops) {
@@ -153,15 +166,15 @@ int main(int argc, char *argv[]) {
             op->initialize();
             f->add_operator(op);
 
-            auto x         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto input     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto output    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+            auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+            auto input  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+            auto output = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
             double start = MPI_Wtime();
             f->update(x->data());
-            auto linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
-            double stop = MPI_Wtime();
-            op_desc.setup = stop - start;
+            auto   linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
+            double stop      = MPI_Wtime();
+            op_desc.setup    = stop - start;
 
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }

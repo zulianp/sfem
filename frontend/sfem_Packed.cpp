@@ -6,6 +6,7 @@
 #include "sfem_Mesh.hpp"
 
 #include <cstdint>
+#include <limits>
 
 namespace sfem {
 
@@ -22,10 +23,20 @@ namespace sfem {
         SharedBuffer<count_t>   ghost_ptr;
         SharedBuffer<idx_t>     ghost_idx;
 
+        size_t nbytes() const 
+        {
+        	return packed_elements->nbytes() + owned_nodes_ptr->nbytes() + ghost_ptr->nbytes() + ghost_idx->nbytes();
+        }
+
         void print(std::ostream &os = std::cout) const {
-            os << "Packed" << std::endl;
+        	os << "--------------------" << std::endl;
+            os << "| Packed |" << std::endl;
             os << "n_packs: " << n_packs << std::endl;
             os << "elements_per_pack: " << elements_per_pack << std::endl;
+            os << "Memory Packed: " << (nbytes() / 1204.) << " KB" << std::endl;
+            os << "Original:      " << (block->elements()->nbytes() / 1204.) << " KB" << std::endl;
+            os << "--------------------" << std::endl;
+
         }
 
         void pack(const std::shared_ptr<Mesh> &mesh,
@@ -132,6 +143,7 @@ namespace sfem {
                 packed_block->owned_nodes_ptr = sfem::create_host_buffer<ptrdiff_t>(packed_block->n_packs + 1);
                 packed_block->ghost_ptr       = sfem::create_host_buffer<idx_t>(packed_block->n_packs + 1);
                 packed_block->pack(mesh, node_map, node_owner, selected);
+                packed_block->print();
 
                 blocks.push_back(packed_block);
             }
@@ -236,6 +248,7 @@ namespace sfem {
     }
 
     template class Packed<uint8_t>;
+    template class Packed<int16_t>;
     template class Packed<uint16_t>;
 
 }  // namespace sfem

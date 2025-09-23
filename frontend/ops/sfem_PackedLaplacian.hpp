@@ -38,8 +38,6 @@ namespace sfem {
      */
     class PackedLaplacian final : public Op {
     public:
-        // using PackedIdxType = uint8_t;
-        using PackedIdxType = uint16_t;
 
         const char *name() const override { return "PackedLaplacian"; }
         inline bool is_linear() const override { return true; }
