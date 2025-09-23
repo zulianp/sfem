@@ -10,8 +10,8 @@
 #include "sfem_base.h"
 
 #include "matrixio_array.h"
-#include "sfem_MPIType.hpp"
 #include "sfem_Communicator.hpp"
+#include "sfem_MPIType.hpp"
 
 namespace sfem {
 
@@ -57,7 +57,7 @@ namespace sfem {
         inline size_t         size() const { return n_; }
         inline MemorySpace    mem_space() const { return mem_space_; }
 
-        void print(std::ostream &os) {
+        void print(std::ostream &os = std::cout) {
             if (mem_space_ == MEMORY_SPACE_DEVICE) {
                 os << "On the device!\n";
                 return;
@@ -179,7 +179,7 @@ namespace sfem {
 
         void release() {
             destroy_ = nullptr;
-            ptr_ = nullptr;
+            ptr_     = nullptr;
         }
 
     private:
@@ -247,13 +247,7 @@ namespace sfem {
         assert(in->size() % n0 == 0);
 
         auto ret = std::make_shared<Buffer<T *>>(
-                n0,
-                in->size() / n0,
-                data,
-                [lifetime = in](int n, void **x) {
-                    free(x);
-                },
-                MEMORY_SPACE_HOST);
+                n0, in->size() / n0, data, [lifetime = in](int n, void **x) { free(x); }, MEMORY_SPACE_HOST);
         return ret;
     }
 
@@ -339,43 +333,42 @@ namespace sfem {
         return manage_host_buffer<T>(local_size, data);
     }
 
-    template<typename O>
+    template <typename O>
     std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<O>> &in) {
         return in;
     }
+    
 
-    template<typename O, typename I>
-    std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<I>> &in) 
-    {
+    template <typename O, typename I>
+    std::shared_ptr<Buffer<O>> astype(const std::shared_ptr<Buffer<I>> &in) {
         // if constexpr(std::is_same<O, I>::value) {
         //     return in;
         // }
 
         const ptrdiff_t size = in->size();
-        auto out = create_host_buffer<O>(size);
+        auto            out  = create_host_buffer<O>(size);
 
-        auto din = in->data();
+        auto din  = in->data();
         auto dout = out->data();
 
-        for(ptrdiff_t i = 0; i < size; i++) {
+        for (ptrdiff_t i = 0; i < size; i++) {
             dout[i] = (O)din[i];
         }
 
         return out;
     }
 
-    template<typename O, typename I>
-    std::shared_ptr<Buffer<O*>> astype(const std::shared_ptr<Buffer<I*>> &in) 
-    {
-        const ptrdiff_t n0 = in->extent(0);
-        const ptrdiff_t n1 = in->extent(1);
-        auto out = create_host_buffer<O>(n0, n1);
+    template <typename O, typename I>
+    std::shared_ptr<Buffer<O *>> astype(const std::shared_ptr<Buffer<I *>> &in) {
+        const ptrdiff_t n0  = in->extent(0);
+        const ptrdiff_t n1  = in->extent(1);
+        auto            out = create_host_buffer<O>(n0, n1);
 
-        auto din = in->data();
+        auto din  = in->data();
         auto dout = out->data();
 
-        for(ptrdiff_t i = 0; i < n0; i++) {
-            for(ptrdiff_t j = 0; j < n1; j++) {
+        for (ptrdiff_t i = 0; i < n0; i++) {
+            for (ptrdiff_t j = 0; j < n1; j++) {
                 dout[i][j] = (O)din[i][j];
             }
         }
@@ -385,21 +378,34 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<Buffer<T *>> copy(const std::shared_ptr<Buffer<T *>> &buffer) {
-        if(buffer->mem_space() == MEMORY_SPACE_DEVICE) {
+        if (buffer->mem_space() == MEMORY_SPACE_DEVICE) {
             SFEM_IMPLEMENT_ME();
         }
 
         auto data = (T **)malloc(buffer->extent(0) * sizeof(T *));
-        for(ptrdiff_t i = 0; i < buffer->extent(0); i++) {
+        for (ptrdiff_t i = 0; i < buffer->extent(0); i++) {
             data[i] = (T *)malloc(buffer->extent(1) * sizeof(T));
             memcpy(data[i], buffer->data()[i], buffer->extent(1) * sizeof(T));
         }
 
-       return manage_host_buffer<T>(buffer->extent(0), buffer->extent(1), data);
+        return manage_host_buffer<T>(buffer->extent(0), buffer->extent(1), data);
     }
 
+    template <typename T>
+    std::shared_ptr<Buffer<T *>> zeros_like(const std::shared_ptr<Buffer<T *>> &buffer) {
+        if (buffer->mem_space() == MEMORY_SPACE_DEVICE) {
+            SFEM_IMPLEMENT_ME();
+        }
 
-    template<typename T>
+        auto data = (T **)malloc(buffer->extent(0) * sizeof(T *));
+        for (ptrdiff_t i = 0; i < buffer->extent(0); i++) {
+            data[i] = (T *)calloc(buffer->extent(1), sizeof(T));
+        }
+
+        return manage_host_buffer<T>(buffer->extent(0), buffer->extent(1), data);
+    }
+
+    template <typename T>
     using SharedBuffer = std::shared_ptr<Buffer<T>>;
 
 }  // namespace sfem

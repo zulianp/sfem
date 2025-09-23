@@ -17,6 +17,7 @@
 #include "sfem_SemiStructuredNeoHookeanOgden.hpp"
 #include "sfem_PlugInOp.hpp"
 #include "sfem_BoundaryMass.hpp"
+#include "sfem_PackedLaplacian.hpp"
 
 
 #include <map>
@@ -72,7 +73,7 @@ namespace sfem {
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
-
+            instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 

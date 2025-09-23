@@ -64,6 +64,7 @@ namespace sfem {
         int                                        initialize_node_to_node_graph();
         int                                        convert_to_macro_element_mesh();
         const std::vector<std::shared_ptr<Block>> &blocks() const;
+        std::vector<std::shared_ptr<Block>> blocks(const std::vector<std::string> &block_names) const;
 
         // Block-related methods
         size_t                       n_blocks() const;
