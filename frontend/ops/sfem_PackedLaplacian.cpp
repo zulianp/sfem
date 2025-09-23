@@ -9,6 +9,8 @@
 #include "laplacian.h"
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
+#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_fff.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
@@ -19,28 +21,27 @@
 #include "sfem_Packed.hpp"
 #include "sfem_Parameters.hpp"
 
-template <typename pack_idx_t>
-int packed_laplacian_apply(enum ElemType                         element_type,
-                           const ptrdiff_t                       n_packs,
-                           const ptrdiff_t                       n_elements_per_pack,
-                           const ptrdiff_t                       n_elements,
-                           const ptrdiff_t                       max_nodes_per_pack,
-                           pack_idx_t **const SFEM_RESTRICT      elements,
-                           const jacobian_t *const SFEM_RESTRICT fff,
-                           const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
-                           const count_t *const SFEM_RESTRICT    ghost_ptr,
-                           const idx_t *const SFEM_RESTRICT      ghost_idx,
-                           const real_t *const SFEM_RESTRICT     u,
-                           real_t *const SFEM_RESTRICT           values) {
-    if (element_type != TET4) {
-        SFEM_ERROR("tet4_laplacian_packed_apply only supports TET4 elements");
-    }
+// using PackedIdxType = uint8_t;
+using PackedIdxType = uint16_t;
+// using PackedIdxType = int16_t;
 
+template <typename pack_idx_t>
+static int tet4_packed_laplacian_apply(const ptrdiff_t                       n_packs,
+                                       const ptrdiff_t                       n_elements_per_pack,
+                                       const ptrdiff_t                       n_elements,
+                                       const ptrdiff_t                       max_nodes_per_pack,
+                                       pack_idx_t **const SFEM_RESTRICT      elements,
+                                       const jacobian_t *const SFEM_RESTRICT fff,
+                                       const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
+                                       const count_t *const SFEM_RESTRICT    ghost_ptr,
+                                       const idx_t *const SFEM_RESTRICT      ghost_idx,
+                                       const real_t *const SFEM_RESTRICT     u,
+                                       real_t *const SFEM_RESTRICT           values) {
     static const int nxe = 4;
 #pragma omp parallel
     {
         real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
-        real_t *out = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
+        real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
 
 #pragma omp for
         for (ptrdiff_t p = 0; p < n_packs; p++) {
@@ -48,12 +49,10 @@ int packed_laplacian_apply(enum ElemType                         element_type,
             const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
             const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
             const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
-            
-            const auto ghosts = &ghost_idx[ghost_ptr[p]];
 
-            memset(out, 0, max_nodes_per_pack * sizeof(real_t));
+            const auto ghosts = &ghost_idx[ghost_ptr[p]];
             memcpy(in, &u[owned_nodes_ptr[p]], n_owned * sizeof(real_t));
-            
+
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 in[n_owned + k] = u[ghosts[k]];
             }
@@ -89,11 +88,13 @@ int packed_laplacian_apply(enum ElemType                         element_type,
             for (ptrdiff_t k = 0; k < n_owned; ++k) {
 #pragma omp atomic update
                 values[owned_nodes_ptr[p] + k] += out[k];
+                out[k] = 0;  // Clean-up while hot
             }
 
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
 #pragma omp atomic update
                 values[ghosts[k]] += out[n_owned + k];
+                out[n_owned + k] = 0;  // Clean-up while hot
             }
         }
 
@@ -102,6 +103,128 @@ int packed_laplacian_apply(enum ElemType                         element_type,
     }
 
     return SFEM_SUCCESS;
+}
+
+template <typename pack_idx_t>
+static int hex8_packed_laplacian_apply(const ptrdiff_t                       n_packs,
+                                       const ptrdiff_t                       n_elements_per_pack,
+                                       const ptrdiff_t                       n_elements,
+                                       const ptrdiff_t                       max_nodes_per_pack,
+                                       pack_idx_t **const SFEM_RESTRICT      elements,
+                                       const jacobian_t *const SFEM_RESTRICT fff,
+                                       const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
+                                       const count_t *const SFEM_RESTRICT    ghost_ptr,
+                                       const idx_t *const SFEM_RESTRICT      ghost_idx,
+                                       const real_t *const SFEM_RESTRICT     u,
+                                       real_t *const SFEM_RESTRICT           values) {
+    static const int nxe = 8;
+#pragma omp parallel
+    {
+        real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
+        real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
+
+#pragma omp for
+        for (ptrdiff_t p = 0; p < n_packs; p++) {
+            const ptrdiff_t e_start = p * n_elements_per_pack;
+            const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
+            const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
+            const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
+
+            const auto ghosts = &ghost_idx[ghost_ptr[p]];
+            memcpy(in, &u[owned_nodes_ptr[p]], n_owned * sizeof(real_t));
+
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                in[n_owned + k] = u[ghosts[k]];
+            }
+
+            for (ptrdiff_t e = e_start; e < e_end; e++) {
+                idx_t ev[nxe];
+                for (int v = 0; v < nxe; ++v) {
+                    ev[v] = elements[v][e];
+                }
+
+                scalar_t element_u[nxe];
+                for (int v = 0; v < nxe; ++v) {
+                    element_u[v] = in[ev[v]];
+                }
+
+                scalar_t element_out[nxe] = {0};
+                scalar_t fff_i[6];
+
+                for (int d = 0; d < 6; ++d) {
+                    fff_i[d] = fff[e * 6 + d];
+                }
+
+                hex8_laplacian_apply_fff_integral(fff_i, element_u, element_out);
+
+                for (int v = 0; v < nxe; ++v) {
+                    out[ev[v]] += element_out[v];
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_owned; ++k) {
+#pragma omp atomic update
+                values[owned_nodes_ptr[p] + k] += out[k];
+                out[k] = 0;  // Clean-up while hot
+            }
+
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+                values[ghosts[k]] += out[n_owned + k];
+                out[n_owned + k] = 0;  // Clean-up while hot
+            }
+        }
+
+        free(in);
+        free(out);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+template <typename pack_idx_t>
+static int packed_laplacian_apply(enum ElemType                         element_type,
+                                  const ptrdiff_t                       n_packs,
+                                  const ptrdiff_t                       n_elements_per_pack,
+                                  const ptrdiff_t                       n_elements,
+                                  const ptrdiff_t                       max_nodes_per_pack,
+                                  pack_idx_t **const SFEM_RESTRICT      elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
+                                  const count_t *const SFEM_RESTRICT    ghost_ptr,
+                                  const idx_t *const SFEM_RESTRICT      ghost_idx,
+                                  const real_t *const SFEM_RESTRICT     u,
+                                  real_t *const SFEM_RESTRICT           values) {
+    switch (element_type) {
+        case TET4:
+            return tet4_packed_laplacian_apply(n_packs,
+                                               n_elements_per_pack,
+                                               n_elements,
+                                               max_nodes_per_pack,
+                                               elements,
+                                               fff,
+                                               owned_nodes_ptr,
+                                               ghost_ptr,
+                                               ghost_idx,
+                                               u,
+                                               values);
+        case HEX8:
+            return hex8_packed_laplacian_apply(n_packs,
+                                               n_elements_per_pack,
+                                               n_elements,
+                                               max_nodes_per_pack,
+                                               elements,
+                                               fff,
+                                               owned_nodes_ptr,
+                                               ghost_ptr,
+                                               ghost_idx,
+                                               u,
+                                               values);
+        default: {
+            SFEM_ERROR("packed_laplacian_apply not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
 }
 
 namespace sfem {
@@ -143,11 +266,17 @@ namespace sfem {
 
             domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
             impl_->fff[b]            = create_host_buffer<jacobian_t>(domain->second.block->n_elements() * 6);
-            if (SFEM_SUCCESS != tet4_fff_fill(domain->second.block->n_elements(),
-                                              domain->second.block->elements()->data(),
-                                              impl_->space->mesh_ptr()->points()->data(),
-                                              impl_->fff[b]->data())) {
-                SFEM_ERROR("Unable to create fff");
+
+            if (domain->second.element_type == HEX8 || domain->second.element_type == SSHEX8) {
+                hex8_fff_fill(domain->second.block->n_elements(),
+                              domain->second.block->elements()->data(),
+                              impl_->space->mesh_ptr()->points()->data(),
+                              impl_->fff[b]->data());
+            } else {
+                tet4_fff_fill(domain->second.block->n_elements(),
+                              domain->second.block->elements()->data(),
+                              impl_->space->mesh_ptr()->points()->data(),
+                              impl_->fff[b]->data());
             }
         }
 
