@@ -87,9 +87,18 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto SFEM_OPERATOR             = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
     int  SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
 
-    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 20);
-    auto m                    = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
+    int SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 20);
+
+    sfem::SharedMesh m;
+    if (sfem::Env::read_string("SFEM_ELEM_TYPE", "hex8") == "hex8") {
+        m = sfem::Mesh::create_hex8_cube(
+                comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
+    } else if (sfem::Env::read_string("SFEM_ELEM_TYPE", "tet4") == "tet4") {
+        m = sfem::Mesh::create_tet4_cube(
+                comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
+    } else {
+        SFEM_ERROR("Invalid mesh type: %s", sfem::Env::read_string("SFEM_ELEM_TYPE", "hex8").c_str());
+    }
 
     // Important for packed elements
     auto sfc = sfem::SFC::create_from_env();

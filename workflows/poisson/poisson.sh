@@ -23,5 +23,7 @@ export SFEM_OPERATOR="PackedLaplacian"
 
 export SFEM_BASE_RESOLUTION=120
 
+rm -rf output_poisson
+
 $LAUNCH poisson
 raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' $EXTRA_OPTIONS

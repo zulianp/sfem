@@ -1104,8 +1104,81 @@ namespace sfem {
         const ptrdiff_t nelements = nx * ny * nz;
         const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
 
-        // TODO: Implement
-        return nullptr;
+        ret->impl_->spatial_dim = 3;
+        ret->impl_->nnodes      = nnodes;
+        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
+        auto elements_buffer    = create_host_buffer<idx_t>(4, nelements * 6);
+
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements * 6;
+
+        auto points   = ret->impl_->points->data();
+        auto elements = elements_buffer->data();
+
+        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+        const double hz = (zmax - zmin) * 1. / nz;
+
+        assert(hx > 0);
+        assert(hy > 0);
+        assert(hz > 0);
+
+        static const int tet_pattern[6][4] = {{0, 1, 3, 7},
+                                              {0, 1, 7, 5},
+                                              {0, 4, 5, 7},
+                                              {1, 2, 3, 6},
+                                              {1, 3, 7, 6},
+                                              {1, 5, 6, 7}};
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+
+                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+
+                    const idx_t cube_nodes[8] = {i0, i1, i2, i3, i4, i5, i6, i7};
+                    const ptrdiff_t base      = (zi * ny * nx + yi * nx + xi) * 6;
+
+                    for (int sub = 0; sub < 6; sub++) {
+                        const ptrdiff_t tet = base + sub;
+                        elements[0][tet]    = cube_nodes[tet_pattern[sub][0]];
+                        elements[1][tet]    = cube_nodes[tet_pattern[sub][1]];
+                        elements[2][tet]    = cube_nodes[tet_pattern[sub][2]];
+                        elements[3][tet]    = cube_nodes[tet_pattern[sub][3]];
+                    }
+                }
+            }
+        }
+
+        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
+            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
+                    points[0][node] = (double)xmin + xi * hx;
+                    points[1][node] = (double)ymin + yi * hy;
+                    points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(TET4);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
+
+        return ret;
     }
 
     std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
