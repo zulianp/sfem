@@ -115,6 +115,18 @@ namespace sfem {
 
         static std::shared_ptr<Mesh> create_hex8_reference_cube();
 
+        static std::shared_ptr<Mesh> create_cube(const std::shared_ptr<Communicator> &comm,
+                                                 const enum ElemType                  element_type,
+                                                 const int                            nx   = 1,
+                                                 const int                            ny   = 1,
+                                                 const int                            nz   = 1,
+                                                 const geom_t                         xmin = 0,
+                                                 const geom_t                         ymin = 0,
+                                                 const geom_t                         zmin = 0,
+                                                 const geom_t                         xmax = 1,
+                                                 const geom_t                         ymax = 1,
+                                                 const geom_t                         zmax = 1);
+
         static std::shared_ptr<Mesh> create_hex8_cube(const std::shared_ptr<Communicator> &comm,
                                                       const int                            nx   = 1,
                                                       const int                            ny   = 1,
