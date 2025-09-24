@@ -19,8 +19,8 @@ export PATH=$SFEM_PATH/worflows/mech/:$PATH
 export PATH=$CODE_DIR/merge_git_repos/sfem/data/benchmarks/meshes:$PATH
 
 HERE=$PWD
-export SFEM_OPERATOR="PackedLaplacian"
-export SFEM_BASE_RESOLUTION=4
+# export SFEM_OPERATOR="PackedLaplacian"
+export SFEM_BASE_RESOLUTION=60
 
 $LAUNCH poisson
 raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' $EXTRA_OPTIONS
