@@ -21,7 +21,8 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 HERE=$PWD
 
 export SFEM_ENABLE_OUTPUT=0
-export SFEM_BASE_RESOLUTION=300
+# export SFEM_BASE_RESOLUTION=300
+export SFEM_BASE_RESOLUTION=200
 
 SFEM_OPERATOR="PackedLaplacian" SFEM_TRACE_FILE=bench_packed.csv   poisson
 
