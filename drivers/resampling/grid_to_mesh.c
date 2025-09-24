@@ -748,7 +748,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_chainsaw_xyz,        //
+                              mesh_fun_ones,                //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;

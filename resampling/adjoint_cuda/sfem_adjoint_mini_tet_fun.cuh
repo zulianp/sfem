@@ -640,4 +640,81 @@ __device__ __forceinline__ void store_add(T* dst, T v) {
 #endif
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+
+template <typename FloatType>
+struct __align__(16) buffer_cluster_t {
+    FloatType* buffer = nullptr;
+    ptrdiff_t  size   = 0;
+};
+
+template <typename FloatType>
+cudaError_t clear_buffer_cluster_async(buffer_cluster_t<FloatType>& buffer_cluster, cudaStream_t stream) {
+    if (buffer_cluster.buffer) {
+        cudaError_t error = cudaFreeAsync(buffer_cluster.buffer, stream);
+        if (error != cudaSuccess) {
+            printf("CUDA error in clear_buffer_cluster_async: %s\n", cudaGetErrorString(error));
+            return error;
+        }
+        buffer_cluster.buffer = nullptr;
+        buffer_cluster.size   = 0;
+    }
+    return cudaSuccess;
+}
+
+template <typename FloatType>
+cudaError_t allocate_buffer_cluster(buffer_cluster_t<FloatType>& buffer_cluster, ptrdiff_t size, cudaStream_t stream,
+                                    bool force_realloc = false) {
+    if (force_realloc && buffer_cluster.buffer != nullptr) {
+        clear_buffer_cluster_async(buffer_cluster, stream);
+    }
+
+    if (size > buffer_cluster.size || force_realloc) {
+        cudaError_t error;
+        error = cudaMallocAsync((void**)&buffer_cluster.buffer, size * sizeof(FloatType), stream);
+        if (error != cudaSuccess) {
+            printf("CUDA error in allocate_buffer_cluster: %s\n", cudaGetErrorString(error));
+            return error;
+        }
+        buffer_cluster.size = size;
+    }
+    return cudaSuccess;
+}
+
+template <typename FloatType>
+cudaError_t clear_buffer_cluster(buffer_cluster_t<FloatType>& buffer_cluster) {
+    if (buffer_cluster.buffer) {
+        cudaError_t error = cudaFree(buffer_cluster.buffer);
+        if (error != cudaSuccess) {
+            printf("CUDA error in clear_buffer_cluster: %s\n", cudaGetErrorString(error));
+            return error;
+        }
+        buffer_cluster.buffer = nullptr;
+        buffer_cluster.size   = 0;
+    }
+    return cudaSuccess;
+}
+
+template <typename FloatType>
+bool is_buffer_valid(const buffer_cluster_t<FloatType>& buffer_cluster, ptrdiff_t required_size = 0) {
+    if (!buffer_cluster.buffer) {
+        return false;
+    }
+
+    if (required_size > 0 && buffer_cluster.size < required_size) {
+        return false;
+    }
+
+    return true;
+}
+
+template <typename FloatType>
+cudaError_t reset_buffer_values(buffer_cluster_t<FloatType>& buffer_cluster, FloatType value, cudaStream_t stream) {
+    if (!buffer_cluster.buffer) {
+        return cudaErrorInvalidDevicePointer;
+    }
+
+    return cudaMemsetAsync(buffer_cluster.buffer, value, buffer_cluster.size * sizeof(FloatType), stream);
+}
+
 #endif  // __SFEM_ADJOINT_MINI_TET_FUN_CUH__
