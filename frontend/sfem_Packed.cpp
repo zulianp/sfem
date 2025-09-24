@@ -101,7 +101,7 @@ namespace sfem {
                             d_packed_elements[v][e] = d_node_map[d_elements[v][e]] - d_owned_nodes_ptr[p];
                             assert(d_packed_elements[v][e] + d_owned_nodes_ptr[p] == d_node_map[d_elements[v][e]]);
                         } else {
-                            d_ghost_idx[d_ghost_ptr[p] + bkghosts] = node;
+                            d_ghost_idx[d_ghost_ptr[p] + bkghosts] = d_node_map[node];
                             d_packed_elements[v][e]                = nowned + bkghosts++;
                         }
                     }
