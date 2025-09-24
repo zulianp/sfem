@@ -1090,6 +1090,24 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<Mesh> Mesh::create_tet4_cube(const std::shared_ptr<Communicator> &comm,
+                                                 const int                            nx,
+                                                 const int                            ny,
+                                                 const int                            nz,
+                                                 const geom_t                         xmin,
+                                                 const geom_t                         ymin,
+                                                 const geom_t                         zmin,
+                                                 const geom_t                         xmax,
+                                                 const geom_t                         ymax,
+                                                 const geom_t                         zmax) {
+        auto            ret       = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements = nx * ny * nz;
+        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
+
+        // TODO: Implement
+        return nullptr;
+    }
+
     std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
         auto points = impl_->points->data();
 
