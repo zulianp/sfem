@@ -364,7 +364,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         auto max_it          = thrust::max_element(d_begin, d_end);
         max_total_size_local = *max_it;
         max_idx_global       = (max_it - d_begin) + start_element;
-    }
+    }  // END: Find max and min total_size_local across all elements
 
     //// launch clustered kernel ////
     const unsigned int cluster_size       = 16;
@@ -373,7 +373,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
 
     buffer_cluster_t<real_t> buffer_cluster;
     allocate_buffer_cluster(buffer_cluster, (elements_per_block + 13) * (max_total_size_local), cuda_stream_alloc);
-    cudaMemset((void*)buffer_cluster.buffer, -1, buffer_cluster.size * sizeof(real_t));
+    cudaMemset((void*)buffer_cluster.buffer, (-1 * 0x1A7DAF1C), buffer_cluster.size * sizeof(real_t));
 
     printf("max_total_size_local = %lld \n", (long long)max_total_size_local);
     printf("nelements            = %lld \n", (long long)nelements);
@@ -398,7 +398,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                 end_element_local = end_element;
             }
 
-            const unsigned int total_threads_per_grid_prop = ((end_element_local - start_element_local) / cluster_size) *  //
+            const unsigned int total_threads_per_grid_prop = ((end_element_local - start_element_local + 1) / cluster_size) *  //
                                                              LANES_PER_TILE;
 
             const unsigned int blocks_per_grid = (total_threads_per_grid_prop + threads_per_block - 1) / threads_per_block + 1;
@@ -408,13 +408,13 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
             //        (long long)end_element_local,
             //        (long long)nelements);
 
-            // printf("<<<blocks_per_grid, threads_per_block>>>(start_element_local, end_element_local, nelem_local);\n");
-            // printf("  blocks_per_grid = %u, threads_per_block = %u, nelem_local = %lld, start = %lld, end = %lld\n\n",
-            //        blocks_per_grid,
-            //        threads_per_block,
-            //        (long long)(end_element_local - start_element_local),
-            //        (long long)start_element_local,
-            //        (long long)end_element_local);
+            printf("<<<blocks_per_grid, threads_per_block>>>(start_element_local, end_element_local, nelem_local);\n");
+            printf("  blocks_per_grid = %u, threads_per_block = %u, nelem_local = %lld, start = %lld, end = %lld\n\n",
+                   blocks_per_grid,
+                   threads_per_block,
+                   (long long)(end_element_local - start_element_local),
+                   (long long)start_element_local,
+                   (long long)end_element_local);
 
             // if (end_element_local <= start_element_local) {
             //     printf("Warning: Invalid element range: start=%lld, end=%lld\n",
