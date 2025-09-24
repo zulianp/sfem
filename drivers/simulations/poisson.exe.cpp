@@ -1,6 +1,8 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+
+#include "sfem_defs.h"
+
 
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
@@ -90,10 +92,10 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     int SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 20);
 
     sfem::SharedMesh m;
-    if (sfem::Env::read_string("SFEM_ELEM_TYPE", "hex8") == "hex8") {
+    if (type_from_string(sfem::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str()) == HEX8) {
         m = sfem::Mesh::create_hex8_cube(
                 comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
-    } else if (sfem::Env::read_string("SFEM_ELEM_TYPE", "tet4") == "tet4") {
+    } else if (type_from_string(sfem::Env::read_string("SFEM_ELEM_TYPE", "TET4").c_str()) == TET4) {
         m = sfem::Mesh::create_tet4_cube(
                 comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
     } else {
