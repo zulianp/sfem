@@ -19,9 +19,12 @@ export PATH=$SFEM_PATH/worflows/mech/:$PATH
 export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
-export SFEM_OPERATOR="PackedLaplacian"
 
-export SFEM_BASE_RESOLUTION=120
+export SFEM_ENABLE_OUTPUT=0
+export SFEM_BASE_RESOLUTION=300
 
-$LAUNCH poisson
-raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' $EXTRA_OPTIONS
+SFEM_OPERATOR="PackedLaplacian" SFEM_TRACE_FILE=bench_packed.csv   poisson
+
+SFEM_OPERATOR="Laplacian"       SFEM_TRACE_FILE=bench_standard.csv poisson
+
+grep "Laplacian::apply" bench_*.csv | tr ',' ' ' | awk '{print $3}'

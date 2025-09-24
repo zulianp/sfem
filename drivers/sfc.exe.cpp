@@ -31,16 +31,8 @@ int sfc_reorder(const std::shared_ptr<sfem::Communicator> &comm, int argc, char 
         return EXIT_FAILURE;
     }
 
-
     const char *folder = argv[1];
     const char *output_folder = argv[2];
-
-    int SFEM_ORDER_WITH_COORDINATE = sfem::Env::read<int>("SFEM_ORDER_WITH_COORDINATE", -1);
-
-    if (!comm->rank()) {
-        printf("%s %s %s\n", argv[0], folder, output_folder);
-        printf("SFEM_ORDER_WITH_COORDINATE=%d\n", SFEM_ORDER_WITH_COORDINATE);
-    }
 
     double tick = MPI_Wtime();
 

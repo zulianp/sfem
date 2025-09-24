@@ -89,7 +89,7 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 20);
     auto m                    = sfem::Mesh::create_hex8_cube(
-            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 2 * SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 4);
+            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 4, 4, 4);
 
     // Important for packed elements
     auto sfc = sfem::SFC::create_from_env();

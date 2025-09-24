@@ -519,6 +519,9 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(8, nelements);
 
+        ret->impl_->n_owned_nodes = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -599,6 +602,9 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(3, nelements);
 
+        ret->impl_->n_owned_nodes = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -663,6 +669,9 @@ namespace sfem {
         ret->impl_->nnodes      = nnodes;
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(4, nelements);
+
+        ret->impl_->n_owned_nodes = nnodes;
+        ret->impl_->n_owned_elements = nelements;
 
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
@@ -733,6 +742,9 @@ namespace sfem {
         ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
         auto white_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
         auto black_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
+
+        ret->impl_->n_owned_nodes = nnodes;
+        ret->impl_->n_owned_elements = nelements;
 
         auto points         = ret->impl_->points->data();
         auto white_elements = white_elements_buffer->data();
@@ -845,6 +857,9 @@ namespace sfem {
         ret->impl_->points         = create_host_buffer<geom_t>(3, nnodes);
         auto left_elements_buffer  = create_host_buffer<idx_t>(8, nelements / 2);
         auto right_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
+
+        ret->impl_->n_owned_nodes = nnodes;
+        ret->impl_->n_owned_elements = nelements;
 
         auto points         = ret->impl_->points->data();
         auto left_elements  = left_elements_buffer->data();
