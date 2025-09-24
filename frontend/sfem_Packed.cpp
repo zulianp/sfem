@@ -36,12 +36,10 @@ namespace sfem {
             os << "Memory Packed: " << (nbytes() / 1204.) << " KB" << std::endl;
             os << "Original:      " << (block->elements()->nbytes() / 1204.) << " KB" << std::endl;
             os << "--------------------" << std::endl;
-
         }
 
-      
-
         void pack(const std::shared_ptr<Mesh> &mesh,
+                  const ptrdiff_t pack_offset,
                   const SharedBuffer<idx_t>   &node_map,
                   const SharedBuffer<idx_t>   &node_owner,
                   const SharedBuffer<mask_t>  &selected) {
@@ -71,10 +69,10 @@ namespace sfem {
                         if (!mask_get(node, d_selected)) {
                             d_owned_nodes_ptr[p + 1]++;
                             d_node_map[node]   = next_id++;
-                            d_node_owner[node] = p;
+                            d_node_owner[node] = p + pack_offset;
                             mask_set(node, d_selected);
                         } else {
-                            if (d_node_owner[node] != p) {
+                            if (d_node_owner[node] != p + pack_offset) {
                                 d_ghost_ptr[p + 1]++;
                             }
                         }
@@ -99,7 +97,7 @@ namespace sfem {
                     for (ptrdiff_t e = start; e < end; e++) {
                         const ptrdiff_t node = d_elements[v][e];
 
-                        if (d_node_owner[node] == p) {
+                        if (d_node_owner[node] == p + pack_offset) {
                             d_packed_elements[v][e] = d_node_map[d_elements[v][e]] - d_owned_nodes_ptr[p];
                             assert(d_packed_elements[v][e] + d_owned_nodes_ptr[p] == d_node_map[d_elements[v][e]]);
                         } else {
@@ -133,6 +131,7 @@ namespace sfem {
             auto node_owner = sfem::create_host_buffer<idx_t>(mesh->n_nodes());
             auto selected   = sfem::create_host_buffer<mask_t>(mask_count(mesh->n_nodes()));
 
+            ptrdiff_t pack_offset = 0;
             for (auto &block : mesh->blocks(block_names)) {
                 auto packed_block   = std::make_shared<Block>();
                 packed_block->block = block;
@@ -145,10 +144,11 @@ namespace sfem {
                         sfem::create_host_buffer<pack_idx_t>(block->n_nodes_per_element(), block->n_elements());
                 packed_block->owned_nodes_ptr = sfem::create_host_buffer<ptrdiff_t>(packed_block->n_packs + 1);
                 packed_block->ghost_ptr       = sfem::create_host_buffer<idx_t>(packed_block->n_packs + 1);
-                packed_block->pack(mesh, node_map, node_owner, selected);
+                packed_block->pack(mesh, pack_offset, node_map, node_owner, selected);
                 packed_block->print();
 
                 blocks.push_back(packed_block);
+                pack_offset += packed_block->n_packs;
             }
 
             if(modify_mesh) {
