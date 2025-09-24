@@ -42,8 +42,8 @@ namespace sfem {
         bool                has_semi_structured_mesh() const;
         SemiStructuredMesh &semi_structured_mesh();
 
-        using PackedIdxType = uint16_t;
-        // using PackedIdxType = uint8_t;
+        // using PackedIdxType = uint16_t;
+        using PackedIdxType = uint8_t;
         int initialize_packed_mesh();
         bool has_packed_mesh() const;
         std::shared_ptr<Packed<PackedIdxType>> packed_mesh();

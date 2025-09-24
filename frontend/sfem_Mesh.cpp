@@ -1199,17 +1199,17 @@ namespace sfem {
         return ret;
     }
 
-    static std::shared_ptr<Mesh> Mesh::create_cube(const std::shared_ptr<Communicator> &comm,
-                                                   const enum ElemType                  element_type,
-                                                   const int                            nx,
-                                                   const int                            ny,
-                                                   const int                            nz,
-                                                   const geom_t                         xmin,
-                                                   const geom_t                         ymin,
-                                                   const geom_t                         zmin,
-                                                   const geom_t                         xmax,
-                                                   const geom_t                         ymax,
-                                                   const geom_t                         zmax) {
+    std::shared_ptr<Mesh> Mesh::create_cube(const std::shared_ptr<Communicator> &comm,
+                                            const enum ElemType                  element_type,
+                                            const int                            nx,
+                                            const int                            ny,
+                                            const int                            nz,
+                                            const geom_t                         xmin,
+                                            const geom_t                         ymin,
+                                            const geom_t                         zmin,
+                                            const geom_t                         xmax,
+                                            const geom_t                         ymax,
+                                            const geom_t                         zmax) {
         switch (element_type) {
             case HEX8:
                 return create_hex8_cube(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);

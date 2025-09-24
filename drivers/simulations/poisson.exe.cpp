@@ -6,6 +6,7 @@
 #include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_SFC.hpp"
+#include "sfem_P1toP2.hpp"
 
 int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
@@ -95,6 +96,10 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Important for packed elements
     auto sfc = sfem::SFC::create_from_env();
     sfc->reorder(*m);
+
+    if(sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+        m = sfem::convert_p1_mesh_to_p2(m);
+    }
 
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->initialize_packed_mesh();
