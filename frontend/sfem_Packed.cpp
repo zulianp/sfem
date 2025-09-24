@@ -4,6 +4,7 @@
 #include "sfem_mask.h"
 
 #include "sfem_Mesh.hpp"
+#include "sfem_Env.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -126,6 +127,8 @@ namespace sfem {
         void init(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names, const bool modify_mesh) {
             this->mesh = mesh;
 
+            const ptrdiff_t SFEM_ELEMENTS_PER_PACK = sfem::Env::read("SFEM_ELEMENTS_PER_PACK", 0);
+
             node_map = sfem::create_host_buffer<idx_t>(mesh->n_nodes());
 
             auto node_owner = sfem::create_host_buffer<idx_t>(mesh->n_nodes());
@@ -135,9 +138,16 @@ namespace sfem {
             for (auto &block : mesh->blocks(block_names)) {
                 auto packed_block   = std::make_shared<Block>();
                 packed_block->block = block;
+
                 packed_block->n_packs =
                         (block->n_elements() * block->n_nodes_per_element() + max_nodes_per_pack - 1) / max_nodes_per_pack;
                 packed_block->elements_per_pack = (block->n_elements() + packed_block->n_packs - 1) / packed_block->n_packs;
+
+                if(SFEM_ELEMENTS_PER_PACK) {
+                    packed_block->elements_per_pack = MIN(packed_block->elements_per_pack, SFEM_ELEMENTS_PER_PACK);
+                    packed_block->n_packs = (block->n_elements() + packed_block->elements_per_pack  - 1) / packed_block->elements_per_pack ;
+                }
+                
                 assert(packed_block->elements_per_pack * block->n_nodes_per_element() <= max_nodes_per_pack);
 
                 packed_block->packed_elements =
