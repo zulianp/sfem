@@ -10,6 +10,7 @@
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
+#include "sfem_Packed.hpp"
 
 namespace sfem {
 
@@ -28,7 +29,7 @@ namespace sfem {
         std::shared_ptr<CRSGraph>              node_to_node_graph;
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
         std::shared_ptr<sfem::Buffer<idx_t *>> device_elements;
-
+        std::shared_ptr<Packed<PackedIdxType>> packed_mesh;
         // Data-structures for semistructured mesh
         std::shared_ptr<SemiStructuredMesh> semi_structured_mesh;
 
@@ -254,4 +255,13 @@ namespace sfem {
     bool FunctionSpace::is_multi_block() const { return impl_->mesh && impl_->mesh->n_blocks() > 1; }
 
     std::vector<enum ElemType> FunctionSpace::element_types() const { return impl_->element_types; }
+
+    int FunctionSpace::initialize_packed_mesh() {
+        impl_->packed_mesh = Packed<PackedIdxType>::create(impl_->mesh, {}, true);
+        return SFEM_SUCCESS;
+    }
+
+    bool FunctionSpace::has_packed_mesh() const { return static_cast<bool>(impl_->packed_mesh); }
+
+    std::shared_ptr<Packed<FunctionSpace::PackedIdxType>> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
 }  // namespace sfem

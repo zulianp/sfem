@@ -1226,19 +1226,17 @@ namespace sfem {
     }
 
     int Mesh::renumber_nodes() {
-        auto points     = this->points()->data();
-        auto elements   = this->elements()->data();
+        const int nxe = n_nodes_per_element();
         auto n_nodes    = this->n_nodes();
         auto n_elements = this->n_elements();
 
-        auto new_idx_buff = create_host_buffer<ptrdiff_t>(n_nodes);
+        auto new_idx_buff = create_host_buffer<idx_t>(n_nodes);
 
         auto new_idx = new_idx_buff->data();
         for (ptrdiff_t i = 0; i < n_nodes; i++) {
             new_idx[i] = -1;
         }
 
-        int   nxe          = n_nodes_per_element();
         idx_t next_node_id = 0;
         for (auto &b : impl_->blocks) {
             auto elements   = b->elements()->data();
@@ -1254,14 +1252,51 @@ namespace sfem {
             }
         }
 
-        const int dim = spatial_dimension();
+        return renumber_nodes(new_idx_buff);
 
+        // const int dim = spatial_dimension();
+
+        // auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
+        // auto new_points      = new_points_buff->data();
+
+        // for (int d = 0; d < dim; d++) {
+        //     for (ptrdiff_t i = 0; i < n_nodes; i++) {
+        //         new_points[d][new_idx[i]] = points[d][i];
+        //     }
+        // }
+
+        // impl_->points = new_points_buff;
+
+        // for (auto &b : impl_->blocks) {
+        //     auto elements   = b->elements()->data();
+        //     auto n_elements = b->n_elements();
+
+        //     for (ptrdiff_t e = 0; e < n_elements; e++) {
+        //         for (int v = 0; v < nxe; v++) {
+        //             elements[v][e] = new_idx[elements[v][e]];
+        //         }
+        //     }
+        // }
+
+        // return SFEM_SUCCESS;
+    }
+
+    int Mesh::renumber_nodes(const SharedBuffer<idx_t> &node_mapping) {
+        const int dim = spatial_dimension();
+        const int nxe = n_nodes_per_element();
+        const ptrdiff_t n_nodes = this->n_nodes();
+        const ptrdiff_t n_elements = this->n_elements();
+
+        auto points     = this->points()->data();
+        auto elements   = this->elements()->data();
         auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
         auto new_points      = new_points_buff->data();
 
+        auto d_node_mapping = node_mapping->data();
+
         for (int d = 0; d < dim; d++) {
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                new_points[d][new_idx[i]] = points[d][i];
+                new_points[d][d_node_mapping[i]] = points[d][i];
             }
         }
 
@@ -1273,7 +1308,7 @@ namespace sfem {
 
             for (ptrdiff_t e = 0; e < n_elements; e++) {
                 for (int v = 0; v < nxe; v++) {
-                    elements[v][e] = new_idx[elements[v][e]];
+                    elements[v][e] = d_node_mapping[elements[v][e]];
                 }
             }
         }
