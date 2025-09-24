@@ -9,6 +9,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
+#include "sfem_SFC.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -102,6 +103,11 @@ int main(int argc, char *argv[]) {
         } else {
             m = sfem::Mesh::create_hex8_cube(
                     comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+        }
+
+        if(sfem::Env::read("SFEM_USE_SFC", false)) {
+            auto sfc = sfem::SFC::create_from_env();
+            sfc->reorder(*m);
         }
 
         // FIXME tune based on available memory
