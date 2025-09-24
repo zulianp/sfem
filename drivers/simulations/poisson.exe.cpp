@@ -5,6 +5,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_SFC.hpp"
 
 int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();
@@ -13,13 +14,15 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
 
-    int  SFEM_MAX_IT             = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
-    bool SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
-    bool SFEM_VERBOSE            = sfem::Env::read<bool>("SFEM_VERBOSE", true);
+    int    SFEM_MAX_IT             = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
+    bool   SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
+    bool   SFEM_VERBOSE            = sfem::Env::read<bool>("SFEM_VERBOSE", true);
+    real_t SFEM_RTOL               = sfem::Env::read<real_t>("SFEM_RTOL", 1e-6);
 
     cg->set_max_it(SFEM_MAX_IT);
     cg->verbose = SFEM_VERBOSE;
     cg->set_op(linear_op);
+    cg->set_rtol(SFEM_RTOL);
 
     if (SFEM_USE_PRECONDITIONER) {
         auto diag = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -27,8 +30,6 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
         auto preconditioner = sfem::create_shiftable_jacobi(diag, es);
         cg->set_preconditioner_op(preconditioner);
     }
-
-    cg->set_rtol(1e-9);
 
     auto x   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto rhs = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -87,9 +88,12 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     int  SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
 
     int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 20);
-    // sfem::Mesh::create_hex8_bidomain_cube(
     auto m                    = sfem::Mesh::create_hex8_cube(
-            comm, 2*SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 1, 1);
+            comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 2 * SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 4);
+
+    // Important for packed elements
+    auto sfc = sfem::SFC::create_from_env();
+    sfc->reorder(*m);
 
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->initialize_packed_mesh();
@@ -97,14 +101,14 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
 
-    auto right_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.999; });
+    auto sideset0 = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return z > 3.999; });
 
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.001; });
+    auto sideset1 = sfem::Sideset::create_from_selector(
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return z < 0.001; });
 
-    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
-            {.sidesets = left_sideset, .value = -1, .component = 0}, {.sidesets = right_sideset, .value = 1, .component = 0}};
+    std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {{.sidesets = sideset1, .value = -1, .component = 0},
+                                                                             {.sidesets = sideset0, .value = 1, .component = 0}};
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
