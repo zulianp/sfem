@@ -1100,17 +1100,18 @@ namespace sfem {
                                                  const geom_t                         xmax,
                                                  const geom_t                         ymax,
                                                  const geom_t                         zmax) {
-        auto            ret       = std::make_shared<Mesh>(comm);
-        const ptrdiff_t nelements = nx * ny * nz;
-        const ptrdiff_t nnodes    = (nx + 1) * (ny + 1) * (nz + 1);
+        auto            ret             = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements       = nx * ny * nz;
+        const ptrdiff_t nnodes_vertices = (nx + 1) * (ny + 1) * (nz + 1);
+        const ptrdiff_t nnodes_total    = nnodes_vertices + nelements;
 
         ret->impl_->spatial_dim = 3;
-        ret->impl_->nnodes      = nnodes;
-        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
-        auto elements_buffer    = create_host_buffer<idx_t>(4, nelements * 6);
+        ret->impl_->nnodes      = nnodes_total;
+        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes_total);
+        auto elements_buffer    = create_host_buffer<idx_t>(4, nelements * 12);
 
-        ret->impl_->n_owned_nodes    = nnodes;
-        ret->impl_->n_owned_elements = nelements * 6;
+        ret->impl_->n_owned_nodes    = nnodes_total;
+        ret->impl_->n_owned_elements = nelements * 12;
 
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
@@ -1127,12 +1128,12 @@ namespace sfem {
         assert(hy > 0);
         assert(hz > 0);
 
-        static const int tet_pattern[6][4] = {{0, 1, 3, 7},
-                                              {0, 1, 7, 5},
-                                              {0, 4, 5, 7},
-                                              {1, 2, 3, 6},
-                                              {1, 3, 7, 6},
-                                              {1, 5, 6, 7}};
+        static const int face_nodes[6][4] = {{0, 1, 2, 3},
+                                             {4, 7, 6, 5},
+                                             {0, 4, 5, 1},
+                                             {3, 2, 6, 7},
+                                             {0, 3, 7, 4},
+                                             {1, 5, 6, 2}};
 
         for (ptrdiff_t zi = 0; zi < nz; zi++) {
             for (ptrdiff_t yi = 0; yi < ny; yi++) {
@@ -1147,15 +1148,25 @@ namespace sfem {
                     const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
                     const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
 
-                    const idx_t cube_nodes[8] = {i0, i1, i2, i3, i4, i5, i6, i7};
-                    const ptrdiff_t base      = (zi * ny * nx + yi * nx + xi) * 6;
+                    const idx_t        cube_nodes[8] = {i0, i1, i2, i3, i4, i5, i6, i7};
+                    const ptrdiff_t    elem_index    = zi * ny * nx + yi * nx + xi;
+                    const idx_t        center_idx    = nnodes_vertices + elem_index;
+                    const ptrdiff_t    base          = elem_index * 12;
 
-                    for (int sub = 0; sub < 6; sub++) {
-                        const ptrdiff_t tet = base + sub;
-                        elements[0][tet]    = cube_nodes[tet_pattern[sub][0]];
-                        elements[1][tet]    = cube_nodes[tet_pattern[sub][1]];
-                        elements[2][tet]    = cube_nodes[tet_pattern[sub][2]];
-                        elements[3][tet]    = cube_nodes[tet_pattern[sub][3]];
+                    for (int face = 0; face < 6; face++) {
+                        const int *fn = face_nodes[face];
+
+                        const ptrdiff_t t0 = base + face * 2 + 0;
+                        elements[0][t0]    = cube_nodes[fn[0]];
+                        elements[1][t0]    = cube_nodes[fn[1]];
+                        elements[2][t0]    = cube_nodes[fn[2]];
+                        elements[3][t0]    = center_idx;
+
+                        const ptrdiff_t t1 = base + face * 2 + 1;
+                        elements[0][t1]    = cube_nodes[fn[0]];
+                        elements[1][t1]    = cube_nodes[fn[2]];
+                        elements[2][t1]    = cube_nodes[fn[3]];
+                        elements[3][t1]    = center_idx;
                     }
                 }
             }
@@ -1168,6 +1179,19 @@ namespace sfem {
                     points[0][node] = (double)xmin + xi * hx;
                     points[1][node] = (double)ymin + yi * hy;
                     points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const ptrdiff_t elem_index = zi * ny * nx + yi * nx + xi;
+                    const idx_t     center_idx = nnodes_vertices + elem_index;
+
+                    points[0][center_idx] = (double)xmin + (xi + 0.5) * hx;
+                    points[1][center_idx] = (double)ymin + (yi + 0.5) * hy;
+                    points[2][center_idx] = (double)zmin + (zi + 0.5) * hz;
                 }
             }
         }

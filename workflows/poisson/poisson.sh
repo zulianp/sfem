@@ -11,6 +11,8 @@ then
 	exit 1
 fi
 
+source $SFEM_PATH/workflows/sfem_config.sh
+
 export PATH=$SFEM_PATH/bin:$PATH
 export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
 export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
@@ -21,9 +23,9 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 HERE=$PWD
 export SFEM_OPERATOR="PackedLaplacian"
 
-export SFEM_BASE_RESOLUTION=120
+export SFEM_BASE_RESOLUTION=20
 
 rm -rf output_poisson
 
 $LAUNCH poisson
-raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' $EXTRA_OPTIONS
+raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' -d $SFEM_REAL_T $EXTRA_OPTIONS
