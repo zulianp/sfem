@@ -472,32 +472,37 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                                     const tet_properties_info_t<FloatType> tet_properties_info,  //
                                                     FloatType* const                       data) {                                     //
 
-    const int tet_id_base   = (blockIdx.x * blockDim.x) / (LANES_PER_TILE * tets_per_block);
-    const int warp_id       = threadIdx.x / LANES_PER_TILE;
-    const int lane_id       = threadIdx.x % LANES_PER_TILE;
-    const int warp_id_abs   = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
-    const int cluster_begin = warp_id_abs * tet_cluster_size + start_element;
-    const int cluster_end   = cluster_begin + tet_cluster_size;
+    const int tet_id_base     = blockIdx.x;
+    const int warp_id         = threadIdx.x / LANES_PER_TILE;
+    const int lane_id         = threadIdx.x % LANES_PER_TILE;
+    const int warps_per_block = blockDim.x / LANES_PER_TILE;
+    const int warp_id_abs     = blockIdx.x * warps_per_block + warp_id;
+    const int cluster_begin   = warp_id_abs * tet_cluster_size + start_element;
+    const int cluster_end     = cluster_begin + tet_cluster_size;
 
-    FloatType* buffer_local_data = &buffer_cluster.buffer[tet_id_base * buffer_size];
+    FloatType* buffer_local_data = &(buffer_cluster.buffer[tet_id_base * buffer_size]);
 
 #define START_BUFFER_IDX_SIZE 64
 
     __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
     for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
+        //
         for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
-            if (i + tet_id_base * buffer_size > buffer_cluster.size) {
-                printf("Err: overflow i = %d, tet_id_base = %d, "
-                       "buffer_size = %ld, buffer_cluster.size = %ld, total_index = %ld, diff = %ld\n",
-                       i,
-                       tet_id_base,
-                       buffer_size,
-                       buffer_cluster.size,
-                       i + tet_id_base * buffer_size,
-                       (i + tet_id_base * buffer_size) - buffer_cluster.size);
-                return;
-            };
+            //
+            // if (i + tet_id_base * buffer_size > buffer_cluster.size) {
+            //     printf("Err: overflow i = %d, tet_id_base = %d, "
+            //            "buffer_size = %ld, buffer_cluster.size = %ld, total_index = %ld, diff = %ld\n",
+            //            i,
+            //            tet_id_base,
+            //            buffer_size,
+            //            buffer_cluster.size,
+            //            i + tet_id_base * buffer_size,
+            //            (i + tet_id_base * buffer_size) - buffer_cluster.size);
+            //     return;
+            // }
+            //
+
             if (i < buffer_size) buffer_local_data[i] = FloatType(0.0);
             // if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
         }
@@ -711,6 +716,9 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                 }
             }
         }
+
+        __syncthreads();
+
     }  // End loop over elements in the cluster
 }  // End kernel: sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu
 /////////////////////////////////////////////////////////////////////////////////
