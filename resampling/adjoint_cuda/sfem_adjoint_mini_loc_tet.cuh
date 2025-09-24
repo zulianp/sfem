@@ -101,41 +101,6 @@ private:
     }
 };
 
-struct buffer_cluster_t {
-public:
-    real_t*   buffer = nullptr;
-    ptrdiff_t size   = 0;
-
-    void allocate(ptrdiff_t size_, cudaStream_t stream_) {
-        if (size_ > size) {
-            if (buffer) {
-                this->clear_async(stream_);
-            }
-            cudaMallocAsync((void**)&buffer, size_ * sizeof(real_t), stream_);
-            size = size_;
-        }
-    }
-
-    void clear_async(cudaStream_t stream_) {
-        if (buffer) {
-            cudaFreeAsync(buffer, stream_);
-            buffer = nullptr;
-            size   = 0;
-        }
-    }
-
-    void clear() {
-        if (buffer) {
-            cudaFree(buffer);
-            buffer = nullptr;
-            size   = 0;
-        }
-    }
-
-    buffer_cluster_t() = default;
-    ~buffer_cluster_t() { this->clear(); }
-};
-
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
@@ -475,7 +440,6 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
         }
     }
 }
-/////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
@@ -483,7 +447,7 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 template <typename FloatType>
 __global__ void                                                                                       //
 sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             buffer_size,          //
-                                                    buffer_cluster_t            buffer_cluster,       //
+                                                    buffer_cluster_t<FloatType> buffer_cluster,       //
                                                     const ptrdiff_t             tets_per_block,       //
                                                     const ptrdiff_t             tet_cluster_size,     // Cluster size
                                                     const ptrdiff_t             start_element,        // Mesh
@@ -508,7 +472,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                                     const tet_properties_info_t<FloatType> tet_properties_info,  //
                                                     FloatType* const                       data) {                                     //
 
-    const int tet_id_base   = (blockIdx.x * blockDim.x) / LANES_PER_TILE;
+    const int tet_id_base   = (blockIdx.x * blockDim.x) / (LANES_PER_TILE * tets_per_block);
     const int warp_id       = threadIdx.x / LANES_PER_TILE;
     const int lane_id       = threadIdx.x % LANES_PER_TILE;
     const int warp_id_abs   = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE;
@@ -522,17 +486,18 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
     __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
     for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
-        //
         for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
-            // if (i + tet_id_base * buffer_size > buffer_cluster.size) {
-            //     printf("Error: buffer overflow in sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu, i = %d, tet_id_base = %d, "
-            //            "buffer_size = %ld, buffer_cluster.size = %ld\n",
-            //            i,
-            //            tet_id_base,
-            //            buffer_size,
-            //            buffer_cluster.size);
-            //     return;
-            // };
+            if (i + tet_id_base * buffer_size > buffer_cluster.size) {
+                printf("Err: overflow i = %d, tet_id_base = %d, "
+                       "buffer_size = %ld, buffer_cluster.size = %ld, total_index = %ld, diff = %ld\n",
+                       i,
+                       tet_id_base,
+                       buffer_size,
+                       buffer_cluster.size,
+                       i + tet_id_base * buffer_size,
+                       (i + tet_id_base * buffer_size) - buffer_cluster.size);
+                return;
+            };
             if (i < buffer_size) buffer_local_data[i] = FloatType(0.0);
             // if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
         }
@@ -694,7 +659,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                      &hex_local_buffer[0],                       //
                                      0);                                         //
 
-        // __syncwarp();
+        __syncthreads();
 
         const ptrdiff_t total_size_local = tet_properties_info.total_size_local[element_i];
 
@@ -717,7 +682,8 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
                 const ptrdiff_t g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
 
-                // printf("gi0 = %ld, gi1 = %ld, gi2 = %ld, g_index = %ld, value = %e, i0 = %ld, i1 = %ld, i2 = %ld, i0_origin = "
+                // printf("gi0 = %ld, gi1 = %ld, gi2 = %ld, g_index = %ld, value = %e, i0 = %ld, i1 = %ld, i2 = %ld,
+                // i0_origin = "
                 //        "%ld, i1_origin = %ld, i2_origin = %ld, min_grid_0 = %ld, min_grid_1 = %ld, min_grid_2 = %ld\n",
                 //        gi0,
                 //        gi1,

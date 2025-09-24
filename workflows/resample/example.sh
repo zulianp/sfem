@@ -20,6 +20,8 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 NCORES=8
 
+export CUDA_LAUNCH_BLOCKING=1
+
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
