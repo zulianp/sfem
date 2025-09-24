@@ -22,9 +22,7 @@
 #include "sfem_Packed.hpp"
 #include "sfem_Parameters.hpp"
 
-// using PackedIdxType = uint8_t;
-using PackedIdxType = uint16_t;
-// using PackedIdxType = int16_t;
+using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
 struct PackedLaplacian {
@@ -50,8 +48,9 @@ struct PackedLaplacian {
                 const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
                 const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
                 const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
-
                 const auto ghosts = &ghost_idx[ghost_ptr[p]];
+                scalar_t *const g_out = &out[n_owned];
+
                 memcpy(in, &u[owned_nodes_ptr[p]], n_owned * sizeof(real_t));
 
                 for (ptrdiff_t k = 0; k < n_ghost; ++k) {
@@ -59,7 +58,7 @@ struct PackedLaplacian {
                 }
 
                 for (ptrdiff_t e = e_start; e < e_end; e++) {
-                    idx_t ev[NXE];
+                    pack_idx_t ev[NXE];
                     for (int v = 0; v < NXE; ++v) {
                         ev[v] = elements[v][e];
                     }
@@ -88,11 +87,11 @@ struct PackedLaplacian {
                     values[owned_nodes_ptr[p] + k] += out[k];
                     out[k] = 0;  // Clean-up while hot
                 }
-
+                
                 for (ptrdiff_t k = 0; k < n_ghost; ++k) {
 #pragma omp atomic update
-                    values[ghosts[k]] += out[n_owned + k];
-                    out[n_owned + k] = 0;  // Clean-up while hot
+                    values[ghosts[k]] += g_out[k];
+                    g_out[k] = 0;  // Clean-up while hot
                 }
             }
 
@@ -133,163 +132,6 @@ struct Tet10MicroKernel {
         tet10_laplacian_apply_add_fff(fff, element_u, element_out);
     }
 };
-
-// template <typename pack_idx_t>
-// static int tet4_packed_laplacian_apply(const ptrdiff_t                       n_packs,
-//                                        const ptrdiff_t                       n_elements_per_pack,
-//                                        const ptrdiff_t                       n_elements,
-//                                        const ptrdiff_t                       max_nodes_per_pack,
-//                                        pack_idx_t **const SFEM_RESTRICT      elements,
-//                                        const jacobian_t *const SFEM_RESTRICT fff,
-//                                        const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
-//                                        const count_t *const SFEM_RESTRICT    ghost_ptr,
-//                                        const idx_t *const SFEM_RESTRICT      ghost_idx,
-//                                        const real_t *const SFEM_RESTRICT     u,
-//                                        real_t *const SFEM_RESTRICT           values) {
-//     static const int nxe = 4;
-// #pragma omp parallel
-//     {
-//         real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
-//         real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
-
-// #pragma omp for
-//         for (ptrdiff_t p = 0; p < n_packs; p++) {
-//             const ptrdiff_t e_start = p * n_elements_per_pack;
-//             const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
-//             const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
-//             const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
-
-//             const auto ghosts = &ghost_idx[ghost_ptr[p]];
-//             memcpy(in, &u[owned_nodes_ptr[p]], n_owned * sizeof(real_t));
-
-//             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-//                 in[n_owned + k] = u[ghosts[k]];
-//             }
-
-//             for (ptrdiff_t e = e_start; e < e_end; e++) {
-//                 idx_t ev[nxe];
-//                 for (int v = 0; v < nxe; ++v) {
-//                     ev[v] = elements[v][e];
-//                 }
-
-//                 scalar_t element_out[nxe] = {0};
-//                 scalar_t fff_i[6];
-
-//                 for (int d = 0; d < 6; ++d) {
-//                     fff_i[d] = fff[e * 6 + d];
-//                 }
-
-//                 tet4_laplacian_apply_fff(fff_i,
-//                                          in[ev[0]],
-//                                          in[ev[1]],
-//                                          in[ev[2]],
-//                                          in[ev[3]],
-//                                          &element_out[0],
-//                                          &element_out[1],
-//                                          &element_out[2],
-//                                          &element_out[3]);
-
-//                 for (int v = 0; v < nxe; ++v) {
-//                     out[ev[v]] += element_out[v];
-//                 }
-//             }
-
-//             for (ptrdiff_t k = 0; k < n_owned; ++k) {
-// #pragma omp atomic update
-//                 values[owned_nodes_ptr[p] + k] += out[k];
-//                 out[k] = 0;  // Clean-up while hot
-//             }
-
-//             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-// #pragma omp atomic update
-//                 values[ghosts[k]] += out[n_owned + k];
-//                 out[n_owned + k] = 0;  // Clean-up while hot
-//             }
-//         }
-
-//         free(in);
-//         free(out);
-//     }
-
-//     return SFEM_SUCCESS;
-// }
-
-// template <typename pack_idx_t>
-// static int hex8_packed_laplacian_apply(const ptrdiff_t                       n_packs,
-//                                        const ptrdiff_t                       n_elements_per_pack,
-//                                        const ptrdiff_t                       n_elements,
-//                                        const ptrdiff_t                       max_nodes_per_pack,
-//                                        pack_idx_t **const SFEM_RESTRICT      elements,
-//                                        const jacobian_t *const SFEM_RESTRICT fff,
-//                                        const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
-//                                        const count_t *const SFEM_RESTRICT    ghost_ptr,
-//                                        const idx_t *const SFEM_RESTRICT      ghost_idx,
-//                                        const real_t *const SFEM_RESTRICT     u,
-//                                        real_t *const SFEM_RESTRICT           values) {
-//     static const int nxe = 8;
-// #pragma omp parallel
-//     {
-//         real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
-//         real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
-
-// #pragma omp for
-//         for (ptrdiff_t p = 0; p < n_packs; p++) {
-//             const ptrdiff_t e_start = p * n_elements_per_pack;
-//             const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
-//             const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
-//             const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
-
-//             const auto ghosts = &ghost_idx[ghost_ptr[p]];
-//             memcpy(in, &u[owned_nodes_ptr[p]], n_owned * sizeof(real_t));
-
-//             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-//                 in[n_owned + k] = u[ghosts[k]];
-//             }
-
-//             for (ptrdiff_t e = e_start; e < e_end; e++) {
-//                 idx_t ev[nxe];
-//                 for (int v = 0; v < nxe; ++v) {
-//                     ev[v] = elements[v][e];
-//                 }
-
-//                 scalar_t element_u[nxe];
-//                 for (int v = 0; v < nxe; ++v) {
-//                     element_u[v] = in[ev[v]];
-//                 }
-
-//                 scalar_t element_out[nxe] = {0};
-//                 scalar_t fff_i[6];
-
-//                 for (int d = 0; d < 6; ++d) {
-//                     fff_i[d] = fff[e * 6 + d];
-//                 }
-
-//                 hex8_laplacian_apply_fff_integral(fff_i, element_u, element_out);
-
-//                 for (int v = 0; v < nxe; ++v) {
-//                     out[ev[v]] += element_out[v];
-//                 }
-//             }
-
-//             for (ptrdiff_t k = 0; k < n_owned; ++k) {
-// #pragma omp atomic update
-//                 values[owned_nodes_ptr[p] + k] += out[k];
-//                 out[k] = 0;  // Clean-up while hot
-//             }
-
-//             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-// #pragma omp atomic update
-//                 values[ghosts[k]] += out[n_owned + k];
-//                 out[n_owned + k] = 0;  // Clean-up while hot
-//             }
-//         }
-
-//         free(in);
-//         free(out);
-//     }
-
-//     return SFEM_SUCCESS;
-// }
 
 template <typename pack_idx_t>
 static int packed_laplacian_apply(enum ElemType                         element_type,
@@ -341,30 +183,6 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                                ghost_idx,
                                                                                u,
                                                                                values);
-        // case TET4:
-        //     return tet4_packed_laplacian_apply(n_packs,
-        //                                        n_elements_per_pack,
-        //                                        n_elements,
-        //                                        max_nodes_per_pack,
-        //                                        elements,
-        //                                        fff,
-        //                                        owned_nodes_ptr,
-        //                                        ghost_ptr,
-        //                                        ghost_idx,
-        //                                        u,
-        //                                        values);
-        // case HEX8:
-        //     return hex8_packed_laplacian_apply(n_packs,
-        //                                        n_elements_per_pack,
-        //                                        n_elements,
-        //                                        max_nodes_per_pack,
-        //                                        elements,
-        //                                        fff,
-        //                                        owned_nodes_ptr,
-        //                                        ghost_ptr,
-        //                                        ghost_idx,
-        //                                        u,
-        //                                        values);
         default: {
             SFEM_ERROR("packed_laplacian_apply not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
@@ -399,7 +217,7 @@ namespace sfem {
     int PackedLaplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("PackedLaplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        impl_->packed  = Packed<PackedIdxType>::create(impl_->space->mesh_ptr(), block_names);
+        impl_->packed  = impl_->space->packed_mesh();
 
         impl_->fff.resize(impl_->packed->n_blocks());
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {

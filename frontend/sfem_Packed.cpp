@@ -39,6 +39,8 @@ namespace sfem {
 
         }
 
+      
+
         void pack(const std::shared_ptr<Mesh> &mesh,
                   const SharedBuffer<idx_t>   &node_map,
                   const SharedBuffer<idx_t>   &node_owner,
@@ -118,11 +120,12 @@ namespace sfem {
         std::shared_ptr<Mesh>  mesh;
         SharedBuffer<idx_t>    node_map;
         SharedBuffer<geom_t *> reordered_points;
+        bool synched_with_mesh{false};
 
         // New mesh data
         std::vector<std::shared_ptr<Block>> blocks;
 
-        void init(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names) {
+        void init(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names, const bool modify_mesh) {
             this->mesh = mesh;
 
             node_map = sfem::create_host_buffer<idx_t>(mesh->n_nodes());
@@ -146,6 +149,30 @@ namespace sfem {
                 packed_block->print();
 
                 blocks.push_back(packed_block);
+            }
+
+            if(modify_mesh) {
+               mesh->renumber_nodes(node_map);
+               reordered_points = mesh->points();
+               synched_with_mesh = true;
+               node_map = nullptr;
+            }
+        }
+
+        void init_reordered_points() {
+            if (!reordered_points) {
+                reordered_points            = sfem::zeros_like(mesh->points());
+                auto            d_reordered_points = reordered_points->data();
+                auto            d_points           = mesh->points()->data();
+                auto            d_node_map         = node_map->data();
+                const ptrdiff_t nnodes             = mesh->n_nodes();
+                const int       dim                = mesh->spatial_dimension();
+    
+                for (int d = 0; d < dim; d++) {
+                    for (ptrdiff_t node = 0; node < nnodes; node++) {
+                        d_reordered_points[d][d_node_map[node]] = d_points[d][node];
+                    }
+                }
             }
         }
     };
@@ -184,9 +211,9 @@ namespace sfem {
     Packed<pack_idx_t>::~Packed() = default;
 
     template <typename pack_idx_t>
-    std::shared_ptr<Packed<pack_idx_t>> Packed<pack_idx_t>::create(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names) {
+    std::shared_ptr<Packed<pack_idx_t>> Packed<pack_idx_t>::create(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names, const bool modify_mesh) {
         auto packed = std::make_shared<Packed<pack_idx_t>>();
-        packed->impl_->init(mesh, block_names);
+        packed->impl_->init(mesh, block_names, modify_mesh);
         return packed;
     }
 
@@ -194,6 +221,8 @@ namespace sfem {
     void Packed<pack_idx_t>::map_to_packed(const real_t *const SFEM_RESTRICT values,
                                            real_t *const SFEM_RESTRICT       out_values,
                                            const int                         block_size) const {
+        if(!impl_->synched_with_mesh) SFEM_ERROR("Mesh is not synched! Cannot call this!\n");
+
         auto            d_node_map = impl_->node_map->data();
         const ptrdiff_t nnodes     = impl_->mesh->n_nodes();
         for (ptrdiff_t node = 0; node < nnodes; node++) {
@@ -205,6 +234,8 @@ namespace sfem {
     void Packed<pack_idx_t>::map_to_unpacked(const real_t *const SFEM_RESTRICT values,
                                              real_t *const SFEM_RESTRICT       out_values,
                                              const int                         block_size) const {
+        if(!impl_->synched_with_mesh) SFEM_ERROR("Mesh is not synched! Cannot call this!\n");
+
         auto            d_node_map = impl_->node_map->data();
         const ptrdiff_t nnodes     = impl_->mesh->n_nodes();
         for (ptrdiff_t node = 0; node < nnodes; node++) {
@@ -214,20 +245,7 @@ namespace sfem {
 
     template <typename pack_idx_t>
     SharedBuffer<geom_t *> Packed<pack_idx_t>::points() {
-        if (!impl_->reordered_points) {
-            impl_->reordered_points            = sfem::zeros_like(impl_->mesh->points());
-            auto            d_reordered_points = impl_->reordered_points->data();
-            auto            d_points           = impl_->mesh->points()->data();
-            auto            d_node_map         = impl_->node_map->data();
-            const ptrdiff_t nnodes             = impl_->mesh->n_nodes();
-            const int       dim                = impl_->mesh->spatial_dimension();
-
-            for (int d = 0; d < dim; d++) {
-                for (ptrdiff_t node = 0; node < nnodes; node++) {
-                    d_reordered_points[d][d_node_map[node]] = d_points[d][node];
-                }
-            }
-        }
+       impl_->init_reordered_points();
 
         return impl_->reordered_points;
     }

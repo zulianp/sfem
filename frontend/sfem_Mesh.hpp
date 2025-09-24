@@ -107,6 +107,8 @@ namespace sfem {
 
         std::shared_ptr<Communicator> comm() const;
 
+        
+
         inline static std::shared_ptr<Mesh> create_from_file(const std::shared_ptr<Communicator> &comm, const char *path) {
             auto ret = std::make_shared<Mesh>(comm);
             ret->read(path);
@@ -171,6 +173,7 @@ namespace sfem {
         int split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name);
         int split_boundary_layer();
         int renumber_nodes();
+        int renumber_nodes(const SharedBuffer<idx_t> &node_mapping);
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(const std::shared_ptr<Communicator> &comm);
         void set_element_type(const enum ElemType element_type);
