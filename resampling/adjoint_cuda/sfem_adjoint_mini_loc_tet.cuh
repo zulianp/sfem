@@ -294,7 +294,7 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
                min_grid_0,
                min_grid_1,
                min_grid_2,
-               element_i);
+               (long)element_i);
 
     // printf("Exaedre volume: %e\n", hexahedron_volume);
 
@@ -473,21 +473,37 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                                     FloatType* const                       data) {                                     //
 
     const int tet_id_base     = blockIdx.x;
-    const int warp_id         = threadIdx.x / LANES_PER_TILE;
+    const int warp_id_loc     = threadIdx.x / LANES_PER_TILE;
     const int lane_id         = threadIdx.x % LANES_PER_TILE;
     const int warps_per_block = blockDim.x / LANES_PER_TILE;
-    const int warp_id_abs     = blockIdx.x * warps_per_block + warp_id;
-    const int cluster_begin   = warp_id_abs * tet_cluster_size + start_element;
+    const int warp_id_abs     = blockIdx.x * warps_per_block + warp_id_loc;
+    const int cluster_begin   = start_element + warp_id_abs * tet_cluster_size;
     const int cluster_end     = cluster_begin + tet_cluster_size;
 
-    FloatType* buffer_local_data = &(buffer_cluster.buffer[tet_id_base * buffer_size]);
+    const ptrdiff_t buffer_begin_idx  = tet_id_base * buffer_size;
+    FloatType*      buffer_local_data = &(buffer_cluster.buffer[buffer_begin_idx]);
+
+    // if (lane_id == 0)
+    //     printf("Block %d, warp_id %d, lane_id %d, warps_per_block %d, tet_id_base %d, cluster_begin %d, cluster_end %d, "
+    //            "tet_cluster_size %d, buffer_begin_idx %ld, buffer_size %ld\n",
+    //            blockIdx.x,
+    //            warp_id,
+    //            lane_id,
+    //            warps_per_block,
+    //            tet_id_base,
+    //            cluster_begin,
+    //            cluster_end,
+    //            (int)tet_cluster_size,
+    //            (long)buffer_begin_idx,
+    //            (long)buffer_size);
 
 #define START_BUFFER_IDX_SIZE 64
 
     __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
     for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
-        //
+        // Loop over elements in the cluster
+
         for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
             //
             // if (i + tet_id_base * buffer_size > buffer_cluster.size) {
@@ -501,22 +517,22 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
             //            (i + tet_id_base * buffer_size) - buffer_cluster.size);
             //     return;
             // }
-            //
 
             if (i < buffer_size) buffer_local_data[i] = FloatType(0.0);
-            // if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
+            if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
         }
 
         __syncthreads();
+
+        if (element_i >= end_element) return;  // Out of range /////////////////////////////////////
 
         if (lane_id == 0) {
-            tet_start_buffer_idx[warp_id] = tet_properties_info.total_size_local[element_i];
+            tet_start_buffer_idx[warp_id_loc] = tet_properties_info.total_size_local[element_i];
         }
 
         __syncthreads();
-        // return;
 
-        if (lane_id == 0 and warp_id == 0) {
+        if (lane_id == 0 and warp_id_loc == 0) {
             ptrdiff_t offset = 0;
             for (int i = 0; i < tets_per_block; i++) {
                 const ptrdiff_t sz      = tet_start_buffer_idx[i];
@@ -527,11 +543,9 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
         __syncthreads();
 
-        FloatType* hex_local_buffer = &buffer_local_data[tet_start_buffer_idx[warp_id]];
+        FloatType* hex_local_buffer = &buffer_local_data[tet_start_buffer_idx[warp_id_loc]];
 
         // return;
-
-        if (element_i >= end_element) return;  // Out of range
 
         // printf("Processing element %ld in range %ld - %ld\n", element_i, start_element, end_element);
 
@@ -710,7 +724,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                 //     gi2 >= 0 and gi2 < n2 and  //
                 //     g_index >= 0 and           //
                 //     g_index < n0 * n1 * n2)
-                {  //
+                {
                     // // Atomic add to global memory
                     atomicAdd(&data[g_index], hex_local_buffer_value);
                 }
