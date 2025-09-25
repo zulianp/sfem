@@ -1927,12 +1927,17 @@ field_view_ensure_margin(MPI_Comm                             comm,          //
 }
 
 // Function to normalize the field by hexahedron volume and find min/max
-void                                                        //
-normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Field data to normalize
-                                 const ptrdiff_t n_zyx,     // Input: Total size of the field array
-                                 const geom_t    delta[3],  // Input: Grid spacing
-                                 real_t*         out_min,   // Output: Minimum value found in the field
-                                 real_t*         out_max) {         // Output: Maximum value found in the field
+void                                                             //
+normalize_field_and_find_min_max(real_t*         field,          // Input/Output: Field data to normalize
+                                 const ptrdiff_t n_zyx,          // Input: Total size of the field array
+                                 const geom_t    delta[3],       // Input: Grid spacing
+                                 real_t*         out_min,        // Output: Minimum value found in the field
+                                 real_t*         out_max,        //
+                                 int*            out_min_index,  //
+                                 int*            out_max_index) {           // Output: Maximum value found in the field
+
+    int max_field_index = -1;
+    int min_field_index = -1;
 
     if (!field || !delta || !out_min || !out_max) {
         fprintf(stderr, "Error: Invalid arguments provided to %s\n", __func__);
@@ -1990,10 +1995,12 @@ normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Fie
         // Find min/max without normalization
         for (ptrdiff_t i = 0; i < n_zyx; i++) {
             if (field[i] > max_val) {
-                max_val = field[i];
+                max_val         = field[i];
+                max_field_index = i;
             }
             if (field[i] < min_val) {
-                min_val = field[i];
+                min_val         = field[i];
+                min_field_index = i;
             }
         }
     } else {
@@ -2002,14 +2009,18 @@ normalize_field_and_find_min_max(real_t*         field,     // Input/Output: Fie
             field[i] /= hexa_volume;
 
             if (field[i] > max_val) {
-                max_val = field[i];
-            }
-            if (field[i] < min_val) {
-                min_val = field[i];
+                max_val         = field[i];
+                max_field_index = i;
+                if (field[i] < min_val) {
+                    min_val         = field[i];
+                    min_field_index = i;
+                }
             }
         }
     }
 
-    *out_min = min_val;
-    *out_max = max_val;
+    *out_min       = min_val;
+    *out_max       = max_val;
+    *out_min_index = min_field_index;
+    *out_max_index = max_field_index;
 }

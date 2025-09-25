@@ -69,6 +69,24 @@ get_option_argument(int         argc,    //
     return -2;  // Option not found
 }
 
+void get_3d_coordinates(int              index,   //
+                        const ptrdiff_t* nlocal,  //
+                        const geom_t*    origin,  //
+                        const geom_t*    delta,   //
+                        int*             coords) {            //
+    // Convert linear index to 3D grid indices
+    const ptrdiff_t k = index / (nlocal[0] * nlocal[1]);
+    const ptrdiff_t j = (index % (nlocal[0] * nlocal[1])) / nlocal[0];
+    const ptrdiff_t i = index % nlocal[0];
+
+    // Convert grid indices to spatial coordinates
+    if (coords != NULL) {
+        coords[0] = i;
+        coords[1] = j;
+        coords[2] = k;
+    }
+}
+
 /**
  * @brief Handle the option result object
  *
@@ -318,17 +336,19 @@ int check_string_in_args(const int argc, const char* argv[], const char* target,
 // print_rank_info ////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
-void                                         //
-print_rank_info(int              mpi_rank,   //
-                int              mpi_size,   //
-                real_t           max_field,  //
-                real_t           min_field,  //
-                ptrdiff_t        n_zyx,      //
-                const ptrdiff_t* nlocal,     //
-                const geom_t*    origin,     //
-                const geom_t*    delta,      //
-                const ptrdiff_t* nglobal) {  //
-                                             //
+void                                               //
+print_rank_info(int              mpi_rank,         //
+                int              mpi_size,         //
+                real_t           max_field,        //
+                real_t           min_field,        //
+                int              max_field_index,  //
+                int              min_field_index,  //
+                ptrdiff_t        n_zyx,            //
+                const ptrdiff_t* nlocal,           //
+                const geom_t*    origin,           //
+                const geom_t*    delta,            //
+                const ptrdiff_t* nglobal) {        //
+                                                   //
     MPI_Barrier(MPI_COMM_WORLD);
 
     int z_size_local = nlocal[2];
@@ -356,8 +376,8 @@ print_rank_info(int              mpi_rank,   //
             field_mpi_domain.start_indices[1] = 0;
             field_mpi_domain.start_indices[2] = start_index_z;
 
-            printf("Rank %d: max_field = %1.14e\n", mpi_rank, max_field);
-            printf("Rank %d: min_field = %1.14e\n", mpi_rank, min_field);
+            printf("Rank %d: max_field = %1.14e, max index = %d\n", mpi_rank, max_field, max_field_index);
+            printf("Rank %d: min_field = %1.14e, min index = %d\n", mpi_rank, min_field, min_field_index);
             printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
             if (mpi_rank == 0) {
                 printf("Rank %d: global_z_size = %d\n", mpi_rank, z_size);
@@ -401,6 +421,8 @@ real_t mesh_fun_trig(real_t x, real_t y, real_t z) { return 2.0 * (sin(6.0 * x) 
 real_t mesh_fun_trig_pos(real_t x, real_t y, real_t z) { return 8.0 + mesh_fun_trig(x, y, z); }
 
 real_t mesh_fun_ones(real_t x, real_t y, real_t z) { return 1.0; }
+
+real_t mesh_fun_zeros(real_t x, real_t y, real_t z) { return 0.0; }
 
 real_t mesh_fun_linear_step(real_t x, real_t y, real_t z) {
     real_t dd = -0.2;
@@ -771,10 +793,28 @@ int main(int argc, char* argv[]) {
 
                     real_t max_field_tet10 = -(__DBL_MAX__);
                     real_t min_field_tet10 = (__DBL_MAX__);
+                    int    min_field_index = -1;
+                    int    max_field_index = -1;
 
-                    normalize_field_and_find_min_max(field, n_zyx, delta, &min_field_tet10, &max_field_tet10);
+                    normalize_field_and_find_min_max(field,  //
+                                                     n_zyx,
+                                                     delta,
+                                                     &min_field_tet10,
+                                                     &max_field_tet10,
+                                                     &max_field_index,
+                                                     &min_field_index);
 
-                    print_rank_info(mpi_rank, mpi_size, max_field_tet10, min_field_tet10, n_zyx, nlocal, origin, delta, nglobal);
+                    print_rank_info(mpi_rank,
+                                    mpi_size,
+                                    max_field_tet10,
+                                    min_field_tet10,
+                                    max_field_index,
+                                    min_field_index,
+                                    n_zyx,
+                                    nlocal,
+                                    origin,
+                                    delta,
+                                    nglobal);
 
                     ndarray_write(MPI_COMM_WORLD,
                                   "/home/sriva/git/sfem/workflows/resample/test_field_t10.raw",
@@ -873,24 +913,44 @@ int main(int argc, char* argv[]) {
 
                     MPI_Barrier(MPI_COMM_WORLD);
 
-                    real_t min_field_tet4 = 0.0;
-                    real_t max_field_tet4 = 0.0;
+                    real_t min_field_tet4       = 0.0;
+                    real_t max_field_tet4       = 0.0;
+                    int    min_field_index_tet4 = -1;
+                    int    max_field_index_tet4 = -1;
 
-                    normalize_field_and_find_min_max(field,             //
-                                                     n_zyx,             //
-                                                     delta,             //
-                                                     &min_field_tet4,   //
-                                                     &max_field_tet4);  //
+                    normalize_field_and_find_min_max(field,                   //
+                                                     n_zyx,                   //
+                                                     delta,                   //
+                                                     &min_field_tet4,         //
+                                                     &max_field_tet4,         //
+                                                     &min_field_index_tet4,   //
+                                                     &max_field_index_tet4);  //
 
-                    print_rank_info(mpi_rank,        //
-                                    mpi_size,        //
-                                    max_field_tet4,  //
-                                    min_field_tet4,  //
-                                    n_zyx,           //
-                                    nlocal,          //
-                                    origin,          //
-                                    delta,           //
-                                    nglobal);        //
+                    int max_field_coords[3];
+
+                    get_3d_coordinates(max_field_index_tet4,  //
+                                       nlocal,
+                                       origin,
+                                       delta,
+                                       max_field_coords);
+
+                    printf("Max field coords: %d %d %d :: coord %d\n",
+                           max_field_coords[0],
+                           max_field_coords[1],
+                           max_field_coords[2],
+                           (stride[0] * max_field_coords[0] + stride[1] * max_field_coords[1] + stride[2] * max_field_coords[2]));
+
+                    print_rank_info(mpi_rank,              //
+                                    mpi_size,              //
+                                    max_field_tet4,        //
+                                    min_field_tet4,        //
+                                    max_field_index_tet4,  //
+                                    min_field_index_tet4,  //
+                                    n_zyx,                 //
+                                    nlocal,                //
+                                    origin,                //
+                                    delta,                 //
+                                    nglobal);              //
 
                     // printf("max_field = %1.14e\n", max_field);
                     // printf("min_field = %1.14e\n", min_field);

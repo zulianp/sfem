@@ -299,7 +299,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
     }
 
-    const unsigned int tets_per_block    = 8;
+    const unsigned int tets_per_block    = 16;
     cudaStream_t       cuda_stream       = NULL;  // default stream
     cudaStream_t       cuda_stream_clock = NULL;
     cudaStreamCreate(&cuda_stream);
@@ -339,15 +339,15 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                                                                       dy,                    //
                                                                       dz,                    //
                                                                       tet_properties_info);  //
+
+        cudaStreamSynchronize(cuda_stream);
+
+        // Optional: check for errors
+        error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            fprintf(stderr, "CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
+        }
     }  // END: Compute local grid sizes for each element
-
-    cudaStreamSynchronize(cuda_stream);
-
-    // Optional: check for errors
-    error = cudaGetLastError();
-    if (error != cudaSuccess) {
-        printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
-    }
 
     ptrdiff_t max_total_size_local = -1;
     ptrdiff_t max_idx_global       = -1;
@@ -372,8 +372,8 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     const ptrdiff_t    buffer_memory_size = max_total_size_local * tets_per_block;
 
     buffer_cluster_t<real_t> buffer_cluster;
-    allocate_buffer_cluster(buffer_cluster, (elements_per_block + 13) * (max_total_size_local), cuda_stream_alloc);
-    cudaMemset((void*)buffer_cluster.buffer, (-1 * 0x1A7DAF1C), buffer_cluster.size * sizeof(real_t));
+    allocate_buffer_cluster(buffer_cluster, (elements_per_block *2) * (max_total_size_local + 100), cuda_stream_alloc);
+    // cudaMemset((void*)buffer_cluster.buffer, (-1 * 0x1A7DAF1C), buffer_cluster.size * sizeof(real_t));
 
     printf("max_total_size_local = %lld \n", (long long)max_total_size_local);
     printf("nelements            = %lld \n", (long long)nelements);
