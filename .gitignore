@@ -275,3 +275,4 @@ dev-debug.log
 # tasks/ 
 workflows/resample/metadata_test_field_t10.yml
 
+/build_release/
