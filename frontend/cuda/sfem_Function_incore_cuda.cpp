@@ -896,6 +896,246 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
     };
 
+
+    class GPUKelvinVoigtNewmark final : public Op {
+        public:
+            std::shared_ptr<FunctionSpace> space;
+            std::shared_ptr<Adjugate>      adjugate;
+            enum RealType                  real_type { SFEM_REAL_DEFAULT };
+            void                          *stream{SFEM_DEFAULT_STREAM};
+            enum ElemType                  element_type { INVALID };
+            real_t                         k{4};
+            real_t                         K{3};
+            real_t                         eta{0.1};
+            real_t                         rho{1};
+            std::shared_ptr<Buffer<real_t>> vel_[3];
+            std::shared_ptr<Buffer<real_t>> acc_[3];
+    
+            static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+                assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+                return std::make_unique<GPUKelvinVoigtNewmark>(space);
+            }
+    
+            std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+                auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
+                assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+                assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+                ret->adjugate = adjugate;
+                return ret;
+            }
+    
+            const char *name() const override { return "gpu:KelvinVoigtNewmark"; }
+            inline bool is_linear() const override { return true; }
+    
+            void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
+                if (strcmp(name, "velocity") == 0) {
+                    vel_[component] = vel;
+                } else if (strcmp(name, "acceleration") == 0) {
+                    acc_[component] = vel;
+                } else {
+                    SFEM_ERROR("Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, 0/1/2) first.\n");
+                }
+            }
+
+
+            int initialize(const std::vector<std::string> &block_names = {}) override {
+                SFEM_TRACE_SCOPE("GPUKelvinVoigtNewmark:initialize");
+    
+                real_t SFEM_SHEAR_STIFFNESS_KV        = 4;
+                real_t SFEM_BULK_MODULUS = 3;
+                real_t SFEM_DAMPING_RATIO = 0.1;
+                real_t SFEM_DENSITY = 1.0;
+    
+                SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
+                SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
+                SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
+                SFEM_READ_ENV(SFEM_DENSITY, atof);
+                k     = SFEM_SHEAR_STIFFNESS_KV;
+                K = SFEM_BULK_MODULUS;
+                eta = SFEM_DAMPING_RATIO;
+                rho = SFEM_DENSITY;
+    
+                auto elements = space->device_elements();
+                if (!elements) {
+                    elements = create_device_elements(space, space->element_type());
+                    space->set_device_elements(elements);
+                }
+    
+                adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
+                return SFEM_SUCCESS;
+            }
+    
+            GPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space) : space(space), element_type(space->element_type()) {}
+    
+            int hessian_crs(const real_t *const  x,
+                            const count_t *const rowptr,
+                            const idx_t *const   colidx,
+                            real_t *const        values) override {
+                SFEM_IMPLEMENT_ME();
+                return SFEM_FAILURE;
+            }
+    
+            int hessian_bsr(const real_t *const  x,
+                            const count_t *const rowptr,
+                            const idx_t *const   colidx,
+                            real_t *const        values) override {
+                                SFEM_IMPLEMENT_ME();
+                                return SFEM_FAILURE;
+            }
+    
+            int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+                SFEM_IMPLEMENT_ME();
+                return SFEM_FAILURE;
+            }
+    
+            int gradient(const real_t *const x, real_t *const out) override {
+                SFEM_TRACE_SCOPE("cu_kelvin_voigt_apply");
+
+                // Determine DOFs and prepare device pointers for x, v, a, out
+                const ptrdiff_t ndofs = space->n_dofs();
+
+                const real_t *v = vel_[0]->data();
+                const real_t *a = acc_[0]->data();
+
+                const real_t *x_dev = x;
+                const real_t *v_dev = v;
+                const real_t *a_dev = a;
+                real_t       *out_dev = out;
+
+                std::shared_ptr<Buffer<real_t>> x_tmp, v_tmp, a_tmp, out_tmp;
+
+                auto to_device_if_needed_in = [&](const real_t *src, std::shared_ptr<Buffer<real_t>> &tmp) -> const real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+                        return src; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    buffer_host_to_device((size_t)ndofs * sizeof(real_t), src, tmp->data());
+                    return tmp->data();
+                };
+
+                auto to_device_if_needed_out = [&](real_t *dst, std::shared_ptr<Buffer<real_t>> &tmp) -> real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+                        return dst; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    d_memset(tmp->data(), 0, (size_t)ndofs * sizeof(real_t));
+                    return tmp->data();
+                };
+
+                x_dev   = to_device_if_needed_in(x, x_tmp);
+                v_dev   = to_device_if_needed_in(v, v_tmp);
+                a_dev   = to_device_if_needed_in(a, a_tmp);
+                out_dev = to_device_if_needed_out(out, out_tmp);
+
+                int err = cu_kelvin_voigt_apply(element_type,
+                                                adjugate->n_elements(),
+                                                adjugate->elements()->data(),
+                                                adjugate->n_elements(),  // stride
+                                                adjugate->jacobian_adjugate()->data(),
+                                                adjugate->jacobian_determinant()->data(),
+                                                k,
+                                                K,
+                                                eta,
+                                                rho,
+                                                real_type,
+                                                x_dev,
+                                                v_dev,
+                                                a_dev,
+                                                out_dev,
+                                                stream);
+
+                if (err) return err;
+
+                if (out_tmp) {
+                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
+                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
+                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                        out[i] += tmp_h->data()[i];
+                    }
+                }
+
+                return SFEM_SUCCESS;
+            }
+    
+            int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+                SFEM_TRACE_SCOPE("cu_kelvin_voigt_apply");
+
+                const ptrdiff_t ndofs = space->n_dofs();
+
+                const real_t *v = vel_[0]->data();
+                const real_t *a = acc_[0]->data();
+
+                const real_t *h_dev = h;
+                const real_t *v_dev = v;
+                const real_t *a_dev = a;
+                real_t       *out_dev = out;
+
+                std::shared_ptr<Buffer<real_t>> h_tmp, v_tmp, a_tmp, out_tmp;
+
+                auto to_device_if_needed_in = [&](const real_t *src, std::shared_ptr<Buffer<real_t>> &tmp) -> const real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+                        return src; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    buffer_host_to_device((size_t)ndofs * sizeof(real_t), src, tmp->data());
+                    return tmp->data();
+                };
+
+                auto to_device_if_needed_out = [&](real_t *dst, std::shared_ptr<Buffer<real_t>> &tmp) -> real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+                        return dst; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    d_memset(tmp->data(), 0, (size_t)ndofs * sizeof(real_t));
+                    return tmp->data();
+                };
+
+                h_dev   = to_device_if_needed_in(h, h_tmp);
+                v_dev   = to_device_if_needed_in(v, v_tmp);
+                a_dev   = to_device_if_needed_in(a, a_tmp);
+                out_dev = to_device_if_needed_out(out, out_tmp);
+
+                int err = cu_kelvin_voigt_apply(element_type,
+                                                adjugate->n_elements(),
+                                                adjugate->elements()->data(),
+                                                adjugate->n_elements(),  // stride
+                                                adjugate->jacobian_adjugate()->data(),
+                                                adjugate->jacobian_determinant()->data(),
+                                                k,
+                                                K,
+                                                eta,
+                                                rho,
+                                                real_type,
+                                                h_dev,
+                                                v_dev,
+                                                a_dev,
+                                                out_dev,
+                                                stream);
+
+                if (err) return err;
+
+                if (out_tmp) {
+                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
+                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
+                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                        out[i] += tmp_h->data()[i];
+                    }
+                }
+
+                return SFEM_SUCCESS;
+            }
+
+            int value(const real_t *x, real_t *const out) override {
+                SFEM_IMPLEMENT_ME();
+                return SFEM_FAILURE;
+            }
+        };
+
+
     class GPUEMOp : public Op {
     public:
         std::shared_ptr<FunctionSpace>    space;
