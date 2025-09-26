@@ -6,7 +6,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DELETE_LOG="${DELETE_LOG:-0}"
 IS_DEBUG="${IS_DEBUG:-1}"
-BUILD_DIR="${BUILD_DIR:-${REPO_DIR}/build_debug}"
+BUILD_DIR="${BUILD_DIR:-${REPO_DIR}/build_daint_dbg}"
 BIN_NAME="${BIN_NAME:-sfem_NewmarkKVTest}"
 BIN_ARGS="${BIN_ARGS:-}"
 IS_CMAKE_COMPILE_FLAG="${IS_CMAKE_COMPILE_FLAG:-0}"
