@@ -160,18 +160,31 @@ typedef char mask_t;
 
 #if defined(__APPLE__)
   typedef __fp16 half_t;
-#else
+#elif defined(__FLT16_MANT_DIG__)
+
   typedef _Float16 half_t;
+#else
+
+  typedef float half_t;
+  #define SFEM_HALF_FALLBACK_TO_FLOAT 1
 #endif
 
+#if defined(SFEM_HALF_FALLBACK_TO_FLOAT)
+static const float FP16_MAX = 65504.0f;
+#else
 static const half_t FP16_MAX = (half_t)65504.0f;
+#endif
 
 typedef float metric_tensor_t;
 
 typedef int64_t sshex_side_code_t;
 typedef uint16_t block_idx_t;
 typedef float  scaling_t;
+#if defined(SFEM_HALF_FALLBACK_TO_FLOAT)
+typedef float compressed_t;
+#else
 typedef half_t compressed_t;
+#endif
 
 
 #endif  // SFEM_CONFIG_HPP
