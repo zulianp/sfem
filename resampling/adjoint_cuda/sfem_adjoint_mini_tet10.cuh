@@ -6,40 +6,6 @@
 #include "tet10_resample_field.cuh"
 
 ////////////////////////////////////////////////////////////////////////////////
-// Compute matrix J_phys * J_ref = J_tot
-////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
-__device__ __inline__ void                                                         //
-compute_matrix_mult_3x3_gpu(const typename Float3<FloatType>::type* const J_phys,  // Jacobian matrix of the physical tetrahedron
-                            const typename Float3<FloatType>::type* const J_ref,   // Jacobian matrix of the reference tetrahedron
-                            typename Float3<FloatType>::type*             J_tot) {             // Output Jacobian matrix
-    // Row 1
-    J_tot[0].x = fast_fma(J_phys[0].y, J_ref[1].x, J_phys[0].x * J_ref[0].x);
-    J_tot[0].x = fast_fma(J_phys[0].z, J_ref[2].x, J_tot[0].x);
-    J_tot[0].y = fast_fma(J_phys[0].y, J_ref[1].y, J_phys[0].x * J_ref[0].y);
-    J_tot[0].y = fast_fma(J_phys[0].z, J_ref[2].y, J_tot[0].y);
-    J_tot[0].z = fast_fma(J_phys[0].y, J_ref[1].z, J_phys[0].x * J_ref[0].z);
-    J_tot[0].z = fast_fma(J_phys[0].z, J_ref[2].z, J_tot[0].z);
-
-    // Row 2
-    J_tot[1].x = fast_fma(J_phys[1].y, J_ref[1].x, J_phys[1].x * J_ref[0].x);
-    J_tot[1].x = fast_fma(J_phys[1].z, J_ref[2].x, J_tot[1].x);
-    J_tot[1].y = fast_fma(J_phys[1].y, J_ref[1].y, J_phys[1].x * J_ref[0].y);
-    J_tot[1].y = fast_fma(J_phys[1].z, J_ref[2].y, J_tot[1].y);
-    J_tot[1].z = fast_fma(J_phys[1].y, J_ref[1].z, J_phys[1].x * J_ref[0].z);
-    J_tot[1].z = fast_fma(J_phys[1].z, J_ref[2].z, J_tot[1].z);
-
-    // Row 3
-    J_tot[2].x = fast_fma(J_phys[2].y, J_ref[1].x, J_phys[2].x * J_ref[0].x);
-    J_tot[2].x = fast_fma(J_phys[2].z, J_ref[2].x, J_tot[2].x);
-    J_tot[2].y = fast_fma(J_phys[2].y, J_ref[1].y, J_phys[2].x * J_ref[0].y);
-    J_tot[2].y = fast_fma(J_phys[2].z, J_ref[2].y, J_tot[2].y);
-    J_tot[2].z = fast_fma(J_phys[2].y, J_ref[1].z, J_phys[2].x * J_ref[0].z);
-    J_tot[2].z = fast_fma(J_phys[2].z, J_ref[2].z, J_tot[2].z);
-    return;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Compute the physical coordinates of the mini-tetrahedra
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
@@ -165,10 +131,11 @@ tet10_Lagrange_basis_gpu(const FloatType qx, const FloatType qy, const FloatType
 // Compute the values of the tet10 basis functions at the mini-tet points
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ __inline__ void compute_wf_tet10_mini_gpu(const FloatType*                              wf_tet10,  //
-                                                     const typename Float3<FloatType>::type* const J_ref_c,   //
-                                                     const typename Float3<FloatType>::type        b0,        //
-                                                     FloatType*                                    wf_tet10_mini) {
+__device__ __inline__ void                                                         //
+compute_wf_tet10_mini_gpu(const FloatType*                              wf_tet10,  //
+                          const typename Float3<FloatType>::type* const J_ref_c,   //
+                          const typename Float3<FloatType>::type        b0,        //
+                          FloatType*                                    wf_tet10_mini) {
     const FloatType x_unit[10] = {0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.5, 0.0};
     const FloatType y_unit[10] = {0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.5};
     const FloatType z_unit[10] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5};

@@ -286,15 +286,15 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
     const ptrdiff_t n1_local = tet_properties_info.n1_local[element_i];
     const ptrdiff_t n2_local = tet_properties_info.n2_local[element_i];
 
-    if (element_i > 30000 and element_i < 30010)  //
-        printf("Stride local: %ld, %ld, %ld, min_grid_0: %ld, min_grid_1: %ld, min_grid_2: %ld, element_i: %ld \n",
-               stride0_local,
-               stride1_local,
-               stride2_local,
-               min_grid_0,
-               min_grid_1,
-               min_grid_2,
-               (long)element_i);
+    // if (element_i > 30000 and element_i < 30010)  //
+    //     printf("Stride local: %ld, %ld, %ld, min_grid_0: %ld, min_grid_1: %ld, min_grid_2: %ld, element_i: %ld \n",
+    //            stride0_local,
+    //            stride1_local,
+    //            stride2_local,
+    //            min_grid_0,
+    //            min_grid_1,
+    //            min_grid_2,
+    //            (long)element_i);
 
     // printf("Exaedre volume: %e\n", hexahedron_volume);
 
@@ -478,7 +478,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
     const int warps_per_block = blockDim.x / LANES_PER_TILE;
     const int warp_id_abs     = blockIdx.x * warps_per_block + warp_id_loc;
     const int cluster_begin   = start_element + warp_id_abs * tet_cluster_size;
-    const int cluster_end     = cluster_begin + tet_cluster_size;
+    // const int cluster_end     = cluster_begin + tet_cluster_size;
 
     const ptrdiff_t buffer_begin_idx  = tet_id_base * buffer_size;
     FloatType*      buffer_local_data = &(buffer_cluster.buffer[buffer_begin_idx]);
@@ -501,8 +501,10 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
     __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
-    for (int element_i = cluster_begin; element_i < cluster_end; element_i++) {
+    for (int cluster_i = 0; cluster_i < tet_cluster_size; cluster_i++) {
         // Loop over elements in the cluster
+
+        const int element_i = cluster_i + cluster_begin;  // Global element index
 
         for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
             //
@@ -519,15 +521,15 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
             // }
 
             if (i < buffer_size) buffer_local_data[i] = FloatType(0.0);
-            if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
+            // if (i < START_BUFFER_IDX_SIZE) tet_start_buffer_idx[i] = 0;
         }
 
-        __syncthreads();
+        // __syncthreads();
 
-        if (element_i >= end_element) return;  // Out of range /////////////////////////////////////
-
-        if (lane_id == 0) {
-            tet_start_buffer_idx[warp_id_loc] = tet_properties_info.total_size_local[element_i];
+        if (element_i < end_element) {
+            if (lane_id == 0) tet_start_buffer_idx[warp_id_loc] = tet_properties_info.total_size_local[element_i];
+        } else {
+            if (lane_id == 0) tet_start_buffer_idx[warp_id_loc] = 0;
         }
 
         __syncthreads();
@@ -542,6 +544,15 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
         }
 
         __syncthreads();
+
+        if (element_i >= end_element) {
+            // Note: in this if-scope the number of __syncthreads() calls is important to maintain 
+            // the synchronization of the warps in the threading block.
+            // !!!! It must be equal to the number of __syncthreads() calls following this if-scope.
+            __syncthreads();
+            __syncthreads();
+            continue;  // Out of range /////////////////////////////////////
+        }
 
         FloatType* hex_local_buffer = &buffer_local_data[tet_start_buffer_idx[warp_id_loc]];
 

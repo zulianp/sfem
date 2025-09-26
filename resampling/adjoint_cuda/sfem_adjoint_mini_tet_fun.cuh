@@ -193,6 +193,40 @@ __device__ __forceinline__ double fast_abs<double>(double x) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Compute matrix J_phys * J_ref = J_tot
+////////////////////////////////////////////////////////////////////////////////
+template <typename FloatType>
+__device__ __inline__ void                                                         //
+compute_matrix_mult_3x3_gpu(const typename Float3<FloatType>::type* const J_phys,  // Jacobian matrix of the physical tetrahedron
+                            const typename Float3<FloatType>::type* const J_ref,   // Jacobian matrix of the reference tetrahedron
+                            typename Float3<FloatType>::type*             J_tot) {             // Output Jacobian matrix
+    // Row 1
+    J_tot[0].x = fast_fma(J_phys[0].y, J_ref[1].x, J_phys[0].x * J_ref[0].x);
+    J_tot[0].x = fast_fma(J_phys[0].z, J_ref[2].x, J_tot[0].x);
+    J_tot[0].y = fast_fma(J_phys[0].y, J_ref[1].y, J_phys[0].x * J_ref[0].y);
+    J_tot[0].y = fast_fma(J_phys[0].z, J_ref[2].y, J_tot[0].y);
+    J_tot[0].z = fast_fma(J_phys[0].y, J_ref[1].z, J_phys[0].x * J_ref[0].z);
+    J_tot[0].z = fast_fma(J_phys[0].z, J_ref[2].z, J_tot[0].z);
+
+    // Row 2
+    J_tot[1].x = fast_fma(J_phys[1].y, J_ref[1].x, J_phys[1].x * J_ref[0].x);
+    J_tot[1].x = fast_fma(J_phys[1].z, J_ref[2].x, J_tot[1].x);
+    J_tot[1].y = fast_fma(J_phys[1].y, J_ref[1].y, J_phys[1].x * J_ref[0].y);
+    J_tot[1].y = fast_fma(J_phys[1].z, J_ref[2].y, J_tot[1].y);
+    J_tot[1].z = fast_fma(J_phys[1].y, J_ref[1].z, J_phys[1].x * J_ref[0].z);
+    J_tot[1].z = fast_fma(J_phys[1].z, J_ref[2].z, J_tot[1].z);
+
+    // Row 3
+    J_tot[2].x = fast_fma(J_phys[2].y, J_ref[1].x, J_phys[2].x * J_ref[0].x);
+    J_tot[2].x = fast_fma(J_phys[2].z, J_ref[2].x, J_tot[2].x);
+    J_tot[2].y = fast_fma(J_phys[2].y, J_ref[1].y, J_phys[2].x * J_ref[0].y);
+    J_tot[2].y = fast_fma(J_phys[2].z, J_ref[2].y, J_tot[2].y);
+    J_tot[2].z = fast_fma(J_phys[2].y, J_ref[1].z, J_phys[2].x * J_ref[0].z);
+    J_tot[2].z = fast_fma(J_phys[2].z, J_ref[2].z, J_tot[2].z);
+    return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Function to get the Jacobian matrix for a given category
 // get_category_Jacobian
 ////////////////////////////////////////////////////////////////////////////////
