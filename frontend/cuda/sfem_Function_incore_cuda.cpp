@@ -4,16 +4,19 @@
 
 #include "sfem_defs.h"
 #include "sfem_mesh.h"
+#include <cuda_runtime_api.h>
 
 // CPU
 #include "sshex8_laplacian.h"
 
 // GPU
 #include "cu_boundary_condition.h"
+#include "cu_integrate_values.h"
 #include "cu_hex8_adjugate.h"
 #include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
+#include "cu_kelvin_voigt.h"
 #include "cu_mask.h"
 #include "cu_sshex8_elemental_matrix.h"
 #include "cu_sshex8_laplacian.h"
@@ -298,7 +301,119 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_IMPLEMENT_ME();
+            SFEM_TRACE_SCOPE("GPUNeumannConditions::gradient");
+
+            // Prepare points on host (mesh or semi-structured mesh)
+            auto space = this->space;
+            auto mesh  = space->mesh_ptr();
+
+            auto points = mesh->points();
+            if (space->has_semi_structured_mesh()) {
+                points = space->semi_structured_mesh().points();
+            }
+
+            // Ensure output is on device (accumulate back to host if needed)
+            const ptrdiff_t ndofs = space->n_dofs();
+
+            real_t *out_dev = out;
+            std::shared_ptr<Buffer<real_t>> out_tmp;
+            {
+                cudaPointerAttributes attr{};
+                if (!(cudaPointerGetAttributes(&attr, out) == cudaSuccess && attr.type == 2)) {
+                    out_tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    d_memset(out_tmp->data(), 0, (size_t)ndofs * sizeof(real_t));
+                    out_dev = out_tmp->data();
+                }
+            }
+
+            int err = 0;
+
+            // Use host NeumannConditions for host-side data (surface indices and values),
+            // and device-side copies held in this->conditions for GPU kernels
+            const auto &hconds = h_neumann->conditions();
+
+            for (size_t i = 0; i < conditions.size(); ++i) {
+                const auto &hc = hconds[i];
+                const auto &dc = conditions[i];
+
+                const enum ElemType st = hc.element_type;
+                const int           nnxs = elem_num_nodes(st);
+                const int           dim  = mesh->spatial_dimension();
+                const ptrdiff_t     ne   = dc.surface->extent(1);
+
+                if (ne == 0) continue;
+
+                if (st != QUADSHELL4) {
+                    SFEM_ERROR("GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only QUADSHELL4)\n",
+                               type_to_string(st));
+                    return SFEM_FAILURE;
+                }
+
+                // Gather per-element coordinates into SoA layout expected by CUDA kernels:
+                // coords[d][v * ne + e] = points[d][ surface[v][e] ]
+                auto coords_h = sfem::create_host_buffer<geom_t>(dim, ne * nnxs);
+                for (int d = 0; d < dim; ++d) {
+                    const geom_t *const px = points->data()[d];
+                    geom_t *const       cx = coords_h->data()[d];
+
+                    for (ptrdiff_t e = 0; e < ne; ++e) {
+                        for (int v = 0; v < nnxs; ++v) {
+                            const idx_t node = hc.surface->data()[v][e];
+                            cx[v * ne + e] = px[node];
+                        }
+                    }
+                }
+
+                // Move coords to device (only needed if we try GPU path)
+                auto coords_d = sfem::to_device(coords_h);
+
+                // Dispatch to CUDA wrappers
+                if (dc.values) {
+                    // Scale per-element values by -hc.value (GPU wrapper has no scale_factor)
+                    auto scaled = sfem::create_device_buffer<real_t>(ne);
+
+                    // dc.values are already on device
+                    d_copy(ne, dc.values->data(), scaled->data());
+                    d_scal(ne, -hc.value, scaled->data());
+
+                    int gpu_ret = cu_integrate_values(st,
+                                               ne,
+                                               dc.surface->data(),
+                                               (const geom_t **)coords_d->data(),
+                                               SFEM_REAL_DEFAULT,
+                                               (void *)scaled->data(),
+                                               space->block_size(),
+                                               hc.component,
+                                               (void *)out_dev,
+                                               SFEM_DEFAULT_STREAM);
+                    err |= gpu_ret;
+                } else {
+                    // Constant value: pass -hc.value directly
+                    int gpu_ret = cu_integrate_value(st,
+                                              ne,
+                                              dc.surface->data(),
+                                              (const geom_t **)coords_d->data(),
+                                              -hc.value,
+                                              space->block_size(),
+                                              hc.component,
+                                              SFEM_REAL_DEFAULT,
+                                              (void *)out_dev,
+                                              SFEM_DEFAULT_STREAM);
+                    err |= gpu_ret;
+                }
+            }
+
+            if (err) return err;
+
+            // If we created a temporary device output, accumulate back to host
+            if (out_tmp) {
+                auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
+                buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    out[i] += tmp_h->data()[i];
+                }
+            }
+
             return SFEM_SUCCESS;
         }
 
@@ -1360,6 +1475,7 @@ namespace sfem {
         Factory::register_op("ss:gpu:EMOp", &GPUEMOp::create);
         Factory::register_op("ss:gpu:EMWarpOp", &GPUEMWarpOp::create);
         Factory::register_op("gpu:EMOp", &GPUEMOp::create);
+        Factory::register_op("gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
     }
 
 }  // namespace sfem
