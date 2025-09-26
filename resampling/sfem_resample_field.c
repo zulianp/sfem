@@ -2011,10 +2011,10 @@ normalize_field_and_find_min_max(real_t*         field,          // Input/Output
             if (field[i] > max_val) {
                 max_val         = field[i];
                 max_field_index = i;
-                if (field[i] < min_val) {
-                    min_val         = field[i];
-                    min_field_index = i;
-                }
+            }
+            if (field[i] < min_val) {
+                min_val         = field[i];
+                min_field_index = i;
             }
         }
     }
