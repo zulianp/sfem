@@ -545,8 +545,16 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Function::derefine");
         auto ret = std::make_shared<Function>(space);
 
-        for (auto &o : impl_->ops) {
+        for (size_t i = 0; i < impl_->ops.size(); i++) {
+            auto &o = impl_->ops[i];
+            if (o->is_no_op()) {
+                continue;
+            }
             auto dop = o->derefine_op(space);
+            if (!dop) {
+                SFEM_ERROR("derefine_op returned nullptr");
+                return nullptr;
+            }
             if (!dop->is_no_op()) {
                 ret->impl_->ops.push_back(dop);
             }
