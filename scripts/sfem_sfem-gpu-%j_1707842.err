@@ -1,0 +1,78 @@
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In member function 'virtual int sfem::GPUNeumannConditions::gradient(const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:319:17: error: 'cudaPointerAttributes' was not declared in this scope
+  319 |                 cudaPointerAttributes attr{};
+      |                 ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:320:49: error: 'attr' was not declared in this scope
+  320 |                 if (!(cudaPointerGetAttributes(&attr, out) == cudaSuccess && attr.type == 2)) {
+      |                                                 ^~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:320:23: error: 'cudaPointerGetAttributes' was not declared in this scope
+  320 |                 if (!(cudaPointerGetAttributes(&attr, out) == cudaSuccess && attr.type == 2)) {
+      |                       ^~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:320:63: error: 'cudaSuccess' was not declared in this scope
+  320 |                 if (!(cudaPointerGetAttributes(&attr, out) == cudaSuccess && attr.type == 2)) {
+      |                                                               ^~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In lambda function:
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1121:21: error: 'cudaPointerAttributes' was not declared in this scope
+ 1121 |                     cudaPointerAttributes attr{};
+      |                     ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1122:51: error: 'attr' was not declared in this scope
+ 1122 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                                                   ^~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1122:25: error: 'cudaPointerGetAttributes' was not declared in this scope
+ 1122 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1122:65: error: 'cudaSuccess' was not declared in this scope
+ 1122 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                                                                 ^~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In lambda function:
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1131:21: error: 'cudaPointerAttributes' was not declared in this scope
+ 1131 |                     cudaPointerAttributes attr{};
+      |                     ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1132:51: error: 'attr' was not declared in this scope
+ 1132 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                                                   ^~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1132:25: error: 'cudaPointerGetAttributes' was not declared in this scope
+ 1132 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1132:65: error: 'cudaSuccess' was not declared in this scope
+ 1132 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                                                                 ^~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In member function 'virtual int sfem::GPUKelvinVoigtNewmark::gradient(const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1145:27: error: 'cu_kelvin_voigt_apply' was not declared in this scope
+ 1145 |                 int err = cu_kelvin_voigt_apply(element_type,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In lambda function:
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1191:21: error: 'cudaPointerAttributes' was not declared in this scope
+ 1191 |                     cudaPointerAttributes attr{};
+      |                     ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1192:51: error: 'attr' was not declared in this scope
+ 1192 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                                                   ^~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1192:25: error: 'cudaPointerGetAttributes' was not declared in this scope
+ 1192 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1192:65: error: 'cudaSuccess' was not declared in this scope
+ 1192 |                     if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+      |                                                                 ^~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In lambda function:
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1201:21: error: 'cudaPointerAttributes' was not declared in this scope
+ 1201 |                     cudaPointerAttributes attr{};
+      |                     ^~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1202:51: error: 'attr' was not declared in this scope
+ 1202 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                                                   ^~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1202:25: error: 'cudaPointerGetAttributes' was not declared in this scope
+ 1202 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1202:65: error: 'cudaSuccess' was not declared in this scope
+ 1202 |                     if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+      |                                                                 ^~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp: In member function 'virtual int sfem::GPUKelvinVoigtNewmark::apply(const real_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/frontend/cuda/sfem_Function_incore_cuda.cpp:1215:27: error: 'cu_kelvin_voigt_apply' was not declared in this scope
+ 1215 |                 int err = cu_kelvin_voigt_apply(element_type,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+make[2]: *** [CMakeFiles/sfem.dir/build.make:2974: CMakeFiles/sfem.dir/frontend/cuda/sfem_Function_incore_cuda.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:329: CMakeFiles/sfem.dir/all] Error 2
+make: *** [Makefile:146: all] Error 2
+srun: error: nid006553: task 0: Exited with exit code 2
+srun: Terminating StepId=1707842.1

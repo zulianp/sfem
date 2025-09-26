@@ -79,7 +79,8 @@ namespace sfem {
                         paci[v] = (compressed_t)(pai[v] / cs[i]);
 
                         assert(cs[i] > 0);
-                        assert(std::isfinite(paci[v]));
+                        // Avoid _Float16 overload ambiguity on some libstdc++ versions
+                        assert(std::isfinite(static_cast<double>(paci[v])));
                     }
                 }
             }

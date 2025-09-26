@@ -2,10 +2,10 @@
 #SBATCH --account=c40
 #SBATCH --job-name=sfem-gpu-%j
 #SBATCH --partition=debug
-#SBATCH --time=00:01:00
+#SBATCH --time=00:02:00
 #SBATCH -N 1
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-node=1 
 #SBATCH --cpus-per-task=32
 #SBATCH --output=sfem_%x_%j.out
 #SBATCH --error=sfem_%x_%j.err
@@ -13,17 +13,17 @@
 set -euo pipefail
 
 DELETE_LOG="${DELETE_LOG:-0}"
-IS_DEBUG="${IS_DEBUG:-0}"
-BUILD_DIR="${BUILD_DIR:-$HOME/ws/sfem_github/sfem/build_test}"
-BIN_NAME="${BIN_NAME:-sfem_CudaContactTest}"
+IS_DEBUG="${IS_DEBUG:-1}"
+BUILD_DIR="${BUILD_DIR:-$HOME/ws/sfem_github/sfem/build_debug}"
+BIN_NAME="${BIN_NAME:-sfem_NewmarkKVTest}"
 BIN_ARGS="${BIN_ARGS:-}"
-IS_CMAKE_COMPILE_FLAG="${IS_CMAKE_COMPILE_FLAG:-1}"
+IS_CMAKE_COMPILE_FLAG="${IS_CMAKE_COMPILE_FLAG:-0}"
 
 EXEC_SPACE="${EXEC_SPACE:-device}"
 
-if [ "$DELETE_LOG" -eq 1 ]; then
-    rm -f sfem_*.out sfem_*.err
-fi
+# if [ "$DELETE_LOG" -eq 1 ]; then
+#     rm -f sfem_*.out sfem_*.err
+# fi
 
 cd "${BUILD_DIR}"
 
