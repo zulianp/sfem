@@ -225,7 +225,7 @@ namespace sfem {
         }
 
         int hyperelasticity_load_plugins(const std::string &folder) {
-            // TODO: load plugins from folders and make them available as HyperelasticityKernels
+            // TODO: load plugins (shared libraries) from the folder and make them available as HyperelasticityKernels
             return SFEM_FAILURE;
         }
     };
@@ -235,7 +235,10 @@ namespace sfem {
 
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<Hyperelasticity>(space);
-        ret->impl_->hyperelasticity_load_plugins(sfem::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./"));
+        auto plugin_folder = sfem::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./");
+        if(!plugin_folder.empty()) {
+            ret->impl_->hyperelasticity_load_plugins(plugin_folder);
+        }
         return ret;
     }
 
