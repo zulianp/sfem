@@ -254,7 +254,7 @@ set(SFEM_TARGETS sfem)
 
 # Optional generated operator plug-ins (not built by default)
 if(SFEM_ENABLE_CODEGEN)
-    add_subdirectory(operators/generated)
+    # add_subdirectory(operators/generated)
 endif() 
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
