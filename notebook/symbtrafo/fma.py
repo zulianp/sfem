@@ -2,10 +2,10 @@ import sympy as sp
 
 from sympy.printing.c import ccode
 import sympy.codegen.ast as ast
+from sympy.codegen.cfunctions import fma
 
 # Symbols
 a, b, c, d, e, f = sp.symbols("a b c d e f")
-fma = sp.Function("fma")
 
 def _decompose_simple_product(t):
     """Return (x, y) if t is a product of >=2 factors with coeff separated."""
@@ -27,11 +27,13 @@ def _pack_fmas_balanced(terms):
 
     if len(terms) == 2:
         left, right = terms
+         # case: left is product
         xy = _decompose_simple_product(left)
         if xy:
             return fma(xy[0], xy[1], right)
         xy = _decompose_simple_product(right)
         if xy:
+            # case: right is product
             return fma(xy[0], xy[1], left)
         return sp.Add(left, right)
 
@@ -58,6 +60,7 @@ def fma_rewrite(expr):
                 return coeff * _pack_fmas_balanced(list(inside.args))
             else:
                 return coeff * inside
+
 
         # otherwise no common factor
         return _pack_fmas_balanced(list(expr2.args))
@@ -98,13 +101,14 @@ def generate_c_code(expr, result_name="out"):
 # Tests
 # ----------------
 examples = [
+    a + b*c,
     2*a*b + 3*a**2*b*c*(c/b) + a/b/(3*a**2*b*c),
     4*a*b + 6*a*b*d + e,
     3*a*b + c,
     -2*a*b*c + d,
     a*b + c + d*e,
     a*b*(c + d*e)*(a*b + c) + c,
-    a*b*(c + d*e)*(a*b + c) + c
+    a*b*(c + d*e)*(a*b + c) + c + sp.log(c)
 ]
 
 for ex in examples:
@@ -123,9 +127,9 @@ cse_repls, reduced = sp.cse(expr, symbols=sp.numbered_symbols("t"))
 
 lines = []
 for sym, rhs in cse_repls:
-    lines.append(f"double {sym} = {ccode(rhs)};")
+    lines.append(f"double {sym} = {ccode(cleanup(fma_rewrite(rhs)))};")
 
 for r in reduced:
-    lines.append(ccode(r));
+    lines.append(ccode(cleanup(fma_rewrite(r))));
 
 print( "\n".join(lines))
