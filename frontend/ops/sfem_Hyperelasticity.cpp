@@ -89,6 +89,8 @@ namespace sfem {
         }
     };
 
+  
+
     struct HyperelasticityKernels {
         // Function objects for element-wise kernels (optionally bound to material params)
         std::function<int(const enum ElemType,
@@ -205,6 +207,7 @@ namespace sfem {
                           real_t *const)>
                 objective_steps;
         ~HyperelasticityKernels() = default;
+        
     };
 
     class Hyperelasticity::Impl {
@@ -220,6 +223,11 @@ namespace sfem {
         std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) {
             return kernels[domain.element_type];
         }
+
+        int hyperelasticity_load_plugins(const std::string &folder) {
+            // TODO: load plugins from folders and make them available as HyperelasticityKernels
+            return SFEM_FAILURE;
+        }
     };
 
     std::unique_ptr<Op> Hyperelasticity::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -227,6 +235,7 @@ namespace sfem {
 
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<Hyperelasticity>(space);
+        ret->impl_->hyperelasticity_load_plugins(sfem::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./"));
         return ret;
     }
 
