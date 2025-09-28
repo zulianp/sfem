@@ -17,7 +17,7 @@ namespace sfem {
         ~Packed();
         static std::shared_ptr<Packed> create(const std::shared_ptr<Mesh>    &mesh,
                                               const std::vector<std::string> &block_names = {},
-                                              const bool modify_mesh = false);
+                                              const bool                      modify_mesh = false);
 
         void map_to_packed(const real_t *const SFEM_RESTRICT values,
                            real_t *const SFEM_RESTRICT       out_values,
