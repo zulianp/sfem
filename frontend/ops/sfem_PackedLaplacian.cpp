@@ -101,7 +101,7 @@ struct PackedLaplacian {
 
                 real_t *const SFEM_RESTRICT acc = &values[owned_nodes_ptr[p]];
                 for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    // No need for atomic
+                    // No need for atomic there are no collisions
                     acc[k] += out[k];
                     out[k] = 0;  // Clean-up while hot
                 }
