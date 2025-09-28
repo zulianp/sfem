@@ -236,7 +236,7 @@ namespace sfem {
                                 mask_set(node, d_ghost_flag);
                             }
 
-                            d_packed_elements[v][e] = d_ghost_map[node];
+                            d_packed_elements[v][e] = nowned + d_ghost_map[node];
                         }
                     }
                 }
