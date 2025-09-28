@@ -21,9 +21,11 @@
 #include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
+#include <dlfcn.h>
 #include <math.h>
 #include <mpi.h>
 #include <functional>
+#include <vector>
 
 namespace sfem {
 
@@ -89,125 +91,105 @@ namespace sfem {
         }
     };
 
-  
-
     struct HyperelasticityKernels {
-        // Function objects for element-wise kernels (optionally bound to material params)
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const real_t *const,
-                          const count_t *const,
-                          const idx_t *const,
-                          real_t *const)>
-                hessian_aos;
+        virtual int hessian_aos(const ptrdiff_t,
+                                const ptrdiff_t,
+                                idx_t **const,
+                                geom_t **const,
+                                const real_t *const,
+                                const count_t *const,
+                                const idx_t *const,
+                                real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const real_t *const,
-                          real_t *const)>
-                hessian_diag_aos;
+        virtual int hessian_diag_aos(const ptrdiff_t,
+                                     const ptrdiff_t,
+                                     idx_t **const,
+                                     geom_t **const,
+                                     const real_t *const,
+                                     real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const real_t *const,
-                          real_t *const)>
-                gradient_aos;
+        virtual int gradient_aos(const ptrdiff_t,
+                                 const ptrdiff_t,
+                                 idx_t **const,
+                                 geom_t **const,
+                                 const real_t *const,
+                                 real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const real_t *const,
-                          const real_t *const,
-                          real_t *const)>
-                apply_aos;
+        virtual int apply_aos(const ptrdiff_t,
+                              const ptrdiff_t,
+                              idx_t **const,
+                              geom_t **const,
+                              const real_t *const,
+                              const real_t *const,
+                              real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          const metric_tensor_t *const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          const ptrdiff_t,
-                          real_t *const,
-                          real_t *const,
-                          real_t *const)>
-                partial_assembly_apply;
+        virtual int partial_assembly_apply(const ptrdiff_t,
+                                           const ptrdiff_t,
+                                           idx_t **const,
+                                           const metric_tensor_t *const,
+                                           const ptrdiff_t,
+                                           const real_t *const,
+                                           const real_t *const,
+                                           const real_t *const,
+                                           const ptrdiff_t,
+                                           real_t *const,
+                                           real_t *const,
+                                           real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          const compressed_t *const,
-                          const scaling_t *const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          const ptrdiff_t,
-                          real_t *const,
-                          real_t *const,
-                          real_t *const)>
-                compressed_partial_assembly_apply;
+        virtual int compressed_partial_assembly_apply(const ptrdiff_t,
+                                                      const ptrdiff_t,
+                                                      idx_t **const,
+                                                      const compressed_t *const,
+                                                      const scaling_t *const,
+                                                      const ptrdiff_t,
+                                                      const real_t *const,
+                                                      const real_t *const,
+                                                      const real_t *const,
+                                                      const ptrdiff_t,
+                                                      real_t *const,
+                                                      real_t *const,
+                                                      real_t *const) = 0;
 
-        std::function<int(const enum ElemType,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          metric_tensor_t *const)>
-                hessian_partial_assembly;
+        virtual int hessian_partial_assembly(const ptrdiff_t,
+                                             const ptrdiff_t,
+                                             idx_t **const,
+                                             geom_t **const,
+                                             const ptrdiff_t,
+                                             const real_t *const,
+                                             const real_t *const,
+                                             const real_t *const,
+                                             metric_tensor_t *const) = 0;
 
         // Objective and path-evaluated objective (HEX8 specialized forms)
-        std::function<int(const ptrdiff_t,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          const int,
-                          real_t *const)>
-                objective;
+        virtual int objective(const ptrdiff_t,
+                              const ptrdiff_t,
+                              const ptrdiff_t,
+                              idx_t **const,
+                              geom_t **const,
+                              const ptrdiff_t,
+                              const real_t *const,
+                              const real_t *const,
+                              const real_t *const,
+                              const int,
+                              real_t *const) = 0;
 
-        std::function<int(const ptrdiff_t,
-                          const ptrdiff_t,
-                          const ptrdiff_t,
-                          idx_t **const,
-                          geom_t **const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          const ptrdiff_t,
-                          const real_t *const,
-                          const real_t *const,
-                          const real_t *const,
-                          const int,
-                          const real_t *const,
-                          real_t *const)>
-                objective_steps;
-        ~HyperelasticityKernels() = default;
-        
+        virtual int objective_steps(const ptrdiff_t,
+                                    const ptrdiff_t,
+                                    const ptrdiff_t,
+                                    idx_t **const,
+                                    geom_t **const,
+                                    const ptrdiff_t,
+                                    const real_t *const,
+                                    const real_t *const,
+                                    const real_t *const,
+                                    const ptrdiff_t,
+                                    const real_t *const,
+                                    const real_t *const,
+                                    const real_t *const,
+                                    const int,
+                                    const real_t *const,
+                                    real_t *const) = 0;
+        ~HyperelasticityKernels()                  = default;
     };
 
     class Hyperelasticity::Impl {
@@ -219,14 +201,353 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
 
         std::unordered_map<enum ElemType, std::shared_ptr<HyperelasticityKernels>> kernels;
-        
-        std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) {
-            return kernels[domain.element_type];
-        }
+
+        std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) { return kernels[domain.element_type]; }
 
         int hyperelasticity_load_plugins(const std::string &folder) {
-            // TODO: load plugins (shared libraries) from the folder and make them available as HyperelasticityKernels
-            return SFEM_FAILURE;
+            // Load candidate shared libraries from folder (best‑effort),
+            // resolve known hyperelasticity symbols, and bind fast wrappers.
+
+            auto try_open_all = [&](const std::string &dir) -> std::vector<void *> {
+                std::vector<void *> handles;
+                auto                so_files    = sfem::find_files(dir + "/*.so");
+                auto                dylib_files = sfem::find_files(dir + "/*.dylib");
+                so_files.insert(so_files.end(), dylib_files.begin(), dylib_files.end());
+                for (const auto &path : so_files) {
+                    void *h = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+                    if (h) handles.push_back(h);
+                }
+                return handles;
+            };
+
+            auto handles = try_open_all(folder);
+
+            // Helper: resolve symbol from any opened handle
+            auto resolve = [&](const char *sym) -> void * {
+                for (auto *h : handles) {
+                    if (!h) continue;
+                    void *p = dlsym(h, sym);
+                    if (p) return p;
+                }
+                return nullptr;
+            };
+
+            // // Typedefs for underlying C kernels
+            // using hess_aos_fn = int (*)(void *ctx,
+            //                             const enum ElemType,
+            //                             const ptrdiff_t,
+            //                             const ptrdiff_t,
+            //                             idx_t **const,
+            //                             geom_t **const,
+            //                             const real_t,
+            //                             const real_t,
+            //                             const real_t *const,
+            //                             const count_t *const,
+            //                             const idx_t *const,
+            //                             real_t *const);
+
+            // using hess_diag_aos_fn = int (*)(void *ctx,
+            //                                  const enum ElemType,
+            //                                  const ptrdiff_t,
+            //                                  const ptrdiff_t,
+            //                                  idx_t **const,
+            //                                  geom_t **const,
+            //                                  const real_t,
+            //                                  const real_t,
+            //                                  const real_t *const,
+            //                                  real_t *const);
+
+            // using grad_aos_fn = int (*)(void *ctx,
+            //                             const enum ElemType,
+            //                             const ptrdiff_t,
+            //                             const ptrdiff_t,
+            //                             idx_t **const,
+            //                             geom_t **const,
+            //                             const real_t,
+            //                             const real_t,
+            //                             const real_t *const,
+            //                             real_t *const);
+
+            // using apply_aos_fn = int (*)(void *ctx,
+            //                              const enum ElemType,
+            //                              const ptrdiff_t,
+            //                              const ptrdiff_t,
+            //                              idx_t **const,
+            //                              geom_t **const,
+            //                              const real_t,
+            //                              const real_t,
+            //                              const real_t *const,
+            //                              const real_t *const,
+            //                              real_t *const);
+
+            // using hess_pa_fn = int (*)(void *ctx,
+            //                            const enum ElemType,
+            //                            const ptrdiff_t,
+            //                            const ptrdiff_t,
+            //                            idx_t **const,
+            //                            geom_t **const,
+            //                            const real_t,
+            //                            const real_t,
+            //                            const ptrdiff_t,
+            //                            const real_t *const,
+            //                            const real_t *const,
+            //                            const real_t *const,
+            //                            metric_tensor_t *const);
+
+            // using pa_apply_fn = int (*)(void *ctx,
+            //                             const enum ElemType,
+            //                             const ptrdiff_t,
+            //                             const ptrdiff_t,
+            //                             idx_t **const,
+            //                             const metric_tensor_t *const,
+            //                             const ptrdiff_t,
+            //                             const real_t *const,
+            //                             const real_t *const,
+            //                             const real_t *const,
+            //                             const ptrdiff_t,
+            //                             real_t *const,
+            //                             real_t *const,
+            //                             real_t *const);
+
+            // using pa_apply_comp_fn = int (*)(void *ctx,
+            //                                  const enum ElemType,
+            //                                  const ptrdiff_t,
+            //                                  const ptrdiff_t,
+            //                                  idx_t **const,
+            //                                  const compressed_t *const,
+            //                                  const scaling_t *const,
+            //                                  const ptrdiff_t,
+            //                                  const real_t *const,
+            //                                  const real_t *const,
+            //                                  const real_t *const,
+            //                                  const ptrdiff_t,
+            //                                  real_t *const,
+            //                                  real_t *const,
+            //                                  real_t *const);
+
+            // using hex8_obj_fn = int (*)(void *ctx,
+            //                             const ptrdiff_t,
+            //                             const ptrdiff_t,
+            //                             const ptrdiff_t,
+            //                             idx_t **const,
+            //                             geom_t **const,
+            //                             const real_t,
+            //                             const real_t,
+            //                             const ptrdiff_t,
+            //                             const real_t *const,
+            //                             const real_t *const,
+            //                             const real_t *const,
+            //                             const int,
+            //                             real_t *const);
+
+            // using hex8_obj_steps_fn = int (*)(void *ctx,
+            //                                   const ptrdiff_t,
+            //                                   const ptrdiff_t,
+            //                                   const ptrdiff_t,
+            //                                   idx_t **const,
+            //                                   geom_t **const,
+            //                                   const real_t,
+            //                                   const real_t,
+            //                                   const ptrdiff_t,
+            //                                   const real_t *const,
+            //                                   const real_t *const,
+            //                                   const real_t *const,
+            //                                   const ptrdiff_t,
+            //                                   const real_t *const,
+            //                                   const real_t *const,
+            //                                   const real_t *const,
+            //                                   const int,
+            //                                   const real_t *const,
+            //                                   real_t *const);
+
+            // // Resolve (prefer plug-ins; otherwise use built-ins)
+            // auto f_hess_aos = reinterpret_cast<hess_aos_fn>(resolve("neohookean_ogden_hessian_aos"));
+            // if (!f_hess_aos) f_hess_aos = &neohookean_ogden_hessian_aos;
+
+            // auto f_hess_diag_aos = reinterpret_cast<hess_diag_aos_fn>(resolve("neohookean_ogden_diag_aos"));
+            // if (!f_hess_diag_aos) f_hess_diag_aos = &neohookean_ogden_diag_aos;
+
+            // auto f_grad_aos = reinterpret_cast<grad_aos_fn>(resolve("neohookean_ogden_gradient_aos"));
+            // if (!f_grad_aos) f_grad_aos = &neohookean_ogden_gradient_aos;
+
+            // auto f_apply_aos = reinterpret_cast<apply_aos_fn>(resolve("neohookean_ogden_apply_aos"));
+            // if (!f_apply_aos) f_apply_aos = &neohookean_ogden_apply_aos;
+
+            // auto f_hess_pa = reinterpret_cast<hess_pa_fn>(resolve("neohookean_ogden_hessian_partial_assembly"));
+            // if (!f_hess_pa) f_hess_pa = &neohookean_ogden_hessian_partial_assembly;
+
+            // auto f_pa_apply = reinterpret_cast<pa_apply_fn>(resolve("neohookean_ogden_partial_assembly_apply"));
+            // if (!f_pa_apply) f_pa_apply = &neohookean_ogden_partial_assembly_apply;
+
+            // auto f_pa_apply_comp =
+            //         reinterpret_cast<pa_apply_comp_fn>(resolve("neohookean_ogden_compressed_partial_assembly_apply"));
+            // if (!f_pa_apply_comp) f_pa_apply_comp = &neohookean_ogden_compressed_partial_assembly_apply;
+
+            // auto f_hex8_obj = reinterpret_cast<hex8_obj_fn>(resolve("hex8_neohookean_ogden_objective"));
+            // if (!f_hex8_obj) f_hex8_obj = &hex8_neohookean_ogden_objective;
+
+            // auto f_hex8_obj_steps = reinterpret_cast<hex8_obj_steps_fn>(resolve("hex8_neohookean_ogden_objective_steps"));
+            // if (!f_hex8_obj_steps) f_hex8_obj_steps = &hex8_neohookean_ogden_objective_steps;
+
+            // // Bind mu, lambda once (fast path; per-block overrides are not supported here)
+            // // const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+            // // const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+
+            // auto make_common = [&]() {
+            //     auto k = std::make_shared<HyperelasticityKernels>();
+
+            //     k->hessian_aos = [=](const enum ElemType  et,
+            //                          const ptrdiff_t      ne,
+            //                          const ptrdiff_t      nn,
+            //                          idx_t **const        els,
+            //                          geom_t **const       pts,
+            //                          const real_t *const  u,
+            //                          const count_t *const rowptr,
+            //                          const idx_t *const   colidx,
+            //                          real_t *const        values) {
+            //         return f_hess_aos(ctx, et, ne, nn, els, pts, u, rowptr, colidx, values);
+            //     };
+
+            //     k->hessian_diag_aos = [=](const enum ElemType et,
+            //                               const ptrdiff_t     ne,
+            //                               const ptrdiff_t     nn,
+            //                               idx_t **const       els,
+            //                               geom_t **const      pts,
+            //                               const real_t *const u,
+            //                               real_t *const       out) { return f_hess_diag_aos(ctx, et, ne, nn, els, pts, u, out);
+            //                               };
+
+            //     k->gradient_aos = [=](const enum ElemType et,
+            //                           const ptrdiff_t     ne,
+            //                           const ptrdiff_t     nn,
+            //                           idx_t **const       els,
+            //                           geom_t **const      pts,
+            //                           const real_t *const u,
+            //                           real_t *const       out) { return f_grad_aos(ctx, et, ne, nn, els, pts, u, out); };
+
+            //     k->apply_aos = [=](const enum ElemType et,
+            //                        const ptrdiff_t     ne,
+            //                        const ptrdiff_t     nn,
+            //                        idx_t **const       els,
+            //                        geom_t **const      pts,
+            //                        const real_t *const x,
+            //                        const real_t *const h,
+            //                        real_t *const       out) { return f_apply_aos(ctx, et, ne, nn, els, pts, x, h, out); };
+
+            //     k->partial_assembly_apply = [=](const enum ElemType          et,
+            //                                     const ptrdiff_t              ne,
+            //                                     const ptrdiff_t              stride,
+            //                                     idx_t **const                els,
+            //                                     const metric_tensor_t *const partial,
+            //                                     const ptrdiff_t              h_stride,
+            //                                     const real_t *const          hx,
+            //                                     const real_t *const          hy,
+            //                                     const real_t *const          hz,
+            //                                     const ptrdiff_t              out_stride,
+            //                                     real_t *const                outx,
+            //                                     real_t *const                outy,
+            //                                     real_t *const                outz) {
+            //         return f_pa_apply(ctx, et, ne, stride, els, partial, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+            //     };
+
+            //     k->compressed_partial_assembly_apply = [=](const enum ElemType       et,
+            //                                                const ptrdiff_t           ne,
+            //                                                const ptrdiff_t           stride,
+            //                                                idx_t **const             els,
+            //                                                const compressed_t *const partial,
+            //                                                const scaling_t *const    scaling,
+            //                                                const ptrdiff_t           h_stride,
+            //                                                const real_t *const       hx,
+            //                                                const real_t *const       hy,
+            //                                                const real_t *const       hz,
+            //                                                const ptrdiff_t           out_stride,
+            //                                                real_t *const             outx,
+            //                                                real_t *const             outy,
+            //                                                real_t *const             outz) {
+            //         return f_pa_apply_comp(
+            //                 ctx, et, ne, stride, els, partial, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+            //     };
+
+            //     k->hessian_partial_assembly = [=](const enum ElemType    et,
+            //                                       const ptrdiff_t        ne,
+            //                                       const ptrdiff_t        stride,
+            //                                       idx_t **const          els,
+            //                                       geom_t **const         pts,
+            //                                       const ptrdiff_t        u_stride,
+            //                                       const real_t *const    ux,
+            //                                       const real_t *const    uy,
+            //                                       const real_t *const    uz,
+            //                                       metric_tensor_t *const partial) {
+            //         return f_hess_pa(ctx, et, ne, stride, els, pts, u_stride, ux, uy, uz, partial);
+            //     };
+
+            //     return k;
+            // };
+
+            // // Common kernels for all supported element types
+            // auto common_tet4 = make_common();
+            // auto common_hex8 = make_common();
+
+            // // HEX8 objective kernels
+            // common_hex8->objective = [=](const ptrdiff_t     ne,
+            //                              const ptrdiff_t     stride,
+            //                              const ptrdiff_t     nn,
+            //                              idx_t **const       els,
+            //                              geom_t **const      pts,
+            //                              const ptrdiff_t     u_stride,
+            //                              const real_t *const ux,
+            //                              const real_t *const uy,
+            //                              const real_t *const uz,
+            //                              const int           is_element_wise,
+            //                              real_t *const       out) {
+            //     return f_hex8_obj(ctx, ne, stride, nn, els, pts, u_stride, ux, uy, uz, is_element_wise, out);
+            // };
+
+            // common_hex8->objective_steps = [=](const ptrdiff_t     ne,
+            //                                    const ptrdiff_t     stride,
+            //                                    const ptrdiff_t     nn,
+            //                                    idx_t **const       els,
+            //                                    geom_t **const      pts,
+            //                                    const ptrdiff_t     u_stride,
+            //                                    const real_t *const ux,
+            //                                    const real_t *const uy,
+            //                                    const real_t *const uz,
+            //                                    const ptrdiff_t     inc_stride,
+            //                                    const real_t *const incx,
+            //                                    const real_t *const incy,
+            //                                    const real_t *const incz,
+            //                                    const int           nsteps,
+            //                                    const real_t *const steps,
+            //                                    real_t *const       out) {
+            //     return f_hex8_obj_steps(ctx,
+            //                             ne,
+            //                             stride,
+            //                             nn,
+            //                             els,
+            //                             pts,
+            //                             ctx,
+            //                             u_stride,
+            //                             ux,
+            //                             uy,
+            //                             uz,
+            //                             inc_stride,
+            //                             incx,
+            //                             incy,
+            //                             incz,
+            //                             nsteps,
+            //                             steps,
+            //                             out);
+            // };
+
+            // // TET4 has no objective in this fast path
+            // common_tet4->objective       = [](auto...) { return SFEM_FAILURE; };
+            // common_tet4->objective_steps = [](auto...) { return SFEM_FAILURE; };
+
+            // // Register per-element kernels
+            // kernels[TET4] = common_tet4;
+            // kernels[HEX8] = common_hex8;
+
+            return SFEM_SUCCESS;
         }
     };
 
@@ -236,7 +557,7 @@ namespace sfem {
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<Hyperelasticity>(space);
         auto plugin_folder = sfem::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./");
-        if(!plugin_folder.empty()) {
+        if (!plugin_folder.empty()) {
             ret->impl_->hyperelasticity_load_plugins(plugin_folder);
         }
         return ret;
@@ -245,17 +566,16 @@ namespace sfem {
     Hyperelasticity::Hyperelasticity(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>(space)) {}
 
     int Hyperelasticity::hessian_crs(const real_t *const  x,
-                                    const count_t *const rowptr,
-                                    const idx_t *const   colidx,
-                                    real_t *const        values) {
+                                     const count_t *const rowptr,
+                                     const idx_t *const   colidx,
+                                     real_t *const        values) {
         SFEM_TRACE_SCOPE("Hyperelasticity::hessian_crs");
 
         auto mesh  = impl_->space->mesh_ptr();
         auto graph = impl_->space->node_to_node_graph();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
-            return kernels->hessian_aos(domain.element_type,
-                                        domain.block->n_elements(),
+            return kernels->hessian_aos(domain.block->n_elements(),
                                         mesh->n_nodes(),
                                         domain.block->elements()->data(),
                                         mesh->points()->data(),
@@ -272,13 +592,8 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
-            return kernels->hessian_diag_aos(domain.element_type,
-                                     mesh->n_elements(),
-                                     mesh->n_nodes(),
-                                     domain.block->elements()->data(),
-                                     mesh->points()->data(),
-                                     x,
-                                     out);
+            return kernels->hessian_diag_aos(
+                    mesh->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), mesh->points()->data(), x, out);
         });
     }
 
@@ -288,8 +603,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto kernels = impl_->find_kernels(domain);
-            return kernels->gradient_aos(domain.element_type,
-                                         domain.block->n_elements(),
+            return kernels->gradient_aos(domain.block->n_elements(),
                                          mesh->n_nodes(),
                                          domain.block->elements()->data(),
                                          mesh->points()->data(),
@@ -307,8 +621,7 @@ namespace sfem {
             if (ua->partial_assembly_buffer) {
                 if (ua->use_compression) {
                     auto kernels = impl_->find_kernels(domain);
-                    return kernels->compressed_partial_assembly_apply(domain.element_type,
-                                                                      domain.block->n_elements(),
+                    return kernels->compressed_partial_assembly_apply(domain.block->n_elements(),
                                                                       ua->elements_stride,
                                                                       ua->elements->data(),
                                                                       ua->partial_assembly_compressed->data(),
@@ -324,8 +637,7 @@ namespace sfem {
 
                 } else {
                     auto kernels = impl_->find_kernels(domain);
-                    return kernels->partial_assembly_apply(domain.element_type,
-                                                           domain.block->n_elements(),
+                    return kernels->partial_assembly_apply(domain.block->n_elements(),
                                                            ua->elements_stride,
                                                            ua->elements->data(),
                                                            ua->partial_assembly_buffer->data(),
@@ -341,8 +653,7 @@ namespace sfem {
             }
 
             auto kernels = impl_->find_kernels(domain);
-            return kernels->apply_aos(domain.element_type,
-                                      domain.block->n_elements(),
+            return kernels->apply_aos(domain.block->n_elements(),
                                       mesh->n_nodes(),
                                       domain.block->elements()->data(),
                                       mesh->points()->data(),
@@ -396,8 +707,7 @@ namespace sfem {
                             sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
                 }
                 auto kernels = impl_->find_kernels(domain.second);
-                int ok = kernels->hessian_partial_assembly(domain.second.element_type,
-                                                           domain.second.block->n_elements(),
+                int  ok      = kernels->hessian_partial_assembly(domain.second.block->n_elements(),
                                                            assembly_data->elements_stride,
                                                            assembly_data->elements->data(),
                                                            mesh->points()->data(),
@@ -436,10 +746,10 @@ namespace sfem {
     }
 
     int Hyperelasticity::value_steps(const real_t       *x,
-                                    const real_t       *h,
-                                    const int           nsteps,
-                                    const real_t *const steps,
-                                    real_t *const       out) {
+                                     const real_t       *h,
+                                     const int           nsteps,
+                                     const real_t *const steps,
+                                     real_t *const       out) {
         SFEM_TRACE_SCOPE("Hyperelasticity::value_steps");
 
         auto mesh = impl_->space->mesh_ptr();
