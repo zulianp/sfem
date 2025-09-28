@@ -1,6 +1,7 @@
 #include "sfem_PackedLaplacian.hpp"
 #include "sfem_Tracer.hpp"
 
+#include "sfem_Env.hpp"
 #include "sfem_defs.h"
 #include "sfem_logger.h"
 #include "sfem_macros.h"
@@ -13,6 +14,11 @@
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Mesh.hpp"
@@ -23,6 +29,14 @@
 #include "sfem_Parameters.hpp"
 
 using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
+
+// #if defined(__GNUC__) || defined(__clang__)
+// #define SFEM_PREFETCH_R(addr, locality) __builtin_prefetch((addr), 0, (locality))
+// #define SFEM_PREFETCH_W(addr, locality) __builtin_prefetch((addr), 1, (locality))
+// #else
+// #define SFEM_PREFETCH_R(addr, locality)
+// #define SFEM_PREFETCH_W(addr, locality)
+// #endif
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
 struct PackedLaplacian {
@@ -42,7 +56,7 @@ struct PackedLaplacian {
             real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
             real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
 
-#pragma omp for
+#pragma omp for schedule(static)
             for (ptrdiff_t p = 0; p < n_packs; p++) {
                 const ptrdiff_t e_start = p * n_elements_per_pack;
                 const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
@@ -82,12 +96,13 @@ struct PackedLaplacian {
                     }
                 }
 
+                real_t *const SFEM_RESTRICT acc = &values[owned_nodes_ptr[p]];
                 for (ptrdiff_t k = 0; k < n_owned; ++k) {
 #pragma omp atomic update
-                    values[owned_nodes_ptr[p] + k] += out[k];
+                    acc[k] += out[k];
                     out[k] = 0;  // Clean-up while hot
                 }
-                
+
                 for (ptrdiff_t k = 0; k < n_ghost; ++k) {
 #pragma omp atomic update
                     values[ghosts[k]] += g_out[k];

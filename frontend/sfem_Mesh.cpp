@@ -1442,6 +1442,8 @@ namespace sfem {
 
         for (int d = 0; d < dim; d++) {
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                assert(d_node_mapping[i] < n_nodes);
+                assert(d_node_mapping[i] >= 0);
                 new_points[d][d_node_mapping[i]] = points[d][i];
             }
         }
