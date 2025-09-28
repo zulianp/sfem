@@ -24,7 +24,8 @@ HERE=$PWD
 export SFEM_OPERATOR="PackedLaplacian"
 # export SFEM_OPERATOR="Laplacian"
 
-export SFEM_BASE_RESOLUTION=50
+export SFEM_BASE_RESOLUTION=30
+export SFEM_ELEMENTS_PER_PACK=1024
 
 rm -rf output_poisson
 
