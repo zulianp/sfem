@@ -22,8 +22,9 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 HERE=$PWD
 export SFEM_OPERATOR="PackedLaplacian"
+# export SFEM_OPERATOR="Laplacian"
 
-export SFEM_BASE_RESOLUTION=20
+export SFEM_BASE_RESOLUTION=50
 
 rm -rf output_poisson
 

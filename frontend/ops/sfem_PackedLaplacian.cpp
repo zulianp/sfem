@@ -47,8 +47,8 @@ struct PackedLaplacian {
                      pack_idx_t **const SFEM_RESTRICT      elements,
                      const jacobian_t *const SFEM_RESTRICT fff,
                      const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
-                     const ptrdiff_t *const SFEM_RESTRICT  shared_nodes_ptr,
-                     const count_t *const SFEM_RESTRICT    ghost_ptr,
+                     const ptrdiff_t *const SFEM_RESTRICT  n_shared_nodes,
+                     const ptrdiff_t *const SFEM_RESTRICT    ghost_ptr,
                      const idx_t *const SFEM_RESTRICT      ghost_idx,
                      const real_t *const SFEM_RESTRICT     u,
                      real_t *const SFEM_RESTRICT           values) {
@@ -61,12 +61,12 @@ struct PackedLaplacian {
             for (ptrdiff_t p = 0; p < n_packs; p++) {
                 const ptrdiff_t e_start = p * n_elements_per_pack;
                 const ptrdiff_t e_end   = MIN(n_elements, (p + 1) * n_elements_per_pack);
-                const ptrdiff_t n_owned = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
-                const ptrdiff_t n_shared = shared_nodes_ptr[p + 1] - shared_nodes_ptr[p];
+                const ptrdiff_t n_contiguous = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
+                const ptrdiff_t n_shared = n_shared_nodes[p];
                 const ptrdiff_t n_ghost = ghost_ptr[p + 1] - ghost_ptr[p];
-                const ptrdiff_t n_contiguous = n_owned + n_shared;
+                const ptrdiff_t n_owned = n_contiguous - n_shared;
                 const auto      ghosts  = &ghost_idx[ghost_ptr[p]];
-                scalar_t *const g_out   = &out[n_owned + n_shared];
+                scalar_t *const g_out   = &out[n_contiguous];
 
                 memcpy(in, &u[owned_nodes_ptr[p]], n_contiguous * sizeof(real_t));
 
@@ -99,18 +99,17 @@ struct PackedLaplacian {
                     }
                 }
 
-                real_t *const SFEM_RESTRICT owned = &values[owned_nodes_ptr[p]];
+                real_t *const SFEM_RESTRICT acc = &values[owned_nodes_ptr[p]];
                 for (ptrdiff_t k = 0; k < n_owned; ++k) {
                     // No need of atomic
-                    owned[k] += out[k];
+                    acc[k] += out[k];
                     out[k] = 0;  // Clean-up while hot
                 }
 
-                real_t *const SFEM_RESTRICT shared = &owned[n_owned];
-                for (ptrdiff_t k = 0; k < n_shared; ++k) {
+                for (ptrdiff_t k = n_owned; k < n_contiguous; ++k) {
 #pragma omp atomic update
-                    shared[k] += out[n_owned + k];
-                    out[n_owned + k] = 0;  // Clean-up while hot
+                    acc[k] += out[k];
+                    out[k] = 0;  // Clean-up while hot
                 }
 
                 for (ptrdiff_t k = 0; k < n_ghost; ++k) {
@@ -167,8 +166,8 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                   pack_idx_t **const SFEM_RESTRICT      elements,
                                   const jacobian_t *const SFEM_RESTRICT fff,
                                   const ptrdiff_t *const SFEM_RESTRICT  owned_nodes_ptr,
-                                  const ptrdiff_t *const SFEM_RESTRICT  shared_nodes_ptr,
-                                  const count_t *const SFEM_RESTRICT    ghost_ptr,
+                                  const ptrdiff_t *const SFEM_RESTRICT  n_shared_nodes,
+                                  const ptrdiff_t *const SFEM_RESTRICT    ghost_ptr,
                                   const idx_t *const SFEM_RESTRICT      ghost_idx,
                                   const real_t *const SFEM_RESTRICT     u,
                                   real_t *const SFEM_RESTRICT           values) {
@@ -181,7 +180,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                              elements,
                                                                              fff,
                                                                              owned_nodes_ptr,
-                                                                             shared_nodes_ptr,
+                                                                             n_shared_nodes,
                                                                              ghost_ptr,
                                                                              ghost_idx,
                                                                              u,
@@ -194,7 +193,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                              elements,
                                                                              fff,
                                                                              owned_nodes_ptr,
-                                                                             shared_nodes_ptr,
+                                                                             n_shared_nodes,
                                                                              ghost_ptr,
                                                                              ghost_idx,
                                                                              u,
@@ -207,7 +206,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                                elements,
                                                                                fff,
                                                                                owned_nodes_ptr,
-                                                                               shared_nodes_ptr,
+                                                                               n_shared_nodes,
                                                                                ghost_ptr,
                                                                                ghost_idx,
                                                                                u,
@@ -404,7 +403,7 @@ namespace sfem {
             auto b                  = *std::static_pointer_cast<int>(domain.user_data);
             auto elements           = impl_->packed->elements(b);
             auto owned_nodes_ptr    = impl_->packed->owned_nodes_ptr(b);
-            auto shared_nodes_ptr   = impl_->packed->shared_nodes_ptr(b);
+            auto n_shared     = impl_->packed->n_shared(b);
             auto ghost_ptr          = impl_->packed->ghost_ptr(b);
             auto ghost_idx          = impl_->packed->ghost_idx(b);
             auto fff                = impl_->fff[b]->data();
@@ -417,7 +416,7 @@ namespace sfem {
                                                          elements->data(),
                                                          fff,
                                                          owned_nodes_ptr->data(),
-                                                         shared_nodes_ptr->data(),
+                                                         n_shared->data(),
                                                          ghost_ptr->data(),
                                                          ghost_idx->data(),
                                                          h,
