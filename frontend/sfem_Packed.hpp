@@ -33,8 +33,8 @@ namespace sfem {
         std::string                block_name(const int block_idx) const;
         SharedBuffer<pack_idx_t *> elements(const int block_idx) const;
         SharedBuffer<ptrdiff_t>    owned_nodes_ptr(const int block_idx) const;
-        SharedBuffer<ptrdiff_t>    shared_nodes_ptr(const int block_idx) const;
-        SharedBuffer<count_t>      ghost_ptr(const int block_idx) const;
+        SharedBuffer<ptrdiff_t>    n_shared(const int block_idx) const;
+        SharedBuffer<ptrdiff_t>    ghost_ptr(const int block_idx) const;
         SharedBuffer<idx_t>        ghost_idx(const int block_idx) const;
         ptrdiff_t                  n_packs(const int block_idx) const;
         ptrdiff_t                  n_elements_per_pack(const int block_idx) const;
