@@ -54,6 +54,7 @@ set(SFEM_MODULES
     operators/cvfem_tet4
     operators/cvfem_tri3
     operators/edgeshell2
+    operators/generic
     operators/hex8
     operators/hex8/dg
     operators/hierarchical
