@@ -202,9 +202,6 @@ int main(int argc, char *argv[]) {
         }
 
         for (auto &op_desc : ops) {
-            // fflush(stdout);
-            // printf("Processing %s %s\n", op_desc.name.c_str(), op_desc.type.c_str());
-            // fflush(stdout);
             std::shared_ptr<sfem::FunctionSpace> fs;
             if (ssmesh) {
                 fs = sfem::FunctionSpace::create(ssmesh, op_desc.block_size);

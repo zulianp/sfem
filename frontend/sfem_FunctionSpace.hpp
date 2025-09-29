@@ -14,6 +14,7 @@ namespace sfem {
     class FunctionSpace final {
     public:
         using PackedIdxType = uint16_t;
+        // using PackedIdxType = uint8_t;
         using PackedMesh = Packed<PackedIdxType>;
 
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const enum ElemType element_type = INVALID);
