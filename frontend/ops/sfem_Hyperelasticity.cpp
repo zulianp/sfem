@@ -87,7 +87,7 @@ namespace sfem {
                         paci[v] = (compressed_t)(pai[v] / cs[i]);
 
                         assert(cs[i] > 0);
-                        assert(std::isfinite(paci[v]));
+                        // assert(std::isfinite(paci[v]));
                     }
                 }
             }

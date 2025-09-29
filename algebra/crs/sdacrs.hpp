@@ -20,10 +20,10 @@ namespace sfem {
                                          const IDX *const SFEM_RESTRICT cols,
                                          const VAL *const SFEM_RESTRICT vals,
                                          const TOp *const SFEM_RESTRICT x) {
-        TOp                    ret            = 0;
-        static const ptrdiff_t n_blocks       = n / VEC_SIZE;
-        const ptrdiff_t        b_extent       = n_blocks * VEC_SIZE;
-        TOp                    buff[VEC_SIZE] = {0};
+        TOp             ret            = 0;
+        const ptrdiff_t n_blocks       = n / VEC_SIZE;
+        const ptrdiff_t b_extent       = n_blocks * VEC_SIZE;
+        TOp             buff[VEC_SIZE] = {0};
 
         for (ptrdiff_t k = 0; k < b_extent; k += VEC_SIZE) {
 #pragma unroll(VEC_SIZE)
@@ -46,16 +46,15 @@ namespace sfem {
         return ret;
     }
 
-
     template <int VEC_SIZE, typename IDX, typename VAL, typename TOp>
     static SFEM_FORCE_INLINE TOp da_sdot_padded(const ptrdiff_t                n,
-                                             const IDX *const SFEM_RESTRICT cols,
-                                             const VAL *const SFEM_RESTRICT vals,
-                                             const TOp *const SFEM_RESTRICT x) {
-        TOp                    ret            = 0;
-        static const ptrdiff_t n_blocks       = n / VEC_SIZE;
-        const ptrdiff_t        b_extent       = n_blocks * VEC_SIZE;
-        TOp                    buff[VEC_SIZE] = {0};
+                                                const IDX *const SFEM_RESTRICT cols,
+                                                const VAL *const SFEM_RESTRICT vals,
+                                                const TOp *const SFEM_RESTRICT x) {
+        TOp             ret            = 0;
+        const ptrdiff_t n_blocks       = n / VEC_SIZE;
+        const ptrdiff_t b_extent       = n_blocks * VEC_SIZE;
+        TOp             buff[VEC_SIZE] = {0};
 
         for (ptrdiff_t k = 0; k < b_extent; k += VEC_SIZE) {
 #pragma unroll(VEC_SIZE)
@@ -71,7 +70,6 @@ namespace sfem {
         return ret;
     }
 
-
     template <typename R, typename C, typename T, typename S, typename TOp = T>
     class SDACRS : public Operator<TOp> {
     public:
@@ -85,8 +83,8 @@ namespace sfem {
         SharedBuffer<C> offdiag_colidx;
         SharedBuffer<T> offdiag_values;
 
-        static const int VEC_SIZE = 8;
-        static const bool PAD = sizeof(T) != sizeof(double); // Padding for double makes the perf worse
+        static const int  VEC_SIZE = 8;
+        static const bool PAD      = sizeof(T) != sizeof(double);  // Padding for double makes the perf worse
 
         size_t nbytes() const {
             size_t ret = 0;
@@ -173,14 +171,16 @@ namespace sfem {
                                                                     const SharedBuffer<T> &values,
                                                                     const ExecutionSpace   es) {
         assert(es == EXECUTION_SPACE_HOST);
-        using SDACRS_t = SDACRS<R, C, TStorage, S, TOp>;
-        static const bool PAD = SDACRS_t::PAD;
-        static const int VEC_SIZE = SDACRS_t::VEC_SIZE;
+        using SDACRS_t             = SDACRS<R, C, TStorage, S, TOp>;
+        static const bool PAD      = SDACRS_t::PAD;
+        static const int  VEC_SIZE = SDACRS_t::VEC_SIZE;
 
         const auto nrows = rowptr->size() - 1;
 
         auto diag_rowptr = sfem::create_host_buffer<R>(nrows + 1);
         auto off_rowptr  = sfem::create_host_buffer<R>(nrows + 1);
+
+        static_assert(std::is_signed<S>::value, "S must be a signed integer type for local offsets");
 
         static const S ub_span = std::numeric_limits<S>::max();
         static const S lb_span = -std::numeric_limits<S>::max();
@@ -212,7 +212,7 @@ namespace sfem {
                 }
             }
 
-            if(PAD) {
+            if (PAD) {
                 diag_count = (diag_count + VEC_SIZE - 1) / VEC_SIZE * VEC_SIZE;
             }
 
@@ -256,7 +256,7 @@ namespace sfem {
                 }
             }
 
-            if(PAD) {
+            if (PAD) {
                 for (int i = diag_write; i < d_drp[row + 1]; i++) {
                     d_diag_colidx[i] = 0;
                     d_diag_values[i] = 0;
@@ -276,7 +276,7 @@ namespace sfem {
         size_t crs_bytes    = rowptr->nbytes() + colidx->nbytes() + values->nbytes();
         size_t sdacrs_bytes = sdacrs->nbytes();
 
-        if (true) {
+        if (false) {
             printf("CRS KB: %zu\n", crs_bytes / 1024);
             printf("SDACRS KB: %zu\n", sdacrs_bytes / 1024);
             printf("DIAG NNZ: %zu\n", diag_values->size());

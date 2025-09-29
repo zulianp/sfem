@@ -11,6 +11,7 @@
 #include "sfem_Env.hpp"
 #include "sfem_SFC.hpp"
 #include "sfem_P1toP2.hpp"
+#include "sfem_Packed.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -173,18 +174,21 @@ int main(int argc, char *argv[]) {
 
         printf("element_type %s\n", type_to_string(m->element_type()));
 
+        std::vector<OpDesc_t>                     ops;
+        std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
+        std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
+
+        if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
+            ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
+        } else {
+            packed_mesh = sfem::FunctionSpace::PackedMesh::create(m, {}, true);
+        }
+
         double start = MPI_Wtime();
         m->node_to_node_graph();
         double stop = MPI_Wtime();
 
         printf("CRS Graph creation %g [s]\n", (stop - start));
-
-        std::vector<OpDesc_t>                     ops;
-        std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
-
-        if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-            ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
-        }
 
         int dim = m->spatial_dimension();
         add_matrix_free_scalar_ops(m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
@@ -198,9 +202,14 @@ int main(int argc, char *argv[]) {
         }
 
         for (auto &op_desc : ops) {
+            fflush(stdout);
+            printf("Processing %s %s\n", op_desc.name.c_str(), op_desc.type.c_str());
+            fflush(stdout);
             std::shared_ptr<sfem::FunctionSpace> fs;
             if (ssmesh) {
                 fs = sfem::FunctionSpace::create(ssmesh, op_desc.block_size);
+            } else if(packed_mesh) {
+                fs = sfem::FunctionSpace::create(packed_mesh, op_desc.block_size);
             } else {
                 fs = sfem::FunctionSpace::create(m, op_desc.block_size);
             }

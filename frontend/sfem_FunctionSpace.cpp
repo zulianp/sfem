@@ -155,6 +155,19 @@ namespace sfem {
         return ret;
     }
 
+
+    std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<Packed<PackedIdxType>> &mesh, const int block_size) {
+        auto ret                         = std::make_shared<FunctionSpace>();
+        ret->impl_->mesh                 = mesh->mesh();
+        ret->impl_->block_size           = block_size;
+        ret->impl_->packed_mesh = mesh;
+        ret->impl_->nlocal               = mesh->mesh()->n_nodes() * block_size;
+        ret->impl_->nglobal              = ret->impl_->nlocal;
+
+        ret->impl_->element_types.push_back(mesh->mesh()->element_type());
+        return ret;
+    }
+
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)
         : impl_(std::make_unique<Impl>()) {
         impl_->mesh       = mesh;
