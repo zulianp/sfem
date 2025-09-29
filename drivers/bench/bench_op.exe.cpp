@@ -10,6 +10,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
 #include "sfem_SFC.hpp"
+#include "sfem_P1toP2.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -74,6 +75,60 @@ typedef struct OpDesc {
 
 } OpDesc_t;
 
+void add_matrix_free_scalar_ops(enum ElemType                   element_type,
+                                const bool                      semi_structured,
+                                const enum sfem::ExecutionSpace es,
+                                std::vector<OpDesc_t>          &ops) {
+    ops.push_back({.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1});
+
+    if (semi_structured) {
+        ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
+    } else {
+        ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
+    }
+
+    if (element_type == HEX8 && !semi_structured) {
+        ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
+    }
+}
+
+void add_matrix_based_scalar_ops(enum ElemType                   element_type,
+                                 const bool                      semi_structured,
+                                 const enum sfem::ExecutionSpace es,
+                                 std::vector<OpDesc_t>          &ops) {
+    if (!semi_structured) {
+        ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
+    }
+}
+
+void add_matrix_free_vector_ops(const int                       dim,
+                                enum ElemType                   element_type,
+                                const bool                      semi_structured,
+                                const enum sfem::ExecutionSpace es,
+                                std::vector<OpDesc_t>          &ops) {
+    ops.push_back({.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim});
+
+    if ((element_type == TET4 && !semi_structured) || element_type == HEX8) {
+        ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
+    }
+}
+
+void add_matrix_based_vector_ops(const int                       dim,
+                                 enum ElemType                   element_type,
+                                 const bool                      semi_structured,
+                                 const enum sfem::ExecutionSpace es,
+                                 std::vector<OpDesc_t>          &ops) {
+    if(element_type == TET10) return;
+    ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
+
+    if (element_type == HEX8) {
+        ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim});  // FIXME
+    }
+}
+
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
     {
@@ -87,7 +142,7 @@ int main(int argc, char *argv[]) {
         int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
         int SFEM_REPEAT               = sfem::Env::read("SFEM_REPEAT", 5);
 
-        sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
+        auto es = sfem::EXECUTION_SPACE_HOST;
 
         const char *SFEM_EXECUTION_SPACE{nullptr};
         SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
@@ -101,61 +156,45 @@ int main(int argc, char *argv[]) {
         if (!path.empty()) {
             m = sfem::Mesh::create_from_file(comm, path.c_str());
         } else {
-            m = sfem::Mesh::create_hex8_cube(
-                    comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            auto SFEM_ELEM_TYPE = type_from_string(sfem::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
+
+            m = sfem::Mesh::create_cube(
+                    comm, SFEM_ELEM_TYPE, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
         }
 
-        if(sfem::Env::read("SFEM_USE_SFC", false)) {
+        if(sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+            m = sfem::convert_p1_mesh_to_p2(m);
+        }
+
+        if (sfem::Env::read("SFEM_USE_SFC", false)) {
             auto sfc = sfem::SFC::create_from_env();
             sfc->reorder(*m);
         }
 
-        // FIXME tune based on available memory
-        const bool too_large_for_matrix = m->n_nodes() > 10100100;
+        printf("element_type %s\n", type_to_string(m->element_type()));
 
-        int dim = m->spatial_dimension();
+        double start = MPI_Wtime();
+        m->node_to_node_graph();
+        double stop = MPI_Wtime();
 
-        if (!too_large_for_matrix) {
-            double start = MPI_Wtime();
-            m->node_to_node_graph();
-            double stop = MPI_Wtime();
-            std::cout << "CRS Graph creation " << (stop - start) << " [s]\n";
-        }
+        printf("CRS Graph creation %g [s]\n", (stop - start));
 
-        std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
-                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim}});
-
-        if (!too_large_for_matrix) {
-            ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
-        }
-
+        std::vector<OpDesc_t>                     ops;
         std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
+
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
             ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
-
-            ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
-
-        } else {
-            if (!too_large_for_matrix) {
-                ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-                ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
-                ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
-                ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
-            }
-            ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
-            if (m->element_type() == HEX8) {
-                // FIXME
-                ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
-
-                if (!too_large_for_matrix) {
-                    ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim});  // FIXME
-                }
-            }
-            // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
         }
 
-        if ((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
-            ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
+        int dim = m->spatial_dimension();
+        add_matrix_free_scalar_ops(m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+        add_matrix_based_scalar_ops(m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+
+        add_matrix_free_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+
+        // Limited by memory
+        if (m->n_nodes() * dim < 10100100) {
+            add_matrix_based_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         }
 
         for (auto &op_desc : ops) {
