@@ -266,6 +266,8 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
 
     cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
+    cudaStream_t cuda_stream_memset = NULL;  // default stream
+    cudaStreamCreate(&cuda_stream_memset);
 
     tet_properties_info_t<real_t> tet_properties_info;
     tet_properties_info.alloc_async(nelements, cuda_stream_alloc);
@@ -276,6 +278,14 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
     cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
 
+    cudaMemcpyAsync((void*)weighted_field_device,
+                    (void*)weighted_field,
+                    nnodes * sizeof(real_t),
+                    cudaMemcpyHostToDevice,
+                    cuda_stream_alloc);
+
+    cudaMemsetAsync((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_memset);
+
     elems_tet4_device elements_device = make_elems_tet4_device();
     cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
 
@@ -284,19 +294,13 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
 
     cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
 
-    cudaMemcpyAsync((void*)weighted_field_device,
-                    (void*)weighted_field,
-                    nnodes * sizeof(real_t),
-                    cudaMemcpyHostToDevice,
-                    cuda_stream_alloc);
-
-    cudaMemset((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t));
-
     copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
 
     copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
 
     cudaStreamSynchronize(cuda_stream_alloc);
+    cudaStreamSynchronize(cuda_stream_memset);
+    cudaStreamDestroy(cuda_stream_memset);
 
     // Optional: check for errors
     cudaError_t error = cudaGetLastError();
@@ -305,7 +309,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         exit(EXIT_FAILURE);
     }
 
-    const unsigned int tets_per_block    = 16;
+    const unsigned int tets_per_block    = 8;
     cudaStream_t       cuda_stream       = NULL;  // default stream
     cudaStream_t       cuda_stream_clock = NULL;
     cudaStreamCreate(&cuda_stream);
@@ -378,8 +382,10 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     const unsigned int elements_per_block = nelements / 22 + 1;
     const ptrdiff_t    buffer_memory_size = max_total_size_local * tets_per_block;
 
-    buffer_cluster_t<real_t> buffer_cluster;
-    allocate_buffer_cluster(buffer_cluster, (elements_per_block) * (max_total_size_local), cuda_stream_alloc);
+    buffer_cluster_t<real_t> buffer_cluster;                                                            //
+    allocate_buffer_cluster(buffer_cluster,                                                             //
+                            (elements_per_block * max_total_size_local + cluster_size) / cluster_size,  //
+                            cuda_stream_alloc);                                                         //
     // cudaMemset((void*)buffer_cluster.buffer, (-1 * 0x1A7DAF1C), buffer_cluster.size * sizeof(real_t));
 
 #if SFEM_LOG_LEVEL >= 5
@@ -396,7 +402,9 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     cudaStreamSynchronize(cuda_stream_alloc);
 
     {  // BEGIN: Compute local grid sizes for each element
-        const unsigned int threads_per_block = LANES_PER_TILE * tets_per_block;
+        // const unsigned int threads_per_block    = LANES_PER_TILE * tets_per_block;
+        const dim3 threads_per_block_2d = dim3(LANES_PER_TILE, tets_per_block, 1);
+        const int  threads_per_block    = threads_per_block_2d.x * threads_per_block_2d.y;
 
         for (ptrdiff_t start_element_local = start_element;  //
              start_element_local < end_element;              //
@@ -425,7 +433,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
 
             sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu<real_t>  //
                     <<<blocks_per_grid,                                  //
-                       threads_per_block,
+                       threads_per_block_2d,
                        0,
                        cuda_stream>>>(buffer_memory_size,     // Mesh
                                       buffer_cluster,         //
@@ -470,10 +478,11 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         cudaEventElapsedTime(&milliseconds, start_event, stop_event);
 
 #if SFEM_LOG_LEVEL >= 5
-        printf("Cluster Kernel: ================== SFEM Adjoint Mini-Tet Kernel GPU ================\n");
-        printf("Kernel execution time: %f ms\n", milliseconds);
-        printf("Throughput: %e elements/s\n", (float)(end_element - start_element) / (milliseconds / 1000.0f));
-        printf("===================================================================\n");
+        printf("=== Cluster Buffer Kernel: SFEM Adjoint Mini-Tet Kernel GPU ================\n");
+        printf(" File: %s:%d \n", __FILE__, __LINE__);
+        printf(" Kernel execution time: %f ms\n", milliseconds);
+        printf(" Throughput: %e elements/s\n", (float)(end_element - start_element) / (milliseconds / 1000.0f));
+        printf("============================================================================\n");
 
         printf("  Max total_size_local = %lld\n", (long long)max_total_size_local);
         printf("  Max idx global       = %lld\n", (long long)max_idx_global);
@@ -489,6 +498,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         cudaStreamDestroy(cuda_stream_clock);
 
         clear_buffer_cluster_async(buffer_cluster, cuda_stream_alloc);
+        tet_properties_info.free_async(cuda_stream_alloc);
 
         cudaMemcpy((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
 
