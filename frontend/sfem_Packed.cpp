@@ -355,6 +355,12 @@ namespace sfem {
     };
 
     template <typename pack_idx_t>
+    std::shared_ptr<Mesh> Packed<pack_idx_t>::mesh() const
+    {
+        return impl_->mesh;
+    }
+
+    template <typename pack_idx_t>
     ptrdiff_t Packed<pack_idx_t>::n_blocks() const {
         return impl_->blocks.size();
     }

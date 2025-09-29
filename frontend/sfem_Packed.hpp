@@ -15,6 +15,8 @@ namespace sfem {
     public:
         Packed();
         ~Packed();
+
+        std::shared_ptr<Mesh> mesh() const;
         static std::shared_ptr<Packed> create(const std::shared_ptr<Mesh>    &mesh,
                                               const std::vector<std::string> &block_names = {},
                                               const bool                      modify_mesh = false);
