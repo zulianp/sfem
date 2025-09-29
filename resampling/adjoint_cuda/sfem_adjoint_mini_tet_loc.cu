@@ -262,7 +262,20 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                                                           const real_t* const         weighted_field,  // Input weighted field
                                                           const mini_tet_parameters_t mini_tet_parameters,  // Threshold for alpha
                                                           real_t* const               data) {                             //
-                                                                                                            //
+    //
+
+    //// launch clustered kernel ////
+    unsigned int cluster_size_tmp = 16;
+    const char*  env_cluster_size = getenv("SFEM_CLUSTER_SIZE_ADJOINT");
+    if (env_cluster_size) {
+        cluster_size_tmp = atoi(env_cluster_size);
+    }
+
+    unsigned int tets_per_block_tmp = 8;
+    const char*  env_tets_per_block = getenv("SFEM_TET_PER_BLOCK_ADJOINT");
+    if (env_tets_per_block) {
+        tets_per_block_tmp = atoi(env_tets_per_block);
+    }
 
     cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
@@ -309,7 +322,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         exit(EXIT_FAILURE);
     }
 
-    const unsigned int tets_per_block    = 8;
+    const unsigned int tets_per_block    = tets_per_block_tmp;
     cudaStream_t       cuda_stream       = NULL;  // default stream
     cudaStream_t       cuda_stream_clock = NULL;
     cudaStreamCreate(&cuda_stream);
@@ -378,9 +391,10 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     }  // END: Find max and min total_size_local across all elements
 
     //// launch clustered kernel ////
-    const unsigned int cluster_size       = 16;
-    const unsigned int elements_per_block = nelements / 22 + 1;
-    const ptrdiff_t    buffer_memory_size = max_total_size_local * tets_per_block;
+    const unsigned int elements_per_block_approx = 1500000;
+    const unsigned int cluster_size              = cluster_size_tmp;
+    const unsigned int elements_per_block        = elements_per_block_approx;
+    const ptrdiff_t    buffer_memory_size        = max_total_size_local * tets_per_block;
 
     buffer_cluster_t<real_t> buffer_cluster;                                                            //
     allocate_buffer_cluster(buffer_cluster,                                                             //
@@ -482,6 +496,12 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         printf(" File: %s:%d \n", __FILE__, __LINE__);
         printf(" Kernel execution time: %f ms\n", milliseconds);
         printf(" Throughput: %e elements/s\n", (float)(end_element - start_element) / (milliseconds / 1000.0f));
+        printf("<cluster_bench>  %d , %d , %d , %e, %e \n",
+               cluster_size,
+               tets_per_block,
+               (end_element - start_element),
+               (milliseconds * 1.0e-3),
+               (float)(end_element - start_element) / (milliseconds * 1.0e-3));
         printf("============================================================================\n");
 
         printf("  Max total_size_local = %lld\n", (long long)max_total_size_local);
