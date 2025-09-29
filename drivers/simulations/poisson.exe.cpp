@@ -84,6 +84,8 @@ int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_d
 }
 
 int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    SFEM_TRACE_SCOPE("solve_poisson_problem");
+    
     auto es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
     auto SFEM_OPERATOR             = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
     int  SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);

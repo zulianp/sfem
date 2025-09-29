@@ -26,7 +26,7 @@ namespace sfem {
         SharedBuffer<idx_t>     ghost_idx;
 
         size_t nbytes() const {
-            return packed_elements->nbytes() + owned_nodes_ptr->nbytes() + ghost_ptr->nbytes() + ghost_idx->nbytes();
+            return packed_elements->nbytes() + owned_nodes_ptr->nbytes() + ghost_ptr->nbytes() + ghost_idx->nbytes() + n_shared->nbytes();
         }
 
         void print(std::ostream &os = std::cout) const {

@@ -29,7 +29,7 @@ export SFEM_PROMOTE_TO_P2=1
 
 elements_per_pack=(512 1024 2048 4096)
 
-rm bench_*.csv
+rm -f bench_*.csv
 
 for e in ${elements_per_pack[@]}
 do
