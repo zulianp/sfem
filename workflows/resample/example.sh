@@ -99,6 +99,7 @@ LAUNCH="mpiexec -np $n_procs "
 #     --set roofline \
 #     --print-details body \
 #     -f \
+#     --replay-mode application \
 #     --section ComputeWorkloadAnalysis \
 #     --section InstructionStats \
 #     --section SourceCounters \

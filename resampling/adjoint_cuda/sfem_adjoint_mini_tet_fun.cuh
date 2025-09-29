@@ -231,121 +231,10 @@ compute_matrix_mult_3x3_gpu(const typename Float3<FloatType>::type* const J_phys
 // get_category_Jacobian
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ bool get_category_c_Jacobian(const unsigned int category,  //
-                                        const FloatType    L,         //
-                                        FloatType*         Jacobian_c) {      //
-
-    const FloatType invL = FloatType(1.0) / FloatType(L);
-    const FloatType zero = FloatType(0.0);
-
-    switch (category) {
-        case 0:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = invL;
-            Jacobian_c[1] = zero;
-            Jacobian_c[2] = zero;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = zero;
-            Jacobian_c[4] = invL;
-            Jacobian_c[5] = zero;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = zero;
-            Jacobian_c[7] = zero;
-            Jacobian_c[8] = invL;
-            break;
-
-        case 1:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = zero;
-            Jacobian_c[1] = -invL;
-            Jacobian_c[2] = -invL;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = zero;
-            Jacobian_c[4] = invL;
-            Jacobian_c[5] = zero;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = invL;
-            Jacobian_c[7] = invL;
-            Jacobian_c[8] = invL;
-            break;
-
-        case 2:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = -invL;
-            Jacobian_c[1] = zero;
-            Jacobian_c[2] = zero;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = invL;
-            Jacobian_c[4] = zero;
-            Jacobian_c[5] = invL;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = invL;
-            Jacobian_c[7] = invL;
-            Jacobian_c[8] = zero;
-            break;
-
-        case 3:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = -invL;
-            Jacobian_c[1] = -invL;
-            Jacobian_c[2] = -invL;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = zero;
-            Jacobian_c[4] = invL;
-            Jacobian_c[5] = invL;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = invL;
-            Jacobian_c[7] = invL;
-            Jacobian_c[8] = zero;
-            break;
-
-        case 4:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = -invL;
-            Jacobian_c[1] = -invL;
-            Jacobian_c[2] = zero;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = invL;
-            Jacobian_c[4] = invL;
-            Jacobian_c[5] = invL;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = zero;
-            Jacobian_c[7] = invL;
-            Jacobian_c[8] = zero;
-            break;
-
-        case 5:
-            // Row 0: indices 0,1,2
-            Jacobian_c[0] = zero;
-            Jacobian_c[1] = zero;
-            Jacobian_c[2] = -invL;
-            // Row 1: indices 3,4,5
-            Jacobian_c[3] = zero;
-            Jacobian_c[4] = -invL;
-            Jacobian_c[5] = zero;
-            // Row 2: indices 6,7,8
-            Jacobian_c[6] = invL;
-            Jacobian_c[7] = invL;
-            Jacobian_c[8] = invL;
-            break;
-
-        default:
-            __trap();
-            return false;
-            break;
-    }
-
-    return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Function to get the Jacobian matrix for a given category
-// get_category_Jacobian
-////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
-__device__ bool get_category_Jacobian(const unsigned int                category,      //
-                                      const FloatType                   L,             //
-                                      typename Float3<FloatType>::type* Jacobian_c) {  //
+__device__ __forceinline__ bool                                        //
+get_category_Jacobian(const unsigned int                category,      //
+                      const FloatType                   L,             //
+                      typename Float3<FloatType>::type* Jacobian_c) {  //
 
     const FloatType invL = FloatType(1.0) / L;
     const FloatType zero = FloatType(0.0);
@@ -401,54 +290,7 @@ __device__ bool get_category_Jacobian(const unsigned int                category
 // make_Jocobian_matrix_tet_cu
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ FloatType                                 //
-make_Jacobian_matrix_tet_c_gpu(const FloatType fx0,  // Tetrahedron vertices X-coordinates
-                               const FloatType fx1,  //
-                               const FloatType fx2,  //
-                               const FloatType fx3,  //
-                               const FloatType fy0,  // Tetrahedron vertices Y-coordinates
-                               const FloatType fy1,  //
-                               const FloatType fy2,  //
-                               const FloatType fy3,  //
-                               const FloatType fz0,  // Tetrahedron vertices Z-coordinates
-                               const FloatType fz1,  //
-                               const FloatType fz2,  //
-                               const FloatType fz3,
-                               FloatType*      J) {  // Jacobian matrix
-    // Compute the Jacobian matrix for tetrahedron transformation
-    // J = [x1-x0, x2-x0, x3-x0]   <- Row 0: indices 0,1,2
-    //     [y1-y0, y2-y0, y3-y0]   <- Row 1: indices 3,4,5
-    //     [z1-z0, z2-z0, z3-z0]   <- Row 2: indices 6,7,8
-
-    // Row 0: x-components (indices 0,1,2)
-    J[0] = fx1 - fx0;  // dx/dxi
-    J[1] = fx2 - fx0;  // dx/deta
-    J[2] = fx3 - fx0;  // dx/dzeta
-
-    // Row 1: y-components (indices 3,4,5)
-    J[3] = fy1 - fy0;  // dy/dxi
-    J[4] = fy2 - fy0;  // dy/deta
-    J[5] = fy3 - fy0;  // dy/dzeta
-
-    // Row 2: z-components (indices 6,7,8)
-    J[6] = fz1 - fz0;  // dz/dxi
-    J[7] = fz2 - fz0;  // dz/deta
-    J[8] = fz3 - fz0;  // dz/dzeta
-
-    // Compute determinant of the 3x3 Jacobian matrix
-    const FloatType det = J[0] * (J[4] * J[8] - J[5] * J[7]) -  //
-                          J[1] * (J[3] * J[8] - J[5] * J[6]) +  //
-                          J[2] * (J[3] * J[7] - J[4] * J[6]);   //
-
-    return det;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Function to compute the Jacobian matrix and its determinant for a tetrahedron
-// make_Jocobian_matrix_tet_cu
-////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
-__device__ FloatType                                                 //
+__device__ __forceinline__ FloatType                                 //
 make_Jacobian_matrix_tet_gpu(const FloatType                   fx0,  // Tetrahedron vertices X-coordinates
                              const FloatType                   fx1,  //
                              const FloatType                   fx2,  //
@@ -511,7 +353,7 @@ hex_aa_8_eval_fun_T_gpu(const FloatType x,   // Local coordinates (in the unit c
 // Function to collect the indices of the 8 vertices of a hexahedron
 // hex_aa_8_collect_coeffs_indices_cu
 ////////////////////////////////////////////////////////////////////////////////
-__device__ __inline__ void                                    //
+__device__ __forceinline__ void                               //
 hex_aa_8_collect_coeffs_indices_gpu(const ptrdiff_t stride0,  // Stride
                                     const ptrdiff_t stride1,  //
                                     const ptrdiff_t stride2,  //
@@ -527,21 +369,25 @@ hex_aa_8_collect_coeffs_indices_gpu(const ptrdiff_t stride0,  // Stride
                                     ptrdiff_t&      i6,       //
                                     ptrdiff_t&      i7) {          //
 
+    const ptrdiff_t i_plus_1 = i + 1;
+    const ptrdiff_t j_plus_1 = j + 1;
+    const ptrdiff_t k_plus_1 = k + 1;
+
     i0 = i * stride0 + j * stride1 + k * stride2;
-    i1 = (i + 1) * stride0 + j * stride1 + k * stride2;
-    i2 = (i + 1) * stride0 + (j + 1) * stride1 + k * stride2;
-    i3 = i * stride0 + (j + 1) * stride1 + k * stride2;
-    i4 = i * stride0 + j * stride1 + (k + 1) * stride2;
-    i5 = (i + 1) * stride0 + j * stride1 + (k + 1) * stride2;
-    i6 = (i + 1) * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
-    i7 = i * stride0 + (j + 1) * stride1 + (k + 1) * stride2;
+    i1 = i_plus_1 * stride0 + j * stride1 + k * stride2;
+    i2 = i_plus_1 * stride0 + j_plus_1 * stride1 + k * stride2;
+    i3 = i * stride0 + j_plus_1 * stride1 + k * stride2;
+    i4 = i * stride0 + j * stride1 + k_plus_1 * stride2;
+    i5 = i_plus_1 * stride0 + j * stride1 + k_plus_1 * stride2;
+    i6 = i_plus_1 * stride0 + j_plus_1 * stride1 + k_plus_1 * stride2;
+    i7 = i * stride0 + j_plus_1 * stride1 + k_plus_1 * stride2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Function to compute the distance between two points in 3D space
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ FloatType                       //
+__device__ __forceinline__ FloatType       //
 points_distance_gpu(const FloatType x0,    //
                     const FloatType y0,    //
                     const FloatType z0,    //
@@ -562,7 +408,7 @@ points_distance_gpu(const FloatType x0,    //
 // Function to compute the maximum edge length of a tetrahedron
 ////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ FloatType                                     //
+__device__ __forceinline__ FloatType                     //
 tet_edge_max_length_gpu(const FloatType  v0x,            //
                         const FloatType  v0y,            //
                         const FloatType  v0z,            //
@@ -636,7 +482,7 @@ tet_edge_max_length_gpu(const FloatType  v0x,            //
 // Function to map alpha to HYTEG refinement level
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType>
-__device__ int                                                    //
+__device__ __forceinline__ int                                    //
 alpha_to_hyteg_level_gpu(const FloatType    alpha,                //
                          const FloatType    alpha_min_threshold,  //
                          const FloatType    alpha_max_threshold,  //

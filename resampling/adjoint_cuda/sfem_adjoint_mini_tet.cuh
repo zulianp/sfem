@@ -720,10 +720,10 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                                                          data,
                                                                          size_hex_domain);
                 }
-            }
-        }
+            }  // END for (int i = 0; i < nodes_per_side - 1 - j; ++i)
+        }  // END for (int j = 0; j < nodes_per_side - 1; ++j)
         // Ik = Ik + Nl;
-    }
+    }  // END for (int k = 0; k <= L; ++k)
 }  // END: main_tet_loop_gpu
 
 ////////////////////////////////////////////////////////////////////////////////

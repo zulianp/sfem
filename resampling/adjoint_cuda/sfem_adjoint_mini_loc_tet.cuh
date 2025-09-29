@@ -472,12 +472,15 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                                                     const tet_properties_info_t<FloatType> tet_properties_info,  //
                                                     FloatType* const                       data) {                                     //
 
-    const int tet_id_base     = blockIdx.x;
-    const int warp_id_loc     = threadIdx.x / LANES_PER_TILE;
-    const int lane_id         = threadIdx.x % LANES_PER_TILE;
-    const int warps_per_block = blockDim.x / LANES_PER_TILE;
-    const int warp_id_abs     = blockIdx.x * warps_per_block + warp_id_loc;
-    const int cluster_begin   = start_element + warp_id_abs * tet_cluster_size;
+    const int tet_id_base      = blockIdx.x;
+    const int warp_id_loc      = threadIdx.y;
+    const int lane_id          = threadIdx.x % LANES_PER_TILE;
+    const int warps_per_block  = blockDim.y;
+    const int warp_id_abs      = blockIdx.x * warps_per_block + warp_id_loc;
+    const int cluster_begin    = start_element + warp_id_abs * tet_cluster_size;
+    const int thread_index_loc = threadIdx.x + threadIdx.y * LANES_PER_TILE;
+    const int block_total_dim  = blockDim.x * blockDim.y;
+
     // const int cluster_end     = cluster_begin + tet_cluster_size;
 
     const ptrdiff_t buffer_begin_idx  = tet_id_base * buffer_size;
@@ -506,7 +509,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
         const int element_i = cluster_i + cluster_begin;  // Global element index
 
-        for (int i = threadIdx.x; i < buffer_size; i += blockDim.x) {
+        for (int i = thread_index_loc; i < buffer_size; i += block_total_dim) {
             //
             // if (i + tet_id_base * buffer_size > buffer_cluster.size) {
             //     printf("Err: overflow i = %d, tet_id_base = %d, "
@@ -546,7 +549,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
         __syncthreads();
 
         if (element_i >= end_element) {
-            // Note: in this if-scope the number of __syncthreads() calls is important to maintain 
+            // Note: in this if-scope the number of __syncthreads() calls is important to maintain
             // the synchronization of the warps in the threading block.
             // !!!! It must be equal to the number of __syncthreads() calls following this if-scope.
             __syncthreads();
@@ -738,6 +741,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
                 {
                     // // Atomic add to global memory
                     atomicAdd(&data[g_index], hex_local_buffer_value);
+                    // data[g_index] += hex_local_buffer_value;
                 }
             }
         }

@@ -441,7 +441,7 @@ real_t mesh_fun_chainsaw_x(real_t x, real_t y, real_t z) {
 }
 
 real_t mesh_fun_chainsaw_xyz(real_t x, real_t y, real_t z) {
-    const real_t period = 0.2;
+    const real_t period = 0.15;
     const real_t amp    = 1.0;
     const real_t xyz    = (copysign(1, x) * copysign(1, y) * copysign(1, z)) * sqrt(x * x + y * y + z * z);
 
@@ -770,7 +770,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_lin_hs_y,        //
+                              mesh_fun_chainsaw_xyz,        //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;

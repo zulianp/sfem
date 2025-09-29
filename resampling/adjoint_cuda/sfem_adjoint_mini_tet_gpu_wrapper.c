@@ -21,36 +21,44 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
 #define TEST_KERNEL_MODEL 3
 
+    int         repetitions = 1;
+    const char* env_reps    = getenv("SFEM_REPETITIONS_ADJOINT");
+    if (env_reps) {
+        repetitions = atoi(env_reps);
+    }
+
+    for (int i = 0; i < repetitions; i++) {
 #if TEST_KERNEL_MODEL == 0
-    call_sfem_adjoint_mini_tet_kernel_gpu(
+        call_sfem_adjoint_mini_tet_kernel_gpu(
 #elif TEST_KERNEL_MODEL == 1
-    call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(
+        call_sfem_adjoint_mini_tet_shared_info_kernel_gpu(
 #elif TEST_KERNEL_MODEL == 2
-    call_sfem_adjoint_mini_tet_cluster_kernel_gpu(
+        call_sfem_adjoint_mini_tet_cluster_kernel_gpu(
 #elif TEST_KERNEL_MODEL == 3
-    call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(
+        call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(
 #endif
-            start_element,                  // Mesh
-            end_element,                    //
-            (end_element - start_element),  // nelements
-            nnodes,                         //
-            elems,                          //
-            xyz,                            //
-            n[0],                           // SDF
-            n[1],                           //
-            n[2],                           //
-            stride[0],                      // Stride
-            stride[1],                      //
-            stride[2],                      //
-            origin[0],                      // Origin
-            origin[1],                      //
-            origin[2],                      //
-            delta[0],                       // Delta
-            delta[1],                       //
-            delta[2],                       //
-            weighted_field,                 // Input weighted field
-            mini_tet_parameters,            // Threshold for alpha
-            data);                          //
+                start_element,                  // Mesh
+                end_element,                    //
+                (end_element - start_element),  // nelements
+                nnodes,                         //
+                elems,                          //
+                xyz,                            //
+                n[0],                           // SDF
+                n[1],                           //
+                n[2],                           //
+                stride[0],                      // Stride
+                stride[1],                      //
+                stride[2],                      //
+                origin[0],                      // Origin
+                origin[1],                      //
+                origin[2],                      //
+                delta[0],                       // Delta
+                delta[1],                       //
+                delta[2],                       //
+                weighted_field,                 // Input weighted field
+                mini_tet_parameters,            // Threshold for alpha
+                data);                          //
+    }
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
 }
