@@ -15,7 +15,7 @@ rm -f "$output_file"
 echo "cluster_size,tet_per_block,nelements,closk,Throughtput" > "$output_file"
 
 cluster_size_list=(1 4 8 12 16 24 32 48 64 96 128 192 256)
-tets_per_block_list=(4 6 8 12 16 24 32)
+tets_per_block_list=(4 6 8 12 16)
 
 # cluster_size_list=(1 4 8)
 # tets_per_block_list=(4 6)
