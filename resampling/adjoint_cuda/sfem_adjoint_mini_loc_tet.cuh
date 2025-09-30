@@ -6,6 +6,8 @@
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
+#define COLLECT_L_DATA
+
 template <typename FloatType>
 class tet_properties_info_t {
 public:
@@ -23,6 +25,10 @@ public:
     ptrdiff_t* n0_local = nullptr;
     ptrdiff_t* n1_local = nullptr;
     ptrdiff_t* n2_local = nullptr;
+
+#ifdef COLLECT_L_DATA
+    ptrdiff_t* level_L = nullptr;  // refinement level L for each tet
+#endif
 
     // Host-side meta
     size_t count = 0;
@@ -62,6 +68,10 @@ public:
         if ((err = cudaMallocAsync((void**)&n1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
         if ((err = cudaMallocAsync((void**)&n2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
 
+#ifdef COLLECT_L_DATA
+        if ((err = cudaMallocAsync((void**)&level_L, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
+#endif
+
         return cudaSuccess;
     }
 
@@ -85,6 +95,10 @@ public:
         free_if(n1_local);
         free_if(n2_local);
 
+#ifdef COLLECT_L_DATA
+        free_if(level_L);
+#endif
+
         reset();
         // Optionally, user can cudaStreamSynchronize(stream) after this
         return cudaSuccess;
@@ -96,6 +110,10 @@ private:
         total_size_local                     = nullptr;
         stride0_local = stride1_local = stride2_local = nullptr;
         n0_local = n1_local = n2_local = nullptr;
+
+#ifdef COLLECT_L_DATA
+        level_L = nullptr;
+#endif
 
         count = 0;
     }
@@ -194,6 +212,42 @@ sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_elem
     tet_properties_info.stride0_local[element_i] = 1;
     tet_properties_info.stride1_local[element_i] = sizen_0;
     tet_properties_info.stride2_local[element_i] = sizen_0 * sizen_1;
+
+#ifdef COLLECT_L_DATA
+    // Compute the maximum edge length and the corresponding alpha
+    FloatType edges_length[6];
+    int       vertex_a = -1;
+    int       vertex_b = -1;
+
+    const FloatType d_min = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+
+    const FloatType max_edges_length =                         //
+            tet_edge_max_length_gpu<FloatType>(x0_n,           //
+                                               y0_n,           //
+                                               z0_n,           //
+                                               x1_n,           //
+                                               y1_n,           //
+                                               z1_n,           //
+                                               x2_n,           //
+                                               y2_n,           //
+                                               z2_n,           //
+                                               x3_n,           //
+                                               y3_n,           //
+                                               z3_n,           //
+                                               &vertex_a,      // Output
+                                               &vertex_b,      // Output
+                                               edges_length);  // Output
+
+    const FloatType alpha_tet = max_edges_length / d_min;
+
+    const int L = alpha_to_hyteg_level_gpu(alpha_tet,                                        //
+                                           FloatType(ADJOINT_MINI_TET_ALPHA_MIN_THRESHOLD),  //
+                                           FloatType(ADJOINT_MINI_TET_ALPHA_MAX_THRESHOLD),  //
+                                           ADJOINT_MINI_TET_MIN_REFINEMENT_L,                //
+                                           ADJOINT_MINI_TET_MAX_REFINEMENT_L);               //
+
+    tet_properties_info.level_L[element_i] = L;
+#endif  // COLLECT_L_DATA
 }
 
 /////////////////////////////////////////////////////////////////////////////////
