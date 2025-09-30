@@ -1,0 +1,1870 @@
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c: In function 'read_boundary_conditions':
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:49:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   49 |         const char *pch = strtok(sets, splitter);
+      |                                  ^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/base/./sfem_defs.h:7,
+                 from /users/hyang/ws/sfem_github/sfem/mesh/./sfem_mesh.h:5,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.h:8,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:1:
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:75:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   75 |         const char *pch = strtok(values, splitter);
+      |                                  ^~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:119:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  119 |         const char *pch = strtok(components, splitter);
+      |                                  ^~~~~~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c: In function 'hex_aa_8_eval_weno4_3D_Unit':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c:646:9: note: '#pragma message: WENO_DIRECT'
+  646 | #pragma message "WENO_DIRECT"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_V.c:13:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:849:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_adjoint_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1448:31: warning: passing argument 7 of 'apply_inv_lumped_mass' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1448 |                               g);               //
+      |                               ^
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:13:
+/users/hyang/ws/sfem_github/sfem/operators/./mass.h:33:42: note: expected 'real_t * const' {aka 'double * const'} but argument is of type 'const real_t *' {aka 'const double *'}
+   33 |                            real_t *const values);
+      |                            ~~~~~~~~~~~~~~^~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1474:9: note: '#pragma message: ATTENTIN Using TEST_REFINE_ADJOINT for TET10'
+ 1474 | #pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1606:41: warning: passing argument 1 of 'perform_exchange_operations' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1606 |             perform_exchange_operations(mesh,                                   //
+      |                                         ^~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1027:37: note: expected 'mesh_t *' but argument is of type 'const mesh_t *'
+ 1027 | perform_exchange_operations(mesh_t* mesh,         //
+      |                             ~~~~~~~~^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:12:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:316: warning: "ZEROS_VEC" redefined
+  316 | #define ZEROS_VEC \
+      | 
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:65: note: this is the location of the previous definition
+   65 | #define ZEROS_VEC \
+      | 
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.h:10,
+                 from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:1:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c: In function 'hex_aa_8_collect_coeffs_O3_ptr_vec':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:274:30: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  274 |         first_ptrs_array[ii] = &data[first_indices[ii]];
+      |                              ^
+ptxas info    : 0 bytes gmem
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z20cu_mask_nodes_kernellPKiiiPi' for 'sm_90'
+ptxas info    : Function properties for _Z20cu_mask_nodes_kernellPKiiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z33cu_displace_surface_points_kernelilPKiPPfPKdS2_' for 'sm_90'
+ptxas info    : Function properties for _Z33cu_displace_surface_points_kernelilPKiPPfPKdS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z25cu_displace_points_kernelilPKiPPfPKdS2_' for 'sm_90'
+ptxas info    : Function properties for _Z25cu_displace_points_kernelilPKiPPfPKdS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'cu_crs_constraint_nodes_to_identity_vec_kernel' for 'sm_90'
+ptxas info    : Function properties for cu_crs_constraint_nodes_to_identity_vec_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function 'constraint_gradient_nodes_to_value_vec_kernel' for 'sm_90'
+ptxas info    : Function properties for constraint_gradient_nodes_to_value_vec_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function 'constraint_nodes_to_values_vec_kernel' for 'sm_90'
+ptxas info    : Function properties for constraint_nodes_to_values_vec_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function 'constraint_nodes_to_value_vec_kernel' for 'sm_90'
+ptxas info    : Function properties for constraint_nodes_to_value_vec_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function 'constraint_nodes_copy_vec_kernel' for 'sm_90'
+ptxas info    : Function properties for constraint_nodes_copy_vec_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z30obstacle_contact_stress_kernelilPKiPPdPKdS4_S1_' for 'sm_90'
+ptxas info    : Function properties for _Z30obstacle_contact_stress_kernelilPKiPPdPKdS4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 44 registers
+ptxas info    : Compiling entry function '_Z38obstacle_hessian_block_diag_sym_kernelilPKiPPdPKdS4_S1_' for 'sm_90'
+ptxas info    : Function properties for _Z38obstacle_hessian_block_diag_sym_kernelilPKiPPdPKdS4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_Z41obstacle_distribute_contact_forces_kernelilPKiPPdPKdS4_S1_' for 'sm_90'
+ptxas info    : Function properties for _Z41obstacle_distribute_contact_forces_kernelilPKiPPdPKdS4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z30obstacle_normal_project_kernelilPKiPPdPKdS1_' for 'sm_90'
+ptxas info    : Function properties for _Z30obstacle_normal_project_kernelilPKiPPdPKdS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : 237 bytes gmem
+ptxas info    : Compiling entry function '_ZN4sfem8private_10sbv3_applyIfddEEvlPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_10sbv3_applyIfddEEvlPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_21sbv3_sym_diag_to_diagIdfEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_21sbv3_sym_diag_to_diagIdfEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_25sbv3_add_sym_diag_to_diagIdfEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_25sbv3_add_sym_diag_to_diagIdfEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIddfEEvlPKiPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIddfEEvlPKiPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_26inverse3_inplace_apply_AoSIfEEvlPT_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_26inverse3_inplace_apply_AoSIfEEvlPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_11mask3_applyIfEEvlPKiPT_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_11mask3_applyIfEEvlPKiPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_10sbv3_applyIfffEEvlPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_10sbv3_applyIfffEEvlPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_21sbv3_sym_diag_to_diagIffEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_21sbv3_sym_diag_to_diagIffEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_25sbv3_add_sym_diag_to_diagIffEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_25sbv3_add_sym_diag_to_diagIffEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIfffEEvlPKiPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIfffEEvlPKiPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_26inverse3_inplace_apply_AoSIdEEvlPT_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_26inverse3_inplace_apply_AoSIdEEvlPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_11mask3_applyIdEEvlPKiPT_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_11mask3_applyIdEEvlPKiPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_10sbv3_applyIdddEEvlPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_10sbv3_applyIdddEEvlPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_21sbv3_sym_diag_to_diagIddEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_21sbv3_sym_diag_to_diagIddEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_25sbv3_add_sym_diag_to_diagIddEEvlPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_25sbv3_add_sym_diag_to_diagIddEEvlPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIdddEEvlPKiPKT_PKT0_PT1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem8private_32sbv3_add_sparse_sym_diag_to_diagIdddEEvlPKiPKT_PKT0_PT1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : 135 bytes gmem
+ptxas info    : Compiling entry function '_ZN4sfem16sbv_mult3_kernelIdEEvlPKiPKT_S5_S5_PS3_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem16sbv_mult3_kernelIdEEvlPKiPKT_S5_S5_PS3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers
+ptxas info    : Compiling entry function '_ZN4sfem16sbv_mult3_kernelIfEEvlPKiPKT_S5_S5_PS3_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem16sbv_mult3_kernelIfEEvlPKiPKT_S5_S5_PS3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z14tvalues_kernelIfEvlT_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z14tvalues_kernelIfEvlT_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers
+ptxas info    : Compiling entry function '_Z17reciprocal_kernelIfEvlT_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z17reciprocal_kernelIfEvlT_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers
+ptxas info    : Compiling entry function '_Z13txypaz_kernelIfEvlPKT_S2_S0_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z13txypaz_kernelIfEvlPKT_S2_S0_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers
+ptxas info    : Compiling entry function '_Z14tvalues_kernelIdEvlT_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z14tvalues_kernelIdEvlT_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers
+ptxas info    : Compiling entry function '_Z17reciprocal_kernelIdEvlT_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z17reciprocal_kernelIdEvlT_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z13txypaz_kernelIdEvlPKT_S2_S0_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z13txypaz_kernelIdEvlPKT_S2_S0_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_Z4tdivIdEvlPKT_S2_PS0_' for 'sm_90'
+ptxas info    : Function properties for _Z4tdivIdEvlPKT_S2_PS0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 29 registers
+ptxas info    : 201 bytes gmem
+ptxas info    : Compiling entry function '_ZN4sfem19calc_J_pen_p_kernelIdEEvlPKT_S1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19calc_J_pen_p_kernelIdEEvlPKT_S1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 41 registers
+ptxas info    : Compiling entry function '_ZN4sfem19calc_J_pen_m_kernelIdEEvlPKT_S1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19calc_J_pen_m_kernelIdEEvlPKT_S1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 41 registers
+ptxas info    : Compiling entry function '_ZN4sfem20update_lagr_m_kernelIdEEvlT_PKS1_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20update_lagr_m_kernelIdEEvlT_PKS1_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN4sfem20update_lagr_p_kernelIdEEvlT_PKS1_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20update_lagr_p_kernelIdEEvlT_PKS1_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN4sfem13ramp_m_kernelIdEEvlT_PKS1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem13ramp_m_kernelIdEEvlT_PKS1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 41 registers
+ptxas info    : Compiling entry function '_ZN4sfem13ramp_p_kernelIdEEvlT_PKS1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem13ramp_p_kernelIdEEvlT_PKS1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 41 registers
+ptxas info    : Compiling entry function '_ZN4sfem21sq_norm_ramp_m_kernelIdEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem21sq_norm_ramp_m_kernelIdEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem21sq_norm_ramp_p_kernelIdEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem21sq_norm_ramp_p_kernelIdEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem19calc_J_pen_p_kernelIfEEvlPKT_S1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19calc_J_pen_p_kernelIfEEvlPKT_S1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_ZN4sfem19calc_J_pen_m_kernelIfEEvlPKT_S1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19calc_J_pen_m_kernelIfEEvlPKT_S1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_ZN4sfem20update_lagr_m_kernelIfEEvlT_PKS1_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20update_lagr_m_kernelIfEEvlT_PKS1_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers
+ptxas info    : Compiling entry function '_ZN4sfem20update_lagr_p_kernelIfEEvlT_PKS1_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20update_lagr_p_kernelIfEEvlT_PKS1_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers
+ptxas info    : Compiling entry function '_ZN4sfem13ramp_m_kernelIfEEvlT_PKS1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem13ramp_m_kernelIfEEvlT_PKS1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 29 registers
+ptxas info    : Compiling entry function '_ZN4sfem13ramp_p_kernelIfEEvlT_PKS1_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem13ramp_p_kernelIfEEvlT_PKS1_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 29 registers
+ptxas info    : Compiling entry function '_ZN4sfem21sq_norm_ramp_m_kernelIfEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem21sq_norm_ramp_m_kernelIfEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem21sq_norm_ramp_p_kernelIfEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem21sq_norm_ramp_p_kernelIfEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, 32 bytes smem
+/users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt_inline.hpp(359): warning #20058-D: the #pragma unroll must precede a loop
+  #pragma unroll
+          ^
+          detected during:
+            instantiation of "void cu_affine_hex8_kelvin_voigt_apply_kernel(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, T, T, T, T, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *) [with T=real_t]" at line 209 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+            instantiation of "int cu_affine_hex8_kelvin_voigt_apply_tpl(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, real_t, real_t, real_t, real_t, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *, void *) [with T=real_t]" at line 267 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/operators/macro_tet4/cuda/cu_macro_tet4_linear_elasticity.cu(19): warning #177-D: function "adjugate_and_det_micro_kernel" was declared but never referenced
+  static inline __attribute__((device)) __attribute__((host)) void adjugate_and_det_micro_kernel(const geom_t px0,
+                                                                   ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 542 bytes gmem
+ptxas info    : Compiling entry function '_ZN4sfem19max_alpha_lb_kernelIdEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19max_alpha_lb_kernelIdEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem19max_alpha_ub_kernelIdEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19max_alpha_ub_kernelIdEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem22max_alpha_lb_ub_kernelIdEEvlPKT_S3_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem22max_alpha_lb_ub_kernelIdEEvlPKT_S3_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 47 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem23free_gradient_lb_kernelIdEEvlPKT_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem23free_gradient_lb_kernelIdEEvlPKT_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem23free_gradient_ub_kernelIdEEvlPKT_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem23free_gradient_ub_kernelIdEEvlPKT_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem26free_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26free_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers
+ptxas info    : Compiling entry function '_ZN4sfem26chopped_gradient_lb_kernelIdEEvlPKT_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26chopped_gradient_lb_kernelIdEEvlPKT_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem26chopped_gradient_ub_kernelIdEEvlPKT_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26chopped_gradient_ub_kernelIdEEvlPKT_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem29chopped_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem29chopped_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_ZN4sfem24norm_gradients_lb_kernelIdEEvlPKT_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem24norm_gradients_lb_kernelIdEEvlPKT_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem24norm_gradients_ub_kernelIdEEvlPKT_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem24norm_gradients_ub_kernelIdEEvlPKT_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem27norm_gradients_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem27norm_gradients_lb_ub_kernelIdEEvlPKT_S3_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem33norm_projected_gradient_lb_kernelIdEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem33norm_projected_gradient_lb_kernelIdEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem33norm_projected_gradient_ub_kernelIdEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem33norm_projected_gradient_ub_kernelIdEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem36norm_projected_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem36norm_projected_gradient_lb_ub_kernelIdEEvlPKT_S3_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 64 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem17project_lb_kernelIdEEvlPKT_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem17project_lb_kernelIdEEvlPKT_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN4sfem17project_ub_kernelIdEEvlPKT_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem17project_ub_kernelIdEEvlPKT_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN4sfem20project_lb_ub_kernelIdEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20project_lb_ub_kernelIdEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers
+ptxas info    : Compiling entry function '_ZN4sfem19max_alpha_lb_kernelIfEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19max_alpha_lb_kernelIfEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem19max_alpha_ub_kernelIfEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem19max_alpha_ub_kernelIfEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem22max_alpha_lb_ub_kernelIfEEvlPKT_S3_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem22max_alpha_lb_ub_kernelIfEEvlPKT_S3_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem23free_gradient_lb_kernelIfEEvlPKT_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem23free_gradient_lb_kernelIfEEvlPKT_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem23free_gradient_ub_kernelIfEEvlPKT_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem23free_gradient_ub_kernelIfEEvlPKT_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem26free_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26free_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem26chopped_gradient_lb_kernelIfEEvlPKT_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26chopped_gradient_lb_kernelIfEEvlPKT_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem26chopped_gradient_ub_kernelIfEEvlPKT_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem26chopped_gradient_ub_kernelIfEEvlPKT_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN4sfem29chopped_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem29chopped_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN4sfem24norm_gradients_lb_kernelIfEEvlPKT_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem24norm_gradients_lb_kernelIfEEvlPKT_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem24norm_gradients_ub_kernelIfEEvlPKT_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem24norm_gradients_ub_kernelIfEEvlPKT_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem27norm_gradients_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_S4_S1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem27norm_gradients_lb_ub_kernelIfEEvlPKT_S3_S3_S3_PS1_S4_S1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem33norm_projected_gradient_lb_kernelIfEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem33norm_projected_gradient_lb_kernelIfEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem33norm_projected_gradient_ub_kernelIfEEvlPKT_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem33norm_projected_gradient_ub_kernelIfEEvlPKT_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem36norm_projected_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_S1_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem36norm_projected_gradient_lb_ub_kernelIfEEvlPKT_S3_S3_S3_S1_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, 32 bytes smem
+ptxas info    : Compiling entry function '_ZN4sfem17project_lb_kernelIfEEvlPKT_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem17project_lb_kernelIfEEvlPKT_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers
+ptxas info    : Compiling entry function '_ZN4sfem17project_ub_kernelIfEEvlPKT_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem17project_ub_kernelIfEEvlPKT_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers
+ptxas info    : Compiling entry function '_ZN4sfem20project_lb_ub_kernelIfEEvlPKT_S3_PS1_' for 'sm_90'
+ptxas info    : Function properties for _ZN4sfem20project_lb_ub_kernelIfEEvlPKT_S3_PS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers
+ptxas info    : 1157 bytes gmem
+ptxas info    : Compiling entry function '_Z53cu_macrotet4_to_tet4_restriction_element_based_kernelIffEvlPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_macrotet4_to_tet4_restriction_element_based_kernelIffEvlPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers
+ptxas info    : Compiling entry function '_Z53cu_macrotet4_to_tet4_restriction_element_based_kernelIddEvlPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_macrotet4_to_tet4_restriction_element_based_kernelIddEvlPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 100 registers
+ptxas info    : Compiling entry function '_Z54cu_macrotet4_to_tet4_prolongation_element_based_kernelIffEvlPPiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z54cu_macrotet4_to_tet4_prolongation_element_based_kernelIffEvlPPiilPKT_lPT0_
+    48 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 74 registers, 48 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z54cu_macrotet4_to_tet4_prolongation_element_based_kernelIddEvlPPiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z54cu_macrotet4_to_tet4_prolongation_element_based_kernelIddEvlPPiilPKT_lPT0_
+    48 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 74 registers, 48 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z39cu_macrotet4_to_tet4_restriction_kernelIffEvlPKiS1_S1_iPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_macrotet4_to_tet4_restriction_kernelIffEvlPKiS1_S1_iPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z39cu_macrotet4_to_tet4_restriction_kernelIddEvlPKiS1_S1_iPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_macrotet4_to_tet4_restriction_kernelIddEvlPKiS1_S1_iPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z40cu_tet4_to_macrotet4_prolongation_kernelIffEvlPKiS1_S1_iPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _Z40cu_tet4_to_macrotet4_prolongation_kernelIffEvlPKiS1_S1_iPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z40cu_tet4_to_macrotet4_prolongation_kernelIddEvlPKiS1_S1_iPKT_PT0_' for 'sm_90'
+ptxas info    : Function properties for _Z40cu_tet4_to_macrotet4_prolongation_kernelIddEvlPKiS1_S1_iPKT_PT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas warning : Registers are spilled to local memory in function '_Z44cu_affine_hex8_laplacian_apply_taylor_kernelIfEvlPPilPKfPKT_PS4_', 8 bytes spill stores, 8 bytes spill loads
+ptxas warning : Registers are spilled to local memory in function '_Z44cu_affine_hex8_laplacian_apply_taylor_kernelIdEvlPPilPKfPKT_PS4_', 8 bytes spill stores, 8 bytes spill loads
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z37cu_quadshell4_integrate_values_kernelIfEvlPPilPPKfPKT_iiPS5_' for 'sm_90'
+ptxas info    : Function properties for _Z37cu_quadshell4_integrate_values_kernelIfEvlPPilPPKfPKT_iiPS5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_Z37cu_quadshell4_integrate_values_kernelIdEvlPPilPPKfPKT_iiPS5_' for 'sm_90'
+ptxas info    : Function properties for _Z37cu_quadshell4_integrate_values_kernelIdEvlPPilPPKfPKT_iiPS5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers
+ptxas info    : Compiling entry function '_Z36cu_quadshell4_integrate_value_kernelIfEvlPPilPPKfdiiPT_' for 'sm_90'
+ptxas info    : Function properties for _Z36cu_quadshell4_integrate_value_kernelIfEvlPPilPPKfdiiPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_Z36cu_quadshell4_integrate_value_kernelIdEvlPPilPPKfdiiPT_' for 'sm_90'
+ptxas info    : Function properties for _Z36cu_quadshell4_integrate_value_kernelIdEvlPPilPPKfdiiPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z44cu_macro_tet4_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_macro_tet4_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 251 registers
+ptxas info    : Compiling entry function '_Z44cu_macro_tet4_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_macro_tet4_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 252 registers
+ptxas info    : Compiling entry function '_Z43cu_macro_tet4_linear_elasticity_diag_kernellPPilPKfS2_ddPd' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_macro_tet4_linear_elasticity_diag_kernellPPilPKfS2_ddPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers
+ptxas info    : 414 bytes gmem
+ptxas info    : Compiling entry function '_Z39cu_affine_hex8_laplacian_crs_sym_kernelIfEvlPPilPKfPKiS5_PT_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_affine_hex8_laplacian_crs_sym_kernelIfEvlPPilPKfPKiS5_PT_S7_
+    320 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 136 registers, 320 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z39cu_affine_hex8_laplacian_crs_sym_kernelIdEvlPPilPKfPKiS5_PT_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_affine_hex8_laplacian_crs_sym_kernelIdEvlPPilPKfPKiS5_PT_S7_
+    576 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, 576 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z44cu_affine_hex8_laplacian_apply_taylor_kernelIfEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_hex8_laplacian_apply_taylor_kernelIfEvlPPilPKfPKT_PS4_
+    8 bytes stack frame, 8 bytes spill stores, 8 bytes spill loads
+ptxas info    : Used 254 registers, 8 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z44cu_affine_hex8_laplacian_apply_taylor_kernelIdEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_hex8_laplacian_apply_taylor_kernelIdEvlPPilPKfPKT_PS4_
+    8 bytes stack frame, 8 bytes spill stores, 8 bytes spill loads
+ptxas info    : Used 254 registers, 8 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z37cu_affine_hex8_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z37cu_affine_hex8_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 118 registers
+ptxas info    : Compiling entry function '_Z37cu_affine_hex8_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z37cu_affine_hex8_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 116 registers
+ptxas info    : Compiling entry function '_Z43cu_affine_hex8_laplacian_apply_tiled_kernelIfLi128EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_affine_hex8_laplacian_apply_tiled_kernelIfLi128EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 47 registers
+ptxas info    : Compiling entry function '_Z43cu_affine_hex8_laplacian_apply_tiled_kernelIdLi128EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_affine_hex8_laplacian_apply_tiled_kernelIdLi128EEvlPPilPKfPKT_PS4_
+    48 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 45 registers, 48 bytes cumulative stack size
+ptxas warning : Registers are spilled to local memory in function '_Z40cu_affine_hex8_kelvin_voigt_apply_kernelIfEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_', 212 bytes spill stores, 236 bytes spill loads
+ptxas warning : Registers are spilled to local memory in function '_Z40cu_affine_hex8_kelvin_voigt_apply_kernelIdEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_', 808 bytes spill stores, 1192 bytes spill loads
+ptxas info    : 1917 bytes gmem
+ptxas info    : Compiling entry function '_Z40cu_affine_hex8_kelvin_voigt_apply_kernelIfEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z40cu_affine_hex8_kelvin_voigt_apply_kernelIfEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_
+    200 bytes stack frame, 212 bytes spill stores, 236 bytes spill loads
+ptxas info    : Used 255 registers, 200 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z40cu_affine_hex8_kelvin_voigt_apply_kernelIdEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z40cu_affine_hex8_kelvin_voigt_apply_kernelIdEvlPPilPKfS3_T_S4_S4_S4_lPKS4_S6_S6_S6_S6_S6_S6_S6_S6_lPS4_S7_S7_
+    792 bytes stack frame, 808 bytes spill stores, 1192 bytes spill loads
+ptxas info    : Used 255 registers, 792 bytes cumulative stack size
+ptxas warning : Registers are spilled to local memory in function '_Z45cu_affine_hex8_linear_elasticity_apply_kernelIdEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_', 244 bytes spill stores, 392 bytes spill loads
+ptxas info    : 1810 bytes gmem
+ptxas info    : Compiling entry function '_Z54cu_affine_hex8_linear_elasticity_block_diag_sym_kernelIfEvlPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z54cu_affine_hex8_linear_elasticity_block_diag_sym_kernelIfEvlPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers
+ptxas info    : Compiling entry function '_Z54cu_affine_hex8_linear_elasticity_block_diag_sym_kernelIdEvlPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z54cu_affine_hex8_linear_elasticity_block_diag_sym_kernelIdEvlPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers
+ptxas info    : Compiling entry function '_Z43cu_affine_hex8_linear_elasticity_bsr_kernelIfEvlPPilPKfS3_T_S4_PKiS6_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_affine_hex8_linear_elasticity_bsr_kernelIfEvlPPilPKfS3_T_S4_PKiS6_PS4_
+    64 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 152 registers, 64 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z43cu_affine_hex8_linear_elasticity_bsr_kernelIdEvlPPilPKfS3_T_S4_PKiS6_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_affine_hex8_linear_elasticity_bsr_kernelIdEvlPPilPKfS3_T_S4_PKiS6_PS4_
+    64 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 209 registers, 64 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z45cu_affine_hex8_linear_elasticity_apply_kernelIfEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z45cu_affine_hex8_linear_elasticity_apply_kernelIfEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 239 registers
+ptxas info    : Compiling entry function '_Z45cu_affine_hex8_linear_elasticity_apply_kernelIdEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z45cu_affine_hex8_linear_elasticity_apply_kernelIdEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    232 bytes stack frame, 244 bytes spill stores, 392 bytes spill loads
+ptxas info    : Used 255 registers, 232 bytes cumulative stack size
+ptxas info    : 568 bytes gmem
+ptxas info    : Compiling entry function '_Z38cu_affine_sshex8_laplacian_diag_kernelIfEvilPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_affine_sshex8_laplacian_diag_kernelIfEvilPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 90 registers
+ptxas info    : Compiling entry function '_Z38cu_affine_sshex8_laplacian_diag_kernelIdEvilPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_affine_sshex8_laplacian_diag_kernelIdEvilPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 98 registers
+/users/hyang/ws/sfem_github/sfem/operators/sshex8/cuda/cu_sshex8_linear_elasticity.cu(507): warning #177-D: function "cu_sshex8_is_interior" was declared but never referenced
+  static __attribute__((device)) inline bool cu_sshex8_is_interior(const int level, const int xi, const int yi, const int zi) {
+                                             ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z31cu_tet10_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z31cu_tet10_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 124 registers
+ptxas info    : Compiling entry function '_Z31cu_tet10_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z31cu_tet10_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 124 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z32cu_sstet4_laplacian_apply_kernelIfEvillPKfPKT_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z32cu_sstet4_laplacian_apply_kernelIfEvillPKfPKT_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 93 registers
+ptxas info    : Compiling entry function '_Z32cu_sstet4_laplacian_apply_kernelIdEvillPKfPKT_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z32cu_sstet4_laplacian_apply_kernelIdEvillPKfPKT_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers
+ptxas info    : 1834 bytes gmem
+ptxas info    : Compiling entry function '_Z27cu_sshex8_prolongate_kernelIffEvliiPPiiiS1_i8RealTypelPKT_S2_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z27cu_sshex8_prolongate_kernelIffEvliiPPiiiS1_i8RealTypelPKT_S2_lPT0_
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 113 registers, 32 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z27cu_sshex8_prolongate_kernelIddEvliiPPiiiS1_i8RealTypelPKT_S2_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z27cu_sshex8_prolongate_kernelIddEvliiPPiiiS1_i8RealTypelPKT_S2_lPT0_
+    64 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 122 registers, 64 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z25cu_sshex8_restrict_kernelIffEvliiPPiPKtiiS1_PKT0_i8RealTypelPKT_S7_lPS4_' for 'sm_90'
+ptxas info    : Function properties for _Z25cu_sshex8_restrict_kernelIffEvliiPPiPKtiiS1_PKT0_i8RealTypelPKT_S7_lPS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 154 registers
+ptxas info    : Compiling entry function '_Z25cu_sshex8_restrict_kernelIddEvliiPPiPKtiiS1_PKT0_i8RealTypelPKT_S7_lPS4_' for 'sm_90'
+ptxas info    : Function properties for _Z25cu_sshex8_restrict_kernelIddEvliiPPiPKtiiS1_PKT0_i8RealTypelPKT_S7_lPS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 170 registers
+ptxas info    : Compiling entry function '_Z41cu_sshex8_hierarchical_restriction_kernelIffEvilPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z41cu_sshex8_hierarchical_restriction_kernelIffEvilPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers
+ptxas info    : Compiling entry function '_Z41cu_sshex8_hierarchical_restriction_kernelIddEvilPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z41cu_sshex8_hierarchical_restriction_kernelIddEvilPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers
+ptxas info    : Compiling entry function '_Z42cu_sshex8_hierarchical_prolongation_kernelIffEvilPPiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z42cu_sshex8_hierarchical_prolongation_kernelIffEvilPPiilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 114 registers
+ptxas info    : Compiling entry function '_Z42cu_sshex8_hierarchical_prolongation_kernelIddEvilPPiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z42cu_sshex8_hierarchical_prolongation_kernelIddEvilPPiilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z38cu_tet10_linear_elasticity_diag_kernelIfEvlPPilPKfS3_ddlPT_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_tet10_linear_elasticity_diag_kernelIfEvlPPilPKfS3_ddlPT_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 200 registers
+ptxas info    : Compiling entry function '_Z38cu_tet10_linear_elasticity_diag_kernelIdEvlPPilPKfS3_ddlPT_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_tet10_linear_elasticity_diag_kernelIdEvlPPilPKfS3_ddlPT_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 200 registers
+ptxas info    : Compiling entry function '_Z39cu_tet10_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_tet10_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 254 registers
+ptxas info    : Compiling entry function '_Z39cu_tet10_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_tet10_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 239 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : 2137 bytes gmem
+ptxas info    : Compiling entry function '_Z28cu_ssquad4_prolongate_kernelIffEvlliiPiiiS0_ilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z28cu_ssquad4_prolongate_kernelIffEvlliiPiiiS0_ilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers
+ptxas info    : Compiling entry function '_Z28cu_ssquad4_prolongate_kernelIddEvlliiPiiiS0_ilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z28cu_ssquad4_prolongate_kernelIddEvlliiPiiiS0_ilPKT_lPT0_
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 32 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z26cu_ssquad4_restrict_kernelIffEvliiPPiPKtiiS1_PKT0_ilPKT_lPS4_' for 'sm_90'
+ptxas info    : Function properties for _Z26cu_ssquad4_restrict_kernelIffEvliiPPiPKtiiS1_PKT0_ilPKT_lPS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 112 registers
+ptxas info    : Compiling entry function '_Z26cu_ssquad4_restrict_kernelIddEvliiPPiPKtiiS1_PKT0_ilPKT_lPS4_' for 'sm_90'
+ptxas info    : Function properties for _Z26cu_ssquad4_restrict_kernelIddEvliiPPiPKtiiS1_PKT0_ilPKT_lPS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers
+ptxas info    : Compiling entry function '_Z46cu_ssquad4_hierarchical_restriction_SoA_kernelIffEvilPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_ssquad4_hierarchical_restriction_SoA_kernelIffEvilPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 66 registers
+ptxas info    : Compiling entry function '_Z46cu_ssquad4_hierarchical_restriction_SoA_kernelIddEvilPPiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_ssquad4_hierarchical_restriction_SoA_kernelIddEvilPPiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 74 registers
+ptxas info    : Compiling entry function '_Z42cu_ssquad4_hierarchical_restriction_kernelIffEvillPKiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z42cu_ssquad4_hierarchical_restriction_kernelIffEvillPKiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 82 registers
+ptxas info    : Compiling entry function '_Z42cu_ssquad4_hierarchical_restriction_kernelIddEvillPKiPKtilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z42cu_ssquad4_hierarchical_restriction_kernelIddEvillPKiPKtilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 82 registers
+ptxas info    : Compiling entry function '_Z43cu_ssquad4_hierarchical_prolongation_kernelIffEvillPKiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_ssquad4_hierarchical_prolongation_kernelIffEvillPKiilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 98 registers
+ptxas info    : Compiling entry function '_Z43cu_ssquad4_hierarchical_prolongation_kernelIddEvillPKiilPKT_lPT0_' for 'sm_90'
+ptxas info    : Function properties for _Z43cu_ssquad4_hierarchical_prolongation_kernelIddEvillPKiilPKT_lPT0_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers
+ptxas info    : 0 bytes gmem
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z38cu_tet4_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_tet4_linear_elasticity_apply_kernelIfEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 94 registers
+ptxas info    : Compiling entry function '_Z38cu_tet4_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z38cu_tet4_linear_elasticity_apply_kernelIdEvlPPilPKfS3_ddlPKT_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 104 registers
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 787 bytes gmem
+ptxas info    : Compiling entry function '_Z28cu_tet4_laplacian_crs_kernelIfEvlPPilPKfPKiS5_PT_' for 'sm_90'
+ptxas info    : Function properties for _Z28cu_tet4_laplacian_crs_kernelIfEvlPPilPKfPKiS5_PT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers
+ptxas info    : Compiling entry function '_Z28cu_tet4_laplacian_crs_kernelIdEvlPPilPKfPKiS5_PT_' for 'sm_90'
+ptxas info    : Function properties for _Z28cu_tet4_laplacian_crs_kernelIdEvlPPilPKfPKiS5_PT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 90 registers
+ptxas info    : Compiling entry function '_Z29cu_tet4_laplacian_diag_kernelIfEvlPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z29cu_tet4_laplacian_diag_kernelIfEvlPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers
+ptxas info    : Compiling entry function '_Z29cu_tet4_laplacian_diag_kernelIdEvlPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z29cu_tet4_laplacian_diag_kernelIdEvlPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 58 registers
+ptxas info    : Compiling entry function '_Z30cu_tet4_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z30cu_tet4_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers
+ptxas info    : Compiling entry function '_Z30cu_tet4_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z30cu_tet4_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 0 bytes gmem
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu: In function 'cudaError_t copy_elems_tet10_managed(ptrdiff_t, elems_tet10_device*, const idx_t**)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu:103:1: warning: control reaches end of non-void function [-Wreturn-type]
+  103 | }
+      | ^
+ptxas warning : Registers are spilled to local memory in function '_Z46cu_affine_sshex8_elemental_matrix_apply_kernelIdEvilPPiPPT_PKS2_S3_', 92 bytes spill stores, 92 bytes spill loads
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z19cu_normalize_kernellPPd' for 'sm_90'
+ptxas info    : Function properties for _Z19cu_normalize_kernellPPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 47 registers
+ptxas info    : Compiling entry function '_Z15cu_in_place_divlPdPKd' for 'sm_90'
+ptxas info    : Function properties for _Z15cu_in_place_divlPdPKd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers
+ptxas info    : 3491 bytes gmem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi8EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi8EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 6088 bytes smem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi6EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi6EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 3000 bytes smem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi4EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIfLi4EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 1256 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi8EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi8EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 6088 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi6EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi6EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 3000 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi4EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIfLi4EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 1256 bytes smem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi8EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi8EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 114 registers, 12176 bytes smem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi6EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi6EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 114 registers, 6000 bytes smem
+ptxas info    : Compiling entry function '_Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi4EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z55cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_warpIdLi4EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 114 registers, 2512 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi8EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi8EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 12176 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi6EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi6EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 6000 bytes smem
+ptxas info    : Compiling entry function '_Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi4EEvlPKiPKT_S4_PS2_' for 'sm_90'
+ptxas info    : Function properties for _Z53cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TCIdLi4EEvlPKiPKT_S4_PS2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 2512 bytes smem
+ptxas info    : Compiling entry function '_Z46cu_affine_sshex8_elemental_matrix_apply_kernelIfEvilPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_affine_sshex8_elemental_matrix_apply_kernelIfEvilPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 233 registers
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi8EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi8EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 6088 bytes smem
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi6EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi6EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 3000 bytes smem
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi4EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIfLi4EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers, 1256 bytes smem
+ptxas info    : Compiling entry function '_Z46cu_affine_sshex8_elemental_matrix_apply_kernelIdEvilPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_affine_sshex8_elemental_matrix_apply_kernelIdEvilPPiPPT_PKS2_S3_
+    88 bytes stack frame, 92 bytes spill stores, 92 bytes spill loads
+ptxas info    : Used 255 registers, 88 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi8EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi8EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers, 12176 bytes smem
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi6EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi6EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers, 6000 bytes smem
+ptxas info    : Compiling entry function '_Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi4EEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z51cu_affine_sshex8_elemental_matrix_apply_kernel_warpIdLi4EEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers, 2512 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_hex8_elemental_matrix_apply_kernelIfEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_hex8_elemental_matrix_apply_kernelIfEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_Z49cu_affine_hex8_elemental_matrix_apply_kernel_warpILi128EfEvlPPiPPT0_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z49cu_affine_hex8_elemental_matrix_apply_kernel_warpILi128EfEvlPPiPPT0_PKS2_S3_
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 87 registers, 32 bytes cumulative stack size, 512 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_hex8_elemental_matrix_apply_kernelIdEvlPPiPPT_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_hex8_elemental_matrix_apply_kernelIdEvlPPiPPT_PKS2_S3_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_Z49cu_affine_hex8_elemental_matrix_apply_kernel_warpILi128EdEvlPPiPPT0_PKS2_S3_' for 'sm_90'
+ptxas info    : Function properties for _Z49cu_affine_hex8_elemental_matrix_apply_kernel_warpILi128EdEvlPPiPPT0_PKS2_S3_
+    64 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 104 registers, 64 bytes cumulative stack size, 1024 bytes smem
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_kernels.cuh(1172): remark #20200-D: #pragma message: "WENO_DIRECT_CUDA is enabled"
+  #pragma message "WENO_DIRECT_CUDA is enabled"
+                                               ^
+
+ptxas info    : 1216 bytes gmem
+ptxas info    : Compiling entry function '_Z47cu_quadshell4_resample_gap_normals_local_kernelllPPiPPfPKlS4_PKfS6_S6_PPd' for 'sm_90'
+ptxas info    : Function properties for _Z47cu_quadshell4_resample_gap_normals_local_kernelllPPiPPfPKlS4_PKfS6_S6_PPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 250 registers
+ptxas info    : Compiling entry function '_Z45cu_quadshell4_resample_gap_value_local_kernelllPPiPPfPKlS4_PKfS6_S6_Pd' for 'sm_90'
+ptxas info    : Function properties for _Z45cu_quadshell4_resample_gap_value_local_kernelllPPiPPfPKlS4_PKfS6_S6_Pd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 224 registers
+ptxas info    : Compiling entry function '_Z42cu_quadshell4_resample_weight_local_kernelllPPiPPfPd' for 'sm_90'
+ptxas info    : Function properties for _Z42cu_quadshell4_resample_weight_local_kernelllPPiPPfPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers
+ptxas info    : Compiling entry function '_Z39cu_quadshell4_resample_gap_local_kernelllPPiPPfPKlS4_PKfS6_S6_PdPS7_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_quadshell4_resample_gap_local_kernelllPPiPPfPKlS4_PKfS6_S6_PdPS7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 249 registers
+ptxas info    : 813 bytes gmem
+ptxas info    : Compiling entry function '_Z34cu_macro_tet4_laplacian_crs_kernelIfEvlPPilPKfPKiS5_PT_' for 'sm_90'
+ptxas info    : Function properties for _Z34cu_macro_tet4_laplacian_crs_kernelIfEvlPPilPKfPKiS5_PT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 202 registers
+ptxas info    : Compiling entry function '_Z34cu_macro_tet4_laplacian_crs_kernelIdEvlPPilPKfPKiS5_PT_' for 'sm_90'
+ptxas info    : Function properties for _Z34cu_macro_tet4_laplacian_crs_kernelIdEvlPPilPKfPKiS5_PT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 162 registers
+ptxas info    : Compiling entry function '_Z35cu_macro_tet4_laplacian_diag_kernelIfEvlPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z35cu_macro_tet4_laplacian_diag_kernelIfEvlPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 58 registers
+ptxas info    : Compiling entry function '_Z35cu_macro_tet4_laplacian_diag_kernelIdEvlPPilPKfPT_' for 'sm_90'
+ptxas info    : Function properties for _Z35cu_macro_tet4_laplacian_diag_kernelIdEvlPPilPKfPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 58 registers
+ptxas info    : Compiling entry function '_Z36cu_macro_tet4_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z36cu_macro_tet4_laplacian_apply_kernelIfEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 126 registers
+ptxas info    : Compiling entry function '_Z36cu_macro_tet4_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z36cu_macro_tet4_laplacian_apply_kernelIdEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers
+ptxas info    : 2470 bytes gmem
+ptxas info    : Compiling entry function '_Z39cu_affine_sshex8_laplacian_apply_kernelIfEvilPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_affine_sshex8_laplacian_apply_kernelIfEvilPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 126 registers
+ptxas info    : Compiling entry function '_Z57cu_affine_sshex8_laplacian_apply_local_mem_batched_kernelIfLi16ELi4EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z57cu_affine_sshex8_laplacian_apply_local_mem_batched_kernelIfLi16ELi4EEvlPPilPKfPKT_PS4_
+    11560 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, 11560 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z49cu_affine_sshex8_laplacian_apply_local_mem_kernelIfLi2EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z49cu_affine_sshex8_laplacian_apply_local_mem_kernelIfLi2EEvlPPilPKfPKT_PS4_
+    216 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 234 registers, 216 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi8EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi8EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, 5832 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi6EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi6EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, 2744 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi4EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIfLi4EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, 1000 bytes smem
+ptxas info    : Compiling entry function '_Z39cu_affine_sshex8_laplacian_apply_kernelIdEvilPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z39cu_affine_sshex8_laplacian_apply_kernelIdEvilPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 126 registers
+ptxas info    : Compiling entry function '_Z57cu_affine_sshex8_laplacian_apply_local_mem_batched_kernelIdLi16ELi4EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z57cu_affine_sshex8_laplacian_apply_local_mem_batched_kernelIdLi16ELi4EEvlPPilPKfPKT_PS4_
+    23120 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 183 registers, 23120 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z49cu_affine_sshex8_laplacian_apply_local_mem_kernelIdLi2EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z49cu_affine_sshex8_laplacian_apply_local_mem_kernelIdLi2EEvlPPilPKfPKT_PS4_
+    432 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 250 registers, 432 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi8EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi8EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 217 registers, 11664 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi6EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi6EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 217 registers, 5488 bytes smem
+ptxas info    : Compiling entry function '_Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi4EEvlPPilPKfPKT_PS4_' for 'sm_90'
+ptxas info    : Function properties for _Z44cu_affine_sshex8_laplacian_apply_kernel_warpIdLi4EEvlPPilPKfPKT_PS4_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 217 registers, 2000 bytes smem
+ptxas info    : 207 bytes gmem
+ptxas info    : Compiling entry function '_Z28divide_by_mass_vector_kernellPdPKd' for 'sm_90'
+ptxas info    : Function properties for _Z28divide_by_mass_vector_kernellPdPKd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_Z32tet4_assemble_lumped_mass_kernelll17elems_tet4_device15xyz_tet4_devicePd' for 'sm_90'
+ptxas info    : Function properties for _Z32tet4_assemble_lumped_mass_kernelll17elems_tet4_device15xyz_tet4_devicePd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_Z42tet4_resample_field_reduce_local_kernel_v2lll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z42tet4_resample_field_reduce_local_kernel_v2lll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 96 registers
+ptxas info    : Compiling entry function '_Z39tet4_resample_field_reduce_local_kernellll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z39tet4_resample_field_reduce_local_kernellll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 108 registers
+ptxas info    : Compiling entry function '_Z8mykernelv' for 'sm_90'
+ptxas info    : Function properties for _Z8mykernelv
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers
+ptxas info    : Compiling entry function '_Z32tet4_resample_field_local_kernellll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z32tet4_resample_field_local_kernellll17elems_tet4_device15xyz_tet4_devicelllffffffPKdPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 90 registers
+ptxas warning : Registers are spilled to local memory in function '_Z61hex8_to_isoparametric_tet10_resample_field_local_cube1_kernellll18elems_tet10_device16xyz_tet10_devicellllllffffffPKdPd', 212 bytes spill stores, 316 bytes spill loads
+ptxas info    : 229 bytes gmem
+ptxas info    : Compiling entry function '_Z61hex8_to_isoparametric_tet10_resample_field_local_cube1_kernellll18elems_tet10_device16xyz_tet10_devicellllllffffffPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z61hex8_to_isoparametric_tet10_resample_field_local_cube1_kernellll18elems_tet10_device16xyz_tet10_devicellllllffffffPKdPd
+    464 bytes stack frame, 212 bytes spill stores, 316 bytes spill loads
+ptxas info    : Used 255 registers, 464 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z12zeros_kernellPd' for 'sm_90'
+ptxas info    : Function properties for _Z12zeros_kernellPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 6 registers
+ptxas info    : Compiling entry function '_Z19compute_g_kernel_v2lPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z19compute_g_kernel_v2lPKdPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_Z16compute_g_kernellPKdS0_Pd' for 'sm_90'
+ptxas info    : Function properties for _Z16compute_g_kernellPKdS0_Pd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_Z52isoparametric_tet10_assemble_dual_mass_vector_kernellll18elems_tet10_device16xyz_tet10_devicePd' for 'sm_90'
+ptxas info    : Function properties for _Z52isoparametric_tet10_assemble_dual_mass_vector_kernellll18elems_tet10_device16xyz_tet10_devicePd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 152 registers
+ptxas info    : Compiling entry function '_Z62hex8_to_isoparametric_tet10_resample_field_local_reduce_kernellll18elems_tet10_device16xyz_tet10_devicellllllffffffPKdPd' for 'sm_90'
+ptxas info    : Function properties for _Z62hex8_to_isoparametric_tet10_resample_field_local_reduce_kernellll18elems_tet10_device16xyz_tet10_devicellllllffffffPKdPd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 208 registers
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu: In function 'int tet4_resample_field_local_reduce_CUDA_wrapper(int, int, const mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu:1191:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+ 1191 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu: In function 'int hex8_to_tet10_resample_field_local_CUDA_wrapper(int, int, mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu:883:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+  883 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ptxas info    : 23 bytes gmem
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS26DeviceMergeSortMergeKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeEl20CompareTuplesIndicesNS9_IJiidEEESL_EEvbT1_T2_T3_PT5_PT6_T4_PSR_SR_Pc' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS26DeviceMergeSortMergeKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeEl20CompareTuplesIndicesNS9_IJiidEEESL_EEvbT1_T2_T3_PT5_PT6_T4_PSR_SR_Pc
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS30DeviceMergeSortPartitionKernelIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS3_6detail15normal_iteratorINS3_10device_ptrIiEEEESD_NSA_INSB_IdEEEEEEEEEl20CompareTuplesIndicesNS8_IJiidEEEEEvbT_PT2_T0_SN_PSN_T1_SN_i' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS30DeviceMergeSortPartitionKernelIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS3_6detail15normal_iteratorINS3_10device_ptrIiEEEESD_NSA_INSB_IdEEEEEEEEEl20CompareTuplesIndicesNS8_IJiidEEEEEvbT_PT2_T0_SN_PSN_T1_SN_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS30DeviceMergeSortBlockSortKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeESI_SM_l20CompareTuplesIndicesNS9_IJiidEEESL_EEvbT1_T2_T3_T4_T5_PT7_PT8_T6_Pc' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS30DeviceMergeSortBlockSortKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeESI_SM_l20CompareTuplesIndicesNS9_IJiidEEESL_EEvbT1_T2_T3_T4_T5_PT7_PT8_T6_Pc
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 35 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS26DeviceMergeSortMergeKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeEl20CompareTuplesWeightsNS9_IJiidEEESL_EEvbT1_T2_T3_PT5_PT6_T4_PSR_SR_Pc' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS26DeviceMergeSortMergeKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeEl20CompareTuplesWeightsNS9_IJiidEEESL_EEvbT1_T2_T3_PT5_PT6_T4_PSR_SR_Pc
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS30DeviceMergeSortPartitionKernelIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS3_6detail15normal_iteratorINS3_10device_ptrIiEEEESD_NSA_INSB_IdEEEEEEEEEl20CompareTuplesWeightsNS8_IJiidEEEEEvbT_PT2_T0_SN_PSN_T1_SN_i' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS30DeviceMergeSortPartitionKernelIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS3_6detail15normal_iteratorINS3_10device_ptrIiEEEESD_NSA_INSB_IdEEEEEEEEEl20CompareTuplesWeightsNS8_IJiidEEEEEvbT_PT2_T0_SN_PSN_T1_SN_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS30DeviceMergeSortBlockSortKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeESI_SM_l20CompareTuplesWeightsNS9_IJiidEEESL_EEvbT1_T2_T3_T4_T5_PT7_PT8_T6_Pc' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS30DeviceMergeSortBlockSortKernelILb0ENS0_21DeviceMergeSortPolicyIN6thrust20THRUST_200301_900_NS12zip_iteratorIN4cuda3std3__45tupleIJNS4_6detail15normal_iteratorINS4_10device_ptrIiEEEESE_NSB_INSC_IdEEEEEEEEEE9Policy600ESI_PNS0_8NullTypeESI_SM_l20CompareTuplesWeightsNS9_IJiidEEESL_EEvbT1_T2_T3_T4_T5_PT7_PT8_T6_Pc
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers
+ptxas info    : Compiling entry function '_ZN3cub17CUB_200301_900_NS11EmptyKernelIvEEvv' for 'sm_90'
+ptxas info    : Function properties for _ZN3cub17CUB_200301_900_NS11EmptyKernelIvEEvv
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 4 registers
+ptxas warning : Registers are spilled to local memory in function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi16EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_', 4584 bytes spill stores, 5144 bytes spill loads
+ptxas warning : Registers are spilled to local memory in function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi8EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_', 4568 bytes spill stores, 5120 bytes spill loads
+ptxas warning : Registers are spilled to local memory in function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi4EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_', 256 bytes spill stores, 420 bytes spill loads
+ptxas warning : Registers are spilled to local memory in function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi2EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_', 256 bytes spill stores, 420 bytes spill loads
+ptxas info    : 3174 bytes gmem
+ptxas info    : Compiling entry function '_Z56cu_affine_sshex8_linear_elasticity_block_diag_sym_kernelIfEvilPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z56cu_affine_sshex8_linear_elasticity_block_diag_sym_kernelIfEvilPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 74 registers, 32 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z56cu_affine_sshex8_linear_elasticity_block_diag_sym_kernelIdEvilPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z56cu_affine_sshex8_linear_elasticity_block_diag_sym_kernelIdEvilPPilPKfS3_T_S4_lPS4_S5_S5_S5_S5_S5_
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, 32 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z46cu_affine_sshex8_linear_elasticity_diag_kernelIfEvilPPilPKfS3_T_S4_lPS4_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_affine_sshex8_linear_elasticity_diag_kernelIfEvilPPilPKfS3_T_S4_lPS4_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 114 registers
+ptxas info    : Compiling entry function '_Z46cu_affine_sshex8_linear_elasticity_diag_kernelIdEvilPPilPKfS3_T_S4_lPS4_S5_S5_' for 'sm_90'
+ptxas info    : Function properties for _Z46cu_affine_sshex8_linear_elasticity_diag_kernelIdEvilPPilPKfS3_T_S4_lPS4_S5_S5_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 184 registers
+ptxas info    : Compiling entry function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIfLi16EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIfLi16EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    78608 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 226 registers, 78608 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIfLi8EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIfLi8EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    11688 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 226 registers, 11688 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIfLi4EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIfLi4EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 249 registers
+ptxas info    : Compiling entry function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIfLi2EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIfLi2EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 249 registers
+ptxas info    : Compiling entry function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi16EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi16EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    157480 bytes stack frame, 4584 bytes spill stores, 5144 bytes spill loads
+ptxas info    : Used 250 registers, 157480 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi8EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z67cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernelIdLi8EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    23616 bytes stack frame, 4568 bytes spill stores, 5120 bytes spill loads
+ptxas info    : Used 250 registers, 23616 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi4EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi4EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    248 bytes stack frame, 256 bytes spill stores, 420 bytes spill loads
+ptxas info    : Used 255 registers, 248 bytes cumulative stack size
+ptxas info    : Compiling entry function '_Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi2EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_' for 'sm_90'
+ptxas info    : Function properties for _Z52cu_affine_sshex8_linear_elasticity_apply_warp_kernelIdLi2EEvlPPilPKfS3_T_S4_lPKS4_S6_S6_lPS4_S7_S7_
+    248 bytes stack frame, 256 bytes spill stores, 420 bytes spill loads
+ptxas info    : Used 255 registers, 248 bytes cumulative stack size
+In file included from /users/hyang/ws/sfem_github/sfem/drivers/cuda/cuda_do_spmv.c:13:
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:434:1: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  434 | cusparseCreateCsric02Info(csric02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:438:1: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  438 | cusparseDestroyCsric02Info(csric02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:442:1: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  442 | cusparseCreateBsric02Info(bsric02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:446:1: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  446 | cusparseDestroyBsric02Info(bsric02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:450:1: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  450 | cusparseCreateCsrilu02Info(csrilu02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:454:1: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  454 | cusparseDestroyCsrilu02Info(csrilu02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:458:1: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  458 | cusparseCreateBsrilu02Info(bsrilu02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:462:1: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  462 | cusparseDestroyBsrilu02Info(bsrilu02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:466:1: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  466 | cusparseCreateBsrsv2Info(bsrsv2Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:470:1: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  470 | cusparseDestroyBsrsv2Info(bsrsv2Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:474:1: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  474 | cusparseCreateBsrsm2Info(bsrsm2Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:478:1: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  478 | cusparseDestroyBsrsm2Info(bsrsm2Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:482:1: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  482 | cusparseCreateCsru2csrInfo(csru2csrInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:486:1: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  486 | cusparseDestroyCsru2csrInfo(csru2csrInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:490:1: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  490 | cusparseCreateColorInfo(cusparseColorInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:494:1: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  494 | cusparseDestroyColorInfo(cusparseColorInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:498:1: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  498 | cusparseCreatePruneInfo(pruneInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:502:1: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  502 | cusparseDestroyPruneInfo(pruneInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:759:27: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  759 |                           bsrsv2Info_t     info,
+      |                           ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:774:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  774 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:789:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  789 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:804:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  804 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:819:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  819 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:834:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  834 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:849:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  849 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:864:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  864 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:879:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  879 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:894:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  894 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:895:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  895 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:910:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  910 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:911:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  911 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:926:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  926 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:927:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  927 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:942:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  942 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:943:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  943 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:959:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  959 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:962:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  962 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:978:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  978 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:981:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  981 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:997:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  997 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1000:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1000 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1016:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1016 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1019:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1019 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1113:27: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1113 |                           bsrsm2Info_t     info,
+      |                           ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1130:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1130 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1147:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1147 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1164:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1164 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1181:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1181 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1198:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1198 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1215:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1215 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1232:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1232 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1249:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1249 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1266:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1266 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1267:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1267 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1284:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1284 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1285:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1285 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1302:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1302 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1303:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1303 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1320:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1320 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1321:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1321 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1339:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1339 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1344:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1344 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1362:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1362 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1367:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1367 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1385:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1385 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1390:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1390 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1408:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1408 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1413:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1413 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1423:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1423 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1431:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1431 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1439:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1439 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1447:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1447 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1455:29: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1455 |                             csrilu02Info_t   info,
+      |                             ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1467:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1467 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1479:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1479 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1491:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1491 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1503:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1503 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1515:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1515 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1527:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1527 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1539:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1539 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1551:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1551 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1563:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1563 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1564:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1564 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1576:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1576 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1577:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1577 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1589:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1589 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1590:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1590 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1602:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1602 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1603:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1603 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1615:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1615 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1616:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1616 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1628:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1628 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1629:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1629 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1641:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1641 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1642:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1642 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1654:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1654 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1655:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1655 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1661:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1661 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1669:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1669 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1677:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1677 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1685:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1685 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1693:29: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1693 |                             bsrilu02Info_t   info,
+      |                             ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1707:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1707 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1721:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1721 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1735:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1735 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1749:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1749 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1763:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1763 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1777:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1777 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1791:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1791 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1805:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1805 |                                bsrilu02Info_t           info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1819:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1819 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1820:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1820 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1834:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1834 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1835:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1835 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1849:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1849 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1850:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1850 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1864:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1864 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1865:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1865 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1879:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1879 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1880:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1880 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1894:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1894 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1895:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1895 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1909:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1909 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1910:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1910 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1924:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1924 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1925:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1925 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1931:28: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1931 |                            csric02Info_t    info,
+      |                            ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1943:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1943 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1955:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1955 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1967:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1967 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1979:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1979 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1991:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1991 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2003:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2003 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2015:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2015 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2027:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2027 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2039:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2039 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2040:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2040 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2052:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2052 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2053:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2053 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2065:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2065 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2066:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2066 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2078:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2078 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2079:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2079 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2091:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2091 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2092:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2092 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2104:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2104 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2105:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2105 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2117:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2117 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2118:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2118 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2130:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2130 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2131:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2131 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2137:28: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2137 |                            bsric02Info_t    info,
+      |                            ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2151:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2151 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2165:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2165 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2179:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2179 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2193:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2193 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2207:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2207 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2221:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2221 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2235:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2235 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2249:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2249 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2263:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2263 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2264:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2264 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2278:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2278 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2279:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2279 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2293:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2293 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2294:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2294 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2308:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2308 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2309:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2309 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2323:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2323 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2324:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2324 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2338:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2338 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2339:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2339 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2354:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2354 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2355:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2355 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2369:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2369 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2370:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2370 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3043:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3043 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3058:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3058 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3073:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3073 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3088:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3088 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4152:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4152 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4164:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4164 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4176:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4176 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4188:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4188 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4201:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4201 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4214:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4214 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4227:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4227 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4240:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4240 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4253:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4253 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4266:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4266 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4279:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4279 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4292:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4292 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4619:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4619 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4635:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4635 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4668:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4668 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4683:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4683 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4717:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4717 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4732:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4732 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4774:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4774 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4793:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4793 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4833:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4833 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4851:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4851 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4891:35: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4891 |                                   pruneInfo_t              info,
+      |                                   ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4909:35: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4909 |                                   pruneInfo_t              info,
+      |                                   ^~~~~~~~~~~
+sfem_NewmarkKVTest: /users/hyang/ws/sfem_github/sfem/algebra/./sfem_cg.hpp:188: int sfem::ConjugateGradient<T>::aux_apply_basic(ptrdiff_t, const T*, T*) [with T = double; ptrdiff_t = long int]: Assertion `ptAp == ptAp' failed.
+srun: error: nid006544: task 0: Aborted (core dumped)
+srun: Terminating StepId=1720285.2

@@ -1,0 +1,3 @@
+sfem_NewmarkKVTest: /users/hyang/ws/sfem_github/sfem/algebra/./sfem_cg.hpp:188: int sfem::ConjugateGradient<T>::aux_apply_basic(ptrdiff_t, const T*, T*) [with T = double; ptrdiff_t = long int]: Assertion `ptAp == ptAp' failed.
+srun: error: nid006544: task 0: Aborted (core dumped)
+srun: Terminating StepId=1715722.2

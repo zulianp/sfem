@@ -1,0 +1,949 @@
+/users/hyang/ws/sfem_github/sfem/mesh/read_mesh.c: In function 'mesh_read_mpi':
+/users/hyang/ws/sfem_github/sfem/mesh/read_mesh.c:750:45: warning: argument 1 range [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Walloc-size-larger-than=]
+  750 |             uint8_t *is_local  = (uint8_t *)calloc(n_local_elements, sizeof(uint8_t));
+      |                                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/base/./sfem_base.h:5,
+                 from /users/hyang/ws/sfem_github/sfem/mesh/read_mesh.h:6,
+                 from /users/hyang/ws/sfem_github/sfem/mesh/read_mesh.c:2:
+/usr/include/stdlib.h:542:14: note: in a call to allocation function 'calloc' declared here
+  542 | extern void *calloc (size_t __nmemb, size_t __size)
+      |              ^~~~~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c: In function 'read_boundary_conditions':
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:49:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   49 |         const char *pch = strtok(sets, splitter);
+      |                                  ^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/base/./sfem_defs.h:7,
+                 from /users/hyang/ws/sfem_github/sfem/mesh/./sfem_mesh.h:5,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.h:8,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:1:
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:75:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   75 |         const char *pch = strtok(values, splitter);
+      |                                  ^~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:119:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  119 |         const char *pch = strtok(components, splitter);
+      |                                  ^~~~~~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp: In function '_Z49lagrange_hex_symmetric_interior_penalty_apply_tplILi2EEillPPiPKiPKlPPfdPKdPd._omp_fn.0':
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:496:45: warning: iteration 2 invokes undefined behavior [-Waggressive-loop-optimizations]
+  496 |                         sip[idx]      = -sip[idx];
+      |                                          ~~~^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:493:37: note: within this loop
+  493 |                 for (int zi = 0; zi < N; zi++) {
+      |                                  ~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:450:31: warning: iteration 2 invokes undefined behavior [-Waggressive-loop-optimizations]
+  450 |                     temp[idx] =
+      |                     ~~~~~~~~~~^
+  451 |                             (JinvXdS[0] * side_gx[idx] + JinvXdS[1] * side_gy[idx] + JinvXdS[2] * side_gz[idx]) * qw[zi] * qw[xi];
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:447:33: note: within this loop
+  447 |             for (int zi = 0; zi < Q; zi++) {
+      |                              ~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp: In function '_Z49lagrange_hex_symmetric_interior_penalty_apply_tplILi4EEillPPiPKiPKlPPfdPKdPd._omp_fn.0':
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:496:45: warning: iteration 3 invokes undefined behavior [-Waggressive-loop-optimizations]
+  496 |                         sip[idx]      = -sip[idx];
+      |                                          ~~~^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:493:37: note: within this loop
+  493 |                 for (int zi = 0; zi < N; zi++) {
+      |                                  ~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:450:31: warning: iteration 3 invokes undefined behavior [-Waggressive-loop-optimizations]
+  450 |                     temp[idx] =
+      |                     ~~~~~~~~~~^
+  451 |                             (JinvXdS[0] * side_gx[idx] + JinvXdS[1] * side_gy[idx] + JinvXdS[2] * side_gz[idx]) * qw[zi] * qw[xi];
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:447:33: note: within this loop
+  447 |             for (int zi = 0; zi < Q; zi++) {
+      |                              ~~~^~~
+In function 'void lagrange_hex_integrate_adjoint_consistency_face_add(const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, T*) [with int N = 5; int Nx = 5; int Ny = 1; int Nz = 5; int Qx = 12; int Qy = 1; int Qz = 12; T = double]',
+    inlined from '_Z49lagrange_hex_symmetric_interior_penalty_apply_tplILi4EEillPPiPKiPKlPPfdPKdPd._omp_fn.0' at /users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:460:99:
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:206:33: warning: iteration 2 invokes undefined behavior [-Waggressive-loop-optimizations]
+  206 |                 out[idx] += temp[idx] * JinvXdS[2];
+      |                             ~~~~^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:202:24: note: within this loop
+  202 |     for(int zi = 0; zi < Nz; zi++) {
+      |                     ~~~^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_V.c:13:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:849:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_adjoint_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1448:31: warning: passing argument 7 of 'apply_inv_lumped_mass' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1448 |                               g);               //
+      |                               ^
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:13:
+/users/hyang/ws/sfem_github/sfem/operators/./mass.h:33:42: note: expected 'real_t * const' {aka 'double * const'} but argument is of type 'const real_t *' {aka 'const double *'}
+   33 |                            real_t *const values);
+      |                            ~~~~~~~~~~~~~~^~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1474:9: note: '#pragma message: ATTENTIN Using TEST_REFINE_ADJOINT for TET10'
+ 1474 | #pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1606:41: warning: passing argument 1 of 'perform_exchange_operations' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1606 |             perform_exchange_operations(mesh,                                   //
+      |                                         ^~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1027:37: note: expected 'mesh_t *' but argument is of type 'const mesh_t *'
+ 1027 | perform_exchange_operations(mesh_t* mesh,         //
+      |                             ~~~~~~~~^~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c: In function 'hex_aa_8_eval_weno4_3D_Unit':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c:646:9: note: '#pragma message: WENO_DIRECT'
+  646 | #pragma message "WENO_DIRECT"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:12:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:316: warning: "ZEROS_VEC" redefined
+  316 | #define ZEROS_VEC \
+      | 
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:65: note: this is the location of the previous definition
+   65 | #define ZEROS_VEC \
+      | 
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.h:10,
+                 from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:1:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c: In function 'hex_aa_8_collect_coeffs_O3_ptr_vec':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:274:30: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  274 |         first_ptrs_array[ii] = &data[first_indices[ii]];
+      |                              ^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp: In function '_Z49lagrange_hex_symmetric_interior_penalty_apply_tplILi8EEillPPiPKiPKlPPfdPKdPd._omp_fn.0':
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:496:45: warning: iteration 4 invokes undefined behavior [-Waggressive-loop-optimizations]
+  496 |                         sip[idx]      = -sip[idx];
+      |                                          ~~~^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:493:37: note: within this loop
+  493 |                 for (int zi = 0; zi < N; zi++) {
+      |                                  ~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:450:31: warning: iteration 4 invokes undefined behavior [-Waggressive-loop-optimizations]
+  450 |                     temp[idx] =
+      |                     ~~~~~~~~~~^
+  451 |                             (JinvXdS[0] * side_gx[idx] + JinvXdS[1] * side_gy[idx] + JinvXdS[2] * side_gz[idx]) * qw[zi] * qw[xi];
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:447:33: note: within this loop
+  447 |             for (int zi = 0; zi < Q; zi++) {
+      |                              ~~~^~~
+In function 'void lagrange_hex_integrate_adjoint_consistency_face_add(const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, const T*, T*) [with int N = 9; int Nx = 9; int Ny = 1; int Nz = 9; int Qx = 24; int Qy = 1; int Qz = 24; T = double]',
+    inlined from '_Z49lagrange_hex_symmetric_interior_penalty_apply_tplILi8EEillPPiPKiPKlPPfdPKdPd._omp_fn.0' at /users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:460:99:
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:206:33: warning: iteration 4 invokes undefined behavior [-Waggressive-loop-optimizations]
+  206 |                 out[idx] += temp[idx] * JinvXdS[2];
+      |                             ~~~~^
+/users/hyang/ws/sfem_github/sfem/operators/spectral_hex/dg/spectral_hex_symmetric_interior_penalty.cpp:202:24: note: within this loop
+  202 |     for(int zi = 0; zi < Nz; zi++) {
+      |                     ~~~^~~~
+/users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt_inline.hpp(359): warning #20058-D: the #pragma unroll must precede a loop
+  #pragma unroll
+          ^
+          detected during:
+            instantiation of "void cu_affine_hex8_kelvin_voigt_apply_kernel(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, T, T, T, T, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *) [with T=real_t]" at line 209 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+            instantiation of "int cu_affine_hex8_kelvin_voigt_apply_tpl(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, real_t, real_t, real_t, real_t, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *, void *) [with T=real_t]" at line 267 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/operators/macro_tet4/cuda/cu_macro_tet4_linear_elasticity.cu(19): warning #177-D: function "adjugate_and_det_micro_kernel" was declared but never referenced
+  static inline __attribute__((device)) __attribute__((host)) void adjugate_and_det_micro_kernel(const geom_t px0,
+                                                                   ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/operators/sshex8/cuda/cu_sshex8_linear_elasticity.cu(507): warning #177-D: function "cu_sshex8_is_interior" was declared but never referenced
+  static __attribute__((device)) inline bool cu_sshex8_is_interior(const int level, const int xi, const int yi, const int zi) {
+                                             ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu: In function 'cudaError_t copy_elems_tet10_managed(ptrdiff_t, elems_tet10_device*, const idx_t**)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu:103:1: warning: control reaches end of non-void function [-Wreturn-type]
+  103 | }
+      | ^
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_kernels.cuh(1172): remark #20200-D: #pragma message: "WENO_DIRECT_CUDA is enabled"
+  #pragma message "WENO_DIRECT_CUDA is enabled"
+                                               ^
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu: In function 'int tet4_resample_field_local_reduce_CUDA_wrapper(int, int, const mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu:1191:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+ 1191 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu: In function 'int hex8_to_tet10_resample_field_local_CUDA_wrapper(int, int, mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu:883:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+  883 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/drivers/cuda/cuda_do_spmv.c:13:
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:434:1: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  434 | cusparseCreateCsric02Info(csric02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:438:1: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  438 | cusparseDestroyCsric02Info(csric02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:442:1: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  442 | cusparseCreateBsric02Info(bsric02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:446:1: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  446 | cusparseDestroyBsric02Info(bsric02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:450:1: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  450 | cusparseCreateCsrilu02Info(csrilu02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:454:1: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  454 | cusparseDestroyCsrilu02Info(csrilu02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:458:1: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  458 | cusparseCreateBsrilu02Info(bsrilu02Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:462:1: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  462 | cusparseDestroyBsrilu02Info(bsrilu02Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:466:1: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  466 | cusparseCreateBsrsv2Info(bsrsv2Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:470:1: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  470 | cusparseDestroyBsrsv2Info(bsrsv2Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:474:1: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  474 | cusparseCreateBsrsm2Info(bsrsm2Info_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:478:1: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  478 | cusparseDestroyBsrsm2Info(bsrsm2Info_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:482:1: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  482 | cusparseCreateCsru2csrInfo(csru2csrInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:486:1: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  486 | cusparseDestroyCsru2csrInfo(csru2csrInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:490:1: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  490 | cusparseCreateColorInfo(cusparseColorInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:494:1: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  494 | cusparseDestroyColorInfo(cusparseColorInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:498:1: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  498 | cusparseCreatePruneInfo(pruneInfo_t* info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:502:1: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  502 | cusparseDestroyPruneInfo(pruneInfo_t info);
+      | ^~~~~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:759:27: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  759 |                           bsrsv2Info_t     info,
+      |                           ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:774:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  774 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:789:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  789 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:804:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  804 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:819:28: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  819 |                            bsrsv2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:834:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  834 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:849:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  849 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:864:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  864 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:879:31: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  879 |                               bsrsv2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:894:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  894 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:895:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  895 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:910:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  910 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:911:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  911 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:926:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  926 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:927:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  927 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:942:26: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  942 |                          bsrsv2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:943:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  943 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:959:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  959 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:962:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  962 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:978:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  978 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:981:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  981 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:997:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+  997 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1000:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1000 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1016:23: warning: 'bsrsv2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1016 |                       bsrsv2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1019:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1019 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1113:27: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1113 |                           bsrsm2Info_t     info,
+      |                           ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1130:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1130 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1147:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1147 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1164:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1164 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1181:28: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1181 |                            bsrsm2Info_t             info,
+      |                            ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1198:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1198 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1215:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1215 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1232:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1232 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1249:31: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1249 |                               bsrsm2Info_t             info,
+      |                               ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1266:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1266 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1267:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1267 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1284:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1284 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1285:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1285 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1302:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1302 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1303:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1303 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1320:26: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1320 |                          bsrsm2Info_t             info,
+      |                          ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1321:26: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1321 |                          cusparseSolvePolicy_t    policy,
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1339:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1339 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1344:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1344 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1362:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1362 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1367:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1367 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1385:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1385 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1390:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1390 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1408:23: warning: 'bsrsm2Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1408 |                       bsrsm2Info_t             info,
+      |                       ^~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1413:23: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1413 |                       cusparseSolvePolicy_t    policy,
+      |                       ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1423:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1423 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1431:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1431 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1439:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1439 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1447:32: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1447 |                                csrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1455:29: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1455 |                             csrilu02Info_t   info,
+      |                             ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1467:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1467 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1479:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1479 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1491:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1491 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1503:30: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1503 |                              csrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1515:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1515 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1527:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1527 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1539:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1539 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1551:33: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1551 |                                 csrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1563:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1563 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1564:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1564 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1576:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1576 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1577:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1577 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1589:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1589 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1590:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1590 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1602:28: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1602 |                            csrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1603:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1603 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1615:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1615 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1616:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1616 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1628:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1628 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1629:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1629 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1641:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1641 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1642:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1642 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1654:19: warning: 'csrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1654 |                   csrilu02Info_t        info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1655:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1655 |                   cusparseSolvePolicy_t policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1661:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1661 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1669:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1669 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1677:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1677 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1685:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1685 |                                bsrilu02Info_t   info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1693:29: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1693 |                             bsrilu02Info_t   info,
+      |                             ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1707:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1707 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1721:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1721 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1735:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1735 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1749:30: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1749 |                              bsrilu02Info_t           info,
+      |                              ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1763:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1763 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1777:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1777 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1791:33: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1791 |                                 bsrilu02Info_t           info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1805:32: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1805 |                                bsrilu02Info_t           info,
+      |                                ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1819:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1819 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1820:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1820 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1834:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1834 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1835:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1835 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1849:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1849 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1850:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1850 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1864:28: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1864 |                            bsrilu02Info_t           info,
+      |                            ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1865:28: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1865 |                            cusparseSolvePolicy_t    policy,
+      |                            ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1879:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1879 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1880:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1880 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1894:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1894 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1895:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1895 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1909:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1909 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1910:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1910 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1924:19: warning: 'bsrilu02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1924 |                   bsrilu02Info_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1925:19: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1925 |                   cusparseSolvePolicy_t    policy,
+      |                   ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1931:28: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1931 |                            csric02Info_t    info,
+      |                            ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1943:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1943 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1955:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1955 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1967:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1967 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1979:29: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1979 |                             csric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:1991:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 1991 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2003:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2003 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2015:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2015 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2027:32: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2027 |                                csric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2039:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2039 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2040:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2040 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2052:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2052 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2053:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2053 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2065:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2065 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2066:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2066 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2078:27: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2078 |                           csric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2079:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2079 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2091:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2091 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2092:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2092 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2104:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2104 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2105:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2105 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2117:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2117 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2118:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2118 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2130:18: warning: 'csric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2130 |                  csric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2131:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2131 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2137:28: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2137 |                            bsric02Info_t    info,
+      |                            ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2151:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2151 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2165:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2165 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2179:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2179 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2193:29: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2193 |                             bsric02Info_t            info,
+      |                             ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2207:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2207 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2221:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2221 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2235:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2235 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2249:32: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2249 |                                bsric02Info_t            info,
+      |                                ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2263:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2263 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2264:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2264 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2278:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2278 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2279:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2279 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2293:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2293 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2294:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2294 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2308:27: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2308 |                           bsric02Info_t            info,
+      |                           ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2309:27: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2309 |                           cusparseSolvePolicy_t    policy,
+      |                           ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2323:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2323 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2324:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2324 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2338:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2338 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2339:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2339 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2354:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2354 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2355:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2355 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2369:18: warning: 'bsric02Info_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2369 |                  bsric02Info_t            info,
+      |                  ^~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:2370:18: warning: 'cusparseSolvePolicy_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 2370 |                  cusparseSolvePolicy_t    policy,
+      |                  ^~~~~~~~~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:318:14: note: declared here
+  318 | typedef enum {
+      |              ^
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3043:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3043 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3058:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3058 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3073:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3073 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:3088:19: warning: 'cusparseColorInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 3088 |                   const cusparseColorInfo_t info);
+      |                   ^~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4152:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4152 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4164:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4164 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4176:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4176 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4188:33: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4188 |                                 csru2csrInfo_t   info,
+      |                                 ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4201:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4201 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4214:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4214 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4227:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4227 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4240:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4240 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4253:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4253 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4266:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4266 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4279:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4279 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4292:19: warning: 'csru2csrInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4292 |                   csru2csrInfo_t           info,
+      |                   ^~~~~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4619:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4619 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4635:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4635 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4668:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4668 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4683:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4683 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4717:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4717 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4732:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4732 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4774:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4774 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4793:36: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4793 |                                    pruneInfo_t              info,
+      |                                    ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4833:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4833 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4851:37: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4851 |                                     pruneInfo_t              info,
+      |                                     ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4891:35: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4891 |                                   pruneInfo_t              info,
+      |                                   ^~~~~~~~~~~
+/user-environment/env/default/targets/sbsa-linux/include/cusparse.h:4909:35: warning: 'pruneInfo_t' is deprecated: The type will be removed in the next major release [-Wdeprecated-declarations]
+ 4909 |                                   pruneInfo_t              info,
+      |                                   ^~~~~~~~~~~
