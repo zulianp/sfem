@@ -403,9 +403,9 @@ hex8_to_isoparametric_tet10_local_adjoint_category_gpu(const int        L,   //
                                                        const typename Float3<FloatType>::type* J_fc,        // Jacobian matrix
                                                        const typename Float3<FloatType>::type* J_ref,       // Jacobian matrix
                                                        const FloatType                         det_J_phys,  //
-                                                       const geom_t    x[10],         // Tetrahedron vertices X-coordinates
-                                                       const geom_t    y[10],         // Tetrahedron vertices Y-coordinates
-                                                       const geom_t    z[10],         // Tetrahedron vertices Z-coordinates
+                                                       const FloatType x[10],         // Tetrahedron vertices X-coordinates
+                                                       const FloatType y[10],         // Tetrahedron vertices Y-coordinates
+                                                       const FloatType z[10],         // Tetrahedron vertices Z-coordinates
                                                        const FloatType ox,            // Origin of the grid
                                                        const FloatType oy,            //
                                                        const FloatType oz,            //
@@ -774,12 +774,12 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
                                 x,                                               // Tetrahedron vertices X-coordinates
                                 y,                                               //
                                 z,                                               // Tetrahedron vertices Z-coordinates
-                                ox,                                              // Origin of the grid
-                                oy,                                              //
-                                oz,                                              //
-                                dx,                                              // Spacing of the grid
-                                dy,                                              //
-                                dz,                                              //
+                                FloatType(ox),                                   // Origin of the grid
+                                FloatType(oy),                                   //
+                                FloatType(oz),                                   //
+                                FloatType(dx),                                   // Spacing of the grid
+                                FloatType(dy),                                   //
+                                FloatType(dz),                                   //
                                 wf_tet10,                                        // Weighted field at the vertices
                                 stride0,                                         // Stride
                                 stride1,                                         //
@@ -799,12 +799,12 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
                                     x,                                               // Tetrahedron vertices X-coordinates
                                     y,                                               //
                                     z,                                               // Tetrahedron vertices Z-coordinates
-                                    ox,                                              // Origin of the grid
-                                    oy,                                              //
-                                    oz,                                              //
-                                    dx,                                              // Spacing of the grid
-                                    dy,                                              //
-                                    dz,                                              //
+                                    FloatType(ox),                                   // Origin of the grid
+                                    FloatType(oy),                                   //
+                                    FloatType(oz),                                   //
+                                    FloatType(dx),                                   // Spacing of the grid
+                                    FloatType(dy),                                   //
+                                    FloatType(dz),                                   //
                                     wf_tet10,                                        // Weighted field at the vertices
                                     stride0,                                         // Stride
                                     stride1,                                         //
@@ -826,12 +826,12 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
                                     x,                                               // Tetrahedron vertices X-coordinates
                                     y,                                               //
                                     z,                                               // Tetrahedron vertices Z-coordinates
-                                    ox,                                              // Origin of the grid
-                                    oy,                                              //
-                                    oz,                                              //
-                                    dx,                                              // Spacing of the grid
-                                    dy,                                              //
-                                    dz,                                              //
+                                    FloatType(ox),                                   // Origin of the grid
+                                    FloatType(oy),                                   //
+                                    FloatType(oz),                                   //
+                                    FloatType(dx),                                   // Spacing of the grid
+                                    FloatType(dy),                                   //
+                                    FloatType(dz),                                   //
                                     wf_tet10,                                        // Weighted field at the vertices
                                     stride0,                                         // Stride
                                     stride1,                                         //
