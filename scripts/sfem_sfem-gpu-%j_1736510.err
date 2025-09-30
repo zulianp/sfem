@@ -1,0 +1,141 @@
+[0m-- GLOB mismatch![0m
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c: In function 'read_boundary_conditions':
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:49:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   49 |         const char *pch = strtok(sets, splitter);
+      |                                  ^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/base/./sfem_defs.h:7,
+                 from /users/hyang/ws/sfem_github/sfem/mesh/./sfem_mesh.h:5,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.h:8,
+                 from /users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:1:
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:75:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   75 |         const char *pch = strtok(values, splitter);
+      |                                  ^~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/operators/boundary_conditions/boundary_condition_io.c:119:34: warning: passing argument 1 of 'strtok' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  119 |         const char *pch = strtok(components, splitter);
+      |                                  ^~~~~~~~~~
+/usr/include/string.h:336:39: note: expected 'char * restrict' but argument is of type 'const char *'
+  336 | extern char *strtok (char *__restrict __s, const char *__restrict __delim)
+      |                      ~~~~~~~~~~~~~~~~~^~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c: In function 'hex_aa_8_eval_weno4_3D_Unit':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field.c:646:9: note: '#pragma message: WENO_DIRECT'
+  646 | #pragma message "WENO_DIRECT"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:12:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_V.c:13:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_resample_field_V2.c:316: warning: "ZEROS_VEC" redefined
+  316 | #define ZEROS_VEC \
+      | 
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:65: note: this is the location of the previous definition
+   65 | #define ZEROS_VEC \
+      | 
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:849:
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field_vec.h:20:9: note: '#pragma message: USING SIMD 256 double'
+   20 | #pragma message "USING SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_adjoint_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1448:31: warning: passing argument 7 of 'apply_inv_lumped_mass' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1448 |                               g);               //
+      |                               ^
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:13:
+/users/hyang/ws/sfem_github/sfem/operators/./mass.h:33:42: note: expected 'real_t * const' {aka 'double * const'} but argument is of type 'const real_t *' {aka 'const double *'}
+   33 |                            real_t *const values);
+      |                            ~~~~~~~~~~~~~~^~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1474:9: note: '#pragma message: ATTENTIN Using TEST_REFINE_ADJOINT for TET10'
+ 1474 | #pragma message "ATTENTIN Using TEST_REFINE_ADJOINT for TET10"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c: In function 'resample_field_mesh_tet10':
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1606:41: warning: passing argument 1 of 'perform_exchange_operations' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+ 1606 |             perform_exchange_operations(mesh,                                   //
+      |                                         ^~~~
+/users/hyang/ws/sfem_github/sfem/resampling/sfem_resample_field.c:1027:37: note: expected 'mesh_t *' but argument is of type 'const mesh_t *'
+ 1027 | perform_exchange_operations(mesh_t* mesh,         //
+      |                             ~~~~~~~~^~~~
+In file included from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.h:10,
+                 from /users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:1:
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_vec.h:19:9: note: '#pragma message: SIMD 256 double'
+   19 | #pragma message "SIMD 256 double"
+      |         ^~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c: In function 'hex_aa_8_collect_coeffs_O3_ptr_vec':
+/users/hyang/ws/sfem_github/sfem/resampling/tet10/tet10_weno_V.c:274:30: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+  274 |         first_ptrs_array[ii] = &data[first_indices[ii]];
+      |                              ^
+/users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt_inline.hpp(359): warning #20058-D: the #pragma unroll must precede a loop
+  #pragma unroll
+          ^
+          detected during:
+            instantiation of "void cu_affine_hex8_kelvin_voigt_apply_kernel(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, T, T, T, T, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *) [with T=real_t]" at line 209 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+            instantiation of "int cu_affine_hex8_kelvin_voigt_apply_tpl(ptrdiff_t, idx_t **, ptrdiff_t, const float *, const float *, real_t, real_t, real_t, real_t, ptrdiff_t, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, const T *, ptrdiff_t, T *, T *, T *, void *) [with T=real_t]" at line 267 of /users/hyang/ws/sfem_github/sfem/operators/hex8/cuda/cu_hex8_kelvin_voigt.cu
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/operators/macro_tet4/cuda/cu_macro_tet4_linear_elasticity.cu(19): warning #177-D: function "adjugate_and_det_micro_kernel" was declared but never referenced
+  static inline __attribute__((device)) __attribute__((host)) void adjugate_and_det_micro_kernel(const geom_t px0,
+                                                                   ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/operators/sshex8/cuda/cu_sshex8_linear_elasticity.cu(507): warning #177-D: function "cu_sshex8_is_interior" was declared but never referenced
+  static __attribute__((device)) inline bool cu_sshex8_is_interior(const int level, const int xi, const int yi, const int zi) {
+                                             ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu(103): warning #940-D: missing return statement at end of non-void function "copy_elems_tet10_managed"
+  }
+  ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu: In function 'cudaError_t copy_elems_tet10_managed(ptrdiff_t, elems_tet10_device*, const idx_t**)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_fun.cu:103:1: warning: control reaches end of non-void function [-Wreturn-type]
+  103 | }
+      | ^
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field_kernels.cuh(1172): remark #20200-D: #pragma message: "WENO_DIRECT_CUDA is enabled"
+  #pragma message "WENO_DIRECT_CUDA is enabled"
+                                               ^
+
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu: In function 'int hex8_to_tet10_resample_field_local_CUDA_wrapper(int, int, mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/tet10_resample_field.cu:883:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+  883 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu: In function 'int tet4_resample_field_local_reduce_CUDA_wrapper(int, int, const mesh_t*, int*, const ptrdiff_t*, const ptrdiff_t*, const geom_t*, const geom_t*, const real_t*, real_t*)':
+/users/hyang/ws/sfem_github/sfem/resampling/cuda/sfem_resample_field_cuda.cu:1191:17: note: '#pragma message: CUDA_HOST_MEMORY is enabled'
+ 1191 | #pragma message "CUDA_HOST_MEMORY is enabled"
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp: In function '{anonymous}::KVGradientOutput {anonymous}::run_single_apply(sfem::ExecutionSpace)':
+/users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp:119:26: error: no matching function for call to 'sfem::Op::apply(double*, double*)'
+  119 |     ctx.neumann_op->apply(solution->data(), neumann_buffer->data());
+      |     ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_NeumannConditions.hpp:18,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_Function.hpp:27,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_ContactConditions.hpp:4,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_API.hpp:19,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp:3:
+/users/hyang/ws/sfem_github/sfem/frontend/ops/./sfem_Op.hpp:192:21: note: candidate: 'virtual int sfem::Op::apply(const real_t*, const real_t*, real_t*)'
+  192 |         virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
+      |                     ^~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/ops/./sfem_Op.hpp:192:21: note:   candidate expects 3 arguments, 2 provided
+make[2]: *** [CMakeFiles/sfem_CudaNewmarkKVTest.dir/build.make:76: CMakeFiles/sfem_CudaNewmarkKVTest.dir/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:3503: CMakeFiles/sfem_CudaNewmarkKVTest.dir/all] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [Makefile:146: all] Error 2
+srun: error: nid006549: task 0: Exited with exit code 2
+srun: Terminating StepId=1736510.0

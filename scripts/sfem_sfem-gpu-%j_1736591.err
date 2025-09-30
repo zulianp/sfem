@@ -1,0 +1,18 @@
+/users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp: In function '{anonymous}::KVGradientOutput {anonymous}::run_single_apply(sfem::ExecutionSpace)':
+/users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp:119:26: error: no matching function for call to 'sfem::Op::apply(double*, double*)'
+  119 |     ctx.neumann_op->apply(solution->data(), neumann_buffer->data());
+      |     ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_NeumannConditions.hpp:18,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_Function.hpp:27,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_ContactConditions.hpp:4,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/./sfem_API.hpp:19,
+                 from /users/hyang/ws/sfem_github/sfem/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp:3:
+/users/hyang/ws/sfem_github/sfem/frontend/ops/./sfem_Op.hpp:192:21: note: candidate: 'virtual int sfem::Op::apply(const real_t*, const real_t*, real_t*)'
+  192 |         virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
+      |                     ^~~~~
+/users/hyang/ws/sfem_github/sfem/frontend/ops/./sfem_Op.hpp:192:21: note:   candidate expects 3 arguments, 2 provided
+make[2]: *** [CMakeFiles/sfem_CudaNewmarkKVTest.dir/build.make:76: CMakeFiles/sfem_CudaNewmarkKVTest.dir/frontend/tests/cuda/sfem_CudaNewmarkKVTest.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:3503: CMakeFiles/sfem_CudaNewmarkKVTest.dir/all] Error 2
+make: *** [Makefile:146: all] Error 2
+srun: error: nid006550: task 0: Exited with exit code 2
+srun: Terminating StepId=1736591.0

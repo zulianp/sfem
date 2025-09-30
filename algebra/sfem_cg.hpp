@@ -183,8 +183,16 @@ namespace sfem {
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = blas.dot(n, p, Ap);
+
+                assert(ptAp != 0);
+                assert(std::isfinite(ptAp) && ptAp != 0);
+                assert(std::isfinite(rtr) && rtr != 0);
+
                 const T alpha = rtr / ptAp;
 
+
+                assert(std::isfinite(alpha));
+                
                 assert(ptAp == ptAp);
                 assert(alpha == alpha);
 
