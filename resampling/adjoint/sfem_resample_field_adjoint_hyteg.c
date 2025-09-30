@@ -1828,10 +1828,11 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
 #if SFEM_LOG_LEVEL >= 5
     // Print the histogram of refinement levels
-    // printf("Histogram of refinement levels:\n");
-    // for (int l = 1; l <= MAX_REF_L; l++) {
-    //     printf("L = %d: %e elements\n", l, (double)(histo_L[l]));
-    // }
+    printf("Histogram of refinement levels:\n");
+    printf("Level,Number_of_elements\n");
+    for (int l = 1; l <= MAX_REF_L; l++) {
+        printf("%d, %ld\n", l, histo_L[l]);
+    }
 
     printf("\nHistogram of refinement levels (visual):\n");
 

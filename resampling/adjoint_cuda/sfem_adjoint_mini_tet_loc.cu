@@ -512,6 +512,20 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         printf("===================================================================\n");
 #endif
 
+#ifdef COLLECT_L_DATA
+
+        ptrdiff_t* L_data = (ptrdiff_t*)malloc(nelements * sizeof(ptrdiff_t));
+        cudaMemcpy((void*)L_data, (void*)tet_properties_info.level_L, nelements * sizeof(ptrdiff_t), cudaMemcpyDeviceToHost);
+
+        FILE* fp_L = fopen("L_data.dat", "w");
+        for (size_t i = 0; i < nelements; i++) {
+            fprintf(fp_L, "%lld\n", (long long)L_data[i]);
+        }
+        fclose(fp_L);
+        free(L_data);
+
+#endif  // COLLECT_L_DATA
+
         cudaEventDestroy(start_event);
         cudaEventDestroy(stop_event);
         cudaStreamDestroy(cuda_stream);
