@@ -1,3 +1,0 @@
-slurmstepd: error: *** STEP 1731197.1 ON nid006548 CANCELLED AT 2025-09-29T15:28:25 DUE TO TIME LIMIT ***
-slurmstepd: error: *** JOB 1731197 ON nid006548 CANCELLED AT 2025-09-29T15:28:25 DUE TO TIME LIMIT ***
-srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
