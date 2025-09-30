@@ -1,4 +1,4 @@
-cluster_size,tet_per_block,nelements,closk,Throughtput
+cluster_size,tet_per_block,nelements,clock,Throughput
 1 , 4 , 24942592 , 1.562510e-01, 1.596315e+08 
 1 , 4 , 24942592 , 1.546120e-01, 1.613238e+08 
 1 , 4 , 24942592 , 1.545218e-01, 1.614179e+08 
