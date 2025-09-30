@@ -122,7 +122,7 @@ void add_matrix_based_vector_ops(const int                       dim,
                                  const bool                      semi_structured,
                                  const enum sfem::ExecutionSpace es,
                                  std::vector<OpDesc_t>          &ops) {
-    if(element_type == TET10) return;
+    if(element_type == TET10 || semi_structured) return;
     ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
 
     if (element_type == HEX8) {
