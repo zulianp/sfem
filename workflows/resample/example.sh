@@ -137,7 +137,7 @@ fi
 
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
 
-PRECISION=float32
+PRECISION=float64
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION
 
 
