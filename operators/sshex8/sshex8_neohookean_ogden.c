@@ -1,6 +1,7 @@
 #include "sshex8_neohookean_ogden.h"
 
 #include "sfem_defs.h"
+#include "sfem_unroll.h"
 
 #include "hex8_inline_cpu.h"
 #include "hex8_linear_elasticity_inline_cpu.h"
@@ -680,8 +681,9 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                         }
 
                         for (int i = 0; i < 3 * 8; i++) {
-                            const scalar_t *const col = &element_matrix[i * 3 * 8];
+                            const scalar_t *const SFEM_RESTRICT col = &element_matrix[i * 3 * 8];
                             const scalar_t        ui  = element_h[i];
+#pragma omp simd
                             for (int j = 0; j < 3 * 8; j++) {
                                 eout[j] += ui * col[j];
                             }
