@@ -1,0 +1,3 @@
+[0m-- GLOB mismatch![0m
+srun: error: nid006548: task 0: Segmentation fault (core dumped)
+srun: Terminating StepId=1735368.1

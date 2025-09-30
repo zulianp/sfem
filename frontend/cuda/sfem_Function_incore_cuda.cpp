@@ -336,10 +336,10 @@ namespace sfem {
                 const auto &hc = hconds[i];
                 const auto &dc = conditions[i];
 
-                const enum ElemType st = hc.element_type;
-                const int           nnxs = elem_num_nodes(st);
-                const int           dim  = mesh->spatial_dimension();
-                const ptrdiff_t     ne   = dc.surface->extent(1);
+                const enum ElemType st     = hc.element_type;
+                const int           nnxs   = elem_num_nodes(st);
+                const int           dim    = mesh->spatial_dimension();
+                const ptrdiff_t     ne     = dc.surface->extent(1);
 
                 if (ne == 0) continue;
 
@@ -349,8 +349,6 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
 
-                // Gather per-element coordinates into SoA layout expected by CUDA kernels:
-                // coords[d][v * ne + e] = points[d][ surface[v][e] ]
                 auto coords_h = sfem::create_host_buffer<geom_t>(dim, ne * nnxs);
                 for (int d = 0; d < dim; ++d) {
                     const geom_t *const px = points->data()[d];
@@ -364,48 +362,42 @@ namespace sfem {
                     }
                 }
 
-                // Move coords to device (only needed if we try GPU path)
                 auto coords_d = sfem::to_device(coords_h);
 
-                // Dispatch to CUDA wrappers
-                if (dc.values) {
-                    // Scale per-element values by -hc.value (GPU wrapper has no scale_factor)
+                if (hc.values && hc.values->size() && dc.values) {
                     auto scaled = sfem::create_device_buffer<real_t>(ne);
 
-                    // dc.values are already on device
                     d_copy(ne, dc.values->data(), scaled->data());
                     d_scal(ne, -hc.value, scaled->data());
 
                     int gpu_ret = cu_integrate_values(st,
-                                               ne,
-                                               dc.surface->data(),
-                                               (const geom_t **)coords_d->data(),
-                                               SFEM_REAL_DEFAULT,
-                                               (void *)scaled->data(),
-                                               space->block_size(),
-                                               hc.component,
-                                               (void *)out_dev,
-                                               SFEM_DEFAULT_STREAM);
+                                                      ne,
+                                                      dc.surface->data(),
+                                                      (const geom_t **)coords_d->data(),
+                                                      SFEM_REAL_DEFAULT,
+                                                      (void *)scaled->data(),
+                                                      space->block_size(),
+                                                      hc.component,
+                                                      (void *)out_dev,
+                                                      SFEM_DEFAULT_STREAM);
                     err |= gpu_ret;
                 } else {
-                    // Constant value: pass -hc.value directly
                     int gpu_ret = cu_integrate_value(st,
-                                              ne,
-                                              dc.surface->data(),
-                                              (const geom_t **)coords_d->data(),
-                                              -hc.value,
-                                              space->block_size(),
-                                              hc.component,
-                                              SFEM_REAL_DEFAULT,
-                                              (void *)out_dev,
-                                              SFEM_DEFAULT_STREAM);
+                                                     ne,
+                                                     dc.surface->data(),
+                                                     (const geom_t **)coords_d->data(),
+                                                     -hc.value,
+                                                     space->block_size(),
+                                                     hc.component,
+                                                     SFEM_REAL_DEFAULT,
+                                                     (void *)out_dev,
+                                                     SFEM_DEFAULT_STREAM);
                     err |= gpu_ret;
                 }
             }
 
             if (err) return err;
 
-            // If we created a temporary device output, accumulate back to host
             if (out_tmp) {
                 auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
                 buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
@@ -1023,6 +1015,10 @@ namespace sfem {
             real_t                         K{3};
             real_t                         eta{0.1};
             real_t                         rho{1};
+            // Newmark parameters for linearization in apply()
+            real_t                         dt{0.1};
+            real_t                         gamma{0.5};
+            real_t                         beta{0.25};
             std::shared_ptr<Buffer<real_t>> vel_[3];
             std::shared_ptr<Buffer<real_t>> acc_[3];
     
@@ -1069,6 +1065,17 @@ namespace sfem {
                 K = SFEM_BULK_MODULUS;
                 eta = SFEM_DAMPING_RATIO;
                 rho = SFEM_DENSITY;
+
+                // Optional Newmark parameters from env (defaults: beta=1/4, gamma=1/2)
+                real_t SFEM_DT = dt;
+                real_t SFEM_NEWMARK_GAMMA = gamma;
+                real_t SFEM_NEWMARK_BETA = beta;
+                SFEM_READ_ENV(SFEM_DT, atof);
+                SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
+                SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
+                dt    = SFEM_DT;
+                gamma = SFEM_NEWMARK_GAMMA;
+                beta  = SFEM_NEWMARK_BETA;
     
                 auto elements = space->device_elements();
                 if (!elements) {
@@ -1178,16 +1185,11 @@ namespace sfem {
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_apply");
 
                 const ptrdiff_t ndofs = space->n_dofs();
-
-                const real_t *v = vel_[0]->data();
-                const real_t *a = acc_[0]->data();
-
                 const real_t *h_dev = h;
-                const real_t *v_dev = v;
-                const real_t *a_dev = a;
                 real_t       *out_dev = out;
 
-                std::shared_ptr<Buffer<real_t>> h_tmp, v_tmp, a_tmp, out_tmp;
+                std::shared_ptr<Buffer<real_t>> h_tmp, out_tmp;
+                std::shared_ptr<Buffer<real_t>> v_lin_tmp, a_lin_tmp;
 
                 auto to_device_if_needed_in = [&](const real_t *src, std::shared_ptr<Buffer<real_t>> &tmp) -> const real_t * {
                     cudaPointerAttributes attr{};
@@ -1210,9 +1212,21 @@ namespace sfem {
                 };
 
                 h_dev   = to_device_if_needed_in(h, h_tmp);
-                v_dev   = to_device_if_needed_in(v, v_tmp);
-                a_dev   = to_device_if_needed_in(a, a_tmp);
                 out_dev = to_device_if_needed_out(out, out_tmp);
+
+                // Build linearized velocity/acceleration increments from h
+                // Newmark (average acceleration):
+                //   δa = (1/(beta*dt^2))·δu,  δv = (gamma/(beta*dt))·δu
+                const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
+                const real_t a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
+                v_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
+                a_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
+                // v_lin_tmp = v_scale * h_dev
+                d_copy(ndofs, h_dev, v_lin_tmp->data());
+                d_scal(ndofs, v_scale, v_lin_tmp->data());
+                // a_lin_tmp = a_scale * h_dev
+                d_copy(ndofs, h_dev, a_lin_tmp->data());
+                d_scal(ndofs, a_scale, a_lin_tmp->data());
 
                 int err = cu_kelvin_voigt_apply(element_type,
                                                 adjugate->n_elements(),
@@ -1226,8 +1240,8 @@ namespace sfem {
                                                 rho,
                                                 real_type,
                                                 h_dev,
-                                                v_dev,
-                                                a_dev,
+                                                v_lin_tmp->data(),
+                                                a_lin_tmp->data(),
                                                 out_dev,
                                                 stream);
 

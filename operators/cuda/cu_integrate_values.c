@@ -23,7 +23,7 @@ int cu_integrate_value(const int                          element_type,
     const ptrdiff_t coords_stride = nelements;
 
     // Debug
-    printf("[DBG wrap val] type=%d ne=%ld bs=%d comp=%d\n", element_type, (long)nelements, block_size, component);
+    // printf("[DBG wrap val] type=%d ne=%ld bs=%d comp=%d\n", element_type, (long)nelements, block_size, component);
 
     switch (element_type) {
         case QUADSHELL4: {
@@ -54,7 +54,7 @@ int cu_integrate_values(const int                          element_type,
     const ptrdiff_t coords_stride = nelements;
 
     // Debug
-    printf("[DBG wrap arr] type=%d ne=%ld bs=%d comp=%d\n", element_type, (long)nelements, block_size, component);
+    // printf("[DBG wrap arr] type=%d ne=%ld bs=%d comp=%d\n", element_type, (long)nelements, block_size, component);
 
     switch (element_type) {
         case QUADSHELL4: {
