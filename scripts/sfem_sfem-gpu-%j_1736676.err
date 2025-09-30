@@ -1,8 +1,0 @@
-/usr/bin/ld: /usr/lib/../lib64/crt1.o: in function `__wrap_main':
-/home/abuild/rpmbuild/BUILD/glibc-2.31/csu/../sysdeps/aarch64/start.S:103:(.text+0x38): undefined reference to `main'
-collect2: error: ld returned 1 exit status
-make[2]: *** [CMakeFiles/sfem_CudaNewmarkKVTest.dir/build.make:107: sfem_CudaNewmarkKVTest] Error 1
-make[1]: *** [CMakeFiles/Makefile2:3503: CMakeFiles/sfem_CudaNewmarkKVTest.dir/all] Error 2
-make: *** [Makefile:146: all] Error 2
-srun: error: nid006544: task 0: Exited with exit code 2
-srun: Terminating StepId=1736676.0
