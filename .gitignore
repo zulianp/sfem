@@ -250,3 +250,6 @@ workflows/resample/data_5_tet10/metadata_sdf.float32.yml
 workflows/resample/data_5_tet4/metadata_sdf.float32.yml
 workflows/resample/metadata_test_field_t10.yml
 workflows/resample/cluster_results/plot_bench.jl
+workflows/resample/bench_adj/pdf_plots/elements_by_level.pdf
+workflows/resample/bench_adj/*
+
