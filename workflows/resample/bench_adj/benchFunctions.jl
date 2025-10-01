@@ -241,10 +241,10 @@ function plot_level_histograms(data_dict::Dict{String, DataFrame}; figsize = (10
 
 		# Add text annotation with total elements
 		total_elements = sum(df.Number_of_elements)
-		ax.text(0.02, 0.98, "Total elements: $(total_elements)", 
-            transform = ax.transAxes, 
-            verticalalignment = "top",
-            bbox = Dict("boxstyle" => "round,pad=0.3", "facecolor" => "white", "alpha" => 0.8))
+		ax.text(0.02, 0.98, "Total elements: $(total_elements)",
+			transform = ax.transAxes,
+			verticalalignment = "top",
+			bbox = Dict("boxstyle" => "round,pad=0.3", "facecolor" => "white", "alpha" => 0.8))
 	end
 
 	plt.tight_layout()
@@ -275,5 +275,79 @@ function plot_elements_by_level(data_dict::Dict{String, DataFrame}; figsize = (1
 	ax.set_yscale("log")  # Log scale often useful for element counts
 
 	plt.tight_layout()
+	return fig
+end
+
+function read_alpha_data(filepath::String)
+	if !isfile(filepath)
+		throw(ArgumentError("File not found: $filepath"))
+	end
+
+	# Read the file as a CSV without headers and convert to vector
+	df = CSV.File(filepath, header = false) |> DataFrame
+
+	# If it's a single column, extract it as a vector
+	if ncol(df) == 1
+		return Vector(df[!, 1])
+	else
+		# If multiple columns, flatten all data into a single vector
+		return vec(Matrix(df))
+	end
+end
+
+"""
+	plot_alpha_histogram(alpha_vec::Vector; bins=100, figsize=(10, 6), 
+						color="steelblue", alpha_val=0.7, show_stats=true)
+
+Create a histogram of alpha values with optional statistical overlays.
+
+# Arguments
+- `alpha_vec::Vector`: Vector of alpha values to plot
+- `bins::Int=100`: Number of histogram bins
+- `figsize::Tuple=(10, 6)`: Figure size (width, height)
+- `color::String="steelblue"`: Histogram color
+- `alpha_val::Float64=0.7`: Transparency of histogram bars
+- `show_stats::Bool=true`: Whether to show mean and std dev lines
+
+# Returns
+- `fig`: PyPlot figure object
+"""
+function plot_alpha_histogram(alpha_vec::Vector; bins = 100, figsize = (10, 6),
+	color = "steelblue", alpha_val = 0.7, show_stats = true)
+	# Create histogram using PyPlot
+	fig, ax = subplots(figsize = figsize)
+
+	# Create the histogram
+	n, bins_out, patches = ax.hist(alpha_vec, bins = bins, alpha = alpha_val,
+		color = color, edgecolor = "black")
+
+	# Add labels and title
+	ax.set_xlabel("Alpha Value")
+	ax.set_ylabel("Frequency")
+	ax.set_title("Distribution of Alpha Values")
+
+	# Set scientific notation on y-axis
+	ax.ticklabel_format(style = "scientific", axis = "y", scilimits = (0, 0))
+
+	if show_stats
+		# Add statistics
+		mean_val = mean(alpha_vec)
+		std_val = std(alpha_vec)
+
+		# Add vertical lines for mean and ±1 std dev
+		ax.axvline(mean_val, color = "red", linestyle = "-", linewidth = 2, label = "Mean $(round(mean_val, digits=2))")
+		ax.axvline(mean_val - std_val, color = "green", linestyle = "--", linewidth = 1, label = "±$(round(std_val, digits=2)) Std Dev")
+		ax.axvline(mean_val + std_val, color = "green", linestyle = "--", linewidth = 1)
+
+		# Add legend
+		ax.legend()
+	end
+
+	# Add grid
+	ax.grid(true, alpha = 0.3)
+
+	# Adjust layout
+	plt.tight_layout()
+
 	return fig
 end
