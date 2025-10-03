@@ -70,7 +70,8 @@ function summarize_cluster_stats(df::DataFrame)
                              se = std(x) / sqrt(n)
                              t_val = quantile(TDist(n - 1), 0.95)  # 90% CI uses α/2 = 0.05, so 0.95 quantile
                              se * t_val
-                         end) => :ci90_Throughput)
+                         end) => :ci90_Throughput,
+                         :Throughput_mini_tet => mean => :mean_Throughput_mini_tet)
 
     return summary_df
 end
@@ -240,7 +241,8 @@ Create a 3x1 subplot with histograms showing Level distribution for each dataset
 Classes (Level) are on the vertical axis, frequency on horizontal axis.
 Number of bins is determined by the maximum Level across all datasets.
 """
-function plot_level_histograms(data_dict::Dict{String,DataFrame}; figsize=(10, 12))
+function plot_level_histograms(data_dict::Dict{String,DataFrame};
+                               figsize=(10, 12))
     if length(data_dict) != 3
         throw(ArgumentError("Function expects exactly 3 datasets, got $(length(data_dict))"))
     end
@@ -304,6 +306,7 @@ function plot_elements_by_level(data_dict::Dict{String,DataFrame};
                                 figsize=(12, 8),
                                 fontsize=14,
                                 legend_list=nothing)
+    #
     fig, ax = subplots(; figsize=figsize)
 
     colors = ["blue", "red", "green", "orange", "purple"]
@@ -431,6 +434,77 @@ function plot_alpha_histogram(alpha_vec::Vector; bins=100, figsize=(10, 6),
     # Adjust layout
     plt.tight_layout()
 
+    return fig
+end
+
+function plot_multiple_alpha_histograms(alpha_vectors::Vector{Vector{T}};
+                                        labels::Vector{String},
+                                        bins=100,
+                                        figsize=(12, 8),
+                                        colors=nothing,
+                                        alpha_val=0.6,
+                                        show_stats=false,
+                                        cut_at_bin=nothing,
+                                        fontsize=12) where {T<:Real}
+    //
+    if length(alpha_vectors) != length(labels)
+        throw(ArgumentError("Number of alpha vectors must match number of labels"))
+    end
+
+    fig, ax = subplots(; figsize=figsize)
+
+    if isnothing(colors)
+        colors = ["steelblue", "orange", "green", "red", "purple", "brown"]
+    end
+
+    for (i, alpha_vec) in enumerate(alpha_vectors)
+        color = colors[mod(i - 1, length(colors)) + 1]
+
+        # Create histogram with a label for the legend
+        ax.hist(alpha_vec;
+                bins=bins,
+                alpha=alpha_val,
+                color=color,
+                edgecolor="black",
+                label=labels[i])
+
+        if show_stats
+            mean_val = mean(alpha_vec)
+            std_val = std(alpha_vec)
+
+            # Add vertical line for the mean, using the same color
+            ax.axvline(mean_val;
+                       color=color,
+                       linestyle="--",
+                       linewidth=2,
+                       label="$(labels[i]) Mean: $(round(mean_val, digits=2))")
+        end
+    end
+
+    # Add labels and title
+    ax.set_xlabel(L"$\alpha$ values"; fontsize=fontsize)
+    # ax.set_ylabel("Frequency"; fontsize=fontsize)
+    # ax.set_title("Alpha Distributions"; fontsize=fontsize)
+
+    # Set scientific notation on y-axis
+    ax.ticklabel_format(; style="scientific", axis="y", scilimits=(0, 0),
+                        fontsize=fontsize - 2)
+
+    # Add legend
+    legend_obj = ax.legend(; fontsize=fontsize - 2, loc="best", framealpha=0.8, frameon=true)
+    legend_obj.get_frame().set_edgecolor("none")
+
+    ax.tick_params(; axis="both", which="major", labelsize=fontsize - 2)
+    # ax.tick_params(; axis="both", which="minor", labelsize=fontsize - 2)
+
+    if !isnothing(cut_at_bin)
+        ax.set_xlim(0, cut_at_bin)
+    end
+
+    # Add grid
+    ax.grid(true; alpha=0.3)
+
+    plt.tight_layout()
     return fig
 end
 
