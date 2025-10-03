@@ -1154,10 +1154,12 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                             const geom_t* const SFEM_RESTRICT    origin,        // SDF: origin[3]
                             const geom_t* const SFEM_RESTRICT    delta,         // SDF: delta[3]
                             const real_t* const SFEM_RESTRICT    g,             // Weighted field
+                            const function_XYZ_t                 fun_XYZ,       // Function to apply
                             real_t* const SFEM_RESTRICT          data,          // SDF: data (output)
                             unsigned int*                        data_cnt,      // SDF: data count (output)
                             real_t const*                        alpha,         // SDF: tet alpha
                             real_t const*                        volume,        // SDF: tet volume
+                            real_t const*                        data_fun_XYZ,  // SDF: data for fun_XYZ
                             sfem_resample_field_info*            info,          //
                             const mini_tet_parameters_t          mini_tet_parameters) {  // Info struct with options and flags
     //
@@ -1254,7 +1256,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-#define TEST_GPU_HYTEG_REFINEMENT
+// #define TEST_GPU_HYTEG_REFINEMENT
+#define COMPUTE_FUN_XYZ_HEX
+
 #ifdef TEST_GPU_HYTEG_REFINEMENT
 
             ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                              //
@@ -1286,6 +1290,23 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                                                                    mass_vector,                    //
                                                                    mini_tet_parameters,            //
                                                                    data);                          //
+#ifdef COMPUTE_FUN_XYZ_HEX
+            if (fun_XYZ != NULL && data_fun_XYZ != NULL) {
+                ret = tet4_resample_field_apply_fun_to_hexa_d(0,                              //
+                                                              mesh->nelements,                //
+                                                              mesh->nnodes,                   //
+                                                              (const idx_t**)mesh->elements,  //
+                                                              (const geom_t**)mesh->points,   //
+                                                              n,                              //
+                                                              stride,                         //
+                                                              origin,                         //
+                                                              delta,                          //
+                                                              mass_vector,                    //
+                                                              mini_tet_parameters,            //
+                                                              fun_XYZ,                        //
+                                                              data_fun_XYZ);                  //
+            }
+#endif
 
             break;
 

@@ -83,9 +83,9 @@ tet4_apply_fun_tetrahedron_local_adjoint_category(const unsigned int     categor
         const ptrdiff_t j = floor(grid_y);
         const ptrdiff_t k = floor(grid_z);
 
-        const real_t xx_0 = (real_t)i * dx - ox;
-        const real_t yy_0 = (real_t)j * dy - oy;
-        const real_t zz_0 = (real_t)k * dz - oz;
+        const real_t xx_0 = (real_t)i * dx + ox;
+        const real_t yy_0 = (real_t)j * dy + oy;
+        const real_t zz_0 = (real_t)k * dz + oz;
 
         const real_t xx_1 = xx_0 + dx;
         const real_t yy_1 = yy_0 + dy;
