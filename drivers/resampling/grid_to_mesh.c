@@ -476,6 +476,8 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(comm, &mpi_rank);
     MPI_Comm_size(comm, &mpi_size);
 
+    const function_XYZ_t mesh_fun_XYZ = mesh_fun_chainsaw_xyz;
+
     // print argv
     if (mpi_rank == 0) {
         printf("argc: %d\n", argc);
@@ -770,7 +772,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_chainsaw_xyz,        //
+                              mesh_fun_XYZ,                 //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
