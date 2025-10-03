@@ -566,10 +566,11 @@ int main(int argc, char* argv[]) {
     }
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
-    real_t*       field        = NULL;
-    unsigned int* field_cnt    = NULL;  // TESTING used to count the number of times a field is updated
-    real_t*       field_alpha  = NULL;  // TESTING used to store the alpha field
-    real_t*       filed_volume = NULL;  // TESTING used to store the volume field
+    real_t*       field         = NULL;
+    unsigned int* field_cnt     = NULL;  // TESTING used to count the number of times a field is updated
+    real_t*       field_alpha   = NULL;  // TESTING used to store the alpha field
+    real_t*       field_volume  = NULL;  // TESTING used to store the volume field
+    real_t*       field_fun_XYZ = NULL;  // TESTING used to store the analytical function
 
     ptrdiff_t nlocal[3];
 
@@ -614,9 +615,10 @@ int main(int argc, char* argv[]) {
             field = malloc(n_zyx * sizeof(real_t));
 
             // TODO: are data to analyze the results
-            field_cnt    = calloc(n_zyx, sizeof(unsigned int));
-            field_alpha  = calloc(n_zyx, sizeof(real_t));
-            filed_volume = calloc(n_zyx, sizeof(real_t));
+            field_cnt     = calloc(n_zyx, sizeof(unsigned int));
+            field_alpha   = calloc(n_zyx, sizeof(real_t));
+            field_volume  = calloc(n_zyx, sizeof(real_t));
+            field_fun_XYZ = calloc(n_zyx, sizeof(real_t));
 
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
@@ -888,10 +890,12 @@ int main(int argc, char* argv[]) {
                                                         origin,                //
                                                         delta,                 //
                                                         g,                     //
+                                                        mesh_fun_XYZ,          //
                                                         field,                 //
                                                         field_cnt,             //
                                                         field_alpha,           //
-                                                        filed_volume,          //
+                                                        field_volume,          //
+                                                        field_fun_XYZ,         //
                                                         &info,                 //
                                                         mini_tet_parameters);  //
 
@@ -983,6 +987,26 @@ int main(int argc, char* argv[]) {
                                   field,
                                   nlocal,
                                   nglobal);
+
+                    if (field_fun_XYZ != NULL) {
+                        char        out_filename_fun_xyz[1000];
+                        const char* env_out_filename_fun_xyz = getenv("OUT_FILENAME_FUN_XYZ_RAW");
+                        if (env_out_filename_fun_xyz && strlen(env_out_filename_fun_xyz) > 0) {
+                            snprintf(out_filename_fun_xyz, 1000, "%s", env_out_filename_fun_xyz);
+                        } else {
+                            snprintf(out_filename_fun_xyz,
+                                     1000,
+                                     "/home/sriva/git/sfem/workflows/resample/test_field_fun_XYZ.raw",
+                                     mpi_rank);
+                        }
+                        ndarray_write(MPI_COMM_WORLD,
+                                      out_filename_fun_xyz,
+                                      ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
+                                      3,
+                                      field_fun_XYZ,
+                                      nlocal,
+                                      nglobal);
+                    }
 
                     // // TEST: write the in out field and the field_cnt
                     // ndarray_write(MPI_COMM_WORLD,
@@ -1166,9 +1190,9 @@ int main(int argc, char* argv[]) {
         field_alpha = NULL;
     }
 
-    if (filed_volume) {
-        free(filed_volume);
-        filed_volume = NULL;
+    if (field_volume) {
+        free(field_volume);
+        field_volume = NULL;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

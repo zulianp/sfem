@@ -32,7 +32,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=torus4
+mesh=torus3   ### Use 4 for benchmarking
 # mesh=impeller_tet4
 
 out=resampled
@@ -66,9 +66,9 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-# sdf_test.py $sdf 125
+sdf_test.py $sdf 125
 # sdf_test.py $sdf 250
-sdf_test.py $sdf 500
+# sdf_test.py $sdf 500
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
@@ -162,6 +162,7 @@ function process_raw_file() {
 process_raw_file field_cnt
 process_raw_file bit_array
 process_raw_file test_field
+process_raw_file test_field_fun_XYZ
 process_raw_file test_field_alpha
 process_raw_file test_field_volume
 

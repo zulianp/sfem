@@ -30,6 +30,9 @@ typedef struct {
     real_t            alpha_th;             // Threshold for adjoint refinement
 } sfem_resample_field_info;
 
+/** @brief Function pointer type for a function of three variables. */
+typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
+
 /**
  * @brief Resamples a field from a structured grid to a tetrahedral mesh (local version).
  *
@@ -330,21 +333,23 @@ in_out_tet4(const int                            mpi_size,   // MPI size
  *
  * @return 0 if the operation is successful.
  */
-int                                                                            //
-resample_field_adjoint_tet4(const int                            mpi_size,     // MPI size
-                            const int                            mpi_rank,     // MPI rank
-                            const mesh_t* const SFEM_RESTRICT    mesh,         // Mesh: mesh_t struct
-                            const ptrdiff_t* const SFEM_RESTRICT n,            // SDF: n[3]
-                            const ptrdiff_t* const SFEM_RESTRICT stride,       // SDF: stride[3]
-                            const geom_t* const SFEM_RESTRICT    origin,       // SDF: origin[3]
-                            const geom_t* const SFEM_RESTRICT    delta,        // SDF: delta[3]
-                            const real_t* const SFEM_RESTRICT    g,            // Weighted field
-                            real_t* const SFEM_RESTRICT          data,         // SDF: data (output)
-                            unsigned int*                        data_cnt,     // SDF: data count (output)
-                            real_t const*                        alpha,        // SDF: tet alpha
-                            real_t const*                        volume,       // SDF: tet volume
-                            sfem_resample_field_info*            info,         // Info struct with options and flags
-                            const mini_tet_parameters_t          mini_tet_parameters);  // Mini tet params
+int                                                                              //
+resample_field_adjoint_tet4(const int                            mpi_size,       // MPI size
+                            const int                            mpi_rank,       // MPI rank
+                            const mesh_t* const SFEM_RESTRICT    mesh,           // Mesh: mesh_t struct
+                            const ptrdiff_t* const SFEM_RESTRICT n,              // SDF: n[3]
+                            const ptrdiff_t* const SFEM_RESTRICT stride,         // SDF: stride[3]
+                            const geom_t* const SFEM_RESTRICT    origin,         // SDF: origin[3]
+                            const geom_t* const SFEM_RESTRICT    delta,          // SDF: delta[3]
+                            const real_t* const SFEM_RESTRICT    g,              // Weighted field
+                            const function_XYZ_t                 fun_XYZ,        // Function to apply
+                            real_t* const SFEM_RESTRICT          data,           // SDF: data (output)
+                            unsigned int*                        data_cnt,       // SDF: data count (output)
+                            real_t const*                        alpha,          // SDF: tet alpha
+                            real_t const*                        volume,         // SDF: tet volume
+                            real_t const*                        field_fun_XYZ,  // SDF: tet field function
+                            sfem_resample_field_info*            info,           // Info struct with options and flags
+                            const mini_tet_parameters_t          mini_tet_parameters);    // Mini tet params
 
 /// @brief  DEBUG code for testing the adjoint resampling operation
 /// @param mpi_size
@@ -683,6 +688,21 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
                                                  const mini_tet_parameters_t          mini_tet_parameters,
                                                  real_t* const SFEM_RESTRICT          data);  //
 
+int                                                                                                //
+tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      start_element,        // Mesh
+                                        const ptrdiff_t                      end_element,          //
+                                        const ptrdiff_t                      nnodes,               //
+                                        const idx_t** const SFEM_RESTRICT    elems,                //
+                                        const geom_t** const SFEM_RESTRICT   xyz,                  //
+                                        const ptrdiff_t* const SFEM_RESTRICT n,                    // SDF
+                                        const ptrdiff_t* const SFEM_RESTRICT stride,               //
+                                        const geom_t* const SFEM_RESTRICT    origin,               //
+                                        const geom_t* const SFEM_RESTRICT    delta,                //
+                                        const real_t* const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                        const mini_tet_parameters_t          mini_tet_parameters,  //
+                                        const function_XYZ_t                 fun_XYZ,              // Function to apply
+                                        const real_t* const SFEM_RESTRICT    hex_fun_data);           // Output
+
 /**
  * @brief
  *
@@ -825,9 +845,6 @@ tet4_alpha_volume_mesh_adjoint(const ptrdiff_t                      start_elemen
                                const real_t* const SFEM_RESTRICT    weighted_field,  // Input weighted field
                                real_t* const SFEM_RESTRICT          alpha,           // Output alpha
                                real_t* const SFEM_RESTRICT          tet_volume);              // Output tetrahedral volume
-
-/** @brief Function pointer type for a function of three variables. */
-typedef real_t (*function_XYZ_t)(real_t x, real_t y, real_t z);
 
 /**
  * @brief Apply a function to a mesh
