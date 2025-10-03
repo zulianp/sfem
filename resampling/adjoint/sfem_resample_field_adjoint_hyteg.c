@@ -1237,6 +1237,16 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
         const real_type d6 = It * hex8_f6;
         const real_type d7 = It * hex8_f7;
 
+        // Update the data
+        data[i0] += d0;
+        data[i1] += d1;
+        data[i2] += d2;
+        data[i3] += d3;
+        data[i4] += d4;
+        data[i5] += d5;
+        data[i6] += d6;
+        data[i7] += d7;
+
         // if (quad_i < 8 && category == 0) {
         //     printf("---- Debug info (tet4_resample_tetrahedron_local_adjoint_category_gpu) ----\n");
         //     printf("Category: %d, L: %d, quad_i: %d, dV %e, det_J_phys: %e, theta_volume %e, inv_N_micro_tet %e\n",
@@ -1294,16 +1304,6 @@ tet4_resample_tetrahedron_local_adjoint_category(const unsigned int     category
 
         //     if (quad_i > 6) exit(1);
         // }
-
-        // Update the data
-        data[i0] += d0;
-        data[i1] += d1;
-        data[i2] += d2;
-        data[i3] += d3;
-        data[i4] += d4;
-        data[i5] += d5;
-        data[i6] += d6;
-        data[i7] += d7;
 
     }  // END: for (int quad_i = 0; quad_i < TET_QUAD_NQP; quad_i++)
 
@@ -1865,3 +1865,4 @@ tet4_resample_field_local_refine_adjoint_hyteg_d(const ptrdiff_t                
 
     return ret;  // Return the result of the refinement
 }
+
