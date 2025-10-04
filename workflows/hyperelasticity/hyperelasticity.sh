@@ -27,7 +27,7 @@ then
 	cd aorta_geometry
 
 
-	cylinder.py aorta.vtk 1
+	cylinder.py aorta.vtk 2
 	db_to_raw.py aorta.vtk aorta --select_elem_type=tetra
 	surf_type=tri3
 	
@@ -46,6 +46,16 @@ then
 	cd $HERE
 fi
 
+export SFEM_ROTATE_SIDESET=aorta_geometry/outlet
+export SFEM_ROTATE_ANGLE=8
+export SFEM_ROTATE_STEPS=44
+# export SFEM_ROTATE_ANGLE=1.2
+# export SFEM_ROTATE_STEPS=10
+export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
+
+rm -rf output
 
 $LAUNCH hyperelasticy aorta_geometry/aorta dirichlet.yaml output
-raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS
+# raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS
+
+raw_to_db.py output/mesh output.xdmf -p "output/out/disp.0.*.raw,output/out/disp.1.*.raw,output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 

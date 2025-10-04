@@ -32,6 +32,7 @@ struct RotateYZ {
     std::shared_ptr<sfem::Buffer<real_t>> uy;
     std::shared_ptr<sfem::Buffer<real_t>> uz;
     sfem::ExecutionSpace                  execution_space;
+    real_t rcenter[3] = {0, 0, 0};
 
     RotateYZ(  //
             const std::shared_ptr<sfem::FunctionSpace>  &space,
@@ -74,8 +75,8 @@ struct RotateYZ {
         for (ptrdiff_t i = 0; i < nodeset->size(); i++) {
             const ptrdiff_t dof = nodeset->data()[i];
 
-            geom_t ypos = points[1][dof] - 0.5;
-            geom_t zpos = points[2][dof] - 0.5;
+            geom_t ypos = points[1][dof] - rcenter[1];
+            geom_t zpos = points[2][dof] - rcenter[2];
 
             geom_t ypos_rot = mat[0] * ypos + mat[1] * zpos;
             geom_t zpos_rot = mat[2] * ypos + mat[3] * zpos;
@@ -103,10 +104,15 @@ struct RotateYZ {
         const real_t      angle        = sfem::Env::read("SFEM_ROTATE_ANGLE", 0.0);
         const std::string sideset_path = sfem::Env::read_string("SFEM_ROTATE_SIDESET", "");
         const int         steps        = sfem::Env::read("SFEM_ROTATE_STEPS", 10);
+
         if (!sideset_path.empty()) {
             printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
             auto sideset = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
-            return RotateYZ::create(space, sideset, steps, angle, execution_space);
+            auto ret = RotateYZ::create(space, sideset, steps, angle, execution_space);
+            ret->rcenter[0] = sfem::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
+            ret->rcenter[1] = sfem::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
+            ret->rcenter[2] = sfem::Env::read("SFEM_ROTATE_RCENTER_Z", 0.0);
+            return ret;
         }
         return nullptr;
     }

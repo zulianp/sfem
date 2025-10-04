@@ -11,7 +11,193 @@
 
 #include "sfem_vec.h"
 #include "tet4_neohookean_ogden_inline_cpu.h"
+#include "tet4_neohookean_ogden_local.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
+
+int tet4_neohookean_ogden_objective(const ptrdiff_t                   nelements,
+                                    const ptrdiff_t                   stride,
+                                    const ptrdiff_t                   nnodes,
+                                    idx_t **const SFEM_RESTRICT       elements,
+                                    geom_t **const SFEM_RESTRICT      points,
+                                    const real_t                      mu,
+                                    const real_t                      lambda,
+                                    const ptrdiff_t                   u_stride,
+                                    const real_t *const SFEM_RESTRICT ux,
+                                    const real_t *const SFEM_RESTRICT uy,
+                                    const real_t *const SFEM_RESTRICT uz,
+                                    const int                         is_element_wise,
+                                    real_t *const SFEM_RESTRICT       out) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+
+        scalar_t edispx[4];
+        scalar_t edispy[4];
+        scalar_t edispz[4];
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            edispx[v]           = ux[idx];
+            edispy[v]           = uy[idx];
+            edispz[v]           = uz[idx];
+        }
+
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        scalar_t v = 0;
+        tet4_neohookean_ogden_objective_integral(jacobian_adjugate, jacobian_determinant, mu, lambda, edispx, edispy, edispz, &v);
+        assert(v == v);
+
+        if (is_element_wise) {
+            out[i] = v;
+        } else {
+#pragma omp atomic update
+            *out += v;
+        }
+    }
+
+    if (*out != *out) {
+        *out = 1e10;
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int tet4_neohookean_ogden_objective_steps(const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   inc_stride,
+                                          const real_t *const SFEM_RESTRICT incx,
+                                          const real_t *const SFEM_RESTRICT incy,
+                                          const real_t *const SFEM_RESTRICT incz,
+                                          const int                         nsteps,
+                                          const real_t *const               steps,
+                                          real_t *const SFEM_RESTRICT       out) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel
+    {
+        scalar_t *out_local = (scalar_t *)calloc(nsteps, sizeof(scalar_t));
+
+#pragma omp for
+        for (ptrdiff_t i = 0; i < nelements; ++i) {
+            idx_t ev[4];
+
+            scalar_t edispx[4];
+            scalar_t edispy[4];
+            scalar_t edispz[4];
+
+            scalar_t eincx[4];
+            scalar_t eincy[4];
+            scalar_t eincz[4];
+
+            scalar_t jacobian_adjugate[9];
+            scalar_t jacobian_determinant = 0;
+
+            for (int v = 0; v < 4; ++v) {
+                ev[v] = elements[v][i * stride];
+            }
+
+            for (int v = 0; v < 4; ++v) {
+                const ptrdiff_t idx = ev[v] * u_stride;
+                edispx[v]           = ux[idx];
+                edispy[v]           = uy[idx];
+                edispz[v]           = uz[idx];
+            }
+
+            for (int v = 0; v < 8; ++v) {
+                const ptrdiff_t idx = ev[v] * inc_stride;
+                eincx[v]            = incx[idx];
+                eincy[v]            = incy[idx];
+                eincz[v]            = incz[idx];
+            }
+
+            tet4_adjugate_and_det_s(x[ev[0]],
+                                    x[ev[1]],
+                                    x[ev[2]],
+                                    x[ev[3]],
+                                    // Y-coordinates
+                                    y[ev[0]],
+                                    y[ev[1]],
+                                    y[ev[2]],
+                                    y[ev[3]],
+                                    // Z-coordinates
+                                    z[ev[0]],
+                                    z[ev[1]],
+                                    z[ev[2]],
+                                    z[ev[3]],
+                                    // Output
+                                    jacobian_adjugate,
+                                    &jacobian_determinant);
+
+            tet4_neohookean_ogden_objective_steps_integral(jacobian_adjugate,
+                                                           jacobian_determinant,
+                                                           mu,
+                                                           lambda,
+                                                           edispx,
+                                                           edispy,
+                                                           edispz,
+                                                           eincx,
+                                                           eincy,
+                                                           eincz,
+                                                           nsteps,
+                                                           steps,
+                                                           out_local);
+        }
+
+        for (int s = 0; s < nsteps; s++) {
+#pragma omp atomic update
+            out[s] += out_local[s];
+        }
+
+        free(out_local);
+    }
+
+    for (int s = 0; s < nsteps; s++) {
+        if (out[s] != out[s]) {
+            out[s] = 1e10;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
 
 static void neohookean_gradient_ref(const real_t                      mu,
                                     const real_t                      lambda,
@@ -152,75 +338,6 @@ static void neohookean_gradient_ref(const real_t                      mu,
     element_vector[11] = x18 * (x103 * x96 + x104 * x92 + x105 * x94);
 }
 
-// int tet4_neohookean_ogden_value(const ptrdiff_t nelements,
-//                                 const ptrdiff_t nnodes,
-//                                 idx_t **const SFEM_RESTRICT elements,
-//                                 geom_t **const SFEM_RESTRICT points,
-//                                 const real_t mu,
-//                                 const real_t lambda,
-//                                 const ptrdiff_t u_stride,
-//                                 const real_t *const ux,
-//                                 const real_t *const uy,
-//                                 const real_t *const uz,
-//                                 real_t *const SFEM_RESTRICT value) {
-//     SFEM_UNUSED(nnodes);
-
-//     const geom_t *const x = points[0];
-//     const geom_t *const y = points[1];
-//     const geom_t *const z = points[2];
-
-//     real_t acc = 0;
-// #pragma omp parallel for reduction(+ : acc)
-//     for (ptrdiff_t i = 0; i < nelements; ++i) {
-//         idx_t ev[4];
-//         scalar_t element_ux[4];
-//         scalar_t element_uy[4];
-//         scalar_t element_uz[4];
-
-// #pragma unroll(4)
-//         for (int v = 0; v < 4; ++v) {
-//             ev[v] = elements[v][i];
-//         }
-
-//         for (int enode = 0; enode < 4; ++enode) {
-//             idx_t dof = ev[enode] * u_stride;
-//             element_ux[enode] = ux[dof];
-//             element_uy[enode] = uy[dof];
-//             element_uz[enode] = uz[dof];
-//         }
-
-//         real_t element_scalar = 0;
-//         tet4_neohookean_ogden_value_points(  // Model parameters
-//                 mu,
-//                 lambda,
-//                 // X-coordinates
-//                 x[ev[0]],
-//                 x[ev[1]],
-//                 x[ev[2]],
-//                 x[ev[3]],
-//                 // Y-coordinates
-//                 y[ev[0]],
-//                 y[ev[1]],
-//                 y[ev[2]],
-//                 y[ev[3]],
-//                 // Z-coordinates
-//                 z[ev[0]],
-//                 z[ev[1]],
-//                 z[ev[2]],
-//                 z[ev[3]],
-//                 element_ux,
-//                 element_uy,
-//                 element_uz,
-//                 // output vector
-//                 &element_scalar);
-
-//         acc += element_scalar;
-//     }
-
-//     *value += acc;
-//     return SFEM_SUCCESS;
-// }
-
 int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 const ptrdiff_t              nnodes,
                                 idx_t **const SFEM_RESTRICT  elements,
@@ -301,7 +418,8 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 jacobian_adjugate,
                                 &jacobian_determinant);
 
-#if 0  // Old implementation
+#if 0  
+// Old implementation
         tet4_neohookean_hessian_apply_adj(jacobian_adjugate,
                                           jacobian_determinant,
                                           mu,
