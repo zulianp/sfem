@@ -14,6 +14,7 @@
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Env.hpp"
+#include "sfem_P1toP2.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -32,7 +33,7 @@ struct RotateYZ {
     std::shared_ptr<sfem::Buffer<real_t>> uy;
     std::shared_ptr<sfem::Buffer<real_t>> uz;
     sfem::ExecutionSpace                  execution_space;
-    real_t rcenter[3] = {0, 0, 0};
+    real_t                                rcenter[3] = {0, 0, 0};
 
     RotateYZ(  //
             const std::shared_ptr<sfem::FunctionSpace>  &space,
@@ -107,8 +108,8 @@ struct RotateYZ {
 
         if (!sideset_path.empty()) {
             printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
-            auto sideset = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
-            auto ret = RotateYZ::create(space, sideset, steps, angle, execution_space);
+            auto sideset    = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
+            auto ret        = RotateYZ::create(space, sideset, steps, angle, execution_space);
             ret->rcenter[0] = sfem::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
             ret->rcenter[1] = sfem::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
             ret->rcenter[2] = sfem::Env::read("SFEM_ROTATE_RCENTER_Z", 0.0);
@@ -151,7 +152,12 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         }
     }
 
-    auto      mesh       = sfem::Mesh::create_from_file(comm, mesh_path);
+    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
+
+    if (sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+        mesh = sfem::convert_p1_mesh_to_p2(mesh);
+    }
+
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 

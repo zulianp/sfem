@@ -875,9 +875,11 @@ class SRHyperelasticity:
 
 
 if __name__ == "__main__":
-    fe = Hex8()
+    # fe = Hex8()
+    # fe = Tet4()
+    fe = Tet10()
     op = SRHyperelasticity.create_from_string(fe, "neohookean", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
-    op = SRHyperelasticity.create_from_string_unimodular(fe, "mooney_rivlin", "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2")
+    # op = SRHyperelasticity.create_from_string_unimodular(fe, "mooney_rivlin", "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2")
     # op.check_metric_tensor_symmetries()
 
     

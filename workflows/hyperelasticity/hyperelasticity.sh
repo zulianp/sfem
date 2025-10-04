@@ -27,8 +27,9 @@ then
 	cd aorta_geometry
 
 
-	cylinder.py aorta.vtk 2
+	cylinder.py aorta.vtk 1
 	db_to_raw.py aorta.vtk aorta --select_elem_type=tetra
+	sfc aorta aorta
 	surf_type=tri3
 	
 	skin aorta skin_aorta
@@ -46,12 +47,13 @@ then
 	cd $HERE
 fi
 
-export SFEM_ROTATE_SIDESET=aorta_geometry/outlet
-export SFEM_ROTATE_ANGLE=8
-export SFEM_ROTATE_STEPS=44
+# export SFEM_ROTATE_SIDESET=aorta_geometry/outlet
+# export SFEM_ROTATE_ANGLE=6
+# export SFEM_ROTATE_STEPS=44
 # export SFEM_ROTATE_ANGLE=1.2
 # export SFEM_ROTATE_STEPS=10
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
+export SFEM_USE_PARTIAL_ASSEMBLY=1
 
 rm -rf output
 

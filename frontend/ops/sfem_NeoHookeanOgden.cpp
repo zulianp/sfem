@@ -228,13 +228,14 @@ namespace sfem {
         bool use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
-            auto ua                  = std::make_shared<struct AssemblyData>();
-            ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == HEX8;
-            ua->use_compression      = use_compression;
-            ua->use_AoS              = use_AoS;
-            ua->elements             = domain.second.block->elements();
-            ua->elements_stride      = 1;
-            domain.second.user_data  = ua;
+            auto ua = std::make_shared<struct AssemblyData>();
+            ua->use_partial_assembly =
+                    use_partial_assembly || domain.second.element_type == HEX8 || domain.second.element_type == TET10;
+            ua->use_compression     = use_compression;
+            ua->use_AoS             = use_AoS;
+            ua->elements            = domain.second.block->elements();
+            ua->elements_stride     = 1;
+            domain.second.user_data = ua;
 
             if (use_AoS) {
                 auto nxe            = domain.second.block->n_nodes_per_element();
@@ -259,28 +260,25 @@ namespace sfem {
             auto mu           = domain.second.parameters->get_real_value("mu", impl_->mu);
             auto element_type = domain.second.element_type;
 
-            if (element_type == TET4 || element_type == HEX8) {
-                // FIXME: Add support for other element types
-                if (!assembly_data->partial_assembly_buffer) {
-                    assembly_data->partial_assembly_buffer =
-                            sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
-                }
-
-                int ok = neohookean_ogden_hessian_partial_assembly(
-                        domain.second.element_type,
-                        domain.second.block->n_elements(),
-                        assembly_data->elements_stride,
-                        assembly_data->elements->data(),
-                        mesh->points()->data(),
-                        domain.second.parameters->get_real_value("mu", impl_->mu),
-                        domain.second.parameters->get_real_value("lambda", impl_->lambda),
-                        3,
-                        &u[0],
-                        &u[1],
-                        &u[2],
-                        assembly_data->partial_assembly_buffer->data());
-                assembly_data->compress_partial_assembly(domain.second);
+            // FIXME: Add support for other element types
+            if (!assembly_data->partial_assembly_buffer) {
+                assembly_data->partial_assembly_buffer =
+                        sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
             }
+
+            int ok = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
+                                                               domain.second.block->n_elements(),
+                                                               assembly_data->elements_stride,
+                                                               assembly_data->elements->data(),
+                                                               mesh->points()->data(),
+                                                               domain.second.parameters->get_real_value("mu", impl_->mu),
+                                                               domain.second.parameters->get_real_value("lambda", impl_->lambda),
+                                                               3,
+                                                               &u[0],
+                                                               &u[1],
+                                                               &u[2],
+                                                               assembly_data->partial_assembly_buffer->data());
+            assembly_data->compress_partial_assembly(domain.second);
         }
 
         return SFEM_SUCCESS;
