@@ -213,8 +213,12 @@ def exodusII_to_raw(input_mesh, output_folder):
     #########################################
     # Sidesets
     #########################################
+    num_sidesets = 0
 
-    num_sidesets = nc.dimensions["num_side_sets"].size
+    if "num_side_sets" in nc.dimensions:
+        num_sidesets = nc.dimensions["num_side_sets"].size
+    else:
+        return
     print(f"num_sidesets={num_sidesets}")
 
     s2n_map = ss_to_nodelist[elem_type]

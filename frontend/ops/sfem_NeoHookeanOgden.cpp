@@ -21,8 +21,8 @@
 #include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
-#include <mpi.h>
 #include <math.h>
+#include <mpi.h>
 
 namespace sfem {
 
@@ -293,31 +293,17 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
 
-            if (domain.element_type == HEX8) {
-                return hex8_neohookean_ogden_objective(domain.block->n_elements(),
-                                                       ua->elements_stride,
-                                                       mesh->n_nodes(),
-                                                       ua->elements->data(),
-                                                       mesh->points()->data(),
-                                                       domain.parameters->get_real_value("mu", impl_->mu),
-                                                       domain.parameters->get_real_value("lambda", impl_->lambda),
-                                                       3,
-                                                       &x[0],
-                                                       &x[1],
-                                                       &x[2],
-                                                       false,
-                                                       out);
-            } else {
-                return neohookean_ogden_value_aos(domain.element_type,
+            return neohookean_ogden_objective_aos(domain.element_type,
                                                   domain.block->n_elements(),
+                                                  ua->elements_stride,
                                                   mesh->n_nodes(),
-                                                  domain.block->elements()->data(),
+                                                  ua->elements->data(),
                                                   mesh->points()->data(),
                                                   domain.parameters->get_real_value("mu", impl_->mu),
                                                   domain.parameters->get_real_value("lambda", impl_->lambda),
                                                   x,
+                                                  false,
                                                   out);
-            }
         });
     }
 
@@ -331,29 +317,19 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
-            if (domain.element_type == HEX8) {
-                return hex8_neohookean_ogden_objective_steps(mesh->n_elements(),
-                                                             ua->elements_stride,
-                                                             mesh->n_nodes(),
-                                                             ua->elements->data(),
-                                                             mesh->points()->data(),
-                                                             domain.parameters->get_real_value("mu", impl_->mu),
-                                                             domain.parameters->get_real_value("lambda", impl_->lambda),
-                                                             3,
-                                                             &x[0],
-                                                             &x[1],
-                                                             &x[2],
-                                                             3,
-                                                             &h[0],
-                                                             &h[1],
-                                                             &h[2],
-                                                             nsteps,
-                                                             steps,
-                                                             out);
-            } else {
-                // Must be implemented
-                return SFEM_FAILURE;
-            }
+            return neohookean_ogden_objective_steps_aos(domain.element_type,
+                                                        mesh->n_elements(),
+                                                        ua->elements_stride,
+                                                        mesh->n_nodes(),
+                                                        ua->elements->data(),
+                                                        mesh->points()->data(),
+                                                        domain.parameters->get_real_value("mu", impl_->mu),
+                                                        domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                        x,
+                                                        h,
+                                                        nsteps,
+                                                        steps,
+                                                        out);
         });
     }
 
