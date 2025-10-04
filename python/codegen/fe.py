@@ -1,5 +1,6 @@
 import sympy as sp
 from sfem_codegen import adjugate
+from sfem_codegen import determinant
 from sfem_codegen import norm2
 from sfem_codegen import c_gen
 from sfem_codegen import c_log
@@ -725,3 +726,54 @@ class FE:
         )
 
         str_to_file(f"{self.name()}_kernels.cu", code)
+
+    def generate_jacobian_code(self):
+        jac = self.jacobian(self.quadrature_point())
+        rows, cols = jac.shape
+        jac_expr = []
+        for r in range(0, rows):
+            for c in range(0, cols):
+                if self.strided:
+                    jac_expr.append(
+                        ast.Assignment(
+                            sp.symbols(f"jacobian[{r*cols+c}*stride_jacobian]"),
+                            jac[r, c],
+                        )
+                    )
+                else:
+                    jac_expr.append(
+                        ast.Assignment(sp.symbols(f"jacobian[{r*cols+c}]"), jac[r, c])
+                    )
+        return c_gen(jac_expr)
+
+    def generate_isoparametric_jacobian_code(self):
+        jac = self.isoparametric_jacobian(self.quadrature_point())
+        rows, cols = jac.shape
+        jac_expr = []
+        for r in range(0, rows):
+            for c in range(0, cols):
+                if self.strided:
+                    jac_expr.append(
+                        ast.Assignment(
+                            sp.symbols(f"jacobian[{r*cols+c}*stride_jacobian]"),
+                            jac[r, c],
+                        )
+                    )
+                else:
+                    jac_expr.append(
+                        ast.Assignment(sp.symbols(f"jacobian[{r*cols+c}]"), jac[r, c])
+                    )
+        return c_gen(jac_expr)
+
+    def generate_jacobian_adjugate_and_determinant_code(self):
+        jac = self.isoparametric_jacobian(self.quadrature_point())
+        rows, cols = jac.shape
+        expr = []
+        adj = adjugate(jac)
+        det = determinant(jac)
+        for r in range(0, rows):
+            for c in range(0, cols):
+                expr.append(ast.Assignment(sp.symbols(f"adjugate[{r*cols+c}]"), jac[r, c]))
+
+        expr.append(ast.Assignment(sp.symbols(f"determinant[0]"), det))
+        return c_gen(expr)

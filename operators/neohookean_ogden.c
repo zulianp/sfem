@@ -2,6 +2,7 @@
 
 #include "tet4_neohookean_ogden.h"
 #include "hex8_neohookean_ogden.h"
+#include "tet10_neohookean_ogden.h"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -179,6 +180,23 @@ int neohookean_ogden_gradient_aos(const enum ElemType               element_type
                                                   &values[1],
                                                   &values[2]);
         }
+        case TET10: {
+            return tet10_neohookean_ogden_gradient(nelements,
+                                                  1,
+                                                  nnodes,
+                                                  elements,
+                                                  points,
+                                                  mu,
+                                                  lambda,
+                                                  3,
+                                                  &u[0],
+                                                  &u[1],
+                                                  &u[2],
+                                                  3,
+                                                  &values[0],
+                                                  &values[1],
+                                                  &values[2]);
+        }
         case HEX8: {
             return hex8_neohookean_ogden_gradient(nelements,
                                                   1,
@@ -248,6 +266,10 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
             return tet4_neohookean_ogden_hessian_partial_assembly(
                     nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
         }
+        case TET10: {
+            return tet10_neohookean_ogden_hessian_partial_assembly(
+                    nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
+        }
         case HEX8: {
             return hex8_neohookean_ogden_hessian_partial_assembly(
                     nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, partial_assembly);
@@ -275,6 +297,10 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_partial_assembly_apply(
+                    nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
+        case TET10: {
+            return tet10_neohookean_ogden_partial_assembly_apply(
                     nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         case HEX8: {
@@ -308,6 +334,10 @@ int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType      
             return tet4_neohookean_ogden_compressed_partial_assembly_apply(
                     nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
+        case TET10: {
+            return tet10_neohookean_ogden_compressed_partial_assembly_apply(
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
         case HEX8: {
             return hex8_neohookean_ogden_compressed_partial_assembly_apply(
                     nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
@@ -334,6 +364,9 @@ int neohookean_ogden_objective_aos(const enum ElemType               element_typ
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
+        }
+        case TET10: {
+            return tet10_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
         }
         case HEX8: {
             return hex8_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
@@ -362,6 +395,9 @@ int neohookean_ogden_objective_steps_aos(const enum ElemType               eleme
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);
+        }
+        case TET10: {
+            return tet10_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);
         }
         case HEX8: {
             return hex8_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);

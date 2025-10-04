@@ -701,7 +701,7 @@ def compressible_mooney_rivlin(fe):
 
 if __name__ == "__main__":
     # fe = Tet4()
-    fe = Hex8()
-    # fe = Tet10()
+    # fe = Hex8()
+    fe = Tet10()
     neohookean_ogden(fe)
     # compressible_mooney_rivlin(fe)
