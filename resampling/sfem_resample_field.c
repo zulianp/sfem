@@ -37,9 +37,10 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
     PRINT_CURRENT_FUNCTION;
 
     for (ptrdiff_t node = 0; node < nnodes; node++) {
-        const real_t x = xyz[0][node];
-        const real_t y = xyz[1][node];
-        const real_t z = xyz[2][node];
+        // Get the coordinates of the node
+        const real_t x = (real_t)xyz[0][node];
+        const real_t y = (real_t)xyz[1][node];
+        const real_t z = (real_t)xyz[2][node];
 
         const real_t v1 = fun(x, y, z);
 

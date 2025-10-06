@@ -7,6 +7,7 @@
 #include "matrixio_array.h"
 
 #include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,31 +21,90 @@
 
 #include <stdio.h>
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// resample_field_adjoint_tet4 /////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////
+// check_point_in_tet /////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+void                                           //
+check_point_in_tet(const int           p_cnt,  //
+                   const real_t const* px,     //
+                   const real_t const* py,     //
+                   const real_t const* pz,     //
+                   const real_t        x0,     //
+                   const real_t        x1,     //
+                   const real_t        x2,     //
+                   const real_t        x3,     //
+                   const real_t        y0,     //
+                   const real_t        y1,     //
+                   const real_t        y2,     //
+                   const real_t        y3,     //
+                   const real_t        z0,     //
+                   const real_t        z1,     //
+                   const real_t        z2,     //
+                   const real_t        z3,     //
+                   bool*               is_in) {              //
+    //
+    const real_t vol_tet_main = fabs(tet4_measure_v2(x0,    //
+                                                     x1,    //
+                                                     x2,    //
+                                                     x3,    //
+                                                     y0,    //
+                                                     y1,    //
+                                                     y2,    //
+                                                     y3,    //
+                                                     z0,    //
+                                                     z1,    //
+                                                     z2,    //
+                                                     z3));  //
+
+    for (int p_i = 0; p_i < p_cnt; p_i++) {
+        const real_t vol0 = fabs(tet4_measure_v2(px[p_i], x1, x2, x3, py[p_i], y1, y2, y3, pz[p_i], z1, z2, z3));
+        const real_t vol1 = fabs(tet4_measure_v2(x0, px[p_i], x2, x3, y0, py[p_i], y2, y3, z0, pz[p_i], z2, z3));
+        const real_t vol2 = fabs(tet4_measure_v2(x0, x1, px[p_i], x3, y0, y1, py[p_i], y3, z0, z1, pz[p_i], z3));
+        const real_t vol3 = fabs(tet4_measure_v2(x0, x1, x2, px[p_i], y0, y1, y2, py[p_i], z0, z1, z2, pz[p_i]));
+
+        const real_t vol_sum = vol0 + vol1 + vol2 + vol3;
+
+        if (fabs(vol_sum - vol_tet_main) > 1e-6 * vol_tet_main) {
+            is_in[p_i] = false;
+        } else {
+            is_in[p_i] = true;
+        }
+    }
+
+    return true;
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_tetrahedron_local_adjoint_category ////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-real_t                                                                                //
-tet4_apply_fun_tetrahedron_local_adjoint_category(const unsigned int     category,    //
-                                                  const unsigned int     L,           // Refinement level
-                                                  const real_t const*    bc,          // transposition vector for category
-                                                  const real_t           J_phys[9],   // Jacobian matrix
-                                                  const real_t           J_ref[9],    // Jacobian matrix
-                                                  const real_t           det_J_phys,  // Determinant of the Jacobian matrix
-                                                  const real_t           fx0,         // Tetrahedron vertices X-coordinates
-                                                  const real_t           fy0,         // Tetrahedron vertices Y-coordinates
-                                                  const real_t           fz0,         // Tetrahedron vertices Z-coordinates
-                                                  const function_XYZ_t   fun_XYZ,     // Function to apply
-                                                  const geom_t           ox,          // Origin of the grid
-                                                  const geom_t           oy,          //
-                                                  const geom_t           oz,          //
-                                                  const geom_t           dx,          // Spacing of the grid
-                                                  const geom_t           dy,          //
-                                                  const geom_t           dz,          //
-                                                  const ptrdiff_t* const stride,      // Stride
-                                                  const ptrdiff_t* const n,           // Size of the grid
-                                                  real_t* const          hex_fun_data) {       // Output
+real_t                                                                                  //
+tet4_apply_fun_tetrahedron_local_adjoint_category(const unsigned int     category,      //
+                                                  const unsigned int     L,             // Refinement level
+                                                  const real_t const*    bc,            // transposition vector for category
+                                                  const real_t           J_phys[9],     // Jacobian matrix
+                                                  const real_t           J_ref[9],      // Jacobian matrix
+                                                  const real_t           det_J_phys,    // Determinant of the Jacobian matrix
+                                                  const real_t           fx0,           // Tetrahedron vertices X-coordinates
+                                                  const real_t           fy0,           // Tetrahedron vertices Y-coordinates
+                                                  const real_t           fz0,           // Tetrahedron vertices Z-coordinates
+                                                  const function_XYZ_t   fun_XYZ,       // Function to apply
+                                                  const real_t* const    xyz_tet_main,  // Tetrahedron vertices coordinates
+                                                  const geom_t           ox,            // Origin of the grid
+                                                  const geom_t           oy,            //
+                                                  const geom_t           oz,            //
+                                                  const geom_t           dx,            // Spacing of the grid
+                                                  const geom_t           dy,            //
+                                                  const geom_t           dz,            //
+                                                  const ptrdiff_t* const stride,        // Stride
+                                                  const ptrdiff_t* const n,             // Size of the grid
+                                                  real_t* const          hex_fun_data) {         // Output
 
     // Jacobian matrix for the tetrahedron
 
@@ -108,14 +168,37 @@ tet4_apply_fun_tetrahedron_local_adjoint_category(const unsigned int     categor
                                           &i6,     //
                                           &i7);    //
 
-        hex_fun_data[i0] = fun_XYZ(xx_0, yy_0, zz_0);  // Update the data
-        hex_fun_data[i1] = fun_XYZ(xx_1, yy_0, zz_0);
-        hex_fun_data[i2] = fun_XYZ(xx_1, yy_1, zz_0);
-        hex_fun_data[i3] = fun_XYZ(xx_0, yy_1, zz_0);
-        hex_fun_data[i4] = fun_XYZ(xx_0, yy_0, zz_1);
-        hex_fun_data[i5] = fun_XYZ(xx_1, yy_0, zz_1);
-        hex_fun_data[i6] = fun_XYZ(xx_1, yy_1, zz_1);
-        hex_fun_data[i7] = fun_XYZ(xx_0, yy_1, zz_1);
+        const real_t p_hex_x[8] = {xx_0, xx_1, xx_1, xx_0, xx_0, xx_1, xx_1, xx_0};
+        const real_t p_hex_y[8] = {yy_0, yy_0, yy_1, yy_1, yy_0, yy_0, yy_1, yy_1};
+        const real_t p_hex_z[8] = {zz_0, zz_0, zz_0, zz_0, zz_1, zz_1, zz_1, zz_1};
+        bool         is_in[8]   = {true, true, true, true, true, true, true, true};
+
+        check_point_in_tet(8,                 // Number of points to check
+                           p_hex_x,           // X-coordinates of the points to check
+                           p_hex_y,           // Y-coordinates of the points to check
+                           p_hex_z,           // Z-coordinates of the points to check
+                           xyz_tet_main[0],   // Tetrahedron vertices X-coordinates
+                           xyz_tet_main[1],   //
+                           xyz_tet_main[2],   //
+                           xyz_tet_main[3],   //
+                           xyz_tet_main[4],   // Tetrahedron vertices Y-coordinates
+                           xyz_tet_main[5],   //
+                           xyz_tet_main[6],   //
+                           xyz_tet_main[7],   //
+                           xyz_tet_main[8],   // Tetrahedron vertices Z-coordinates
+                           xyz_tet_main[9],   //
+                           xyz_tet_main[10],  //
+                           xyz_tet_main[11],  //
+                           is_in);            // Output: is the point inside the tetrahedron?
+
+        hex_fun_data[i0] = is_in[0] ? fun_XYZ(p_hex_x[0], p_hex_y[0], p_hex_z[0]) : hex_fun_data[i0];  // Update the data
+        hex_fun_data[i1] = is_in[1] ? fun_XYZ(p_hex_x[1], p_hex_y[1], p_hex_z[1]) : hex_fun_data[i1];
+        hex_fun_data[i2] = is_in[2] ? fun_XYZ(p_hex_x[2], p_hex_y[2], p_hex_z[2]) : hex_fun_data[i2];
+        hex_fun_data[i3] = is_in[3] ? fun_XYZ(p_hex_x[3], p_hex_y[3], p_hex_z[3]) : hex_fun_data[i3];
+        hex_fun_data[i4] = is_in[4] ? fun_XYZ(p_hex_x[4], p_hex_y[4], p_hex_z[4]) : hex_fun_data[i4];
+        hex_fun_data[i5] = is_in[5] ? fun_XYZ(p_hex_x[5], p_hex_y[5], p_hex_z[5]) : hex_fun_data[i5];
+        hex_fun_data[i6] = is_in[6] ? fun_XYZ(p_hex_x[6], p_hex_y[6], p_hex_z[6]) : hex_fun_data[i6];
+        hex_fun_data[i7] = is_in[7] ? fun_XYZ(p_hex_x[7], p_hex_y[7], p_hex_z[7]) : hex_fun_data[i7];
 
         // Update the data
 
@@ -231,10 +314,23 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
         const real_t z2_n = xyz[2][ev[2]];
         const real_t z3_n = xyz[2][ev[3]];
 
-        const real_t wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
-        const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
-        const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
-        const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+        const real_t xyz_tet_main[12] = {x0_n,
+                                         x1_n,
+                                         x2_n,
+                                         x3_n,  //
+                                         y0_n,
+                                         y1_n,
+                                         y2_n,
+                                         y3_n,  //
+                                         z0_n,
+                                         z1_n,
+                                         z2_n,
+                                         z3_n};  //
+
+        // const real_t wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+        // const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+        // const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+        // const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
 
         real_t det_J_phys =                     //
                 fabs(make_Jacobian_matrix_tet(  //
@@ -301,7 +397,7 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
                                            mini_tet_parameters.alpha_min_threshold,  //
                                            mini_tet_parameters.alpha_max_threshold,  //
                                            mini_tet_parameters.min_refinement_L,     //
-                                           mini_tet_parameters.max_refinement_L);    //
+                                           1);                                       //
 
         histo_L[L] += 1;  // Update the histogram of refinement levels
 
@@ -371,7 +467,6 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
         real_t theta_volume_main = 0.0;  // Volume of the HyTeg tetrahedron
 
         for (int k = 0; k < L + 1; k++) {  // Loop over the refinement levels
-
             const unsigned int nodes_pes_side = (L - k) + 1;
             // const unsigned int nodes_per_layer = nodes_pes_side * (nodes_pes_side + 1) / 2;
 
@@ -419,6 +514,7 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
                                         y0_n,              //
                                         z0_n,              //
                                         fun_XYZ,           // Function to apply
+                                        xyz_tet_main,      // XYZ coordinates of the tetrahedron vertices
                                         ox,                // Origin of the grid
                                         oy,                //
                                         oz,                //
@@ -463,6 +559,7 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
                                             y0_n,               // Tetrahedron vertices Y-coordinates
                                             z0_n,               // Tetrahedron vertices Z-coordinates
                                             fun_XYZ,            // Function to apply
+                                            xyz_tet_main,       // XYZ coordinates of the tetrahedron vertices
                                             ox,                 // Origin of the grid
                                             oy,                 //
                                             oz,                 //
@@ -516,6 +613,7 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
                                         y0_n,                                       //
                                         z0_n,                                       // Tetrahedron vertices Z-coordinates
                                         fun_XYZ,                                    // Function to apply
+                                        xyz_tet_main,                               // XYZ coordinates of the tetrahedron vertices
                                         ox,                                         // Origin of the grid
                                         oy,                                         //
                                         oz,                                         //
