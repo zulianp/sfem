@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <math.h>
 #include <mpi.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1022,7 +1023,7 @@ int main(int argc, char* argv[]) {
                                   nlocal,
                                   nglobal);
 
-                    if (field_fun_XYZ != NULL) {
+                    if (field_fun_XYZ != NULL && false) {
                         char        out_filename_fun_xyz[1000];
                         const char* env_out_filename_fun_xyz = getenv("OUT_FILENAME_FUN_XYZ_RAW");
                         if (env_out_filename_fun_xyz && strlen(env_out_filename_fun_xyz) > 0) {
