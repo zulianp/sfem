@@ -265,13 +265,13 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     //
 
     //// launch clustered kernel ////
-    unsigned int cluster_size_tmp = 16;
+    unsigned int cluster_size_tmp = 8;
     const char*  env_cluster_size = getenv("SFEM_CLUSTER_SIZE_ADJOINT");
     if (env_cluster_size) {
         cluster_size_tmp = atoi(env_cluster_size);
     }
 
-    unsigned int tets_per_block_tmp = 8;
+    unsigned int tets_per_block_tmp = 4;
     const char*  env_tets_per_block = getenv("SFEM_TET_PER_BLOCK_ADJOINT");
     if (env_tets_per_block) {
         tets_per_block_tmp = atoi(env_tets_per_block);
