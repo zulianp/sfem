@@ -1,6 +1,11 @@
 #include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #include "sfem_resample_field_adjoint_hyteg.h"
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// tet4_resample_tetrahedron_local_adjoint_category //////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 int                                                                                                      //
 tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t                      start_element,   // Mesh
                                                    const ptrdiff_t                      end_element,     //
@@ -64,6 +69,11 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
 }
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// tet4_resample_field_local_refine_adjoint_hyteg_gpu //////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 int                                                                                                                   //
 hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_gpu(const ptrdiff_t                      start_element,   // Mesh
                                                                 const ptrdiff_t                      end_element,     //

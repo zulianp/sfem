@@ -32,7 +32,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=torus3   ### Use 4 for benchmarking
+mesh=torus4   ### Use 4 for benchmarking
 # mesh=impeller_tet4
 
 out=resampled
@@ -66,8 +66,8 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-# sdf_test.py $sdf 125
-sdf_test.py $sdf 250
+sdf_test.py $sdf 125
+# sdf_test.py $sdf 250
 # sdf_test.py $sdf 500
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
@@ -87,7 +87,7 @@ Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 
 # Nsight_OUTPUT="/capstor/scratch/cscs/sriva/ncu_out"
 
-LAUNCH="mpiexec -np $n_procs "
+# LAUNCH="mpiexec -np $n_procs "
 # LAUNCH="srun -p debug  --exclusive -n $n_procs --gpus-per-task=1  "
 
 # LAUNCH="srun -p debug  --cpu-bind=socket  --exclusive -n $n_procs --gpus-per-task=1  ./mps-wrapper.sh "
@@ -97,18 +97,19 @@ LAUNCH="mpiexec -np $n_procs "
 # LAUNCH=""
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
-# LAUNCH="${Nsight_PATH}/ncu \
-#     --set roofline \
-#     --print-details body \
-#     -f \
-#     --replay-mode application \
-#     --section ComputeWorkloadAnalysis \
-#     --section InstructionStats \
-#     --section SourceCounters \
-#     --section LaunchStats \
-#     --kernel-name-base demangled \
-#     -o ${Nsight_OUTPUT} \
-# 	mpiexec -np $n_procs "
+LAUNCH="${Nsight_PATH}/ncu \
+    --set roofline \
+    --print-details body \
+    -f \
+    --replay-mode application \
+	--app-replay-match all \
+    --section ComputeWorkloadAnalysis \
+    --section InstructionStats \
+    --section SourceCounters \
+    --section LaunchStats \
+    --kernel-name-base demangled \
+    -o ${Nsight_OUTPUT} \
+	mpiexec -np $n_procs "
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
