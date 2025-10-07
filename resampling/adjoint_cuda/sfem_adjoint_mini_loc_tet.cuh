@@ -6,7 +6,7 @@
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
 
-#define COLLECT_ALPHA_DATA
+// #define COLLECT_ALPHA_DATA
 
 template <typename FloatType>
 class tet_properties_info_t {

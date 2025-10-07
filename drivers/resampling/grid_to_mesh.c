@@ -478,6 +478,40 @@ int main(int argc, char* argv[]) {
 
     const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig;
 
+#if SFEM_LOG_LEVEL >= 5
+
+    if (mpi_rank == 0) {
+        if (mesh_fun_XYZ == mesh_fun_par) {
+            printf("Using: mesh_fun_par\n");
+        } else if (mesh_fun_XYZ == mesh_fun_lin_x) {
+            printf("Using: mesh_fun_lin_x\n");
+        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_x) {
+            printf("Using: mesh_fun_lin_hs_x\n");
+        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_y) {
+            printf("Using: mesh_fun_lin_hs_y\n");
+        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_z) {
+            printf("Using: mesh_fun_lin_hs_z\n");
+        } else if (mesh_fun_XYZ == mesh_fun_trig) {
+            printf("Using: mesh_fun_trig\n");
+        } else if (mesh_fun_XYZ == mesh_fun_trig_pos) {
+            printf("Using: mesh_fun_trig_pos\n");
+        } else if (mesh_fun_XYZ == mesh_fun_ones) {
+            printf("Using: mesh_fun_ones\n");
+        } else if (mesh_fun_XYZ == mesh_fun_zeros) {
+            printf("Using: mesh_fun_zeros\n");
+        } else if (mesh_fun_XYZ == mesh_fun_linear_step) {
+            printf("Using: mesh_fun_linear_step\n");
+        } else if (mesh_fun_XYZ == mesh_fun_chainsaw_x) {
+            printf("Using: mesh_fun_chainsaw_x\n");
+        } else if (mesh_fun_XYZ == mesh_fun_chainsaw_xyz) {
+            printf("Using: mesh_fun_chainsaw_xyz\n");
+        } else {
+            printf("Using: UNKNOWN function\n");
+        }
+    }
+
+#endif  // SFEM_LOG_LEVEL
+
     // print argv
     if (mpi_rank == 0) {
         printf("argc: %d\n", argc);
