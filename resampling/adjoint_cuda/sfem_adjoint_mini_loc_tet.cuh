@@ -8,23 +8,24 @@
 
 // #define COLLECT_ALPHA_DATA
 
-template <typename FloatType>
+template <typename FloatType,  //
+          typename IntType = ptrdiff_t>
 class tet_properties_info_t {
 public:
     // Arrays allocated on device (length = count)
-    ptrdiff_t* min_grid_0 = nullptr;  // delta with respect to the global grid in the global grid
-    ptrdiff_t* min_grid_1 = nullptr;
-    ptrdiff_t* min_grid_2 = nullptr;
+    IntType* min_grid_0 = nullptr;  // delta with respect to the global grid in the global grid
+    IntType* min_grid_1 = nullptr;
+    IntType* min_grid_2 = nullptr;
 
-    ptrdiff_t* total_size_local;
+    IntType* total_size_local = nullptr;
 
-    ptrdiff_t* stride0_local = nullptr;
-    ptrdiff_t* stride1_local = nullptr;
-    ptrdiff_t* stride2_local = nullptr;
+    IntType* stride0_local = nullptr;
+    IntType* stride1_local = nullptr;
+    IntType* stride2_local = nullptr;
 
-    ptrdiff_t* n0_local = nullptr;
-    ptrdiff_t* n1_local = nullptr;
-    ptrdiff_t* n2_local = nullptr;
+    IntType* n0_local = nullptr;
+    IntType* n1_local = nullptr;
+    IntType* n2_local = nullptr;
 
 #ifdef COLLECT_ALPHA_DATA
     FloatType* tet_alpha = nullptr;  // refinement level alpha for each tet
@@ -33,7 +34,7 @@ public:
     // Host-side meta
     size_t count = 0;
 
-    __device__ size_t get_tet_grid_size(const ptrdiff_t tet_i) const {
+    __device__ size_t get_tet_grid_size(const IntType tet_i) const {
         return (n0_local[tet_i] * n1_local[tet_i] * n2_local[tet_i]);
     }
 
@@ -50,23 +51,20 @@ public:
         };
 
         // ptrdiff_t arrays
-        if ((err = cudaMallocAsync((void**)&min_grid_0, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_grid_1, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&min_grid_2, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&min_grid_0, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&min_grid_1, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&min_grid_2, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
 
-        if ((err = cudaMallocAsync((void**)&total_size_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
-            return fail_cleanup(err);
-
-        if ((err = cudaMallocAsync((void**)&stride0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
-            return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&stride1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
-            return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&stride2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess)
+        if ((err = cudaMallocAsync((void**)&total_size_local, n * sizeof(IntType), stream)) != cudaSuccess)
             return fail_cleanup(err);
 
-        if ((err = cudaMallocAsync((void**)&n0_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&n1_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
-        if ((err = cudaMallocAsync((void**)&n2_local, n * sizeof(ptrdiff_t), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&stride0_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&stride1_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&stride2_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+
+        if ((err = cudaMallocAsync((void**)&n0_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&n1_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
+        if ((err = cudaMallocAsync((void**)&n2_local, n * sizeof(IntType), stream)) != cudaSuccess) return fail_cleanup(err);
 
 #ifdef COLLECT_ALPHA_DATA
         if ((err = cudaMallocAsync((void**)&tet_alpha, n * sizeof(FloatType), stream)) != cudaSuccess) return fail_cleanup(err);
@@ -122,19 +120,19 @@ private:
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
+template <typename FloatType, typename IntType = ptrdiff_t>
 __global__ void                                                                               //
-sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_element,          // Mesh
-                                     const ptrdiff_t                  end_element,            //
-                                     const ptrdiff_t                  nnodes,                 //
+sfem_make_local_data_tets_kernel_gpu(const IntType                    start_element,          // Mesh
+                                     const IntType                    end_element,            //
+                                     const IntType                    nnodes,                 //
                                      const elems_tet4_device          elems,                  //
                                      const xyz_tet4_device            xyz,                    //
-                                     const ptrdiff_t                  n0,                     // SDF
-                                     const ptrdiff_t                  n1,                     //
-                                     const ptrdiff_t                  n2,                     //
-                                     const ptrdiff_t                  stride0,                // Stride
-                                     const ptrdiff_t                  stride1,                //
-                                     const ptrdiff_t                  stride2,                //
+                                     const IntType                    n0,                     // SDF
+                                     const IntType                    n1,                     //
+                                     const IntType                    n2,                     //
+                                     const IntType                    stride0,                // Stride
+                                     const IntType                    stride1,                //
+                                     const IntType                    stride2,                //
                                      const geom_t                     origin0,                // Origin
                                      const geom_t                     origin1,                //
                                      const geom_t                     origin2,                //
@@ -182,22 +180,22 @@ sfem_make_local_data_tets_kernel_gpu(const ptrdiff_t                  start_elem
 
     // Step 2: Convert to grid indices with respect to origin (0,0,0)
     // Using floor for minimum indices (with safety margin of -1)
-    const ptrdiff_t min_grid_x = fast_floor(x_min / FloatType(dx)) - 1;
-    const ptrdiff_t min_grid_y = fast_floor(y_min / FloatType(dy)) - 1;
-    const ptrdiff_t min_grid_z = fast_floor(z_min / FloatType(dz)) - 1;
+    const IntType min_grid_x = fast_floor(x_min / FloatType(dx)) - 1;
+    const IntType min_grid_y = fast_floor(y_min / FloatType(dy)) - 1;
+    const IntType min_grid_z = fast_floor(z_min / FloatType(dz)) - 1;
 
     // Using ceil for maximum indices (with safety margin of +1)
-    const ptrdiff_t max_grid_x = fast_ceil(x_max / FloatType(dx)) + 1;
-    const ptrdiff_t max_grid_y = fast_ceil(y_max / FloatType(dy)) + 1;
-    const ptrdiff_t max_grid_z = fast_ceil(z_max / FloatType(dz)) + 1;
+    const IntType max_grid_x = fast_ceil(x_max / FloatType(dx)) + 1;
+    const IntType max_grid_y = fast_ceil(y_max / FloatType(dy)) + 1;
+    const IntType max_grid_z = fast_ceil(z_max / FloatType(dz)) + 1;
 
     // Step 3: Calculate grid dimensions
-    const ptrdiff_t sizen_0 = max_grid_x - min_grid_x + 1;
-    const ptrdiff_t sizen_1 = max_grid_y - min_grid_y + 1;
-    const ptrdiff_t sizen_2 = max_grid_z - min_grid_z + 1;
+    const IntType sizen_0 = max_grid_x - min_grid_x + 1;
+    const IntType sizen_1 = max_grid_y - min_grid_y + 1;
+    const IntType sizen_2 = max_grid_z - min_grid_z + 1;
 
     // Calculate total number of cells in the bounding box
-    const ptrdiff_t total_size = sizen_0 * sizen_1 * sizen_2;
+    const IntType total_size = sizen_0 * sizen_1 * sizen_2;
 
     tet_properties_info.min_grid_0[element_i] = min_grid_x;
     tet_properties_info.min_grid_1[element_i] = min_grid_y;
@@ -491,23 +489,24 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
+template <typename FloatType,                                                                         //
+          typename IntType = int>                                                                     //
 __global__ void                                                                                       //
-sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             buffer_size,          //
+sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const IntType               buffer_size,          //
                                                     buffer_cluster_t<FloatType> buffer_cluster,       //
-                                                    const ptrdiff_t             tets_per_block,       //
-                                                    const ptrdiff_t             tet_cluster_size,     // Cluster size
-                                                    const ptrdiff_t             start_element,        // Mesh
-                                                    const ptrdiff_t             end_element,          //
-                                                    const ptrdiff_t             nnodes,               //
+                                                    const IntType               tets_per_block,       //
+                                                    const IntType               tet_cluster_size,     // Cluster size
+                                                    const IntType               start_element,        // Mesh
+                                                    const IntType               end_element,          //
+                                                    const IntType               nnodes,               //
                                                     const elems_tet4_device     elems,                //
                                                     const xyz_tet4_device       xyz,                  //
-                                                    const ptrdiff_t             n0,                   // SDF
-                                                    const ptrdiff_t             n1,                   //
-                                                    const ptrdiff_t             n2,                   //
-                                                    const ptrdiff_t             stride0,              // Stride
-                                                    const ptrdiff_t             stride1,              //
-                                                    const ptrdiff_t             stride2,              //
+                                                    const IntType               n0,                   // SDF
+                                                    const IntType               n1,                   //
+                                                    const IntType               n2,                   //
+                                                    const IntType               stride0,              // Stride
+                                                    const IntType               stride1,              //
+                                                    const IntType               stride2,              //
                                                     const geom_t                origin0,              // Origin
                                                     const geom_t                origin1,              //
                                                     const geom_t                origin2,              //
@@ -530,8 +529,8 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
     // const int cluster_end     = cluster_begin + tet_cluster_size;
 
-    const ptrdiff_t buffer_begin_idx  = tet_id_base * buffer_size;
-    FloatType*      buffer_local_data = &(buffer_cluster.buffer[buffer_begin_idx]);
+    const IntType buffer_begin_idx  = tet_id_base * buffer_size;
+    FloatType*    buffer_local_data = &(buffer_cluster.buffer[buffer_begin_idx]);
 
     // if (lane_id == 0)
     //     printf("Block %d, warp_id %d, lane_id %d, warps_per_block %d, tet_id_base %d, cluster_begin %d, cluster_end %d, "
@@ -549,7 +548,7 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
 #define START_BUFFER_IDX_SIZE 64
 
-    __shared__ ptrdiff_t tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
+    __shared__ IntType tet_start_buffer_idx[START_BUFFER_IDX_SIZE];
 
     for (int cluster_i = 0; cluster_i < tet_cluster_size; cluster_i++) {
         // Loop over elements in the cluster
@@ -585,9 +584,9 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
         __syncthreads();
 
         if (lane_id == 0 and warp_id_loc == 0) {
-            ptrdiff_t offset = 0;
+            IntType offset = 0;
             for (int i = 0; i < tets_per_block; i++) {
-                const ptrdiff_t sz      = tet_start_buffer_idx[i];
+                const IntType sz        = tet_start_buffer_idx[i];
                 tet_start_buffer_idx[i] = offset;
                 offset += sz;
             }
@@ -613,21 +612,21 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
         const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
         const FloatType hexahedron_volume = dx * dy * dz;
 
-        const ptrdiff_t min_grid_0 = tet_properties_info.min_grid_0[element_i];
-        const ptrdiff_t min_grid_1 = tet_properties_info.min_grid_1[element_i];
-        const ptrdiff_t min_grid_2 = tet_properties_info.min_grid_2[element_i];
+        const IntType min_grid_0 = tet_properties_info.min_grid_0[element_i];
+        const IntType min_grid_1 = tet_properties_info.min_grid_1[element_i];
+        const IntType min_grid_2 = tet_properties_info.min_grid_2[element_i];
 
-        const ptrdiff_t stride0_local = tet_properties_info.stride0_local[element_i];
-        const ptrdiff_t stride1_local = tet_properties_info.stride1_local[element_i];
-        const ptrdiff_t stride2_local = tet_properties_info.stride2_local[element_i];
+        const IntType stride0_local = tet_properties_info.stride0_local[element_i];
+        const IntType stride1_local = tet_properties_info.stride1_local[element_i];
+        const IntType stride2_local = tet_properties_info.stride2_local[element_i];
 
         const FloatType min_grid_x_coord = dx * FloatType(min_grid_0);
         const FloatType min_grid_y_coord = dy * FloatType(min_grid_1);
         const FloatType min_grid_z_coord = dz * FloatType(min_grid_2);
 
-        const ptrdiff_t n0_local = tet_properties_info.n0_local[element_i];
-        const ptrdiff_t n1_local = tet_properties_info.n1_local[element_i];
-        const ptrdiff_t n2_local = tet_properties_info.n2_local[element_i];
+        const IntType n0_local = tet_properties_info.n0_local[element_i];
+        const IntType n1_local = tet_properties_info.n1_local[element_i];
+        const IntType n2_local = tet_properties_info.n2_local[element_i];
 
         // if (element_i > 30000 and element_i < 30010)  //
         //     printf("Stride local: %ld, %ld, %ld, min_grid_0: %ld, min_grid_1: %ld, min_grid_2: %ld, element_i: %ld \n",
@@ -741,26 +740,26 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const ptrdiff_t             
 
         __syncthreads();
 
-        const ptrdiff_t total_size_local = tet_properties_info.total_size_local[element_i];
+        const IntType total_size_local = tet_properties_info.total_size_local[element_i];
 
-        const ptrdiff_t i0_origin = fast_ceil(-origin0 / dx);
-        const ptrdiff_t i1_origin = fast_ceil(-origin1 / dy);
-        const ptrdiff_t i2_origin = fast_ceil(-origin2 / dz);
+        const IntType i0_origin = fast_ceil(-origin0 / dx);
+        const IntType i1_origin = fast_ceil(-origin1 / dy);
+        const IntType i2_origin = fast_ceil(-origin2 / dz);
 
-        for (ptrdiff_t i_total_local = lane_id; i_total_local < total_size_local; i_total_local += LANES_PER_TILE) {
-            const ptrdiff_t i0 = (i_total_local % (n0_local));
-            const ptrdiff_t i1 = (i_total_local / (n0_local)) % (n1_local);
-            const ptrdiff_t i2 = (i_total_local / (n0_local * n1_local));
+        for (IntType i_total_local = lane_id; i_total_local < total_size_local; i_total_local += LANES_PER_TILE) {
+            const IntType i0 = (i_total_local % (n0_local));
+            const IntType i1 = (i_total_local / (n0_local)) % (n1_local);
+            const IntType i2 = (i_total_local / (n0_local * n1_local));
 
             // const int       i_total_local          = i;
             const FloatType hex_local_buffer_value = hex_local_buffer[i_total_local];
 
             if (hex_local_buffer_value != 0.0) {
-                const ptrdiff_t gi0 = i0_origin + i0 + min_grid_0;
-                const ptrdiff_t gi1 = i1_origin + i1 + min_grid_1;
-                const ptrdiff_t gi2 = i2_origin + i2 + min_grid_2;
+                const IntType gi0 = i0_origin + i0 + min_grid_0;
+                const IntType gi1 = i1_origin + i1 + min_grid_1;
+                const IntType gi2 = i2_origin + i2 + min_grid_2;
 
-                const ptrdiff_t g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
+                const IntType g_index = gi2 * stride2 + gi1 * stride1 + gi0 * stride0;
 
                 // printf("gi0 = %ld, gi1 = %ld, gi2 = %ld, g_index = %ld, value = %e, i0 = %ld, i1 = %ld, i2 = %ld,
                 // i0_origin = "

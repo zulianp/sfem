@@ -445,35 +445,35 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
                    (long long)end_element_local);
 #endif
 
-            sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu<real_t>  //
-                    <<<blocks_per_grid,                                  //
-                       threads_per_block_2d,                             //
-                       0,                                                //
-                       cuda_stream>>>(buffer_memory_size,                // Mesh
-                                      buffer_cluster,                    //
-                                      tets_per_block,                    //
-                                      cluster_size,                      //
-                                      start_element_local,               //
-                                      end_element_local,                 //
-                                      nnodes,                            //
-                                      elements_device,                   //
-                                      xyz_device,                        //
-                                      n0,                                // SDF
-                                      n1,                                //
-                                      n2,                                //
-                                      stride0,                           // Stride
-                                      stride1,                           //
-                                      stride2,                           //
-                                      origin0,                           // Origin
-                                      origin1,                           //
-                                      origin2,                           //
-                                      dx,                                // Delta
-                                      dy,                                //
-                                      dz,                                //
-                                      weighted_field_device,             // Input weighted field
-                                      mini_tet_parameters,               // Threshold for alpha
-                                      tet_properties_info,               //
-                                      data_device);                      //
+            sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu<real_t, ptrdiff_t>  //
+                    <<<blocks_per_grid,                                             //
+                       threads_per_block_2d,                                        //
+                       0,                                                           //
+                       cuda_stream>>>(buffer_memory_size,                           // Mesh
+                                      buffer_cluster,                               //
+                                      tets_per_block,                               //
+                                      cluster_size,                                 //
+                                      start_element_local,                          //
+                                      end_element_local,                            //
+                                      nnodes,                                       //
+                                      elements_device,                              //
+                                      xyz_device,                                   //
+                                      n0,                                           // SDF
+                                      n1,                                           //
+                                      n2,                                           //
+                                      stride0,                                      // Stride
+                                      stride1,                                      //
+                                      stride2,                                      //
+                                      origin0,                                      // Origin
+                                      origin1,                                      //
+                                      origin2,                                      //
+                                      dx,                                           // Delta
+                                      dy,                                           //
+                                      dz,                                           //
+                                      weighted_field_device,                        // Input weighted field
+                                      mini_tet_parameters,                          // Threshold for alpha
+                                      tet_properties_info,                          //
+                                      data_device);                                 //
 
             cudaStreamSynchronize(cuda_stream);
 
