@@ -773,7 +773,7 @@ class FE:
         det = determinant(jac)
         for r in range(0, rows):
             for c in range(0, cols):
-                expr.append(ast.Assignment(sp.symbols(f"adjugate[{r*cols+c}]"), jac[r, c]))
+                expr.append(ast.Assignment(sp.symbols(f"adjugate[{r*cols+c}]"), adj[r, c]))
 
         expr.append(ast.Assignment(sp.symbols(f"determinant[0]"), det))
         return c_gen(expr)
