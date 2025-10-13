@@ -5,8 +5,9 @@
 #include <cstddef>
 #include "sfem_adjoint_mini_tet_fun.cuh"
 
-template <typename FloatType>
-__device__ FloatType  //
+template <typename FloatType,            //
+          typename IntType = ptrdiff_t>  //
+__device__ FloatType                     //
 tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const unsigned int                     category,    //
         const unsigned int                     L,           // Refinement level
@@ -25,14 +26,14 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType                        dx,          // Spacing of the grid
         const FloatType                        dy,          //
         const FloatType                        dz,          //
-        const ptrdiff_t                        stride0,     // Stride
-        const ptrdiff_t                        stride1,     //
-        const ptrdiff_t                        stride2,     //
-        const ptrdiff_t                        n0,          // Size of the grid
-        const ptrdiff_t                        n1,          //
-        const ptrdiff_t                        n2,          //
+        const IntType                          stride0,     // Stride
+        const IntType                          stride1,     //
+        const IntType                          stride2,     //
+        const IntType                          n0,          // Size of the grid
+        const IntType                          n1,          //
+        const IntType                          n2,          //
         FloatType* const                       data,        //
-        const ptrdiff_t                        size_hex_domain = 0) {              // Output
+        const IntType                          size_hex_domain = 0) {                // Output
 
     // data[0] += 1; // To avoid unused variable warning
 
@@ -52,16 +53,16 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     const FloatType inv_dz = FloatType(1.0) / dz;
 
     // Per-thread cell-aware accumulation (one-entry cache)
-    ptrdiff_t cache_base = -1;  // invalid
+    IntType cache_base = -1;  // invalid
     // Relative offsets for the 8 hex nodes (constant for given strides)
-    const ptrdiff_t off0 = 0;
-    const ptrdiff_t off1 = stride0;
-    const ptrdiff_t off2 = stride0 + stride1;
-    const ptrdiff_t off3 = stride1;
-    const ptrdiff_t off4 = stride2;
-    const ptrdiff_t off5 = stride0 + stride2;
-    const ptrdiff_t off6 = stride0 + stride1 + stride2;
-    const ptrdiff_t off7 = stride1 + stride2;
+    const IntType off0 = 0;
+    const IntType off1 = stride0;
+    const IntType off2 = stride0 + stride1;
+    const IntType off3 = stride1;
+    const IntType off4 = stride2;
+    const IntType off5 = stride0 + stride2;
+    const IntType off6 = stride0 + stride1 + stride2;
+    const IntType off7 = stride1 + stride2;
 
     FloatType acc0 = 0, acc1 = 0, acc2 = 0, acc3 = 0;
     FloatType acc4 = 0, acc5 = 0, acc6 = 0, acc7 = 0;
@@ -71,12 +72,12 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
     const FloatType neg_oy_inv_dy = (-oy) * inv_dy;
     const FloatType neg_oz_inv_dz = (-oz) * inv_dz;
 
-    const ptrdiff_t quad_iterations = TET_QUAD_NQP / LANES_PER_TILE + ((TET_QUAD_NQP % LANES_PER_TILE) ? 1 : 0);
-    const ptrdiff_t quad_start      = lane_id * quad_iterations;
+    const IntType quad_iterations = TET_QUAD_NQP / LANES_PER_TILE + ((TET_QUAD_NQP % LANES_PER_TILE) ? 1 : 0);
+    const IntType quad_start      = lane_id * quad_iterations;
 
-    for (ptrdiff_t quad_i = 0; quad_i < quad_iterations; ++quad_i) {  // loop over the quadrature points
+    for (IntType quad_i = 0; quad_i < quad_iterations; ++quad_i) {  // loop over the quadrature points
 
-        const ptrdiff_t quad_i_tile = quad_start + quad_i;
+        const IntType quad_i_tile = quad_start + quad_i;
         // const int quad_i_tile = quad_i + lane_id;
 
         if (quad_i_tile >= TET_QUAD_NQP) continue;  // skip inactive lanes early
@@ -115,9 +116,9 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         const FloatType grid_z = fast_fma(inv_dz, zq_phys, neg_oz_inv_dz);
 
         // Fast floor
-        const ptrdiff_t i = (ptrdiff_t)fast_floor<FloatType>(grid_x);
-        const ptrdiff_t j = (ptrdiff_t)fast_floor<FloatType>(grid_y);
-        const ptrdiff_t k = (ptrdiff_t)fast_floor<FloatType>(grid_z);
+        const IntType i = (IntType)fast_floor<FloatType>(grid_x);
+        const IntType j = (IntType)fast_floor<FloatType>(grid_y);
+        const IntType k = (IntType)fast_floor<FloatType>(grid_z);
 
         const FloatType l_x = (grid_x - (FloatType)(i));
         const FloatType l_y = (grid_y - (FloatType)(j));
@@ -217,21 +218,6 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu(
         store_add(&data[cache_base + off6], acc6);
         store_add(&data[cache_base + off7], acc7);
     }
-
-    // Reduce the cumulated_dV across all lanes in the tile
-    // unsigned int mask = 0xFF;  // Mask for 8 lanes
-
-    // // Reduction using warp shuffle operations
-    // for (int offset = LANES_PER_TILE / 2; offset > 0; offset >>= 1) {
-    //     cumulated_dV += __shfl_down_sync(mask, cumulated_dV, offset);
-    // }
-
-    // // Broadcast the result from lane 0 to all other lanes in the tile
-    // cumulated_dV = __shfl_sync(mask, cumulated_dV, 0);
-
-    // for (int ii = 0; ii < size_hex_domain; ++ii) {
-    //     if (data[ii] != 0.0) printf("data[%d] = %e\n", ii, (double)data[ii]);
-    // }
 
     return 0.0;  // cumulated_dV;  // Return the cumulative volume for debugging
 }
@@ -577,7 +563,8 @@ tet4_resample_tetrahedron_local_adjoint_category_gpu_v2(
 // Main loop over the mini-tetrahedron
 // main_tet_loop_gpu
 ////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
+template <typename FloatType,  //
+          typename IntType>    //
 __device__ void main_tet_loop_gpu(const int                               L,
                                   const typename Float3<FloatType>::type* J_phys,      // Jacobian matrix
                                   const FloatType                         det_J_phys,  // Determinant of the Jacobian matrix
@@ -592,14 +579,14 @@ __device__ void main_tet_loop_gpu(const int                               L,
                                   const FloatType                         dx,       // Spacing of the grid
                                   const FloatType                         dy,       //
                                   const FloatType                         dz,       //
-                                  const ptrdiff_t                         stride0,  // Stride
-                                  const ptrdiff_t                         stride1,  //
-                                  const ptrdiff_t                         stride2,  //
-                                  const ptrdiff_t                         n0,       // Size of the grid
-                                  const ptrdiff_t                         n1,       //
-                                  const ptrdiff_t                         n2,       //
+                                  const IntType                           stride0,  // Stride
+                                  const IntType                           stride1,  //
+                                  const IntType                           stride2,  //
+                                  const IntType                           n0,       // Size of the grid
+                                  const IntType                           n1,       //
+                                  const IntType                           n2,       //
                                   FloatType* const                        data,     //
-                                  const ptrdiff_t                         size_hex_domain = 0) {            // Output
+                                  const IntType                           size_hex_domain = 0) {              // Output
 
     const FloatType zero = 0.0;
 
@@ -633,92 +620,95 @@ __device__ void main_tet_loop_gpu(const int                               L,
                 // ... category 0 logic here ...
                 {
                     const unsigned int cat_0 = 0;
-                    tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_0,  //
-                                                                         L,
-                                                                         bc,
-                                                                         J_phys,
-                                                                         Jacobian_c[cat_0],
-                                                                         det_J_phys,
-                                                                         fxyz,
-                                                                         wf0,
-                                                                         wf1,
-                                                                         wf2,
-                                                                         wf3,
-                                                                         ox,
-                                                                         oy,
-                                                                         oz,
-                                                                         dx,
-                                                                         dy,
-                                                                         dz,
-                                                                         stride0,
-                                                                         stride1,
-                                                                         stride2,
-                                                                         n0,
-                                                                         n1,
-                                                                         n2,
-                                                                         data,
-                                                                         size_hex_domain);
+                    tet4_resample_tetrahedron_local_adjoint_category_gpu<FloatType,       //
+                                                                         IntType>(cat_0,  //
+                                                                                  L,
+                                                                                  bc,
+                                                                                  J_phys,
+                                                                                  Jacobian_c[cat_0],
+                                                                                  det_J_phys,
+                                                                                  fxyz,
+                                                                                  wf0,
+                                                                                  wf1,
+                                                                                  wf2,
+                                                                                  wf3,
+                                                                                  ox,
+                                                                                  oy,
+                                                                                  oz,
+                                                                                  dx,
+                                                                                  dy,
+                                                                                  dz,
+                                                                                  stride0,
+                                                                                  stride1,
+                                                                                  stride2,
+                                                                                  n0,
+                                                                                  n1,
+                                                                                  n2,
+                                                                                  data,
+                                                                                  size_hex_domain);
                 }
 
                 if (i >= 1) {
 #pragma unroll
                     for (int cat_ii = 1; cat_ii <= 4; cat_ii++) {
-                        tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_ii,  //
-                                                                             L,
-                                                                             bc,
-                                                                             J_phys,
-                                                                             Jacobian_c[cat_ii],
-                                                                             det_J_phys,
-                                                                             fxyz,
-                                                                             wf0,
-                                                                             wf1,
-                                                                             wf2,
-                                                                             wf3,
-                                                                             ox,
-                                                                             oy,
-                                                                             oz,
-                                                                             dx,
-                                                                             dy,
-                                                                             dz,
-                                                                             stride0,
-                                                                             stride1,
-                                                                             stride2,
-                                                                             n0,
-                                                                             n1,
-                                                                             n2,
-                                                                             data,
-                                                                             size_hex_domain);
+                        tet4_resample_tetrahedron_local_adjoint_category_gpu<FloatType,        //
+                                                                             IntType>(cat_ii,  //
+                                                                                      L,
+                                                                                      bc,
+                                                                                      J_phys,
+                                                                                      Jacobian_c[cat_ii],
+                                                                                      det_J_phys,
+                                                                                      fxyz,
+                                                                                      wf0,
+                                                                                      wf1,
+                                                                                      wf2,
+                                                                                      wf3,
+                                                                                      ox,
+                                                                                      oy,
+                                                                                      oz,
+                                                                                      dx,
+                                                                                      dy,
+                                                                                      dz,
+                                                                                      stride0,
+                                                                                      stride1,
+                                                                                      stride2,
+                                                                                      n0,
+                                                                                      n1,
+                                                                                      n2,
+                                                                                      data,
+                                                                                      size_hex_domain);
                     }
                 }  // END if (i >= 1)
 
                 if (j >= 1 && i >= 1) {
                     // Category 5
                     const unsigned int cat_5 = 5;
-                    tet4_resample_tetrahedron_local_adjoint_category_gpu(cat_5,  //
-                                                                         L,
-                                                                         bc,
-                                                                         J_phys,
-                                                                         Jacobian_c[cat_5],
-                                                                         det_J_phys,
-                                                                         fxyz,
-                                                                         wf0,
-                                                                         wf1,
-                                                                         wf2,
-                                                                         wf3,
-                                                                         ox,
-                                                                         oy,
-                                                                         oz,
-                                                                         dx,
-                                                                         dy,
-                                                                         dz,
-                                                                         stride0,
-                                                                         stride1,
-                                                                         stride2,
-                                                                         n0,
-                                                                         n1,
-                                                                         n2,
-                                                                         data,
-                                                                         size_hex_domain);
+                    tet4_resample_tetrahedron_local_adjoint_category_gpu<FloatType,       //
+                                                                         IntType>(cat_5,  //
+                                                                                  L,
+                                                                                  bc,
+                                                                                  J_phys,
+                                                                                  Jacobian_c[cat_5],
+                                                                                  det_J_phys,
+                                                                                  fxyz,
+                                                                                  wf0,
+                                                                                  wf1,
+                                                                                  wf2,
+                                                                                  wf3,
+                                                                                  ox,
+                                                                                  oy,
+                                                                                  oz,
+                                                                                  dx,
+                                                                                  dy,
+                                                                                  dz,
+                                                                                  stride0,
+                                                                                  stride1,
+                                                                                  stride2,
+                                                                                  n0,
+                                                                                  n1,
+                                                                                  n2,
+                                                                                  data,
+                                                                                  size_hex_domain);
                 }
             }  // END for (int i = 0; i < nodes_per_side - 1 - j; ++i)
         }  // END for (int j = 0; j < nodes_per_side - 1; ++j)

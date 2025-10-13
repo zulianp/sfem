@@ -244,7 +244,7 @@ sfem_make_local_data_tets_kernel_gpu(const IntType                    start_elem
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType>
+template <typename FloatType, typename IntType = ptrdiff_t>
 __global__ void                                                                                          //
 sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                        shared_memory_size,   //
                                             const ptrdiff_t                        tets_per_block,       //
@@ -420,28 +420,28 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
                                                     z3_n,             //
                                                     Jacobian_phys));  //
 
-    main_tet_loop_gpu<FloatType>(L,                                          //
-                                 Jacobian_phys,                              //
-                                 det_J_phys,                                 //
-                                 Float3<FloatType>::make(x0_n, y0_n, z0_n),  //
-                                 wf0,                                        //
-                                 wf1,                                        //
-                                 wf2,                                        //
-                                 wf3,                                        //
-                                 FloatType(0.0),                             //
-                                 FloatType(0.0),                             //
-                                 FloatType(0.0),                             //
-                                 dx,                                         //
-                                 dy,                                         //
-                                 dz,                                         //
-                                 stride0_local,                              //
-                                 stride1_local,                              //
-                                 stride2_local,                              //
-                                 n0_local,                                   //
-                                 n1_local,                                   //
-                                 n2_local,                                   //
-                                 &hex_local_buffer[0],                       //
-                                 0);                                         //
+    main_tet_loop_gpu<FloatType, IntType>(L,                                          //
+                                          Jacobian_phys,                              //
+                                          det_J_phys,                                 //
+                                          Float3<FloatType>::make(x0_n, y0_n, z0_n),  //
+                                          wf0,                                        //
+                                          wf1,                                        //
+                                          wf2,                                        //
+                                          wf3,                                        //
+                                          FloatType(0.0),                             //
+                                          FloatType(0.0),                             //
+                                          FloatType(0.0),                             //
+                                          dx,                                         //
+                                          dy,                                         //
+                                          dz,                                         //
+                                          stride0_local,                              //
+                                          stride1_local,                              //
+                                          stride2_local,                              //
+                                          n0_local,                                   //
+                                          n1_local,                                   //
+                                          n2_local,                                   //
+                                          &hex_local_buffer[0],                       //
+                                          0);                                         //
 
     // __syncwarp();
 
@@ -490,7 +490,7 @@ sfem_adjoint_mini_tet_shared_loc_kernel_gpu(const ptrdiff_t                     
 // Kernel to perform adjoint mini-tetrahedron resampling
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType,                                                                         //
-          typename IntType = int>                                                                     //
+          typename IntType = ptrdiff_t>                                                               //
 __global__ void                                                                                       //
 sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const IntType               buffer_size,          //
                                                     buffer_cluster_t<FloatType> buffer_cluster,       //
@@ -715,28 +715,28 @@ sfem_adjoint_mini_tet_buffer_cluster_loc_kernel_gpu(const IntType               
                                                         z3_n,             //
                                                         Jacobian_phys));  //
 
-        main_tet_loop_gpu<FloatType>(L,                                          //
-                                     Jacobian_phys,                              //
-                                     det_J_phys,                                 //
-                                     Float3<FloatType>::make(x0_n, y0_n, z0_n),  //
-                                     wf0,                                        //
-                                     wf1,                                        //
-                                     wf2,                                        //
-                                     wf3,                                        //
-                                     FloatType(0.0),                             //
-                                     FloatType(0.0),                             //
-                                     FloatType(0.0),                             //
-                                     dx,                                         //
-                                     dy,                                         //
-                                     dz,                                         //
-                                     stride0_local,                              //
-                                     stride1_local,                              //
-                                     stride2_local,                              //
-                                     n0_local,                                   //
-                                     n1_local,                                   //
-                                     n2_local,                                   //
-                                     &hex_local_buffer[0],                       //
-                                     0);                                         //
+        main_tet_loop_gpu<FloatType, IntType>(L,                                          //
+                                              Jacobian_phys,                              //
+                                              det_J_phys,                                 //
+                                              Float3<FloatType>::make(x0_n, y0_n, z0_n),  //
+                                              wf0,                                        //
+                                              wf1,                                        //
+                                              wf2,                                        //
+                                              wf3,                                        //
+                                              FloatType(0.0),                             //
+                                              FloatType(0.0),                             //
+                                              FloatType(0.0),                             //
+                                              dx,                                         //
+                                              dy,                                         //
+                                              dz,                                         //
+                                              stride0_local,                              //
+                                              stride1_local,                              //
+                                              stride2_local,                              //
+                                              n0_local,                                   //
+                                              n1_local,                                   //
+                                              n2_local,                                   //
+                                              &hex_local_buffer[0],                       //
+                                              0);                                         //
 
         __syncthreads();
 
