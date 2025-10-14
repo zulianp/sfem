@@ -436,25 +436,16 @@ tet4_resample_tetrahedron_local_buffer_adjoint_category_gpu(  //
         }
     }  // End loop over the quadrature points
 
-    for (int idx = 0; idx < (local_buffer_index + 1) * 8; idx += LANES_PER_TILE) {
-        int lane_idx = idx + lane_id;
-        if (lane_idx < (local_buffer_index + 1) * 8) {
-            int buf_idx = lane_idx / 8;
-            int off_idx = lane_idx % 8;
-            store_add(&data[local_buffer_offsets[buf_idx][off_idx]], local_buffer_accumulators[buf_idx][off_idx]);
+#pragma unroll
+    for (int idx = 0; idx <= local_buffer_index; idx++) {
+        const IntType*   offsets = local_buffer_offsets[idx];
+        const FloatType* accums  = local_buffer_accumulators[idx];
+
+#pragma unroll 8
+        for (int off_idx = 0; off_idx < 8; off_idx++) {
+            warpAggregatedAdd(data, offsets[off_idx], accums[off_idx]);
         }
     }
-    // // Flush tail
-    // if (cache_base != -1) {
-    //     store_add(&data[cache_base + off0], acc0);
-    //     store_add(&data[cache_base + off1], acc1);
-    //     store_add(&data[cache_base + off2], acc2);
-    //     store_add(&data[cache_base + off3], acc3);
-    //     store_add(&data[cache_base + off4], acc4);
-    //     store_add(&data[cache_base + off5], acc5);
-    //     store_add(&data[cache_base + off6], acc6);
-    //     store_add(&data[cache_base + off7], acc7);
-    // }
 
     return 0.0;  // cumulated_dV;  // Return the cumulative volume for debugging
 }

@@ -629,7 +629,7 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_kernel(  //
     const FloatType hexahedron_volume = dx * dy * dz;
     const FloatType inv_dmin          = static_cast<FloatType>(1.0) / d_min;
 
-    int degenerated_tetrahedra_cnt = 0;
+    // int degenerated_tetrahedra_cnt = 0;
     int uniform_refine_cnt         = 0;
 
     // Unit tetrahedron vertices
