@@ -436,6 +436,14 @@ tet4_resample_tetrahedron_local_buffer_adjoint_category_gpu(  //
         }
     }  // End loop over the quadrature points
 
+    for (int idx = 0; idx < (local_buffer_index + 1) * 8; idx += LANES_PER_TILE) {
+        int lane_idx = idx + lane_id;
+        if (lane_idx < (local_buffer_index + 1) * 8) {
+            int buf_idx = lane_idx / 8;
+            int off_idx = lane_idx % 8;
+            store_add(&data[local_buffer_offsets[buf_idx][off_idx]], local_buffer_accumulators[buf_idx][off_idx]);
+        }
+    }
     // // Flush tail
     // if (cache_base != -1) {
     //     store_add(&data[cache_base + off0], acc0);
