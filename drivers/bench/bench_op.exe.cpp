@@ -102,6 +102,7 @@ void add_matrix_based_scalar_ops(enum ElemType                   element_type,
         ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
         ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
         ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
+        ops.push_back({.name = "Laplacian", .type = SELL, .block_size = 1});
     }
 }
 

@@ -41,6 +41,7 @@ endif()
 set(SFEM_MODULES
     algebra base matrix 
     algebra/crs
+    algebra/ell
     algebra/openmp
     mesh 
     mesh/multiblock

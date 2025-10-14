@@ -38,6 +38,7 @@
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
+#include "sell.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
@@ -1096,6 +1097,21 @@ namespace sfem {
         }
     }
 
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_sell(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+            case 4:
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es);
+            default:
+                return sfem::sell_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+        }
+    }
+
     static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs, const real_t *const x, real_t *const r) {
 #ifdef SFEM_ENABLE_CUDA
         if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
@@ -1158,10 +1174,10 @@ namespace sfem {
                 return sfem::hessian_scrs(f, u, es);
             } else if (format == ALIGNEDCRS) {
                 return hessian_acrs(f, u, es);
-            }
-
-            if (format == SPLITDACRS) {
+            } else if (format == SPLITDACRS) {
                 return sfem::hessian_sdacrs(f, u, es);
+            } else if (format == SELL) {
+                return sfem::hessian_sell(f, u, es);
             }
 
             if (format != CRS) {
