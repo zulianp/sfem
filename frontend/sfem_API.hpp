@@ -1101,14 +1101,16 @@ namespace sfem {
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
         int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  slice_height = sfem::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
+
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
-                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
             case 4:
-                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es);
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
             default:
-                return sfem::sell_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+                return sfem::sell_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
         }
     }
 

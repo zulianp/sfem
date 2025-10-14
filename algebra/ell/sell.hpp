@@ -16,6 +16,108 @@
 
 namespace sfem {
 
+    // Stateless SELL-C SpMV kernel with compile-time slice height
+    // Layout semantics:
+    // - slice_ptr has size n_slices+1, cumulative per-slice widths (max nnz per row in slice)
+    // - colidx/values are column-major within each slice with contiguous stride SLICE_HEIGHT
+    // - storage is padded to complete columns within a slice
+    // Row-major traversal (one row per thread)
+    // Pointer-stride across column-major storage to remove muls in hot loop.
+    // Optional compile-time prefetch distance in columns.
+    template <int SLICE_HEIGHT, int PREFETCH_DIST = 0, typename R, typename C, typename V, typename TOp>
+    static inline int sell_spmv_rowmajor(const std::ptrdiff_t           nrows,
+                                         const R *const SFEM_RESTRICT   slice_ptr,
+                                         const C *const SFEM_RESTRICT   colidx,
+                                         const V *const SFEM_RESTRICT   values,
+                                         const TOp *const SFEM_RESTRICT x,
+                                         TOp *const SFEM_RESTRICT       y) {
+        if (!slice_ptr || !colidx || !values || !x || !y) {
+            SFEM_ERROR("sell_spmv: invalid pointers!\n");
+            return SFEM_FAILURE;
+        }
+
+#pragma omp parallel for schedule(static, SLICE_HEIGHT)
+        for (std::ptrdiff_t row = 0; row < nrows; ++row) {
+            const std::ptrdiff_t s         = row / SLICE_HEIGHT;                        // slice id
+            const int            r_in_s    = static_cast<int>(row - s * SLICE_HEIGHT);  // local row in slice
+            const std::ptrdiff_t width     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
+            const std::ptrdiff_t base_cols = static_cast<std::ptrdiff_t>(slice_ptr[s]) * SLICE_HEIGHT;
+
+            const C *SFEM_RESTRICT colp = colidx + base_cols + r_in_s;
+            const V *SFEM_RESTRICT valp = values + base_cols + r_in_s;
+
+            TOp acc = y[row];
+            for (std::ptrdiff_t j = 0; j < width; ++j) {
+#if (PREFETCH_DIST > 0)
+#if defined(__GNUC__)
+                if (j + PREFETCH_DIST < width) {
+                    __builtin_prefetch(valp + SLICE_HEIGHT * PREFETCH_DIST, 0, 1);
+                    __builtin_prefetch(colp + SLICE_HEIGHT * PREFETCH_DIST, 0, 1);
+                    const C pf_c = colp[SLICE_HEIGHT * PREFETCH_DIST];
+                    __builtin_prefetch(x + pf_c, 0, 1);
+                }
+#endif
+#endif
+                acc += static_cast<TOp>(valp[0]) * x[colp[0]];
+                colp += SLICE_HEIGHT;
+                valp += SLICE_HEIGHT;
+            }
+            y[row] = acc;
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    // Slice-major traversal (one slice per thread). Improves locality for values/colidx/y.
+    // The last slice may be partial; guard rows beyond nrows.
+    template <int SLICE_HEIGHT, typename R, typename C, typename V, typename TOp>
+    static inline int sell_spmv_slicemajor(const std::ptrdiff_t           nrows,
+                                           const R *const SFEM_RESTRICT   slice_ptr,
+                                           const C *const SFEM_RESTRICT   colidx,
+                                           const V *const SFEM_RESTRICT   values,
+                                           const TOp *const SFEM_RESTRICT x,
+                                           TOp *const SFEM_RESTRICT       y) {
+        if (!slice_ptr || !colidx || !values || !x || !y) {
+            SFEM_ERROR("sell_spmv: invalid pointers!\n");
+            return SFEM_FAILURE;
+        }
+
+        const std::ptrdiff_t n_slices = (nrows + SLICE_HEIGHT - 1) / SLICE_HEIGHT;
+
+#pragma omp parallel for schedule(static)
+        for (std::ptrdiff_t s = 0; s < n_slices; ++s) {
+            const std::ptrdiff_t row_begin = s * SLICE_HEIGHT;
+            const std::ptrdiff_t row_end   = std::min<std::ptrdiff_t>(row_begin + SLICE_HEIGHT, nrows);
+            const std::ptrdiff_t width     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
+            const std::ptrdiff_t base      = static_cast<std::ptrdiff_t>(slice_ptr[s]) * SLICE_HEIGHT;
+
+            // Process one column of the slice at a time for better contiguous accesses
+            for (std::ptrdiff_t j = 0; j < width; ++j) {
+                const std::ptrdiff_t col_base = base + j * SLICE_HEIGHT;
+
+#pragma unroll(4)
+                for (std::ptrdiff_t row = row_begin; row < row_end; ++row) {
+                    const int            r_in_s = static_cast<int>(row - row_begin);
+                    const std::ptrdiff_t idx    = col_base + r_in_s;
+                    y[row] += static_cast<TOp>(values[idx]) * x[colidx[idx]];
+                }
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    // Backward-compatible wrapper: defaults to row-major without prefetch
+    template <int SLICE_HEIGHT, typename R, typename C, typename V, typename TOp>
+    static inline int sell_spmv(const std::ptrdiff_t           nrows,
+                                const R *const SFEM_RESTRICT   slice_ptr,
+                                const C *const SFEM_RESTRICT   colidx,
+                                const V *const SFEM_RESTRICT   values,
+                                const TOp *const SFEM_RESTRICT x,
+                                TOp *const SFEM_RESTRICT       y) {
+        return sell_spmv_rowmajor<SLICE_HEIGHT, 0, R, C, V, TOp>(nrows, slice_ptr, colidx, values, x, y);
+    }
+
     template <typename R, typename C, typename T, typename TOp = T>
     class SlicedEllpack : public Operator<TOp> {
     public:
@@ -52,26 +154,59 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            auto d_slice_ptr = slice_ptr->data();
-            auto d_colidx    = colidx->data();
-            auto d_values    = values->data();
+            const auto      d_slice_ptr = slice_ptr->data();
+            const auto      d_colidx    = colidx->data();
+            const auto      d_values    = values->data();
+            const ptrdiff_t nrows       = n_rows;
 
-            const ptrdiff_t nrows  = n_rows;
-            const int       height = slice_height_;
+            // switch (slice_height_) {
+            // case 8:
+            //     return sell_spmv_rowmajor<8, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            // case 16:
+            //     return sell_spmv_rowmajor<16, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            // case 32:
+            //     return sell_spmv_rowmajor<32, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            // case 64:
+            //     return sell_spmv_rowmajor<64, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            // default:
+            //     break;
+            // }
 
-#pragma omp parallel for
+            switch (slice_height_) {
+                case 8:
+                    return sell_spmv_slicemajor<8>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+                case 16:
+                    return sell_spmv_slicemajor<16>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+                case 32:
+                    return sell_spmv_slicemajor<32>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+                case 64:
+                    return sell_spmv_slicemajor<64>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+                default:
+                    break;
+            }
+
+            // Fallback generic path for unusual slice heights (pointer-stride row-major)
+            const int height = slice_height_;
+#pragma omp parallel for schedule(static)
             for (ptrdiff_t row = 0; row < nrows; ++row) {
-                const ptrdiff_t s         = row / height;                        // slice id
-                const int       r_in_s    = static_cast<int>(row - s * height);  // local row within slice
+                const ptrdiff_t s         = row / height;
+                const int       r_in_s    = static_cast<int>(row - s * height);
                 const ptrdiff_t width     = static_cast<ptrdiff_t>(d_slice_ptr[s + 1] - d_slice_ptr[s]);
                 const ptrdiff_t base_cols = static_cast<ptrdiff_t>(d_slice_ptr[s]) * height;
 
+                const C *SFEM_RESTRICT colp = d_colidx + base_cols + r_in_s;
+                const T *SFEM_RESTRICT valp = d_values + base_cols + r_in_s;
+
                 TOp acc = y[row];
+                // #if defined(__clang__)
+                // #pragma clang loop vectorize(enable)
+                // #pragma clang loop interleave_count(2)
+                // #pragma clang loop unroll(enable)
+                // #endif
                 for (ptrdiff_t j = 0; j < width; ++j) {
-                    const ptrdiff_t idx = base_cols + j * height + r_in_s;
-                    const C         c   = d_colidx[idx];
-                    const TOp       v   = static_cast<TOp>(d_values[idx]);
-                    acc += v * x[c];
+                    acc += static_cast<TOp>(valp[0]) * x[colp[0]];
+                    colp += height;
+                    valp += height;
                 }
                 y[row] = acc;
             }
