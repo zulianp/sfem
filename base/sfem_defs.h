@@ -23,6 +23,7 @@ static OperatorType BSR = "BSR";
 static OperatorType BSR_SYM = "BSR_SYM";
 static OperatorType COO_SYM = "COO_SYM";
 static OperatorType SPLITDACRS = "SPLITDACRS";
+static OperatorType SELL = "SELL";
 
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
