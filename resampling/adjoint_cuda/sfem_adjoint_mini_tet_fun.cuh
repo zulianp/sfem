@@ -61,8 +61,15 @@ struct Float3<float> {
 
 // Warp-aggregated atomicAdd to reduce contention (1 atomic per unique address in a warp)
 template <typename T>
-__device__ inline void warpAggAtomicAdd(T* data, ptrdiff_t idx, T val) {
-#if __CUDA_ARCH__ >= 700
+__device__ inline void warpAggregatedAdd(T* data, ptrdiff_t idx, T val) {
+#if __CUDA_ARCH__ < 700
+
+#pragma error "Warp-aggregated Add requires CUDA Compute Capability 7.0 or higher"
+
+#else
+
+    // #pragma message("Using warp-aggregated atomicAdd")
+
     const unsigned full_mask = __activemask();
     // Group lanes by target address
     unsigned long long key    = reinterpret_cast<unsigned long long>(data + idx);
@@ -74,18 +81,14 @@ __device__ inline void warpAggAtomicAdd(T* data, ptrdiff_t idx, T val) {
     T sum = val;
     for (int src = 0; src < warpSize; ++src) {
         // Everyone executes the same shuffle; only the leader of a group uses selected values
-        T v = __shfl_sync(full_mask, val, src);
+        T value = __shfl_sync(full_mask, val, src);
         if (lane == leader && (peers & (1u << src)) && src != leader) {
-            sum += v;
+            sum += value;
         }
     }
 
-    if (lane == leader) {
-        atomicAdd(&data[idx], sum);
-    }
-#else
-    // Fallback for older architectures
-    atomicAdd(&data[idx], val);
+    if (lane == leader) data[idx] += sum;
+
 #endif
 }
 
