@@ -1,7 +1,7 @@
-#include "sfem_SemiStructuredKV.hpp"
+#include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
 
 // C includes
-#include "sshex8_kv.h"
+#include "sshex8_kelvin_voigt_newmark.h"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
@@ -134,7 +134,7 @@ namespace sfem {
         int    err;
 
         // We only provide affine path for now (consistent with sshex8_kv.c)
-        err = affine_sshex8_kv_gradient(
+        err = affine_sshex8_kelvin_voigt_newmark_gradient(
             ssm.level(),
             ssm.n_elements(),
             ssm.interior_start(),
@@ -165,7 +165,7 @@ namespace sfem {
         int    err;
 
         // We only provide affine path for now (consistent with sshex8_kv.c)
-        err = affine_sshex8_kv_apply(ssm.level(),
+        err = affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
                                                     ssm.n_elements(),
                                                     ssm.interior_start(),
                                                     ssm.element_data(),

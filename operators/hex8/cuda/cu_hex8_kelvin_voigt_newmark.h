@@ -1,5 +1,5 @@
-#ifndef CU_HEX8_KELVIN_VOIGHT_H
-#define CU_HEX8_KELVIN_VOIGHT_H
+#ifndef CU_HEX8_KELVIN_VOIGT_NEWMARK_H
+#define CU_HEX8_KELVIN_VOIGT_NEWMARK_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-int cu_affine_hex8_kelvin_voigt_apply(const ptrdiff_t                 nelements,
+int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t                 nelements,
     idx_t **const SFEM_RESTRICT     elements,
     const ptrdiff_t                 jacobian_stride,
     const void *const SFEM_RESTRICT jacobian_adjugate,
@@ -18,6 +18,9 @@ int cu_affine_hex8_kelvin_voigt_apply(const ptrdiff_t                 nelements,
     const real_t                    K,
     const real_t                    eta,
     const real_t                    rho,
+    const real_t                    dt,
+    const real_t                    gamma,
+    const real_t                    beta,
     const enum RealType             real_type,
     const ptrdiff_t                 u_stride,
     const void *const SFEM_RESTRICT ux,
@@ -39,4 +42,4 @@ int cu_affine_hex8_kelvin_voigt_apply(const ptrdiff_t                 nelements,
 #ifdef __cplusplus
 }
 #endif
-#endif  // CU_HEX8_KELVIN_VOIGHT_H
+#endif  // CU_HEX8_KELVIN_VOIGT_NEWMARK_H

@@ -1,5 +1,5 @@
-#ifndef SFEM_SSHEX8_KV_H
-#define SFEM_SSHEX8_KV_H
+#ifndef SFEM_SSHEX8_KELVIN_VOIGT_NEWMARK_H
+#define SFEM_SSHEX8_KELVIN_VOIGT_NEWMARK_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -9,7 +9,7 @@ extern "C" {
 #endif
 // Semi-structured Kelvin-Voigt Newmark (affine) LHS apply
 // Current exported symbol implemented in sshex8_kv.c (name kept for compatibility)
-int affine_sshex8_kv_apply(const int                    level,
+int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
                                           const ptrdiff_t              nelements,
                                           const ptrdiff_t              nnodes,
                                           idx_t **const SFEM_RESTRICT  elements,
@@ -30,7 +30,7 @@ int affine_sshex8_kv_apply(const int                    level,
                                           real_t *const                outy,
                                           real_t *const                outz);
 
-int affine_sshex8_kv_gradient(const int                    level,
+int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    level,
                                           const ptrdiff_t              nelements,
                                           const ptrdiff_t              nnodes,
                                           idx_t **const SFEM_RESTRICT  elements,
@@ -78,4 +78,4 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
 #ifdef __cplusplus
 }
 #endif
-#endif  // SFEM_SSHEX8_KV_H
+#endif  // SFEM_SSHEX8_KELVIN_VOIGT_NEWMARK_H

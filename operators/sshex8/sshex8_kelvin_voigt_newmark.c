@@ -7,6 +7,7 @@
 // #include "hex8_quadrature.h"
 #include "line_quadrature.h"
 #include "sshex8.h"
+#include "sshex8_kelvin_voigt_newmark.h"
 
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))
@@ -31,7 +32,7 @@ static void print_matrix(int r, int c, const scalar_t *const m) {
     printf("]\n");
 }
 
-int affine_sshex8_kv_apply(const int                    level,
+int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
                            const ptrdiff_t              nelements,
                            const ptrdiff_t              nnodes,
                            idx_t **const SFEM_RESTRICT  elements,
@@ -214,7 +215,7 @@ int affine_sshex8_kv_apply(const int                    level,
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_kv_gradient(const int                    level,
+int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    level,
                               const ptrdiff_t              nelements,
                               const ptrdiff_t              nnodes,
                               idx_t **const SFEM_RESTRICT  elements,

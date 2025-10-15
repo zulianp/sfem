@@ -21,7 +21,7 @@ commands
   continue
 end
 
-break cu_hex8_kelvin_voigt_apply_adj<double,double> if threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && k == 0
+break cu_hex8_kelvin_voigt_newmark_apply_adj<double,double> if threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && k == 0
 commands
   silent
   printf "\n==== KELVIN ELEMENT ====\n"

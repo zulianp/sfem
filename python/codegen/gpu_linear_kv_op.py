@@ -616,6 +616,57 @@ class GPULinearKVOp:
 
 
 
+    def hessian_blocks(self):
+        H = self.eval_lhs_matrix
+        rows, cols = H.shape
+        fe = self.fe
+
+        n = fe.n_nodes()
+        dims = fe.spatial_dim()
+
+        blocks = []
+
+        for d1 in range(0, dims):
+            for d2 in range(0, dims):
+                expr = []
+                for i in range(0, n):
+                    for j in range(0, n):
+                        var = sp.symbols(f"element_matrix[{i*n + j}]")
+                        expr.append(
+                            ast.AddAugmentedAssignment(var, H[d1 * n + i, d2 * n + j])
+                        )
+                blocks.append((f"block_{d1}_{d2}", expr))
+
+        return blocks
+
+
+    def hessian_blocks_tpl(self):
+        tpl = """
+template<typename scalar_t, typename accumulator_t>
+static inline __host__ __device__ void  cu_hex8_kelvin_voigt_newmark_matrix_{BLOCK_NAME}(
+const scalar_t k,
+const scalar_t K,
+const scalar_t eta,
+const scalar_t rho,
+const scalar_t dt,
+const scalar_t gamma,
+const scalar_t beta,
+const scalar_t *const SFEM_RESTRICT adjugate,
+const scalar_t jacobian_determinant,
+const scalar_t qx,
+const scalar_t qy,
+const scalar_t qz,
+const scalar_t qw,
+accumulator_t *const SFEM_RESTRICT
+element_matrix) 
+{{
+	{CODE}
+}}
+"""
+        return tpl
+
+
+
 def main():
     start = perf_counter()
 
@@ -629,6 +680,15 @@ def main():
     # c_log("//--------------------------")
     # c_code(op.jacobian())
     # c_code(op.geometry())
+
+    tpl = op.hessian_blocks_tpl()
+    blocks = op.hessian_blocks()
+    for k,v in blocks:
+    	c_log("//--------------------------")
+    	c_log(f"// hessian {k}")
+    	c_log("//--------------------------")
+    	code = c_gen(v)
+    	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
 
     c_log("//--------------------------")
     c_log("// displacement_gradient")
