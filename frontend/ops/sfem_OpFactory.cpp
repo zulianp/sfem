@@ -10,7 +10,7 @@
 #include "sfem_SemiStructuredVectorLaplacian.hpp"
 #include "sfem_SemiStructuredLumpedMass.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
-#include "sfem_SemiStructuredKV.hpp"
+#include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"

@@ -16,11 +16,12 @@
 #include "cu_hex8_fff.h"
 #include "cu_laplacian.h"
 #include "cu_linear_elasticity.h"
-#include "cu_kelvin_voigt.h"
+#include "cu_kelvin_voigt_newmark.h"
 #include "cu_mask.h"
 #include "cu_sshex8_elemental_matrix.h"
 #include "cu_sshex8_laplacian.h"
 #include "cu_sshex8_linear_elasticity.h"
+#include "cu_sshex8_kelvin_voigt_newmark.h"
 #include "cu_tet4_adjugate.h"
 #include "cu_tet4_fff.h"
 
@@ -1092,30 +1093,79 @@ namespace sfem {
             }
     
             int gradient(const real_t *const x, real_t *const out) override {
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_apply");
+                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+
+                // Determine DOFs and prepare device pointers for x, v, a, out
+                const ptrdiff_t ndofs = space->n_dofs();
+
                 const real_t *v = vel_[0]->data();
                 const real_t *a = acc_[0]->data();
 
-                return cu_kelvin_voigt_apply(element_type,
-                                             adjugate->n_elements(),
-                                             adjugate->elements()->data(),
-                                             adjugate->n_elements(),  // stride
-                                             adjugate->jacobian_adjugate()->data(),
-                                             adjugate->jacobian_determinant()->data(),
-                                             k,
-                                             K,
-                                             eta,
-                                             rho,
-                                             real_type,
-                                             x,
-                                             v,
-                                             a,
-                                             out,
-                                             stream);
+                const real_t *x_dev = x;
+                const real_t *v_dev = v;
+                const real_t *a_dev = a;
+                real_t       *out_dev = out;
+
+                std::shared_ptr<Buffer<real_t>> x_tmp, v_tmp, a_tmp, out_tmp;
+
+                auto to_device_if_needed_in = [&](const real_t *src, std::shared_ptr<Buffer<real_t>> &tmp) -> const real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
+                        return src; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    buffer_host_to_device((size_t)ndofs * sizeof(real_t), src, tmp->data());
+                    return tmp->data();
+                };
+
+                auto to_device_if_needed_out = [&](real_t *dst, std::shared_ptr<Buffer<real_t>> &tmp) -> real_t * {
+                    cudaPointerAttributes attr{};
+                    if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
+                        return dst; // already device
+                    }
+                    tmp = sfem::create_device_buffer<real_t>(ndofs);
+                    d_memset(tmp->data(), 0, (size_t)ndofs * sizeof(real_t));
+                    return tmp->data();
+                };
+
+                x_dev   = to_device_if_needed_in(x, x_tmp);
+                v_dev   = to_device_if_needed_in(v, v_tmp);
+                a_dev   = to_device_if_needed_in(a, a_tmp);
+                out_dev = to_device_if_needed_out(out, out_tmp);
+
+                int err = cu_kelvin_voigt_newmark_apply(element_type,
+                                                adjugate->n_elements(),
+                                                adjugate->elements()->data(),
+                                                adjugate->n_elements(),  // stride
+                                                adjugate->jacobian_adjugate()->data(),
+                                                adjugate->jacobian_determinant()->data(),
+                                                k,
+                                                K,
+                                                eta,
+                                                rho,
+                                                real_type,
+                                                x_dev,
+                                                v_dev,
+                                                a_dev,
+                                                out_dev,
+                                                stream);
+
+                if (err) return err;
+
+                if (out_tmp) {
+                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
+                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
+                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                        out[i] += tmp_h->data()[i];
+                    }
+                }
+
+                return SFEM_SUCCESS;
             }
     
             int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_apply");
+                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+
                 const ptrdiff_t ndofs = space->n_dofs();
 
                 const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
@@ -1128,22 +1178,34 @@ namespace sfem {
                 d_copy(ndofs, h, a_lin_tmp->data());
                 d_scal(ndofs, a_scale, a_lin_tmp->data());
 
-                return cu_kelvin_voigt_apply(element_type,
-                                             adjugate->n_elements(),
-                                             adjugate->elements()->data(),
-                                             adjugate->n_elements(),  // stride
-                                             adjugate->jacobian_adjugate()->data(),
-                                             adjugate->jacobian_determinant()->data(),
-                                             k,
-                                             K,
-                                             eta,
-                                             rho,
-                                             real_type,
-                                             h,
-                                             v_lin_tmp->data(),
-                                             a_lin_tmp->data(),
-                                             out,
-                                             stream);
+                int err = cu_kelvin_voigt_newmark_apply(element_type,
+                                                adjugate->n_elements(),
+                                                adjugate->elements()->data(),
+                                                adjugate->n_elements(),  // stride
+                                                adjugate->jacobian_adjugate()->data(),
+                                                adjugate->jacobian_determinant()->data(),
+                                                k,
+                                                K,
+                                                eta,
+                                                rho,
+                                                real_type,
+                                                h_dev,
+                                                v_lin_tmp->data(),
+                                                a_lin_tmp->data(),
+                                                out_dev,
+                                                stream);
+
+                if (err) return err;
+
+                if (out_tmp) {
+                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
+                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
+                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                        out[i] += tmp_h->data()[i];
+                    }
+                }
+
+                return SFEM_SUCCESS;
             }
 
             int value(const real_t *x, real_t *const out) override {
@@ -1152,6 +1214,121 @@ namespace sfem {
             }
         };
 
+
+    class SemiStructuredGPUEMKelvinVoigtNewmark final : public Op {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<Adjugate>      adjugate;
+        enum RealType                  real_type { SFEM_REAL_DEFAULT };
+        void                          *stream{SFEM_DEFAULT_STREAM};
+       
+        real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
+            return std::make_unique<SemiStructuredGPUKelvinVoigtNewmark>(space);
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            if (derefined_space->has_semi_structured_mesh()) {
+                auto ret = std::make_shared<SemiStructuredGPUKelvinVoigtNewmark>(derefined_space);
+                ret->adjugate = std::make_shared<Adjugate>(
+                    derefined_space->element_type(),
+                    sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
+                                                         derefined_space->semi_structured_mesh().level(),
+                                                         adjugate->elements()),
+                    adjugate->jacobian_adjugate(),
+                    adjugate->jacobian_determinant());
+                ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
+                ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
+                ret->real_type = real_type; ret->stream = stream;
+                return ret;
+            } else {
+                auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
+                ret->initialize();
+                return ret;
+            }
+        }
+
+        const char *name() const override { return "ss:gpu:KelvinVoigtNewmark"; }
+        inline bool is_linear() const override { return true; }
+
+        int initialize(const std::vector<std::string>& = {}) override {
+            // 读物性与 Newmark 参数（同 GPUKelvinVoigtNewmark）
+            real_t SFEM_SHEAR_STIFFNESS_KV = k, SFEM_BULK_MODULUS = K;
+            real_t SFEM_DAMPING_RATIO = eta, SFEM_DENSITY = rho;
+            real_t SFEM_DT = dt, SFEM_NEWMARK_GAMMA = gamma, SFEM_NEWMARK_BETA = beta;
+            SFEM_READ_ENV(SFEM_SHEAR_STIFFNESS_KV, atof);
+            SFEM_READ_ENV(SFEM_BULK_MODULUS, atof);
+            SFEM_READ_ENV(SFEM_DAMPING_RATIO, atof);
+            SFEM_READ_ENV(SFEM_DENSITY, atof);
+            SFEM_READ_ENV(SFEM_DT, atof);
+            SFEM_READ_ENV(SFEM_NEWMARK_GAMMA, atof);
+            SFEM_READ_ENV(SFEM_NEWMARK_BETA, atof);
+            k = SFEM_SHEAR_STIFFNESS_KV; K = SFEM_BULK_MODULUS;
+            eta = SFEM_DAMPING_RATIO; rho = SFEM_DENSITY;
+            dt = SFEM_DT; gamma = SFEM_NEWMARK_GAMMA; beta = SFEM_NEWMARK_BETA;
+    
+            auto elements = space->device_elements();
+            if (!elements) { elements = create_device_elements(space, space->element_type()); space->set_device_elements(elements); }
+            adjugate = std::make_shared<Adjugate>(space->mesh(), space->element_type(), elements);
+            return SFEM_SUCCESS;
+        }
+    
+        SemiStructuredGPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace>& space) : space(space) {}
+    
+        int gradient(const real_t *const x, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->elements()->data(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->jacobian_adjugate()->data(),
+                                                               adjugate->jacobian_determinant()->data(),
+                                                               k, K, eta, rho,
+                                                               dt, gamma, beta,
+                                                               real_type,
+                                                               3, &x[0], &x[1], &x[2],
+                                                               3, &out[0], &out[1], &out[2],
+                                                               SFEM_DEFAULT_STREAM);
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->elements()->data(),
+                                                               adjugate->n_elements(),
+                                                               adjugate->jacobian_adjugate()->data(),
+                                                               adjugate->jacobian_determinant()->data(),
+                                                               k, K, eta, rho,
+                                                               dt, gamma, beta,
+                                                               real_type,
+                                                               3, &h[0], &h[1], &h[2],
+                                                               3, &out[0], &out[1], &out[2],
+                                                               SFEM_DEFAULT_STREAM);
+        }
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+            auto &ssm = space->semi_structured_mesh();
+            return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
+                                                              adjugate->n_elements(),
+                                                              adjugate->elements()->data(),
+                                                              adjugate->n_elements(),
+                                                              adjugate->jacobian_adjugate()->data(),
+                                                              adjugate->jacobian_determinant()->data(),
+                                                              k, K, eta, rho,
+                                                              dt, gamma, beta,
+                                                              real_type,
+                                                              3, &values[0], &values[1], &values[2],
+                                                              SFEM_DEFAULT_STREAM);
+        }
+    
+        int value(const real_t*, real_t*const) override { SFEM_IMPLEMENT_ME(); return SFEM_FAILURE; }
+        int report(const real_t*const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+    };
 
     class GPUEMOp : public Op {
     public:
