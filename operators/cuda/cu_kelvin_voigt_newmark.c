@@ -1,12 +1,12 @@
 #include "sfem_base.h"
 #include "sfem_defs.h"
 
-#include "cu_hex8_kelvin_voigt.h"
+#include "cu_hex8_kelvin_voigt_newmark.h"
 
 #include <mpi.h>
 #include <stdio.h>
 
-extern int cu_kelvin_voigt_apply(const enum ElemType             element_type,
+extern int cu_kelvin_voigt_newmark_apply(const enum ElemType             element_type,
                                       const ptrdiff_t                 nelements,
                                       idx_t **const SFEM_RESTRICT     elements,
                                       const ptrdiff_t                 jacobian_stride,
@@ -24,7 +24,7 @@ extern int cu_kelvin_voigt_apply(const enum ElemType             element_type,
                                       void                           *stream) {
     switch (element_type) {
         case HEX8: {
-            return cu_affine_hex8_kelvin_voigt_apply(nelements,
+            return cu_affine_hex8_kelvin_voigt_newmark_apply(nelements,
                                                           elements,
                                                           jacobian_stride,
                                                           jacobian_adjugate,
