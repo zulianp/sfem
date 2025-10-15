@@ -40,8 +40,15 @@ namespace sfem {
         for (std::ptrdiff_t row = 0; row < nrows; ++row) {
             const std::ptrdiff_t s         = row / SLICE_HEIGHT;                        // slice id
             const int            r_in_s    = static_cast<int>(row - s * SLICE_HEIGHT);  // local row in slice
-            const std::ptrdiff_t width     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
-            const std::ptrdiff_t base_cols = static_cast<std::ptrdiff_t>(slice_ptr[s]) * SLICE_HEIGHT;
+            const std::ptrdiff_t elems     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
+            const std::ptrdiff_t width     = elems / SLICE_HEIGHT;                       // columns in this slice
+            const std::ptrdiff_t base_cols = static_cast<std::ptrdiff_t>(slice_ptr[s]);  // element offset base
+
+            if (width == 0) {
+                // Nothing stored in this slice; no valid base to stride from
+                y[row] = y[row];
+                continue;
+            }
 
             const C *SFEM_RESTRICT colp = colidx + base_cols + r_in_s;
             const V *SFEM_RESTRICT valp = values + base_cols + r_in_s;
@@ -58,7 +65,7 @@ namespace sfem {
                 }
 #endif
 #endif
-                acc += static_cast<TOp>(valp[0]) * x[colp[0]];
+                if (colp[0] != (C)-1) acc += static_cast<TOp>(valp[0]) * x[colp[0]];
                 colp += SLICE_HEIGHT;
                 valp += SLICE_HEIGHT;
             }
@@ -88,8 +95,9 @@ namespace sfem {
         for (std::ptrdiff_t s = 0; s < n_slices; ++s) {
             const std::ptrdiff_t row_begin = s * SLICE_HEIGHT;
             const std::ptrdiff_t row_end   = std::min<std::ptrdiff_t>(row_begin + SLICE_HEIGHT, nrows);
-            const std::ptrdiff_t width     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
-            const std::ptrdiff_t base      = static_cast<std::ptrdiff_t>(slice_ptr[s]) * SLICE_HEIGHT;
+            const std::ptrdiff_t elems     = static_cast<std::ptrdiff_t>(slice_ptr[s + 1] - slice_ptr[s]);
+            const std::ptrdiff_t width     = elems / SLICE_HEIGHT;
+            const std::ptrdiff_t base      = static_cast<std::ptrdiff_t>(slice_ptr[s]);
 
             // Process one column of the slice at a time for better contiguous accesses
             for (std::ptrdiff_t j = 0; j < width; ++j) {
@@ -99,7 +107,7 @@ namespace sfem {
                 for (std::ptrdiff_t row = row_begin; row < row_end; ++row) {
                     const int            r_in_s = static_cast<int>(row - row_begin);
                     const std::ptrdiff_t idx    = col_base + r_in_s;
-                    y[row] += static_cast<TOp>(values[idx]) * x[colidx[idx]];
+                    if (colidx[idx] != (C)-1) y[row] += static_cast<TOp>(values[idx]) * x[colidx[idx]];
                 }
             }
         }
@@ -118,6 +126,55 @@ namespace sfem {
         return sell_spmv_rowmajor<SLICE_HEIGHT, 0, R, C, V, TOp>(nrows, slice_ptr, colidx, values, x, y);
     }
 
+    template <int SLICE_HEIGHT, typename R, typename C, typename V, typename TOp>
+    static inline int sell_spmv_simd(const std::ptrdiff_t           nrows,
+                                     const R *const SFEM_RESTRICT   slice_ptr,
+                                     const C *const SFEM_RESTRICT   colidx,
+                                     const V *const SFEM_RESTRICT   values,
+                                     const TOp *const SFEM_RESTRICT x,
+                                     TOp *const SFEM_RESTRICT       y) {
+        // TODO
+        ptrdiff_t n_slices = nrows / SLICE_HEIGHT;
+        ptrdiff_t reminder = nrows - n_slices * SLICE_HEIGHT;
+
+        // Vectorized loop
+        for (ptrdiff_t s = 0; s < n_slices; ++s) {
+            const ptrdiff_t row_begin = s * SLICE_HEIGHT;
+            const ptrdiff_t row_end   = row_begin + SLICE_HEIGHT;
+            const ptrdiff_t elems     = slice_ptr[s + 1] - slice_ptr[s];
+            const ptrdiff_t width     = elems / SLICE_HEIGHT;
+            const ptrdiff_t base      = slice_ptr[s];
+
+            TOp * const SFEM_RESTRICT acc = &y[row_begin];
+
+            for(ptrdiff_t j = 0; j < width; ++j) {
+                const ptrdiff_t col_base = base + j * SLICE_HEIGHT;
+                const C * const SFEM_RESTRICT colp = &colidx[col_base];
+                const V * const SFEM_RESTRICT valp = &values[col_base];
+
+                TOp in[SLICE_HEIGHT] = {0};
+                for(ptrdiff_t r = 0; r < SLICE_HEIGHT; ++r) {
+                    if(colp[r] != -1) {
+                        in[r] = x[colp[r]];
+                    }
+                }
+
+#pragma omp simd safelen(SLICE_HEIGHT)
+                for(ptrdiff_t r = 0; r < SLICE_HEIGHT; ++r) {
+                    acc[r] += in[r] * valp[r];
+                }
+            }
+        }
+
+        // Clean-up loop for the last slice
+        for (ptrdiff_t r = 0; r < reminder; ++r) {
+            const ptrdiff_t idx = nrows - reminder + r;
+            if (colidx[idx] != -1) y[idx] += static_cast<TOp>(values[idx]) * x[colidx[idx]];
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     template <typename R, typename C, typename T, typename TOp = T>
     class SlicedEllpack : public Operator<TOp> {
     public:
@@ -128,9 +185,13 @@ namespace sfem {
         // - Each slice has a (padded) width equal to the maximum nnz per row in the slice
         // - Entries are stored column-major per slice to improve memory locality
 
-        SharedBuffer<R> slice_ptr;  // size: n_slices + 1, prefix-sum of per-slice widths
-        SharedBuffer<C> colidx;     // size: slice_ptr[n_slices] * slice_height_
-        SharedBuffer<T> values;     // size: slice_ptr[n_slices] * slice_height_
+        // CuSPARSE-compatible SELL:
+        // - slice_ptr holds element offsets (prefix-sum of width[s] * slice_height_)
+        // - base element offset for slice s is slice_ptr[s]
+        // - width[s] = (slice_ptr[s+1] - slice_ptr[s]) / slice_height_
+        SharedBuffer<R> slice_ptr;  // size: n_slices + 1, prefix-sum of per-slice element counts
+        SharedBuffer<C> colidx;     // size: slice_ptr[n_slices]
+        SharedBuffer<T> values;     // size: slice_ptr[n_slices]
 
         static const int DEFAULT_SLICE_HEIGHT = 32;
 
@@ -159,57 +220,69 @@ namespace sfem {
             const auto      d_values    = values->data();
             const ptrdiff_t nrows       = n_rows;
 
-            // switch (slice_height_) {
-            // case 8:
-            //     return sell_spmv_rowmajor<8, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-            // case 16:
-            //     return sell_spmv_rowmajor<16, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-            // case 32:
-            //     return sell_spmv_rowmajor<32, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-            // case 64:
-            //     return sell_spmv_rowmajor<64, 2>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-            // default:
-            //     break;
-            // }
-
             switch (slice_height_) {
-                case 8:
-                    return sell_spmv_slicemajor<8>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-                case 16:
-                    return sell_spmv_slicemajor<16>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-                case 32:
-                    return sell_spmv_slicemajor<32>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-                case 64:
-                    return sell_spmv_slicemajor<64>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
-                default:
-                    break;
+            case 8:
+                return sell_spmv_simd<8>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            case 16:
+                return sell_spmv_simd<16>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            case 32:
+                return sell_spmv_simd<32>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            case 64:
+                return sell_spmv_simd<64>(nrows, d_slice_ptr, d_colidx, d_values, x, y);
+            default:
+                break;
             }
 
-            // Fallback generic path for unusual slice heights (pointer-stride row-major)
-            const int height = slice_height_;
+            // Fallback generic path for unusual slice heights: iterate by slices
+            {
+                const int       height   = slice_height_;
+                const ptrdiff_t n_slices = (nrows + height - 1) / height;
+
 #pragma omp parallel for schedule(static)
-            for (ptrdiff_t row = 0; row < nrows; ++row) {
-                const ptrdiff_t s         = row / height;
-                const int       r_in_s    = static_cast<int>(row - s * height);
-                const ptrdiff_t width     = static_cast<ptrdiff_t>(d_slice_ptr[s + 1] - d_slice_ptr[s]);
-                const ptrdiff_t base_cols = static_cast<ptrdiff_t>(d_slice_ptr[s]) * height;
+                for (ptrdiff_t s = 0; s < n_slices; ++s) {
+                    const ptrdiff_t row_begin = s * height;
+                    const ptrdiff_t row_end   = std::min<ptrdiff_t>(row_begin + height, nrows);
+                    const ptrdiff_t elems     = static_cast<ptrdiff_t>(d_slice_ptr[s + 1] - d_slice_ptr[s]);
+                    const ptrdiff_t width     = elems / height;
+                    const ptrdiff_t base      = static_cast<ptrdiff_t>(d_slice_ptr[s]);
+                    if (width == 0) continue;
 
-                const C *SFEM_RESTRICT colp = d_colidx + base_cols + r_in_s;
-                const T *SFEM_RESTRICT valp = d_values + base_cols + r_in_s;
+                    for (ptrdiff_t j = 0; j < width; ++j) {
+                        const ptrdiff_t col_base = base + j * height;
 
-                TOp acc = y[row];
-                // #if defined(__clang__)
-                // #pragma clang loop vectorize(enable)
-                // #pragma clang loop interleave_count(2)
-                // #pragma clang loop unroll(enable)
-                // #endif
-                for (ptrdiff_t j = 0; j < width; ++j) {
-                    acc += static_cast<TOp>(valp[0]) * x[colp[0]];
-                    colp += height;
-                    valp += height;
+#pragma omp simd
+                        for (ptrdiff_t row = row_begin; row < row_end; ++row) {
+                            const int       r_in_s = static_cast<int>(row - row_begin);
+                            const ptrdiff_t idx    = col_base + r_in_s;
+
+                            if (d_colidx[idx] != -1) y[row] += static_cast<TOp>(d_values[idx]) * x[d_colidx[idx]];
+                        }
+                    }
                 }
-                y[row] = acc;
             }
+
+            //             const ptrdiff_t num_slices = nrows / slice_height_;
+            // #pragma omp parallel for schedule(static)
+            //             for (ptrdiff_t s = 0; s < num_slices; ++s) {
+            //                 ptrdiff_t start = d_slice_ptr[s];
+            //                 ptrdiff_t end = d_slice_ptr[s+1];
+            //                 int slice_width = (end - start) / slice_height_;
+            //                 for (ptrdiff_t j = 0; j < slice_width; ++j) {
+            // #pragma omp simd
+            //                     for (ptrdiff_t r = 0; r < slice_height_; ++r) {
+            //                         ptrdiff_t idx = start + j * slice_height_ + r;
+            //                         if(d_colidx[idx] != -1)
+            //                             y[s*slice_height_+ r] += d_values[idx] * x[d_colidx[idx]];
+            //                     }
+            //                 }
+            //             }
+
+            //             // Clean-up loop for the last slice
+            //             const ptrdiff_t last_slice_height = n_rows % slice_height_;
+            //             for (ptrdiff_t r = 0; r < last_slice_height; ++r) {
+            //                 ptrdiff_t idx = n_rows - last_slice_height + r;
+            //                 y[idx] += d_values[idx] * x[d_colidx[idx]];
+            //             }
 
             return SFEM_SUCCESS;
         }
@@ -246,7 +319,7 @@ namespace sfem {
         const int       H        = slice_height;
         const ptrdiff_t n_slices = (nrows + H - 1) / H;
 
-        // Compute per-slice padded widths (max row length in slice)
+        // Compute per-slice padded element counts (width * H) to match cuSPARSE layout
         auto slice_ptr = sfem::create_host_buffer<R>(n_slices + 1);
         auto d_sp      = slice_ptr->data();
         d_sp[0]        = 0;
@@ -261,11 +334,11 @@ namespace sfem {
                 if (extent > max_width) max_width = extent;
             }
 
-            d_sp[s + 1] = static_cast<R>(d_sp[s] + max_width);
+            // element count for this slice (column-major, padded with -1)
+            d_sp[s + 1] = static_cast<R>(d_sp[s] + max_width * H);
         }
 
-        const ptrdiff_t total_columns = static_cast<ptrdiff_t>(d_sp[n_slices]);
-        const ptrdiff_t storage_size  = total_columns * H;  // column-major per slice, padded to slice height
+        const ptrdiff_t storage_size = static_cast<ptrdiff_t>(d_sp[n_slices]);
 
         auto sell_colidx = sfem::create_host_buffer<C>(storage_size);
         auto sell_values = sfem::create_host_buffer<TStorage>(storage_size);
@@ -278,8 +351,12 @@ namespace sfem {
         for (ptrdiff_t s = 0; s < n_slices; ++s) {
             const ptrdiff_t row_begin = s * H;
             const ptrdiff_t row_end   = std::min<ptrdiff_t>(row_begin + H, nrows);
-            const ptrdiff_t width     = static_cast<ptrdiff_t>(d_sp[s + 1] - d_sp[s]);
-            const ptrdiff_t base      = static_cast<ptrdiff_t>(d_sp[s]) * H;
+            const ptrdiff_t elems     = static_cast<ptrdiff_t>(d_sp[s + 1] - d_sp[s]);
+            const ptrdiff_t width     = elems / H;
+            const ptrdiff_t base      = static_cast<ptrdiff_t>(d_sp[s]);
+            if (width == 0) {
+                continue;
+            }
 
             for (ptrdiff_t r = 0; r < H; ++r) {
                 const ptrdiff_t row       = row_begin + r;
@@ -295,7 +372,7 @@ namespace sfem {
                         d_sc[idx] = d_colidx[row_start + j];
                         d_sv[idx] = static_cast<TStorage>(d_values[row_start + j]);
                     } else {
-                        d_sc[idx] = 0;
+                        d_sc[idx] = (C)-1;  // cuSPARSE padding sentinel
                         d_sv[idx] = static_cast<TStorage>(0);
                     }
                 }
