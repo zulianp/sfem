@@ -304,23 +304,26 @@ namespace sfem {
             bool coarse_solver_verbose          = false;
             bool debug                          = false;
             bool enable_shift                   = true;
-            bool enable_line_search             = false;
+            bool enable_line_search             = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
             bool project_coarse_correction      = false;
 
-            int SFEM_ENABLE_NL_OBSTACLE = 1;
-
-            int coarse_linear_smoothing_steps = 10;
-            int linear_smoothing_steps        = 1;
-            int max_inner_it                  = 40;
-            int max_it                        = sfem::Env::read("SFEM_MAX_IT", 15);
-            int nlsmooth_steps                = 15;
-            int max_coarse_it                 = 40000;
+            int SFEM_ENABLE_NL_OBSTACLE       = sfem::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
+            int coarse_linear_smoothing_steps = sfem::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
+            int linear_smoothing_steps        = sfem::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
+            ;
+            int    max_inner_it         = sfem::Env::read("SFEM_MAX_INNER_IT", 40);
+            int    max_it               = sfem::Env::read("SFEM_MAX_IT", 15);
+            int    nlsmooth_steps       = sfem::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
+            int    max_coarse_it        = sfem::Env::read("SFEM_MAX_COARSE_IT", 40000);
+            real_t omega_factor         = sfem::Env::read("SFEM_OMEGA_FACTOR", 100.);
+            real_t stagnation_threshold = sfem::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
             static constexpr bool is_double = std::is_same<real_t, double>::value;
 
-            real_t atol                   = is_double ? 1e-9 : 5e-7;
-            real_t max_penalty_param      = enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4);
-            real_t penalty_param          = 1e4;
+            real_t atol              = sfem::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
+            real_t max_penalty_param = sfem::Env::read(
+                    "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
+            real_t penalty_param          = sfem::Env::read("SFEM_PENALTY_PARAM", 1e4);
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
@@ -347,12 +350,13 @@ namespace sfem {
                 in->get("max_inner_it", max_inner_it);
                 in->get("max_it", max_it);
                 in->get("max_penalty_param", max_penalty_param);
-                in->get("nlsmooth_steps", nlsmooth_steps);
                 in->get("penalty_param", penalty_param);
+                in->get("nlsmooth_steps", nlsmooth_steps);
                 in->get("penalty_param_increase", penalty_param_increase);
                 in->get("project_coarse_correction", project_coarse_correction);
                 in->get("max_coarse_it", max_coarse_it);
                 in->get("coarse_rtol", coarse_rtol);
+                in->get("stagnation_threshold", stagnation_threshold);
             }
 
             ////////////////////////////////////////////////////////////////////////////////////
@@ -559,6 +563,8 @@ namespace sfem {
             mg->set_enable_shift(enable_shift);
             mg->set_penalty_param_increase(penalty_param_increase);
             mg->set_nlsmooth_steps(nlsmooth_steps);
+            mg->set_omega_factor(omega_factor);
+            mg->set_stagnation_threshold(stagnation_threshold);
 
             if (SFEM_ENABLE_NL_OBSTACLE) {
                 mg->set_update_constraints([that = this](const T *const disp) {
