@@ -34,7 +34,9 @@ typedef struct OpDesc {
     template <class Op, class X, class Y>
     void measure(Op op, X x, Y y, int repeat) {
         // Warm-up
-        op->apply(x, y);
+        for(int i = 0; i < 2; i++) {
+            op->apply(x, y);
+        }
 
         sfem::device_synchronize();
 

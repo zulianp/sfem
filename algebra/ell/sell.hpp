@@ -138,6 +138,7 @@ namespace sfem {
         ptrdiff_t reminder = nrows - n_slices * SLICE_HEIGHT;
 
         // Vectorized loop
+#pragma omp parallel for schedule(static)
         for (ptrdiff_t s = 0; s < n_slices; ++s) {
             const ptrdiff_t row_begin = s * SLICE_HEIGHT;
             const ptrdiff_t row_end   = row_begin + SLICE_HEIGHT;
@@ -166,10 +167,33 @@ namespace sfem {
             }
         }
 
-        // Clean-up loop for the last slice
-        for (ptrdiff_t r = 0; r < reminder; ++r) {
-            const ptrdiff_t idx = nrows - reminder + r;
-            if (colidx[idx] != -1) y[idx] += static_cast<TOp>(values[idx]) * x[colidx[idx]];
+        if(reminder) {
+                // Clean-up loop for the last slice
+            const ptrdiff_t row_begin = n_slices * SLICE_HEIGHT;
+            const ptrdiff_t row_end   = row_begin + reminder;
+            const ptrdiff_t elems     = slice_ptr[n_slices + 1] - slice_ptr[n_slices];
+            const ptrdiff_t width     = elems / reminder;
+            const ptrdiff_t base      = slice_ptr[n_slices];
+
+            TOp * const SFEM_RESTRICT acc = &y[row_begin];
+
+            for(ptrdiff_t j = 0; j < width; ++j) {
+                const ptrdiff_t col_base = base + j * reminder;
+                const C * const SFEM_RESTRICT colp = &colidx[col_base];
+                const V * const SFEM_RESTRICT valp = &values[col_base];
+
+                TOp in[SLICE_HEIGHT] = {0};
+                for(ptrdiff_t r = 0; r < reminder; ++r) {
+                    if(colp[r] != -1) {
+                        in[r] = x[colp[r]];
+                    }
+                }
+
+#pragma omp simd
+                for(ptrdiff_t r = 0; r < reminder; ++r) {
+                    acc[r] += in[r] * valp[r];
+                }
+            }
         }
 
         return SFEM_SUCCESS;
