@@ -1094,78 +1094,29 @@ namespace sfem {
     
             int gradient(const real_t *const x, real_t *const out) override {
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-
-                // Determine DOFs and prepare device pointers for x, v, a, out
-                const ptrdiff_t ndofs = space->n_dofs();
-
                 const real_t *v = vel_[0]->data();
                 const real_t *a = acc_[0]->data();
 
-                const real_t *x_dev = x;
-                const real_t *v_dev = v;
-                const real_t *a_dev = a;
-                real_t       *out_dev = out;
-
-                std::shared_ptr<Buffer<real_t>> x_tmp, v_tmp, a_tmp, out_tmp;
-
-                auto to_device_if_needed_in = [&](const real_t *src, std::shared_ptr<Buffer<real_t>> &tmp) -> const real_t * {
-                    cudaPointerAttributes attr{};
-                    if (cudaPointerGetAttributes(&attr, src) == cudaSuccess && attr.type == 2) {
-                        return src; // already device
-                    }
-                    tmp = sfem::create_device_buffer<real_t>(ndofs);
-                    buffer_host_to_device((size_t)ndofs * sizeof(real_t), src, tmp->data());
-                    return tmp->data();
-                };
-
-                auto to_device_if_needed_out = [&](real_t *dst, std::shared_ptr<Buffer<real_t>> &tmp) -> real_t * {
-                    cudaPointerAttributes attr{};
-                    if (cudaPointerGetAttributes(&attr, dst) == cudaSuccess && attr.type == 2) {
-                        return dst; // already device
-                    }
-                    tmp = sfem::create_device_buffer<real_t>(ndofs);
-                    d_memset(tmp->data(), 0, (size_t)ndofs * sizeof(real_t));
-                    return tmp->data();
-                };
-
-                x_dev   = to_device_if_needed_in(x, x_tmp);
-                v_dev   = to_device_if_needed_in(v, v_tmp);
-                a_dev   = to_device_if_needed_in(a, a_tmp);
-                out_dev = to_device_if_needed_out(out, out_tmp);
-
-                int err = cu_kelvin_voigt_newmark_apply(element_type,
-                                                adjugate->n_elements(),
-                                                adjugate->elements()->data(),
-                                                adjugate->n_elements(),  // stride
-                                                adjugate->jacobian_adjugate()->data(),
-                                                adjugate->jacobian_determinant()->data(),
-                                                k,
-                                                K,
-                                                eta,
-                                                rho,
-                                                real_type,
-                                                x_dev,
-                                                v_dev,
-                                                a_dev,
-                                                out_dev,
-                                                stream);
-
-                if (err) return err;
-
-                if (out_tmp) {
-                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
-                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
-                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                        out[i] += tmp_h->data()[i];
-                    }
-                }
-
-                return SFEM_SUCCESS;
+                return cu_kelvin_voigt_newmark_apply(element_type,
+                                             adjugate->n_elements(),
+                                             adjugate->elements()->data(),
+                                             adjugate->n_elements(),  // stride
+                                             adjugate->jacobian_adjugate()->data(),
+                                             adjugate->jacobian_determinant()->data(),
+                                             k,
+                                             K,
+                                             eta,
+                                             rho,
+                                             real_type,
+                                             x,
+                                             v,
+                                             a,
+                                             out,
+                                             stream);
             }
     
             int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-
                 const ptrdiff_t ndofs = space->n_dofs();
 
                 const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
@@ -1178,34 +1129,22 @@ namespace sfem {
                 d_copy(ndofs, h, a_lin_tmp->data());
                 d_scal(ndofs, a_scale, a_lin_tmp->data());
 
-                int err = cu_kelvin_voigt_newmark_apply(element_type,
-                                                adjugate->n_elements(),
-                                                adjugate->elements()->data(),
-                                                adjugate->n_elements(),  // stride
-                                                adjugate->jacobian_adjugate()->data(),
-                                                adjugate->jacobian_determinant()->data(),
-                                                k,
-                                                K,
-                                                eta,
-                                                rho,
-                                                real_type,
-                                                h_dev,
-                                                v_lin_tmp->data(),
-                                                a_lin_tmp->data(),
-                                                out_dev,
-                                                stream);
-
-                if (err) return err;
-
-                if (out_tmp) {
-                    auto tmp_h = sfem::create_host_buffer<real_t>(ndofs);
-                    buffer_device_to_host((size_t)ndofs * sizeof(real_t), out_tmp->data(), tmp_h->data());
-                    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                        out[i] += tmp_h->data()[i];
-                    }
-                }
-
-                return SFEM_SUCCESS;
+                return cu_kelvin_voigt_newmark_apply(element_type,
+                                             adjugate->n_elements(),
+                                             adjugate->elements()->data(),
+                                             adjugate->n_elements(),  // stride
+                                             adjugate->jacobian_adjugate()->data(),
+                                             adjugate->jacobian_determinant()->data(),
+                                             k,
+                                             K,
+                                             eta,
+                                             rho,
+                                             real_type,
+                                             h,
+                                             v_lin_tmp->data(),
+                                             a_lin_tmp->data(),
+                                             out,
+                                             stream);
             }
 
             int value(const real_t *x, real_t *const out) override {
