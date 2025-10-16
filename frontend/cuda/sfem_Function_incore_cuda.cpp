@@ -1193,7 +1193,7 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
 
         int initialize(const std::vector<std::string>& = {}) override {
-            // 读物性与 Newmark 参数（同 GPUKelvinVoigtNewmark）
+
             real_t SFEM_SHEAR_STIFFNESS_KV = k, SFEM_BULK_MODULUS = K;
             real_t SFEM_DAMPING_RATIO = eta, SFEM_DENSITY = rho;
             real_t SFEM_DT = dt, SFEM_NEWMARK_GAMMA = gamma, SFEM_NEWMARK_BETA = beta;
