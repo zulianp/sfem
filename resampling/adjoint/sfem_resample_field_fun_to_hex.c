@@ -1,4 +1,5 @@
 #include "sfem_resample_field.h"
+#include "sfem_resample_field_adjoint_hyteg.h"
 #include "sfem_resample_field_tet4_math.h"
 #include "sfem_stack.h"
 
@@ -31,9 +32,9 @@
 /////////////////////////////////////////////////////////////////////////////
 void                                           //
 check_point_in_tet(const int           p_cnt,  //
-                   const real_t const* px,     //
-                   const real_t const* py,     //
-                   const real_t const* pz,     //
+                   const real_t* const px,     //
+                   const real_t* const py,     //
+                   const real_t* const pz,     //
                    const real_t        x0,     //
                    const real_t        x1,     //
                    const real_t        x2,     //
