@@ -18,9 +18,6 @@ int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t                 ne
     const real_t                    K,
     const real_t                    eta,
     const real_t                    rho,
-    const real_t                    dt,
-    const real_t                    gamma,
-    const real_t                    beta,
     const enum RealType             real_type,
     const ptrdiff_t                 u_stride,
     const void *const SFEM_RESTRICT ux,
@@ -36,7 +33,7 @@ int cu_affine_hex8_kelvin_voigt_newmark_apply(const ptrdiff_t                 ne
     void *const SFEM_RESTRICT       outx,
     void *const SFEM_RESTRICT       outy,
     void *const SFEM_RESTRICT       outz,
-    void                           *stream);;
+    void                           *stream);
 
 
 #ifdef __cplusplus

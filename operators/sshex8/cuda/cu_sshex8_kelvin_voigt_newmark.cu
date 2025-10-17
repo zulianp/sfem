@@ -8,6 +8,79 @@
 // #include "cu_hex8_linear_elasticity_matrix_inline.hpp"
 #include "cu_sshex8_inline.hpp"
 
+// Forward declarations (needed before use in templates)
+template <typename T>
+static int cu_affine_sshex8_kelvin_voigt_newmark_diag_tpl(const int                                level,
+                                                          const ptrdiff_t                          nelements,
+                                                          idx_t **const SFEM_RESTRICT              elements,
+                                                          const ptrdiff_t                          jacobian_stride,
+                                                          const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                          const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                          const T                                  k,
+                                                          const T                                  K,
+                                                          const T                                  eta,
+                                                          const T                                  rho,
+                                                          const T                                  dt,
+                                                          const T                                  gamma,
+                                                          const T                                  beta,
+                                                          const ptrdiff_t                          out_stride,
+                                                          T *const SFEM_RESTRICT                   outx,
+                                                          T *const SFEM_RESTRICT                   outy,
+                                                          T *const SFEM_RESTRICT                   outz,
+                                                          void                                    *stream);
+
+template <typename T>
+__global__ void cu_affine_sshex8_kelvin_voigt_newmark_diag_kernel(const int                                level,
+                                                                  const ptrdiff_t                          nelements,
+                                                                  idx_t **const SFEM_RESTRICT              elements,
+                                                                  const ptrdiff_t                          jacobian_stride,
+                                                                  const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                                  const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                                  const T                                  k,
+                                                                  const T                                  K,
+                                                                  const T                                  eta,
+                                                                  const T                                  rho,
+                                                                  const T                                  dt,
+                                                                  const T                                  gamma,
+                                                                  const T                                  beta,
+                                                                  const ptrdiff_t                          out_stride,
+                                                                  T *const SFEM_RESTRICT                   outx,
+                                                                  T *const SFEM_RESTRICT                   outy,
+                                                                  T *const SFEM_RESTRICT                   outz);
+
+// Small inline micro-kernel used below
+template <typename T, int LEVEL>
+static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix, const T *const u_block, T *const out_block) {
+    for (int zi = 0; zi < LEVEL; zi++) {
+        for (int yi = 0; yi < LEVEL; yi++) {
+            for (int xi = 0; xi < LEVEL; xi++) {
+                T u[8];
+                T out[8];
+
+                int lev[8] = {cu_sshex8_lidx(LEVEL, xi, yi, zi),
+                              cu_sshex8_lidx(LEVEL, xi + 1, yi, zi),
+                              cu_sshex8_lidx(LEVEL, xi + 1, yi + 1, zi),
+                              cu_sshex8_lidx(LEVEL, xi, yi + 1, zi),
+                              cu_sshex8_lidx(LEVEL, xi, yi, zi + 1),
+                              cu_sshex8_lidx(LEVEL, xi + 1, yi, zi + 1),
+                              cu_sshex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1),
+                              cu_sshex8_lidx(LEVEL, xi, yi + 1, zi + 1)};
+
+                for (int vi = 0; vi < 8; vi++) { u[vi] = u_block[lev[vi]]; }
+                for (int i = 0; i < 8; i++) { out[i] = 0; }
+
+                for (int i = 0; i < 8; i++) {
+                    const T *const row = &elemental_matrix[i * 8];
+                    const T        ui  = u[i];
+                    for (int j = 0; j < 8; j++) { out[j] += ui * row[j]; }
+                }
+
+                for (int vi = 0; vi < 8; vi++) { out_block[lev[vi]] += out[vi]; }
+            }
+        }
+    }
+}
+
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_kernel(
         const ptrdiff_t                          nelements,
@@ -63,21 +136,21 @@ __global__ void cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_kernel(
             ev[6] = cu_sshex8_lidx(LEVEL, xi + 1, yi + 1, zi + 1);
             ev[7] = cu_sshex8_lidx(LEVEL, xi, yi + 1, zi + 1);
 
-            for (int v = 0; v < 8; v++) {
-                ev[v] = elements[ev[v]][e];
+            for (int vi = 0; vi < 8; vi++) {
+                ev[vi] = elements[ev[vi]][e];
             }
 
-            for (int v = 0; v < 8; v++) {
-                ptrdiff_t idx = ev[v] * u_stride;
-                u[0][v]       = g_ux[idx];
-                u[1][v]       = g_uy[idx];
-                u[2][v]       = g_uz[idx];
-                v[0][v]       = g_vx[idx];
-                v[1][v]       = g_vy[idx];
-                v[2][v]       = g_vz[idx];
-                a[0][v]       = g_ax[idx];
-                a[1][v]       = g_ay[idx];
-                a[2][v]       = g_az[idx];
+            for (int vi = 0; vi < 8; vi++) {
+                ptrdiff_t idx = ev[vi] * u_stride;
+                u[0][vi]      = g_ux[idx];
+                u[1][vi]      = g_uy[idx];
+                u[2][vi]      = g_uz[idx];
+                v[0][vi]      = g_vx[idx];
+                v[1][vi]      = g_vy[idx];
+                v[2][vi]      = g_vz[idx];
+                a[0][vi]      = g_ax[idx];
+                a[1][vi]      = g_ay[idx];
+                a[2][vi]      = g_az[idx];
             }
 
             sub_adjugate[0] = g_jacobian_adjugate[0 * jacobian_stride + e];
@@ -94,8 +167,8 @@ __global__ void cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_kernel(
             cu_hex8_sub_adj_0_in_place((T)(1. / LEVEL), sub_adjugate, &sub_determinant);
 
             for (int d = 0; d < 3; d++) {
-                for (int v = 0; v < 8; v++) {
-                    out[d][v] = 0;
+                for (int vi = 0; vi < 8; vi++) {
+                    out[d][vi] = 0;
                 }
             }
 
@@ -128,11 +201,11 @@ __global__ void cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_kernel(
                 }
             }
 
-            for (int v = 0; v < 8; v++) {
-                const ptrdiff_t idx = ev[v] * out_stride;
-                atomicAdd(&g_outx[idx], out[0][v]);
-                atomicAdd(&g_outy[idx], out[1][v]);
-                atomicAdd(&g_outz[idx], out[2][v]);
+            for (int vi = 0; vi < 8; vi++) {
+                const ptrdiff_t idx = ev[vi] * out_stride;
+                atomicAdd(&g_outx[idx], out[0][vi]);
+                atomicAdd(&g_outy[idx], out[1][vi]);
+                atomicAdd(&g_outz[idx], out[2][vi]);
             }
         }
     }
@@ -213,6 +286,12 @@ int cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_tpl(const ptrdiff_t        
                                                                                                        ux,
                                                                                                        uy,
                                                                                                        uz,
+                                                                                                       vx,
+                                                                                                       vy,
+                                                                                                       vz,
+                                                                                                       ax,
+                                                                                                       ay,
+                                                                                                       az,
                                                                                                        out_stride,
                                                                                                        outx,
                                                                                                        outy,
@@ -704,6 +783,96 @@ static int cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl(const int            
     }
 }
 
+// C-linkage wrapper exported to the front-end (matches header signature)
+extern "C" int cu_affine_sshex8_kelvin_voigt_newmark_apply(const int                       level,
+                                                            const ptrdiff_t                 nelements,
+                                                            idx_t **const SFEM_RESTRICT     elements,
+                                                            const ptrdiff_t                 jacobian_stride,
+                                                            const void *const SFEM_RESTRICT jacobian_adjugate,
+                                                            const void *const SFEM_RESTRICT jacobian_determinant,
+                                                            const real_t                    k,
+                                                            const real_t                    K,
+                                                            const real_t                    eta,
+                                                            const real_t                    rho,
+                                                            const real_t                    dt,
+                                                            const real_t                    gamma,
+                                                            const real_t                    beta,
+                                                            const enum RealType             real_type,
+                                                            const ptrdiff_t                 u_stride,
+                                                            const void *const SFEM_RESTRICT ux,
+                                                            const void *const SFEM_RESTRICT uy,
+                                                            const void *const SFEM_RESTRICT uz,
+                                                            const void *const SFEM_RESTRICT vx,
+                                                            const void *const SFEM_RESTRICT vy,
+                                                            const void *const SFEM_RESTRICT vz,
+                                                            const void *const SFEM_RESTRICT ax,
+                                                            const void *const SFEM_RESTRICT ay,
+                                                            const void *const SFEM_RESTRICT az,
+                                                            const ptrdiff_t                 out_stride,
+                                                            void *const SFEM_RESTRICT       outx,
+                                                            void *const SFEM_RESTRICT       outy,
+                                                            void *const SFEM_RESTRICT       outz,
+                                                            void                           *stream) {
+    switch (real_type) {
+        case SFEM_REAL_DEFAULT: {
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<real_t>(level,
+                                                                          nelements,
+                                                                          elements,
+                                                                          jacobian_stride,
+                                                                          (cu_jacobian_t *)jacobian_adjugate,
+                                                                          (cu_jacobian_t *)jacobian_determinant,
+                                                                          k, K, eta, rho,
+                                                                          dt, gamma, beta,
+                                                                          u_stride,
+                                                                          (real_t *)ux, (real_t *)uy, (real_t *)uz,
+                                                                          (real_t *)vx, (real_t *)vy, (real_t *)vz,
+                                                                          (real_t *)ax, (real_t *)ay, (real_t *)az,
+                                                                          out_stride,
+                                                                          (real_t *)outx, (real_t *)outy, (real_t *)outz,
+                                                                          stream);
+        }
+        case SFEM_FLOAT32: {
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<float>(level,
+                                                                         nelements,
+                                                                         elements,
+                                                                         jacobian_stride,
+                                                                         (cu_jacobian_t *)jacobian_adjugate,
+                                                                         (cu_jacobian_t *)jacobian_determinant,
+                                                                         k, K, eta, rho,
+                                                                         dt, gamma, beta,
+                                                                         u_stride,
+                                                                         (float *)ux, (float *)uy, (float *)uz,
+                                                                         (float *)vx, (float *)vy, (float *)vz,
+                                                                         (float *)ax, (float *)ay, (float *)az,
+                                                                         out_stride,
+                                                                         (float *)outx, (float *)outy, (float *)outz,
+                                                                         stream);
+        }
+        case SFEM_FLOAT64: {
+            return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<double>(level,
+                                                                          nelements,
+                                                                          elements,
+                                                                          jacobian_stride,
+                                                                          (cu_jacobian_t *)jacobian_adjugate,
+                                                                          (cu_jacobian_t *)jacobian_determinant,
+                                                                          k, K, eta, rho,
+                                                                          dt, gamma, beta,
+                                                                          u_stride,
+                                                                          (double *)ux, (double *)uy, (double *)uz,
+                                                                          (double *)vx, (double *)vy, (double *)vz,
+                                                                          (double *)ax, (double *)ay, (double *)az,
+                                                                          out_stride,
+                                                                          (double *)outx, (double *)outy, (double *)outz,
+                                                                          stream);
+        }
+        default: {
+            SFEM_ERROR("[Error] cu_affine_sshex8_kelvin_voigt_newmark_apply: not implemented for type %s (code %d)\n",
+                      real_type_to_string(real_type), real_type);
+            return SFEM_FAILURE;
+        }
+    }
+}
+
 extern int cu_affine_sshex8_kelvin_voigt_newmark_diag(const int                       level,
                                                       const ptrdiff_t                 nelements,
                                                       idx_t **const SFEM_RESTRICT     elements,
@@ -796,6 +965,147 @@ extern int cu_affine_sshex8_kelvin_voigt_newmark_diag(const int                 
         }
     }
 }
+
+
+
+
+// extern int cu_affine_sshex8_kelvin_voigt_newmark_apply(const int                       level,
+//     const ptrdiff_t                 nelements,
+//     idx_t **const SFEM_RESTRICT     elements,
+//     const ptrdiff_t                 jacobian_stride,
+//     const void *const SFEM_RESTRICT jacobian_adjugate,
+//     const void *const SFEM_RESTRICT jacobian_determinant,
+//     const real_t                    k,
+//     const real_t                    K,
+//     const real_t                    eta,
+//     const real_t                    rho,
+//     const real_t                    dt,
+//     const real_t                    gamma,
+//     const real_t                    beta,
+//     const enum RealType             real_type,
+//     const ptrdiff_t                 u_stride,
+//     const void *const SFEM_RESTRICT ux,
+//     const void *const SFEM_RESTRICT uy,
+//     const void *const SFEM_RESTRICT uz,
+//     const void *const SFEM_RESTRICT vx,
+//     const void *const SFEM_RESTRICT vy,
+//     const void *const SFEM_RESTRICT vz,
+//     const void *const SFEM_RESTRICT ax,
+//     const void *const SFEM_RESTRICT ay,
+//     const void *const SFEM_RESTRICT az,
+//     const ptrdiff_t                 out_stride,
+//     void *const SFEM_RESTRICT       outx,
+//     void *const SFEM_RESTRICT       outy,
+//     void *const SFEM_RESTRICT       outz,
+//     void                           *stream) {
+// // init_quadrature();
+
+// switch (real_type) {
+// case SFEM_REAL_DEFAULT: {
+// return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<real_t>(level,
+//                         nelements,
+//                         elements,
+//                         jacobian_stride,
+//                         (cu_jacobian_t *)jacobian_adjugate,
+//                         (cu_jacobian_t *)jacobian_determinant,
+//                         k,
+//                         K,
+//                         eta,
+//                         rho,
+//                         dt,
+//                         gamma,
+//                         beta,
+//                         u_stride,
+//                         (real_t *)ux,
+//                         (real_t *)uy,
+//                         (real_t *)uz,
+//                         (real_t *)vx,
+//                         (real_t *)vy,
+//                         (real_t *)vz,
+//                         (real_t *)ax,
+//                         (real_t *)ay,
+//                         (real_t *)az,
+//                         out_stride,
+//                         (real_t *)outx,
+//                         (real_t *)outy,
+//                         (real_t *)outz,
+//                         stream);
+// }
+// case SFEM_FLOAT32: {
+// return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<float>(level,
+//                        nelements,
+//                        elements,
+//                        jacobian_stride,
+//                        (cu_jacobian_t *)jacobian_adjugate,
+//                        (cu_jacobian_t *)jacobian_determinant,
+//                        k,
+//                        K,
+//                        eta,
+//                        rho,
+//                        dt,
+//                        gamma,
+//                        beta,
+//                        u_stride,
+//                        (float *)ux,
+//                        (float *)uy,
+//                        (float *)uz,
+//                        (float *)vx,
+//                        (float *)vy,
+//                        (float *)vz,
+//                        (float *)ax,
+//                        (float *)ay,
+//                        (float *)az,
+//                        out_stride,
+//                        (float *)outx,
+//                        (float *)outy,
+//                        (float *)outz,
+//                        stream);
+// }
+// case SFEM_FLOAT64: {
+// return cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl<double>(level,
+//                         nelements,
+//                         elements,
+//                         jacobian_stride,
+//                         (cu_jacobian_t *)jacobian_adjugate,
+//                         (cu_jacobian_t *)jacobian_determinant,
+//                         k,
+//                         K,
+//                         eta,
+//                         rho,
+//                         dt,
+//                         gamma,
+//                         beta,
+//                         u_stride,
+//                         (double *)ux,
+//                         (double *)uy,
+//                         (double *)uz,
+//                         (double *)vx,
+//                         (double *)vy,
+//                         (double *)vz,
+//                         (double *)ax,
+//                         (double *)ay,
+//                         (double *)az,
+//                         out_stride,
+//                         (double *)outx,
+//                         (double *)outy,
+//                         (double *)outz,
+//                         stream);
+// }
+// default: {
+// SFEM_ERROR(
+// "[Error] cu_affine_sshex8_kelvin_voigt_newmark_apply: not implemented "
+// "for "
+// "type %s "
+// "(code %d)\n",
+// real_type_to_string(real_type),
+// real_type);
+// return SFEM_FAILURE;
+// }
+// }
+// }
+
+
+
 
 template <typename T>
 static int cu_affine_sshex8_kelvin_voigt_newmark_diag_tpl(const int                                level,
