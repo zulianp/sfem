@@ -64,6 +64,7 @@ std::pair<std::shared_ptr<sfem::Function>, std::shared_ptr<sfem::Op>> create_kel
     sfem::NeumannConditions::Condition nc_left{.sidesets = left_sideset, .value = 0.5, .component = 0};
     auto                               n_conds = sfem::create_neumann_conditions(fs, {nc_left}, es);
     f->add_operator(n_conds);
+
 #else  // Test with Dirichlet only (in case diable test_newmark)
     sfem::DirichletConditions::Condition left0{.sideset = left_sideset, .value = 0.2, .component = 0};
     sfem::DirichletConditions::Condition left1{.sideset = left_sideset, .value = 0.2, .component = 1};
@@ -78,34 +79,34 @@ std::pair<std::shared_ptr<sfem::Function>, std::shared_ptr<sfem::Op>> create_kel
     return std::make_pair(f, kelvin_voigt_newmark);
 }
 
-std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
-    auto fs = f->space();
-    auto es = f->execution_space();
+// std::shared_ptr<sfem::Buffer<real_t>> create_inverse_mass_vector(const std::shared_ptr<sfem::Function> &f) {
+//     auto fs = f->space();
+//     auto es = f->execution_space();
 
-    auto blas = sfem::blas<real_t>(es);
+//     auto blas = sfem::blas<real_t>(es);
 
-    auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto mass            = sfem::create_op(fs, "LumpedMass", es);
-    mass->initialize();
-    mass->hessian_diag(nullptr, inv_mass_vector->data());
-    f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
-    blas->reciprocal(inv_mass_vector->size(), 1, inv_mass_vector->data());
-    return inv_mass_vector;
-}
+//     auto inv_mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+//     auto mass            = sfem::create_op(fs, "LumpedMass", es);
+//     mass->initialize();
+//     mass->hessian_diag(nullptr, inv_mass_vector->data());
+//     f->set_value_to_constrained_dofs(1, inv_mass_vector->data());
+//     blas->reciprocal(inv_mass_vector->size(), 1, inv_mass_vector->data());
+//     return inv_mass_vector;
+// }
 
-std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<sfem::Function> &f) {
-    auto fs = f->space();
-    auto es = f->execution_space();
+// std::shared_ptr<sfem::Buffer<real_t>> create_mass_vector(const std::shared_ptr<sfem::Function> &f) {
+//     auto fs = f->space();
+//     auto es = f->execution_space();
 
-    auto blas = sfem::blas<real_t>(es);
+//     auto blas = sfem::blas<real_t>(es);
 
-    auto mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-    auto mass        = sfem::create_op(fs, "LumpedMass", es);
-    mass->initialize();
-    mass->hessian_diag(nullptr, mass_vector->data());
-    f->set_value_to_constrained_dofs(1, mass_vector->data());
-    return mass_vector;
-}
+//     auto mass_vector = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+//     auto mass        = sfem::create_op(fs, "LumpedMass", es);
+//     mass->initialize();
+//     mass->hessian_diag(nullptr, mass_vector->data());
+//     f->set_value_to_constrained_dofs(1, mass_vector->data());
+//     return mass_vector;
+// }
 
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto fs = f->space();
@@ -163,16 +164,27 @@ int test_newmark_kv() {
         real_t t           = 0;
         int    nliter      = 1;
 
-        bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
+        bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
         SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
         int SFEM_ELEMENT_REFINE_LEVEL = 0;
         SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
         if (SFEM_NEWMARK_ENABLE_OUTPUT) {
-            output->write_time_step("disp", t, displacement->data());
-            output->write_time_step("velocity", t, velocity->data());
-            output->write_time_step("acceleration", t, acceleration->data());
+            auto u = displacement;
+            auto v = velocity;
+            auto a = acceleration;
+            #ifdef SFEM_ENABLE_CUDA
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                u = sfem::to_host(u);
+                v = sfem::to_host(v);
+                a = sfem::to_host(a);
+            }
+
+            #endif
+            output->write_time_step("disp", t, u->data());
+            output->write_time_step("velocity", t, v->data());
+            output->write_time_step("acceleration", t, a->data());
 
             // If no issues encountered we log the time
             output->log_time(t);
@@ -198,7 +210,7 @@ int test_newmark_kv() {
             auto material_op = sfem::create_linear_operator("MF", f, solution, es);
             auto cg = sfem::create_cg<real_t>(material_op, es);
             cg->set_preconditioner_op(jacobi);
-            cg->verbose = true;
+            cg->verbose = false;
             solver = cg;
 
             // solver->verbose = false;
@@ -287,16 +299,26 @@ int test_newmark_kv() {
         real_t t           = 0;
         int    nliter      = 1;
 
-        bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
+        bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
         SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
         int SFEM_ELEMENT_REFINE_LEVEL = 0;
         SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
         if (SFEM_NEWMARK_ENABLE_OUTPUT) {
-            output->write_time_step("disp", t, displacement->data());
-            output->write_time_step("velocity", t, velocity->data());
-            output->write_time_step("acceleration", t, acceleration->data());
+            auto u = displacement;
+            auto v = velocity;
+            auto a = acceleration;
+            #ifdef SFEM_ENABLE_CUDA
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                u = sfem::to_host(u);
+                v = sfem::to_host(v);
+                a = sfem::to_host(a);
+            }
+            #endif
+            output->write_time_step("disp", t, u->data());
+            output->write_time_step("velocity", t, v->data());
+            output->write_time_step("acceleration", t, a->data());
 
             // If no issues encountered we log the time
             output->log_time(t);
@@ -336,7 +358,7 @@ int test_newmark_kv() {
         //         es);
 
                 auto solver     = sfem::create_cg<real_t>(linear_op, es);
-                solver->verbose = true;
+                solver->verbose = false;
 
                 // Use increment as temp buffer
                 blas->zeros(ndofs, increment->data());
@@ -381,9 +403,19 @@ int test_newmark_kv() {
                 printf("%g/%g\n", double(t), double(T));
 
                 // Write to disk
-                output->write_time_step("disp", t, displacement->data());
-                output->write_time_step("velocity", t, velocity->data());
-                output->write_time_step("acceleration", t, acceleration->data());
+                auto u = displacement;
+                auto v = velocity;
+                auto a = acceleration;
+                #ifdef SFEM_ENABLE_CUDA
+                if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                    u = sfem::to_host(u);
+                    v = sfem::to_host(v);
+                    a = sfem::to_host(a);
+                }
+                #endif
+                output->write_time_step("disp", t, u->data());
+                output->write_time_step("velocity", t, v->data());
+                output->write_time_step("acceleration", t, a->data());
 
                 // If no issues encountered we log the time
                 output->log_time(t);

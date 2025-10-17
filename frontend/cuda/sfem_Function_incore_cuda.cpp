@@ -391,15 +391,19 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
+    int apply(const real_t *const x, const real_t *const h, real_t *const out) override { return SFEM_SUCCESS; }
 
-        int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
+    int value(const real_t *x, real_t *const out) override { return SFEM_SUCCESS; }
+    
+    int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) override { return SFEM_SUCCESS; }
 
-        inline bool is_linear() const override { return true; }
+    inline bool is_linear() const override { return true; }
 
-        int n_conditions() const;
+    int n_conditions() const;
 
-        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
+    ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+    std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override { return no_op(); }
     };
 
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
@@ -1092,28 +1096,34 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
     
-            int gradient(const real_t *const x, real_t *const out) override {
-                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-                const real_t *v = vel_[0]->data();
-                const real_t *a = acc_[0]->data();
-
-                return cu_kelvin_voigt_newmark_apply(element_type,
-                                             adjugate->n_elements(),
-                                             adjugate->elements()->data(),
-                                             adjugate->n_elements(),  // stride
-                                             adjugate->jacobian_adjugate()->data(),
-                                             adjugate->jacobian_determinant()->data(),
-                                             k,
-                                             K,
-                                             eta,
-                                             rho,
-                                             real_type,
-                                             x,
-                                             v,
-                                             a,
-                                             out,
-                                             stream);
+        int gradient(const real_t *const x, real_t *const out) override {
+            SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+            
+            if (!vel_[0] || !acc_[0]) {
+                SFEM_ERROR("GPUKelvinVoigtNewmark::gradient: velocity or acceleration field not set! Call set_field(\"velocity\", buffer, 0) and set_field(\"acceleration\", buffer, 0) first.\n");
+                return SFEM_FAILURE;
             }
+            
+            const real_t *v = vel_[0]->data();
+            const real_t *a = acc_[0]->data();
+
+            return cu_kelvin_voigt_newmark_apply(element_type,
+                                         adjugate->n_elements(),
+                                         adjugate->elements()->data(),
+                                         adjugate->n_elements(),  // stride
+                                         adjugate->jacobian_adjugate()->data(),
+                                         adjugate->jacobian_determinant()->data(),
+                                         k,
+                                         K,
+                                         eta,
+                                         rho,
+                                         real_type,
+                                         x,
+                                         v,
+                                         a,
+                                         out,
+                                         stream);
+        }
     
             int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
@@ -1147,25 +1157,44 @@ namespace sfem {
                                              stream);
             }
 
-            int value(const real_t *x, real_t *const out) override {
-                SFEM_IMPLEMENT_ME();
-                return SFEM_FAILURE;
-            }
-        };
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_IMPLEMENT_ME();
+            return SFEM_FAILURE;
+        }
+
+        int report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+    };
 
 
-    class SemiStructuredGPUEMKelvinVoigtNewmark final : public Op {
+    class SemiStructuredGPUKelvinVoigtNewmark final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<Adjugate>      adjugate;
         enum RealType                  real_type { SFEM_REAL_DEFAULT };
         void                          *stream{SFEM_DEFAULT_STREAM};
+        enum ElemType                  element_type { INVALID };
        
         real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
+        std::shared_ptr<Buffer<real_t>> vel_[3];
+        std::shared_ptr<Buffer<real_t>> acc_[3];
+
+
+        void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
+            if (strcmp(name, "velocity") == 0) {
+                vel_[component] = vel;
+            } else if (strcmp(name, "acceleration") == 0) {
+                acc_[component] = vel;
+            } else {
+                SFEM_ERROR("Invalid field name! Call set_field(\"velocity\", buffer, 0/1/2) or set_field(\"acceleration\", buffer, 0/1/2) first.\n");
+            }
+        }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-            return std::make_unique<SemiStructuredGPUKelvinVoigtNewmark>(space);
+            auto ret = std::make_unique<SemiStructuredGPUKelvinVoigtNewmark>(space);
+            ret->initialize();
+            return ret;
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
@@ -1181,6 +1210,12 @@ namespace sfem {
                 ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
                 ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
                 ret->real_type = real_type; ret->stream = stream;
+                // Copy velocity and acceleration field references
+                for (int c = 0; c < 3; c++) {
+                    ret->vel_[c] = vel_[c];
+                    ret->acc_[c] = acc_[c];
+                }
+                ret->initialize();
                 return ret;
             } else {
                 auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
@@ -1216,51 +1251,67 @@ namespace sfem {
     
         SemiStructuredGPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace>& space) : space(space) {}
     
-        int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
-            return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
-                                                               adjugate->n_elements(),
-                                                               adjugate->elements()->data(),
-                                                               adjugate->n_elements(),
-                                                               adjugate->jacobian_adjugate()->data(),
-                                                               adjugate->jacobian_determinant()->data(),
-                                                               k, K, eta, rho,
-                                                               dt, gamma, beta,
-                                                               real_type,
-                                                               3, &x[0], &x[1], &x[2],
-                                                               3, &out[0], &out[1], &out[2],
-                                                               SFEM_DEFAULT_STREAM);
-        }
+    int gradient(const real_t *const x, real_t *const out) override {
+        auto &ssm = space->semi_structured_mesh();
+        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
+        const real_t *v = vel_[0]->data();
+        const real_t *a = acc_[0]->data();
+        return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
+                                                           adjugate->n_elements(),
+                                                           adjugate->elements()->data(),
+                                                           adjugate->n_elements(),
+                                                           adjugate->jacobian_adjugate()->data(),
+                                                           adjugate->jacobian_determinant()->data(),
+                                                           k, K, eta, rho,
+                                                           dt, gamma, beta,
+                                                           real_type,
+                                                           3, x, &x[1], &x[2], v, &v[1], &v[2], a, &a[1], &a[2],
+                                                           3, out, &out[1], &out[2],
+                                                           SFEM_DEFAULT_STREAM);
+    }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
-            return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
-                                                               adjugate->n_elements(),
-                                                               adjugate->elements()->data(),
-                                                               adjugate->n_elements(),
-                                                               adjugate->jacobian_adjugate()->data(),
-                                                               adjugate->jacobian_determinant()->data(),
-                                                               k, K, eta, rho,
-                                                               dt, gamma, beta,
-                                                               real_type,
-                                                               3, &h[0], &h[1], &h[2],
-                                                               3, &out[0], &out[1], &out[2],
-                                                               SFEM_DEFAULT_STREAM);
-        }
+    int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+        auto &ssm = space->semi_structured_mesh();
+        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
+        const real_t *v = vel_[0]->data();
+        const real_t *a = acc_[0]->data();
+        return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
+                                                           adjugate->n_elements(),
+                                                           adjugate->elements()->data(),
+                                                           adjugate->n_elements(),
+                                                           adjugate->jacobian_adjugate()->data(),
+                                                           adjugate->jacobian_determinant()->data(),
+                                                           k, K, eta, rho,
+                                                           dt, gamma, beta,
+                                                           real_type,
+                                                           3, h, &h[1], &h[2],
+                                                           v, &v[1], &v[2],
+                                                           a, &a[1], &a[2],
+                                                           3, out, &out[1], &out[2],
+                                                           SFEM_DEFAULT_STREAM);
+    }
 
-        int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            auto &ssm = space->semi_structured_mesh();
-            return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
-                                                              adjugate->n_elements(),
-                                                              adjugate->elements()->data(),
-                                                              adjugate->n_elements(),
-                                                              adjugate->jacobian_adjugate()->data(),
-                                                              adjugate->jacobian_determinant()->data(),
-                                                              k, K, eta, rho,
-                                                              dt, gamma, beta,
-                                                              real_type,
-                                                              3, &values[0], &values[1], &values[2],
-                                                              SFEM_DEFAULT_STREAM);
+    int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
+        auto &ssm = space->semi_structured_mesh();
+        return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
+                                                          adjugate->n_elements(),
+                                                          adjugate->elements()->data(),
+                                                          adjugate->n_elements(),
+                                                          adjugate->jacobian_adjugate()->data(),
+                                                          adjugate->jacobian_determinant()->data(),
+                                                          k, K, eta, rho,
+                                                          dt, gamma, beta,
+                                                          real_type,
+                                                          3, values, &values[1], &values[2],
+                                                          SFEM_DEFAULT_STREAM);
+    }
+        
+        int hessian_crs(const real_t *const  /*x*/,
+                        const count_t *const /*rowptr*/,
+                        const idx_t *const   /*colidx*/,
+                        real_t *const        /*values*/) override {
+            SFEM_ERROR("[Error] SemiStructuredGPUKelvinVoigtNewmark::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
         }
     
         int value(const real_t*, real_t*const) override { SFEM_IMPLEMENT_ME(); return SFEM_FAILURE; }
@@ -1494,6 +1545,7 @@ namespace sfem {
         Factory::register_op("ss:gpu:EMWarpOp", &GPUEMWarpOp::create);
         Factory::register_op("gpu:EMOp", &GPUEMOp::create);
         Factory::register_op("gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
+        Factory::register_op("ss:gpu:KelvinVoigtNewmark", &SemiStructuredGPUKelvinVoigtNewmark::create);
     }
 
 }  // namespace sfem
