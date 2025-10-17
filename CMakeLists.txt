@@ -57,16 +57,13 @@ set(SFEM_MODULES
     operators/edgeshell2
     operators/generic
     operators/hex8
-    operators/hex8/dg
     operators/hierarchical
     operators/macro_tet4
     operators/macro_tri3
     operators/navier_stokes
     operators/quad4
-    operators/quad4/dg
     operators/quadshell4
     operators/spectral_hex
-    operators/spectral_hex/dg
     operators/sshex8
     operators/ssquad4
     operators/sstet4
@@ -81,6 +78,13 @@ set(SFEM_MODULES
     solver
     ssmg
 )
+
+# FIXME DG is yet to be implemented 
+# list(APPEND SFEM_MODULES
+#     operators/hex8/dg
+#     operators/quad4/dg
+#     operators/spectral_hex/dg
+# )
 
 if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
     list(APPEND SFEM_MODULES operators/tet4/vectorized)
