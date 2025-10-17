@@ -15,6 +15,7 @@
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Env.hpp"
 #include "sfem_P1toP2.hpp"
+#include "sfem_Packed.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -158,8 +159,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         mesh = sfem::convert_p1_mesh_to_p2(mesh);
     }
 
+    std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
+    if (sfem::Env::read("SFEM_USE_PACKED_MESH", false)) {
+        packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
+    }
+
     const int block_size = mesh->spatial_dimension();
-    auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
+    std::shared_ptr<sfem::FunctionSpace> fs;
+    if (packed_mesh) {
+        fs = sfem::FunctionSpace::create(packed_mesh, block_size);
+    } else {
+        fs = sfem::FunctionSpace::create(mesh, block_size);
+    }
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);

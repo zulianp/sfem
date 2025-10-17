@@ -26,7 +26,8 @@ namespace sfem {
         SharedBuffer<idx_t>     ghost_idx;
 
         size_t nbytes() const {
-            return packed_elements->nbytes() + owned_nodes_ptr->nbytes() + ghost_ptr->nbytes() + ghost_idx->nbytes() + n_shared->nbytes();
+            return packed_elements->nbytes() + owned_nodes_ptr->nbytes() + ghost_ptr->nbytes() + ghost_idx->nbytes() +
+                   n_shared->nbytes();
         }
 
         void print(std::ostream &os = std::cout) const {
@@ -47,7 +48,7 @@ namespace sfem {
             const ptrdiff_t nelements  = block->n_elements();
 
             auto d_node_owner = node_owner->data();
-            auto d_owned_flag      = owned_flag->data();
+            auto d_owned_flag = owned_flag->data();
 
             for (ptrdiff_t p = 0; p < n_packs; p++) {
                 const ptrdiff_t start = p * elements_per_pack;
@@ -68,11 +69,11 @@ namespace sfem {
         void identify_shared(const ptrdiff_t             pack_offset,
                              const SharedBuffer<idx_t>  &node_owner,
                              const SharedBuffer<mask_t> &shared_flag) {
-            auto d_node_owner = node_owner->data();
-            auto d_shared_flag     = shared_flag->data();
-            auto            d_elements = block->elements()->data();
-            const int       nxe        = block->n_nodes_per_element();
-            const ptrdiff_t nelements  = block->n_elements();
+            auto            d_node_owner  = node_owner->data();
+            auto            d_shared_flag = shared_flag->data();
+            auto            d_elements    = block->elements()->data();
+            const int       nxe           = block->n_nodes_per_element();
+            const ptrdiff_t nelements     = block->n_elements();
 
             for (ptrdiff_t p = 0; p < n_packs; p++) {
                 const ptrdiff_t start = p * elements_per_pack;
@@ -91,10 +92,10 @@ namespace sfem {
         }
 
         ptrdiff_t construct_owned_shared_ghost_and_map(const ptrdiff_t             pack_offset,
-                                                  const ptrdiff_t global_next_id,
-                                                  const SharedBuffer<idx_t>  &node_map,
-                                                  const SharedBuffer<idx_t>  &node_owner,
-                                                  const SharedBuffer<mask_t> &shared_flag) {
+                                                       const ptrdiff_t             global_next_id,
+                                                       const SharedBuffer<idx_t>  &node_map,
+                                                       const SharedBuffer<idx_t>  &node_owner,
+                                                       const SharedBuffer<mask_t> &shared_flag) {
             auto d_node_map        = node_map->data();
             auto d_elements        = block->elements()->data();
             auto d_node_owner      = node_owner->data();
@@ -132,7 +133,7 @@ namespace sfem {
                         const idx_t node = d_elements[v][e];
 
                         if (!mask_get(node, d_selected)) {
-                            if(d_node_owner[node] == p + pack_offset) {
+                            if (d_node_owner[node] == p + pack_offset) {
                                 nowned++;
                                 nshared += mask_get(node, d_shared_flag);
                                 mask_set(node, d_selected);
@@ -181,7 +182,7 @@ namespace sfem {
 
                 // Accumulate
                 d_owned_nodes_ptr[p + 1] = nowned + d_owned_nodes_ptr[p];
-                d_n_shared[p] = nshared;
+                d_n_shared[p]            = nshared;
                 d_ghost_ptr[p + 1] += d_ghost_ptr[p];
             }
 
@@ -192,8 +193,7 @@ namespace sfem {
                   const ptrdiff_t              pack_offset,
                   const SharedBuffer<idx_t>   &node_map,
                   const SharedBuffer<idx_t>   &node_owner,
-                  const SharedBuffer<mask_t> &ghost_flag) {
-
+                  const SharedBuffer<mask_t>  &ghost_flag) {
             auto d_elements        = block->elements()->data();
             auto d_packed_elements = this->packed_elements->data();
             auto d_owned_nodes_ptr = this->owned_nodes_ptr->data();
@@ -205,18 +205,18 @@ namespace sfem {
             const int       nxe       = block->n_nodes_per_element();
             const ptrdiff_t nelements = block->n_elements();
 
-            this->ghost_idx  = sfem::create_host_buffer<idx_t>(d_ghost_ptr[n_packs]);
-            auto d_ghost_idx = this->ghost_idx->data();
+            this->ghost_idx   = sfem::create_host_buffer<idx_t>(d_ghost_ptr[n_packs]);
+            auto d_ghost_idx  = this->ghost_idx->data();
             auto d_ghost_flag = ghost_flag->data();
 
             memset(d_ghost_flag, 0, ghost_flag->nbytes());
-            auto ghost_map = sfem::create_host_buffer<pack_idx_t>(mesh->n_nodes());
+            auto ghost_map   = sfem::create_host_buffer<pack_idx_t>(mesh->n_nodes());
             auto d_ghost_map = ghost_map->data();
 
             for (ptrdiff_t p = 0; p < n_packs; p++) {
-                const ptrdiff_t start = p * elements_per_pack;
-                const ptrdiff_t end   = MIN(nelements, (p + 1) * elements_per_pack);
-                const ptrdiff_t nowned       = d_owned_nodes_ptr[p + 1] - d_owned_nodes_ptr[p];
+                const ptrdiff_t start  = p * elements_per_pack;
+                const ptrdiff_t end    = MIN(nelements, (p + 1) * elements_per_pack);
+                const ptrdiff_t nowned = d_owned_nodes_ptr[p + 1] - d_owned_nodes_ptr[p];
 
                 pack_idx_t bkghosts = 0;
                 for (int v = 0; v < nxe; v++) {
@@ -230,8 +230,8 @@ namespace sfem {
                             d_packed_elements[v][e] = d_node_map[d_elements[v][e]] - d_owned_nodes_ptr[p];
                             assert(d_packed_elements[v][e] + d_owned_nodes_ptr[p] == d_node_map[d_elements[v][e]]);
                         } else {
-                            if(!mask_get(node, d_ghost_flag)) {
-                                d_ghost_map[node] = bkghosts++;
+                            if (!mask_get(node, d_ghost_flag)) {
+                                d_ghost_map[node]                               = bkghosts++;
                                 d_ghost_idx[d_ghost_ptr[p] + d_ghost_map[node]] = d_node_map[node];
                                 mask_set(node, d_ghost_flag);
                             }
@@ -312,10 +312,11 @@ namespace sfem {
                 pack_offset += packed_block->n_packs;
             }
 
-            pack_offset = 0;
+            pack_offset              = 0;
             ptrdiff_t global_next_id = 0;
             for (auto &packed_block : blocks) {
-                global_next_id = packed_block->construct_owned_shared_ghost_and_map(pack_offset, global_next_id, node_map, node_owner, flags);
+                global_next_id = packed_block->construct_owned_shared_ghost_and_map(
+                        pack_offset, global_next_id, node_map, node_owner, flags);
                 pack_offset += packed_block->n_packs;
             }
 
@@ -355,8 +356,7 @@ namespace sfem {
     };
 
     template <typename pack_idx_t>
-    std::shared_ptr<Mesh> Packed<pack_idx_t>::mesh() const
-    {
+    std::shared_ptr<Mesh> Packed<pack_idx_t>::mesh() const {
         return impl_->mesh;
     }
 
