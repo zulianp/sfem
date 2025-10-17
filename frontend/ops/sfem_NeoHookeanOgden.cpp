@@ -21,72 +21,13 @@
 #include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
+#include "sfem_ElasticityAssemblyData.hpp"
+
 #include <math.h>
 #include <mpi.h>
 
 namespace sfem {
 
-    struct AssemblyData {
-        SharedBuffer<metric_tensor_t> partial_assembly_buffer;
-        SharedBuffer<scaling_t>       compression_scaling;
-        SharedBuffer<compressed_t>    partial_assembly_compressed;
-        SharedBuffer<idx_t *>         elements;
-        ptrdiff_t                     elements_stride{1};
-
-        bool use_partial_assembly{false};
-        bool use_compression{false};
-        bool use_AoS{false};
-
-        int compress_partial_assembly(OpDomain &domain) {
-            auto mesh = domain.block;
-
-            if (use_compression) {
-                if (!compression_scaling) {
-                    compression_scaling         = sfem::create_host_buffer<scaling_t>(mesh->n_elements());
-                    partial_assembly_compressed = sfem::create_host_buffer<compressed_t>(mesh->n_elements() * TET4_S_IKMN_SIZE);
-                }
-
-                auto      cs         = compression_scaling->data();
-                auto      pa         = partial_assembly_buffer->data();
-                auto      pac        = partial_assembly_compressed->data();
-                ptrdiff_t n_elements = mesh->n_elements();
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    auto pai = &pa[i * TET4_S_IKMN_SIZE];
-                    cs[i]    = pai[0];
-                    for (int v = 1; v < TET4_S_IKMN_SIZE; v++) {
-                        cs[i] = MAX(cs[i], fabs(pai[v]));
-                    }
-                }
-
-                real_t max_scaling = 0;
-
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    if (cs[i] > real_t(FP16_MAX)) {
-                        max_scaling = MAX(max_scaling, cs[i]);
-                        cs[i]       = real_t(cs[i] + 1e-8) / real_t(FP16_MAX);
-                    } else {
-                        cs[i] = 1;
-                    }
-                }
-
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_elements; i++) {
-                    auto pai  = &pa[i * TET4_S_IKMN_SIZE];
-                    auto paci = &pac[i * TET4_S_IKMN_SIZE];
-                    for (int v = 0; v < TET4_S_IKMN_SIZE; v++) {
-                        paci[v] = (compressed_t)(pai[v] / cs[i]);
-
-                        assert(cs[i] > 0);
-                        // assert(std::isfinite(paci[v]));
-                    }
-                }
-            }
-
-            return SFEM_SUCCESS;
-        }
-    };
 
     class NeoHookeanOgden::Impl {
     public:
@@ -172,7 +113,7 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
-            auto ua = std::static_pointer_cast<struct AssemblyData>(domain.user_data);
+            auto ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
             if (ua->partial_assembly_buffer) {
                 if (ua->use_compression) {
                     return neohookean_ogden_compressed_partial_assembly_apply(domain.element_type,
@@ -228,7 +169,7 @@ namespace sfem {
         bool use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
-            auto ua = std::make_shared<struct AssemblyData>();
+            auto ua = std::make_shared<struct ElasticityAssemblyData>();
             ua->use_partial_assembly =
                     use_partial_assembly || domain.second.element_type == HEX8 || domain.second.element_type == TET10;
             ua->use_compression     = use_compression;
@@ -253,7 +194,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
 
         for (auto &domain : impl_->domains->domains()) {
-            auto assembly_data = std::static_pointer_cast<struct AssemblyData>(domain.second.user_data);
+            auto assembly_data = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.second.user_data);
             if (!assembly_data->use_partial_assembly) continue;
 
             auto lambda       = domain.second.parameters->get_real_value("lambda", impl_->lambda);
@@ -289,7 +230,7 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
-            auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
+            auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
 
             return neohookean_ogden_objective_aos(domain.element_type,
                                                   domain.block->n_elements(),
@@ -314,7 +255,7 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
-            auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
+            auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
             return neohookean_ogden_objective_steps_aos(domain.element_type,
                                                         mesh->n_elements(),
                                                         ua->elements_stride,

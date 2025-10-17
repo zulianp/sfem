@@ -115,9 +115,9 @@ void add_matrix_free_vector_ops(const int                       dim,
                                 std::vector<OpDesc_t>          &ops) {
     ops.push_back({.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim});
 
-    if ((element_type == TET4 && !semi_structured) || element_type == HEX8) {
+    // if ((element_type == TET4 && !semi_structured) || element_type == HEX8) {
         ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
-    }
+    // }
 }
 
 void add_matrix_based_vector_ops(const int                       dim,

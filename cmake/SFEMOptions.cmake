@@ -23,6 +23,8 @@ option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" OFF)
 option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
+option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
+
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -107,3 +109,7 @@ if(SFEM_ENABLE_AVX2)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=core-avx2 -DSFEM_ENABLE_AVX2_SORT")
 endif()
+
+
+
+

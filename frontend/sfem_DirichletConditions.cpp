@@ -1,5 +1,7 @@
 #include "sfem_DirichletConditions.hpp"
 
+#include "sfem_config.h"
+
 #include <stddef.h>
 
 #include "boundary_condition.h"

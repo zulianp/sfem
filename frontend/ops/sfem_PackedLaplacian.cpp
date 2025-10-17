@@ -39,7 +39,7 @@ using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 // #endif
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
-struct PackedLaplacian {
+struct PackedLaplacianApply {
     static int apply(const ptrdiff_t                       n_packs,
                      const ptrdiff_t                       n_elements_per_pack,
                      const ptrdiff_t                       n_elements,
@@ -173,7 +173,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                   real_t *const SFEM_RESTRICT           values) {
     switch (element_type) {
         case TET4:
-            return PackedLaplacian<PackedIdxType, 4, Tet4MicroKernel>::apply(n_packs,
+            return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel>::apply(n_packs,
                                                                              n_elements_per_pack,
                                                                              n_elements,
                                                                              max_nodes_per_pack,
@@ -186,7 +186,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                              u,
                                                                              values);
         case HEX8:
-            return PackedLaplacian<PackedIdxType, 8, Hex8MicroKernel>::apply(n_packs,
+            return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel>::apply(n_packs,
                                                                              n_elements_per_pack,
                                                                              n_elements,
                                                                              max_nodes_per_pack,
@@ -199,7 +199,7 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                                                              u,
                                                                              values);
         case TET10:
-            return PackedLaplacian<PackedIdxType, 10, Tet10MicroKernel>::apply(n_packs,
+            return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel>::apply(n_packs,
                                                                                n_elements_per_pack,
                                                                                n_elements,
                                                                                max_nodes_per_pack,
