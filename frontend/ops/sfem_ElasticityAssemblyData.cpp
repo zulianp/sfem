@@ -9,7 +9,7 @@
 
 namespace sfem {
 
-    int ElasticityAssemblyData::compress_partial_assembly(OpDomain &domain) {
+    int ElasticityAssemblyData::compress_partial_assembly(const OpDomain &domain) {
         auto mesh = domain.block;
 
         if (use_compression) {
