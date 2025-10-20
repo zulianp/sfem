@@ -240,9 +240,9 @@ hex8_to_isoparametric_tet10_local_adjoint_category_II(const int             L,  
                                                       const real_t const    J_fc[9],       // Jacobian matrix
                                                       const real_t const    J_ref[9],      // Jacobian matrix
                                                       const real_t          det_J_phys,    //
-                                                      const geom_t          x[10],         // Tetrahedron vertices X-coordinates
-                                                      const geom_t          y[10],         // Tetrahedron vertices Y-coordinates
-                                                      const geom_t          z[10],         // Tetrahedron vertices Z-coordinates
+                                                      const real_t          x[10],         // Tetrahedron vertices X-coordinates
+                                                      const real_t          y[10],         // Tetrahedron vertices Y-coordinates
+                                                      const real_t          z[10],         // Tetrahedron vertices Z-coordinates
                                                       const real_t          ox,            // Origin of the grid
                                                       const real_t          oy,            //
                                                       const real_t          oz,            //
@@ -467,7 +467,7 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t     
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // ISOPARAMETRIC
-        geom_t x[10], y[10], z[10];
+        real_t x[10], y[10], z[10];
         idx_t  ev[10];
 
         real_t hex8_f[8];
@@ -483,9 +483,9 @@ hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint(const ptrdiff_t     
 
         // ISOPARAMETRIC
         for (int v = 0; v < 10; ++v) {
-            x[v] = (geom_t)(xyz[0][ev[v]]);  // x-coordinates
-            y[v] = (geom_t)(xyz[1][ev[v]]);  // y-coordinates
-            z[v] = (geom_t)(xyz[2][ev[v]]);  // z-coordinates
+            x[v] = (real_t)(xyz[0][ev[v]]);  // x-coordinates
+            y[v] = (real_t)(xyz[1][ev[v]]);  // y-coordinates
+            z[v] = (real_t)(xyz[2][ev[v]]);  // z-coordinates
         }
 
         const real_t det_J_phys =               //

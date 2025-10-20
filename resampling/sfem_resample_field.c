@@ -4,9 +4,12 @@
 #include <stddef.h>  // Add this for ptrdiff_t type
 #include <stdio.h>
 #include <string.h>
-#include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #include "sfem_base.h"
 #include "sfem_config.h"  // Include the generated config header
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_adjoint_mini_tet_gpu_wrapper.h"
+#endif
 
 #include "matrixio_array.h"
 #include "sfem_resample_field.h"
@@ -496,11 +499,13 @@ tet4_resample_field_local(const ptrdiff_t                      nelements,  // Me
             for (int v = 0; v < 4; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
-                { weighted_field[ev[v]] += element_field[v]; }
+                {
+                    weighted_field[ev[v]] += element_field[v];
+                }
 
             }  // end vertex loop
-        }      // end element loop
-    }          // end parallel region
+        }  // end element loop
+    }  // end parallel region
 
     return 0;
 }
@@ -640,11 +645,13 @@ int trishell3_resample_field_local(
             for (int v = 0; v < 3; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
-                { weighted_field[ev[v]] += element_field[v]; }
+                {
+                    weighted_field[ev[v]] += element_field[v];
+                }
 
             }  // end vertex loop
-        }      // end element loop
-    }          // end parallel region
+        }  // end element loop
+    }  // end parallel region
 
     return 0;
 }  // end trishell3_resample_field_local
@@ -774,18 +781,20 @@ int beam2_resample_field_local(const ptrdiff_t nelements, const ptrdiff_t nnodes
                         element_field[edof_i] += eval_field * beam2_f[edof_i] * dV;
                     }
                 }  // end integrate gap function
-            }      // end quadrature loop
+            }  // end quadrature loop
 
             UNROLL_ZERO
             for (int v = 0; v < 2; ++v) {
                 // Invert sign since distance field is negative insdide and positive outside
 #pragma omp critical
-                { weighted_field[ev[v]] += element_field[v]; }
+                {
+                    weighted_field[ev[v]] += element_field[v];
+                }
 
             }  // end vertex loop
 
         }  // end element loop
-    }      // end parallel region
+    }  // end parallel region
 
     return 0;
 }  // end beam2_resample_field_local
@@ -1258,9 +1267,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
 #define TEST_GPU_HYTEG_REFINEMENT
-// #define COMPUTE_FUN_XYZ_HEX
+            // #define COMPUTE_FUN_XYZ_HEX
 
-#ifdef TEST_GPU_HYTEG_REFINEMENT
+#if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
 
             ret = tet4_resample_field_local_refine_adjoint_hyteg_gpu(0,                              //
                                                                      mesh->nelements,                //
@@ -1572,6 +1581,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
     mini_tet_parameters.min_refinement_L    = 1;
     mini_tet_parameters.max_refinement_L    = 15;
 
+#if defined(SFEM_ENABLE_CUDA)
     hex8_to_isoparametric_tet10_resample_field_hyteg_mt_adjoint_gpu(0,                     //
                                                                     mesh->nelements,       //
                                                                     mesh->nnodes,          //
@@ -1584,6 +1594,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                                                                     weighted_field,        //
                                                                     data,                  //
                                                                     mini_tet_parameters);  //
+#endif
 
 #endif
 
@@ -1695,7 +1706,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         for (ptrdiff_t i = 0; i < mesh->nnodes; i++) {  //
             assert(mass_vector[i] != 0);                //
             g[i] = weighted_field[i] / mass_vector[i];  //
-        }                                               // end for (i) loop
+        }  // end for (i) loop
 
     } else {
         apply_inv_lumped_mass(st,               //
