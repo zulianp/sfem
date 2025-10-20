@@ -77,7 +77,7 @@ check_point_in_tet(const int           p_cnt,  //
         }
     }
 
-    return true;
+    return;
 }
 
 //////////////////////////////////////////////////////////
@@ -629,9 +629,9 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
 
                         // Solve the case for the current Cat. 5 tetrahedron.
                     }  // END: if (j >= 1 && i >= 1) for cat 5
-                }      // END: for (int j = 0; j < nodes_pes_side - i - 1; j++) // Loop over the nodes on the second edge
-            }          // END: for (int i = 0; i < nodes_pes_side - 1; i++) // Loop over the nodes on the first edge
-        }              // END: for (int k = 0; k < L + 1; k++) // Loop over the refinement levels
+                }  // END: for (int j = 0; j < nodes_pes_side - i - 1; j++) // Loop over the nodes on the second edge
+            }  // END: for (int i = 0; i < nodes_pes_side - 1; i++) // Loop over the nodes on the first edge
+        }  // END: for (int k = 0; k < L + 1; k++) // Loop over the refinement levels
 
         HYTEG_D_LOG("\n Element %ld: theta_volume_main = %.12e\n", element_i, theta_volume_main);
         HYTEG_D_LOG(" Element %ld: tet_volume =          %.12e\n", element_i, tet_volume);

@@ -29,8 +29,8 @@ make_Jacobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinate
                          const real_t fz0,  // Tetrahedron vertices Z-coordinates
                          const real_t fz1,  //
                          const real_t fz2,  //
-                         const real_t fz3,
-                         real_t       J[9]);  // Jacobian matrix
+                         const real_t fz3,  //
+                         real_t       J[9]);      // Jacobian matrix
 
 void                                           //
 check_point_in_tet(const int           p_cnt,  //
@@ -50,5 +50,7 @@ check_point_in_tet(const int           p_cnt,  //
                    const real_t        z2,     //
                    const real_t        z3,     //
                    bool*               is_in);               //
+
+int get_terminal_columns();
 
 #endif  // __SFEM_RESAMPLE_FIELD_ADJOINT_HYTEG_H__
