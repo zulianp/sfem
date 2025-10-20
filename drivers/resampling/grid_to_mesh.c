@@ -1015,6 +1015,10 @@ int main(int argc, char* argv[]) {
                         snprintf(out_filename_raw, 1000, "/home/sriva/git/sfem/workflows/resample/test_field.raw", mpi_rank);
                     }
 
+#if SFEM_LOG_LEVEL >= 5
+                    printf("Writing output field to: %s, %s:%d\n", out_filename_raw, __FILE__, __LINE__);
+#endif
+
                     ndarray_write(MPI_COMM_WORLD,
                                   out_filename_raw,
                                   ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
@@ -1031,7 +1035,7 @@ int main(int argc, char* argv[]) {
                         } else {
                             snprintf(out_filename_fun_xyz,
                                      1000,
-                                     "/home/sriva/git/sfem/workflows/resample/test_field_fun_XYZ.raw",
+                                     "/home/simone/git/sfem_d/sfem/workflows/resample/test_field_fun_XYZ.raw",
                                      mpi_rank);
                         }
                         ndarray_write(MPI_COMM_WORLD,
