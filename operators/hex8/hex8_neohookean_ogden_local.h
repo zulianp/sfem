@@ -300,7 +300,9 @@ static SFEM_INLINE void hex8_neohookean_ogden_hessian_diag(const scalar_t *const
                                                            const scalar_t *const SFEM_RESTRICT dispx,
                                                            const scalar_t *const SFEM_RESTRICT dispy,
                                                            const scalar_t *const SFEM_RESTRICT dispz,
-                                                           scalar_t *const SFEM_RESTRICT       H_diag) {
+                                                           scalar_t *const SFEM_RESTRICT       H_diagx,
+                                                           scalar_t *const SFEM_RESTRICT       H_diagy,
+                                                           scalar_t *const SFEM_RESTRICT       H_diagz) {
     scalar_t F[9];
     {
         // mundane ops: 267 divs: 1 sqrts: 0
@@ -579,30 +581,30 @@ static SFEM_INLINE void hex8_neohookean_ogden_hessian_diag(const scalar_t *const
     const scalar_t x224 = x223 * x3;
     const scalar_t x225 = x221 * x65;
     const scalar_t x226 = x223 * x71;
-    H_diag[0] += x64 * (x0 * x53 + x0 * x58 + x1 * x63 + x34 + x42 + x48 + x49 * x51 + x54 * x56 + x59 * x61);
-    H_diag[1] += x64 * (qx * x53 + qx * x58 + x48 + x49 * x68 + x54 * x69 + x59 * x70 + x63 * x65 + x66 + x67);
-    H_diag[2] += x64 * (qx * x75 + qx * x77 + x65 * x79 + x67 + x68 * x74 + x69 * x76 + x70 * x78 + x73 + x80);
-    H_diag[3] += x64 * (x0 * x75 + x0 * x77 + x1 * x79 + x42 + x51 * x74 + x56 * x76 + x61 * x78 + x80 + x81);
-    H_diag[4] += x64 * (x0 * x88 + x0 * x92 + x1 * x90 + x34 + x51 * x91 + x56 * x87 + x61 * x89 + x84 + x86);
-    H_diag[5] += x64 * (qx * x88 + qx * x92 + x65 * x90 + x66 + x68 * x91 + x69 * x87 + x70 * x89 + x86 + x93);
-    H_diag[6] += x64 * (qx * x95 + qx * x97 + x100 + x65 * x99 + x68 * x94 + x69 * x96 + x70 * x98 + x73 + x93);
-    H_diag[7] += x64 * (x0 * x95 + x0 * x97 + x1 * x99 + x100 + x51 * x94 + x56 * x96 + x61 * x98 + x81 + x84);
-    H_diag[8] += x64 * (x121 + x127 + x133 + x134 * x135 + x135 * x136 + x137 * x138 + x138 * x139 + x140 * x141 + x141 * x142);
-    H_diag[9] += x64 * (x133 + x134 * x145 + x136 * x145 + x137 * x146 + x139 * x146 + x140 * x147 + x142 * x147 + x143 + x144);
-    H_diag[10] += x64 * (x134 * x150 + x136 * x150 + x137 * x151 + x139 * x151 + x140 * x152 + x142 * x152 + x144 + x149 + x153);
-    H_diag[11] += x64 * (x127 + x134 * x155 + x136 * x155 + x137 * x157 + x139 * x157 + x140 * x156 + x142 * x156 + x153 + x154);
-    H_diag[12] += x64 * (x121 + x134 * x164 + x136 * x164 + x137 * x162 + x139 * x162 + x140 * x163 + x142 * x163 + x159 + x161);
-    H_diag[13] += x64 * (x134 * x167 + x136 * x167 + x137 * x166 + x139 * x166 + x140 * x168 + x142 * x168 + x143 + x161 + x165);
-    H_diag[14] += x64 * (x134 * x169 + x136 * x169 + x137 * x170 + x139 * x170 + x140 * x171 + x142 * x171 + x149 + x165 + x172);
-    H_diag[15] += x64 * (x134 * x174 + x136 * x174 + x137 * x175 + x139 * x175 + x140 * x173 + x142 * x173 + x154 + x159 + x172);
-    H_diag[16] += x64 * (x135 * x209 + x135 * x210 + x138 * x211 + x138 * x212 + x141 * x213 + x141 * x214 + x196 + x202 + x208);
-    H_diag[17] += x64 * (x145 * x209 + x145 * x210 + x146 * x211 + x146 * x212 + x147 * x213 + x147 * x214 + x208 + x215 + x216);
-    H_diag[18] += x64 * (x150 * x209 + x150 * x210 + x151 * x211 + x151 * x212 + x152 * x213 + x152 * x214 + x216 + x218 + x219);
-    H_diag[19] += x64 * (x155 * x209 + x155 * x210 + x156 * x213 + x156 * x214 + x157 * x211 + x157 * x212 + x202 + x219 + x220);
-    H_diag[20] += x64 * (x162 * x211 + x162 * x212 + x163 * x213 + x163 * x214 + x164 * x209 + x164 * x210 + x196 + x222 + x224);
-    H_diag[21] += x64 * (x166 * x211 + x166 * x212 + x167 * x209 + x167 * x210 + x168 * x213 + x168 * x214 + x215 + x224 + x225);
-    H_diag[22] += x64 * (x169 * x209 + x169 * x210 + x170 * x211 + x170 * x212 + x171 * x213 + x171 * x214 + x218 + x225 + x226);
-    H_diag[23] += x64 * (x173 * x213 + x173 * x214 + x174 * x209 + x174 * x210 + x175 * x211 + x175 * x212 + x220 + x222 + x226);
+    H_diagx[0] += x64 * (x0 * x53 + x0 * x58 + x1 * x63 + x34 + x42 + x48 + x49 * x51 + x54 * x56 + x59 * x61);
+    H_diagx[1] += x64 * (qx * x53 + qx * x58 + x48 + x49 * x68 + x54 * x69 + x59 * x70 + x63 * x65 + x66 + x67);
+    H_diagx[2] += x64 * (qx * x75 + qx * x77 + x65 * x79 + x67 + x68 * x74 + x69 * x76 + x70 * x78 + x73 + x80);
+    H_diagx[3] += x64 * (x0 * x75 + x0 * x77 + x1 * x79 + x42 + x51 * x74 + x56 * x76 + x61 * x78 + x80 + x81);
+    H_diagx[4] += x64 * (x0 * x88 + x0 * x92 + x1 * x90 + x34 + x51 * x91 + x56 * x87 + x61 * x89 + x84 + x86);
+    H_diagx[5] += x64 * (qx * x88 + qx * x92 + x65 * x90 + x66 + x68 * x91 + x69 * x87 + x70 * x89 + x86 + x93);
+    H_diagx[6] += x64 * (qx * x95 + qx * x97 + x100 + x65 * x99 + x68 * x94 + x69 * x96 + x70 * x98 + x73 + x93);
+    H_diagx[7] += x64 * (x0 * x95 + x0 * x97 + x1 * x99 + x100 + x51 * x94 + x56 * x96 + x61 * x98 + x81 + x84);
+    H_diagy[0] += x64 * (x121 + x127 + x133 + x134 * x135 + x135 * x136 + x137 * x138 + x138 * x139 + x140 * x141 + x141 * x142);
+    H_diagy[1] += x64 * (x133 + x134 * x145 + x136 * x145 + x137 * x146 + x139 * x146 + x140 * x147 + x142 * x147 + x143 + x144);
+    H_diagy[2] += x64 * (x134 * x150 + x136 * x150 + x137 * x151 + x139 * x151 + x140 * x152 + x142 * x152 + x144 + x149 + x153);
+    H_diagy[3] += x64 * (x127 + x134 * x155 + x136 * x155 + x137 * x157 + x139 * x157 + x140 * x156 + x142 * x156 + x153 + x154);
+    H_diagy[4] += x64 * (x121 + x134 * x164 + x136 * x164 + x137 * x162 + x139 * x162 + x140 * x163 + x142 * x163 + x159 + x161);
+    H_diagy[5] += x64 * (x134 * x167 + x136 * x167 + x137 * x166 + x139 * x166 + x140 * x168 + x142 * x168 + x143 + x161 + x165);
+    H_diagy[6] += x64 * (x134 * x169 + x136 * x169 + x137 * x170 + x139 * x170 + x140 * x171 + x142 * x171 + x149 + x165 + x172);
+    H_diagy[7] += x64 * (x134 * x174 + x136 * x174 + x137 * x175 + x139 * x175 + x140 * x173 + x142 * x173 + x154 + x159 + x172);
+    H_diagz[0] += x64 * (x135 * x209 + x135 * x210 + x138 * x211 + x138 * x212 + x141 * x213 + x141 * x214 + x196 + x202 + x208);
+    H_diagz[1] += x64 * (x145 * x209 + x145 * x210 + x146 * x211 + x146 * x212 + x147 * x213 + x147 * x214 + x208 + x215 + x216);
+    H_diagz[2] += x64 * (x150 * x209 + x150 * x210 + x151 * x211 + x151 * x212 + x152 * x213 + x152 * x214 + x216 + x218 + x219);
+    H_diagz[3] += x64 * (x155 * x209 + x155 * x210 + x156 * x213 + x156 * x214 + x157 * x211 + x157 * x212 + x202 + x219 + x220);
+    H_diagz[4] += x64 * (x162 * x211 + x162 * x212 + x163 * x213 + x163 * x214 + x164 * x209 + x164 * x210 + x196 + x222 + x224);
+    H_diagz[5] += x64 * (x166 * x211 + x166 * x212 + x167 * x209 + x167 * x210 + x168 * x213 + x168 * x214 + x215 + x224 + x225);
+    H_diagz[6] += x64 * (x169 * x209 + x169 * x210 + x170 * x211 + x170 * x212 + x171 * x213 + x171 * x214 + x218 + x225 + x226);
+    H_diagz[7] += x64 * (x173 * x213 + x173 * x214 + x174 * x209 + x174 * x210 + x175 * x211 + x175 * x212 + x220 + x222 + x226);
 }
 
 static SFEM_INLINE void hex8_neohookean_ogden_hessian(const scalar_t *const SFEM_RESTRICT adjugate,
