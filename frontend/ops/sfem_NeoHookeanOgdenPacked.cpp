@@ -9,10 +9,12 @@
 
 #include "hex8_fff.h"
 #include "hex8_laplacian_inline_cpu.h"
+#include "hex8_neohookean_ogden.h"
 #include "hex8_neohookean_ogden_local.h"
 #include "hex8_partial_assembly_neohookean_inline.h"
 #include "laplacian.h"
 #include "line_quadrature.h"
+#include "neohookean_ogden.h"
 #include "tet10_laplacian_inline_cpu.h"
 #include "tet4_inline_cpu.h"
 #include "tet4_laplacian_inline_cpu.h"
@@ -26,6 +28,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Mesh.hpp"
 
+#include "sfem_ElasticityAssemblyData.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Packed.hpp"
@@ -37,7 +40,7 @@
 
 using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 
-struct GradientScratch {
+struct HyperelasticityScratch {
     struct ThreadData {
         ptrdiff_t max_nodes_per_pack;
         real_t   *in[3];
@@ -93,7 +96,7 @@ struct GradientScratch {
 #endif
     }
 
-    GradientScratch(const ptrdiff_t max_nodes_per_pack) {
+    HyperelasticityScratch(const ptrdiff_t max_nodes_per_pack) {
 #ifdef _OPENMP
         int n_threads = omp_get_max_threads();
         thread_data.resize(n_threads);
@@ -107,7 +110,7 @@ struct GradientScratch {
 #endif
     }
 
-    ~GradientScratch() {}
+    ~HyperelasticityScratch() {}
 };
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
@@ -132,7 +135,7 @@ struct NeoHookeanOgdenPackedGradient {
                      real_t *const SFEM_RESTRICT          outx,
                      real_t *const SFEM_RESTRICT          outy,
                      real_t *const SFEM_RESTRICT          outz,
-                     GradientScratch                     &scratch) {
+                     HyperelasticityScratch              &scratch) {
         const geom_t *const x = points[0];
         const geom_t *const y = points[1];
         const geom_t *const z = points[2];
@@ -149,6 +152,10 @@ struct NeoHookeanOgdenPackedGradient {
             geom_t  *px  = scratch.px(thread_id);
             geom_t  *py  = scratch.py(thread_id);
             geom_t  *pz  = scratch.pz(thread_id);
+
+            for (int d = 0; d < 3; d++) {
+                memset(out[d], 0, max_nodes_per_pack * sizeof(real_t));
+            }
 
 #pragma omp for schedule(static)
             for (ptrdiff_t p = 0; p < n_packs; p++) {
@@ -285,7 +292,7 @@ struct NeoHookeanOgdenPackedGradient {
     }
 };
 
-struct Hex8MicroKernel {
+struct Hex8MicroKernelGradient {
     static SFEM_INLINE void apply(const scalar_t *const SFEM_RESTRICT lx,
                                   const scalar_t *const SFEM_RESTRICT ly,
                                   const scalar_t *const SFEM_RESTRICT lz,
@@ -353,33 +360,253 @@ static int packed_neohookean_ogden_gradient(enum ElemType                       
                                             real_t *const SFEM_RESTRICT          outx,
                                             real_t *const SFEM_RESTRICT          outy,
                                             real_t *const SFEM_RESTRICT          outz,
-                                            GradientScratch                     &scratch) {
+                                            HyperelasticityScratch              &scratch) {
     switch (element_type) {
         case HEX8:
-            return NeoHookeanOgdenPackedGradient<PackedIdxType, 8, Hex8MicroKernel>::apply(n_packs,
-                                                                                           n_elements_per_pack,
-                                                                                           n_elements,
-                                                                                           max_nodes_per_pack,
-                                                                                           elements,
-                                                                                           points,
-                                                                                           owned_nodes_ptr,
-                                                                                           n_shared_nodes,
-                                                                                           ghost_ptr,
-                                                                                           ghost_idx,
-                                                                                           mu,
-                                                                                           lambda,
-                                                                                           u_stride,
-                                                                                           ux,
-                                                                                           uy,
-                                                                                           uz,
-                                                                                           out_stride,
-                                                                                           outx,
-                                                                                           outy,
-                                                                                           outz,
-                                                                                           scratch);
+            return NeoHookeanOgdenPackedGradient<PackedIdxType, 8, Hex8MicroKernelGradient>::apply(n_packs,
+                                                                                                   n_elements_per_pack,
+                                                                                                   n_elements,
+                                                                                                   max_nodes_per_pack,
+                                                                                                   elements,
+                                                                                                   points,
+                                                                                                   owned_nodes_ptr,
+                                                                                                   n_shared_nodes,
+                                                                                                   ghost_ptr,
+                                                                                                   ghost_idx,
+                                                                                                   mu,
+                                                                                                   lambda,
+                                                                                                   u_stride,
+                                                                                                   ux,
+                                                                                                   uy,
+                                                                                                   uz,
+                                                                                                   out_stride,
+                                                                                                   outx,
+                                                                                                   outy,
+                                                                                                   outz,
+                                                                                                   scratch);
 
         default: {
-            SFEM_ERROR("packed_laplacian_apply not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("packed_neohookean_ogden_gradient not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+template <typename pack_idx_t, int NXE, typename MicroKernel>
+struct HyperelasticityPackedApply {
+    static int apply(const ptrdiff_t                            n_packs,
+                     const ptrdiff_t                            n_elements_per_pack,
+                     const ptrdiff_t                            n_elements,
+                     const ptrdiff_t                            max_nodes_per_pack,
+                     pack_idx_t **const SFEM_RESTRICT           elements,
+                     const ptrdiff_t *const SFEM_RESTRICT       owned_nodes_ptr,
+                     const ptrdiff_t *const SFEM_RESTRICT       n_shared_nodes,
+                     const ptrdiff_t *const SFEM_RESTRICT       ghost_ptr,
+                     const idx_t *const SFEM_RESTRICT           ghost_idx,
+                     const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                     const scalar_t *const SFEM_RESTRICT        Wimpn_compressed,
+                     const ptrdiff_t                            h_stride,
+                     const real_t *const SFEM_RESTRICT          hx,
+                     const real_t *const SFEM_RESTRICT          hy,
+                     const real_t *const SFEM_RESTRICT          hz,
+                     const ptrdiff_t                            out_stride,
+                     real_t *const SFEM_RESTRICT                outx,
+                     real_t *const SFEM_RESTRICT                outy,
+                     real_t *const SFEM_RESTRICT                outz,
+                     HyperelasticityScratch                    &scratch) {
+#pragma omp parallel
+        {
+#ifdef _OPENMP
+            int thread_id = omp_get_thread_num();
+#else
+            int thread_id = 0;
+#endif
+            real_t **in  = scratch.in(thread_id);
+            real_t **out = scratch.out(thread_id);
+
+            for (int d = 0; d < 3; d++) {
+                memset(out[d], 0, max_nodes_per_pack * sizeof(real_t));
+            }
+
+#pragma omp for schedule(static)
+            for (ptrdiff_t p = 0; p < n_packs; p++) {
+                const ptrdiff_t                  e_start      = p * n_elements_per_pack;
+                const ptrdiff_t                  e_end        = MIN(n_elements, (p + 1) * n_elements_per_pack);
+                const ptrdiff_t                  n_contiguous = owned_nodes_ptr[p + 1] - owned_nodes_ptr[p];
+                const ptrdiff_t                  n_shared     = n_shared_nodes[p];
+                const ptrdiff_t                  n_ghost      = ghost_ptr[p + 1] - ghost_ptr[p];
+                const ptrdiff_t                  n_not_shared = n_contiguous - n_shared;
+                const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[p]];
+
+                for (ptrdiff_t k = 0; k < n_contiguous; k++) {
+                    const ptrdiff_t idx = (owned_nodes_ptr[p] + k) * h_stride;
+                    in[0][k]            = hx[idx];
+                    in[1][k]            = hy[idx];
+                    in[2][k]            = hz[idx];
+                }
+
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const ptrdiff_t gidx    = ghosts[k] * h_stride;
+                    in[0][n_contiguous + k] = hx[gidx];
+                    in[1][n_contiguous + k] = hy[gidx];
+                    in[2][n_contiguous + k] = hz[gidx];
+                }
+
+                for (ptrdiff_t e = e_start; e < e_end; e++) {
+                    pack_idx_t ev[NXE];
+                    for (int v = 0; v < NXE; ++v) {
+                        ev[v] = elements[v][e];
+                    }
+
+                    scalar_t element_u[3][NXE];
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < NXE; ++v) {
+                            element_u[d][v] = in[d][ev[v]];
+                        }
+                    }
+
+                    accumulator_t element_out[3][NXE];
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < NXE; ++v) {
+                            element_out[d][v] = 0;
+                        }
+                    }
+
+                    const metric_tensor_t *const pai = &partial_assembly[e * HEX8_S_IKMN_SIZE];
+                    scalar_t                     S_ikmn[HEX8_S_IKMN_SIZE];
+                    for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
+                        S_ikmn[k] = pai[k];
+                        assert(S_ikmn[k] == S_ikmn[k]);
+                    }
+
+                    MicroKernel::apply(S_ikmn,
+                                       Wimpn_compressed,
+                                       element_u[0],
+                                       element_u[1],
+                                       element_u[2],
+                                       element_out[0],
+                                       element_out[1],
+                                       element_out[2]);
+
+                    for (int d = 0; d < 3; d++) {
+                        for (int v = 0; v < NXE; ++v) {
+                            assert(element_out[d][v] == element_out[d][v]);
+                            out[d][ev[v]] += element_out[d][v];
+                        }
+                    }
+                }
+
+                real_t *const SFEM_RESTRICT accx = &outx[owned_nodes_ptr[p] * out_stride];
+                real_t *const SFEM_RESTRICT accy = &outy[owned_nodes_ptr[p] * out_stride];
+                real_t *const SFEM_RESTRICT accz = &outz[owned_nodes_ptr[p] * out_stride];
+
+                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+                    const ptrdiff_t idx = k * out_stride;
+                    // No need for atomic there are no collisions
+                    accx[idx] += out[0][k];
+                    accy[idx] += out[1][k];
+                    accz[idx] += out[2][k];
+
+                    out[0][k] = 0;
+                    out[1][k] = 0;
+                    out[2][k] = 0;
+                }
+
+                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+                    const ptrdiff_t idx = k * out_stride;
+#pragma omp atomic update
+                    accx[idx] += out[0][k];
+                    out[0][k] = 0;
+
+#pragma omp atomic update
+                    accy[idx] += out[1][k];
+                    out[1][k] = 0;
+
+#pragma omp atomic update
+                    accz[idx] += out[2][k];
+                    out[2][k] = 0;
+                }
+
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                    const ptrdiff_t idx = ghosts[k] * out_stride;
+#pragma omp atomic update
+                    outx[idx] += out[0][n_contiguous + k];
+                    out[0][n_contiguous + k] = 0;
+#pragma omp atomic update
+                    outy[idx] += out[1][n_contiguous + k];
+                    out[1][n_contiguous + k] = 0;
+#pragma omp atomic update
+                    outz[idx] += out[2][n_contiguous + k];
+                    out[2][n_contiguous + k] = 0;
+                }
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+};
+
+struct Hex8MicroKernelApply {
+    inline static void apply(const scalar_t *const SFEM_RESTRICT S_ikmn,
+                             const scalar_t *const SFEM_RESTRICT Wimpn,
+                             const scalar_t *const SFEM_RESTRICT hx,
+                             const scalar_t *const SFEM_RESTRICT hy,
+                             const scalar_t *const SFEM_RESTRICT hz,
+                             scalar_t *const SFEM_RESTRICT       outx,
+                             scalar_t *const SFEM_RESTRICT       outy,
+                             scalar_t *const SFEM_RESTRICT       outz) {
+        hex8_SdotHdotG(S_ikmn, Wimpn, hx, hy, hz, outx, outy, outz);
+    }
+};
+
+template <typename pack_idx_t>
+static int packed_neohookean_ogden_apply(enum ElemType                              element_type,
+                                         const ptrdiff_t                            n_packs,
+                                         const ptrdiff_t                            n_elements_per_pack,
+                                         const ptrdiff_t                            n_elements,
+                                         const ptrdiff_t                            max_nodes_per_pack,
+                                         pack_idx_t **const SFEM_RESTRICT           elements,
+                                         const ptrdiff_t *const SFEM_RESTRICT       owned_nodes_ptr,
+                                         const ptrdiff_t *const SFEM_RESTRICT       n_shared_nodes,
+                                         const ptrdiff_t *const SFEM_RESTRICT       ghost_ptr,
+                                         const idx_t *const SFEM_RESTRICT           ghost_idx,
+                                         const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                         const ptrdiff_t                            h_stride,
+                                         const real_t *const SFEM_RESTRICT          hx,
+                                         const real_t *const SFEM_RESTRICT          hy,
+                                         const real_t *const SFEM_RESTRICT          hz,
+                                         const ptrdiff_t                            out_stride,
+                                         real_t *const SFEM_RESTRICT                outx,
+                                         real_t *const SFEM_RESTRICT                outy,
+                                         real_t *const SFEM_RESTRICT                outz,
+                                         HyperelasticityScratch                    &scratch) {
+    switch (element_type) {
+        case HEX8: {
+            scalar_t Wimpn_compressed[10];
+            hex8_Wimpn_compressed(Wimpn_compressed);
+            return HyperelasticityPackedApply<PackedIdxType, 8, Hex8MicroKernelApply>::apply(n_packs,
+                                                                                             n_elements_per_pack,
+                                                                                             n_elements,
+                                                                                             max_nodes_per_pack,
+                                                                                             elements,
+                                                                                             owned_nodes_ptr,
+                                                                                             n_shared_nodes,
+                                                                                             ghost_ptr,
+                                                                                             ghost_idx,
+                                                                                             partial_assembly,
+                                                                                             Wimpn_compressed,
+                                                                                             h_stride,
+                                                                                             hx,
+                                                                                             hy,
+                                                                                             hz,
+                                                                                             out_stride,
+                                                                                             outx,
+                                                                                             outy,
+                                                                                             outz,
+                                                                                             scratch);
+        }
+
+        default: {
+            SFEM_ERROR("packed_neohookean_ogden_apply not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
         }
     }
@@ -389,11 +616,12 @@ namespace sfem {
 
     class NeoHookeanOgdenPacked::Impl {
     public:
-        std::shared_ptr<FunctionSpace>                space;  ///< Function space for the operator
-        std::shared_ptr<MultiDomainOp>                domains;
-        std::shared_ptr<Packed<PackedIdxType>>        packed;
-        real_t                                        mu{1}, lambda{1};
-        std::vector<std::shared_ptr<GradientScratch>> scratch;
+        std::shared_ptr<FunctionSpace>                              space;
+        std::shared_ptr<MultiDomainOp>                              domains;
+        std::shared_ptr<Packed<PackedIdxType>>                      packed;
+        real_t                                                      mu{1}, lambda{1};
+        std::vector<std::shared_ptr<HyperelasticityScratch>>        scratch;
+        std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -417,14 +645,16 @@ namespace sfem {
         if (!impl_->space->has_packed_mesh()) {
             fprintf(stderr, "[Warning] NeoHookeanOgdenPacked: Initializing packed mesh, outer states may be inconsistent!\n");
             impl_->space->initialize_packed_mesh();
-            fprintf(stderr, "[Warning] NeoHookeanOgdenPacked:Packed mesh initialized\n");
+            fprintf(stderr, "[Warning] NeoHookeanOgdenPacked: Packed mesh initialized\n");
         }
         impl_->packed = impl_->space->packed_mesh();
 
         impl_->scratch.resize(impl_->packed->n_blocks());
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {
-            impl_->scratch[b] = std::make_shared<GradientScratch>(impl_->packed->max_nodes_per_pack());
+            impl_->scratch[b] = std::make_shared<HyperelasticityScratch>(impl_->packed->max_nodes_per_pack());
         }
+
+        impl_->assembly_data.resize(impl_->packed->n_blocks());
 
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {
             auto name   = impl_->packed->block_name(b);
@@ -535,6 +765,47 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
+    int NeoHookeanOgdenPacked::update(const real_t *const u) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::update");
+
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            auto b = *std::static_pointer_cast<int>(domain.user_data);
+            if (!impl_->assembly_data[b]) {
+                impl_->assembly_data[b]                       = std::make_shared<struct ElasticityAssemblyData>();
+                impl_->assembly_data[b]->use_partial_assembly = true;
+                impl_->assembly_data[b]->use_compression      = false;
+                impl_->assembly_data[b]->use_AoS              = true;
+                impl_->assembly_data[b]->elements             = domain.block->elements();
+                impl_->assembly_data[b]->elements_stride      = 1;
+                impl_->assembly_data[b]->elements             = convert_host_buffer_to_fake_SoA(
+                        domain.block->n_nodes_per_element(),
+                        soa_to_aos(1, domain.block->n_nodes_per_element(), domain.block->elements()));
+                impl_->assembly_data[b]->elements_stride = domain.block->n_nodes_per_element();
+                impl_->assembly_data[b]->partial_assembly_buffer =
+                        sfem::create_host_buffer<metric_tensor_t>(domain.block->n_elements() * HEX8_S_IKMN_SIZE);
+            }
+
+            auto assembly_data = impl_->assembly_data[b];
+
+            int ok = neohookean_ogden_hessian_partial_assembly(domain.element_type,
+                                                               domain.block->n_elements(),
+                                                               assembly_data->elements_stride,
+                                                               assembly_data->elements->data(),
+                                                               mesh->points()->data(),
+                                                               domain.parameters->get_real_value("mu", impl_->mu),
+                                                               domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                               3,
+                                                               &u[0],
+                                                               &u[1],
+                                                               &u[2],
+                                                               assembly_data->partial_assembly_buffer->data());
+            assembly_data->compress_partial_assembly(domain);
+
+            return ok;
+        });
+    }
+
     int NeoHookeanOgdenPacked::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::gradient");
 
@@ -581,33 +852,44 @@ namespace sfem {
     }
 
     int NeoHookeanOgdenPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        // SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::apply");
-        // SFEM_OP_CAPTURE();
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::apply");
 
-        // return impl_->iterate([&](const OpDomain &domain) {
-        //     auto b                  = *std::static_pointer_cast<int>(domain.user_data);
-        //     auto elements           = impl_->packed->elements(b);
-        //     auto owned_nodes_ptr    = impl_->packed->owned_nodes_ptr(b);
-        //     auto n_shared           = impl_->packed->n_shared(b);
-        //     auto ghost_ptr          = impl_->packed->ghost_ptr(b);
-        //     auto ghost_idx          = impl_->packed->ghost_idx(b);
-        //     auto fff                = impl_->fff[b]->data();
-        //     auto max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
-        //     return packed_laplacian_apply<PackedIdxType>(domain.element_type,
-        //                                                  impl_->packed->n_packs(b),
-        //                                                  impl_->packed->n_elements_per_pack(b),
-        //                                                  elements->extent(1),
-        //                                                  max_nodes_per_pack,
-        //                                                  elements->data(),
-        //                                                  fff,
-        //                                                  owned_nodes_ptr->data(),
-        //                                                  n_shared->data(),
-        //                                                  ghost_ptr->data(),
-        //                                                  ghost_idx->data(),
-        //                                                  h,
-        //                                                  out);
-        // });
-        return SFEM_FAILURE;
+        auto mesh   = impl_->space->mesh_ptr();
+        auto points = mesh->points();
+        return impl_->iterate([&](const OpDomain &domain) {
+            auto b               = *std::static_pointer_cast<int>(domain.user_data);
+            auto elements        = impl_->packed->elements(b);
+            auto owned_nodes_ptr = impl_->packed->owned_nodes_ptr(b);
+            auto n_shared        = impl_->packed->n_shared(b);
+            auto ghost_ptr       = impl_->packed->ghost_ptr(b);
+            auto ghost_idx       = impl_->packed->ghost_idx(b);
+
+            auto assembly_data = impl_->assembly_data[b];
+
+            auto scratch = impl_->scratch[b];
+
+            auto max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
+            return packed_neohookean_ogden_apply<PackedIdxType>(domain.element_type,
+                                                                impl_->packed->n_packs(b),
+                                                                impl_->packed->n_elements_per_pack(b),
+                                                                elements->extent(1),
+                                                                max_nodes_per_pack,
+                                                                elements->data(),
+                                                                owned_nodes_ptr->data(),
+                                                                n_shared->data(),
+                                                                ghost_ptr->data(),
+                                                                ghost_idx->data(),
+                                                                assembly_data->partial_assembly_buffer->data(),
+                                                                3,
+                                                                &h[0],
+                                                                &h[1],
+                                                                &h[2],
+                                                                3,
+                                                                &out[0],
+                                                                &out[1],
+                                                                &out[2],
+                                                                *scratch);
+        });
     }
 
     int NeoHookeanOgdenPacked::value(const real_t *x, real_t *const out) {
