@@ -89,6 +89,24 @@ namespace sfem {
                                              this->impl_->lambda,
                                              x,
                                              out);
+
+            // return neohookean_ogden_partial_assembly_diag(
+            //     domain.element_type,
+            //     mesh->n_elements(),
+            //     1,
+            //     domain.block->elements()->data(),
+            //     mesh->points()->data(),
+            //     this->impl_->mu,
+            //     this->impl_->lambda,
+            //     3,
+            //     &x[0],
+            //     &x[1],
+            //     &x[2],
+            //     3,
+            //     &out[0],
+            //     &out[1],
+            //     &out[2]
+            //  );
         });
     }
 

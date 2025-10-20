@@ -278,7 +278,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         f->value(displacement->data(), &energy);
 
         // Newton solver with line search
-        printf("%-10s %-14s %-14s %-14s\n", "Iteration", "gnorm", "energy", "alpha");
+        printf("%-10s %-5s %-14s %-14s %-14s\n", "Iteration", "CG", "gnorm", "energy", "alpha");
         printf("-------------------------------------------------------------\n");
 
         int steps = rotate_conds ? rotate_conds->steps : 1;
@@ -286,6 +286,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             out->write_time_step("rhs", 0, sfem::to_host(rhs)->data());
             out->write_time_step("disp", 0, sfem::to_host(displacement)->data());
         }
+
+        int last_iterations = 0;
+        ptrdiff_t total_linear_iterations = 0;
         for (int step = 1; step <= steps; step++) {
             if (rotate_conds) {
                 rotate_conds->update(step);
@@ -298,13 +301,15 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 f->gradient(displacement->data(), rhs->data());
 
                 const real_t gnorm = blas->norm2(ndofs, rhs->data());
-                printf("%-10d %-14.4e %-14.4e %-14.4f\n", i, gnorm, energy, -selected_alpha);
+                printf("%-10d %-5d %-14.4e %-14.4e %-14.4f\n", i, last_iterations, gnorm, energy, -selected_alpha);
 
                 if (gnorm < SFEM_NL_TOL) break;
 
                 blas->zeros(ndofs, increment->data());
                 f->copy_constrained_dofs(rhs->data(), increment->data());
                 cg->apply(rhs->data(), increment->data());
+                last_iterations = cg->iterations();
+                total_linear_iterations += last_iterations;
 
                 if (enable_line_search) {
                     std::vector<real_t> alphas{-2 * alpha,
@@ -339,6 +344,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 out->write("disp", sfem::to_host(displacement)->data());
             }
         }
+
+        printf("Total linear iterations: %ld\n", (long)total_linear_iterations);
     }
 
     return SFEM_SUCCESS;
