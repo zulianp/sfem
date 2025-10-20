@@ -19,7 +19,7 @@ namespace sfem {
         bool use_compression{false};
         bool use_AoS{false};
 
-        int compress_partial_assembly(OpDomain &domain);
+        int compress_partial_assembly(const OpDomain &domain);
     };
 
 }  // namespace sfem
