@@ -85,6 +85,8 @@ namespace sfem {
          */
         ~NeoHookeanOgdenPacked();
 
+        int update(const real_t *const u) override;
+
         // Matrix assembly methods
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,

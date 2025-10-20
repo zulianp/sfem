@@ -28,6 +28,10 @@
 #include "sfem_Packed.hpp"
 #include "sfem_Parameters.hpp"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 
 // #if defined(__GNUC__) || defined(__clang__)
@@ -37,6 +41,59 @@ using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
 // #define SFEM_PREFETCH_R(addr, locality)
 // #define SFEM_PREFETCH_W(addr, locality)
 // #endif
+
+struct PackedLaplacianScratch {
+    struct ThreadData {
+        ptrdiff_t max_nodes_per_pack;
+        real_t *in;
+        real_t *out;
+
+        ThreadData(const ptrdiff_t max_nodes_per_pack) : max_nodes_per_pack(max_nodes_per_pack) {
+            in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
+            out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
+        }
+
+        ~ThreadData() {
+            free(in);
+            free(out);
+        }
+
+        void reset() { memset(out, 0, max_nodes_per_pack * sizeof(real_t)); }
+    };
+
+    std::vector<std::unique_ptr<ThreadData>> thread_data;
+
+    real_t *in(int thread_id) { return thread_data[thread_id]->in; }
+    real_t *out(int thread_id) { return thread_data[thread_id]->out; }
+
+    void reset() {
+#ifdef _OPENMP
+#pragma omp parallel
+        {
+            int thread_id = omp_get_thread_num();
+            thread_data[thread_id]->reset();
+        }
+#else
+        thread_data[0]->reset();
+#endif
+    }
+
+    PackedLaplacianScratch(const ptrdiff_t max_nodes_per_pack) {
+#ifdef _OPENMP
+        int n_threads = omp_get_max_threads();
+        thread_data.resize(n_threads);
+#pragma omp parallel
+        {
+            int thread_id          = omp_get_thread_num();
+            thread_data[thread_id] = std::make_unique<ThreadData>(max_nodes_per_pack);
+        }
+#else
+        thread_data.emplace_back(std::make_unique<ThreadData>(max_nodes_per_pack));
+#endif
+    }
+
+    ~PackedLaplacianScratch() {}
+};
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
 struct PackedLaplacianApply {
@@ -51,11 +108,19 @@ struct PackedLaplacianApply {
                      const ptrdiff_t *const SFEM_RESTRICT  ghost_ptr,
                      const idx_t *const SFEM_RESTRICT      ghost_idx,
                      const real_t *const SFEM_RESTRICT     u,
-                     real_t *const SFEM_RESTRICT           values) {
+                     real_t *const SFEM_RESTRICT           values,
+                     PackedLaplacianScratch &scratch) {        
 #pragma omp parallel
         {
-            real_t *in  = (real_t *)malloc(max_nodes_per_pack * sizeof(real_t));
-            real_t *out = (real_t *)calloc(max_nodes_per_pack, sizeof(real_t));
+#ifdef _OPENMP
+            int thread_id = omp_get_thread_num();
+#else
+            int thread_id = 0;
+#endif
+
+            real_t *in  = scratch.in(thread_id);
+            real_t *out = scratch.out(thread_id);
+            memset(out, 0, max_nodes_per_pack * sizeof(real_t)); 
 
 #pragma omp for schedule(static)
             for (ptrdiff_t p = 0; p < n_packs; p++) {
@@ -118,9 +183,6 @@ struct PackedLaplacianApply {
                     g_out[k] = 0;  // Clean-up while hot
                 }
             }
-
-            free(in);
-            free(out);
         }
 
         return SFEM_SUCCESS;
@@ -170,47 +232,51 @@ static int packed_laplacian_apply(enum ElemType                         element_
                                   const ptrdiff_t *const SFEM_RESTRICT  ghost_ptr,
                                   const idx_t *const SFEM_RESTRICT      ghost_idx,
                                   const real_t *const SFEM_RESTRICT     u,
-                                  real_t *const SFEM_RESTRICT           values) {
+                                  real_t *const SFEM_RESTRICT           values,
+                                  PackedLaplacianScratch &scratch) {
     switch (element_type) {
         case TET4:
             return PackedLaplacianApply<PackedIdxType, 4, Tet4MicroKernel>::apply(n_packs,
-                                                                             n_elements_per_pack,
-                                                                             n_elements,
-                                                                             max_nodes_per_pack,
-                                                                             elements,
-                                                                             fff,
-                                                                             owned_nodes_ptr,
-                                                                             n_shared_nodes,
-                                                                             ghost_ptr,
-                                                                             ghost_idx,
-                                                                             u,
-                                                                             values);
+                                                                                  n_elements_per_pack,
+                                                                                  n_elements,
+                                                                                  max_nodes_per_pack,
+                                                                                  elements,
+                                                                                  fff,
+                                                                                  owned_nodes_ptr,
+                                                                                  n_shared_nodes,
+                                                                                  ghost_ptr,
+                                                                                  ghost_idx,
+                                                                                  u,
+                                                                                  values,
+                                                                                  scratch);
         case HEX8:
             return PackedLaplacianApply<PackedIdxType, 8, Hex8MicroKernel>::apply(n_packs,
-                                                                             n_elements_per_pack,
-                                                                             n_elements,
-                                                                             max_nodes_per_pack,
-                                                                             elements,
-                                                                             fff,
-                                                                             owned_nodes_ptr,
-                                                                             n_shared_nodes,
-                                                                             ghost_ptr,
-                                                                             ghost_idx,
-                                                                             u,
-                                                                             values);
+                                                                                  n_elements_per_pack,
+                                                                                  n_elements,
+                                                                                  max_nodes_per_pack,
+                                                                                  elements,
+                                                                                  fff,
+                                                                                  owned_nodes_ptr,
+                                                                                  n_shared_nodes,
+                                                                                  ghost_ptr,
+                                                                                  ghost_idx,
+                                                                                  u,
+                                                                                  values,
+                                                                                  scratch);
         case TET10:
             return PackedLaplacianApply<PackedIdxType, 10, Tet10MicroKernel>::apply(n_packs,
-                                                                               n_elements_per_pack,
-                                                                               n_elements,
-                                                                               max_nodes_per_pack,
-                                                                               elements,
-                                                                               fff,
-                                                                               owned_nodes_ptr,
-                                                                               n_shared_nodes,
-                                                                               ghost_ptr,
-                                                                               ghost_idx,
-                                                                               u,
-                                                                               values);
+                                                                                    n_elements_per_pack,
+                                                                                    n_elements,
+                                                                                    max_nodes_per_pack,
+                                                                                    elements,
+                                                                                    fff,
+                                                                                    owned_nodes_ptr,
+                                                                                    n_shared_nodes,
+                                                                                    ghost_ptr,
+                                                                                    ghost_idx,
+                                                                                    u,
+                                                                                    values,
+                                                                                    scratch);
         default: {
             SFEM_ERROR("packed_laplacian_apply not implemented for type %s\n", type_to_string(element_type));
             return SFEM_FAILURE;
@@ -226,6 +292,7 @@ namespace sfem {
         std::shared_ptr<MultiDomainOp>         domains;
         std::shared_ptr<Packed<PackedIdxType>> packed;
         std::vector<SharedBuffer<jacobian_t>>  fff;
+        std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -252,6 +319,11 @@ namespace sfem {
             fprintf(stderr, "[Warning] PackedLaplacian: Packed mesh initialized\n");
         }
         impl_->packed = impl_->space->packed_mesh();
+
+        impl_->scratch.resize(impl_->packed->n_blocks());
+        for (int b = 0; b < impl_->packed->n_blocks(); b++) {
+            impl_->scratch[b] = std::make_shared<PackedLaplacianScratch>(impl_->packed->max_nodes_per_pack());
+        }
 
         impl_->fff.resize(impl_->packed->n_blocks());
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {
@@ -407,6 +479,7 @@ namespace sfem {
             auto ghost_ptr          = impl_->packed->ghost_ptr(b);
             auto ghost_idx          = impl_->packed->ghost_idx(b);
             auto fff                = impl_->fff[b]->data();
+            auto scratch            = impl_->scratch[b];
             auto max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
             return packed_laplacian_apply<PackedIdxType>(domain.element_type,
                                                          impl_->packed->n_packs(b),
@@ -420,7 +493,8 @@ namespace sfem {
                                                          ghost_ptr->data(),
                                                          ghost_idx->data(),
                                                          h,
-                                                         out);
+                                                         out,
+                                                         *scratch);
         });
     }
 
