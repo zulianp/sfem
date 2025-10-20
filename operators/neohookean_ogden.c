@@ -238,7 +238,7 @@ int neohookean_ogden_hessian_aos(const enum ElemType                element_type
 
 int neohookean_ogden_diag_aos(const enum ElemType               element_type,
                               const ptrdiff_t                   nelements,
-                              const ptrdiff_t stride,
+                              const ptrdiff_t                   stride,
                               const ptrdiff_t                   nnodes,
                               idx_t **const SFEM_RESTRICT       elements,
                               geom_t **const SFEM_RESTRICT      points,
@@ -266,6 +266,36 @@ int neohookean_ogden_diag_aos(const enum ElemType               element_type,
         }
         default: {
             SFEM_ERROR("neohookean_ogden_diag_aos not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
+        }
+    }
+}
+
+int neohookean_ogden_partial_assembly_diag(const enum ElemType               element_type,
+                                           const ptrdiff_t                   nelements,
+                                           const ptrdiff_t                   stride,
+                                           idx_t **const SFEM_RESTRICT       elements,
+                                           geom_t **const SFEM_RESTRICT      points,
+                                           const real_t                      mu,
+                                           const real_t                      lambda,
+                                           const ptrdiff_t                   u_stride,
+                                           const real_t *const SFEM_RESTRICT ux,
+                                           const real_t *const SFEM_RESTRICT uy,
+                                           const real_t *const SFEM_RESTRICT uz,
+                                           const ptrdiff_t                   out_stride,
+                                           real_t *const SFEM_RESTRICT       outx,
+                                           real_t *const SFEM_RESTRICT       outy,
+                                           real_t *const SFEM_RESTRICT       outz) {
+
+                                            
+    switch (element_type) {
+        case HEX8: {
+            return hex8_neohookean_ogden_partial_assembly_diag(
+                    nelements, stride, elements, points, mu, lambda, 3, ux, uy, uz, 3, outx, outy, outz);
+        }
+        default: {
+            SFEM_ERROR("neohookean_ogden_partial_assembly_diag not implemented for type %s\n", type_to_string(element_type));
+            return SFEM_FAILURE;
         }
     }
 }

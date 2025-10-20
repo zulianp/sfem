@@ -499,20 +499,100 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
     return SFEM_SUCCESS;
 }
 
-int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                            nelements,
-                                                const ptrdiff_t                            stride,
-                                                idx_t **const SFEM_RESTRICT                elements,
-                                                const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
-                                                const ptrdiff_t                            h_stride,
-                                                const real_t *const SFEM_RESTRICT          hx,
-                                                const real_t *const SFEM_RESTRICT          hy,
-                                                const real_t *const SFEM_RESTRICT          hz,
-                                                const ptrdiff_t                            out_stride,
-                                                real_t *const SFEM_RESTRICT                outx,
-                                                real_t *const SFEM_RESTRICT                outy,
-                                                real_t *const SFEM_RESTRICT                outz) {
-    // TODO
-    return SFEM_FAILURE;
+int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                   nelements,
+                                                const ptrdiff_t                   stride,
+                                                idx_t **const SFEM_RESTRICT       elements,
+                                                geom_t **const SFEM_RESTRICT      points,
+                                                const real_t                      mu,
+                                                const real_t                      lambda,
+                                                const ptrdiff_t                   u_stride,
+                                                const real_t *const SFEM_RESTRICT ux,
+                                                const real_t *const SFEM_RESTRICT uy,
+                                                const real_t *const SFEM_RESTRICT uz,
+                                                const ptrdiff_t                   out_stride,
+                                                real_t *const SFEM_RESTRICT       outx,
+                                                real_t *const SFEM_RESTRICT       outy,
+                                                real_t *const SFEM_RESTRICT       outz) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t    ev[8];
+        scalar_t element_ux[8];
+        scalar_t element_uy[8];
+        scalar_t element_uz[8];
+
+        scalar_t eoutx[8]= {0};
+        scalar_t eouty[8]= {0};
+        scalar_t eoutz[8]= {0};
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            element_ux[v]       = ux[idx];
+            element_uy[v]       = uy[idx];
+            element_uz[v]       = uz[idx];
+        }
+
+        static const scalar_t samplex = 0.5, sampley = 0.5, samplez = 0.5;
+        hex8_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez, jacobian_adjugate, &jacobian_determinant);
+
+        // Sample at the centroid
+        scalar_t F[9] = {0};
+        hex8_F(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, element_ux, element_uy, element_uz, F);
+
+        hex8_neohookean_ogden_hessian_diag(jacobian_adjugate,
+                                           jacobian_determinant,
+                                           samplex,
+                                           sampley,
+                                           samplez,
+                                           1,
+                                           mu,
+                                           lambda,
+                                           element_ux,
+                                           element_uy,
+                                           element_uz,
+                                           eoutx,
+                                           eouty,
+                                           eoutz);
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+            assert(eoutx[edof_i] == eoutx[edof_i]);
+            assert(eouty[edof_i] == eouty[edof_i]);
+            assert(eoutz[edof_i] == eoutz[edof_i]);
+
+#pragma omp atomic update
+            outx[idx] += eoutx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += eouty[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += eoutz[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
 }
 
 int hex8_neohookean_ogden_elasticity_diag(const ptrdiff_t                   nelements,
