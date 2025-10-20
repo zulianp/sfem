@@ -2,12 +2,12 @@
 #define SFEM_CUDA_BASE_H
 
 #include <cuda.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
-#include <cuda_fp16.h>
 
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
 
 inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool abort = true) {
     if (code != cudaSuccess) {
@@ -17,8 +17,10 @@ inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool a
     }
 }
 
-#define SFEM_CUDA_CHECK(ans) \
-    { sfem_cuda_check((ans), __FILE__, __LINE__); }
+#define SFEM_CUDA_CHECK(ans)                        \
+    {                                               \
+        sfem_cuda_check((ans), __FILE__, __LINE__); \
+    }
 
 #ifndef NDEBUG
 #define SFEM_DEBUG_SYNCHRONIZE()                \
@@ -33,7 +35,13 @@ inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool a
 #define SFEM_ENABLE_NVTX
 
 #ifdef SFEM_ENABLE_NVTX
+
+#if CUDART_VERSION >= 13000
+#include "nvtx3/nvToolsExt.h"
+#else  // CUDART_VERSION < 13000
 #include "nvToolsExt.h"
+#endif  // CUDART_VERSION >= 13000
+
 namespace sfem {
     namespace details {
         class Tracer {
@@ -54,12 +62,12 @@ namespace sfem {
         nvtxRangePop();  \
     } while (0)
 
-#else //SFEM_ENABLE_NVTX
+#else  // SFEM_ENABLE_NVTX
 
 #define SFEM_NVTX_SCOPE(name)
 #define SFEM_RANGE_PUSH(name_)
 #define SFEM_RANGE_POP()
- 
-#endif //SFEM_ENABLE_NVTX
+
+#endif  // SFEM_ENABLE_NVTX
 
 #endif  // SFEM_CUDA_BASE_H

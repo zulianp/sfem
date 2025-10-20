@@ -239,10 +239,23 @@ copy_xyz_tet10_device_unified(const ptrdiff_t   nnodes,   //
 //////////////////////////////////////////////////////////
 void                                                                                   //
 memory_hint_xyz_tet10_device_unified(const ptrdiff_t nnodes, xyz_tet10_device* xyz) {  //
-                                                                                       //
+
+#if CUDART_VERSION >= 13000
+
+    cudaMemLocation location;
+    location.type = cudaMemLocationTypeDevice;
+    location.id   = 0;
+
+    // location.id = cudaCpuDeviceId;  // Preferred location is the host
+
+    cudaError_t err0 = cudaMemAdvise(xyz->x, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err1 = cudaMemAdvise(xyz->y, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err2 = cudaMemAdvise(xyz->z, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+#else
     cudaError_t err0 = cudaMemAdvise(xyz->x, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, 0);
     cudaError_t err1 = cudaMemAdvise(xyz->y, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, 0);
     cudaError_t err2 = cudaMemAdvise(xyz->z, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, 0);
+#endif
 
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess) {
         printf("ERROR: setting memory hint for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
@@ -250,9 +263,25 @@ memory_hint_xyz_tet10_device_unified(const ptrdiff_t nnodes, xyz_tet10_device* x
     }
 
     // prefetch the data to the GPU
+
+#if CUDART_VERSION >= 13000
+
+    // cudaMemLocation location;
+    location.type = cudaMemLocationTypeDevice;
+    location.id   = 0;
+
+    // location.id = cudaCpuDeviceId;  // Preferred location is the host
+
+    cudaError_t err3 = cudaMemAdvise(xyz->x, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err4 = cudaMemAdvise(xyz->y, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err5 = cudaMemAdvise(xyz->z, nnodes * sizeof(geom_t), cudaMemAdviseSetReadMostly, location);
+#else
+
     cudaError_t err3 = cudaMemPrefetchAsync(xyz->x, nnodes * sizeof(geom_t), 0, 0);
     cudaError_t err4 = cudaMemPrefetchAsync(xyz->y, nnodes * sizeof(geom_t), 0, 0);
     cudaError_t err5 = cudaMemPrefetchAsync(xyz->z, nnodes * sizeof(geom_t), 0, 0);
+
+#endif
 
     if (err3 != cudaSuccess || err4 != cudaSuccess || err5 != cudaSuccess) {
         printf("ERROR: prefetching data for xyz_tet10_device: %s at %s:%d\n", cudaGetErrorString(err3), __FILE__, __LINE__);
@@ -328,9 +357,24 @@ void                                                     //
 memory_hint_xyz_tet10_managed(const ptrdiff_t   nnodes,  //
                               xyz_tet10_device* xyz) {   //
                                                          //
+#if CUDART_VERSION >= 13000
+    {
+        cudaMemLocation location;
+        location.type = cudaMemLocationTypeDevice;
+        location.id   = 0;
+
+        cudaError_t err0 = cudaMemAdvise(xyz->x, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, location);
+        cudaError_t err1 = cudaMemAdvise(xyz->y, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, location);
+        cudaError_t err2 = cudaMemAdvise(xyz->z, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, location);
+        (void)err0;
+        (void)err1;
+        (void)err2;
+    }
+#else
     cudaMemAdvise(xyz->x, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
     cudaMemAdvise(xyz->y, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
     cudaMemAdvise(xyz->z, nnodes * sizeof(geom_t), cudaMemAdviseSetPreferredLocation, cudaCpuDeviceId);
+#endif
 }  // end memory_hint_xyz_tet10_managed
 
 //////////////////////////////////////////////////////////
@@ -560,6 +604,44 @@ memory_hint_elems_tet10_device_unified(ptrdiff_t           nelements,  //
     int  device_id;
     auto error = cudaGetDevice(&device_id);
 
+#if CUDART_VERSION >= 13000
+    cudaMemLocation location;
+    location.type = cudaMemLocationTypeDevice;
+    location.id   = device_id;
+
+    cudaError_t err0 = cudaMemAdvise(elems->elems_v0, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err1 = cudaMemAdvise(elems->elems_v1, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err2 = cudaMemAdvise(elems->elems_v2, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err3 = cudaMemAdvise(elems->elems_v3, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err4 = cudaMemAdvise(elems->elems_v4, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err5 = cudaMemAdvise(elems->elems_v5, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err6 = cudaMemAdvise(elems->elems_v6, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err7 = cudaMemAdvise(elems->elems_v7, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err8 = cudaMemAdvise(elems->elems_v8, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+    cudaError_t err9 = cudaMemAdvise(elems->elems_v9, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, location);
+
+    if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
+        err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
+        printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
+    }
+
+    // prefetch the data to the GPU (cudaMemPrefetchAsync also uses cudaMemLocation in CUDA 13+)
+    cudaError_t err10 = cudaMemPrefetchAsync(elems->elems_v0, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err11 = cudaMemPrefetchAsync(elems->elems_v1, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err12 = cudaMemPrefetchAsync(elems->elems_v2, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err13 = cudaMemPrefetchAsync(elems->elems_v3, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err14 = cudaMemPrefetchAsync(elems->elems_v4, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err15 = cudaMemPrefetchAsync(elems->elems_v5, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err16 = cudaMemPrefetchAsync(elems->elems_v6, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err17 = cudaMemPrefetchAsync(elems->elems_v7, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err18 = cudaMemPrefetchAsync(elems->elems_v8, nelements * sizeof(idx_t), location, 0);
+    cudaError_t err19 = cudaMemPrefetchAsync(elems->elems_v9, nelements * sizeof(idx_t), location, 0);
+
+    if (err10 != cudaSuccess || err11 != cudaSuccess || err12 != cudaSuccess || err13 != cudaSuccess || err14 != cudaSuccess ||
+        err15 != cudaSuccess || err16 != cudaSuccess || err17 != cudaSuccess || err18 != cudaSuccess || err19 != cudaSuccess) {
+        printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err10), __FILE__, __LINE__);
+    }
+#else
     cudaError_t err0 = cudaMemAdvise(elems->elems_v0, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, device_id);
     cudaError_t err1 = cudaMemAdvise(elems->elems_v1, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, device_id);
     cudaError_t err2 = cudaMemAdvise(elems->elems_v2, nelements * sizeof(idx_t), cudaMemAdviseSetReadMostly, device_id);
@@ -574,26 +656,25 @@ memory_hint_elems_tet10_device_unified(ptrdiff_t           nelements,  //
     if (err0 != cudaSuccess || err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess || err4 != cudaSuccess ||
         err5 != cudaSuccess || err6 != cudaSuccess || err7 != cudaSuccess || err8 != cudaSuccess || err9 != cudaSuccess) {
         printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err0), __FILE__, __LINE__);
-        // Handle the error or exit the program
     }
 
     // prefetch the data to the GPU
-    cudaError_t err10 = cudaMemPrefetchAsync(elems->elems_v0, nelements * sizeof(idx_t), device_id);
-    cudaError_t err11 = cudaMemPrefetchAsync(elems->elems_v1, nelements * sizeof(idx_t), device_id);
-    cudaError_t err12 = cudaMemPrefetchAsync(elems->elems_v2, nelements * sizeof(idx_t), device_id);
-    cudaError_t err13 = cudaMemPrefetchAsync(elems->elems_v3, nelements * sizeof(idx_t), device_id);
-    cudaError_t err14 = cudaMemPrefetchAsync(elems->elems_v4, nelements * sizeof(idx_t), device_id);
-    cudaError_t err15 = cudaMemPrefetchAsync(elems->elems_v5, nelements * sizeof(idx_t), device_id);
-    cudaError_t err16 = cudaMemPrefetchAsync(elems->elems_v6, nelements * sizeof(idx_t), device_id);
-    cudaError_t err17 = cudaMemPrefetchAsync(elems->elems_v7, nelements * sizeof(idx_t), device_id);
-    cudaError_t err18 = cudaMemPrefetchAsync(elems->elems_v8, nelements * sizeof(idx_t), device_id);
-    cudaError_t err19 = cudaMemPrefetchAsync(elems->elems_v9, nelements * sizeof(idx_t), device_id);
+    cudaError_t err10 = cudaMemPrefetchAsync(elems->elems_v0, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err11 = cudaMemPrefetchAsync(elems->elems_v1, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err12 = cudaMemPrefetchAsync(elems->elems_v2, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err13 = cudaMemPrefetchAsync(elems->elems_v3, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err14 = cudaMemPrefetchAsync(elems->elems_v4, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err15 = cudaMemPrefetchAsync(elems->elems_v5, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err16 = cudaMemPrefetchAsync(elems->elems_v6, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err17 = cudaMemPrefetchAsync(elems->elems_v7, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err18 = cudaMemPrefetchAsync(elems->elems_v8, nelements * sizeof(idx_t), device_id, 0);
+    cudaError_t err19 = cudaMemPrefetchAsync(elems->elems_v9, nelements * sizeof(idx_t), device_id, 0);
 
     if (err10 != cudaSuccess || err11 != cudaSuccess || err12 != cudaSuccess || err13 != cudaSuccess || err14 != cudaSuccess ||
         err15 != cudaSuccess || err16 != cudaSuccess || err17 != cudaSuccess || err18 != cudaSuccess || err19 != cudaSuccess) {
         printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err10), __FILE__, __LINE__);
-        // Handle the error or exit the program
     }
+#endif
 }
 
 //////////////////////////////////////////////////////////
@@ -606,7 +687,15 @@ memory_hint_read_mostly(const ptrdiff_t array_size,   //
     int  device_id = 0;
     auto error     = cudaGetDevice(&device_id);
 
+#if CUDART_VERSION >= 13000
+    cudaMemLocation location;
+    location.type = cudaMemLocationTypeDevice;
+    location.id   = device_id;
+
+    cudaError_t err = cudaMemAdvise(ptr, array_size * sizeof_type, cudaMemAdviseSetReadMostly, location);
+#else
     cudaError_t err = cudaMemAdvise(ptr, array_size * sizeof_type, cudaMemAdviseSetReadMostly, device_id);
+#endif
 
     if (err != cudaSuccess) {
         printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
@@ -614,7 +703,11 @@ memory_hint_read_mostly(const ptrdiff_t array_size,   //
     }
 
     // prefetch the data to the GPU
-    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, device_id);
+#if CUDART_VERSION >= 13000
+    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, location, 0);
+#else
+    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, device_id, 0);
+#endif
 
     if (err2 != cudaSuccess) {
         printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
@@ -632,7 +725,15 @@ memory_hint_write_mostly(const ptrdiff_t array_size,   //
     int  device_id = 0;
     auto error     = cudaGetDevice(&device_id);
 
+#if CUDART_VERSION >= 13000
+    cudaMemLocation location;
+    location.type = cudaMemLocationTypeDevice;
+    location.id   = device_id;
+
+    cudaError_t err = cudaMemAdvise(ptr, array_size * sizeof_type, cudaMemAdviseSetAccessedBy, location);
+#else
     cudaError_t err = cudaMemAdvise(ptr, array_size * sizeof_type, cudaMemAdviseSetAccessedBy, device_id);
+#endif
 
     if (err != cudaSuccess) {
         printf("ERROR: setting memory hint for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err), __FILE__, __LINE__);
@@ -640,7 +741,11 @@ memory_hint_write_mostly(const ptrdiff_t array_size,   //
     }
 
     // prefetch the data to the GPU
-    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, device_id);
+#if CUDART_VERSION >= 13000
+    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, location, 0);
+#else
+    cudaError_t err2 = cudaMemPrefetchAsync(ptr, array_size * sizeof_type, device_id, 0);
+#endif
 
     if (err2 != cudaSuccess) {
         printf("ERROR: prefetching data for elems_tet10_device: %s at %s:%d\n", cudaGetErrorString(err2), __FILE__, __LINE__);
