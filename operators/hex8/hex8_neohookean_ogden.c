@@ -14,8 +14,8 @@
 #include "hex8_inline_cpu.h"
 #include "line_quadrature.h"
 
-#include "hex8_partial_assembly_neohookean_inline.h"
 #include "hex8_neohookean_ogden_local.h"
+#include "hex8_partial_assembly_neohookean_inline.h"
 
 int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
                                     const ptrdiff_t                   stride,
@@ -82,7 +82,7 @@ int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
         }
     }
 
-    if(*out != *out) {
+    if (*out != *out) {
         *out = 1e10;
     }
 
@@ -172,7 +172,7 @@ int hex8_neohookean_ogden_objective_steps(const ptrdiff_t                   nele
     }
 
     for (int s = 0; s < nsteps; s++) {
-        if(out[s] != out[s]) {
+        if (out[s] != out[s]) {
             out[s] = 1e10;
         }
     }
@@ -247,19 +247,19 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                     assert(jacobian_determinant != 0);
 
                     hex8_neohookean_ogden_grad(jacobian_adjugate,
-                                         jacobian_determinant,
-                                         qx[kx],
-                                         qx[ky],
-                                         qx[kz],
-                                         qw[kx] * qw[ky] * qw[kz],
-                                         mu,
-                                         lambda,
-                                         edispx,
-                                         edispy,
-                                         edispz,
-                                         eoutx,
-                                         eouty,
-                                         eoutz);
+                                               jacobian_determinant,
+                                               qx[kx],
+                                               qx[ky],
+                                               qx[kz],
+                                               qw[kx] * qw[ky] * qw[kz],
+                                               mu,
+                                               lambda,
+                                               edispx,
+                                               edispy,
+                                               edispz,
+                                               eoutx,
+                                               eouty,
+                                               eoutz);
                 }
             }
         }
@@ -477,6 +477,127 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
         }
 
         hex8_SdotHdotG(S_ikmn, Wimpn_compressed, element_hx, element_hy, element_hz, eoutx, eouty, eoutz);
+
+        for (int edof_i = 0; edof_i < 8; edof_i++) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+            assert(eoutx[edof_i] == eoutx[edof_i]);
+            assert(eouty[edof_i] == eouty[edof_i]);
+            assert(eoutz[edof_i] == eoutz[edof_i]);
+
+#pragma omp atomic update
+            outx[idx] += eoutx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += eouty[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += eoutz[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                            nelements,
+                                                const ptrdiff_t                            stride,
+                                                idx_t **const SFEM_RESTRICT                elements,
+                                                const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                                const ptrdiff_t                            h_stride,
+                                                const real_t *const SFEM_RESTRICT          hx,
+                                                const real_t *const SFEM_RESTRICT          hy,
+                                                const real_t *const SFEM_RESTRICT          hz,
+                                                const ptrdiff_t                            out_stride,
+                                                real_t *const SFEM_RESTRICT                outx,
+                                                real_t *const SFEM_RESTRICT                outy,
+                                                real_t *const SFEM_RESTRICT                outz) {
+    // TODO
+    return SFEM_FAILURE;
+}
+
+int hex8_neohookean_ogden_elasticity_diag(const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   out_stride,
+                                          real_t *const SFEM_RESTRICT       outx,
+                                          real_t *const SFEM_RESTRICT       outy,
+                                          real_t *const SFEM_RESTRICT       outz) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        scalar_t edispx[8];
+        scalar_t edispy[8];
+        scalar_t edispz[8];
+
+        accumulator_t eoutx[8] = {0};
+        accumulator_t eouty[8] = {0};
+        accumulator_t eoutz[8] = {0};
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int d = 0; d < 8; d++) {
+            lx[d] = x[ev[d]];
+            ly[d] = y[ev[d]];
+            lz[d] = z[ev[d]];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            edispx[v]           = ux[idx];
+            edispy[v]           = uy[idx];
+            edispz[v]           = uz[idx];
+        }
+
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
+                    assert(jacobian_determinant == jacobian_determinant);
+                    assert(jacobian_determinant != 0);
+
+                    hex8_neohookean_ogden_hessian_diag(jacobian_adjugate,
+                                                       jacobian_determinant,
+                                                       qx[kx],
+                                                       qx[ky],
+                                                       qx[kz],
+                                                       qw[kx] * qw[ky] * qw[kz],
+                                                       mu,
+                                                       lambda,
+                                                       edispx,
+                                                       edispy,
+                                                       edispz,
+                                                       eoutx,
+                                                       eouty,
+                                                       eoutz);
+                }
+            }
+        }
 
         for (int edof_i = 0; edof_i < 8; edof_i++) {
             const ptrdiff_t idx = ev[edof_i] * out_stride;

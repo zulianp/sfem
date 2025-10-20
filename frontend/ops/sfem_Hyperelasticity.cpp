@@ -240,7 +240,9 @@ namespace sfem {
                         for (int ky = 0; ky < n_qp; ++ky) {
                             for (int kx = 0; kx < n_qp; ++kx) {
                                 hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], Jadj, &Jdet);
-                                scalar_t H_diag[24] = {0};
+                                scalar_t H_diagx[8] = {0};
+                                scalar_t H_diagy[8] = {0};
+                                scalar_t H_diagz[8] = {0};
                                 hex8_neohookean_ogden_hessian_diag(Jadj,
                                                                    Jdet,
                                                                    qx[kx],
@@ -252,11 +254,14 @@ namespace sfem {
                                                                    ux,
                                                                    uy,
                                                                    uz,
-                                                                   H_diag);
+                                                                   H_diagx,
+                                                                   H_diagy,
+                                                                   H_diagz);
+                                                                   
                                 for (int a = 0; a < 8; ++a) {
-                                    ediag[3 * a + 0] += H_diag[3 * a + 0];
-                                    ediag[3 * a + 1] += H_diag[3 * a + 1];
-                                    ediag[3 * a + 2] += H_diag[3 * a + 2];
+                                    ediag[3 * a + 0] += H_diagx[a];
+                                    ediag[3 * a + 1] += H_diagy[a];
+                                    ediag[3 * a + 2] += H_diagz[a];
                                 }
                             }
                         }

@@ -16,6 +16,7 @@
 #include "sfem_Env.hpp"
 #include "sfem_P1toP2.hpp"
 #include "sfem_Packed.hpp"
+#include "sfem_SFC.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -159,12 +160,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         mesh = sfem::convert_p1_mesh_to_p2(mesh);
     }
 
+    // FIXME SFC should also sort the BCs
+    // if (sfem::Env::read("SFEM_USE_SFC", false)) {
+    //     auto sfc = sfem::SFC::create_from_env();
+    //     sfc->reorder(*mesh);
+    // }
+
     std::shared_ptr<sfem::FunctionSpace::PackedMesh> packed_mesh;
     if (sfem::Env::read("SFEM_USE_PACKED_MESH", false)) {
         packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
     }
 
-    const int block_size = mesh->spatial_dimension();
+    const int                            block_size = mesh->spatial_dimension();
     std::shared_ptr<sfem::FunctionSpace> fs;
     if (packed_mesh) {
         fs = sfem::FunctionSpace::create(packed_mesh, block_size);
@@ -212,6 +219,21 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
     cg->set_atol(1e-11);
+
+    std::function<void(const real_t *const)> update_preconditioner = [](const real_t *const disp) {};
+
+    if (sfem::Env::read("SFEM_USE_PRECONDITIONER", false)) {
+        if (fs->element_type() == HEX8) {
+            auto diag                = sfem::create_buffer<real_t>(ndofs, es);
+            auto sj                  = sfem::create_shiftable_jacobi(diag, es);
+            sj->relaxation_parameter = 1. / fs->block_size();
+            cg->set_preconditioner_op(sj);
+            update_preconditioner = [=](const real_t *const disp) {
+                f->hessian_diag(disp, diag->data());
+                sj->set_diag(diag);
+            };
+        }
+    }
 
     // Newton iteration
     int    nl_max_it          = sfem::Env::read("SFEM_NL_MAX_IT", 30);
@@ -271,6 +293,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
             for (int i = 0; i < nl_max_it; i++) {
                 f->update(displacement->data());
+                update_preconditioner(displacement->data());
                 blas->zeros(ndofs, rhs->data());
                 f->gradient(displacement->data(), rhs->data());
 

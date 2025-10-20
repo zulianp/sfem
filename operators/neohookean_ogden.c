@@ -1,8 +1,8 @@
 #include "neohookean_ogden.h"
 
-#include "tet4_neohookean_ogden.h"
 #include "hex8_neohookean_ogden.h"
 #include "tet10_neohookean_ogden.h"
+#include "tet4_neohookean_ogden.h"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -182,20 +182,20 @@ int neohookean_ogden_gradient_aos(const enum ElemType               element_type
         }
         case TET10: {
             return tet10_neohookean_ogden_gradient(nelements,
-                                                  1,
-                                                  nnodes,
-                                                  elements,
-                                                  points,
-                                                  mu,
-                                                  lambda,
-                                                  3,
-                                                  &u[0],
-                                                  &u[1],
-                                                  &u[2],
-                                                  3,
-                                                  &values[0],
-                                                  &values[1],
-                                                  &values[2]);
+                                                   1,
+                                                   nnodes,
+                                                   elements,
+                                                   points,
+                                                   mu,
+                                                   lambda,
+                                                   3,
+                                                   &u[0],
+                                                   &u[1],
+                                                   &u[2],
+                                                   3,
+                                                   &values[0],
+                                                   &values[1],
+                                                   &values[2]);
         }
         case HEX8: {
             return hex8_neohookean_ogden_gradient(nelements,
@@ -238,6 +238,7 @@ int neohookean_ogden_hessian_aos(const enum ElemType                element_type
 
 int neohookean_ogden_diag_aos(const enum ElemType               element_type,
                               const ptrdiff_t                   nelements,
+                              const ptrdiff_t stride,
                               const ptrdiff_t                   nnodes,
                               idx_t **const SFEM_RESTRICT       elements,
                               geom_t **const SFEM_RESTRICT      points,
@@ -245,21 +246,41 @@ int neohookean_ogden_diag_aos(const enum ElemType               element_type,
                               const real_t                      lambda,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT       values) {
-    SFEM_ERROR("IMPLEMENT ME");
-    return SFEM_FAILURE;
+    switch (element_type) {
+        case HEX8: {
+            return hex8_neohookean_ogden_elasticity_diag(nelements,
+                                                         stride,
+                                                         nnodes,
+                                                         elements,
+                                                         points,
+                                                         mu,
+                                                         lambda,
+                                                         3,
+                                                         &u[0],
+                                                         &u[1],
+                                                         &u[2],
+                                                         3,
+                                                         &values[0],
+                                                         &values[1],
+                                                         &values[2]);
+        }
+        default: {
+            SFEM_ERROR("neohookean_ogden_diag_aos not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
 }
 
-int neohookean_ogden_hessian_partial_assembly(const enum ElemType                   element_type,
-                                              const ptrdiff_t                       nelements,
-                                              const ptrdiff_t                       stride,
-                                              idx_t **const SFEM_RESTRICT           elements,
-                                              geom_t **const SFEM_RESTRICT          points,
-                                              const real_t                          mu,
-                                              const real_t                          lambda,
-                                              const ptrdiff_t                       u_stride,
-                                              const real_t *const SFEM_RESTRICT     ux,
-                                              const real_t *const SFEM_RESTRICT     uy,
-                                              const real_t *const SFEM_RESTRICT     uz,
+int neohookean_ogden_hessian_partial_assembly(const enum ElemType                  element_type,
+                                              const ptrdiff_t                      nelements,
+                                              const ptrdiff_t                      stride,
+                                              idx_t **const SFEM_RESTRICT          elements,
+                                              geom_t **const SFEM_RESTRICT         points,
+                                              const real_t                         mu,
+                                              const real_t                         lambda,
+                                              const ptrdiff_t                      u_stride,
+                                              const real_t *const SFEM_RESTRICT    ux,
+                                              const real_t *const SFEM_RESTRICT    uy,
+                                              const real_t *const SFEM_RESTRICT    uz,
                                               metric_tensor_t *const SFEM_RESTRICT partial_assembly) {
     switch (element_type) {
         case TET4: {
@@ -281,19 +302,19 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_partial_assembly_apply(const enum ElemType                   element_type,
-                                            const ptrdiff_t                       nelements,
-                                            const ptrdiff_t                       stride,
-                                            idx_t **const SFEM_RESTRICT           elements,
+int neohookean_ogden_partial_assembly_apply(const enum ElemType                        element_type,
+                                            const ptrdiff_t                            nelements,
+                                            const ptrdiff_t                            stride,
+                                            idx_t **const SFEM_RESTRICT                elements,
                                             const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
-                                            const ptrdiff_t                       h_stride,
-                                            const real_t *const                   hx,
-                                            const real_t *const                   hy,
-                                            const real_t *const                   hz,
-                                            const ptrdiff_t                       out_stride,
-                                            real_t *const                         outx,
-                                            real_t *const                         outy,
-                                            real_t *const                         outz) {
+                                            const ptrdiff_t                            h_stride,
+                                            const real_t *const                        hx,
+                                            const real_t *const                        hy,
+                                            const real_t *const                        hz,
+                                            const ptrdiff_t                            out_stride,
+                                            real_t *const                              outx,
+                                            real_t *const                              outy,
+                                            real_t *const                              outz) {
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_partial_assembly_apply(
@@ -314,21 +335,20 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                  element_type,
-                                                       const ptrdiff_t                      nelements,
-                                                       const ptrdiff_t                      stride,
-                                                       idx_t **const SFEM_RESTRICT          elements,
-                                                       const compressed_t *const SFEM_RESTRICT   partial_assembly,
-                                                       const scaling_t *const SFEM_RESTRICT scaling,
-                                                       const ptrdiff_t                      h_stride,
-                                                       const real_t *const                  hx,
-                                                       const real_t *const                  hy,
-                                                       const real_t *const                  hz,
-                                                       const ptrdiff_t                      out_stride,
-                                                       real_t *const                        outx,
-                                                       real_t *const                        outy,
-                                                       real_t *const                        outz)
-{
+int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                     element_type,
+                                                       const ptrdiff_t                         nelements,
+                                                       const ptrdiff_t                         stride,
+                                                       idx_t **const SFEM_RESTRICT             elements,
+                                                       const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                       const scaling_t *const SFEM_RESTRICT    scaling,
+                                                       const ptrdiff_t                         h_stride,
+                                                       const real_t *const                     hx,
+                                                       const real_t *const                     hy,
+                                                       const real_t *const                     hz,
+                                                       const ptrdiff_t                         out_stride,
+                                                       real_t *const                           outx,
+                                                       real_t *const                           outy,
+                                                       real_t *const                           outz) {
     switch (element_type) {
         case TET4: {
             return tet4_neohookean_ogden_compressed_partial_assembly_apply(
@@ -343,7 +363,8 @@ int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType      
                     nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         default: {
-            SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n", type_to_string(element_type));
+            SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n",
+                       type_to_string(element_type));
         }
     }
     return SFEM_FAILURE;
@@ -359,17 +380,19 @@ int neohookean_ogden_objective_aos(const enum ElemType               element_typ
                                    const real_t                      lambda,
                                    const real_t *const SFEM_RESTRICT u,
                                    const int                         is_element_wise,
-                                   real_t *const SFEM_RESTRICT       out) { 
-
+                                   real_t *const SFEM_RESTRICT       out) {
     switch (element_type) {
         case TET4: {
-            return tet4_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
+            return tet4_neohookean_ogden_objective(
+                    nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
         }
         case TET10: {
-            return tet10_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
+            return tet10_neohookean_ogden_objective(
+                    nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
         }
         case HEX8: {
-            return hex8_neohookean_ogden_objective(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
+            return hex8_neohookean_ogden_objective(
+                    nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], is_element_wise, out);
         }
         default: {
             SFEM_ERROR("neohookean_ogden_objective_aos not implemented for type %s\n", type_to_string(element_type));
@@ -390,17 +413,67 @@ int neohookean_ogden_objective_steps_aos(const enum ElemType               eleme
                                          const real_t *const SFEM_RESTRICT inc,
                                          const int                         nsteps,
                                          const real_t *const               steps,
-                                         real_t *const SFEM_RESTRICT       out) {   
-
+                                         real_t *const SFEM_RESTRICT       out) {
     switch (element_type) {
         case TET4: {
-            return tet4_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);
+            return tet4_neohookean_ogden_objective_steps(nelements,
+                                                         stride,
+                                                         nnodes,
+                                                         elements,
+                                                         points,
+                                                         mu,
+                                                         lambda,
+                                                         3,
+                                                         &u[0],
+                                                         &u[1],
+                                                         &u[2],
+                                                         3,
+                                                         &inc[0],
+                                                         &inc[1],
+                                                         &inc[2],
+                                                         nsteps,
+                                                         steps,
+                                                         out);
         }
         case TET10: {
-            return tet10_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);
+            return tet10_neohookean_ogden_objective_steps(nelements,
+                                                          stride,
+                                                          nnodes,
+                                                          elements,
+                                                          points,
+                                                          mu,
+                                                          lambda,
+                                                          3,
+                                                          &u[0],
+                                                          &u[1],
+                                                          &u[2],
+                                                          3,
+                                                          &inc[0],
+                                                          &inc[1],
+                                                          &inc[2],
+                                                          nsteps,
+                                                          steps,
+                                                          out);
         }
         case HEX8: {
-            return hex8_neohookean_ogden_objective_steps(nelements, stride, nnodes, elements, points, mu, lambda, 3, &u[0], &u[1], &u[2], 3, &inc[0], &inc[1], &inc[2], nsteps, steps, out);
+            return hex8_neohookean_ogden_objective_steps(nelements,
+                                                         stride,
+                                                         nnodes,
+                                                         elements,
+                                                         points,
+                                                         mu,
+                                                         lambda,
+                                                         3,
+                                                         &u[0],
+                                                         &u[1],
+                                                         &u[2],
+                                                         3,
+                                                         &inc[0],
+                                                         &inc[1],
+                                                         &inc[2],
+                                                         nsteps,
+                                                         steps,
+                                                         out);
         }
         default: {
             SFEM_ERROR("neohookean_ogden_objective_steps_aos not implemented for type %s\n", type_to_string(element_type));

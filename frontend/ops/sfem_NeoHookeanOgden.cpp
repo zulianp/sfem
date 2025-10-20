@@ -81,6 +81,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_diag_aos(domain.element_type,
                                              mesh->n_elements(),
+                                             1,
                                              mesh->n_nodes(),
                                              domain.block->elements()->data(),
                                              mesh->points()->data(),

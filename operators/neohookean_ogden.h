@@ -105,6 +105,7 @@ int neohookean_ogden_hessian_aos(const enum ElemType                element_type
 
 int neohookean_ogden_diag_aos(const enum ElemType               element_type,
                               const ptrdiff_t                   nelements,
+                              const ptrdiff_t stride,
                               const ptrdiff_t                   nnodes,
                               idx_t **const SFEM_RESTRICT       elements,
                               geom_t **const SFEM_RESTRICT      points,
