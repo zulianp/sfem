@@ -261,10 +261,20 @@ int test_newmark_kv() {
             if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
                 printf("%g/%g\n", double(t), double(T));
 
+                auto u = displacement;
+                auto v = velocity;
+                auto a = acceleration;
+                #ifdef SFEM_ENABLE_CUDA
+                if (es == sfem::EXECUTION_SPACE_DEVICE) {
+                    u = sfem::to_host(u);
+                    v = sfem::to_host(v);
+                    a = sfem::to_host(a);
+                }
+                #endif
                 // Write to disk
-                output->write_time_step("disp", t, displacement->data());
-                output->write_time_step("velocity", t, velocity->data());
-                output->write_time_step("acceleration", t, acceleration->data());
+                output->write_time_step("disp", t, u->data());
+                output->write_time_step("velocity", t, v->data());
+                output->write_time_step("acceleration", t, a->data());
 
                 // If no issues encountered we log the time
                 output->log_time(t);
