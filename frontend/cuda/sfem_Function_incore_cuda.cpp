@@ -1013,13 +1013,25 @@ namespace sfem {
                 return std::make_unique<GPUKelvinVoigtNewmark>(space);
             }
     
-            std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
-                auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
-                assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
-                assert(ret->element_type == macro_base_elem(adjugate->element_type()));
-                ret->adjugate = adjugate;
-                return ret;
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
+            auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
+            assert(derefined_space->element_type() == macro_base_elem(adjugate->element_type()));
+            assert(ret->element_type == macro_base_elem(adjugate->element_type()));
+            ret->adjugate = adjugate;
+            
+            // Copy physical parameters
+            ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
+            ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
+            ret->real_type = real_type; ret->stream = stream;
+            
+            // Copy velocity and acceleration field references
+            for (int c = 0; c < 3; c++) {
+                ret->vel_[c] = vel_[c];
+                ret->acc_[c] = acc_[c];
             }
+            
+            return ret;
+        }
     
             const char *name() const override { return "gpu:KelvinVoigtNewmark"; }
             inline bool is_linear() const override { return true; }
@@ -1096,34 +1108,28 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
     
-        int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
-            
-            if (!vel_[0] || !acc_[0]) {
-                SFEM_ERROR("GPUKelvinVoigtNewmark::gradient: velocity or acceleration field not set! Call set_field(\"velocity\", buffer, 0) and set_field(\"acceleration\", buffer, 0) first.\n");
-                return SFEM_FAILURE;
-            }
-            
-            const real_t *v = vel_[0]->data();
-            const real_t *a = acc_[0]->data();
+            int gradient(const real_t *const x, real_t *const out) override {
+                SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
+                const real_t *v = vel_[0]->data();
+                const real_t *a = acc_[0]->data();
 
-            return cu_kelvin_voigt_newmark_apply(element_type,
-                                         adjugate->n_elements(),
-                                         adjugate->elements()->data(),
-                                         adjugate->n_elements(),  // stride
-                                         adjugate->jacobian_adjugate()->data(),
-                                         adjugate->jacobian_determinant()->data(),
-                                         k,
-                                         K,
-                                         eta,
-                                         rho,
-                                         real_type,
-                                         x,
-                                         v,
-                                         a,
-                                         out,
-                                         stream);
-        }
+                return cu_kelvin_voigt_newmark_apply(element_type,
+                                             adjugate->n_elements(),
+                                             adjugate->elements()->data(),
+                                             adjugate->n_elements(),  // stride
+                                             adjugate->jacobian_adjugate()->data(),
+                                             adjugate->jacobian_determinant()->data(),
+                                             k,
+                                             K,
+                                             eta,
+                                             rho,
+                                             real_type,
+                                             x,
+                                             v,
+                                             a,
+                                             out,
+                                             stream);
+            }
     
             int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
                 SFEM_TRACE_SCOPE("cu_kelvin_voigt_newmark_apply");
@@ -1192,9 +1198,7 @@ namespace sfem {
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
-            auto ret = std::make_unique<SemiStructuredGPUKelvinVoigtNewmark>(space);
-            ret->initialize();
-            return ret;
+            return std::make_unique<SemiStructuredGPUKelvinVoigtNewmark>(space);
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
@@ -1215,10 +1219,22 @@ namespace sfem {
                     ret->vel_[c] = vel_[c];
                     ret->acc_[c] = acc_[c];
                 }
-                ret->initialize();
+                // Don't call initialize() - adjugate already set correctly above
                 return ret;
             } else {
                 auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
+                
+                // Copy physical parameters
+                ret->k = k; ret->K = K; ret->eta = eta; ret->rho = rho;
+                ret->dt = dt; ret->gamma = gamma; ret->beta = beta;
+                ret->real_type = real_type; ret->stream = stream;
+                
+                // Copy velocity and acceleration field references
+                for (int c = 0; c < 3; c++) {
+                    ret->vel_[c] = vel_[c];
+                    ret->acc_[c] = acc_[c];
+                }
+                
                 ret->initialize();
                 return ret;
             }
@@ -1265,16 +1281,31 @@ namespace sfem {
                                                            k, K, eta, rho,
                                                            dt, gamma, beta,
                                                            real_type,
-                                                           3, x, &x[1], &x[2], v, &v[1], &v[2], a, &a[1], &a[2],
-                                                           3, out, &out[1], &out[2],
+                                                           3, &x[0], &x[1], &x[2], &v[0], &v[1], &v[2], &a[0], &a[1], &a[2],
+                                                           3, &out[0], &out[1], &out[2],
                                                            SFEM_DEFAULT_STREAM);
     }
 
     int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
-        const real_t *v = vel_[0]->data();
-        const real_t *a = acc_[0]->data();
+        
+        // In Newmark's apply (linearized operator), we construct v and a from h
+        // following the same logic as GPUKelvinVoigtNewmark::apply
+        const ptrdiff_t ndofs = space->n_dofs();
+        const real_t v_scale = (dt != 0 && beta != 0) ? (gamma / (beta * dt)) : 0.0;
+        const real_t a_scale = (dt != 0 && beta != 0) ? (1.0 / (beta * dt * dt)) : 0.0;
+        
+        auto v_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
+        auto a_lin_tmp = sfem::create_device_buffer<real_t>(ndofs);
+        d_copy(ndofs, h, v_lin_tmp->data());
+        d_scal(ndofs, v_scale, v_lin_tmp->data());
+        d_copy(ndofs, h, a_lin_tmp->data());
+        d_scal(ndofs, a_scale, a_lin_tmp->data());
+        
+        const real_t *v_lin = v_lin_tmp->data();
+        const real_t *a_lin = a_lin_tmp->data();
+        
         return cu_affine_sshex8_kelvin_voigt_newmark_apply(ssm.level(),
                                                            adjugate->n_elements(),
                                                            adjugate->elements()->data(),
@@ -1284,15 +1315,17 @@ namespace sfem {
                                                            k, K, eta, rho,
                                                            dt, gamma, beta,
                                                            real_type,
-                                                           3, h, &h[1], &h[2],
-                                                           v, &v[1], &v[2],
-                                                           a, &a[1], &a[2],
-                                                           3, out, &out[1], &out[2],
+                                                           3, &h[0], &h[1], &h[2],
+                                                           &v_lin[0], &v_lin[1], &v_lin[2],
+                                                           &a_lin[0], &a_lin[1], &a_lin[2],
+                                                           3, &out[0], &out[1], &out[2],
                                                            SFEM_DEFAULT_STREAM);
     }
 
     int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
         auto &ssm = space->semi_structured_mesh();
+        SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_diag[%d]", ssm.level());
+        
         return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
                                                           adjugate->n_elements(),
                                                           adjugate->elements()->data(),
@@ -1302,7 +1335,7 @@ namespace sfem {
                                                           k, K, eta, rho,
                                                           dt, gamma, beta,
                                                           real_type,
-                                                          3, values, &values[1], &values[2],
+                                                          3, &values[0], &values[1], &values[2],
                                                           SFEM_DEFAULT_STREAM);
     }
         
