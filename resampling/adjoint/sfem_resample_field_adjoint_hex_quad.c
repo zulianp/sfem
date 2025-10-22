@@ -245,6 +245,20 @@ transform_and_check_quadrature_point(                         //
     return result;
 }
 
+int                                                                                                       //
+transfer_weighted_field_tet4_to_hex(const real_t x0, const real_t x1, const real_t x2, const real_t x3,   //
+                                    const real_t y0, const real_t y1, const real_t y2, const real_t y3,   //
+                                    const real_t z0, const real_t z1, const real_t z2, const real_t z3,   //
+                                    const real_t w0, const real_t w1, const real_t w2, const real_t w3,   //
+                                    const real_t q_phys_x, const real_t q_phys_y, const real_t q_phys_z,  //
+                                    const real_t                QW_phys,                                  //
+                                    real_t* const SFEM_RESTRICT data) {                                   //
+
+    const real_t W_phys = 0;
+
+    return 0;
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // tet4_resample_field_local_refine_adjoint_hyteg ////////
