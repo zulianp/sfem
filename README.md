@@ -71,6 +71,7 @@ Install the `uenv` machinery (https://confluence.cscs.ch/display/KB/UENV+user+en
 ```bash
 uenv image pull prgenv-gnu/24.7:v3
 uenv start --view=default prgenv-gnu/24.7:v3
+# uenv start prgenv-gnu/25.6:v2 --view=modules # Aternatively load the desired modules yourself
 
 # In the sfem folder
 mkdir build && \

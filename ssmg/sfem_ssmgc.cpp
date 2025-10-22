@@ -310,7 +310,7 @@ namespace sfem {
             int SFEM_ENABLE_NL_OBSTACLE       = sfem::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
             int coarse_linear_smoothing_steps = sfem::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
             int linear_smoothing_steps        = sfem::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
-            ;
+        
             int    max_inner_it         = sfem::Env::read("SFEM_MAX_INNER_IT", 40);
             int    max_it               = sfem::Env::read("SFEM_MAX_IT", 15);
             int    nlsmooth_steps       = sfem::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
