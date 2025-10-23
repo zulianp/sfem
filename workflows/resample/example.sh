@@ -82,8 +82,8 @@ n_procs=1
 # n_procs=2
 # n_procs=8
 
-Nsight_PATH="/home/sriva/App/NVIDIA-Nsight-Compute-2024.3/"
-Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
+Nsight_PATH="/home/simone/App/ncu/"
+Nsight_OUTPUT="/home/simone/App/ncu_out/ncu_grid_to_mesh"
 
 # Nsight_OUTPUT="/capstor/scratch/cscs/sriva/ncu_out"
 
@@ -97,20 +97,20 @@ Nsight_OUTPUT="/home/sriva/App/NVidia_prof_out/ncu_grid_to_mesh"
 # LAUNCH=""
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus=$n_procs  -p debug -n $n_procs  ./mps-wrapper.sh "
 # LAUNCH="srun --cpu-bind=socket  --exclusive --gpus-per-task=1  -p debug -n $n_procs  ./mps-wrapper.sh "
-# LAUNCH="${Nsight_PATH}/ncu \
-#     --set roofline \
-#     --target-processes all \
-#     --print-details body \
-#     -f \
-#     --replay-mode application \
-#    	--app-replay-match all \
-#     --section ComputeWorkloadAnalysis \
-#     --section InstructionStats \
-#     --section SourceCounters \
-#     --section LaunchStats \
-#     --kernel-name-base demangled \
-#     -o ${Nsight_OUTPUT} \
-# 	mpiexec -np $n_procs "
+LAUNCH="${Nsight_PATH}/ncu \
+    --set roofline \
+    --target-processes all \
+    --print-details body \
+    -f \
+    --replay-mode application \
+   	--app-replay-match all \
+    --section ComputeWorkloadAnalysis \
+    --section InstructionStats \
+    --section SourceCounters \
+    --section LaunchStats \
+    --kernel-name-base demangled \
+    -o ${Nsight_OUTPUT} \
+	mpiexec -np $n_procs "
 
 GRID_TO_MESH="grid_to_mesh"
 #GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
