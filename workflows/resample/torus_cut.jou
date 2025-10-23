@@ -1,0 +1,12 @@
+reset
+create torus major radius 2 minor radius 1 
+create Prism height 4 sides 3 radius 1
+Volume 2  scale 2 
+subtract body 2  from body 1 
+
+volume 1 scheme tetmesh proximity layers off geometry approximation angle 15 geometric sizing on 
+volume 1 size auto factor 4
+mesh volume 1 
+
+# export mesh "/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/data/cubit/torus_cut/torus_cut.e"
+export mesh "/Users/patrickzulian/Desktop/code/merge_git_repos/sfem/data/cubit/torus_cut/torus_cut_fine.e"

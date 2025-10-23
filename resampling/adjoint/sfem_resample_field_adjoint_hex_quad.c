@@ -245,18 +245,77 @@ transform_and_check_quadrature_point(                         //
     return result;
 }
 
-int                                                                                                       //
-transfer_weighted_field_tet4_to_hex(const real_t x0, const real_t x1, const real_t x2, const real_t x3,   //
-                                    const real_t y0, const real_t y1, const real_t y2, const real_t y3,   //
-                                    const real_t z0, const real_t z1, const real_t z2, const real_t z3,   //
-                                    const real_t w0, const real_t w1, const real_t w2, const real_t w3,   //
-                                    const real_t q_phys_x, const real_t q_phys_y, const real_t q_phys_z,  //
-                                    const real_t                QW_phys,                                  //
-                                    real_t* const SFEM_RESTRICT data) {                                   //
+typedef struct ijk_index {
+    ptrdiff_t i;
+    ptrdiff_t j;
+    ptrdiff_t k;
+} ijk_index_t;
 
-    const real_t W_phys = 0;
+ijk_index_t  //                                                                                                          //
+transfer_weighted_field_tet4_to_hex(const real_t                wf0,                  //
+                                    const real_t                wf1,                  //
+                                    const real_t                wf2,                  //
+                                    const real_t                wf3,                  //
+                                    const real_t                q_phys_x,             //
+                                    const real_t                q_phys_y,             //
+                                    const real_t                q_phys_z,             //
+                                    const real_t                q_ref_x,              //
+                                    const real_t                q_ref_y,              //
+                                    const real_t                q_ref_z,              //
+                                    const real_t                QW_phys_hex,          //
+                                    const real_t                ox,                   //
+                                    const real_t                oy,                   //
+                                    const real_t                oz,                   //
+                                    const real_t                dx,                   //
+                                    const real_t                dy,                   //
+                                    const real_t                dz,                   //
+                                    real_t* const SFEM_RESTRICT hex_element_field) {  //
 
-    return 0;
+    // Compute the weighted contribution from the tetrahedron
+    // Using linear shape functions for tetrahedron
+
+    const real_t grid_x = (q_phys_x - ox) / dx;
+    const real_t grid_y = (q_phys_y - oy) / dy;
+    const real_t grid_z = (q_phys_z - oz) / dz;
+
+    const ptrdiff_t i = floor(grid_x);
+    const ptrdiff_t j = floor(grid_y);
+    const ptrdiff_t k = floor(grid_z);
+
+    const real_t l_x = (grid_x - (real_t)i);
+    const real_t l_y = (grid_y - (real_t)j);
+    const real_t l_z = (grid_z - (real_t)k);
+
+    const real_t f0 = 1.0 - q_ref_x - q_ref_y - q_ref_z;
+    const real_t f1 = q_ref_x;
+    const real_t f2 = q_ref_y;
+    const real_t f3 = q_ref_z;
+
+    const real_t wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
+
+    real_type hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
+    hex_aa_8_eval_fun_V(l_x,        // Local coordinates
+                        l_y,        //
+                        l_z,        //
+                        &hex8_f0,   // Output shape functions
+                        &hex8_f1,   //
+                        &hex8_f2,   //
+                        &hex8_f3,   //
+                        &hex8_f4,   //
+                        &hex8_f5,   //
+                        &hex8_f6,   //
+                        &hex8_f7);  //
+
+    hex_element_field[0] += wf_quad * hex8_f0 * QW_phys_hex;
+    hex_element_field[1] += wf_quad * hex8_f1 * QW_phys_hex;
+    hex_element_field[2] += wf_quad * hex8_f2 * QW_phys_hex;
+    hex_element_field[3] += wf_quad * hex8_f3 * QW_phys_hex;
+    hex_element_field[4] += wf_quad * hex8_f4 * QW_phys_hex;
+    hex_element_field[5] += wf_quad * hex8_f5 * QW_phys_hex;
+    hex_element_field[6] += wf_quad * hex8_f6 * QW_phys_hex;
+    hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
+
+    return (ijk_index_t){i, j, k};
 }
 
 //////////////////////////////////////////////////////////
@@ -279,6 +338,15 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                        real_t* const SFEM_RESTRICT          data) {                        //
 
     PRINT_CURRENT_FUNCTION;
+
+    const int off0 = 0;
+    const int off1 = stride[0];
+    const int off2 = stride[0] + stride[1];
+    const int off3 = stride[1];
+    const int off4 = stride[2];
+    const int off5 = stride[0] + stride[2];
+    const int off6 = stride[0] + stride[1] + stride[2];
+    const int off7 = stride[1] + stride[2];
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
@@ -344,12 +412,14 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
 
         sfem_quad_rule_3D(TET_QUAD_MIDPOINT_NQP, N_midpoint, Q_nodes_x, Q_nodes_y, Q_nodes_z, Q_weights);
 
+        real_t hex_element_field[8] = {0.0};
+
         for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x++) {
             for (int j_grid_y = min_grid_y; j_grid_y < max_grid_y; j_grid_y++) {
                 for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
-                    const int i = i_grid_x - min_grid_x;
-                    const int j = j_grid_y - min_grid_y;
-                    const int k = k_grid_z - min_grid_z;
+                    // const int i = i_grid_x - min_grid_x;
+                    // const int j = j_grid_y - min_grid_y;
+                    // const int k = k_grid_z - min_grid_z;
 
                     // Midpoint quadrature rule in 3D
 
@@ -367,7 +437,40 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                                      (real_t[4]){z0_n, z1_n, z2_n, z3_n});  //
 
                         if (result.is_inside) {
-                            // TODO: Transfer the contribution to the grid point
+                            for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
+
+                            ijk_index_t ijk_indices =                                        //
+                                    transfer_weighted_field_tet4_to_hex(wf0,                 //
+                                                                        wf1,                 //
+                                                                        wf2,                 //
+                                                                        wf3,                 //
+                                                                        result.x,            //
+                                                                        result.y,            //
+                                                                        result.z,            //
+                                                                        Q_nodes_x[q_ijk],    //
+                                                                        Q_nodes_y[q_ijk],    //
+                                                                        Q_nodes_z[q_ijk],    //
+                                                                        result.weight,       //
+                                                                        origin[0],           //
+                                                                        origin[1],           //
+                                                                        origin[2],           //
+                                                                        delta[0],            //
+                                                                        delta[1],            //
+                                                                        delta[2],            //
+                                                                        hex_element_field);  //
+
+                            const ptrdiff_t base_index = i_grid_x * stride[0] +  //
+                                                         j_grid_y * stride[1] +  //
+                                                         k_grid_z * stride[2];
+
+                            data[base_index + off0] += hex_element_field[0];  //
+                            data[base_index + off1] += hex_element_field[1];  //
+                            data[base_index + off2] += hex_element_field[2];  //
+                            data[base_index + off3] += hex_element_field[3];  //
+                            data[base_index + off4] += hex_element_field[4];  //
+                            data[base_index + off5] += hex_element_field[5];  //
+                            data[base_index + off6] += hex_element_field[6];  //
+                            data[base_index + off7] += hex_element_field[7];  //
                         }
                     }
                 }
