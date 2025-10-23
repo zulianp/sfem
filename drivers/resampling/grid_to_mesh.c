@@ -856,7 +856,7 @@ int main(int argc, char* argv[]) {
                                     nglobal);
 
                     ndarray_write(MPI_COMM_WORLD,
-                                  "/home/sriva/git/sfem/workflows/resample/test_field_t10.raw",
+                                  "/home/simone/git/sfem_d/sfem/workflows/resample/test_field_t10.raw",
                                   MPI_FLOAT,
                                   3,
                                   field,
@@ -1012,7 +1012,7 @@ int main(int argc, char* argv[]) {
                     if (env_out_filename && strlen(env_out_filename) > 0) {
                         snprintf(out_filename_raw, 1000, "%s", env_out_filename);
                     } else {
-                        snprintf(out_filename_raw, 1000, "/home/sriva/git/sfem/workflows/resample/test_field.raw", mpi_rank);
+                        snprintf(out_filename_raw, 1000, "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw", mpi_rank);
                     }
 
 #if SFEM_LOG_LEVEL >= 5
