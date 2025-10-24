@@ -36,11 +36,11 @@ inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool a
 
 #ifdef SFEM_ENABLE_NVTX
 
-#if CUDART_VERSION >= 13000
+#if CUDART_VERSION >= 12900
 #include "nvtx3/nvToolsExt.h"
-#else  // CUDART_VERSION < 13000
+#else  // CUDART_VERSION < 12900
 #include "nvToolsExt.h"
-#endif  // CUDART_VERSION >= 13000
+#endif  // CUDART_VERSION >= 12900
 
 namespace sfem {
     namespace details {
