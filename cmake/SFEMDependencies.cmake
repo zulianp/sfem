@@ -133,19 +133,33 @@ if(SFEM_ENABLE_CUDA)
 
     list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
 
-    set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
+    # Required CUDA modules
+    set(_SFEM_CUDA_REQUIRED_MODULES "CUDA::cusparse;CUDA::cublas")
+    # Optional CUDA modules (e.g., nvToolsExt deprecated in CUDA 10.0+, replaced by nvtx3)
+    set(_SFEM_CUDA_OPTIONAL_MODULES "CUDA::nvToolsExt")
+    
     set(SFEM_ENABLE_CUBLAS TRUE)
     set(SFEM_ENABLE_CUSPARSE TRUE)
 
     set(SFEM_CUDA_MATH_LIBS_FOUND FALSE)
 
-    foreach(CUDA_MODULE ${_SFEM_CUDA_MODULES})
+    # Add required modules
+    foreach(CUDA_MODULE ${_SFEM_CUDA_REQUIRED_MODULES})
         if(TARGET ${CUDA_MODULE})
             list(APPEND SFEM_DEP_LIBRARIES "${CUDA_MODULE}")
             set(SFEM_CUDA_MATH_LIBS_FOUND TRUE)
         else()
-            message(WARNING "[Warning] CUDAToolkit does not have module ${CUDA_MODULE} in a standard location!")
-            
+            message(WARNING "[Warning] CUDAToolkit does not have required module ${CUDA_MODULE} in a standard location!")
+        endif()
+    endforeach()
+
+    # Add optional modules (only warn if not found)
+    foreach(CUDA_MODULE ${_SFEM_CUDA_OPTIONAL_MODULES})
+        if(TARGET ${CUDA_MODULE})
+            list(APPEND SFEM_DEP_LIBRARIES "${CUDA_MODULE}")
+            message(STATUS "Found optional CUDA module: ${CUDA_MODULE}")
+        else()
+            message(STATUS "[Info] Optional CUDA module ${CUDA_MODULE} not found (this is OK for newer CUDA versions)")
         endif()
     endforeach()
 
