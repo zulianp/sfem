@@ -19,7 +19,13 @@ extern "C" {
 #include "sfem_cuda_base.h"
 
 #if 1
+
+#if CUDART_VERSION >= 12900
+#include "nvtx3/nvToolsExt.h"
+#else  // CUDART_VERSION < 12900
 #include "nvToolsExt.h"
+#endif  // CUDART_VERSION >= 12900
+
 #define SFEM_RANGE_PUSH(name_) \
     do {                       \
         nvtxRangePushA(name_); \
