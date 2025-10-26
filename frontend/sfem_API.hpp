@@ -779,6 +779,7 @@ namespace sfem {
         const int block_size = f->space()->block_size();
         int       prec       = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
+        // FIXME: there is a memory leak here!
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
