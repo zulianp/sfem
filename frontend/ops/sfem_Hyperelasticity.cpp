@@ -370,7 +370,7 @@ namespace sfem {
                     scalar_t F[9] = {0};
                     hex8_F(Jadj, Jdet, sample, sample, sample, ux, uy, uz, F);
                     scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
-                    hex8_S_ikmn_neohookean(Jadj, Jdet, sample, sample, sample, F, mu, lambda, 1, S_ikmn);
+                    hex8_S_ikmn_neohookean(Jadj, Jdet, sample, sample, sample, 1, F, mu, lambda, S_ikmn);
                     for (int k = 0; k < HEX8_S_IKMN_SIZE; ++k) S_out[k] = S_ikmn[k];
                 };
 

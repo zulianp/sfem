@@ -550,10 +550,10 @@ int sshex8_neohookean_ogden_hessian_partial_assembly(int                        
                                                            qx[kx],
                                                            qx[ky],
                                                            qx[kz],
+                                                           qw[kx] * qw[ky] * qw[kz],
                                                            F,
                                                            mu,
                                                            lambda,
-                                                           qw[kx] * qw[ky] * qw[kz],
                                                            partial_assembly_local);
 
                                     for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {

@@ -300,6 +300,10 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t    ev[8];
@@ -330,15 +334,36 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
             element_uz[v]       = uz[idx];
         }
 
+        scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
+#if 0
+
         static const scalar_t samplex = 0.5, sampley = 0.5, samplez = 0.5;
         hex8_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez, jacobian_adjugate, &jacobian_determinant);
 
         // Sample at the centroid
         scalar_t F[9] = {0};
         hex8_F(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, element_ux, element_uy, element_uz, F);
-        scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
-        hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, F, mu, lambda, 1, S_ikmn);
+        
+        hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez,1,F, mu, lambda,  S_ikmn);
 
+#else
+        for(int qz = 0; qz < n_qp; qz++) {
+            for(int ky = 0; ky < n_qp; ky++) {
+                for(int kx = 0; kx < n_qp; kx++) {
+                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[qz], jacobian_adjugate, &jacobian_determinant);
+                    assert(jacobian_determinant == jacobian_determinant);
+                    assert(jacobian_determinant != 0);
+
+                    scalar_t F[9] = {0};
+                    hex8_F(jacobian_adjugate, jacobian_determinant, qx[kx], qx[ky], qx[qz], element_ux, element_uy, element_uz, F);
+
+                    hex8_S_ikmn_neohookean_add(
+                        jacobian_adjugate, jacobian_determinant, 
+                        qx[kx], qx[ky], qx[qz], qw[kx] * qw[ky] * qw[qz], F, mu, lambda, S_ikmn);
+                }
+            }
+        }
+#endif
         metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
             assert(S_ikmn[k] == S_ikmn[k]);

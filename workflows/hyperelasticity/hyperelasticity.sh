@@ -27,11 +27,13 @@ then
 	cd aorta_geometry
 
 
-	cylinder.py aorta.vtk 2
+	cylinder.py aorta.vtk 1
 	db_to_raw.py aorta.vtk aorta --select_elem_type=tetra
-	sfc aorta aorta
+	surf_type=tri3
 	mesh_p1_to_p2 aorta aorta
 	surf_type=tri6
+
+	sfc aorta aorta
 	
 	skin aorta skin_aorta
 	# raw_to_db.py skin_aorta skin_aorta.vtk
@@ -51,16 +53,19 @@ fi
 export SFEM_ROTATE_SIDESET=aorta_geometry/outlet
 # export SFEM_ROTATE_ANGLE=6
 # export SFEM_ROTATE_STEPS=31
-export SFEM_ROTATE_ANGLE=5
-export SFEM_ROTATE_STEPS=60
+export SFEM_ROTATE_ANGLE=3.14
+export SFEM_ROTATE_STEPS=6
 # export SFEM_ROTATE_ANGLE=1.2
 # export SFEM_ROTATE_STEPS=10
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
 export SFEM_USE_PARTIAL_ASSEMBLY=1
-
+export SFEM_ELEMENTS_PER_PACK=2048 
+export SFEM_USE_PACKED_MESH=1
+export SFEM_USE_PRECONDITIONER=0
+export SFEM_ENABLE_LINE_SEARCH=0
 rm -rf output
 
 $LAUNCH hyperelasticy aorta_geometry/aorta dirichlet.yaml output
 # raw_to_db.py aorta_geometry/aorta output.vtk -p 'output/out/*.raw' $EXTRA_OPTIONS
 
-raw_to_db.py output/mesh output.xdmf -p "output/out/disp.0.*.raw,output/out/disp.1.*.raw,output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+raw_to_db.py output/mesh output.xdmf -p "output/out/disp.0.*.raw,output/out/disp.1.*.raw,output/out/disp.2.*.raw" --transient --n_time_steps=$(( SFEM_ROTATE_STEPS + 1 ))
