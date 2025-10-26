@@ -758,7 +758,7 @@ int tet4_neohookean_ogden_bsr(const ptrdiff_t                    nelements,
         scalar_t      element_ux[4];
         scalar_t      element_uy[4];
         scalar_t      element_uz[4];
-        accumulator_t element_matrix[(4 * 3) * (4 * 3)];
+        accumulator_t element_matrix[(4 * 3) * (4 * 3)] = {0};
 
 #pragma unroll(4)
         for (int v = 0; v < 4; ++v) {
@@ -795,7 +795,7 @@ int tet4_neohookean_ogden_bsr(const ptrdiff_t                    nelements,
         tet4_neohookean_hessian(
                 jacobian_adjugate, jacobian_determinant, lambda, mu, element_ux, element_uy, element_uz, element_matrix);
 
-        tet4_local_to_global_vec3(ev, element_matrix, rowptr, colidx, values);
+        tet4_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
     }
 
     return SFEM_SUCCESS;
