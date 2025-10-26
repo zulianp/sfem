@@ -155,6 +155,19 @@ int tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
                                                             real_t *const                           outy,
                                                             real_t *const                           outz);
 
+int tet4_neohookean_ogden_bsr(const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    stride,
+                              idx_t **const SFEM_RESTRICT        elements,
+                              geom_t **const SFEM_RESTRICT       points,
+                              const real_t                       mu,
+                              const real_t                       lambda,
+                              const ptrdiff_t                    u_stride,
+                              const real_t *const                ux,
+                              const real_t *const                uy,
+                              const real_t *const                uz,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              real_t *const SFEM_RESTRICT        values);
 // Opt version later
 
 // int tet4_neohookean_ogden_gradient_opt(const ptrdiff_t nelements,

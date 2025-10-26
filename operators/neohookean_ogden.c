@@ -533,6 +533,12 @@ int neohookean_ogden_bsr(const enum ElemType                element_type,
         case HEX8: {
             return hex8_neohookean_ogden_bsr(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, values);
         }
+        case TET4: {
+            return tet4_neohookean_ogden_bsr(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, values);
+        }
+        case TET10: {
+            return tet10_neohookean_ogden_bsr(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, values);
+        }
         default: {
             SFEM_ERROR("neohookean_ogden_bsr not implemented for type %s\n", type_to_string(element_type));
         }
