@@ -2,7 +2,10 @@
 
 ## MF plus Jacobi Preconditioner
 
+```bash
 SFEM_OPERATOR=NeoHookeanOgden SFEM_USE_PACKED_MESH=1 SFEM_USE_PRECONDITIONER=1 SFEM_ELEMENTS_PER_PACK=2048 ./hyperelasticity_hex8.sh 
+```
+
 Total linear iterations: 27421
 
 ```c++
@@ -39,7 +42,9 @@ solve_hyperelasticity,1,34.342,34.342
 
 ## MF NO Jacobi Preconditioner
 
+```bash
 SFEM_OPERATOR=NeoHookeanOgden SFEM_USE_PACKED_MESH=1 SFEM_USE_PRECONDITIONER=0 SFEM_ELEMENTS_PER_PACK=2048 SFEM_OP_TYPE=MF ./hyperelasticity_hex8.sh 
+```
 Total linear iterations: 33057
 
 ```c++
@@ -70,11 +75,13 @@ Sideset::read,3,0.002879,0.000959667
 solve_hyperelasticity,1,36.2269,36.2269
 ```
 
-Total linear iterations: 65231
+Total linear iterations: 65231	
 
 ## BSR plus Jacobi Preconditioner
 
+```bash
 SFEM_OPERATOR=NeoHookeanOgden SFEM_USE_PACKED_MESH=1 SFEM_USE_PRECONDITIONER=1 SFEM_ELEMENTS_PER_PACK=2048 SFEM_OP_TYPE=BSR ./hyperelasticity_hex8.sh
+```
 Total linear iterations: 22208
 
 ```c++
@@ -115,7 +122,9 @@ solve_hyperelasticity,1,29.222,29.222
 
 ## BSR NO Jacobi Preconditioner
 
+```bash
 SFEM_OPERATOR=NeoHookeanOgden SFEM_USE_PACKED_MESH=1 SFEM_USE_PRECONDITIONER=0 SFEM_ELEMENTS_PER_PACK=2048 SFEM_OP_TYPE=BSR ./hyperelasticity_hex8.sh
+```
 Total linear iterations: 24695
 
 
@@ -149,3 +158,12 @@ Output::write_time_step,82,0.137887,0.00168155
 Sideset::read,3,0.002938,0.000979333
 solve_hyperelasticity,1,27.2844,27.2844
 ```
+
+
+## MF vs BSR
+
+```bash
+SFEM_OPERATOR=NeoHookeanOgdenPacked SFEM_USE_PACKED_MESH=1 SFEM_USE_PRECONDITIONER=0 SFEM_ELEMENTS_PER_PACK=2048 SFEM_OP_TYPE=MF ./hyperelasticity_hex8.sh
+```
+ 
+24447 / 22934
