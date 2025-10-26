@@ -101,3 +101,9 @@ Cite SFEM if you use it for your work:
 	year = {2024}
 }
 ```
+
+# AI Generated docs
+
+https://deepwiki.com/zulianp/sfem
+
+

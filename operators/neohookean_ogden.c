@@ -511,3 +511,60 @@ int neohookean_ogden_objective_steps_aos(const enum ElemType               eleme
     }
     return SFEM_FAILURE;
 }
+
+
+int neohookean_ogden_bsr(const enum ElemType                element_type,
+                         const ptrdiff_t                    nelements,
+                         const ptrdiff_t                    stride,
+                         idx_t **const SFEM_RESTRICT        elems,
+                         geom_t **const SFEM_RESTRICT       xyz,
+                         const real_t                       mu,
+                         const real_t                       lambda,
+                         const ptrdiff_t                    u_stride,
+                         const real_t *const SFEM_RESTRICT  ux,
+                         const real_t *const SFEM_RESTRICT  uy,
+                         const real_t *const SFEM_RESTRICT  uz,
+                         const count_t *const SFEM_RESTRICT rowptr,
+                         const idx_t *const SFEM_RESTRICT   colidx,
+                         real_t *const SFEM_RESTRICT        values)
+{
+ 
+    switch (element_type) {
+        case HEX8: {
+            return hex8_neohookean_ogden_bsr(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, values);
+        }
+        default: {
+            SFEM_ERROR("neohookean_ogden_bsr not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+    return SFEM_FAILURE;
+}
+
+int neohookean_ogden_bcrs_sym(const enum ElemType                element_type,
+                              const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    stride,
+                              idx_t **const SFEM_RESTRICT        elems,
+                              geom_t **const SFEM_RESTRICT       xyz,
+                              const real_t                       mu,
+                              const real_t                       lambda,
+                              const ptrdiff_t                    u_stride,
+                              const real_t *const SFEM_RESTRICT  ux,
+                              const real_t *const SFEM_RESTRICT  uy,
+                              const real_t *const SFEM_RESTRICT  uz,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              const ptrdiff_t                    block_stride,
+                              real_t **const SFEM_RESTRICT       diag_values,
+                              real_t **const SFEM_RESTRICT       off_diag_values)
+{
+    
+    switch (element_type) {
+        case HEX8: {
+            return hex8_neohookean_ogden_bcrs_sym(nelements, stride, elems, xyz, mu, lambda, u_stride, ux, uy, uz, rowptr, colidx, block_stride, diag_values, off_diag_values);
+        }
+        default: {
+            SFEM_ERROR("neohookean_ogden_bcrs_sym not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+    return SFEM_FAILURE;
+}
