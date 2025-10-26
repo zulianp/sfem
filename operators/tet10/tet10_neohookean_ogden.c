@@ -352,6 +352,12 @@ int tet10_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t             
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
+    static const int       n_qp = TET_QUAD_NQP;
+    static const scalar_t *qx   = tet_qx;
+    static const scalar_t *qy   = tet_qy;
+    static const scalar_t *qz   = tet_qz;
+    static const scalar_t *qw   = tet_qw;
+
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t    ev[10];
@@ -382,15 +388,30 @@ int tet10_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t             
             element_uz[v]       = uz[idx];
         }
 
+    scalar_t S_ikmn[TET10_S_IKMN_SIZE] = {0};
+#if 0
         static const scalar_t samplex = 1. / 4, sampley = 1. / 4, samplez = 1. / 4;
-        tet10_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez, jacobian_adjugate, &jacobian_determinant);
+        tet10_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez,  jacobian_adjugate, &jacobian_determinant);
 
         // Sample at the centroid
         scalar_t F[9] = {0};
         tet10_F(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, element_ux, element_uy, element_uz, F);
-        scalar_t S_ikmn[TET10_S_IKMN_SIZE] = {0};
+        
         tet10_S_ikmn_neohookean_ogden(
-                jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, F, mu, lambda, 1, S_ikmn);
+                jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, 1, F, mu, lambda, S_ikmn);
+#else
+        for(int k = 0; k < n_qp; k++) {
+            tet10_adjugate_and_det(lx, ly, lz, qx[k], qy[k], qz[k], jacobian_adjugate, &jacobian_determinant);
+            assert(jacobian_determinant == jacobian_determinant);
+            assert(jacobian_determinant != 0);
+            scalar_t F[9] = {0};
+            tet10_F(jacobian_adjugate, jacobian_determinant, qx[k], qy[k], qz[k], element_ux, element_uy, element_uz, F);
+
+            tet10_S_ikmn_neohookean_ogden_add(
+                jacobian_adjugate, jacobian_determinant, 
+                qx[k], qy[k], qz[k], qw[k], F, mu, lambda, S_ikmn);
+        }
+#endif
 
         metric_tensor_t *const pai = &partial_assembly[i * TET10_S_IKMN_SIZE];
         for (int k = 0; k < TET10_S_IKMN_SIZE; k++) {
