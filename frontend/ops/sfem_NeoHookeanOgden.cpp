@@ -28,7 +28,6 @@
 
 namespace sfem {
 
-
     class NeoHookeanOgden::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -333,5 +332,60 @@ namespace sfem {
 
     void NeoHookeanOgden::set_mu(const real_t mu) { impl_->mu = mu; }
     void NeoHookeanOgden::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
+
+    int NeoHookeanOgden::hessian_bsr(const real_t *const  x,
+                                     const count_t *const rowptr,
+                                     const idx_t *const   colidx,
+                                     real_t *const        values) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_bsr");
+
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_bsr(domain.element_type,
+                                        domain.block->n_elements(),
+                                        1,
+                                        domain.block->elements()->data(),
+                                        mesh->points()->data(),
+                                        domain.parameters->get_real_value("mu", impl_->mu),
+                                        domain.parameters->get_real_value("lambda", impl_->lambda),
+                                        3,
+                                        &x[0],
+                                        &x[1],
+                                        &x[2],
+                                        rowptr,
+                                        colidx,
+                                        values);
+        });
+        return SFEM_SUCCESS;
+    }
+
+    int NeoHookeanOgden::hessian_bcrs_sym(const real_t *const  x,
+                                          const count_t *const rowptr,
+                                          const idx_t *const   colidx,
+                                          const ptrdiff_t      block_stride,
+                                          real_t **const       diag_values,
+                                          real_t **const       off_diag_values) {
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_bcrs_sym(domain.element_type,
+                                             domain.block->n_elements(),
+                                             1,
+                                             domain.block->elements()->data(),
+                                             mesh->points()->data(),
+                                             domain.parameters->get_real_value("mu", impl_->mu),
+                                             domain.parameters->get_real_value("lambda", impl_->lambda),
+                                             3,
+                                             &x[0],
+                                             &x[1],
+                                             &x[2],
+                                             rowptr,
+                                             colidx,
+                                             block_stride,
+                                             diag_values,
+                                             off_diag_values);
+        });
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_bcrs_sym");
+        return SFEM_SUCCESS;
+    }
 
 }  // namespace sfem

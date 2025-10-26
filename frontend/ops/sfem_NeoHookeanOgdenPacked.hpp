@@ -118,6 +118,18 @@ namespace sfem {
         void set_mu(const real_t mu);
         void set_lambda(const real_t lambda);
 
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        int hessian_bcrs_sym(const real_t *const  x,
+                             const count_t *const rowptr,
+                             const idx_t *const   colidx,
+                             const ptrdiff_t      block_stride,
+                             real_t **const       diag_values,
+                             real_t **const       off_diag_values) override;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;

@@ -101,7 +101,7 @@ void add_matrix_based_scalar_ops(enum ElemType                   element_type,
                                  std::vector<OpDesc_t>          &ops) {
     if (!semi_structured) {
         ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-        ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
+        // ops.push_back({.name = "Laplacian", .type = SPLITCRS, .block_size = 1});
         ops.push_back({.name = "Laplacian", .type = ALIGNEDCRS, .block_size = 1});
         ops.push_back({.name = "Laplacian", .type = SPLITDACRS, .block_size = 1});
         ops.push_back({.name = "Laplacian", .type = SELL, .block_size = 1});
@@ -121,6 +121,7 @@ void add_matrix_free_vector_ops(const int                       dim,
 
      if (!semi_structured && element_type == HEX8) {
         ops.push_back({.name = "NeoHookeanOgdenPacked", .type = MATRIX_FREE, .block_size = dim});
+        ops.push_back({.name = "NeoHookeanOgdenPacked", .type = BSR, .block_size = dim});
      }
 }
 

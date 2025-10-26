@@ -212,7 +212,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
 
-    auto linear_op = sfem::create_linear_operator("MF", f, displacement, es);
+    const std::string SFEM_OP_TYPE = sfem::Env::read_string("SFEM_OP_TYPE", "MF");
+    auto linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = SFEM_VERBOSE;
     cg->set_max_it(20000);
@@ -287,7 +288,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             out->write_time_step("disp", 0, sfem::to_host(displacement)->data());
         }
 
-        int last_iterations = 0;
+        int       last_iterations         = 0;
         ptrdiff_t total_linear_iterations = 0;
         for (int step = 1; step <= steps; step++) {
             if (rotate_conds) {
@@ -304,6 +305,11 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 printf("%-10d %-5d %-14.4e %-14.4e %-14.4f\n", i, last_iterations, gnorm, energy, -selected_alpha);
 
                 if (gnorm < SFEM_NL_TOL) break;
+
+                if (SFEM_OP_TYPE != "MF") {
+                    linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
+                    cg->set_op(linear_op);
+                }
 
                 blas->zeros(ndofs, increment->data());
                 f->copy_constrained_dofs(rhs->data(), increment->data());
