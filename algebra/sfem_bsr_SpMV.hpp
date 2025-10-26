@@ -23,7 +23,7 @@ namespace sfem {
                   T* const              y) {
         const int block_matrix_size = block_size * block_size;
         if (block_size == 3) {
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
             for (ptrdiff_t i = 0; i < block_rows; i++) {
                 const R     row_begin = rowptr[i];
                 const R     row_end   = rowptr[i + 1];
@@ -45,7 +45,7 @@ namespace sfem {
             }
 
         } else {
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
             for (ptrdiff_t i = 0; i < block_rows; i++) {
                 const R     row_begin = rowptr[i];
                 const R     row_end   = rowptr[i + 1];
