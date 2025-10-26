@@ -787,27 +787,27 @@ namespace sfem {
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
-            // TODO
             switch (prec) {
-                // case 2:
-                //     return compose_constraints_op(f,
-                //                                   sfem::d_bsr_spmv<count_t, idx_t, half_t, real_t>(d_crs_graph->n_nodes(),
-                //                                                                                    d_crs_graph->n_nodes(),
-                //                                                                                    block_size,
-                //                                                                                    d_crs_graph->rowptr(),
-                //                                                                                    d_crs_graph->colidx(),
-                //                                                                                    astype<half_t>(values),
-                //                                                                                    (real_t)1));
-                // case 4:
-                //     return compose_constraints_op(f,
-                //                                   sfem::d_bsr_spmv<count_t, idx_t, float, real_t>(d_crs_graph->n_nodes(),
-                //                                                                                   d_crs_graph->n_nodes(),
-                //                                                                                   block_size,
-                //                                                                                   d_crs_graph->rowptr(),
-                //                                                                                   d_crs_graph->colidx(),
-                //                                                                                   astype<float>(values),
-                //                                                                                   (real_t)1));
-            default:
+            // FIXME: mixed precision not yet supported for BSR
+            //     case 2:
+            //         return compose_constraints_op(f,
+            //                                       sfem::d_bsr_spmv<count_t, idx_t, half_t, real_t>(d_crs_graph->n_nodes(),
+            //                                                                                        d_crs_graph->n_nodes(),
+            //                                                                                        block_size,
+            //                                                                                        d_crs_graph->rowptr(),
+            //                                                                                        d_crs_graph->colidx(),
+            //                                                                                        astype<half_t>(values),
+            //                                                                                        (real_t)1));
+            //     case 4:
+            //         return compose_constraints_op(f,
+            //                                       sfem::d_bsr_spmv<count_t, idx_t, float, real_t>(d_crs_graph->n_nodes(),
+            //                                                                                       d_crs_graph->n_nodes(),
+            //                                                                                       block_size,
+            //                                                                                       d_crs_graph->rowptr(),
+            //                                                                                       d_crs_graph->colidx(),
+            //                                                                                       astype<float>(values),
+            //                                                                                       (real_t)1));
+            // default:
                 return compose_constraints_op(f,
                                               sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
                                                                d_crs_graph->n_nodes(),
