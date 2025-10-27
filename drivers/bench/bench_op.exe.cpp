@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
         add_matrix_free_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
 
         // Limited by memory
-        if (m->n_nodes() <= 1030301) {
+        if (m->n_nodes() <= sfem::Env::read("SFEM_MAX_NODES_BLOCK_MATRIX", 1030301)) {
             add_matrix_based_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
             printf("Skipping BSR ops for large meshes #nodes %ld #dim %d\n", (long)m->n_nodes(), dim);
