@@ -112,16 +112,21 @@ compute_tet_bounding_box(const real_t                         x0,          //
     const real_t dy = (real_t)delta[1];
     const real_t dz = (real_t)delta[2];
 
-    // Step 2: Convert to grid indices with respect to origin (0,0,0)
+    const real_t ox = (real_t)origin[0];
+    const real_t oy = (real_t)origin[1];
+    const real_t oz = (real_t)origin[2];
+
+    // Step 2: Convert to grid indices accounting for the origin
+    // Formula: grid_index = (physical_coord - origin) / delta
     // Using floor for minimum indices (with safety margin of -1)
-    *min_grid_x = floor(x_min / (dx)) - 1;
-    *min_grid_y = floor(y_min / (dy)) - 1;
-    *min_grid_z = floor(z_min / (dz)) - 1;
+    *min_grid_x = floor((x_min - ox) / dx) - 1;
+    *min_grid_y = floor((y_min - oy) / dy) - 1;
+    *min_grid_z = floor((z_min - oz) / dz) - 1;
 
     // Using ceil for maximum indices (with safety margin of +1)
-    *max_grid_x = ceil(x_max / (dx)) + 1;
-    *max_grid_y = ceil(y_max / (dy)) + 1;
-    *max_grid_z = ceil(z_max / (dz)) + 1;
+    *max_grid_x = ceil((x_max - ox) / dx) + 1;
+    *max_grid_y = ceil((y_max - oy) / dy) + 1;
+    *max_grid_z = ceil((z_max - oz) / dz) + 1;
 
     return 0;  // Success
 }
@@ -181,17 +186,17 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
                         qy[idx] = nodes[j];
                         qz[idx] = nodes[k];
                         idx++;
-                    }
-                }
-            }
+                    }  // END for k
+                }  // END for j
+            }  // END for i
 
             return N * N * N;  // Total number of quadrature points
-        }
+        }  // END case TET_QUAD_MIDPOINT_NQP
 
         default:
             return -1;  // Unknown rule
-    }
-}
+    }  // END switch
+}  // END sfem_quad_rule_3D
 
 typedef struct {
     real_t x, y, z;    // Physical coordinates
@@ -208,6 +213,9 @@ transform_and_check_quadrature_point(                         //
         const real_t* const SFEM_RESTRICT Q_weights,          //
         const geom_t* const SFEM_RESTRICT origin,             //
         const geom_t* const SFEM_RESTRICT delta,              //
+        const ptrdiff_t                   i_grid,             //
+        const ptrdiff_t                   j_grid,             //
+        const ptrdiff_t                   k_grid,             //
         const real_t                      tet_vertices_x[4],  //
         const real_t                      tet_vertices_y[4],  //
         const real_t                      tet_vertices_z[4]) {                     //
@@ -215,13 +223,20 @@ transform_and_check_quadrature_point(                         //
     quadrature_point_result_t result;
 
     // Transform to physical coordinates
-    result.x = Q_nodes_x[q_ijk] * delta[0] + origin[0];
-    result.y = Q_nodes_y[q_ijk] * delta[1] + origin[1];
-    result.z = Q_nodes_z[q_ijk] * delta[2] + origin[2];
+    // Q_nodes are in [0,1] reference space, need to map to the specific grid cell [i_grid, i_grid+1]
+
+    result.x = ((real_t)i_grid + Q_nodes_x[q_ijk]) * delta[0] + origin[0];
+    result.y = ((real_t)j_grid + Q_nodes_y[q_ijk]) * delta[1] + origin[1];
+    result.z = ((real_t)k_grid + Q_nodes_z[q_ijk]) * delta[2] + origin[2];
+
+    // printf("delta: %.2e %.2e %.2e, ", delta[0], delta[1], delta[2]);
+    // printf("origin: %.2e %.2e %.2e, ", origin[0], origin[1], origin[2]);
+    // printf(" phys coord: %.3e %.3e %.3e \n", result.x, result.y, result.z);
 
     // Compute physical weight
-    const real_t w = Q_weights[q_ijk];
-    result.weight  = w * w * w * delta[0] * delta[1] * delta[2];
+
+    // Q_weights[q_ijk] is already the product of 3 1D weights, so just scale by volume
+    result.weight = Q_weights[q_ijk] * delta[0] * delta[1] * delta[2];
 
     // Check containment
     check_point_in_tet(1,
@@ -243,7 +258,7 @@ transform_and_check_quadrature_point(                         //
                        &result.is_inside);
 
     return result;
-}
+}  // END transform_and_check_quadrature_point
 
 typedef struct ijk_index {
     ptrdiff_t i;
@@ -251,7 +266,10 @@ typedef struct ijk_index {
     ptrdiff_t k;
 } ijk_index_t;
 
-ijk_index_t  //                                                                                                          //
+/////////////////////////////////////////////////////////
+// transfer_weighted_field_tet4_to_hex //////////////////
+/////////////////////////////////////////////////////////
+ijk_index_t                                                                           //
 transfer_weighted_field_tet4_to_hex(const real_t                wf0,                  //
                                     const real_t                wf1,                  //
                                     const real_t                wf2,                  //
@@ -316,7 +334,7 @@ transfer_weighted_field_tet4_to_hex(const real_t                wf0,            
     hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
 
     return (ijk_index_t){i, j, k};
-}
+}  // END transfer_weighted_field_tet4_to_hex
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -339,6 +357,8 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
 
     PRINT_CURRENT_FUNCTION;
 
+    const real_t volume_hex = delta[0] * delta[1] * delta[2];
+
     const int off0 = 0;
     const int off1 = stride[0];
     const int off2 = stride[0] + stride[1];
@@ -353,7 +373,13 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
         idx_t ev[4];
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][element_i];
+        }  // END: for v
+
+#if SFEM_LOG_LEVEL >= 5
+        if (element_i % 100000 == 0) {
+            printf("*** Processing element %td / %td \n", element_i, end_element);
         }
+#endif
 
         // Read the coordinates of the vertices of the tetrahedron
         // In the physical space
@@ -424,7 +450,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                     // Midpoint quadrature rule in 3D
 
                     for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
-                        quadrature_point_result_t result =                                                  //
+                        quadrature_point_result_t Qpoint_phys =                                             //
                                 transform_and_check_quadrature_point(q_ijk,                                 //
                                                                      Q_nodes_x,                             //
                                                                      Q_nodes_y,                             //
@@ -432,25 +458,38 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                                      Q_weights,                             //
                                                                      origin,                                //
                                                                      delta,                                 //
+                                                                     i_grid_x,                              //
+                                                                     j_grid_y,                              //
+                                                                     k_grid_z,                              //
                                                                      (real_t[4]){x0_n, x1_n, x2_n, x3_n},   //
                                                                      (real_t[4]){y0_n, y1_n, y2_n, y3_n},   //
                                                                      (real_t[4]){z0_n, z1_n, z2_n, z3_n});  //
 
-                        if (result.is_inside) {
+                        if (Qpoint_phys.is_inside) {
                             for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
+
+                            // printf("Element %td, grid (%td,%td,%td), quad point %d is inside tet at phys (%.6f,%.6f,%.6f) \n",
+                            //        element_i,
+                            //        i_grid_x,
+                            //        j_grid_y,
+                            //        k_grid_z,
+                            //        q_ijk,
+                            //        result.x,
+                            //        result.y,
+                            //        result.z);
 
                             ijk_index_t ijk_indices =                                        //
                                     transfer_weighted_field_tet4_to_hex(wf0,                 //
                                                                         wf1,                 //
                                                                         wf2,                 //
                                                                         wf3,                 //
-                                                                        result.x,            //
-                                                                        result.y,            //
-                                                                        result.z,            //
+                                                                        Qpoint_phys.x,       //
+                                                                        Qpoint_phys.y,       //
+                                                                        Qpoint_phys.z,       //
                                                                         Q_nodes_x[q_ijk],    //
                                                                         Q_nodes_y[q_ijk],    //
                                                                         Q_nodes_z[q_ijk],    //
-                                                                        result.weight,       //
+                                                                        Qpoint_phys.weight,  //
                                                                         origin[0],           //
                                                                         origin[1],           //
                                                                         origin[2],           //
@@ -471,10 +510,22 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                             data[base_index + off5] += hex_element_field[5];  //
                             data[base_index + off6] += hex_element_field[6];  //
                             data[base_index + off7] += hex_element_field[7];  //
-                        }
-                    }
-                }
-            }
-        }
-    }
-}  // End of tet4_resample_field_local_refine_adjoint_hyteg
+
+                            // data[base_index + off0] = volume_hex;  //
+                            // data[base_index + off1] = volume_hex;  //
+                            // data[base_index + off2] = volume_hex;  //
+                            // data[base_index + off3] = volume_hex;  //
+                            // data[base_index + off4] = volume_hex;  //
+                            // data[base_index + off5] = volume_hex;  //
+                            // data[base_index + off6] = volume_hex;  //
+                            // data[base_index + off7] = volume_hex;  //
+
+                        }  // END: if is_inside
+                    }  // END: for q_ijk
+                }  // END: for k_grid_z
+            }  // END: for i_grid_y
+        }  // END: for j_grid_y
+    }  // END: for element_i
+
+    RETURN_FROM_FUNCTION(0);
+}  // END: Function: tet4_resample_field_adjoint_hex_quad_data

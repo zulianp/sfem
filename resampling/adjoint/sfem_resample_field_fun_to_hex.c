@@ -63,17 +63,40 @@ check_point_in_tet(const int           p_cnt,  //
                                                      z3));  //
 
     for (int p_i = 0; p_i < p_cnt; p_i++) {
+        // print tet vertices and the point coordinates
+        // printf("Checking point %d at (%.6e, %.6e, %.6e) against tet vertices: \n", p_i, px[p_i], py[p_i], pz[p_i]);
+        // printf("  Tet vertices X-coordinates: x0=%.6e, x1=%.6e, x2=%.6e, x3=%.6e \n", x0, x1, x2, x3);
+        // printf("  Tet vertices Y-coordinates: y0=%.6e, y1=%.6e, y2=%.6e, y3=%.6e \n", y0, y1, y2, y3);
+        // printf("  Tet vertices Z-coordinates: z0=%.6e, z1=%.6e, z2=%.6e, z3=%.  6e \n", z0, z1, z2, z3);
+
         const real_t vol0 = fabs(tet4_measure_v2(px[p_i], x1, x2, x3, py[p_i], y1, y2, y3, pz[p_i], z1, z2, z3));
         const real_t vol1 = fabs(tet4_measure_v2(x0, px[p_i], x2, x3, y0, py[p_i], y2, y3, z0, pz[p_i], z2, z3));
         const real_t vol2 = fabs(tet4_measure_v2(x0, x1, px[p_i], x3, y0, y1, py[p_i], y3, z0, z1, pz[p_i], z3));
         const real_t vol3 = fabs(tet4_measure_v2(x0, x1, x2, px[p_i], y0, y1, y2, py[p_i], z0, z1, z2, pz[p_i]));
 
-        const real_t vol_sum = vol0 + vol1 + vol2 + vol3;
+        const real_t vol_sum  = vol0 + vol1 + vol2 + vol3;
+        const real_t abs_diff = fabs(vol_sum - vol_tet_main);
 
-        if (fabs(vol_sum - vol_tet_main) > 1e-6 * vol_tet_main) {
+        // Use both relative and absolute tolerance for robustness
+        // Relative tolerance handles different mesh scales
+        // Absolute tolerance prevents false negatives for very small tetrahedra
+        const real_t rel_tolerance = 1e-2 * vol_tet_main;  // 1% relative error (more relaxed)
+        const real_t abs_tolerance = 1e-10;                // Absolute tolerance for tiny volumes
+        const real_t tolerance     = fmax(rel_tolerance, abs_tolerance);
+
+        // printf("Point (%d): abs_diff = %.12e, tolerance = %.12e, vol_sum = %.12e, vol_tet_main = %.12e \n",
+        //        p_i,
+        //        abs_diff,
+        //        tolerance,
+        //        vol_sum,
+        //        vol_tet_main);
+
+        if (abs_diff > tolerance) {
             is_in[p_i] = false;
+            // printf("  -> Point is OUTSIDE (abs_diff/vol_tet = %.6e)\n", abs_diff / vol_tet_main);
         } else {
             is_in[p_i] = true;
+            // printf("  -> Point is INSIDE (abs_diff/vol_tet = %.6e)\n", abs_diff / vol_tet_main);
         }
     }
 
@@ -647,13 +670,13 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
             degenerated_tetrahedra_cnt++;
             HYTEG_D_LOG("Element %ld: Degenerated tetrahedron detected! Det(J) = %g\n", element_i, det_J_phys);
             continue;  // Skip the degenerated tetrahedron
-        }
+        }  // END: if (det_J_phys < 1e-8)
 
         // Check if the tetrahedron is uniformly refined
         if (L == 2) {
             uniform_refine_cnt++;
             HYTEG_D_LOG("Element %ld: Uniformly refined tetrahedron detected! L = %d\n", element_i, L);
-        }
+        }  // END: if (L == 2)
 
     }  // END: for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++)
 
@@ -673,7 +696,7 @@ tet4_resample_field_apply_fun_to_hexa_d(const ptrdiff_t                      sta
         if (histo_L[l] > max_value) {
             max_value = histo_L[l];
         }
-    }
+    }  // END: for (int l = 1; l <= MAX_REF_L; l++)
 
     // Print the visual histogram with # symbols
     const int max_width = get_terminal_columns();  // Maximum number of # symbols per bar
