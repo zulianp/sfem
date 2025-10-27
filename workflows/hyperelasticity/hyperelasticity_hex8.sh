@@ -28,7 +28,8 @@ then
 	mkdir -p hex8_geometry
 	cd hex8_geometry
 
-	box_mesh.py box --cell_type=hex8 -x 120 -y 30 -z 30 --width=4
+	MESH_FACTOR=3
+	box_mesh.py box --cell_type=hex8 -x $((120 * MESH_FACTOR)) -y $((30 * MESH_FACTOR)) -z $((30 * MESH_FACTOR)) --width=4
 	surf_type=quad4
 	
 	skin box skin_box
@@ -60,7 +61,7 @@ export SFEM_ROTATE_RCENTER_Z=0.5
 
 rm -rf hex8_output
 export SFEM_NEOHOOKEAN_OGDEN_USE_AOS=1
-export SFEM_ELEMENTS_PER_PACK=2048 
+export SFEM_ELEMENTS_PER_PACK=4096 
 export SFEM_USE_PACKED_MESH=1
 export SFEM_USE_PRECONDITIONER=0
 export SFEM_ENABLE_LINE_SEARCH=0

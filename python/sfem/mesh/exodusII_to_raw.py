@@ -130,6 +130,7 @@ def exodusII_to_raw(input_mesh, output_folder):
     ss_to_nodelist = {}
     ss_to_nodelist["QUAD4"] = s2n_quad4()
     ss_to_nodelist["HEX8"] = s2n_hex8()
+    ss_to_nodelist["HEX"] = s2n_hex8()
     ss_to_nodelist["TET4"] = s2n_tet4()
     ss_to_nodelist["TETRA"] = s2n_tet4()
     ss_to_nodelist["tetra"] = s2n_tet4()
@@ -275,7 +276,8 @@ def exodusII_to_raw(input_mesh, output_folder):
                 idx[d].append(node)
 
         local_face_idx.tofile(f"{this_sideset_dir}/lfi.int16.raw")
-        parent.tofile(f"{this_sideset_dir}/parent.{str(element_idx_t.__name__)}.raw")
+        # parent.tofile(f"{this_sideset_dir}/parent.{str(element_idx_t.__name__)}.raw")
+        parent.tofile(f"{this_sideset_dir}/parent.raw")
 
         for d in range(0, nnodesxside):
             path = f"{this_sideset_dir}/{name}.{d}.raw"

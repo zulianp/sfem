@@ -46,7 +46,7 @@ int tet4_neohookean_ogden_objective(const ptrdiff_t                   nelements,
             ev[v] = elements[v][i * stride];
         }
 
-        for (int v = 0; v < 8; ++v) {
+        for (int v = 0; v < 4; ++v) {
             const ptrdiff_t idx = ev[v] * u_stride;
             edispx[v]           = ux[idx];
             edispy[v]           = uy[idx];
@@ -142,7 +142,7 @@ int tet4_neohookean_ogden_objective_steps(const ptrdiff_t                   nele
                 edispz[v]           = uz[idx];
             }
 
-            for (int v = 0; v < 8; ++v) {
+            for (int v = 0; v < 4; ++v) {
                 const ptrdiff_t idx = ev[v] * inc_stride;
                 eincx[v]            = incx[idx];
                 eincy[v]            = incy[idx];

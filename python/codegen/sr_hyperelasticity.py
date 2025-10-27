@@ -883,7 +883,7 @@ if __name__ == "__main__":
     # op.check_metric_tensor_symmetries()
 
     
-    op.emit_objective()
-    op.emit_gradient()
+    # op.emit_objective()
+    # op.emit_gradient()
     op.emit_hessian()
-    op.emit_hessian_diag()
+    # op.emit_hessian_diag()
