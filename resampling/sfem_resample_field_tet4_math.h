@@ -240,6 +240,20 @@ tet4_measure_v2(const real_type px0,   // X-coordinate 1st vertex
                 const real_type pz2,   //              3rd vertex
                 const real_type pz3);  //              4th vertex
 
+real_type                              ////
+tet4_measure_v3(const real_type px0,   // X-coordinate 1st vertex
+                const real_type px1,   //              2nd vertex
+                const real_type px2,   //              3rd vertex
+                const real_type px3,   //              4th vertex
+                const real_type py0,   // Y-coordinate 1st vertex
+                const real_type py1,   //              2nd vertex
+                const real_type py2,   //              3rd vertex
+                const real_type py3,   //              4th vertex
+                const real_type pz0,   // Z-coordinate 1st vertex
+                const real_type pz1,   //              2nd vertex
+                const real_type pz2,   //              3rd vertex
+                const real_type pz3);  //              4th vertex
+
 /**
  * @brief Check if a point lies inside a tetrahedron or on its boundary.
  *

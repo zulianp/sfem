@@ -177,6 +177,79 @@ tet4_measure_v2(const real_type px0,    // X-coordinate 1st vertex
 }
 
 /**
+ * @brief Compute the scaled volume measure of a tetrahedral element.
+ *
+ * This function computes the volume of a tetrahedron using the determinant of the
+ * 4x4 matrix defined by the tetrahedron's vertex coordinates augmented with a unit column.
+ * In particular, the volume is obtained by
+ *
+ *   V = (1/6) * det(M)
+ *
+ * where M is defined by:
+ *
+ *   M = [ px0, py0, pz0, 1 ]
+ *       [ px1, py1, pz1, 1 ]
+ *       [ px2, py2, pz2, 1 ]
+ *       [ px3, py3, pz3, 1 ]
+ *
+ * The function computes the volume using edge vectors:
+ *   e1 = p1 - p0
+ *   e2 = p2 - p0
+ *   e3 = p3 - p0
+ * Then V = (1/6) * dot(e1, cross(e2, e3))
+ *
+ * @param[in] px0 X-coordinate of vertex 0.
+ * @param[in] px1 X-coordinate of vertex 1.
+ * @param[in] px2 X-coordinate of vertex 2.
+ * @param[in] px3 X-coordinate of vertex 3.
+ * @param[in] py0 Y-coordinate of vertex 0.
+ * @param[in] py1 Y-coordinate of vertex 1.
+ * @param[in] py2 Y-coordinate of vertex 2.
+ * @param[in] py3 Y-coordinate of vertex 3.
+ * @param[in] pz0 Z-coordinate of vertex 0.
+ * @param[in] pz1 Z-coordinate of vertex 1.
+ * @param[in] pz2 Z-coordinate of vertex 2.
+ * @param[in] pz3 Z-coordinate of vertex 3.
+ *
+ * @return The volume measure of the tetrahedron (V = (1/6) * det(M)).
+ */
+real_type                               ////
+tet4_measure_v3(const real_type px0,    // X-coordinate 1st vertex
+                const real_type px1,    //              2nd vertex
+                const real_type px2,    //              3rd vertex
+                const real_type px3,    //              4th vertex
+                const real_type py0,    // Y-coordinate 1st vertex
+                const real_type py1,    //              2nd vertex
+                const real_type py2,    //              3rd vertex
+                const real_type py3,    //              4th vertex
+                const real_type pz0,    // Z-coordinate 1st vertex
+                const real_type pz1,    //              2nd vertex
+                const real_type pz2,    //              3rd vertex
+                const real_type pz3) {  //              4th vertex
+    ////
+    // Compute edge vectors from vertex 0
+    const real_type e1x = px1 - px0;
+    const real_type e1y = py1 - py0;
+    const real_type e1z = pz1 - pz0;
+
+    const real_type e2x = px2 - px0;
+    const real_type e2y = py2 - py0;
+    const real_type e2z = pz2 - pz0;
+
+    const real_type e3x = px3 - px0;
+    const real_type e3y = py3 - py0;
+    const real_type e3z = pz3 - pz0;
+
+    // Compute cross product e2 x e3
+    const real_type cx = e2y * e3z - e2z * e3y;
+    const real_type cy = e2z * e3x - e2x * e3z;
+    const real_type cz = e2x * e3y - e2y * e3x;
+
+    // Compute scalar triple product and scale by 1/6
+    return (e1x * cx + e1y * cy + e1z * cz) * (1.0 / 6.0);
+}  // END Function: tet4_measure_v2
+
+/**
  * @brief Compute the barycenter (centroid) of a tetrahedral element.
  *
  * This function calculates the coordinates of the barycenter of a tetrahedron by taking
@@ -443,24 +516,24 @@ tet4_resample_field_local_v2(const ptrdiff_t                      start_element,
             // Transform quadrature point to physical space
             // g_qx, g_qy, g_qz are the coordinates of the quadrature point in the physical space
             // of the tetrahedral element
-            tet4_transform_v2(x0,               // x-coordinates of the vertices
-                              x1,               //
-                              x2,               //
-                              x3,               //
-                              y0,               // y-coordinates of the vertices
-                              y1,               //
-                              y2,               //
-                              y3,               //
-                              z0,               // z-coordinates of the vertices
-                              z1,               //
-                              z2,               //
-                              z3,               //
+            tet4_transform_v2(x0,              // x-coordinates of the vertices
+                              x1,              //
+                              x2,              //
+                              x3,              //
+                              y0,              // y-coordinates of the vertices
+                              y1,              //
+                              y2,              //
+                              y3,              //
+                              z0,              // z-coordinates of the vertices
+                              z1,              //
+                              z2,              //
+                              z3,              //
                               tet_qx[quad_i],  // Quadrature point
                               tet_qy[quad_i],  //
                               tet_qz[quad_i],  //
-                              &g_qx,            // Output coordinates
-                              &g_qy,            //
-                              &g_qz);           //
+                              &g_qx,           // Output coordinates
+                              &g_qy,           //
+                              &g_qz);          //
 
 #ifndef SFEM_RESAMPLE_GAP_DUAL
             // Standard basis function

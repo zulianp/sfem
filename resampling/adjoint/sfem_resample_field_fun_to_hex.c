@@ -30,37 +30,38 @@
 /////////////////////////////////////////////////////////////////////////////
 // check_point_in_tet /////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
-void                                           //
-check_point_in_tet(const int           p_cnt,  //
-                   const real_t* const px,     //
-                   const real_t* const py,     //
-                   const real_t* const pz,     //
-                   const real_t        x0,     //
-                   const real_t        x1,     //
-                   const real_t        x2,     //
-                   const real_t        x3,     //
-                   const real_t        y0,     //
-                   const real_t        y1,     //
-                   const real_t        y2,     //
-                   const real_t        y3,     //
-                   const real_t        z0,     //
-                   const real_t        z1,     //
-                   const real_t        z2,     //
-                   const real_t        z3,     //
-                   bool*               is_in) {              //
+void                                                  //
+check_point_in_tet(const int           p_cnt,         //
+                   const real_t* const px,            //
+                   const real_t* const py,            //
+                   const real_t* const pz,            //
+                   const real_t        vol_tet_main,  //
+                   const real_t        x0,            //
+                   const real_t        x1,            //
+                   const real_t        x2,            //
+                   const real_t        x3,            //
+                   const real_t        y0,            //
+                   const real_t        y1,            //
+                   const real_t        y2,            //
+                   const real_t        y3,            //
+                   const real_t        z0,            //
+                   const real_t        z1,            //
+                   const real_t        z2,            //
+                   const real_t        z3,            //
+                   bool*               is_in) {                     //
     //
-    const real_t vol_tet_main = fabs(tet4_measure_v2(x0,    //
-                                                     x1,    //
-                                                     x2,    //
-                                                     x3,    //
-                                                     y0,    //
-                                                     y1,    //
-                                                     y2,    //
-                                                     y3,    //
-                                                     z0,    //
-                                                     z1,    //
-                                                     z2,    //
-                                                     z3));  //
+    // const real_t vol_tet_main = fabs(tet4_measure_v3(x0,    //
+    //                                                  x1,    //
+    //                                                  x2,    //
+    //                                                  x3,    //
+    //                                                  y0,    //
+    //                                                  y1,    //
+    //                                                  y2,    //
+    //                                                  y3,    //
+    //                                                  z0,    //
+    //                                                  z1,    //
+    //                                                  z2,    //
+    //                                                  z3));  //
 
     for (int p_i = 0; p_i < p_cnt; p_i++) {
         // print tet vertices and the point coordinates
@@ -69,10 +70,10 @@ check_point_in_tet(const int           p_cnt,  //
         // printf("  Tet vertices Y-coordinates: y0=%.6e, y1=%.6e, y2=%.6e, y3=%.6e \n", y0, y1, y2, y3);
         // printf("  Tet vertices Z-coordinates: z0=%.6e, z1=%.6e, z2=%.6e, z3=%.  6e \n", z0, z1, z2, z3);
 
-        const real_t vol0 = fabs(tet4_measure_v2(px[p_i], x1, x2, x3, py[p_i], y1, y2, y3, pz[p_i], z1, z2, z3));
-        const real_t vol1 = fabs(tet4_measure_v2(x0, px[p_i], x2, x3, y0, py[p_i], y2, y3, z0, pz[p_i], z2, z3));
-        const real_t vol2 = fabs(tet4_measure_v2(x0, x1, px[p_i], x3, y0, y1, py[p_i], y3, z0, z1, pz[p_i], z3));
-        const real_t vol3 = fabs(tet4_measure_v2(x0, x1, x2, px[p_i], y0, y1, y2, py[p_i], z0, z1, z2, pz[p_i]));
+        const real_t vol0 = fabs(tet4_measure_v3(px[p_i], x1, x2, x3, py[p_i], y1, y2, y3, pz[p_i], z1, z2, z3));
+        const real_t vol1 = fabs(tet4_measure_v3(x0, px[p_i], x2, x3, y0, py[p_i], y2, y3, z0, pz[p_i], z2, z3));
+        const real_t vol2 = fabs(tet4_measure_v3(x0, x1, px[p_i], x3, y0, y1, py[p_i], y3, z0, z1, pz[p_i], z3));
+        const real_t vol3 = fabs(tet4_measure_v3(x0, x1, x2, px[p_i], y0, y1, y2, py[p_i], z0, z1, z2, pz[p_i]));
 
         const real_t vol_sum  = vol0 + vol1 + vol2 + vol3;
         const real_t abs_diff = fabs(vol_sum - vol_tet_main);
@@ -80,7 +81,7 @@ check_point_in_tet(const int           p_cnt,  //
         // Use both relative and absolute tolerance for robustness
         // Relative tolerance handles different mesh scales
         // Absolute tolerance prevents false negatives for very small tetrahedra
-        const real_t rel_tolerance = 1e-2 * vol_tet_main;  // 1% relative error (more relaxed)
+        const real_t rel_tolerance = 1e-3 * vol_tet_main;  // 1% relative error (more relaxed)
         const real_t abs_tolerance = 1e-10;                // Absolute tolerance for tiny volumes
         const real_t tolerance     = fmax(rel_tolerance, abs_tolerance);
 
@@ -201,6 +202,7 @@ tet4_apply_fun_tetrahedron_local_adjoint_category(const unsigned int     categor
                            p_hex_x,           // X-coordinates of the points to check
                            p_hex_y,           // Y-coordinates of the points to check
                            p_hex_z,           // Z-coordinates of the points to check
+                           theta_volume,      // Volume of the main tetrahedron
                            xyz_tet_main[0],   // Tetrahedron vertices X-coordinates
                            xyz_tet_main[1],   //
                            xyz_tet_main[2],   //
