@@ -610,7 +610,7 @@ struct HyperelasticityPackedApply {
                         }
                     }
 
-                    const metric_tensor_t *const pai = &partial_assembly[e * HEX8_S_IKMN_SIZE];
+                    const metric_tensor_t *const SFEM_RESTRICT pai = &partial_assembly[e * HEX8_S_IKMN_SIZE];
                     scalar_t                     S_ikmn[HEX8_S_IKMN_SIZE];
                     for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
                         S_ikmn[k] = pai[k];
