@@ -892,7 +892,7 @@ int main(int argc, char* argv[]) {
                         mini_tet_parameters.alpha_min_threshold = 1.0;
                         mini_tet_parameters.alpha_max_threshold = 8.0;
                         mini_tet_parameters.min_refinement_L    = 1;
-                        mini_tet_parameters.max_refinement_L    = 22;
+                        mini_tet_parameters.max_refinement_L    = 5;
 
                         const char* max_refinement_L_str = getenv("MAX_REFINEMENT_L");
                         if (max_refinement_L_str) {

@@ -77,10 +77,29 @@ raw_to_db.py $mesh output.vtk --point_data=$field --point_data_type=float32
 
 ## Code Conventions
 - for if and while statements anfter the closing parenthesis always add a comment line with "END if (description)" or "END while (description)" or similar.
+example:
+```c
+if (condition) {
+    // code
+} // END if (condition)
+
 
 - For the functions always add a comment line at the end with "END Function: function_name" where function_name is the name of the function.
+example:
+```c
+void function_name(...) {
+    // code
+} // END Function: function_name
+```
 
 - The function returns the values by using  the macro RETURN_FROM_FUNCTION(ret_val), that prints debug info and returns the value.
+example:
+```c
+int function_name(...) {
+    // code
+    RETURN_FROM_FUNCTION(0);
+} // END Function: function_name
+```
 
 - The header of each function body must be in the following format:
 ```c
@@ -89,16 +108,29 @@ raw_to_db.py $mesh output.vtk --point_data=$field --point_data_type=float32
 // function_name
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-function_name
+int function_name(...) {
+    // code
+    RETURN_FROM_FUNCTION(0);
+} // END Function: function_name
 ```
 
+- The header of each function body must be in the following format:
+```c
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// function_name
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int function_name(...) {
+    // code
+    RETURN_FROM_FUNCTION(0);
+} // END Function: function_name
+```
 
-
-### Naming Patterns
-- **Functions**: `snake_case` with element prefix (`tet4_assemble_laplacian`)
-- **Files**: Match function names (`tet4_laplacian.c`)
-- **Environment vars**: `SFEM_` prefix for runtime configuration
-- **Drivers**: Imperative names (`assemble`, `refine`, `skin`)
+- The header of each function body must be in the following format:
+```c
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 
 ### Error Handling
 - Return 0 for success, non-zero for failure

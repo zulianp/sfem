@@ -71,6 +71,337 @@ generate_poly_bounding_box(const real_t* const SFEM_RESTRICT x,      //
     return 0;  // Success
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_inv_transform ////////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void                                                        //
+tet4_inv_transform(const real_type                px0,      // X-coordinate
+                   const real_type                px1,      //
+                   const real_type                px2,      //
+                   const real_type                px3,      //
+                   const real_type                py0,      // Y-coordinate
+                   const real_type                py1,      //
+                   const real_type                py2,      //
+                   const real_type                py3,      //
+                   const real_type                pz0,      // Z-coordinate
+                   const real_type                pz1,      //
+                   const real_type                pz2,      //
+                   const real_type                pz3,      //
+                   const real_type                pfx,      // Input point int the physical space
+                   const real_type                pfy,      //
+                   const real_type                pfz,      //
+                   real_type* const SFEM_RESTRICT out_x,    // Output point in the reference space
+                   real_type* const SFEM_RESTRICT out_y,    //
+                   real_type* const SFEM_RESTRICT out_z) {  //
+    //
+    //
+
+    /**
+     ****************************************************************************************
+    \begin{bmatrix}
+    out_x \\
+    out_y \\
+    out_z
+    \end{bmatrix}
+    =
+    J^{-1} \cdot
+    \begin{bmatrix}
+    pfx - px0 \\
+    pfy - py0 \\
+    pfz - pz0
+    \end{bmatrix}
+    *************************************************************************************************
+  */
+
+    // Compute the Jacobian matrix components
+    const real_type J11 = -px0 + px1;
+    const real_type J12 = -px0 + px2;
+    const real_type J13 = -px0 + px3;
+
+    const real_type J21 = -py0 + py1;
+    const real_type J22 = -py0 + py2;
+    const real_type J23 = -py0 + py3;
+
+    const real_type J31 = -pz0 + pz1;
+    const real_type J32 = -pz0 + pz2;
+    const real_type J33 = -pz0 + pz3;
+
+    // Compute the determinant of the Jacobian
+    const real_type det_J = J11 * (J22 * J33 - J23 * J32) - J12 * (J21 * J33 - J23 * J31) + J13 * (J21 * J32 - J22 * J31);
+
+    // Compute the inverse of the Jacobian matrix
+    const real_type inv_J11 = (J22 * J33 - J23 * J32) / det_J;
+    const real_type inv_J12 = (J13 * J32 - J12 * J33) / det_J;
+    const real_type inv_J13 = (J12 * J23 - J13 * J22) / det_J;
+
+    const real_type inv_J21 = (J23 * J31 - J21 * J33) / det_J;
+    const real_type inv_J22 = (J11 * J33 - J13 * J31) / det_J;
+    const real_type inv_J23 = (J13 * J21 - J11 * J23) / det_J;
+
+    const real_type inv_J31 = (J21 * J32 - J22 * J31) / det_J;
+    const real_type inv_J32 = (J12 * J31 - J11 * J32) / det_J;
+    const real_type inv_J33 = (J11 * J22 - J12 * J21) / det_J;
+
+    // Compute the difference between the physical point and the origin
+    const real_type dx = pfx - px0;
+    const real_type dy = pfy - py0;
+    const real_type dz = pfz - pz0;
+
+    // Apply the inverse transformation
+    *out_x = inv_J11 * dx + inv_J12 * dy + inv_J13 * dz;
+    *out_y = inv_J21 * dx + inv_J22 * dy + inv_J23 * dz;
+    *out_z = inv_J31 * dx + inv_J32 * dy + inv_J33 * dz;
+}  // END: sfem_resample_field_adjoint_hex_quad
+
+void tet4_face_normal(const real_type px0,  //
+                      const real_type py0,  //
+                      const real_type pz0,  //
+                      const real_type px1,  //
+                      const real_type py1,  //
+                      const real_type pz1,  //
+                      const real_type px2,  //
+                      const real_type py2,  //
+                      const real_type pz2,  //
+                      real_type*      nx,   //
+                      real_type*      ny,   //
+                      real_type*      nz) {      //
+
+    // Compute edge vectors
+    const real_type e1x = px1 - px0;
+    const real_type e1y = py1 - py0;
+    const real_type e1z = pz1 - pz0;
+
+    const real_type e2x = px2 - px0;
+    const real_type e2y = py2 - py0;
+    const real_type e2z = pz2 - pz0;
+
+    // Compute cross product e1 x e2
+    *nx = e1y * e2z - e1z * e2y;
+    *ny = e1z * e2x - e1x * e2z;
+    *nz = e1x * e2y - e1y * e2x;
+}  // END: sfem_resample_field_adjoint_hex_quad
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_faces_normals ////////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void                                           //
+tet4_faces_normals(const real_type px0,        //
+                   const real_type px1,        //
+                   const real_type px2,        //
+                   const real_type px3,        //
+                   const real_type py0,        //
+                   const real_type py1,        //
+                   const real_type py2,        //
+                   const real_type py3,        //
+                   const real_type pz0,        //
+                   const real_type pz1,        //
+                   const real_type pz2,        //
+                   const real_type pz3,        //
+                   real_type       normals[4][3]) {  //
+
+    // Compute tetrahedron centroid
+    const real_type cx = (px0 + px1 + px2 + px3) * 0.25;
+    const real_type cy = (py0 + py1 + py2 + py3) * 0.25;
+    const real_type cz = (pz0 + pz1 + pz2 + pz3) * 0.25;
+
+    // Face 0: vertices 1, 2, 3 (opposite to vertex 0)
+    tet4_face_normal(px1, py1, pz1, px2, py2, pz2, px3, py3, pz3, &normals[0][0], &normals[0][1], &normals[0][2]);
+
+    // Check orientation: vector from centroid to face center should align with normal
+    const real_type fc0_x = (px1 + px2 + px3) / 3.0 - cx;
+    const real_type fc0_y = (py1 + py2 + py3) / 3.0 - cy;
+    const real_type fc0_z = (pz1 + pz2 + pz3) / 3.0 - cz;
+    const real_type dot0  = normals[0][0] * fc0_x + normals[0][1] * fc0_y + normals[0][2] * fc0_z;
+    if (dot0 < 0.0) {
+        normals[0][0] = -normals[0][0];
+        normals[0][1] = -normals[0][1];
+        normals[0][2] = -normals[0][2];
+    }  // END if (dot0 < 0.0)
+
+    // Face 1: vertices 0, 3, 2 (opposite to vertex 1)
+    tet4_face_normal(px0, py0, pz0, px3, py3, pz3, px2, py2, pz2, &normals[1][0], &normals[1][1], &normals[1][2]);
+
+    const real_type fc1_x = (px0 + px3 + px2) / 3.0 - cx;
+    const real_type fc1_y = (py0 + py3 + py2) / 3.0 - cy;
+    const real_type fc1_z = (pz0 + pz3 + pz2) / 3.0 - cz;
+    const real_type dot1  = normals[1][0] * fc1_x + normals[1][1] * fc1_y + normals[1][2] * fc1_z;
+    if (dot1 < 0.0) {
+        normals[1][0] = -normals[1][0];
+        normals[1][1] = -normals[1][1];
+        normals[1][2] = -normals[1][2];
+    }  // END if (dot1 < 0.0)
+
+    // Face 2: vertices 0, 1, 3 (opposite to vertex 2)
+    tet4_face_normal(px0, py0, pz0, px1, py1, pz1, px3, py3, pz3, &normals[2][0], &normals[2][1], &normals[2][2]);
+
+    const real_type fc2_x = (px0 + px1 + px3) / 3.0 - cx;
+    const real_type fc2_y = (py0 + py1 + py3) / 3.0 - cy;
+    const real_type fc2_z = (pz0 + pz1 + pz3) / 3.0 - cz;
+    const real_type dot2  = normals[2][0] * fc2_x + normals[2][1] * fc2_y + normals[2][2] * fc2_z;
+    if (dot2 < 0.0) {
+        normals[2][0] = -normals[2][0];
+        normals[2][1] = -normals[2][1];
+        normals[2][2] = -normals[2][2];
+    }  // END if (dot2 < 0.0)
+
+    // Face 3: vertices 0, 2, 1 (opposite to vertex 3)
+    tet4_face_normal(px0, py0, pz0, px2, py2, pz2, px1, py1, pz1, &normals[3][0], &normals[3][1], &normals[3][2]);
+
+    const real_type fc3_x = (px0 + px2 + px1) / 3.0 - cx;
+    const real_type fc3_y = (py0 + py2 + py1) / 3.0 - cy;
+    const real_type fc3_z = (pz0 + pz2 + pz1) / 3.0 - cz;
+    const real_type dot3  = normals[3][0] * fc3_x + normals[3][1] * fc3_y + normals[3][2] * fc3_z;
+    if (dot3 < 0.0) {
+        normals[3][0] = -normals[3][0];
+        normals[3][1] = -normals[3][1];
+        normals[3][2] = -normals[3][2];
+    }  // END if (dot3 < 0.0)
+
+}  // END Function: tet4_faces_normals
+
+/////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+// is_point_in_tet_n ////////////////////////////////////
+/////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+void                                                       //
+is_point_in_tet_n(const int     N,                         //
+                  const real_t  tet4_faces_normals[4][3],  //
+                  const real_t  faces_centroids[4][3],     //
+                  const real_t* ptx,                       //
+                  const real_t* pty,                       //
+                  const real_t* ptz,                       //
+                  bool*         results) {                         //
+    for (int i = 0; i < N; i++) {
+        const real_t* pt = &ptx[i];
+
+        results[i] = true;
+        for (int f = 0; f < 4; f++) {
+            const real_t nx  = tet4_faces_normals[f][0];
+            const real_t ny  = tet4_faces_normals[f][1];
+            const real_t nz  = tet4_faces_normals[f][2];
+            const real_t cx  = faces_centroids[f][0];
+            const real_t cy  = faces_centroids[f][1];
+            const real_t cz  = faces_centroids[f][2];
+            const real_t vx  = cx - ptx[i];
+            const real_t vy  = cy - pty[i];
+            const real_t vz  = cz - ptz[i];
+            const real_t dot = nx * vx + ny * vy + nz * vz;
+            if (dot < 0.0) {
+                results[i] = false;
+            }  // END if (dot < 0.0)
+        }  // END for (int f = 0; f < 4; f++)
+    }  // END for (int i = 0; i < N; i++)
+}  // END Function: is_point_in_tet_n
+
+/////////////////////////////////////////////////////////
+// tet4_inv_Jacobian ////////////////////////////
+/////////////////////////////////////////////////////////
+void                                     //
+tet4_inv_Jacobian(const real_type px0,   //
+                  const real_type px1,   //
+                  const real_type px2,   //
+                  const real_type px3,   //
+                  const real_type py0,   //
+                  const real_type py1,   //
+                  const real_type py2,   //
+                  const real_type py3,   //
+                  const real_type pz0,   //
+                  const real_type pz1,   //
+                  const real_type pz2,   //
+                  const real_type pz3,   //
+                  real_type       J_inv[9]) {  //
+    //
+    //
+
+    /**
+     ****************************************************************************************
+    J^{-1} =
+    \begin{bmatrix}
+    inv_J11 & inv_J12 & inv_J13 \\
+    inv_J21 & inv_J22 & inv_J23 \\
+    inv_J31 & inv_J32 & inv_J33
+    \end{bmatrix}
+    *************************************************************************************************
+     */
+
+    // Compute the Jacobian matrix components
+    const real_type J11 = -px0 + px1;
+    const real_type J12 = -px0 + px2;
+    const real_type J13 = -px0 + px3;
+
+    const real_type J21 = -py0 + py1;
+    const real_type J22 = -py0 + py2;
+    const real_type J23 = -py0 + py3;
+
+    const real_type J31 = -pz0 + pz1;
+    const real_type J32 = -pz0 + pz2;
+    const real_type J33 = -pz0 + pz3;
+
+    // Compute the determinant of the Jacobian
+    const real_type det_J     = J11 * (J22 * J33 - J23 * J32) - J12 * (J21 * J33 - J23 * J31) + J13 * (J21 * J32 - J22 * J31);
+    const real_t    inv_det_J = 1.0 / det_J;
+
+    // Compute the inverse of the Jacobian matrix
+    J_inv[0] = (J22 * J33 - J23 * J32) * inv_det_J;
+    J_inv[1] = (J13 * J32 - J12 * J33) * inv_det_J;
+    J_inv[2] = (J12 * J23 - J13 * J22) * inv_det_J;
+    J_inv[3] = (J23 * J31 - J21 * J33) * inv_det_J;
+    J_inv[4] = (J11 * J33 - J13 * J31) * inv_det_J;
+    J_inv[5] = (J13 * J21 - J11 * J23) * inv_det_J;
+    J_inv[6] = (J21 * J32 - J22 * J31) * inv_det_J;
+    J_inv[7] = (J12 * J31 - J11 * J32) * inv_det_J;
+    J_inv[8] = (J11 * J22 - J12 * J21) * inv_det_J;
+}  // END: sfem_resample_field_adjoint_hex_quad
+
+/////////////////////////////////////////////////////////
+// tet4_inv_transform_J ////////////////////////////
+/////////////////////////////////////////////////////////
+void tet4_inv_transform_J(const real_t*               J_inv,    //
+                          const real_t                pfx,      //
+                          const real_t                pfy,      //
+                          const real_t                pfz,      //
+                          const real_t                px0,      //
+                          const real_t                py0,      //
+                          const real_t                pz0,      //
+                          real_t* const SFEM_RESTRICT out_x,    //
+                          real_t* const SFEM_RESTRICT out_y,    //
+                          real_t* const SFEM_RESTRICT out_z) {  //
+    //
+    //
+
+    /**
+     ****************************************************************************************
+    \begin{bmatrix}
+    out_x \\
+    out_y \\
+    out_z
+    \end{bmatrix}
+    =
+    J^{-1} \cdot
+    \begin{bmatrix}
+    pfx - px0 \\
+    pfy - py0 \\
+    pfz - pz0
+    \end{bmatrix}
+    *************************************************************************************************
+  */
+
+    // Compute the difference between the physical point and the origin
+    const real_t dx = pfx - px0;
+    const real_t dy = pfy - py0;
+    const real_t dz = pfz - pz0;
+
+    // Apply the inverse transformation
+    *out_x = J_inv[0] * dx + J_inv[1] * dy + J_inv[2] * dz;
+    *out_y = J_inv[3] * dx + J_inv[4] * dy + J_inv[5] * dz;
+    *out_z = J_inv[6] * dx + J_inv[7] * dy + J_inv[8] * dz;
+}  // END: sfem_resample_field_adjoint_hex_quad
+
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 // compute_tet_bounding_box ////////////////////////////
@@ -207,6 +538,7 @@ typedef struct {
 static inline quadrature_point_result_t                       //
 transform_and_check_quadrature_point(                         //
         const int                         q_ijk,              //
+        const real_t                      volume_main_tet,    //
         const real_t* const SFEM_RESTRICT Q_nodes_x,          //
         const real_t* const SFEM_RESTRICT Q_nodes_y,          //
         const real_t* const SFEM_RESTRICT Q_nodes_z,          //
@@ -243,6 +575,7 @@ transform_and_check_quadrature_point(                         //
                        &result.x,
                        &result.y,
                        &result.z,
+                       volume_main_tet,
                        tet_vertices_x[0],
                        tet_vertices_x[1],
                        tet_vertices_x[2],
@@ -260,11 +593,14 @@ transform_and_check_quadrature_point(                         //
     return result;
 }  // END transform_and_check_quadrature_point
 
+//////////////////////////////////////////////////////////
+// ijk_index_t ////////////////////////////
+//////////////////////////////////////////////////////////
 typedef struct ijk_index {
     ptrdiff_t i;
     ptrdiff_t j;
     ptrdiff_t k;
-} ijk_index_t;
+} ijk_index_t;  // END ijk_index_t
 
 /////////////////////////////////////////////////////////
 // transfer_weighted_field_tet4_to_hex //////////////////
@@ -370,7 +706,10 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // loop over the 4 vertices of the tetrahedron
-        idx_t ev[4];
+
+        idx_t  ev[4];
+        real_t inv_J_tet[9];
+
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][element_i];
         }  // END: for v
@@ -406,6 +745,33 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
         ptrdiff_t min_grid_x, max_grid_x;
         ptrdiff_t min_grid_y, max_grid_y;
         ptrdiff_t min_grid_z, max_grid_z;
+
+        const real_t vol_tet_main = fabs(tet4_measure_v3(x0_n,    //
+                                                         x1_n,    //
+                                                         x2_n,    //
+                                                         x3_n,    //
+                                                         y0_n,    //
+                                                         y1_n,    //
+                                                         y2_n,    //
+                                                         y3_n,    //
+                                                         z0_n,    //
+                                                         z1_n,    //
+                                                         z2_n,    //
+                                                         z3_n));  //
+
+        tet4_inv_Jacobian(x0_n,        //
+                          x1_n,        //
+                          x2_n,        //
+                          x3_n,        //
+                          y0_n,        //
+                          y1_n,        //
+                          y2_n,        //
+                          y3_n,        //
+                          z0_n,        //
+                          z1_n,        //
+                          z2_n,        //
+                          z3_n,        //
+                          inv_J_tet);  //
 
         compute_tet_bounding_box(x0_n,          //
                                  x1_n,          //
@@ -452,6 +818,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                     for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
                         quadrature_point_result_t Qpoint_phys =                                             //
                                 transform_and_check_quadrature_point(q_ijk,                                 //
+                                                                     vol_tet_main,                          //
                                                                      Q_nodes_x,                             //
                                                                      Q_nodes_y,                             //
                                                                      Q_nodes_z,                             //
@@ -478,6 +845,19 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                             //        result.y,
                             //        result.z);
 
+                            real_t Q_ref_x, Q_ref_y, Q_ref_z;
+
+                            tet4_inv_transform_J(inv_J_tet,      // Inverse Jacobian matrix
+                                                 Qpoint_phys.x,  // Physical coordinates of the quadrature point
+                                                 Qpoint_phys.y,  //
+                                                 Qpoint_phys.z,  //
+                                                 x0_n,           //
+                                                 y0_n,           //
+                                                 z0_n,           //
+                                                 &Q_ref_x,       // Reference coordinates of the quadrature point
+                                                 &Q_ref_y,       //
+                                                 &Q_ref_z);      //
+
                             ijk_index_t ijk_indices =                                        //
                                     transfer_weighted_field_tet4_to_hex(wf0,                 //
                                                                         wf1,                 //
@@ -486,9 +866,9 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                                         Qpoint_phys.x,       //
                                                                         Qpoint_phys.y,       //
                                                                         Qpoint_phys.z,       //
-                                                                        Q_nodes_x[q_ijk],    //
-                                                                        Q_nodes_y[q_ijk],    //
-                                                                        Q_nodes_z[q_ijk],    //
+                                                                        Q_ref_x,             //
+                                                                        Q_ref_y,             //
+                                                                        Q_ref_z,             //
                                                                         Qpoint_phys.weight,  //
                                                                         origin[0],           //
                                                                         origin[1],           //

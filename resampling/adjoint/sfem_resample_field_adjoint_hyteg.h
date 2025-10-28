@@ -32,24 +32,25 @@ make_Jacobian_matrix_tet(const real_t fx0,  // Tetrahedron vertices X-coordinate
                          const real_t fz3,  //
                          real_t       J[9]);      // Jacobian matrix
 
-void                                           //
-check_point_in_tet(const int           p_cnt,  //
-                   const real_t* const px,     //
-                   const real_t* const py,     //
-                   const real_t* const pz,     //
-                   const real_t        x0,     //
-                   const real_t        x1,     //
-                   const real_t        x2,     //
-                   const real_t        x3,     //
-                   const real_t        y0,     //
-                   const real_t        y1,     //
-                   const real_t        y2,     //
-                   const real_t        y3,     //
-                   const real_t        z0,     //
-                   const real_t        z1,     //
-                   const real_t        z2,     //
-                   const real_t        z3,     //
-                   bool*               is_in);               //
+void                                                  //
+check_point_in_tet(const int           p_cnt,         //
+                   const real_t* const px,            //
+                   const real_t* const py,            //
+                   const real_t* const pz,            //
+                   const real_t        vol_tet_main,  //
+                   const real_t        x0,            //
+                   const real_t        x1,            //
+                   const real_t        x2,            //
+                   const real_t        x3,            //
+                   const real_t        y0,            //
+                   const real_t        y1,            //
+                   const real_t        y2,            //
+                   const real_t        y3,            //
+                   const real_t        z0,            //
+                   const real_t        z1,            //
+                   const real_t        z2,            //
+                   const real_t        z3,            //
+                   bool*               is_in);                      //
 
 int get_terminal_columns();
 
