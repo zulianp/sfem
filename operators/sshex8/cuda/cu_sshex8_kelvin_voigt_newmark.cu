@@ -313,7 +313,7 @@ int cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_tpl(const ptrdiff_t        
 #ifndef HEX8_SEGMENTED_TENSOR_LOOP
 #define SEGEMENTED_QUADRATURE_LOOP(fun)  \
     do                                   \
-        for (int k = 0; k < n_qp; k++) { \
+        for (int ki = 0; ki < n_qp; ki++) { \
             fun<T, T>(k,                 \
                       K,                 \
                       eta,               \
@@ -323,10 +323,10 @@ int cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_tpl(const ptrdiff_t        
                       beta,              \
                       sub_adjugate,      \
                       sub_determinant,   \
-                      qx[k],             \
+                      qx[ki],             \
                       qy[k],             \
-                      qz[k],             \
-                      qw[k],             \
+                      qz[ki],             \
+                      qw[ki],             \
                       elemental_matrix); \
         }                                \
     while (0)
@@ -727,6 +727,7 @@ static int cu_affine_sshex8_kelvin_voigt_newmark_apply_tpl(const int            
                                         (real_t *)outz,
                                         stream);
         }
+
         case 8: {
             return my_kernel_large<real_t, 8>(nelements,
                                               elements,
