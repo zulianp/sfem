@@ -15,6 +15,9 @@ namespace sfem {
 
     template<typename T>
     class Buffer;
+
+    template <typename pack_idx_t>
+    class Packed;
 }
 
 #endif //SFEM_FORWARD_DECLARATIONS_HPP

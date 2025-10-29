@@ -1,6 +1,7 @@
 #include "sshex8_neohookean_ogden.h"
 
 #include "sfem_defs.h"
+#include "sfem_unroll.h"
 
 #include "hex8_inline_cpu.h"
 #include "hex8_linear_elasticity_inline_cpu.h"
@@ -194,7 +195,6 @@ int sshex8_neohookean_ogden_objective_steps(int                               le
         free(x);
         free(y);
         free(z);
-
     }
 
     for (int s = 0; s < nsteps; s++) {
@@ -349,10 +349,10 @@ int sshex8_neohookean_ogden_gradient(int                               level,
                                     assert(jacobian_determinant == jacobian_determinant);
                                     assert(jacobian_determinant != 0);
 
-                                    hex8_neohookean_grad(sub_adjugate,
-                                                         sub_determinant,
-                                                         qx[kx],
-                                                         qx[ky],
+                                    hex8_neohookean_ogden_grad(sub_adjugate,
+                                                               sub_determinant,
+                                                               qx[kx],
+                                                               qx[ky],
                                                          qx[kz],
                                                          qw[kx] * qw[ky] * qw[kz],
                                                          mu,
@@ -550,10 +550,10 @@ int sshex8_neohookean_ogden_hessian_partial_assembly(int                        
                                                            qx[kx],
                                                            qx[ky],
                                                            qx[kz],
+                                                           qw[kx] * qw[ky] * qw[kz],
                                                            F,
                                                            mu,
                                                            lambda,
-                                                           qw[kx] * qw[ky] * qw[kz],
                                                            partial_assembly_local);
 
                                     for (int d = 0; d < HEX8_S_IKMN_SIZE; d++) {
@@ -681,8 +681,9 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
                         }
 
                         for (int i = 0; i < 3 * 8; i++) {
-                            const scalar_t *const col = &element_matrix[i * 3 * 8];
+                            const scalar_t *const SFEM_RESTRICT col = &element_matrix[i * 3 * 8];
                             const scalar_t        ui  = element_h[i];
+#pragma omp simd
                             for (int j = 0; j < 3 * 8; j++) {
                                 eout[j] += ui * col[j];
                             }

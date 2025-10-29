@@ -21,9 +21,9 @@
 
 #include "sfem_ssmgc.hpp"
 
-#define SFEM_ENABLE_TOP_BC 0
+#define SFEM_ENABLE_TOP_BC 1
 
-static const real_t disp_y = -0.1;
+static const real_t disp_y = -0.05;
 
 static const geom_t y_top            = 0.05;
 static const int    resolution_ratio = 20;
