@@ -166,10 +166,7 @@ class SRHyperelasticity:
         invariants = [I1b, I2b, J]
         symbol_names = list(self.fun.free_symbols)
         all_symbols = []
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
         for s in symbol_names + invariants:
             if str(s) not in [str(sym) for sym in all_symbols]:
                 all_symbols.append(s)
@@ -186,8 +183,6 @@ class SRHyperelasticity:
             I2b: det_F**sp.Rational(-4, 3) * I2, 
             J: det_F})
 
-<<<<<<< HEAD
-=======
         reserved_syms = [I1b, I2b, J]
         params = []
         for s in symbol_names:
@@ -197,7 +192,6 @@ class SRHyperelasticity:
 
         self.params = params
 
->>>>>>> origin/main
     def __init_fun(self, fun):
         self.__init_symbols(fun)
 
@@ -224,8 +218,6 @@ class SRHyperelasticity:
             I2: sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2)), 
             J: sp.det(F)})
 
-<<<<<<< HEAD
-=======
         reserved_syms = [I1, I2, J]
         params = []
         for s in symbol_names:
@@ -233,7 +225,6 @@ class SRHyperelasticity:
                 params.append(s)
         self.params = params
 
->>>>>>> origin/main
     def __init_symbols(self, fun):
         dims = self.fe.manifold_dim()
         self.fun = simplify(fun)
@@ -292,12 +283,9 @@ class SRHyperelasticity:
         return Jinv
 
     def __compute_disp_grad(self):
-<<<<<<< HEAD
-=======
         if "disp_grad" in self.expression_table:
             return self.expression_table["disp_grad"]
 
->>>>>>> origin/main
         dims = self.fe.manifold_dim()
         disp_grad = self.__create_zero_matrix()
         ref_grad = self.fe.tgrad(self.fe.quadrature_point())
@@ -311,12 +299,9 @@ class SRHyperelasticity:
         return disp_grad
 
     def __compute_inc_grad(self):
-<<<<<<< HEAD
-=======
         if "inc_grad" in self.expression_table:
             return self.expression_table["inc_grad"]
 
->>>>>>> origin/main
         dims = self.fe.manifold_dim()
         inc_grad = self.__create_zero_matrix()
         ref_grad = self.fe.tgrad(self.fe.quadrature_point())
@@ -329,12 +314,9 @@ class SRHyperelasticity:
         
 
     def __compute_F(self):
-<<<<<<< HEAD
-=======
         if "F" in self.expression_table:
             return self.expression_table["F"]
 
->>>>>>> origin/main
         dims = self.fe.manifold_dim()
         disp_grad = self.expression_table["disp_grad"]
         F = disp_grad + sp.eye(dims, dims)
@@ -342,12 +324,9 @@ class SRHyperelasticity:
         return F
 
     def __compute_piola_stress(self):
-<<<<<<< HEAD
-=======
         if "P" in self.expression_table:
             return self.expression_table["P"]
 
->>>>>>> origin/main
         F = self.F_symb
         P = self.__create_zero_matrix()
         for i in range(0, P.shape[0]):
@@ -358,15 +337,12 @@ class SRHyperelasticity:
         return P
 
     def __compute_linearized_stress(self):
-<<<<<<< HEAD
-=======
         # TODO: This tensor has symmetries and it can be compressed
         # S_lin_symb, S_lin_names, S_lin_vals = compress_tensor4("S_lin", S_lin)
         if "S_lin" in self.expression_table:
             return self.expression_table["S_lin"]
 
 
->>>>>>> origin/main
         P = self.expression_table["P"]
         F = self.F_symb
         dim = self.fe.spatial_dim()
@@ -381,14 +357,9 @@ class SRHyperelasticity:
         return S_lin
         
     def __compute_metric_tensor(self):
-<<<<<<< HEAD
-        # P = self.__compute_piola_stress()
-        # F = self.F_symb
-=======
         if "S_ikmn" in self.expression_table:
             return self.expression_table["S_ikmn"]
 
->>>>>>> origin/main
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         dim = self.fe.spatial_dim()     
         S_lin = self.S_lin_symb
@@ -416,12 +387,9 @@ class SRHyperelasticity:
         return S_ikmn  
 
     def __compute_SdotH_km(self):
-<<<<<<< HEAD
-=======
         if "SdotH_km" in self.expression_table:
             return self.expression_table["SdotH_km"] 
 
->>>>>>> origin/main
         S_ikmn = self.S_ikmn_symb
         inc_grad = self.inc_grad_symb
         dim = self.fe.spatial_dim()
@@ -436,12 +404,9 @@ class SRHyperelasticity:
         return SdotH_km
 
     def __compute_metric_tensor_canonical(self):
-<<<<<<< HEAD
-=======
         if "S_ikmn_canonical" in self.expression_table:
             return self.expression_table["S_ikmn_canonical"]
 
->>>>>>> origin/main
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         dim = self.fe.spatial_dim()     
         S_lin = self.expression_table["S_lin"]
@@ -469,19 +434,12 @@ class SRHyperelasticity:
         dim = self.fe.spatial_dim()
         S_ikmn_canonical, canon_list = canon.pack_tensor(S_ikmn, dim)
         self.expression_table["S_ikmn_canonical"] = S_ikmn_canonical
-<<<<<<< HEAD
-        print("S_ikmn_canonical assembled!")
-        return S_ikmn_canonical
-
-    def __compute_SdotH_km_canonical(self):
-=======
         return S_ikmn_canonical
 
     def __compute_SdotH_km_canonical(self):
         if "SdotH_km_canonical" in self.expression_table:
             return self.expression_table["SdotH_km_canonical"]
 
->>>>>>> origin/main
         S_ikmn_canonical = self.S_ikmn_canonical_symb
         dim = self.fe.spatial_dim()
         inc_grad = self.inc_grad_symb
@@ -497,12 +455,9 @@ class SRHyperelasticity:
         return SdotH_km_canonical
 
     def __compute_apply(self):
-<<<<<<< HEAD
-=======
         if "eoutx" in self.expression_table:
             return
 
->>>>>>> origin/main
         SdotH_km = self.__create_matrix_symbol("SdotH_km")
         nnodes = self.fe.n_nodes()
         eoutx = sp.Matrix(nnodes, 1, [0] * nnodes)
@@ -538,12 +493,9 @@ class SRHyperelasticity:
         return SdotH_km_canonical
 
     def __compute_constant_grad_tp(self):
-<<<<<<< HEAD
-=======
         if "Wimpn" in self.expression_table:
             return self.expression_table["Wimpn"]
 
->>>>>>> origin/main
         dims = self.fe.spatial_dim()
         nfun = self.fe.n_nodes()
         g = self.fe.grad(self.fe.quadrature_point())
@@ -562,12 +514,9 @@ class SRHyperelasticity:
         return Wimpn
 
     def __compute_loperand(self):
-<<<<<<< HEAD
-=======
         if "loperand" in self.expression_table:
             return self.expression_table["loperand"] 
 
->>>>>>> origin/main
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         P = self.expression_table["P"]
         dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
@@ -576,8 +525,6 @@ class SRHyperelasticity:
         self.expression_table["loperand"] = loperand
         return loperand
 
-<<<<<<< HEAD
-=======
     def __params_to_args(self):
         params = self.params
         lines = []
@@ -586,7 +533,6 @@ class SRHyperelasticity:
             lines.append(f'    const {real_t}                      {str(p)},\n')
 
         return "".join(lines)
->>>>>>> origin/main
 
     def emit_objective(self):
         self.__compute_dV()
@@ -601,26 +547,15 @@ class SRHyperelasticity:
         fe = self.fe
         dim = fe.spatial_dim()
 
-<<<<<<< HEAD
-        # FIXME: mu and lmbda in the signature are hardcoded
-        sig_objective = (
-            f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_objective(\n'
-=======
         sig_objective = (
             f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_objective(\n'
->>>>>>> origin/main
             f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
             f'    const {real_t}                      jacobian_determinant,\n'
             f'    const {real_t}                      qx,\n'
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-<<<<<<< HEAD
-            f'    const {real_t}                      mu,\n'
-            f'    const {real_t}                      lmbda,\n'
-=======
             f'{self.__params_to_args()}'
->>>>>>> origin/main
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -650,26 +585,15 @@ class SRHyperelasticity:
 
         fe = self.fe
 
-<<<<<<< HEAD
-        # FIXME: mu and lmbda in the signature are hardcoded
-        grad_S = (
-            f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_grad(\n'
-=======
         grad_S = (
             f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_grad(\n'
->>>>>>> origin/main
             f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
             f'    const {real_t}                      jacobian_determinant,\n'
             f'    const {real_t}                      qx,\n'
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-<<<<<<< HEAD
-            f'    const {real_t}                      mu,\n'
-            f'    const {real_t}                      lmbda,\n'
-=======
             f'{self.__params_to_args()}'
->>>>>>> origin/main
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -710,50 +634,6 @@ class SRHyperelasticity:
 
         print(grad_S + grad_body)
 
-<<<<<<< HEAD
-    # def emit_hessian_from_S_ikmn(self):
-    #     self.__compute_dV()
-    #     self.__compute_jacobian_adjugate()
-    #     self.__compute_Jinv()
-    #     self.__compute_disp_grad()
-    #     self.__compute_F()
-    #     self.__compute_piola_stress()
-    #     self.__compute_linearized_stress()
-    #     self.__compute_metric_tensor()
-    #     self.__compute_metric_tensor_canonical()
-      
-    #     fe = self.fe
-    #     dim = fe.spatial_dim()
-
-    #     signature = (
-    #         f'static SFEM_INLINE void {fe.name().lower()}_TPL_ELAST_hessian_from_S_ikmn(\n'
-    #         f'    const {real_t} *const SFEM_RESTRICT S_ikmn_canonical,\n'
-    #         f'    {real_t} *const SFEM_RESTRICT       H)'
-    #         f'\n'
-    #     )
-
-    #     S_ikmn = self.S_ikmn_canonical_symb
-    #     Wimpn = self.expression_table["Wimpn"]
-    #     H = self.__create_zero_matrix()
-
-    #     for i in range(0, dim):
-    #         for k in range(0, dim):
-    #             for m in range(0, dim):
-    #                 for n in range(0, dim):
-    #                     H[i, k, m, n] = S_ikmn[i, k, m, n]
-        
-    #     combined_code = c_gen(assign_matrix("H", H))
-
-    #     body = (
-    #         f'{{\n'
-    #         f'{combined_code}\n'
-    #         f'}}\n'
-    #     )
-
-    #     print(signature + body)
-        
-
-=======
 
     def __subs_tensor4(self, expr, syms, vals):
         s0, s1, s2, s3 = syms.shape
@@ -930,7 +810,6 @@ class SRHyperelasticity:
 
         print(signature + body)
         
->>>>>>> origin/main
 
     def partial_assembly(self):
         self.__compute_dV()
@@ -995,20 +874,6 @@ class SRHyperelasticity:
                         print(f"{i}, {k}, {m}, {n}: {S_diff[i, k, m, n]}")
 
 
-<<<<<<< HEAD
-        # print(S_diff)
-
-
-
-if __name__ == "__main__":
-    fe = Hex8()
-    op = SRHyperelasticity.create_from_string(fe, "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
-    # op.check_metric_tensor_symmetries()
-
-    # op.emit_gradient()
-    # op.emit_objective()
-    # op.emit_hessian_from_S_ikmn()
-=======
 if __name__ == "__main__":
     # fe = Hex8()
     # fe = Tet4()
@@ -1022,4 +887,3 @@ if __name__ == "__main__":
     # op.emit_gradient()
     op.emit_hessian()
     # op.emit_hessian_diag()
->>>>>>> origin/main

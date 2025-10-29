@@ -11,11 +11,7 @@
 
 namespace sfem {
 
-<<<<<<< HEAD
-    template <typename R, typename C, typename T>
-=======
     template <typename R, typename C, typename TStorage, typename T = TStorage>
->>>>>>> origin/main
     class CRSSpMV : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
@@ -29,34 +25,16 @@ namespace sfem {
         std::ptrdiff_t rows() const override { return row_ptr->size() - 1; }
         std::ptrdiff_t cols() const override { return cols_; }
 
-<<<<<<< HEAD
-        SharedBuffer<R> row_ptr;
-        SharedBuffer<C> col_idx;
-        SharedBuffer<T> values;
-=======
         size_t nbytes() const { return row_ptr->nbytes() + col_idx->nbytes() + values->nbytes(); }
 
         SharedBuffer<R> row_ptr;
         SharedBuffer<C> col_idx;
         SharedBuffer<TStorage> values;
->>>>>>> origin/main
         ptrdiff_t       cols_{0};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         ExecutionSpace execution_space() const override { return execution_space_; }
-<<<<<<< HEAD
-    };
-
-    template <typename R, typename C, typename T>
-    std::shared_ptr<CRSSpMV<R, C, T>> h_crs_spmv(const ptrdiff_t        rows,
-                                                 const ptrdiff_t        cols,
-                                                 const SharedBuffer<R>& rowptr,
-                                                 const SharedBuffer<C>& colidx,
-                                                 const SharedBuffer<T>& values,
-                                                 const T                scale_output) {
-        auto ret     = std::make_shared<CRSSpMV<R, C, T>>();
-=======
 
         void print(std::ostream& os = std::cout) const {
             if (execution_space_ == EXECUTION_SPACE_HOST) {
@@ -84,7 +62,6 @@ namespace sfem {
                                                  const SharedBuffer<TStorage>& values,
                                                  const T                scale_output) {
         auto ret     = std::make_shared<CRSSpMV<R, C, TStorage, T>>();
->>>>>>> origin/main
         ret->row_ptr = rowptr;
         ret->col_idx = colidx;
         ret->values  = values;
@@ -131,11 +108,7 @@ namespace sfem {
 
                     y[i] = val;
                 }
-<<<<<<< HEAD
-#else // 20-27% faster on M1
-=======
 #else                     // 20-27% faster on M1
->>>>>>> origin/main
 #pragma omp parallel for  // nowait
                 for (ptrdiff_t i = 0; i < rows; i++) {
                     const R row_begin = rowptr_[i];

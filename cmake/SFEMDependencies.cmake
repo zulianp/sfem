@@ -40,58 +40,20 @@ endif()
 
 # ##############################################################################
 
-<<<<<<< HEAD
-if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
-    if(TPL_LAPACK_LIBRARIES)
-        list(APPEND SFEM_DEP_LIBRARIES ${TPL_LAPACK_LIBRARIES})
-        set(SFEM_HAVE_LAPACK TRUE)
-=======
-
-if(SFEM_ENABLE_MPI)
-    find_package(MPI REQUIRED)
-
-    if(MPI_FOUND)
-        set(SFEM_HAVE_MPI TRUE)
-
-        if(MPI_C_INCLUDE_PATH)
-            set(SFEM_DEP_INCLUDES
-                "${SFEM_DEP_INCLUDES};${MPI_C_INCLUDE_PATH}")
-        endif()
-
-        if(MPI_CXX_INCLUDE_PATH)
-            set(SFEM_DEP_INCLUDES
-                "${SFEM_DEP_INCLUDES};${MPI_CXX_INCLUDE_PATH}")
-        endif()
-
-        if(MPI_LIBRARIES)
-            set(SFEM_DEP_LIBRARIES
-                "${SFEM_DEP_LIBRARIES};${MPI_LIBRARIES}")
-        endif()
-
-        if(MPI_C_LIBRARIES)
-            set(SFEM_DEP_LIBRARIES
-                "${SFEM_DEP_LIBRARIES};${MPI_C_LIBRARIES}")
-        endif()
-
-        if(MPI_CXX_LIBRARIES)
-            set(SFEM_DEP_LIBRARIES
-                "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
-        endif()
-        
->>>>>>> origin/main
-    else()
-        message(
-            FATAL_ERROR
-                "We should never end up here, because find_package above is REQUIRED"
-        )
-    endif()
+if(SFEM_ENABLE_METIS)
+  find_package(METIS REQUIRED)
+  if(METIS_FOUND)
+    list(APPEND SFEM_BUILD_INCLUDES ${METIS_INCLUDES})
+    list(APPEND SFEM_DEP_LIBRARIES ${METIS_LIBRARIES})
+    set(SFEM_ENABLE_METIS ON)
+  else()
+    message(FATAL_ERROR "[Warning] Metis not found")
+  endif()
 endif()
 
 # ##############################################################################
 
-<<<<<<< HEAD
-if(SFEM_ENABLE_MPI)
-    find_package(MPI REQUIRED)
+find_package(MPIExtended REQUIRED)
 
     if(MPI_FOUND)
         set(SFEM_HAVE_MPI TRUE)
@@ -131,8 +93,6 @@ endif()
 
 # ##############################################################################
 
-=======
->>>>>>> origin/main
 find_package(Doxygen QUIET)
 
 if(DOXYGEN_FOUND)
@@ -170,99 +130,7 @@ if(SFEM_ENABLE_CUDA)
 
     find_package(CUDAToolkit REQUIRED)
 
-    list(APPEND SFEM_DEP_LIBRARIES "CUDA::cudart")
-
-    set(_SFEM_CUDA_MODULES "CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
-    set(SFEM_ENABLE_CUBLAS TRUE)
-    set(SFEM_ENABLE_CUSPARSE TRUE)
-
-    set(SFEM_CUDA_MATH_LIBS_FOUND FALSE)
-
-    foreach(CUDA_MODULE ${_SFEM_CUDA_MODULES})
-        if(TARGET ${CUDA_MODULE})
-            list(APPEND SFEM_DEP_LIBRARIES "${CUDA_MODULE}")
-            set(SFEM_CUDA_MATH_LIBS_FOUND TRUE)
-        else()
-            message(WARNING "[Warning] CUDAToolkit does not have module ${CUDA_MODULE} in a standard location!")
-            
-        endif()
-    endforeach()
-
-    if(NOT SFEM_CUDA_MATH_LIBS_FOUND)
-        message("Trying with: CRAY_CUDATOOLKIT_POST_LINK_OPTS=$ENV{CRAY_CUDATOOLKIT_POST_LINK_OPTS}")
-        message("Trying with: CRAY_CUDATOOLKIT_INCLUDE_OPTS=$ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS}")
-        list(APPEND SFEM_DEP_LIBRARIES "$ENV{CRAY_CUDATOOLKIT_POST_LINK_OPTS} -lcublas -lcusparse")
-        include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
-    endif()
-
-    #https://github.com/NVIDIA/thrust/blob/main/thrust/cmake/README.md
-    find_package(Thrust CONFIG)
-    if(Thrust_FOUND)
-        thrust_create_target(Thrust)
-        list(APPEND SFEM_DEP_LIBRARIES Thrust)
-    else()
-        message(WARNING "Thrust not found!")
-    endif()
-endif()
-
-
-
-if(SFEM_ENABLE_RYAML)
-    set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
-    set(RYML_BRANCH_NAME master CACHE STRING "")
-    include(FetchContent)
-    FetchContent_Declare(ryml
-        GIT_REPOSITORY ${RYML_REPO_URL}
-        GIT_TAG ${RYML_BRANCH_NAME}
-        GIT_SHALLOW FALSE  # ensure submodules are checked out
-    )
-    FetchContent_MakeAvailable(ryml)
-    list(APPEND SFEM_SUBMODULES ryml::ryml)
-endif()
-
-if(WIN32)
-    set(GLOB_REPO_URL https://github.com/p-ranav/glob.git CACHE STRING "")
-    set(GLOB_BRANCH_NAME master CACHE STRING "")
-    include(FetchContent)
-    FetchContent_Declare(Glob
-        GIT_REPOSITORY ${GLOB_REPO_URL}
-        GIT_TAG ${GLOB_BRANCH_NAME}
-        GIT_SHALLOW FALSE  # ensure submodules are checked out
-    )
-    FetchContent_MakeAvailable(Glob)
-    list(APPEND SFEM_SUBMODULES Glob)
-endif()
-
-if(SFEM_ENABLE_BLAS)
-    if(APPLE)
-        # Add Accelerate framework for macOS BLAS/LAPACK
-        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
-        list(APPEND SFEM_DEP_LIBRARIES ${ACCELERATE_FRAMEWORK})
-    else()
-        find_package(BLAS REQUIRED)
-<<<<<<< HEAD
-=======
-        list(APPEND SFEM_DEP_LIBRARIES BLAS::BLAS)
->>>>>>> origin/main
-    endif()
-endif()
-
-if(SFEM_ENABLE_LAPACK)
-    find_package(LAPACK REQUIRED)
-    list(APPEND SFEM_DEP_LIBRARIES  LAPACK::LAPACK)
-endif()
-
-<<<<<<< HEAD
-=======
-
-# ##############################################################################
-
->>>>>>> origin/main
-# if(SFEM_ENABLE_HIP)
-# # TODO
-# endif()
-
-if(SFEM_ENABLE_AVX512_SORT)
-	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
+  set(SFEM_DEP_LIBRARIES
+      "${SFEM_DEP_LIBRARIES};CUDA::cusparse;CUDA::cublas;CUDA::nvToolsExt")
 endif()
 

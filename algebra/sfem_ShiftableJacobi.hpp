@@ -50,11 +50,7 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftableJacobi::apply");
-<<<<<<< HEAD
-            
-=======
 
->>>>>>> origin/main
             blas.xypaz(inv_diag->size(), inv_diag->data(), b, 1, x);
             return SFEM_SUCCESS;
         }

@@ -519,12 +519,9 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(8, nelements);
 
-<<<<<<< HEAD
-=======
         ret->impl_->n_owned_nodes    = nnodes;
         ret->impl_->n_owned_elements = nelements;
 
->>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -605,12 +602,9 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(3, nelements);
 
-<<<<<<< HEAD
-=======
         ret->impl_->n_owned_nodes    = nnodes;
         ret->impl_->n_owned_elements = nelements;
 
->>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -676,12 +670,9 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(4, nelements);
 
-<<<<<<< HEAD
-=======
         ret->impl_->n_owned_nodes    = nnodes;
         ret->impl_->n_owned_elements = nelements;
 
->>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -752,12 +743,9 @@ namespace sfem {
         auto white_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
         auto black_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
-<<<<<<< HEAD
-=======
         ret->impl_->n_owned_nodes    = nnodes;
         ret->impl_->n_owned_elements = nelements;
 
->>>>>>> origin/main
         auto points         = ret->impl_->points->data();
         auto white_elements = white_elements_buffer->data();
         auto black_elements = black_elements_buffer->data();
@@ -870,12 +858,9 @@ namespace sfem {
         auto left_elements_buffer  = create_host_buffer<idx_t>(8, nelements / 2);
         auto right_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
-<<<<<<< HEAD
-=======
         ret->impl_->n_owned_nodes    = nnodes;
         ret->impl_->n_owned_elements = nelements;
 
->>>>>>> origin/main
         auto points         = ret->impl_->points->data();
         auto left_elements  = left_elements_buffer->data();
         auto right_elements = right_elements_buffer->data();
@@ -1005,8 +990,6 @@ namespace sfem {
         }
     }
 
-<<<<<<< HEAD
-=======
     std::vector<std::shared_ptr<Mesh::Block>> Mesh::blocks(const std::vector<std::string> &block_names) const {
         if (block_names.empty()) {
             return impl_->blocks;
@@ -1022,7 +1005,6 @@ namespace sfem {
         return ret;
     }
 
->>>>>>> origin/main
     void Mesh::extract_deprecated(mesh_t *mesh) {
 #ifdef SFEM_ENABLE_MPI
         mesh->comm = impl_->comm->get();
@@ -1107,8 +1089,6 @@ namespace sfem {
         return ret;
     }
 
-<<<<<<< HEAD
-=======
     std::shared_ptr<Mesh> Mesh::create_tet4_cube(const std::shared_ptr<Communicator> &comm,
                                                  const int                            nx,
                                                  const int                            ny,
@@ -1241,7 +1221,6 @@ namespace sfem {
         }
     }
 
->>>>>>> origin/main
     std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
         auto points = impl_->points->data();
 
@@ -1393,30 +1372,17 @@ namespace sfem {
     }
 
     int Mesh::renumber_nodes() {
-<<<<<<< HEAD
-        auto points     = this->points()->data();
-        auto elements   = this->elements()->data();
-        auto n_nodes    = this->n_nodes();
-        auto n_elements = this->n_elements();
-
-        auto new_idx_buff = create_host_buffer<ptrdiff_t>(n_nodes);
-=======
         const int nxe        = n_nodes_per_element();
         auto      n_nodes    = this->n_nodes();
         auto      n_elements = this->n_elements();
 
         auto new_idx_buff = create_host_buffer<idx_t>(n_nodes);
->>>>>>> origin/main
 
         auto new_idx = new_idx_buff->data();
         for (ptrdiff_t i = 0; i < n_nodes; i++) {
             new_idx[i] = -1;
         }
 
-<<<<<<< HEAD
-        int   nxe          = n_nodes_per_element();
-=======
->>>>>>> origin/main
         idx_t next_node_id = 0;
         for (auto &b : impl_->blocks) {
             auto elements   = b->elements()->data();
@@ -1432,16 +1398,6 @@ namespace sfem {
             }
         }
 
-<<<<<<< HEAD
-        const int dim = spatial_dimension();
-
-        auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
-        auto new_points      = new_points_buff->data();
-
-        for (int d = 0; d < dim; d++) {
-            for (ptrdiff_t i = 0; i < n_nodes; i++) {
-                new_points[d][new_idx[i]] = points[d][i];
-=======
         return renumber_nodes(new_idx_buff);
 
         // const int dim = spatial_dimension();
@@ -1489,7 +1445,6 @@ namespace sfem {
                 assert(d_node_mapping[i] < n_nodes);
                 assert(d_node_mapping[i] >= 0);
                 new_points[d][d_node_mapping[i]] = points[d][i];
->>>>>>> origin/main
             }
         }
 
@@ -1501,11 +1456,7 @@ namespace sfem {
 
             for (ptrdiff_t e = 0; e < n_elements; e++) {
                 for (int v = 0; v < nxe; v++) {
-<<<<<<< HEAD
-                    elements[v][e] = new_idx[elements[v][e]];
-=======
                     elements[v][e] = d_node_mapping[elements[v][e]];
->>>>>>> origin/main
                 }
             }
         }

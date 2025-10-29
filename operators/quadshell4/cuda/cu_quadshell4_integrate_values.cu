@@ -180,11 +180,7 @@ int cu_quadshell4_integrate_value_tpl(const ptrdiff_t                    nelemen
                 <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, value, vec_size, component, out);
     } else {
         cu_quadshell4_integrate_value_kernel<T>
-<<<<<<< HEAD
                 <<<n_blocks, block_size, 0>>>(nelements, elements, coords_stride, coords, value, vec_size, component, out);
-=======
-                <<<n_blocks, vec_size, 0>>>(nelements, elements, coords_stride, coords, value, block_size, component, out);
->>>>>>> origin/main
     }
 
     SFEM_DEBUG_SYNCHRONIZE();
@@ -221,11 +217,7 @@ int cu_quadshell4_integrate_values_tpl(const ptrdiff_t                    neleme
                 <<<n_blocks, block_size, 0, s>>>(nelements, elements, coords_stride, coords, values, vec_size, component, out);
     } else {
         cu_quadshell4_integrate_values_kernel<T>
-<<<<<<< HEAD
                 <<<n_blocks, block_size, 0>>>(nelements, elements, coords_stride, coords, values, vec_size, component, out);
-=======
-                <<<n_blocks, vec_size, 0>>>(nelements, elements, coords_stride, coords, values, block_size, component, out);
->>>>>>> origin/main
     }
 
     SFEM_DEBUG_SYNCHRONIZE();

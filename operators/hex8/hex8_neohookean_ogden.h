@@ -83,8 +83,6 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
                                                  real_t *const SFEM_RESTRICT                outy,
                                                  real_t *const SFEM_RESTRICT                outz);
 
-<<<<<<< HEAD
-=======
 int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                   nelements,
                                                 const ptrdiff_t                   stride,
                                                 idx_t **const SFEM_RESTRICT       elements,
@@ -100,7 +98,6 @@ int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                 
                                                 real_t *const SFEM_RESTRICT       outy,
                                                 real_t *const SFEM_RESTRICT       outz);
 
->>>>>>> origin/main
 int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
                                                             const ptrdiff_t                         stride,
                                                             idx_t **const SFEM_RESTRICT             elements,
@@ -115,8 +112,6 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
                                                             real_t *const SFEM_RESTRICT             outy,
                                                             real_t *const SFEM_RESTRICT             outz);
 
-<<<<<<< HEAD
-=======
 int hex8_neohookean_ogden_elasticity_diag(const ptrdiff_t                   nelements,
                                           const ptrdiff_t                   stride,
                                           const ptrdiff_t                   nnodes,
@@ -163,7 +158,6 @@ int hex8_neohookean_ogden_bcrs_sym(const ptrdiff_t                    nelements,
                                    real_t **const SFEM_RESTRICT       diag_values,
                                    real_t **const SFEM_RESTRICT       off_diag_values);
 
->>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif

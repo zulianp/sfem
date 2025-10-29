@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #include "cu_integrate_values.h"
 
 #include "cu_quadshell4_integrate_values.h"
@@ -70,6 +69,3 @@ int cu_integrate_values(const int                          element_type,
 
     return SFEM_FAILURE;
 }
-=======
-#include "cu_integrate_values.h"
->>>>>>> origin/main

@@ -1343,13 +1343,7 @@ namespace sfem {
 
     static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
         return make_in_place_op<real_t>(
-<<<<<<< HEAD
-                f->space()->n_dofs(),
-                [=](real_t *const x) { f->apply_zero_constraints(x); },
-                f->execution_space());
-=======
                 f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
->>>>>>> origin/main
     }
 
 }  // namespace sfem

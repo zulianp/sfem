@@ -8,11 +8,6 @@ dirichlet_conditions:
   - type: sideset
     format: file
     path: aorta_geometry/outlet
-<<<<<<< HEAD
-    # value: 2
-    value: 1
-=======
     value: 0.1
     # value: 0.00001
->>>>>>> origin/main
     component: 0
