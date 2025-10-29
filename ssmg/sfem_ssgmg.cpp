@@ -34,8 +34,11 @@ namespace sfem {
             auto f_prev  = functions.back();
             auto fs_prev = f_prev->space();
             auto fs_next = fs_prev->derefine(levels[l]);
+<<<<<<< HEAD
             fs_next->n_dofs();
             printf("fs_next->n_dofs() = %d\n", fs_next->n_dofs());
+=======
+>>>>>>> origin/main
             functions.push_back(f_prev->derefine(fs_next, true));
         }
 

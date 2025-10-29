@@ -123,6 +123,27 @@ void constraint_objective_nodes_to_value_vec(const ptrdiff_t                   n
     out[0] += acc / 2;
 }
 
+<<<<<<< HEAD
+=======
+void constraint_objective_nodes_to_values_vec(const ptrdiff_t                   n_dirichlet_nodes,
+                                              const idx_t                      *dirichlet_nodes,
+                                              const int                         block_size,
+                                              const int                         component,
+                                              const real_t                     *values,
+                                              const real_t *const SFEM_RESTRICT x,
+                                              real_t *const SFEM_RESTRICT       out) {
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+        ptrdiff_t    i    = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
+        const real_t diff = x[i] - values[node];
+        acc += diff * diff;
+    }
+
+    out[0] += acc / 2;
+}
+
+>>>>>>> origin/main
 void constraint_objective_nodes_to_value_vec_steps(const ptrdiff_t                   n_dirichlet_nodes,
                                                    const idx_t                      *dirichlet_nodes,
                                                    const int                         block_size,
@@ -154,6 +175,40 @@ void constraint_objective_nodes_to_value_vec_steps(const ptrdiff_t              
     }
 }
 
+<<<<<<< HEAD
+=======
+void constraint_objective_nodes_to_values_vec_steps(const ptrdiff_t                   n_dirichlet_nodes,
+                                                    const idx_t                      *dirichlet_nodes,
+                                                    const int                         block_size,
+                                                    const int                         component,
+                                                    const real_t                     *values,
+                                                    const real_t *const SFEM_RESTRICT x,
+                                                    const real_t *const SFEM_RESTRICT h,
+                                                    const int                         nsteps,
+                                                    const real_t *const SFEM_RESTRICT steps,
+                                                    real_t *const SFEM_RESTRICT       out) {
+#pragma omp parallel
+    {
+        real_t *acc = (real_t *)calloc(nsteps, sizeof(real_t));
+
+        for (ptrdiff_t node = 0; node < n_dirichlet_nodes; ++node) {
+            ptrdiff_t i = (ptrdiff_t)dirichlet_nodes[node] * block_size + component;
+            for (int s = 0; s < nsteps; s++) {
+                const real_t diff = (x[i] + steps[s] * h[i]) - values[node];
+                acc[s] += diff * diff;
+            }
+        }
+
+        for (int s = 0; s < nsteps; s++) {
+#pragma omp atomic update
+            out[s] += acc[s];
+        }
+
+        free(acc);
+    }
+}
+
+>>>>>>> origin/main
 void        constraint_gradient_nodes_to_value_vec(const ptrdiff_t                   n_dirichlet_nodes,
                                                    const idx_t                      *dirichlet_nodes,
                                                    const int                         block_size,

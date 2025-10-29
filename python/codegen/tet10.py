@@ -405,9 +405,16 @@ def DualTet10():
     return WeightedFE(Tet10(), tet10_weights, "Dual")
 
 
+<<<<<<< HEAD
 # if __name__ == '__main__':
 # Tet10().generate_c_code()
 # Tet10().generate_qp_based_code()
+=======
+if __name__ == '__main__':
+    # Tet10().generate_c_code()
+    # Tet10().generate_qp_based_code()
+    print(Tet10().generate_jacobian_adjugate_and_determinant_code())
+>>>>>>> origin/main
 # fe = Tet10()
 # q = fe.quadrature_point()
 # f = fe.f0(0.51, 0.0, 0.0)

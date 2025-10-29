@@ -83,6 +83,24 @@ int hex8_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                
                                                  real_t *const SFEM_RESTRICT                outy,
                                                  real_t *const SFEM_RESTRICT                outz);
 
+<<<<<<< HEAD
+=======
+int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                   nelements,
+                                                const ptrdiff_t                   stride,
+                                                idx_t **const SFEM_RESTRICT       elements,
+                                                geom_t **const SFEM_RESTRICT      points,
+                                                const real_t                      mu,
+                                                const real_t                      lambda,
+                                                const ptrdiff_t                   u_stride,
+                                                const real_t *const SFEM_RESTRICT ux,
+                                                const real_t *const SFEM_RESTRICT uy,
+                                                const real_t *const SFEM_RESTRICT uz,
+                                                const ptrdiff_t                   out_stride,
+                                                real_t *const SFEM_RESTRICT       outx,
+                                                real_t *const SFEM_RESTRICT       outy,
+                                                real_t *const SFEM_RESTRICT       outz);
+
+>>>>>>> origin/main
 int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
                                                             const ptrdiff_t                         stride,
                                                             idx_t **const SFEM_RESTRICT             elements,
@@ -97,6 +115,55 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
                                                             real_t *const SFEM_RESTRICT             outy,
                                                             real_t *const SFEM_RESTRICT             outz);
 
+<<<<<<< HEAD
+=======
+int hex8_neohookean_ogden_elasticity_diag(const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   out_stride,
+                                          real_t *const SFEM_RESTRICT       outx,
+                                          real_t *const SFEM_RESTRICT       outy,
+                                          real_t *const SFEM_RESTRICT       outz);
+
+int hex8_neohookean_ogden_bsr(const ptrdiff_t                    nelements,
+                              const ptrdiff_t                    stride,
+                              idx_t **const SFEM_RESTRICT        elements,
+                              geom_t **const SFEM_RESTRICT       points,
+                              const real_t                       mu,
+                              const real_t                       lambda,
+                              const ptrdiff_t                    u_stride,
+                              const real_t *const SFEM_RESTRICT  ux,
+                              const real_t *const SFEM_RESTRICT  uy,
+                              const real_t *const SFEM_RESTRICT  uz,
+                              const count_t *const SFEM_RESTRICT rowptr,
+                              const idx_t *const SFEM_RESTRICT   colidx,
+                              real_t *const SFEM_RESTRICT        values);
+
+int hex8_neohookean_ogden_bcrs_sym(const ptrdiff_t                    nelements,
+                                   const ptrdiff_t                    stride,
+                                   idx_t **const SFEM_RESTRICT        elements,
+                                   geom_t **const SFEM_RESTRICT       points,
+                                   const real_t                       mu,
+                                   const real_t                       lambda,
+                                   const ptrdiff_t                    u_stride,
+                                   const real_t *const SFEM_RESTRICT  ux,
+                                   const real_t *const SFEM_RESTRICT  uy,
+                                   const real_t *const SFEM_RESTRICT  uz,
+                                   const count_t *const SFEM_RESTRICT rowptr,
+                                   const idx_t *const SFEM_RESTRICT   colidx,
+                                   const ptrdiff_t                    block_stride,
+                                   real_t **const SFEM_RESTRICT       diag_values,
+                                   real_t **const SFEM_RESTRICT       off_diag_values);
+
+>>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif

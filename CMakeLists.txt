@@ -40,6 +40,11 @@ endif()
 
 set(SFEM_MODULES
     algebra base matrix 
+<<<<<<< HEAD
+=======
+    algebra/crs
+    algebra/ell
+>>>>>>> origin/main
     algebra/openmp
     mesh 
     mesh/multiblock
@@ -53,17 +58,27 @@ set(SFEM_MODULES
     operators/cvfem_tet4
     operators/cvfem_tri3
     operators/edgeshell2
+<<<<<<< HEAD
     operators/hex8
     operators/hex8/dg
+=======
+    operators/generic
+    operators/hex8
+>>>>>>> origin/main
     operators/hierarchical
     operators/macro_tet4
     operators/macro_tri3
     operators/navier_stokes
     operators/quad4
+<<<<<<< HEAD
     operators/quad4/dg
     operators/quadshell4
     operators/spectral_hex
     operators/spectral_hex/dg
+=======
+    operators/quadshell4
+    operators/spectral_hex
+>>>>>>> origin/main
     operators/sshex8
     operators/ssquad4
     operators/sstet4
@@ -79,6 +94,16 @@ set(SFEM_MODULES
     ssmg
 )
 
+<<<<<<< HEAD
+=======
+# FIXME DG is yet to be implemented 
+# list(APPEND SFEM_MODULES
+#     operators/hex8/dg
+#     operators/quad4/dg
+#     operators/spectral_hex/dg
+# )
+
+>>>>>>> origin/main
 if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
     list(APPEND SFEM_MODULES operators/tet4/vectorized)
 endif()
@@ -253,7 +278,11 @@ set(SFEM_TARGETS sfem)
 
 # Optional generated operator plug-ins (not built by default)
 if(SFEM_ENABLE_CODEGEN)
+<<<<<<< HEAD
     add_subdirectory(operators/generated)
+=======
+    # add_subdirectory(operators/generated)
+>>>>>>> origin/main
 endif() 
 
 # option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)

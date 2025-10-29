@@ -190,6 +190,9 @@ int laplacian_apply_opt(int                                   element_type,
         case TET4: {
             return tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
+        case HEX8: {
+            return hex8_laplacian_apply_opt(nelements, elements, fff, u, values);
+        }
         case TET10: {
             return tet10_laplacian_apply_opt(nelements, elements, fff, u, values);
         }
@@ -220,7 +223,7 @@ int laplacian_crs_sym(int                                element_type,
         case HEX8: {
             return hex8_laplacian_crs_sym(nelements, nnodes, elements, points, rowptr, colidx, diag, offdiag);
         }
-        default : {
+        default: {
             SFEM_ERROR("laplacian_crs_sym not implemented for type %s\n", type_to_string(element_type));
         }
     }

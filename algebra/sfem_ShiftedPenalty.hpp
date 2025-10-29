@@ -286,7 +286,11 @@ namespace sfem {
                     if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
                     if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
+<<<<<<< HEAD
                     penetration_tol = penetration_tol / pow(penalty_param_, 0.9);
+=======
+                    penetration_tol = std::max(1e-20, penetration_tol / pow(penalty_param_, 0.9));
+>>>>>>> origin/main
                     omega           = omega / penalty_param_;
 
                     count_lagr_mult_updates++;

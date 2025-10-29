@@ -8,5 +8,10 @@ dirichlet_conditions:
   - type: sideset
     format: file
     path: hex8_geometry/outlet
+<<<<<<< HEAD
     value: [0.3, 0.4, 0]
     component: [0, 1, 2]
+=======
+    value: 0.2
+    component: 0
+>>>>>>> origin/main

@@ -2715,10 +2715,17 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean(const scalar_t *const SFEM_RESTRI
                                                const scalar_t                      qx,
                                                const scalar_t                      qy,
                                                const scalar_t                      qz,
+<<<<<<< HEAD
                                                const scalar_t *const SFEM_RESTRICT F,
                                                const scalar_t                      mu,
                                                const scalar_t                      lmbda,
                                                const scalar_t                      qw,
+=======
+                                               const scalar_t                      qw,
+                                               const scalar_t *const SFEM_RESTRICT F,
+                                               const scalar_t                      mu,
+                                               const scalar_t                      lmbda,
+>>>>>>> origin/main
                                                scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
     // mundane ops: 1014 divs: 2 sqrts: 0
     // total ops: 1030
@@ -2965,6 +2972,265 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean(const scalar_t *const SFEM_RESTRI
                                   adjugate[8] * (adjugate[6] * x186 - adjugate[7] * x187 + adjugate[8] * x179));
 }
 
+<<<<<<< HEAD
+=======
+
+static SFEM_INLINE void hex8_S_ikmn_neohookean_add(const scalar_t *const SFEM_RESTRICT adjugate,
+    const scalar_t                      jacobian_determinant,
+    const scalar_t                      qx,
+    const scalar_t                      qy,
+    const scalar_t                      qz,
+    const scalar_t                      qw,
+    const scalar_t *const SFEM_RESTRICT F,
+    const scalar_t                      mu,
+    const scalar_t                      lmbda,
+    scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
+// mundane ops: 1014 divs: 2 sqrts: 0
+// total ops: 1030
+const scalar_t x0    = F[4] * F[8];
+const scalar_t x1    = F[5] * F[6];
+const scalar_t x2    = F[3] * F[7];
+const scalar_t x3    = F[5] * F[7];
+const scalar_t x4    = F[3] * F[8];
+const scalar_t x5    = F[4] * F[6];
+const scalar_t x6    = F[0] * x0 - F[0] * x3 + F[1] * x1 - F[1] * x4 + F[2] * x2 - F[2] * x5;
+const scalar_t x7    = (1 / POW2(x6));
+const scalar_t x8    = x0 - x3;
+const scalar_t x9    = x7 * x8;
+const scalar_t x10   = x2 - x5;
+const scalar_t x11   = lmbda * log(x6);
+const scalar_t x12   = lmbda + mu - x11;
+const scalar_t x13   = adjugate[2] * x12;
+const scalar_t x14   = x10 * x13;
+const scalar_t x15   = -x1 + x4;
+const scalar_t x16   = x12 * x9;
+const scalar_t x17   = x15 * x16;
+const scalar_t x18   = x7 * POW2(x8);
+const scalar_t x19   = lmbda * x18 + mu * x18 + mu - x11 * x18;
+const scalar_t x20   = adjugate[0] * x19 - adjugate[1] * x17 + x14 * x9;
+const scalar_t x21   = x10 * x16;
+const scalar_t x22   = adjugate[1] * x12;
+const scalar_t x23   = x15 * x7;
+const scalar_t x24   = x10 * x23;
+const scalar_t x25   = POW2(x10) * x7;
+const scalar_t x26   = lmbda * x25 + mu * x25 + mu - x11 * x25;
+const scalar_t x27   = adjugate[0] * x21 + adjugate[2] * x26 - x22 * x24;
+const scalar_t x28   = POW2(x15) * x7;
+const scalar_t x29   = lmbda * x28 + mu * x28 + mu - x11 * x28;
+const scalar_t x30   = -adjugate[0] * x17 + adjugate[1] * x29 - x14 * x23;
+const scalar_t x31   = qw / jacobian_determinant;
+const scalar_t x32   = adjugate[3] * x19 - adjugate[4] * x17 + adjugate[5] * x21;
+const scalar_t x33   = x12 * x24;
+const scalar_t x34   = adjugate[3] * x21 - adjugate[4] * x33 + adjugate[5] * x26;
+const scalar_t x35   = -adjugate[3] * x17 + adjugate[4] * x29 - adjugate[5] * x33;
+const scalar_t x36   = F[0] * F[8] - F[2] * F[6];
+const scalar_t x37   = 1.0 / x6;
+const scalar_t x38   = x15 * x37;
+const scalar_t x39   = x36 * x38;
+const scalar_t x40   = F[8] * mu;
+const scalar_t x41   = F[8] * x11;
+const scalar_t x42   = F[1] * F[8] - F[2] * F[7];
+const scalar_t x43   = x38 * x42;
+const scalar_t x44   = lmbda * x43 + mu * x43 - x11 * x43 + x40 - x41;
+const scalar_t x45   = F[6] * mu;
+const scalar_t x46   = F[6] * x11;
+const scalar_t x47   = F[0] * F[7] - F[1] * F[6];
+const scalar_t x48   = x38 * x47;
+const scalar_t x49   = lmbda * x48 + mu * x48 - x11 * x48 - x45 + x46;
+const scalar_t x50   = adjugate[0] * x44 + adjugate[2] * x49 - x22 * x39;
+const scalar_t x51   = x37 * x8;
+const scalar_t x52   = x12 * x51;
+const scalar_t x53   = x42 * x52;
+const scalar_t x54   = F[7] * mu;
+const scalar_t x55   = F[7] * x11;
+const scalar_t x56   = x47 * x51;
+const scalar_t x57   = lmbda * x56 + mu * x56 - x11 * x56 - x54 + x55;
+const scalar_t x58   = x36 * x51;
+const scalar_t x59   = lmbda * x58 + mu * x58 - x11 * x58 - x40 + x41;
+const scalar_t x60   = -adjugate[0] * x53 + adjugate[1] * x59 - adjugate[2] * x57;
+const scalar_t x61   = x10 * x37;
+const scalar_t x62   = x47 * x61;
+const scalar_t x63   = x42 * x61;
+const scalar_t x64   = lmbda * x63 + mu * x63 - x11 * x63 + x54 - x55;
+const scalar_t x65   = x36 * x61;
+const scalar_t x66   = lmbda * x65 + mu * x65 - x11 * x65 + x45 - x46;
+const scalar_t x67   = -adjugate[0] * x64 + adjugate[1] * x66 - x13 * x62;
+const scalar_t x68   = x31 * x37;
+const scalar_t x69   = x12 * x39;
+const scalar_t x70   = adjugate[3] * x44 - adjugate[4] * x69 + adjugate[5] * x49;
+const scalar_t x71   = -adjugate[3] * x53 + adjugate[4] * x59 - adjugate[5] * x57;
+const scalar_t x72   = x12 * x62;
+const scalar_t x73   = -adjugate[3] * x64 + adjugate[4] * x66 - adjugate[5] * x72;
+const scalar_t x74   = adjugate[6] * x44 - adjugate[7] * x69 + adjugate[8] * x49;
+const scalar_t x75   = -adjugate[6] * x53 + adjugate[7] * x59 - adjugate[8] * x57;
+const scalar_t x76   = -adjugate[6] * x64 + adjugate[7] * x66 - adjugate[8] * x72;
+const scalar_t x77   = F[1] * F[5] - F[2] * F[4];
+const scalar_t x78   = x52 * x77;
+const scalar_t x79   = F[4] * mu;
+const scalar_t x80   = F[4] * x11;
+const scalar_t x81   = F[0] * F[4] - F[1] * F[3];
+const scalar_t x82   = x51 * x81;
+const scalar_t x83   = lmbda * x82 + mu * x82 - x11 * x82 - x79 + x80;
+const scalar_t x84   = F[5] * mu;
+const scalar_t x85   = F[5] * x11;
+const scalar_t x86   = F[0] * F[5] - F[2] * F[3];
+const scalar_t x87   = x51 * x86;
+const scalar_t x88   = lmbda * x87 + mu * x87 - x11 * x87 - x84 + x85;
+const scalar_t x89   = adjugate[0] * x78 - adjugate[1] * x88 + adjugate[2] * x83;
+const scalar_t x90   = x61 * x81;
+const scalar_t x91   = x61 * x77;
+const scalar_t x92   = lmbda * x91 + mu * x91 - x11 * x91 + x79 - x80;
+const scalar_t x93   = F[3] * mu;
+const scalar_t x94   = F[3] * x11;
+const scalar_t x95   = x61 * x86;
+const scalar_t x96   = lmbda * x95 + mu * x95 - x11 * x95 + x93 - x94;
+const scalar_t x97   = adjugate[0] * x92 - adjugate[1] * x96 + x13 * x90;
+const scalar_t x98   = x38 * x77;
+const scalar_t x99   = lmbda * x98 + mu * x98 - x11 * x98 + x84 - x85;
+const scalar_t x100  = x38 * x81;
+const scalar_t x101  = lmbda * x100 + mu * x100 - x100 * x11 - x93 + x94;
+const scalar_t x102  = -adjugate[0] * x99 + adjugate[1] * x12 * x15 * x37 * x86 - adjugate[2] * x101;
+const scalar_t x103  = adjugate[3] * x78 - adjugate[4] * x88 + adjugate[5] * x83;
+const scalar_t x104  = x12 * x90;
+const scalar_t x105  = adjugate[3] * x92 - adjugate[4] * x96 + adjugate[5] * x104;
+const scalar_t x106  = -adjugate[3] * x99 + adjugate[4] * x12 * x15 * x37 * x86 - adjugate[5] * x101;
+const scalar_t x107  = adjugate[6] * x78 - adjugate[7] * x88 + adjugate[8] * x83;
+const scalar_t x108  = adjugate[6] * x92 - adjugate[7] * x96 + adjugate[8] * x104;
+const scalar_t x109  = -adjugate[6] * x99 + adjugate[7] * x12 * x15 * x37 * x86 - adjugate[8] * x101;
+const scalar_t x110  = x42 * x7;
+const scalar_t x111  = x13 * x47;
+const scalar_t x112  = x110 * x36;
+const scalar_t x113  = POW2(x42) * x7;
+const scalar_t x114  = lmbda * x113 + mu * x113 + mu - x11 * x113;
+const scalar_t x115  = adjugate[0] * x114 + x110 * x111 - x112 * x22;
+const scalar_t x116  = adjugate[0] * x12;
+const scalar_t x117  = x110 * x47;
+const scalar_t x118  = x36 * x7;
+const scalar_t x119  = x118 * x47;
+const scalar_t x120  = POW2(x47) * x7;
+const scalar_t x121  = lmbda * x120 + mu * x120 + mu - x11 * x120;
+const scalar_t x122  = adjugate[2] * x121 + x116 * x117 - x119 * x22;
+const scalar_t x123  = POW2(x36) * x7;
+const scalar_t x124  = lmbda * x123 + mu * x123 + mu - x11 * x123;
+const scalar_t x125  = adjugate[1] * x124 - x111 * x118 - x112 * x116;
+const scalar_t x126  = adjugate[5] * x12;
+const scalar_t x127  = x112 * x12;
+const scalar_t x128  = adjugate[3] * x114 - adjugate[4] * x127 + x117 * x126;
+const scalar_t x129  = x117 * x12;
+const scalar_t x130  = x119 * x12;
+const scalar_t x131  = adjugate[3] * x129 - adjugate[4] * x130 + adjugate[5] * x121;
+const scalar_t x132  = -adjugate[3] * x127 + adjugate[4] * x124 - x119 * x126;
+const scalar_t x133  = x36 * x37;
+const scalar_t x134  = x133 * x86;
+const scalar_t x135  = F[2] * mu;
+const scalar_t x136  = F[2] * x11;
+const scalar_t x137  = x133 * x77;
+const scalar_t x138  = lmbda * x137 + mu * x137 - x11 * x137 + x135 - x136;
+const scalar_t x139  = F[0] * mu;
+const scalar_t x140  = F[0] * x11;
+const scalar_t x141  = x133 * x81;
+const scalar_t x142  = lmbda * x141 + mu * x141 - x11 * x141 - x139 + x140;
+const scalar_t x143  = adjugate[0] * x138 + adjugate[2] * x142 - x134 * x22;
+const scalar_t x144  = x37 * x42;
+const scalar_t x145  = x144 * x77;
+const scalar_t x146  = F[1] * mu;
+const scalar_t x147  = F[1] * x11;
+const scalar_t x148  = x144 * x81;
+const scalar_t x149  = lmbda * x148 + mu * x148 - x11 * x148 - x146 + x147;
+const scalar_t x150  = x144 * x86;
+const scalar_t x151  = lmbda * x150 + mu * x150 - x11 * x150 - x135 + x136;
+const scalar_t x152  = adjugate[1] * x151 - adjugate[2] * x149 - x116 * x145;
+const scalar_t x153  = x37 * x47;
+const scalar_t x154  = x153 * x81;
+const scalar_t x155  = x153 * x77;
+const scalar_t x156  = lmbda * x155 + mu * x155 - x11 * x155 + x146 - x147;
+const scalar_t x157  = x153 * x86;
+const scalar_t x158  = lmbda * x157 + mu * x157 - x11 * x157 + x139 - x140;
+const scalar_t x159  = -adjugate[0] * x156 + adjugate[1] * x158 - x13 * x154;
+const scalar_t x160  = x12 * x134;
+const scalar_t x161  = adjugate[3] * x138 - adjugate[4] * x160 + adjugate[5] * x142;
+const scalar_t x162  = x12 * x145;
+const scalar_t x163  = -adjugate[3] * x162 + adjugate[4] * x151 - adjugate[5] * x149;
+const scalar_t x164  = -adjugate[3] * x156 + adjugate[4] * x158 - x126 * x154;
+const scalar_t x165  = adjugate[6] * x138 - adjugate[7] * x160 + adjugate[8] * x142;
+const scalar_t x166  = -adjugate[6] * x162 + adjugate[7] * x151 - adjugate[8] * x149;
+const scalar_t x167  = adjugate[8] * x12;
+const scalar_t x168  = -adjugate[6] * x156 + adjugate[7] * x158 - x154 * x167;
+const scalar_t x169  = x7 * x77;
+const scalar_t x170  = x13 * x81;
+const scalar_t x171  = x169 * x86;
+const scalar_t x172  = x7 * POW2(x77);
+const scalar_t x173  = lmbda * x172 + mu * x172 + mu - x11 * x172;
+const scalar_t x174  = adjugate[0] * x173 + x169 * x170 - x171 * x22;
+const scalar_t x175  = x169 * x81;
+const scalar_t x176  = x7 * x86;
+const scalar_t x177  = x176 * x81;
+const scalar_t x178  = x7 * POW2(x81);
+const scalar_t x179  = lmbda * x178 + mu * x178 + mu - x11 * x178;
+const scalar_t x180  = adjugate[2] * x179 + x116 * x175 - x177 * x22;
+const scalar_t x181  = x7 * POW2(x86);
+const scalar_t x182  = lmbda * x181 + mu * x181 + mu - x11 * x181;
+const scalar_t x183  = adjugate[1] * x182 - x116 * x171 - x170 * x176;
+const scalar_t x184  = x12 * x171;
+const scalar_t x185  = adjugate[3] * x173 - adjugate[4] * x184 + x126 * x175;
+const scalar_t x186  = x12 * x175;
+const scalar_t x187  = x12 * x177;
+const scalar_t x188  = adjugate[3] * x186 - adjugate[4] * x187 + adjugate[5] * x179;
+const scalar_t x189  = -adjugate[3] * x184 + adjugate[4] * x182 - x126 * x177;
+S_ikmn_canonical[0]  += x31 * (adjugate[0] * x20 + adjugate[1] * x30 + adjugate[2] * x27);
+S_ikmn_canonical[1]  += x31 * (adjugate[3] * x20 + adjugate[4] * x30 + adjugate[5] * x27);
+S_ikmn_canonical[2]  += x31 * (adjugate[6] * x20 + adjugate[7] * x30 + adjugate[8] * x27);
+S_ikmn_canonical[3]  += x31 * (adjugate[3] * x32 + adjugate[4] * x35 + adjugate[5] * x34);
+S_ikmn_canonical[4]  += x31 * (adjugate[6] * x32 + adjugate[7] * x35 + adjugate[8] * x34);
+S_ikmn_canonical[5]  += x31 * (adjugate[6] * (adjugate[6] * x19 - adjugate[7] * x17 + adjugate[8] * x21) +
+adjugate[7] * (-adjugate[6] * x17 + adjugate[7] * x29 - adjugate[8] * x33) +
+adjugate[8] * (adjugate[6] * x21 - adjugate[7] * x33 + adjugate[8] * x26));
+S_ikmn_canonical[6]  += x68 * (adjugate[0] * x60 + adjugate[1] * x50 + adjugate[2] * x67);
+S_ikmn_canonical[7]  += x68 * (adjugate[3] * x60 + adjugate[4] * x50 + adjugate[5] * x67);
+S_ikmn_canonical[8]  += x68 * (adjugate[6] * x60 + adjugate[7] * x50 + adjugate[8] * x67);
+S_ikmn_canonical[9]  += x68 * (adjugate[0] * x71 + adjugate[1] * x70 + adjugate[2] * x73);
+S_ikmn_canonical[10] += x68 * (adjugate[3] * x71 + adjugate[4] * x70 + adjugate[5] * x73);
+S_ikmn_canonical[11] += x68 * (adjugate[6] * x71 + adjugate[7] * x70 + adjugate[8] * x73);
+S_ikmn_canonical[12] += x68 * (adjugate[0] * x75 + adjugate[1] * x74 + adjugate[2] * x76);
+S_ikmn_canonical[13] += x68 * (adjugate[3] * x75 + adjugate[4] * x74 + adjugate[5] * x76);
+S_ikmn_canonical[14] += x68 * (adjugate[6] * x75 + adjugate[7] * x74 + adjugate[8] * x76);
+S_ikmn_canonical[15] += x68 * (adjugate[0] * x89 + adjugate[1] * x102 + adjugate[2] * x97);
+S_ikmn_canonical[16] += x68 * (adjugate[3] * x89 + adjugate[4] * x102 + adjugate[5] * x97);
+S_ikmn_canonical[17] += x68 * (adjugate[6] * x89 + adjugate[7] * x102 + adjugate[8] * x97);
+S_ikmn_canonical[18] += x68 * (adjugate[0] * x103 + adjugate[1] * x106 + adjugate[2] * x105);
+S_ikmn_canonical[19] += x68 * (adjugate[3] * x103 + adjugate[4] * x106 + adjugate[5] * x105);
+S_ikmn_canonical[20] += x68 * (adjugate[6] * x103 + adjugate[7] * x106 + adjugate[8] * x105);
+S_ikmn_canonical[21] += x68 * (adjugate[0] * x107 + adjugate[1] * x109 + adjugate[2] * x108);
+S_ikmn_canonical[22] += x68 * (adjugate[3] * x107 + adjugate[4] * x109 + adjugate[5] * x108);
+S_ikmn_canonical[23] += x68 * (adjugate[6] * x107 + adjugate[7] * x109 + adjugate[8] * x108);
+S_ikmn_canonical[24] += x31 * (adjugate[0] * x115 + adjugate[1] * x125 + adjugate[2] * x122);
+S_ikmn_canonical[25] += x31 * (adjugate[3] * x115 + adjugate[4] * x125 + adjugate[5] * x122);
+S_ikmn_canonical[26] += x31 * (adjugate[6] * x115 + adjugate[7] * x125 + adjugate[8] * x122);
+S_ikmn_canonical[27] += x31 * (adjugate[3] * x128 + adjugate[4] * x132 + adjugate[5] * x131);
+S_ikmn_canonical[28] += x31 * (adjugate[6] * x128 + adjugate[7] * x132 + adjugate[8] * x131);
+S_ikmn_canonical[29] += x31 * (adjugate[6] * (adjugate[6] * x114 - adjugate[7] * x127 + adjugate[8] * x129) +
+adjugate[7] * (-adjugate[6] * x127 + adjugate[7] * x124 - adjugate[8] * x130) +
+adjugate[8] * (adjugate[6] * x129 - adjugate[7] * x130 + adjugate[8] * x121));
+S_ikmn_canonical[30] += x68 * (adjugate[0] * x152 + adjugate[1] * x143 + adjugate[2] * x159);
+S_ikmn_canonical[31] += x68 * (adjugate[3] * x152 + adjugate[4] * x143 + adjugate[5] * x159);
+S_ikmn_canonical[32] += x68 * (adjugate[6] * x152 + adjugate[7] * x143 + adjugate[8] * x159);
+S_ikmn_canonical[33] += x68 * (adjugate[0] * x163 + adjugate[1] * x161 + adjugate[2] * x164);
+S_ikmn_canonical[34] += x68 * (adjugate[3] * x163 + adjugate[4] * x161 + adjugate[5] * x164);
+S_ikmn_canonical[35] += x68 * (adjugate[6] * x163 + adjugate[7] * x161 + adjugate[8] * x164);
+S_ikmn_canonical[36] += x68 * (adjugate[0] * x166 + adjugate[1] * x165 + adjugate[2] * x168);
+S_ikmn_canonical[37] += x68 * (adjugate[3] * x166 + adjugate[4] * x165 + adjugate[5] * x168);
+S_ikmn_canonical[38] += x68 * (adjugate[6] * x166 + adjugate[7] * x165 + adjugate[8] * x168);
+S_ikmn_canonical[39] += x31 * (adjugate[0] * x174 + adjugate[1] * x183 + adjugate[2] * x180);
+S_ikmn_canonical[40] += x31 * (adjugate[3] * x174 + adjugate[4] * x183 + adjugate[5] * x180);
+S_ikmn_canonical[41] += x31 * (adjugate[6] * x174 + adjugate[7] * x183 + adjugate[8] * x180);
+S_ikmn_canonical[42] += x31 * (adjugate[3] * x185 + adjugate[4] * x189 + adjugate[5] * x188);
+S_ikmn_canonical[43] += x31 * (adjugate[6] * x185 + adjugate[7] * x189 + adjugate[8] * x188);
+S_ikmn_canonical[44] += x31 * (adjugate[6] * (adjugate[6] * x173 - adjugate[7] * x184 + x167 * x175) +
+adjugate[7] * (-adjugate[6] * x184 + adjugate[7] * x182 - x167 * x177) +
+adjugate[8] * (adjugate[6] * x186 - adjugate[7] * x187 + adjugate[8] * x179));
+}
+
+>>>>>>> origin/main
 static SFEM_INLINE void hex8_apply_S_ikmn(const scalar_t                      qx,
                                           const scalar_t                      qy,
                                           const scalar_t                      qz,

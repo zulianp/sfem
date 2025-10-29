@@ -519,6 +519,12 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(8, nelements);
 
+<<<<<<< HEAD
+=======
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
+>>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -599,6 +605,12 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(3, nelements);
 
+<<<<<<< HEAD
+=======
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
+>>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -664,6 +676,12 @@ namespace sfem {
         ret->impl_->points      = create_host_buffer<geom_t>(2, nnodes);
         auto elements_buffer    = create_host_buffer<idx_t>(4, nelements);
 
+<<<<<<< HEAD
+=======
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
+>>>>>>> origin/main
         auto points   = ret->impl_->points->data();
         auto elements = elements_buffer->data();
 
@@ -734,6 +752,12 @@ namespace sfem {
         auto white_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
         auto black_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
+<<<<<<< HEAD
+=======
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
+>>>>>>> origin/main
         auto points         = ret->impl_->points->data();
         auto white_elements = white_elements_buffer->data();
         auto black_elements = black_elements_buffer->data();
@@ -846,6 +870,12 @@ namespace sfem {
         auto left_elements_buffer  = create_host_buffer<idx_t>(8, nelements / 2);
         auto right_elements_buffer = create_host_buffer<idx_t>(8, nelements / 2);
 
+<<<<<<< HEAD
+=======
+        ret->impl_->n_owned_nodes    = nnodes;
+        ret->impl_->n_owned_elements = nelements;
+
+>>>>>>> origin/main
         auto points         = ret->impl_->points->data();
         auto left_elements  = left_elements_buffer->data();
         auto right_elements = right_elements_buffer->data();
@@ -975,6 +1005,24 @@ namespace sfem {
         }
     }
 
+<<<<<<< HEAD
+=======
+    std::vector<std::shared_ptr<Mesh::Block>> Mesh::blocks(const std::vector<std::string> &block_names) const {
+        if (block_names.empty()) {
+            return impl_->blocks;
+        }
+
+        std::vector<std::shared_ptr<Mesh::Block>> ret;
+        for (auto &block : impl_->blocks) {
+            if (std::find(block_names.begin(), block_names.end(), block->name()) != block_names.end()) {
+                ret.push_back(block);
+            }
+        }
+
+        return ret;
+    }
+
+>>>>>>> origin/main
     void Mesh::extract_deprecated(mesh_t *mesh) {
 #ifdef SFEM_ENABLE_MPI
         mesh->comm = impl_->comm->get();
@@ -1059,6 +1107,141 @@ namespace sfem {
         return ret;
     }
 
+<<<<<<< HEAD
+=======
+    std::shared_ptr<Mesh> Mesh::create_tet4_cube(const std::shared_ptr<Communicator> &comm,
+                                                 const int                            nx,
+                                                 const int                            ny,
+                                                 const int                            nz,
+                                                 const geom_t                         xmin,
+                                                 const geom_t                         ymin,
+                                                 const geom_t                         zmin,
+                                                 const geom_t                         xmax,
+                                                 const geom_t                         ymax,
+                                                 const geom_t                         zmax) {
+        auto            ret             = std::make_shared<Mesh>(comm);
+        const ptrdiff_t nelements       = nx * ny * nz;
+        const ptrdiff_t nnodes_vertices = (nx + 1) * (ny + 1) * (nz + 1);
+        const ptrdiff_t nnodes_total    = nnodes_vertices + nelements;
+
+        ret->impl_->spatial_dim = 3;
+        ret->impl_->nnodes      = nnodes_total;
+        ret->impl_->points      = create_host_buffer<geom_t>(3, nnodes_total);
+        auto elements_buffer    = create_host_buffer<idx_t>(4, nelements * 12);
+
+        ret->impl_->n_owned_nodes    = nnodes_total;
+        ret->impl_->n_owned_elements = nelements * 12;
+
+        auto points   = ret->impl_->points->data();
+        auto elements = elements_buffer->data();
+
+        const ptrdiff_t ldz = (ny + 1) * (nx + 1);
+        const ptrdiff_t ldy = nx + 1;
+        const ptrdiff_t ldx = 1;
+
+        const double hx = (xmax - xmin) * 1. / nx;
+        const double hy = (ymax - ymin) * 1. / ny;
+        const double hz = (zmax - zmin) * 1. / nz;
+
+        assert(hx > 0);
+        assert(hy > 0);
+        assert(hz > 0);
+
+        static const int face_nodes[6][4] = {{0, 1, 2, 3}, {4, 7, 6, 5}, {0, 4, 5, 1}, {3, 2, 6, 7}, {0, 3, 7, 4}, {1, 5, 6, 2}};
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const idx_t i0 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i1 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 0) * ldz;
+                    const idx_t i2 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+                    const idx_t i3 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 0) * ldz;
+
+                    const idx_t i4 = (xi + 0) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i5 = (xi + 1) * ldx + (yi + 0) * ldy + (zi + 1) * ldz;
+                    const idx_t i6 = (xi + 1) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+                    const idx_t i7 = (xi + 0) * ldx + (yi + 1) * ldy + (zi + 1) * ldz;
+
+                    const idx_t     cube_nodes[8] = {i0, i1, i2, i3, i4, i5, i6, i7};
+                    const ptrdiff_t elem_index    = zi * ny * nx + yi * nx + xi;
+                    const idx_t     center_idx    = nnodes_vertices + elem_index;
+                    const ptrdiff_t base          = elem_index * 12;
+
+                    for (int face = 0; face < 6; face++) {
+                        const int *fn = face_nodes[face];
+
+                        const ptrdiff_t t0 = base + face * 2 + 0;
+                        elements[0][t0]    = cube_nodes[fn[0]];
+                        elements[1][t0]    = cube_nodes[fn[1]];
+                        elements[2][t0]    = cube_nodes[fn[2]];
+                        elements[3][t0]    = center_idx;
+
+                        const ptrdiff_t t1 = base + face * 2 + 1;
+                        elements[0][t1]    = cube_nodes[fn[0]];
+                        elements[1][t1]    = cube_nodes[fn[2]];
+                        elements[2][t1]    = cube_nodes[fn[3]];
+                        elements[3][t1]    = center_idx;
+                    }
+                }
+            }
+        }
+
+        for (ptrdiff_t zi = 0; zi <= nz; zi++) {
+            for (ptrdiff_t yi = 0; yi <= ny; yi++) {
+                for (ptrdiff_t xi = 0; xi <= nx; xi++) {
+                    ptrdiff_t node  = xi * ldx + yi * ldy + zi * ldz;
+                    points[0][node] = (double)xmin + xi * hx;
+                    points[1][node] = (double)ymin + yi * hy;
+                    points[2][node] = (double)zmin + zi * hz;
+                }
+            }
+        }
+
+        for (ptrdiff_t zi = 0; zi < nz; zi++) {
+            for (ptrdiff_t yi = 0; yi < ny; yi++) {
+                for (ptrdiff_t xi = 0; xi < nx; xi++) {
+                    const ptrdiff_t elem_index = zi * ny * nx + yi * nx + xi;
+                    const idx_t     center_idx = nnodes_vertices + elem_index;
+
+                    points[0][center_idx] = (double)xmin + (xi + 0.5) * hx;
+                    points[1][center_idx] = (double)ymin + (yi + 0.5) * hy;
+                    points[2][center_idx] = (double)zmin + (zi + 0.5) * hz;
+                }
+            }
+        }
+
+        auto default_block = std::make_shared<Block>();
+        default_block->set_name("default");
+        default_block->set_element_type(TET4);
+        default_block->set_elements(elements_buffer);
+        ret->impl_->blocks.push_back(default_block);
+
+        return ret;
+    }
+
+    std::shared_ptr<Mesh> Mesh::create_cube(const std::shared_ptr<Communicator> &comm,
+                                            const enum ElemType                  element_type,
+                                            const int                            nx,
+                                            const int                            ny,
+                                            const int                            nz,
+                                            const geom_t                         xmin,
+                                            const geom_t                         ymin,
+                                            const geom_t                         zmin,
+                                            const geom_t                         xmax,
+                                            const geom_t                         ymax,
+                                            const geom_t                         zmax) {
+        switch (element_type) {
+            case HEX8:
+                return create_hex8_cube(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+            case TET4:
+                return create_tet4_cube(comm, nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax);
+            default:
+                SFEM_ERROR("Invalid element type: %d", element_type);
+                return nullptr;
+        }
+    }
+
+>>>>>>> origin/main
     std::pair<SharedBuffer<geom_t>, SharedBuffer<geom_t>> Mesh::compute_bounding_box() {
         auto points = impl_->points->data();
 
@@ -1210,19 +1393,30 @@ namespace sfem {
     }
 
     int Mesh::renumber_nodes() {
+<<<<<<< HEAD
         auto points     = this->points()->data();
         auto elements   = this->elements()->data();
         auto n_nodes    = this->n_nodes();
         auto n_elements = this->n_elements();
 
         auto new_idx_buff = create_host_buffer<ptrdiff_t>(n_nodes);
+=======
+        const int nxe        = n_nodes_per_element();
+        auto      n_nodes    = this->n_nodes();
+        auto      n_elements = this->n_elements();
+
+        auto new_idx_buff = create_host_buffer<idx_t>(n_nodes);
+>>>>>>> origin/main
 
         auto new_idx = new_idx_buff->data();
         for (ptrdiff_t i = 0; i < n_nodes; i++) {
             new_idx[i] = -1;
         }
 
+<<<<<<< HEAD
         int   nxe          = n_nodes_per_element();
+=======
+>>>>>>> origin/main
         idx_t next_node_id = 0;
         for (auto &b : impl_->blocks) {
             auto elements   = b->elements()->data();
@@ -1238,6 +1432,7 @@ namespace sfem {
             }
         }
 
+<<<<<<< HEAD
         const int dim = spatial_dimension();
 
         auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
@@ -1246,6 +1441,55 @@ namespace sfem {
         for (int d = 0; d < dim; d++) {
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 new_points[d][new_idx[i]] = points[d][i];
+=======
+        return renumber_nodes(new_idx_buff);
+
+        // const int dim = spatial_dimension();
+
+        // auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
+        // auto new_points      = new_points_buff->data();
+
+        // for (int d = 0; d < dim; d++) {
+        //     for (ptrdiff_t i = 0; i < n_nodes; i++) {
+        //         new_points[d][new_idx[i]] = points[d][i];
+        //     }
+        // }
+
+        // impl_->points = new_points_buff;
+
+        // for (auto &b : impl_->blocks) {
+        //     auto elements   = b->elements()->data();
+        //     auto n_elements = b->n_elements();
+
+        //     for (ptrdiff_t e = 0; e < n_elements; e++) {
+        //         for (int v = 0; v < nxe; v++) {
+        //             elements[v][e] = new_idx[elements[v][e]];
+        //         }
+        //     }
+        // }
+
+        // return SFEM_SUCCESS;
+    }
+
+    int Mesh::renumber_nodes(const SharedBuffer<idx_t> &node_mapping) {
+        const int       dim        = spatial_dimension();
+        const int       nxe        = n_nodes_per_element();
+        const ptrdiff_t n_nodes    = this->n_nodes();
+        const ptrdiff_t n_elements = this->n_elements();
+
+        auto points          = this->points()->data();
+        auto elements        = this->elements()->data();
+        auto new_points_buff = create_host_buffer<geom_t>(dim, n_nodes);
+        auto new_points      = new_points_buff->data();
+
+        auto d_node_mapping = node_mapping->data();
+
+        for (int d = 0; d < dim; d++) {
+            for (ptrdiff_t i = 0; i < n_nodes; i++) {
+                assert(d_node_mapping[i] < n_nodes);
+                assert(d_node_mapping[i] >= 0);
+                new_points[d][d_node_mapping[i]] = points[d][i];
+>>>>>>> origin/main
             }
         }
 
@@ -1257,7 +1501,11 @@ namespace sfem {
 
             for (ptrdiff_t e = 0; e < n_elements; e++) {
                 for (int v = 0; v < nxe; v++) {
+<<<<<<< HEAD
                     elements[v][e] = new_idx[elements[v][e]];
+=======
+                    elements[v][e] = d_node_mapping[elements[v][e]];
+>>>>>>> origin/main
                 }
             }
         }

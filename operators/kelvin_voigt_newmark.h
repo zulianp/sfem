@@ -11,6 +11,7 @@ extern "C" {
 
 // HAOYU
 
+<<<<<<< HEAD
 int kelvin_voigt_newmark_apply_adjugate_soa(const enum ElemType                   element_type,
                                          const ptrdiff_t                       nelements,
                                          const ptrdiff_t                       nnodes,
@@ -106,6 +107,15 @@ int kelvin_voigt_newmark_assemble_diag_aos(const enum ElemType          element_
                                             const real_t                 rho,
                                             real_t *const SFEM_RESTRICT  values);
 
+=======
+int kelvin_voigt_newmark_apply_aos(const enum ElemType               element_type,
+                                   const ptrdiff_t                   nelements,
+                                   const ptrdiff_t                   nnodes,
+                                   idx_t **const SFEM_RESTRICT       elements,
+                                   geom_t **const SFEM_RESTRICT      points,
+                                   const real_t *const SFEM_RESTRICT u,
+                                   real_t *const SFEM_RESTRICT       values);
+>>>>>>> origin/main
 
 #ifdef __cplusplus
 }
