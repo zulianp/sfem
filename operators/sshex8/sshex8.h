@@ -35,11 +35,7 @@ static SFEM_INLINE void hex8_sub_adj_0(const scalar_t *const SFEM_RESTRICT adjug
     sub_adjugate[3]    = adjugate[3] * x0;
     sub_adjugate[4]    = adjugate[4] * x0;
     sub_adjugate[5]    = adjugate[5] * x0;
-<<<<<<< HEAD
-    sub_adjugate[6]    = adjugate[6] * x0;                
-=======
     sub_adjugate[6]    = adjugate[6] * x0;
->>>>>>> origin/main
     sub_adjugate[7]    = adjugate[7] * x0;
     sub_adjugate[8]    = adjugate[8] * x0;
     sub_determinant[0] = determinant * (POW3(h));

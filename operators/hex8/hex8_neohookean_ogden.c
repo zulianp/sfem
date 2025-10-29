@@ -14,13 +14,8 @@
 #include "hex8_inline_cpu.h"
 #include "line_quadrature.h"
 
-<<<<<<< HEAD
-#include "hex8_partial_assembly_neohookean_inline.h"
-#include "hex8_neohookean_ogden_local.h"
-=======
 #include "hex8_neohookean_ogden_local.h"
 #include "hex8_partial_assembly_neohookean_inline.h"
->>>>>>> origin/main
 
 int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
                                     const ptrdiff_t                   stride,
@@ -87,11 +82,7 @@ int hex8_neohookean_ogden_objective(const ptrdiff_t                   nelements,
         }
     }
 
-<<<<<<< HEAD
-    if(*out != *out) {
-=======
     if (*out != *out) {
->>>>>>> origin/main
         *out = 1e10;
     }
 
@@ -181,11 +172,7 @@ int hex8_neohookean_ogden_objective_steps(const ptrdiff_t                   nele
     }
 
     for (int s = 0; s < nsteps; s++) {
-<<<<<<< HEAD
-        if(out[s] != out[s]) {
-=======
         if (out[s] != out[s]) {
->>>>>>> origin/main
             out[s] = 1e10;
         }
     }
@@ -259,22 +246,6 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                     assert(jacobian_determinant == jacobian_determinant);
                     assert(jacobian_determinant != 0);
 
-<<<<<<< HEAD
-                    hex8_neohookean_grad(jacobian_adjugate,
-                                         jacobian_determinant,
-                                         qx[kx],
-                                         qx[ky],
-                                         qx[kz],
-                                         qw[kx] * qw[ky] * qw[kz],
-                                         mu,
-                                         lambda,
-                                         edispx,
-                                         edispy,
-                                         edispz,
-                                         eoutx,
-                                         eouty,
-                                         eoutz);
-=======
                     hex8_neohookean_ogden_grad(jacobian_adjugate,
                                                jacobian_determinant,
                                                qx[kx],
@@ -289,7 +260,6 @@ int hex8_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                                                eoutx,
                                                eouty,
                                                eoutz);
->>>>>>> origin/main
                 }
             }
         }
@@ -330,13 +300,10 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-<<<<<<< HEAD
-=======
     static const int       n_qp = line_q2_n;
     static const scalar_t *qx   = line_q2_x;
     static const scalar_t *qw   = line_q2_w;
 
->>>>>>> origin/main
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t    ev[8];
@@ -367,23 +334,15 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
             element_uz[v]       = uz[idx];
         }
 
-<<<<<<< HEAD
-=======
         scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
 #if 0
 
->>>>>>> origin/main
         static const scalar_t samplex = 0.5, sampley = 0.5, samplez = 0.5;
         hex8_adjugate_and_det(lx, ly, lz, samplex, sampley, samplez, jacobian_adjugate, &jacobian_determinant);
 
         // Sample at the centroid
         scalar_t F[9] = {0};
         hex8_F(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, element_ux, element_uy, element_uz, F);
-<<<<<<< HEAD
-        scalar_t S_ikmn[HEX8_S_IKMN_SIZE] = {0};
-        hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez, F, mu, lambda, 1, S_ikmn);
-
-=======
         
         hex8_S_ikmn_neohookean(jacobian_adjugate, jacobian_determinant, samplex, sampley, samplez,1,F, mu, lambda,  S_ikmn);
 
@@ -405,7 +364,6 @@ int hex8_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
             }
         }
 #endif
->>>>>>> origin/main
         metric_tensor_t *const pai = &partial_assembly[i * HEX8_S_IKMN_SIZE];
         for (int k = 0; k < HEX8_S_IKMN_SIZE; k++) {
             assert(S_ikmn[k] == S_ikmn[k]);
@@ -565,8 +523,6 @@ int hex8_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t     
 
     return SFEM_SUCCESS;
 }
-<<<<<<< HEAD
-=======
 
 int hex8_neohookean_ogden_partial_assembly_diag(const ptrdiff_t                   nelements,
                                                 const ptrdiff_t                   stride,
@@ -1005,4 +961,3 @@ int hex8_neohookean_ogden_bcrs_sym(const ptrdiff_t                    nelements,
 
     return SFEM_SUCCESS;
 }
->>>>>>> origin/main

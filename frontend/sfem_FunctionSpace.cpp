@@ -10,10 +10,7 @@
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
-<<<<<<< HEAD
-=======
 #include "sfem_Packed.hpp"
->>>>>>> origin/main
 
 namespace sfem {
 
@@ -32,11 +29,7 @@ namespace sfem {
         std::shared_ptr<CRSGraph>              node_to_node_graph;
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
         std::shared_ptr<sfem::Buffer<idx_t *>> device_elements;
-<<<<<<< HEAD
-
-=======
         std::shared_ptr<Packed<PackedIdxType>> packed_mesh;
->>>>>>> origin/main
         // Data-structures for semistructured mesh
         std::shared_ptr<SemiStructuredMesh> semi_structured_mesh;
 
@@ -162,8 +155,6 @@ namespace sfem {
         return ret;
     }
 
-<<<<<<< HEAD
-=======
 
     std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<Packed<PackedIdxType>> &mesh, const int block_size) {
         auto ret                         = std::make_shared<FunctionSpace>();
@@ -177,7 +168,6 @@ namespace sfem {
         return ret;
     }
 
->>>>>>> origin/main
     FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)
         : impl_(std::make_unique<Impl>()) {
         impl_->mesh       = mesh;
@@ -249,11 +239,8 @@ namespace sfem {
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
 
-<<<<<<< HEAD
-=======
     SharedBuffer<geom_t *> FunctionSpace::points() { if(has_semi_structured_mesh()) { return impl_->semi_structured_mesh->points(); } return impl_->mesh->points(); }
 
->>>>>>> origin/main
     std::shared_ptr<FunctionSpace> FunctionSpace::lor() const {
         return std::make_shared<FunctionSpace>(
                 impl_->mesh, impl_->block_size, macro_type_variant(impl_->get_element_type_for_block(0)));
@@ -281,8 +268,6 @@ namespace sfem {
     bool FunctionSpace::is_multi_block() const { return impl_->mesh && impl_->mesh->n_blocks() > 1; }
 
     std::vector<enum ElemType> FunctionSpace::element_types() const { return impl_->element_types; }
-<<<<<<< HEAD
-=======
 
     int FunctionSpace::initialize_packed_mesh() {
         impl_->packed_mesh = Packed<PackedIdxType>::create(impl_->mesh, {}, true);
@@ -292,5 +277,4 @@ namespace sfem {
     bool FunctionSpace::has_packed_mesh() const { return static_cast<bool>(impl_->packed_mesh); }
 
     std::shared_ptr<Packed<FunctionSpace::PackedIdxType>> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
->>>>>>> origin/main
 }  // namespace sfem

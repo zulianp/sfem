@@ -304,9 +304,6 @@ int hex8_laplacian_diag(const ptrdiff_t              nelements,
     }
 
     return SFEM_SUCCESS;
-<<<<<<< HEAD
-}
-=======
 }
 
 int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
@@ -346,4 +343,3 @@ int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
 
     return SFEM_SUCCESS;
 }
->>>>>>> origin/main

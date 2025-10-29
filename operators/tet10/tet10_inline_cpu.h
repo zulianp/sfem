@@ -3,36 +3,11 @@
 
 #include "tet4_inline_cpu.h"
 
-<<<<<<< HEAD
-static SFEM_INLINE void tet10_ref_shape_grad_x(const scalar_t qx,
-                                               const scalar_t qy,
-                                               const scalar_t qz,
-                                               scalar_t *const out) {
-=======
 static SFEM_INLINE void tet10_ref_shape_grad_x(const scalar_t qx, const scalar_t qy, const scalar_t qz, scalar_t *const out) {
->>>>>>> origin/main
     const scalar_t x0 = 4 * qx;
     const scalar_t x1 = 4 * qy;
     const scalar_t x2 = 4 * qz;
     const scalar_t x3 = x1 + x2;
-<<<<<<< HEAD
-    out[0] = x0 + x3 - 3;
-    out[1] = x0 - 1;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = -8 * qx - x3 + 4;
-    out[5] = x1;
-    out[6] = -x1;
-    out[7] = -x2;
-    out[8] = x2;
-    out[9] = 0;
-}
-
-static SFEM_INLINE void tet10_ref_shape_grad_y(const scalar_t qx,
-                                               const scalar_t qy,
-                                               const scalar_t qz,
-                                               scalar_t *const out) {
-=======
     out[0]            = x0 + x3 - 3;
     out[1]            = x0 - 1;
     out[2]            = 0;
@@ -46,29 +21,10 @@ static SFEM_INLINE void tet10_ref_shape_grad_y(const scalar_t qx,
 }
 
 static SFEM_INLINE void tet10_ref_shape_grad_y(const scalar_t qx, const scalar_t qy, const scalar_t qz, scalar_t *const out) {
->>>>>>> origin/main
     const scalar_t x0 = 4 * qy;
     const scalar_t x1 = 4 * qx;
     const scalar_t x2 = 4 * qz;
     const scalar_t x3 = x1 + x2;
-<<<<<<< HEAD
-    out[0] = x0 + x3 - 3;
-    out[1] = 0;
-    out[2] = x0 - 1;
-    out[3] = 0;
-    out[4] = -x1;
-    out[5] = x1;
-    out[6] = -8 * qy - x3 + 4;
-    out[7] = -x2;
-    out[8] = 0;
-    out[9] = x2;
-}
-
-static SFEM_INLINE void tet10_ref_shape_grad_z(const scalar_t qx,
-                                               const scalar_t qy,
-                                               const scalar_t qz,
-                                               scalar_t *const out) {
-=======
     out[0]            = x0 + x3 - 3;
     out[1]            = 0;
     out[2]            = x0 - 1;
@@ -82,23 +38,10 @@ static SFEM_INLINE void tet10_ref_shape_grad_z(const scalar_t qx,
 }
 
 static SFEM_INLINE void tet10_ref_shape_grad_z(const scalar_t qx, const scalar_t qy, const scalar_t qz, scalar_t *const out) {
->>>>>>> origin/main
     const scalar_t x0 = 4 * qz;
     const scalar_t x1 = 4 * qx;
     const scalar_t x2 = 4 * qy;
     const scalar_t x3 = x1 + x2;
-<<<<<<< HEAD
-    out[0] = x0 + x3 - 3;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = x0 - 1;
-    out[4] = -x1;
-    out[5] = 0;
-    out[6] = -x2;
-    out[7] = -8 * qz - x3 + 4;
-    out[8] = x1;
-    out[9] = x2;
-=======
     out[0]            = x0 + x3 - 3;
     out[1]            = 0;
     out[2]            = 0;
@@ -109,7 +52,6 @@ static SFEM_INLINE void tet10_ref_shape_grad_z(const scalar_t qx, const scalar_t
     out[7]            = -8 * qz - x3 + 4;
     out[8]            = x1;
     out[9]            = x2;
->>>>>>> origin/main
 }
 
 static SFEM_INLINE idx_t tet10_linear_search(const idx_t target, const idx_t *const arr, const int size) {
@@ -135,14 +77,7 @@ static SFEM_INLINE idx_t tet10_find_col(const idx_t key, const idx_t *const row,
     }
 }
 
-<<<<<<< HEAD
-static SFEM_INLINE void tet10_find_cols(const idx_t *targets,
-                                    const idx_t *const row,
-                                    const int lenrow,
-                                    idx_t *ks) {
-=======
 static SFEM_INLINE void tet10_find_cols(const idx_t *targets, const idx_t *const row, const int lenrow, idx_t *ks) {
->>>>>>> origin/main
     if (lenrow > 32) {
         for (int d = 0; d < 10; ++d) {
             ks[d] = tet10_find_col(targets[d], row, lenrow);
@@ -162,22 +97,6 @@ static SFEM_INLINE void tet10_find_cols(const idx_t *targets, const idx_t *const
     }
 }
 
-<<<<<<< HEAD
-static SFEM_INLINE void tet10_local_to_global(const idx_t *const SFEM_RESTRICT ev,
-                                             const accumulator_t *const SFEM_RESTRICT element_matrix,
-                                             const count_t *const SFEM_RESTRICT rowptr,
-                                             const idx_t *const SFEM_RESTRICT colidx,
-                                             real_t *const SFEM_RESTRICT values) {
-    idx_t ks[10];
-    for (int edof_i = 0; edof_i < 10; ++edof_i) {
-        const idx_t dof_i = ev[edof_i];
-        const idx_t lenrow = rowptr[dof_i + 1] - rowptr[dof_i];
-        const idx_t *row = &colidx[rowptr[dof_i]];
-
-        tet10_find_cols(ev, row, lenrow, ks);
-
-        real_t *rowvalues = &values[rowptr[dof_i]];
-=======
 static SFEM_INLINE void tet10_local_to_global(const idx_t *const SFEM_RESTRICT         ev,
                                               const accumulator_t *const SFEM_RESTRICT element_matrix,
                                               const count_t *const SFEM_RESTRICT       rowptr,
@@ -192,7 +111,6 @@ static SFEM_INLINE void tet10_local_to_global(const idx_t *const SFEM_RESTRICT  
         tet10_find_cols(ev, row, lenrow, ks);
 
         real_t              *rowvalues   = &values[rowptr[dof_i]];
->>>>>>> origin/main
         const accumulator_t *element_row = &element_matrix[edof_i * 10];
 
 #pragma unroll(10)
@@ -204,8 +122,6 @@ static SFEM_INLINE void tet10_local_to_global(const idx_t *const SFEM_RESTRICT  
     }
 }
 
-<<<<<<< HEAD
-=======
 static SFEM_INLINE void tet10_local_to_global_bsr3(const idx_t *const SFEM_RESTRICT         ev,
                                                   const accumulator_t *const SFEM_RESTRICT element_matrix,
                                                   const count_t *const SFEM_RESTRICT       rowptr,
@@ -301,5 +217,4 @@ static SFEM_INLINE void tet10_adjugate_and_det(const scalar_t *const SFEM_RESTRI
     determinant[0]     = x17 * x36 + x21 * x29 * x35 - x22 * x36 - x27 * x35 + x30 * x34 - x31 * x34;
 }
 
->>>>>>> origin/main
 #endif  // TET10_INLINE_CPU_H

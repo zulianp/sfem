@@ -1,27 +1,17 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-<<<<<<< HEAD
-=======
 #include "matrixio_array.h"
->>>>>>> origin/main
 #include "sfem_Buffer.hpp"
 #include "sfem_base.h"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
-<<<<<<< HEAD
-#include "matrixio_array.h"
-
-#include "sfem_API.hpp"
-#include "sfem_Env.hpp"
-=======
 
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
 #include "sfem_P1toP2.hpp"
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
->>>>>>> origin/main
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -44,13 +34,9 @@ typedef struct OpDesc {
     template <class Op, class X, class Y>
     void measure(Op op, X x, Y y, int repeat) {
         // Warm-up
-<<<<<<< HEAD
-        op->apply(x, y);
-=======
         for (int i = 0; i < 2; i++) {
             op->apply(x, y);
         }
->>>>>>> origin/main
 
         sfem::device_synchronize();
 
@@ -70,24 +56,15 @@ typedef struct OpDesc {
     }
 
     static const char *header() {
-<<<<<<< HEAD
-        return "Operation          Type      Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Setup [s]    Dimensions\n"
-               "----------------   -------   ---------   -------------    -----------    ---------    ------------\n";
-=======
         return "Operation                 Type           Time [s]    Rate [MDOF/s]    BW [MDOF/s]    Setup [s]    Dimensions\n"
                "-----------------------   ------------   ---------   -------------    -----------    ---------    ------------\n";
->>>>>>> origin/main
     }
 
     void print(std::ostream &os) {
         char buf[256];
         snprintf(buf,
                  sizeof(buf),
-<<<<<<< HEAD
-                 "%-16s   %-7s   %9.3e   %13.3f    %11.3f    %9.3e    (%d, %d)\n",
-=======
                  "%-23s   %-12s   %9.3e   %13.3f    %11.3f    %9.3e    (%d, %d)\n",
->>>>>>> origin/main
                  name.c_str(),
                  type.c_str(),
                  elapsed,
@@ -101,8 +78,6 @@ typedef struct OpDesc {
 
 } OpDesc_t;
 
-<<<<<<< HEAD
-=======
 void add_matrix_free_scalar_ops(enum ElemType                   element_type,
                                 const bool                      semi_structured,
                                 const enum sfem::ExecutionSpace es,
@@ -163,19 +138,11 @@ void add_matrix_based_vector_ops(const int                       dim,
     }
 }
 
->>>>>>> origin/main
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
     {
         auto comm = context.communicator();
 
-<<<<<<< HEAD
-        int SFEM_BASE_RESOLUTION = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
-        int SFEM_REPEAT = sfem::Env::read("SFEM_REPEAT", 5);
-
-        sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
-=======
         if (comm->size() > 1) {
             SFEM_ERROR("Parallel execution not supported!\n");
         }
@@ -185,7 +152,6 @@ int main(int argc, char *argv[]) {
         int SFEM_REPEAT               = sfem::Env::read("SFEM_REPEAT", 5);
 
         auto es = sfem::EXECUTION_SPACE_HOST;
->>>>>>> origin/main
 
         const char *SFEM_EXECUTION_SPACE{nullptr};
         SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
@@ -193,50 +159,12 @@ int main(int argc, char *argv[]) {
             es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
 
-<<<<<<< HEAD
-        std::string path = sfem::Env::read_string("SFEM_MESH", "");
-=======
         std::string                 path = sfem::Env::read_string("SFEM_MESH", "");
->>>>>>> origin/main
         std::shared_ptr<sfem::Mesh> m;
 
         if (!path.empty()) {
             m = sfem::Mesh::create_from_file(comm, path.c_str());
         } else {
-<<<<<<< HEAD
-            m = sfem::Mesh::create_hex8_cube(
-                    comm, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
-        }
-
-        int dim = m->spatial_dimension();
-        double start = MPI_Wtime();
-        m->node_to_node_graph();
-        double stop = MPI_Wtime();
-        std::cout << "CRS Graph creation " << (stop - start) << " [s]\n";
-
-        std::vector<OpDesc_t> ops({{.name = "Laplacian", .type = MATRIX_FREE, .block_size = 1},
-                                   {.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim},
-                                   {.name = "LinearElasticity", .type = BSR, .block_size = dim}});
-
-        std::shared_ptr<sfem::SemiStructuredMesh> ssmesh;
-        if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-            ssmesh = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
-
-            ops.push_back({.name = "em:Laplacian", .type = MATRIX_FREE, .block_size = 1});
-
-        } else {
-            ops.push_back({.name = "Laplacian", .type = CRS, .block_size = 1});
-            if(m->element_type() == HEX8) {
-                // FIXME
-                ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
-                ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim}); //FIXME
-            }
-            // ops.push_back({.name = "LumpedMass", .type = MATRIX_FREE, .block_size = 1});
-        }
-
-        if((m->element_type() == TET4 && SFEM_ELEMENT_REFINE_LEVEL <= 1) || m->element_type() == HEX8) {
-            ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
-=======
             auto SFEM_ELEM_TYPE = type_from_string(sfem::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
 
             m = sfem::Mesh::create_cube(
@@ -287,18 +215,14 @@ int main(int argc, char *argv[]) {
             add_matrix_based_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
             fprintf(stderr, "[Warning] Skipping BSR ops for large meshes #nodes %ld #dim %d\n", (long)nnodes, dim);
->>>>>>> origin/main
         }
 
         for (auto &op_desc : ops) {
             std::shared_ptr<sfem::FunctionSpace> fs;
             if (ssmesh) {
                 fs = sfem::FunctionSpace::create(ssmesh, op_desc.block_size);
-<<<<<<< HEAD
-=======
             } else if (packed_mesh) {
                 fs = sfem::FunctionSpace::create(packed_mesh, op_desc.block_size);
->>>>>>> origin/main
             } else {
                 fs = sfem::FunctionSpace::create(m, op_desc.block_size);
             }
@@ -309,17 +233,6 @@ int main(int argc, char *argv[]) {
             op->initialize();
             f->add_operator(op);
 
-<<<<<<< HEAD
-            auto x         = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto input     = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto output    = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-
-            double start = MPI_Wtime();
-            f->update(x->data());
-            auto linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
-            double stop = MPI_Wtime();
-            op_desc.setup = stop - start;
-=======
             auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto input  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
             auto output = sfem::create_buffer<real_t>(fs->n_dofs(), es);
@@ -329,7 +242,6 @@ int main(int argc, char *argv[]) {
             auto   linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
             double stop      = MPI_Wtime();
             op_desc.setup    = stop - start;
->>>>>>> origin/main
 
             op_desc.measure(linear_op, input->data(), output->data(), 5);
         }

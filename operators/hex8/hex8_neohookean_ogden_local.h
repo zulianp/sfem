@@ -1,13 +1,8 @@
 #ifndef HEX8_NEOHOOKEAN_OGDEN_LOCAL_H
 #define HEX8_NEOHOOKEAN_OGDEN_LOCAL_H
 
-<<<<<<< HEAD
-#include "sfem_base.h"
-#include <math.h>
-=======
 #include <math.h>
 #include "sfem_base.h"
->>>>>>> origin/main
 
 #include "hex8_partial_assembly_neohookean_inline.h"
 
@@ -109,22 +104,6 @@ static SFEM_INLINE void hex8_neohookean_ogden_objective_steps_integral(const sca
     }
 }
 
-<<<<<<< HEAD
-static SFEM_INLINE void hex8_neohookean_grad(const scalar_t *const SFEM_RESTRICT adjugate,
-                                             const scalar_t                      jacobian_determinant,
-                                             const scalar_t                      qx,
-                                             const scalar_t                      qy,
-                                             const scalar_t                      qz,
-                                             const scalar_t                      qw,
-                                             const scalar_t                      mu,
-                                             const scalar_t                      lmbda,
-                                             const scalar_t *const SFEM_RESTRICT dispx,
-                                             const scalar_t *const SFEM_RESTRICT dispy,
-                                             const scalar_t *const SFEM_RESTRICT dispz,
-                                             scalar_t *const SFEM_RESTRICT       gx,
-                                             scalar_t *const SFEM_RESTRICT       gy,
-                                             scalar_t *const SFEM_RESTRICT       gz) {
-=======
 static SFEM_INLINE void hex8_neohookean_ogden_grad(const scalar_t *const SFEM_RESTRICT adjugate,
                                                    const scalar_t                      jacobian_determinant,
                                                    const scalar_t                      qx,
@@ -139,7 +118,6 @@ static SFEM_INLINE void hex8_neohookean_ogden_grad(const scalar_t *const SFEM_RE
                                                    scalar_t *const SFEM_RESTRICT       gx,
                                                    scalar_t *const SFEM_RESTRICT       gy,
                                                    scalar_t *const SFEM_RESTRICT       gz) {
->>>>>>> origin/main
     scalar_t F[9];
     {
         // mundane ops: 267 divs: 1 sqrts: 0
@@ -311,8 +289,6 @@ static SFEM_INLINE void hex8_neohookean_ogden_grad(const scalar_t *const SFEM_RE
     gz[7] += -qw * (x87 + x89 + x93);
 }
 
-<<<<<<< HEAD
-=======
 static SFEM_INLINE void hex8_neohookean_ogden_hessian_diag(const scalar_t *const SFEM_RESTRICT adjugate,
                                                            const scalar_t                      jacobian_determinant,
                                                            const scalar_t                      qx,
@@ -3735,7 +3711,6 @@ static SFEM_INLINE void hex8_neohookean_ogden_hessian(const scalar_t *const SFEM
     H[575] += x48 * (x2010 + x2012 + x2112 + x2231 + x2251 + x2252);
 }
 
->>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif

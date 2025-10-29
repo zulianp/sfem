@@ -2715,17 +2715,10 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean(const scalar_t *const SFEM_RESTRI
                                                const scalar_t                      qx,
                                                const scalar_t                      qy,
                                                const scalar_t                      qz,
-<<<<<<< HEAD
-                                               const scalar_t *const SFEM_RESTRICT F,
-                                               const scalar_t                      mu,
-                                               const scalar_t                      lmbda,
-                                               const scalar_t                      qw,
-=======
                                                const scalar_t                      qw,
                                                const scalar_t *const SFEM_RESTRICT F,
                                                const scalar_t                      mu,
                                                const scalar_t                      lmbda,
->>>>>>> origin/main
                                                scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
     // mundane ops: 1014 divs: 2 sqrts: 0
     // total ops: 1030
@@ -2972,8 +2965,6 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean(const scalar_t *const SFEM_RESTRI
                                   adjugate[8] * (adjugate[6] * x186 - adjugate[7] * x187 + adjugate[8] * x179));
 }
 
-<<<<<<< HEAD
-=======
 
 static SFEM_INLINE void hex8_S_ikmn_neohookean_add(const scalar_t *const SFEM_RESTRICT adjugate,
     const scalar_t                      jacobian_determinant,
@@ -3230,7 +3221,6 @@ adjugate[7] * (-adjugate[6] * x184 + adjugate[7] * x182 - x167 * x177) +
 adjugate[8] * (adjugate[6] * x186 - adjugate[7] * x187 + adjugate[8] * x179));
 }
 
->>>>>>> origin/main
 static SFEM_INLINE void hex8_apply_S_ikmn(const scalar_t                      qx,
                                           const scalar_t                      qy,
                                           const scalar_t                      qz,

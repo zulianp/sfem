@@ -29,11 +29,7 @@ namespace sfem {
 
             const std::string           &name() const;
             enum ElemType                element_type() const;
-<<<<<<< HEAD
-            int           n_nodes_per_element() const;
-=======
             int                          n_nodes_per_element() const;
->>>>>>> origin/main
             const SharedBuffer<idx_t *> &elements() const;
 
             // Setters for internal use
@@ -68,10 +64,7 @@ namespace sfem {
         int                                        initialize_node_to_node_graph();
         int                                        convert_to_macro_element_mesh();
         const std::vector<std::shared_ptr<Block>> &blocks() const;
-<<<<<<< HEAD
-=======
         std::vector<std::shared_ptr<Block>>        blocks(const std::vector<std::string> &block_names) const;
->>>>>>> origin/main
 
         // Block-related methods
         size_t                       n_blocks() const;
@@ -122,8 +115,6 @@ namespace sfem {
 
         static std::shared_ptr<Mesh> create_hex8_reference_cube();
 
-<<<<<<< HEAD
-=======
         static std::shared_ptr<Mesh> create_cube(const std::shared_ptr<Communicator> &comm,
                                                  const enum ElemType                  element_type,
                                                  const int                            nx   = 1,
@@ -136,7 +127,6 @@ namespace sfem {
                                                  const geom_t                         ymax = 1,
                                                  const geom_t                         zmax = 1);
 
->>>>>>> origin/main
         static std::shared_ptr<Mesh> create_hex8_cube(const std::shared_ptr<Communicator> &comm,
                                                       const int                            nx   = 1,
                                                       const int                            ny   = 1,
@@ -148,8 +138,6 @@ namespace sfem {
                                                       const geom_t                         ymax = 1,
                                                       const geom_t                         zmax = 1);
 
-<<<<<<< HEAD
-=======
         static std::shared_ptr<Mesh> create_tet4_cube(const std::shared_ptr<Communicator> &comm,
                                                       const int                            nx   = 1,
                                                       const int                            ny   = 1,
@@ -161,7 +149,6 @@ namespace sfem {
                                                       const geom_t                         ymax = 1,
                                                       const geom_t                         zmax = 1);
 
->>>>>>> origin/main
         static std::shared_ptr<Mesh> create_tri3_square(const std::shared_ptr<Communicator> &comm,
                                                         const int                            nx   = 1,
                                                         const int                            ny   = 1,
@@ -204,16 +191,10 @@ namespace sfem {
                 const std::function<bool(const geom_t, const geom_t, const geom_t)> &selector,
                 const std::vector<std::string>                                      &block_names = {});
 
-<<<<<<< HEAD
-        int split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name);
-        int split_boundary_layer();
-        int renumber_nodes();
-=======
         int  split_block(const SharedBuffer<element_idx_t> &elements, const std::string &name);
         int  split_boundary_layer();
         int  renumber_nodes();
         int  renumber_nodes(const SharedBuffer<idx_t> &node_mapping);
->>>>>>> origin/main
         void set_node_mapping(const SharedBuffer<idx_t> &node_mapping);
         void set_comm(const std::shared_ptr<Communicator> &comm);
         void set_element_type(const enum ElemType element_type);

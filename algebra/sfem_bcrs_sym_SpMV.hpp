@@ -5,11 +5,7 @@
 #include "sfem_Tracer.hpp"
 
 namespace sfem {
-<<<<<<< HEAD
-    template <typename R, typename C, typename T>
-=======
     template <typename R, typename C, typename TStorage, typename T = TStorage>
->>>>>>> origin/main
     class BCRSSymSpMV : public Operator<T> {
     public:
         std::function<void(const T* const, T* const)> apply_;
@@ -27,13 +23,8 @@ namespace sfem {
 
         SharedBuffer<R>  rowptr;
         SharedBuffer<C>  colidx;
-<<<<<<< HEAD
-        SharedBuffer<T*> diag_values;
-        SharedBuffer<T*> off_diag_values;
-=======
         SharedBuffer<TStorage*> diag_values;
         SharedBuffer<TStorage*> off_diag_values;
->>>>>>> origin/main
 
         int       block_size_{0};
         ptrdiff_t block_rows_{0};
@@ -250,29 +241,17 @@ namespace sfem {
         }
     };
 
-<<<<<<< HEAD
-    template <typename R, typename C, typename T>
-    std::shared_ptr<BCRSSymSpMV<R, C, T>> h_bcrs_sym(const ptrdiff_t         block_rows,
-=======
     template <typename R, typename C, typename TStorage, typename T = TStorage>
     std::shared_ptr<BCRSSymSpMV<R, C, TStorage, T>> h_bcrs_sym(const ptrdiff_t         block_rows,
->>>>>>> origin/main
                                                      const ptrdiff_t         block_cols,
                                                      const int               block_size,
                                                      const SharedBuffer<R>&  rowptr,
                                                      const SharedBuffer<C>&  colidx,
                                                      const ptrdiff_t         block_stride,
-<<<<<<< HEAD
-                                                     const SharedBuffer<T*>& diag_values,
-                                                     const SharedBuffer<T*>& off_diag_values,
-                                                     const T                 scale_output) {
-        auto ret              = std::make_shared<BCRSSymSpMV<R, C, T>>();
-=======
                                                      const SharedBuffer<TStorage*>& diag_values,
                                                      const SharedBuffer<TStorage*>& off_diag_values,
                                                      const T                 scale_output) {
         auto ret              = std::make_shared<BCRSSymSpMV<R, C, TStorage, T>>();
->>>>>>> origin/main
         ret->rowptr           = rowptr;
         ret->colidx           = colidx;
         ret->diag_values      = diag_values;
