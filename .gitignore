@@ -37,6 +37,8 @@ TEST*.xml
 
 core_daint*
 
+core_nid*
+
 *.yml
 
 
