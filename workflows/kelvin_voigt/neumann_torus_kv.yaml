@@ -1,0 +1,16 @@
+
+neumann_conditions:
+  # Apply time-dependent force on outlet (will be controlled by driver)
+  # Note: The actual time-dependent force is handled in the driver code
+  # This just defines the sideset where force is applied
+  - type: sideset
+    format: file
+    path: torus_geometry/outlet
+    value: [0, -2, 0]  # Initial force magnitude (Y direction, downward)
+    component: [0, 1, 2]
+
+# Time-dependent loading strategy:
+# t < T/3: Apply full load (-10 in Y direction)
+# t >= T/3: Remove load (set to 0)
+# This creates: loading phase → unloading → free vibration with damping
+
