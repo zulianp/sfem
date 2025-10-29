@@ -1,9 +1,0 @@
-backend: petsc
-type: ksp
-pc_type: hypre
-ksp_type: cg
-verbose: true
-atol: 1e-14
-stol: 1e-16
-rtol: 0
-max_it: 40

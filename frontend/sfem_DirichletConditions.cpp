@@ -1,5 +1,10 @@
 #include "sfem_DirichletConditions.hpp"
 
+<<<<<<< HEAD
+=======
+#include "sfem_config.h"
+
+>>>>>>> origin/main
 #include <stddef.h>
 
 #include "boundary_condition.h"
@@ -483,8 +488,18 @@ namespace sfem {
 
         // This is pure algebraic energy (may need to scale with boundary mass matrix for proper energy)
         for (auto &c : impl_->conditions) {
+<<<<<<< HEAD
             constraint_objective_nodes_to_value_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, out);
+=======
+            if (c.values) {
+                constraint_objective_nodes_to_values_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x, out);
+            } else {
+                constraint_objective_nodes_to_value_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, out);
+            }
+>>>>>>> origin/main
         }
 
         return SFEM_SUCCESS;
@@ -497,6 +512,7 @@ namespace sfem {
                                          real_t *const       out) {
         SFEM_TRACE_SCOPE("DirichletConditions::value_steps");
         for (auto &c : impl_->conditions) {
+<<<<<<< HEAD
             constraint_objective_nodes_to_value_vec_steps(c.nodeset->size(),
                                                           c.nodeset->data(),
                                                           impl_->space->block_size(),
@@ -507,6 +523,31 @@ namespace sfem {
                                                           nsteps,
                                                           steps,
                                                           out);
+=======
+            if (c.values) {
+                constraint_objective_nodes_to_values_vec_steps(c.nodeset->size(),
+                                                               c.nodeset->data(),
+                                                               impl_->space->block_size(),
+                                                               c.component,
+                                                               c.values->data(),
+                                                               x,
+                                                               h,
+                                                               nsteps,
+                                                               steps,
+                                                               out);
+            } else {
+                constraint_objective_nodes_to_value_vec_steps(c.nodeset->size(),
+                                                              c.nodeset->data(),
+                                                              impl_->space->block_size(),
+                                                              c.component,
+                                                              c.value,
+                                                              x,
+                                                              h,
+                                                              nsteps,
+                                                              steps,
+                                                              out);
+            }
+>>>>>>> origin/main
         }
         return SFEM_SUCCESS;
     }
@@ -515,8 +556,19 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::gradient");
 
         for (auto &c : impl_->conditions) {
+<<<<<<< HEAD
             constraint_gradient_nodes_to_value_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, g);
+=======
+            if (c.values) {
+                constraint_gradient_nodes_to_values_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x, g);
+
+            } else {
+                constraint_gradient_nodes_to_value_vec(
+                        c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.value, x, g);
+            }
+>>>>>>> origin/main
         }
 
         return SFEM_SUCCESS;

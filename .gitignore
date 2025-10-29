@@ -10,6 +10,9 @@ dist/
 *.a
 *.o
 
+*.a
+*.o
+
 # Compiled Java class files
 *.class
 

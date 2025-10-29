@@ -304,4 +304,46 @@ int hex8_laplacian_diag(const ptrdiff_t              nelements,
     }
 
     return SFEM_SUCCESS;
+<<<<<<< HEAD
 }
+=======
+}
+
+int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
+                             idx_t **const SFEM_RESTRICT           elements,
+                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const real_t *const SFEM_RESTRICT     u,
+                             real_t *const SFEM_RESTRICT           values) {
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t         ev[8];
+        accumulator_t element_vector[8];
+        scalar_t      element_u[8];
+        scalar_t      fff_i[6];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            element_u[v] = u[ev[v]];
+        }
+
+        for (int d = 0; d < 6; d++) {
+            fff_i[d] = fff[i * 6 + d];
+        }
+
+        hex8_laplacian_apply_fff_integral(fff_i, element_u, element_vector);
+
+        for (int edof_i = 0; edof_i < 8; ++edof_i) {
+            const idx_t dof_i = ev[edof_i];
+
+#pragma omp atomic update
+            values[dof_i] += element_vector[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+>>>>>>> origin/main

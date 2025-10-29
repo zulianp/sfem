@@ -21,6 +21,7 @@
 #include "tet4_neohookean_ogden.h"
 #include "tet4_partial_assembly_neohookean_inline.h"
 
+<<<<<<< HEAD
 #include <mpi.h>
 #include <math.h>
 
@@ -89,6 +90,15 @@ namespace sfem {
         }
     };
 
+=======
+#include "sfem_ElasticityAssemblyData.hpp"
+
+#include <math.h>
+#include <mpi.h>
+
+namespace sfem {
+
+>>>>>>> origin/main
     class NeoHookeanOgden::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -141,6 +151,10 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neohookean_ogden_diag_aos(domain.element_type,
                                              mesh->n_elements(),
+<<<<<<< HEAD
+=======
+                                             1,
+>>>>>>> origin/main
                                              mesh->n_nodes(),
                                              domain.block->elements()->data(),
                                              mesh->points()->data(),
@@ -148,6 +162,27 @@ namespace sfem {
                                              this->impl_->lambda,
                                              x,
                                              out);
+<<<<<<< HEAD
+=======
+
+            // return neohookean_ogden_partial_assembly_diag(
+            //     domain.element_type,
+            //     mesh->n_elements(),
+            //     1,
+            //     domain.block->elements()->data(),
+            //     mesh->points()->data(),
+            //     this->impl_->mu,
+            //     this->impl_->lambda,
+            //     3,
+            //     &x[0],
+            //     &x[1],
+            //     &x[2],
+            //     3,
+            //     &out[0],
+            //     &out[1],
+            //     &out[2]
+            //  );
+>>>>>>> origin/main
         });
     }
 
@@ -173,7 +208,11 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
+<<<<<<< HEAD
             auto ua = std::static_pointer_cast<struct AssemblyData>(domain.user_data);
+=======
+            auto ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
+>>>>>>> origin/main
             if (ua->partial_assembly_buffer) {
                 if (ua->use_compression) {
                     return neohookean_ogden_compressed_partial_assembly_apply(domain.element_type,
@@ -229,6 +268,7 @@ namespace sfem {
         bool use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
+<<<<<<< HEAD
             auto ua                  = std::make_shared<struct AssemblyData>();
             ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == HEX8;
             ua->use_compression      = use_compression;
@@ -236,6 +276,16 @@ namespace sfem {
             ua->elements             = domain.second.block->elements();
             ua->elements_stride      = 1;
             domain.second.user_data  = ua;
+=======
+            auto ua = std::make_shared<struct ElasticityAssemblyData>();
+            ua->use_partial_assembly =
+                    use_partial_assembly || domain.second.element_type == HEX8 || domain.second.element_type == TET10;
+            ua->use_compression     = use_compression;
+            ua->use_AoS             = use_AoS;
+            ua->elements            = domain.second.block->elements();
+            ua->elements_stride     = 1;
+            domain.second.user_data = ua;
+>>>>>>> origin/main
 
             if (use_AoS) {
                 auto nxe            = domain.second.block->n_nodes_per_element();
@@ -253,13 +303,18 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
 
         for (auto &domain : impl_->domains->domains()) {
+<<<<<<< HEAD
             auto assembly_data = std::static_pointer_cast<struct AssemblyData>(domain.second.user_data);
+=======
+            auto assembly_data = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.second.user_data);
+>>>>>>> origin/main
             if (!assembly_data->use_partial_assembly) continue;
 
             auto lambda       = domain.second.parameters->get_real_value("lambda", impl_->lambda);
             auto mu           = domain.second.parameters->get_real_value("mu", impl_->mu);
             auto element_type = domain.second.element_type;
 
+<<<<<<< HEAD
             if (element_type == TET4 || element_type == HEX8) {
                 // FIXME: Add support for other element types
                 if (!assembly_data->partial_assembly_buffer) {
@@ -282,6 +337,27 @@ namespace sfem {
                         assembly_data->partial_assembly_buffer->data());
                 assembly_data->compress_partial_assembly(domain.second);
             }
+=======
+            // FIXME: Add support for other element types
+            if (!assembly_data->partial_assembly_buffer) {
+                assembly_data->partial_assembly_buffer =
+                        sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * TET4_S_IKMN_SIZE);
+            }
+
+            int ok = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
+                                                               domain.second.block->n_elements(),
+                                                               assembly_data->elements_stride,
+                                                               assembly_data->elements->data(),
+                                                               mesh->points()->data(),
+                                                               domain.second.parameters->get_real_value("mu", impl_->mu),
+                                                               domain.second.parameters->get_real_value("lambda", impl_->lambda),
+                                                               3,
+                                                               &u[0],
+                                                               &u[1],
+                                                               &u[2],
+                                                               assembly_data->partial_assembly_buffer->data());
+            assembly_data->compress_partial_assembly(domain.second);
+>>>>>>> origin/main
         }
 
         return SFEM_SUCCESS;
@@ -292,6 +368,7 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
+<<<<<<< HEAD
             auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
 
             if (domain.element_type == HEX8) {
@@ -313,12 +390,26 @@ namespace sfem {
                                                   domain.block->n_elements(),
                                                   mesh->n_nodes(),
                                                   domain.block->elements()->data(),
+=======
+            auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
+
+            return neohookean_ogden_objective_aos(domain.element_type,
+                                                  domain.block->n_elements(),
+                                                  ua->elements_stride,
+                                                  mesh->n_nodes(),
+                                                  ua->elements->data(),
+>>>>>>> origin/main
                                                   mesh->points()->data(),
                                                   domain.parameters->get_real_value("mu", impl_->mu),
                                                   domain.parameters->get_real_value("lambda", impl_->lambda),
                                                   x,
+<<<<<<< HEAD
                                                   out);
             }
+=======
+                                                  false,
+                                                  out);
+>>>>>>> origin/main
         });
     }
 
@@ -331,6 +422,7 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
+<<<<<<< HEAD
             auto ua = std::static_pointer_cast<AssemblyData>(domain.user_data);
             if (domain.element_type == HEX8) {
                 return hex8_neohookean_ogden_objective_steps(mesh->n_elements(),
@@ -355,6 +447,22 @@ namespace sfem {
                 // Must be implemented
                 return SFEM_FAILURE;
             }
+=======
+            auto ua = std::static_pointer_cast<ElasticityAssemblyData>(domain.user_data);
+            return neohookean_ogden_objective_steps_aos(domain.element_type,
+                                                        mesh->n_elements(),
+                                                        ua->elements_stride,
+                                                        mesh->n_nodes(),
+                                                        ua->elements->data(),
+                                                        mesh->points()->data(),
+                                                        domain.parameters->get_real_value("mu", impl_->mu),
+                                                        domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                        x,
+                                                        h,
+                                                        nsteps,
+                                                        steps,
+                                                        out);
+>>>>>>> origin/main
         });
     }
 
@@ -401,4 +509,62 @@ namespace sfem {
     void NeoHookeanOgden::set_mu(const real_t mu) { impl_->mu = mu; }
     void NeoHookeanOgden::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
 
+<<<<<<< HEAD
+=======
+    int NeoHookeanOgden::hessian_bsr(const real_t *const  x,
+                                     const count_t *const rowptr,
+                                     const idx_t *const   colidx,
+                                     real_t *const        values) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_bsr");
+
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_bsr(domain.element_type,
+                                        domain.block->n_elements(),
+                                        1,
+                                        domain.block->elements()->data(),
+                                        mesh->points()->data(),
+                                        domain.parameters->get_real_value("mu", impl_->mu),
+                                        domain.parameters->get_real_value("lambda", impl_->lambda),
+                                        3,
+                                        &x[0],
+                                        &x[1],
+                                        &x[2],
+                                        rowptr,
+                                        colidx,
+                                        values);
+        });
+        return SFEM_SUCCESS;
+    }
+
+    int NeoHookeanOgden::hessian_bcrs_sym(const real_t *const  x,
+                                          const count_t *const rowptr,
+                                          const idx_t *const   colidx,
+                                          const ptrdiff_t      block_stride,
+                                          real_t **const       diag_values,
+                                          real_t **const       off_diag_values) {
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neohookean_ogden_bcrs_sym(domain.element_type,
+                                             domain.block->n_elements(),
+                                             1,
+                                             domain.block->elements()->data(),
+                                             mesh->points()->data(),
+                                             domain.parameters->get_real_value("mu", impl_->mu),
+                                             domain.parameters->get_real_value("lambda", impl_->lambda),
+                                             3,
+                                             &x[0],
+                                             &x[1],
+                                             &x[2],
+                                             rowptr,
+                                             colidx,
+                                             block_stride,
+                                             diag_values,
+                                             off_diag_values);
+        });
+        SFEM_TRACE_SCOPE("NeoHookeanOgden::hessian_bcrs_sym");
+        return SFEM_SUCCESS;
+    }
+
+>>>>>>> origin/main
 }  // namespace sfem

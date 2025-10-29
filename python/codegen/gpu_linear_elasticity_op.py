@@ -484,7 +484,10 @@ element_matrix)
 	{CODE}
 }}
 """
+<<<<<<< HEAD
         return tpl
+=======
+>>>>>>> origin/main
 
     def hessian_diag(self):
         H = self.eval_hessian
@@ -624,6 +627,7 @@ def main():
     op = GPULinearElasticityOp(fe)
     # op.hessian_check()
 
+<<<<<<< HEAD
     tpl = op.hessian_blocks_tpl()
     blocks = op.hessian_blocks()
     for k,v in blocks:
@@ -665,6 +669,49 @@ def main():
 
     	c_code(op.jacobian())
     	c_code(op.geometry())
+=======
+    # tpl = op.hessian_blocks_tpl()
+    # blocks = op.hessian_blocks()
+    # for k,v in blocks:
+    # 	c_log("//--------------------------")
+    # 	c_log(f"// hessian {k}")
+    # 	c_log("//--------------------------")
+    # 	code = c_gen(v)
+    # 	c_log(tpl.format(BLOCK_NAME=k, CODE=code))
+
+    # if False:
+    # 	c_log("//--------------------------")
+    # 	c_log("// New hessian")
+    # 	c_log("//--------------------------")
+
+    # 	kv = op.hessian_less_registers()
+    # 	for k, v in kv.items():
+
+    # 		print("---------------------")
+    # 		print(f"{k}")
+    # 		print("---------------------")
+    # 		c_code(v)
+
+    # 	# c_log("//--------------------------")
+    # 	# c_log("// New hessian apply")
+    # 	# c_log("//--------------------------")
+
+    # 	# kv = op.hessian_apply()
+    # 	# for k, v in kv.items():
+
+    # 	# 	print("---------------------")
+    # 	# 	print(f"{k}")
+    # 	# 	print("---------------------")
+    # 	# 	c_code(v)
+
+    # else:
+    # 	c_log("//--------------------------")
+    # 	c_log("// geometry")
+    # 	c_log("//--------------------------")
+
+    # 	c_code(op.jacobian())
+    # 	c_code(op.geometry())
+>>>>>>> origin/main
 
     c_log("//--------------------------")
     c_log("// CauchyStress")
@@ -711,10 +758,17 @@ def main():
     # 	# c_log("//--------------------------")
     # 	# c_code(op.value())
 
+<<<<<<< HEAD
     c_log("--------------------------")
     c_log("hessian")
     c_log("--------------------------")
     c_code(op.hessian())
+=======
+    # c_log("--------------------------")
+    # c_log("hessian")
+    # c_log("--------------------------")
+    # c_code(op.hessian())
+>>>>>>> origin/main
 
     # 	c_log("--------------------------")
     # 	c_log("hessian_diag")

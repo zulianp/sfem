@@ -3,6 +3,10 @@
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_defs.h"
+<<<<<<< HEAD
+=======
+#include "sfem_Buffer.hpp"
+>>>>>>> origin/main
 
 #include <memory>
 #include <string>
@@ -12,6 +16,13 @@ namespace sfem {
 
     class FunctionSpace final {
     public:
+<<<<<<< HEAD
+=======
+        using PackedIdxType = uint16_t;
+        // using PackedIdxType = uint8_t;
+        using PackedMesh = Packed<PackedIdxType>;
+
+>>>>>>> origin/main
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const enum ElemType element_type = INVALID);
         ~FunctionSpace();
 
@@ -24,6 +35,10 @@ namespace sfem {
         }
 
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
+<<<<<<< HEAD
+=======
+        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<PackedMesh> &mesh, const int block_size = 1);
+>>>>>>> origin/main
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
         int destroy_vector(real_t *values);
@@ -41,6 +56,17 @@ namespace sfem {
         bool                has_semi_structured_mesh() const;
         SemiStructuredMesh &semi_structured_mesh();
 
+<<<<<<< HEAD
+=======
+        
+        // using PackedIdxType = uint8_t;
+        int initialize_packed_mesh();
+        bool has_packed_mesh() const;
+        std::shared_ptr<PackedMesh> packed_mesh();
+
+        SharedBuffer<geom_t *> points();
+
+>>>>>>> origin/main
         int       block_size() const;
         ptrdiff_t n_dofs() const;
 

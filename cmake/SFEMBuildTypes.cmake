@@ -96,8 +96,8 @@ set(CMAKE_C_FLAGS_AVX512
     CACHE STRING "Flags for using fast operations and avx512" FORCE)
 
 
-message(STATUS "CMAKE_CXX_FLAGS_AVX2: ${CMAKE_CXX_FLAGS_AVX2}")
-message(STATUS "CMAKE_C_FLAGS_AVX2: ${CMAKE_C_FLAGS_AVX2}")
+# message(STATUS "CMAKE_CXX_FLAGS_AVX2: ${CMAKE_CXX_FLAGS_AVX2}")
+# message(STATUS "CMAKE_C_FLAGS_AVX2: ${CMAKE_C_FLAGS_AVX2}")
 
 set(CMAKE_CXX_FLAGS_PROF
     "-O1 -g -DNDEBUG "
@@ -107,12 +107,22 @@ set(CMAKE_CXX_FLAGS_PROF
 
 # set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC\" -arch=sm_90 -Xptxas=-O3,-v -use_fast_math")
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_${SFEM_CUDA_ARCH}")
-set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G -O0")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=-O3,-march=native,-mtune=native,-fPIC -arch=sm_${SFEM_CUDA_ARCH} -Xptxas=-O3,-v,-warn-spills  ")
 
 if(SFEM_ENABLE_CUDA_LINEINFO)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
 endif()
 
 
-message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")
+# message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")
+
+
+if(SFEM_ENABLE_AGGRESSIVE_OPT)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}   -ffast-math -funroll-loops -fomit-frame-pointer -fno-math-errno -fvectorize -fslp-vectorize ")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}     -ffast-math -funroll-loops -fomit-frame-pointer -fno-math-errno -fvectorize -fslp-vectorize ")
+endif()
+
+ if(APPLE_M1)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=apple-m1 -mtune=apple-m1 ")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -mcpu=apple-m1 -mtune=apple-m1 ")
+endif()

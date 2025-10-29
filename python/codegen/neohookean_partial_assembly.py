@@ -666,11 +666,19 @@ static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
         print(f"Wrote {out_path}")
 
 
+<<<<<<< HEAD
 def neohookean(fe):
     name = "neohookean"
     strain_energy_function = "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2"
 
     op = SRHyperelasticity.create_from_string(fe, strain_energy_function)
+=======
+def neohookean_ogden(fe):
+    name = "neohookean_ogden"
+    strain_energy_function = "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2"
+
+    op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function)
+>>>>>>> origin/main
 
     elem_type_lc = fe.name().lower()
     elem_type_uc = fe.name().upper()
@@ -685,7 +693,11 @@ def neohookean(fe):
 def compressible_mooney_rivlin(fe):
     name = "compressible_mooney_rivlin"
     strain_energy_function = "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2"
+<<<<<<< HEAD
     op = SRHyperelasticity.create_from_string_unimodular(fe, strain_energy_function)
+=======
+    op = SRHyperelasticity.create_from_string_unimodular(fe, name, strain_energy_function)
+>>>>>>> origin/main
     
     elem_type_lc = fe.name().lower()
     elem_type_uc = fe.name().upper()
@@ -701,7 +713,13 @@ def compressible_mooney_rivlin(fe):
 
 if __name__ == "__main__":
     # fe = Tet4()
+<<<<<<< HEAD
     fe = Hex8()
     # fe = Tet10()
     neohookean(fe)
+=======
+    # fe = Hex8()
+    fe = Tet10()
+    neohookean_ogden(fe)
+>>>>>>> origin/main
     # compressible_mooney_rivlin(fe)

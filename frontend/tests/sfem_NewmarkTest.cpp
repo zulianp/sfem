@@ -1,7 +1,11 @@
 #include <stdio.h>
 
 #include "sfem_test.h"
+<<<<<<< HEAD
 #include "sfem_ssgmg.hpp"
+=======
+
+>>>>>>> origin/main
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
@@ -134,7 +138,11 @@ int test_explicit_euler() {
     auto displacement = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     auto g            = sfem::create_buffer<real_t>(fs->n_dofs(), es);
 
+<<<<<<< HEAD
     real_t dt          = 0.1;
+=======
+    real_t dt          = 0.0001;
+>>>>>>> origin/main
     real_t T           = 50 * dt;
     size_t export_freq = 1;
     size_t steps       = 0;
@@ -197,14 +205,23 @@ int test_newmark() {
     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
     auto g         = sfem::create_buffer<real_t>(ndofs, es);
 
+<<<<<<< HEAD
     real_t dt          = 0.1;
     real_t T           = 5;
+=======
+    real_t dt          = 0.2;
+    real_t T           = 4;
+>>>>>>> origin/main
     size_t export_freq = 1;
     size_t steps       = 0;
     real_t t           = 0;
     int    nliter      = 1;
 
+<<<<<<< HEAD
     bool SFEM_NEWMARK_ENABLE_OUTPUT = true;
+=======
+    bool SFEM_NEWMARK_ENABLE_OUTPUT = false;
+>>>>>>> origin/main
     SFEM_READ_ENV(SFEM_NEWMARK_ENABLE_OUTPUT, atoi);
 
     if (SFEM_NEWMARK_ENABLE_OUTPUT) {
@@ -216,8 +233,11 @@ int test_newmark() {
         output->log_time(t);
     }
 
+<<<<<<< HEAD
     // auto solver     =  sfem::create_ssgmg(f, es);
 
+=======
+>>>>>>> origin/main
     while (t < T) {
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
@@ -296,4 +316,8 @@ int main(int argc, char *argv[]) {
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/main

@@ -14,11 +14,15 @@
 #include "ssquad4.h"
 
 // C++ includes
+#include "acrs.hpp"
+#include "scrs.hpp"
+#include "sdacrs.hpp"
 #include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
 #include "sfem_Context.hpp"
 #include "sfem_CooSym.hpp"
+#include "sfem_Env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
@@ -34,6 +38,7 @@
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_mprgp.hpp"
+#include "sell.hpp"
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
@@ -98,7 +103,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
+    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const MemorySpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == MEMORY_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
 #endif  // SFEM_ENABLE_CUDA
@@ -106,7 +111,7 @@ namespace sfem {
     }
 
     template <typename T>
-    static SharedBuffer<T*> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
+    static SharedBuffer<T *> create_buffer(const std::ptrdiff_t n0, const std::ptrdiff_t n1, const ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) return sfem::create_device_buffer<T>(n0, n1);
 #endif  // SFEM_ENABLE_CUDA
@@ -754,13 +759,27 @@ namespace sfem {
                 crs_graph->n_nodes(), crs_graph->n_nodes(), crs_graph->rowptr(), crs_graph->colidx(), values, (real_t)1);
     }
 
+    static auto compose_constraints_op(const std::shared_ptr<sfem::Function>         &f,
+                                       const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        return sfem::make_op<real_t>(
+                f->space()->n_dofs(),
+                f->space()->n_dofs(),
+                [=](const real_t *const x, real_t *const y) {
+                    op->apply(x, y);
+                    f->copy_constrained_dofs(x, y);
+                },
+                op->execution_space());
+    }
+
     static auto hessian_bsr(const std::shared_ptr<sfem::Function> &f,
                             const SharedBuffer<real_t>            &x,
                             const sfem::ExecutionSpace             es) {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
         auto      crs_graph  = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
+        int       prec       = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
+        // FIXME: there is a memory leak here!
 #ifdef SFEM_ENABLE_CUDA
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             auto d_crs_graph = sfem::to_device(crs_graph);
@@ -768,23 +787,36 @@ namespace sfem {
 
             f->hessian_bsr(x->data(), d_crs_graph->rowptr()->data(), d_crs_graph->colidx()->data(), values->data());
 
-            auto spmv = sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
-                                         d_crs_graph->n_nodes(),
-                                         block_size,
-                                         d_crs_graph->rowptr(),
-                                         d_crs_graph->colidx(),
-                                         values,
-                                         (real_t)1);
-
-            // Owns the pointers
-            return sfem::make_op<real_t>(
-                    f->space()->n_dofs(),
-                    f->space()->n_dofs(),
-                    [=](const real_t *const x, real_t *const y) {
-                        spmv->apply(x, y);
-                        f->copy_constrained_dofs(x, y);
-                    },
-                    es);
+            switch (prec) {
+            // FIXME: mixed precision not yet supported for BSR
+            //     case 2:
+            //         return compose_constraints_op(f,
+            //                                       sfem::d_bsr_spmv<count_t, idx_t, half_t, real_t>(d_crs_graph->n_nodes(),
+            //                                                                                        d_crs_graph->n_nodes(),
+            //                                                                                        block_size,
+            //                                                                                        d_crs_graph->rowptr(),
+            //                                                                                        d_crs_graph->colidx(),
+            //                                                                                        astype<half_t>(values),
+            //                                                                                        (real_t)1));
+            //     case 4:
+            //         return compose_constraints_op(f,
+            //                                       sfem::d_bsr_spmv<count_t, idx_t, float, real_t>(d_crs_graph->n_nodes(),
+            //                                                                                       d_crs_graph->n_nodes(),
+            //                                                                                       block_size,
+            //                                                                                       d_crs_graph->rowptr(),
+            //                                                                                       d_crs_graph->colidx(),
+            //                                                                                       astype<float>(values),
+            //                                                                                       (real_t)1));
+            // default:
+                return compose_constraints_op(f,
+                                              sfem::d_bsr_spmv(d_crs_graph->n_nodes(),
+                                                               d_crs_graph->n_nodes(),
+                                                               block_size,
+                                                               d_crs_graph->rowptr(),
+                                                               d_crs_graph->colidx(),
+                                                               values,
+                                                               (real_t)1));
+            }
         }
 #endif
         auto values = sfem::create_host_buffer<real_t>(crs_graph->nnz() * block_size * block_size);
@@ -793,24 +825,38 @@ namespace sfem {
 
         f->hessian_bsr(x_data, crs_graph->rowptr()->data(), crs_graph->colidx()->data(), values->data());
 
-        // Owns the pointers
-        auto spmv = sfem::h_bsr_spmv(crs_graph->n_nodes(),
-                                     crs_graph->n_nodes(),
-                                     block_size,
-                                     crs_graph->rowptr(),
-                                     crs_graph->colidx(),
-                                     values,
-                                     (real_t)1);
-        // return spmv;
-        // Owns the pointers
-        return sfem::make_op<real_t>(
-                f->space()->n_dofs(),
-                f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) {
-                    spmv->apply(x, y);
-                    f->copy_constrained_dofs(x, y);
-                },
-                es);
+        switch (prec) {
+            case 2: {
+                return compose_constraints_op(f,
+                                              sfem::h_bsr_spmv<count_t, idx_t, half_t, real_t>(crs_graph->n_nodes(),
+                                                                                               crs_graph->n_nodes(),
+                                                                                               block_size,
+                                                                                               crs_graph->rowptr(),
+                                                                                               crs_graph->colidx(),
+                                                                                               astype<half_t>(values),
+                                                                                               (real_t)1));
+            }
+#ifndef SFEM_REAL_T_IS_FLOAT32
+            case 4:
+                return compose_constraints_op(f,
+                                              sfem::h_bsr_spmv<count_t, idx_t, float, real_t>(crs_graph->n_nodes(),
+                                                                                              crs_graph->n_nodes(),
+                                                                                              block_size,
+                                                                                              crs_graph->rowptr(),
+                                                                                              crs_graph->colidx(),
+                                                                                              astype<float>(values),
+                                                                                              (real_t)1));
+#endif
+            default:
+                return compose_constraints_op(f,
+                                              sfem::h_bsr_spmv<count_t, idx_t, real_t>(crs_graph->n_nodes(),
+                                                                                       crs_graph->n_nodes(),
+                                                                                       block_size,
+                                                                                       crs_graph->rowptr(),
+                                                                                       crs_graph->colidx(),
+                                                                                       values,
+                                                                                       (real_t)1));
+        }
     }
 
     static auto hessian_bcrs_sym(const std::shared_ptr<sfem::Function> &f,
@@ -826,6 +872,8 @@ namespace sfem {
 
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
+
+        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
         SharedBuffer<real_t *> diag_values;
         SharedBuffer<real_t *> off_diag_values;
@@ -847,24 +895,43 @@ namespace sfem {
                             diag_values->data(),
                             off_diag_values->data());
 
-        auto spmv = sfem::h_bcrs_sym<count_t, idx_t, real_t>(crs_graph->n_nodes(),
-                                                             crs_graph->n_nodes(),
-                                                             block_size,
-                                                             crs_graph->rowptr(),
-                                                             crs_graph->colidx(),
-                                                             block_stride,
-                                                             diag_values,
-                                                             off_diag_values,
-                                                             (real_t)1);
-        // Owns the pointers
-        return sfem::make_op<real_t>(
-                f->space()->n_dofs(),
-                f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) {
-                    spmv->apply(x, y);
-                    f->copy_constrained_dofs(x, y);
-                },
-                es);
+        switch (prec) {
+            case 2:
+                return compose_constraints_op(f,
+                                              sfem::h_bcrs_sym<count_t, idx_t, half_t, real_t>(crs_graph->n_nodes(),
+                                                                                               crs_graph->n_nodes(),
+                                                                                               block_size,
+                                                                                               crs_graph->rowptr(),
+                                                                                               crs_graph->colidx(),
+                                                                                               block_stride,
+                                                                                               astype<half_t>(diag_values),
+                                                                                               astype<half_t>(off_diag_values),
+                                                                                               (real_t)1));
+#ifndef SFEM_REAL_T_IS_FLOAT32
+            case 4:
+                return compose_constraints_op(f,
+                                              sfem::h_bcrs_sym<count_t, idx_t, float, real_t>(crs_graph->n_nodes(),
+                                                                                              crs_graph->n_nodes(),
+                                                                                              block_size,
+                                                                                              crs_graph->rowptr(),
+                                                                                              crs_graph->colidx(),
+                                                                                              block_stride,
+                                                                                              astype<float>(diag_values),
+                                                                                              astype<float>(off_diag_values),
+                                                                                              (real_t)1));
+#endif
+            default:
+                return compose_constraints_op(f,
+                                              sfem::h_bcrs_sym<count_t, idx_t, real_t>(crs_graph->n_nodes(),
+                                                                                       crs_graph->n_nodes(),
+                                                                                       block_size,
+                                                                                       crs_graph->rowptr(),
+                                                                                       crs_graph->colidx(),
+                                                                                       block_stride,
+                                                                                       diag_values,
+                                                                                       off_diag_values,
+                                                                                       (real_t)1));
+        }
     }
 
     static auto hessian_coo_sym(const std::shared_ptr<sfem::Function> &f,
@@ -980,6 +1047,74 @@ namespace sfem {
                 es);
     }
 
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_sdacrs(const std::shared_ptr<sfem::Function> &f,
+                                                                  const std::shared_ptr<Buffer<real_t>> &x,
+                                                                  const sfem::ExecutionSpace             es) {
+        auto crs = hessian_crs(f, x, es);
+
+        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        switch (prec) {
+            case 2:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, half_t>(
+                        crs->row_ptr, crs->col_idx, crs->values, es);
+            case 4:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, float>(
+                        crs->row_ptr, crs->col_idx, crs->values, es);
+            default:
+                return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t>(crs->row_ptr, crs->col_idx, crs->values, es);
+        }
+    }
+
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_acrs(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, half_t>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            case 4:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es);
+            default:
+                return sfem::acrs_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+        }
+    }
+
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_scrs(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, half_t>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            case 4:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t, real_t, float>(
+                        temp->row_ptr, temp->col_idx, temp->values, es);
+            default:
+                return sfem::scrs_from_crs<count_t, idx_t, real_t, uint16_t>(temp->row_ptr, temp->col_idx, temp->values, es);
+        }
+    }
+
+    static std::shared_ptr<sfem::Operator<real_t>> hessian_sell(const std::shared_ptr<sfem::Function> &f,
+                                                                const std::shared_ptr<Buffer<real_t>> &x,
+                                                                const sfem::ExecutionSpace             es) {
+        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  slice_height = sfem::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
+
+        auto temp = sfem::hessian_crs(f, x, es);
+        switch (prec) {
+            case 2:
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, half_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
+            case 4:
+                return sfem::sell_from_crs<count_t, idx_t, real_t, real_t, float>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
+            default:
+                return sfem::sell_from_crs<count_t, idx_t, real_t>(temp->row_ptr, temp->col_idx, temp->values, es, slice_height);
+        }
+    }
+
     static real_t residual(sfem::Operator<real_t> &op, const real_t *const rhs, const real_t *const x, real_t *const r) {
 #ifdef SFEM_ENABLE_CUDA
         if (op.execution_space() == sfem::EXECUTION_SPACE_DEVICE) {
@@ -1027,11 +1162,10 @@ namespace sfem {
                                                                           enum sfem::ExecutionSpace                    es) {
         if (format == MATRIX_FREE) {
             return sfem::make_op<real_t>(
-                f->space()->n_dofs(),
-                f->space()->n_dofs(),
-                [=](const real_t *const x, real_t *const y) { f->apply((u? u->data() : nullptr), x, y); },
-                f->execution_space());
-    
+                    f->space()->n_dofs(),
+                    f->space()->n_dofs(),
+                    [=](const real_t *const x, real_t *const y) { f->apply((u ? u->data() : nullptr), x, y); },
+                    f->execution_space());
         }
 
         if (f->space()->block_size() == 1) {
@@ -1039,12 +1173,35 @@ namespace sfem {
                 return sfem::hessian_crs_sym(f, u, es);
             else if (format == COO_SYM)
                 return sfem::hessian_coo_sym(f, u, es);
+            else if (format == SPLITCRS) {
+                return sfem::hessian_scrs(f, u, es);
+            } else if (format == ALIGNEDCRS) {
+                return hessian_acrs(f, u, es);
+            } else if (format == SPLITDACRS) {
+                return sfem::hessian_sdacrs(f, u, es);
+            } else if (format == SELL) {
+                return sfem::hessian_sell(f, u, es);
+            }
 
             if (format != CRS) {
                 fprintf(stderr, "[Warning] fallback to CRS format as \"%s\" is not supported!\n", format.c_str());
             }
 
-            return sfem::hessian_crs(f, u, es);
+            // FIXME: This is a hack to support mixed precision
+            int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+            auto crs  = sfem::hessian_crs(f, u, es);
+            switch (prec) {
+                case 2:
+                    return sfem::h_crs_spmv<count_t, idx_t, half_t, real_t>(
+                            crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<half_t>(crs->values), (real_t)1);
+#ifndef SFEM_REAL_T_IS_FLOAT32
+                case 4:
+                    return sfem::h_crs_spmv<count_t, idx_t, float, real_t>(
+                            crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<float>(crs->values), (real_t)1);
+#endif
+                default:
+                    return crs;
+            }
         }
 
         if (format == BSR) return sfem::hessian_bsr(f, u, es);
@@ -1186,9 +1343,13 @@ namespace sfem {
 
     static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
         return make_in_place_op<real_t>(
+<<<<<<< HEAD
                 f->space()->n_dofs(),
                 [=](real_t *const x) { f->apply_zero_constraints(x); },
                 f->execution_space());
+=======
+                f->space()->n_dofs(), [=](real_t *const x) { f->apply_zero_constraints(x); }, f->execution_space());
+>>>>>>> origin/main
     }
 
 }  // namespace sfem

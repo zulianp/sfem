@@ -40,21 +40,56 @@ endif()
 
 # ##############################################################################
 
+<<<<<<< HEAD
 if(SFEM_ENABLE_LAPACK OR TPL_ENABLE_LAPACK)
     if(TPL_LAPACK_LIBRARIES)
         list(APPEND SFEM_DEP_LIBRARIES ${TPL_LAPACK_LIBRARIES})
         set(SFEM_HAVE_LAPACK TRUE)
-    else()
-        find_package(LAPACK)
-        if(LAPACK_FOUND)
-            set(SFEM_HAVE_LAPACK TRUE)
-            list(APPEND SFEM_DEP_LIBRARIES ${LAPACK_LIBRARIES})
+=======
+
+if(SFEM_ENABLE_MPI)
+    find_package(MPI REQUIRED)
+
+    if(MPI_FOUND)
+        set(SFEM_HAVE_MPI TRUE)
+
+        if(MPI_C_INCLUDE_PATH)
+            set(SFEM_DEP_INCLUDES
+                "${SFEM_DEP_INCLUDES};${MPI_C_INCLUDE_PATH}")
         endif()
+
+        if(MPI_CXX_INCLUDE_PATH)
+            set(SFEM_DEP_INCLUDES
+                "${SFEM_DEP_INCLUDES};${MPI_CXX_INCLUDE_PATH}")
+        endif()
+
+        if(MPI_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_LIBRARIES}")
+        endif()
+
+        if(MPI_C_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_C_LIBRARIES}")
+        endif()
+
+        if(MPI_CXX_LIBRARIES)
+            set(SFEM_DEP_LIBRARIES
+                "${SFEM_DEP_LIBRARIES};${MPI_CXX_LIBRARIES}")
+        endif()
+        
+>>>>>>> origin/main
+    else()
+        message(
+            FATAL_ERROR
+                "We should never end up here, because find_package above is REQUIRED"
+        )
     endif()
 endif()
 
 # ##############################################################################
 
+<<<<<<< HEAD
 if(SFEM_ENABLE_MPI)
     find_package(MPI REQUIRED)
 
@@ -96,6 +131,8 @@ endif()
 
 # ##############################################################################
 
+=======
+>>>>>>> origin/main
 find_package(Doxygen QUIET)
 
 if(DOXYGEN_FOUND)
@@ -203,6 +240,10 @@ if(SFEM_ENABLE_BLAS)
         list(APPEND SFEM_DEP_LIBRARIES ${ACCELERATE_FRAMEWORK})
     else()
         find_package(BLAS REQUIRED)
+<<<<<<< HEAD
+=======
+        list(APPEND SFEM_DEP_LIBRARIES BLAS::BLAS)
+>>>>>>> origin/main
     endif()
 endif()
 
@@ -211,6 +252,12 @@ if(SFEM_ENABLE_LAPACK)
     list(APPEND SFEM_DEP_LIBRARIES  LAPACK::LAPACK)
 endif()
 
+<<<<<<< HEAD
+=======
+
+# ##############################################################################
+
+>>>>>>> origin/main
 # if(SFEM_ENABLE_HIP)
 # # TODO
 # endif()

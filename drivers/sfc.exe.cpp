@@ -19,6 +19,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
+<<<<<<< HEAD
 
 #ifdef DSFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
@@ -132,12 +133,21 @@ int main(int argc, char *argv[]) {
 
     if (argc != 3) {
         if (!rank) {
+=======
+#include "sfem_SFC.hpp"
+
+
+int sfc_reorder(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (argc != 3) {
+        if (!comm->rank()) {
+>>>>>>> origin/main
             fprintf(stderr, "usage: %s <folder> <output_folder>\n", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
+<<<<<<< HEAD
 #ifndef DSFEM_ENABLE_MPI_SORT
     if (size > 1) {
         SFEM_ERROR( "Parallel runs not supported. Compile with mpi-sort\n");
@@ -394,4 +404,29 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
+=======
+    const char *folder = argv[1];
+    const char *output_folder = argv[2];
+
+    double tick = MPI_Wtime();
+
+    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto sfc = sfem::SFC::create_from_env();
+    sfc->reorder(*mesh);
+
+    double tock = MPI_Wtime();
+
+    if (!comm->rank()) {
+        printf("----------------------------------------\n");
+        printf("TTS:\t\t\t%g seconds\n", tock - tick);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return sfc_reorder(ctx->communicator(), argc, argv);
+>>>>>>> origin/main
 }
