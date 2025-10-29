@@ -615,24 +615,23 @@ transform_and_check_quadrature_point(                         //
     return result;
 }  // END: transform_and_check_quadrature_point
 
-static inline quadrature_point_result_t  //
-transform_and_check_quadrature_point_n(  //
-        const int q_ijk,                 //
-        // const real_t                      volume_main_tet,           //
-        const real_t                      tet4_faces_normals[4][3],  //
-        const real_t                      faces_centroids[4][3],     //
-        const real_t* const SFEM_RESTRICT Q_nodes_x,                 //
-        const real_t* const SFEM_RESTRICT Q_nodes_y,                 //
-        const real_t* const SFEM_RESTRICT Q_nodes_z,                 //
-        const real_t* const SFEM_RESTRICT Q_weights,                 //
-        const geom_t* const SFEM_RESTRICT origin,                    //
-        const geom_t* const SFEM_RESTRICT delta,                     //
-        const ptrdiff_t                   i_grid,                    //
-        const ptrdiff_t                   j_grid,                    //
-        const ptrdiff_t                   k_grid,                    //
-        const real_t                      tet_vertices_x[4],         //
-        const real_t                      tet_vertices_y[4],         //
-        const real_t                      tet_vertices_z[4]) {                            //
+static inline quadrature_point_result_t                  //
+transform_and_check_quadrature_point_n(const int q_ijk,  //
+                                                         // const real_t                      volume_main_tet,           //
+                                       const real_t                      tet4_faces_normals[4][3],  //
+                                       const real_t                      faces_centroids[4][3],     //
+                                       const real_t* const SFEM_RESTRICT Q_nodes_x,                 //
+                                       const real_t* const SFEM_RESTRICT Q_nodes_y,                 //
+                                       const real_t* const SFEM_RESTRICT Q_nodes_z,                 //
+                                       const real_t* const SFEM_RESTRICT Q_weights,                 //
+                                       const geom_t* const SFEM_RESTRICT origin,                    //
+                                       const geom_t* const SFEM_RESTRICT delta,                     //
+                                       const ptrdiff_t                   i_grid,                    //
+                                       const ptrdiff_t                   j_grid,                    //
+                                       const ptrdiff_t                   k_grid,                    //
+                                       const real_t                      tet_vertices_x[4],         //
+                                       const real_t                      tet_vertices_y[4],         //
+                                       const real_t                      tet_vertices_z[4]) {                            //
 
     quadrature_point_result_t result;
 
@@ -662,6 +661,79 @@ transform_and_check_quadrature_point_n(  //
 
     return result;
 }  // END: transform_and_check_quadrature_point
+
+/////////////////////////////////////////////////////////
+// is_hex_out_of_tet ////////////////////////////
+/////////////////////////////////////////////////////////
+bool                                                 //
+is_hex_out_of_tet(const real_t inv_J_tet[9],         //
+                  const real_t tet_origin_x,         //
+                  const real_t tet_origin_y,         //
+                  const real_t tet_origin_z,         //
+                  const real_t hex_vertices_x[8],    //
+                  const real_t hex_vertices_y[8],    //
+                  const real_t hex_vertices_z[8]) {  //
+
+    /**
+     * ****************************************************************************************
+     * Check if a hexahedral element is completely outside a tetrahedral element
+     * Using the inverse Jacobian of the tetrahedron to transform hex vertices to tet reference space
+     * and check against tet reference space constraints.
+     * This function return true if the hex is completely outside the tet.
+     * And return false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
+     * This must be used as a fast culling test before more expensive intersection tests.
+     * *****************************************************************************************
+     */
+
+    // Precompute inverse Jacobian components for better cache utilization
+    const real_t inv_J00 = inv_J_tet[0];
+    const real_t inv_J01 = inv_J_tet[1];
+    const real_t inv_J02 = inv_J_tet[2];
+    const real_t inv_J10 = inv_J_tet[3];
+    const real_t inv_J11 = inv_J_tet[4];
+    const real_t inv_J12 = inv_J_tet[5];
+    const real_t inv_J20 = inv_J_tet[6];
+    const real_t inv_J21 = inv_J_tet[7];
+    const real_t inv_J22 = inv_J_tet[8];
+
+    // Track if all vertices violate each constraint
+    int all_negative_x  = 1;  // All ref_x < 0
+    int all_negative_y  = 1;  // All ref_y < 0
+    int all_negative_z  = 1;  // All ref_z < 0
+    int all_outside_sum = 1;  // All ref_x + ref_y + ref_z > 1
+    // int all_larger_than_one = 1;  // All ref_x > 1, ref_y > 1, ref_z > 1 (not used slow)
+
+    for (int v = 0; v < 8; v++) {
+        // Transform hex vertex to tet reference space
+        const real_t dx = hex_vertices_x[v] - tet_origin_x;
+        const real_t dy = hex_vertices_y[v] - tet_origin_y;
+        const real_t dz = hex_vertices_z[v] - tet_origin_z;
+
+        const real_t ref_x = inv_J00 * dx + inv_J01 * dy + inv_J02 * dz;
+        const real_t ref_y = inv_J10 * dx + inv_J11 * dy + inv_J12 * dz;
+        const real_t ref_z = inv_J20 * dx + inv_J21 * dy + inv_J22 * dz;
+
+        // Point is inside tet if: ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND ref_x + ref_y + ref_z <= 1
+        // Point is outside if it violates ANY of these constraints
+
+        // Update flags - use bitwise AND for branchless execution
+        all_negative_x &= (ref_x < 0.0);
+        all_negative_y &= (ref_y < 0.0);
+        all_negative_z &= (ref_z < 0.0);
+        all_outside_sum &= ((ref_x + ref_y + ref_z) > 1.0);
+
+        // Early exit optimization: if we know hex is not completely outside, stop
+        if (!all_negative_x &&   //
+            !all_negative_y &&   //
+            !all_negative_z &&   //
+            !all_outside_sum) {  //
+            return false;
+        }  // END if early exit
+    }  // END for (int v = 0; v < 8; v++)
+
+    // Hex is completely outside if ALL vertices violate at least one constraint
+    return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
+}  // END Function: is_hex_out_of_tet
 
 //////////////////////////////////////////////////////////
 // ijk_index_t ////////////////////////////
@@ -779,7 +851,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
     const int off6 = stride[0] + stride[1] + stride[2];
     const int off7 = stride[1] + stride[2];
 
-    const int N_midpoint = 3;
+    const int N_midpoint = 4;
     const int dim_quad   = N_midpoint * N_midpoint * N_midpoint;
     real_t    Q_nodes_x[dim_quad];
     real_t    Q_nodes_y[dim_quad];
@@ -900,11 +972,55 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
         real_t hex_element_field[8] = {0.0};
 
         for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
+            const real_t z_hex_min = ((real_t)k_grid_z) * delta[2] + origin[2];
+            const real_t z_hex_max = z_hex_min + delta[2];
+
             for (int j_grid_y = min_grid_y; j_grid_y < max_grid_y; j_grid_y++) {
+                const real_t y_hex_min = ((real_t)j_grid_y) * delta[1] + origin[1];
+                const real_t y_hex_max = y_hex_min + delta[1];
+
                 for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x++) {
-                    // const int i = i_grid_x - min_grid_x;
-                    // const int j = j_grid_y - min_grid_y;
-                    // const int k = k_grid_z - min_grid_z;
+                    const real_t x_hex_min = ((real_t)i_grid_x) * delta[0] + origin[0];
+                    const real_t x_hex_max = x_hex_min + delta[0];
+
+                    const real_t hex_vertices_x[8] = {x_hex_min,
+                                                      x_hex_max,
+                                                      x_hex_max,
+                                                      x_hex_min,  //
+                                                      x_hex_min,
+                                                      x_hex_max,
+                                                      x_hex_max,
+                                                      x_hex_min};
+                    const real_t hex_vertices_y[8] = {y_hex_min,
+                                                      y_hex_min,
+                                                      y_hex_max,
+                                                      y_hex_max,  //
+                                                      y_hex_min,
+                                                      y_hex_min,
+                                                      y_hex_max,
+                                                      y_hex_max};
+                    const real_t hex_vertices_z[8] = {z_hex_min,
+                                                      z_hex_min,
+                                                      z_hex_min,
+                                                      z_hex_min,  //
+                                                      z_hex_max,
+                                                      z_hex_max,
+                                                      z_hex_max,
+                                                      z_hex_max};
+
+                    const bool is_out_of_tet = is_hex_out_of_tet(inv_J_tet,        //
+                                                                 x0_n,             //
+                                                                 y0_n,             //
+                                                                 z0_n,             //
+                                                                 hex_vertices_x,   //
+                                                                 hex_vertices_y,   //
+                                                                 hex_vertices_z);  //
+
+                    const int i = i_grid_x - min_grid_x;
+                    const int j = j_grid_y - min_grid_y;
+                    const int k = k_grid_z - min_grid_z;
+
+                    if (is_out_of_tet) continue;  // Skip this hex cell
 
                     // Midpoint quadrature rule in 3D
 
