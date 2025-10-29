@@ -477,7 +477,7 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(comm, &mpi_rank);
     MPI_Comm_size(comm, &mpi_size);
 
-    const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig;
+    const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig_pos;
 
 #if SFEM_LOG_LEVEL >= 5
 
@@ -892,7 +892,7 @@ int main(int argc, char* argv[]) {
                         mini_tet_parameters.alpha_min_threshold = 1.0;
                         mini_tet_parameters.alpha_max_threshold = 8.0;
                         mini_tet_parameters.min_refinement_L    = 1;
-                        mini_tet_parameters.max_refinement_L    = 5;
+                        mini_tet_parameters.max_refinement_L    = 3;
 
                         const char* max_refinement_L_str = getenv("MAX_REFINEMENT_L");
                         if (max_refinement_L_str) {
