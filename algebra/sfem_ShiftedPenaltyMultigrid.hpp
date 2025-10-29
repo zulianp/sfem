@@ -49,6 +49,8 @@ namespace sfem {
      * - `set_upper_bound`: Sets the upper bound for the solution.
      * - `set_lower_bound`: Sets the lower bound for the solution.
      * - `set_penalty_parameter`: Sets the penalty parameter for the shifted penalty method.
+     * - `set_omega_factor`: Sets the omega factor for the shifted penalty method.
+     * - `set_stagnation_threshold`: Sets the stagnation threshold for the shifted penalty method.
      * - `set_constraints_op`: Sets the constraint operators and their transpose.
      * - `add_level_constraint_op_x_op`: Adds a level-specific constraint operator.
      * - `apply`: Applies the multigrid solver to solve the system.
@@ -179,7 +181,8 @@ namespace sfem {
         void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
         void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
         void set_penalty_parameter(const T val) { penalty_param_ = val; }
-
+        void set_omega_factor(const T val) { omega_factor = val; }
+        void set_stagnation_threshold(const T val) { stagnation_threshold = val; }
         void set_constraints_op(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Operator<T>>& op_t) {
             constraints_op_           = op;
             constraints_op_transpose_ = op_t;
@@ -225,7 +228,7 @@ namespace sfem {
 
             int count_inner_iter        = 0;
             int count_lagr_mult_updates = 0;
-            T   omega                   = 1 / penalty_param_;
+            T   omega                   = omega_factor / penalty_param_;
 
             SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
@@ -233,8 +236,11 @@ namespace sfem {
                 blas_.copy(n_dofs, x, x_old->data());
             }
 
+
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
+                
+                T rnorm_previous = 10000000000;
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     count_inner_iter++;
 
@@ -289,7 +295,13 @@ namespace sfem {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
                     }
 
-                    if (r_pen_norm < std::max(atol_, omega) && inner_iter != 0) {
+                    bool stagnation = (std::abs(r_pen_norm/rnorm_previous) > stagnation_threshold);
+                    rnorm_previous = r_pen_norm;
+                    if(stagnation) {
+                        printf("Stagnation detected\n");
+                    }
+
+                    if ((r_pen_norm < std::max(atol_, omega) && inner_iter != 0) || stagnation) {
                         break;
                     }
                 }
@@ -320,13 +332,19 @@ namespace sfem {
 
                 // I moved the previous three lines outside of the if
                 if (norm_pen < penetration_tol) {
+                    // if (enable_shift) {
+                    //     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    //     if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    //     count_lagr_mult_updates++;
+                    // }
+
                     penetration_tol = penetration_tol / pow(penalty_param_, penetration_tol_exp);
-                    omega           = std::max(atol_, omega / penalty_param_);
+                    omega           = std::max(atol_, omega_factor * omega / penalty_param_);
 
                 } else {
                     penalty_param_  = std::min(penalty_param_ * penalty_param_increase, max_penalty_param_);
                     penetration_tol = 1 / pow(penalty_param_, (1 - penetration_tol_exp));
-                    omega           = 1 / penalty_param_;
+                    omega           = omega_factor / penalty_param_;
                 }
 
                 if (debug && ub) {
@@ -836,6 +854,8 @@ namespace sfem {
         T    penalty_param_increase{10};
         T    atol_{1e-10};
         T    penetration_tol_exp{0.9};
+        T    omega_factor{100};
+        T    stagnation_threshold{0.999};
         bool enable_shift{true};
 
         int                      debug{0};

@@ -1,9 +1,11 @@
 #include "sfem_Laplacian.hpp"
 #include "sfem_Tracer.hpp"
 
+#include "hex8_fff.h"
 #include "sfem_defs.h"
 #include "sfem_logger.h"
 #include "sfem_mesh.h"
+#include "tet4_fff.h"
 
 #include "laplacian.h"
 
@@ -39,6 +41,25 @@ namespace sfem {
     int Laplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("Laplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+
+        const int dim  = impl_->space->mesh_ptr()->spatial_dimension();
+        auto      mesh = impl_->space->mesh_ptr();
+
+        for (auto &n2d : impl_->domains->domains()) {
+            auto &domain       = n2d.second;
+            auto element_type = domain.element_type;
+            auto block        = domain.block;
+            auto fff          = create_host_buffer<jacobian_t>(block->n_elements() * 6);
+            
+            if (element_type == HEX8 || element_type == SSHEX8) {
+                hex8_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
+            } else {
+                tet4_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
+            }
+
+            domain.user_data = std::static_pointer_cast<void>(fff);
+        }
+
         return SFEM_SUCCESS;
     }
 
@@ -155,6 +176,12 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
+            if (domain.user_data) {
+                auto fff = std::static_pointer_cast<Buffer<jacobian_t>>(domain.user_data);
+                return laplacian_apply_opt(
+                        domain.element_type, domain.block->n_elements(), domain.block->elements()->data(), fff->data(), h, out);
+            }
+            
             return laplacian_apply(domain.element_type,
                                    domain.block->n_elements(),
                                    mesh->n_nodes(),

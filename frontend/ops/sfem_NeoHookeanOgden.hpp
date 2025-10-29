@@ -4,12 +4,12 @@
 namespace sfem {
     class NeoHookeanOgden final : public Op {
     public:
-        static std::unique_ptr<Op>     create(const std::shared_ptr<FunctionSpace> &space);
-        std::shared_ptr<Op>            lor_op(const std::shared_ptr<FunctionSpace> &space) override;
-        std::shared_ptr<Op>            derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
-        const char                    *name() const override { return "NeoHookeanOgden"; }
-        inline bool                    is_linear() const override { return true; }
-        int                            initialize(const std::vector<std::string> &block_names = {}) override;
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+        std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+        const char                *name() const override { return "NeoHookeanOgden"; }
+        inline bool                is_linear() const override { return true; }
+        int                        initialize(const std::vector<std::string> &block_names = {}) override;
         NeoHookeanOgden(const std::shared_ptr<FunctionSpace> &space);
         int                 hessian_crs(const real_t *const  x,
                                         const count_t *const rowptr,
@@ -24,13 +24,29 @@ namespace sfem {
         ~NeoHookeanOgden() override;
 
         int update(const real_t *const x) override;
-        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override;
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<enum ElemType> &element_types) override;
 
         void set_mu(const real_t mu);
         void set_lambda(const real_t lambda);
+
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        int hessian_bcrs_sym(const real_t *const  x,
+                             const count_t *const rowptr,
+                             const idx_t *const   colidx,
+                             const ptrdiff_t      block_stride,
+                             real_t **const       diag_values,
+                             real_t **const       off_diag_values) override;
 
     private:
         class Impl;

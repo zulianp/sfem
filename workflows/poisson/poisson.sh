@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -e
+
+# source $CODE_DIR/merge_git_repos/sfem/venv/bin/activate
+# export SFEM_PATH=$INSTALL_DIR/sfem
+
+if [[ -z "$SFEM_PATH" ]]
+then
+	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
+	exit 1
+fi
+
+source $SFEM_PATH/workflows/sfem_config.sh
+
+export PATH=$SFEM_PATH/bin:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/mesh/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/grid/:$PATH
+export PATH=$SFEM_PATH/scripts/sfem/sdf/:$PATH
+export PATH=$SFEM_PATH/worflows/mech/:$PATH
+export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
+
+HERE=$PWD
+export SFEM_OPERATOR="PackedLaplacian"
+# export SFEM_OPERATOR="Laplacian"
+
+export SFEM_BASE_RESOLUTION=30
+# export SFEM_ELEMENTS_PER_PACK=1024
+
+rm -rf output_poisson
+
+$LAUNCH poisson
+raw_to_db.py output_poisson/mesh output_poisson.vtk  -p 'output_poisson/*.raw' -d $SFEM_REAL_T $EXTRA_OPTIONS
