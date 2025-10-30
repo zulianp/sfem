@@ -1027,10 +1027,6 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                                  hex_vertices_y,   //
                                                                  hex_vertices_z);  //
 
-                    const int i = i_grid_x - min_grid_x;
-                    const int j = j_grid_y - min_grid_y;
-                    const int k = k_grid_z - min_grid_z;
-
                     if (is_out_of_tet) continue;  // Skip this hex cell
 
                     // Midpoint quadrature rule in 3D
