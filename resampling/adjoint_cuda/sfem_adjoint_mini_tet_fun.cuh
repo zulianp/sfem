@@ -195,6 +195,87 @@ __device__ __forceinline__ double fast_abs<double>(double x) {
     return fast_absd(x);
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_measure_v3_gpu ///////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+/**
+ * @brief Compute the scaled volume measure of a tetrahedral element.
+ *
+ * This function computes the volume of a tetrahedron using the determinant of the
+ * 4x4 matrix defined by the tetrahedron's vertex coordinates augmented with a unit column.
+ * In particular, the volume is obtained by
+ *
+ *   V = (1/6) * det(M)
+ *
+ * where M is defined by:
+ *
+ *   M = [ px0, py0, pz0, 1 ]
+ *       [ px1, py1, pz1, 1 ]
+ *       [ px2, py2, pz2, 1 ]
+ *       [ px3, py3, pz3, 1 ]
+ *
+ * The function computes the volume using edge vectors:
+ *   e1 = p1 - p0
+ *   e2 = p2 - p0
+ *   e3 = p3 - p0
+ * Then V = (1/6) * dot(e1, cross(e2, e3))
+ *
+ * @param[in] px0 X-coordinate of vertex 0.
+ * @param[in] px1 X-coordinate of vertex 1.
+ * @param[in] px2 X-coordinate of vertex 2.
+ * @param[in] px3 X-coordinate of vertex 3.
+ * @param[in] py0 Y-coordinate of vertex 0.
+ * @param[in] py1 Y-coordinate of vertex 1.
+ * @param[in] py2 Y-coordinate of vertex 2.
+ * @param[in] py3 Y-coordinate of vertex 3.
+ * @param[in] pz0 Z-coordinate of vertex 0.
+ * @param[in] pz1 Z-coordinate of vertex 1.
+ * @param[in] pz2 Z-coordinate of vertex 2.
+ * @param[in] pz3 Z-coordinate of vertex 3.
+ *
+ * @return The volume measure of the tetrahedron (V = (1/6) * det(M)).
+ */
+template <typename FloatType>
+__device__ __forceinline__ FloatType        //
+tet4_measure_v3_gpu(const FloatType px0,    // X-coordinate 1st vertex
+                    const FloatType px1,    //              2nd vertex
+                    const FloatType px2,    //              3rd vertex
+                    const FloatType px3,    //              4th vertex
+                    const FloatType py0,    // Y-coordinate 1st vertex
+                    const FloatType py1,    //              2nd vertex
+                    const FloatType py2,    //              3rd vertex
+                    const FloatType py3,    //              4th vertex
+                    const FloatType pz0,    // Z-coordinate 1st vertex
+                    const FloatType pz1,    //              2nd vertex
+                    const FloatType pz2,    //              3rd vertex
+                    const FloatType pz3) {  //              4th vertex
+
+    // Compute edge vectors from vertex 0
+    const FloatType e1x = px1 - px0;
+    const FloatType e1y = py1 - py0;
+    const FloatType e1z = pz1 - pz0;
+
+    const FloatType e2x = px2 - px0;
+    const FloatType e2y = py2 - py0;
+    const FloatType e2z = pz2 - pz0;
+
+    const FloatType e3x = px3 - px0;
+    const FloatType e3y = py3 - py0;
+    const FloatType e3z = pz3 - pz0;
+
+    // Compute cross product e2 x e3 using fast_fma for precision
+    const FloatType cx = fast_fma(e2y, e3z, -e2z * e3y);
+    const FloatType cy = fast_fma(e2z, e3x, -e2x * e3z);
+    const FloatType cz = fast_fma(e2x, e3y, -e2y * e3x);
+
+    // Compute scalar triple product using fast_fma and scale by 1/6
+    const FloatType scalar_triple = fast_fma(e1x, cx, fast_fma(e1y, cy, e1z * cz));
+    return scalar_triple * (FloatType(1.0) / FloatType(6.0));
+
+}  // END Function: tet4_measure_v3_gpu
+
 ////////////////////////////////////////////////////////////////////////////////
 // Compute matrix J_phys * J_ref = J_tot
 ////////////////////////////////////////////////////////////////////////////////
