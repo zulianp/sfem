@@ -697,10 +697,11 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
     const real_t inv_J22 = inv_J_tet[8];
 
     // Track if all vertices violate each constraint
-    int all_negative_x  = 1;  // All ref_x < 0
-    int all_negative_y  = 1;  // All ref_y < 0
-    int all_negative_z  = 1;  // All ref_z < 0
-    int all_outside_sum = 1;  // All ref_x + ref_y + ref_z > 1
+    int all_negative_x      = 1;  // All ref_x < 0
+    int all_negative_y      = 1;  // All ref_y < 0
+    int all_negative_z      = 1;  // All ref_z < 0
+    int all_outside_sum     = 1;  // All ref_x + ref_y + ref_z > 1
+    int all_outside_sum_neg = 1;  // All ref_x + ref_y + ref_z < 0
     // int all_larger_than_one = 1;  // All ref_x > 1, ref_y > 1, ref_z > 1 (not used slow)
 
     for (int v = 0; v < 8; v++) {
@@ -720,9 +721,17 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
         all_negative_x &= (ref_x < 0.0);
         all_negative_y &= (ref_y < 0.0);
         all_negative_z &= (ref_z < 0.0);
-        all_outside_sum &= ((ref_x + ref_y + ref_z) > 1.0);
+
+        const real_t sum_ref = ref_x + ref_y + ref_z;
+        all_outside_sum &= (sum_ref > 1.0);
+        // all_outside_sum_neg &=
 
         // Early exit optimization: if we know hex is not completely outside, stop
+        // if (!all_outside_sum &&  //
+        //     !all_outside_sum_neg) {
+        //     return false;
+        // }  // END if early exit
+
         if (!all_negative_x &&   //
             !all_negative_y &&   //
             !all_negative_z &&   //
@@ -991,6 +1000,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                       x_hex_max,
                                                       x_hex_max,
                                                       x_hex_min};
+
                     const real_t hex_vertices_y[8] = {y_hex_min,
                                                       y_hex_min,
                                                       y_hex_max,
@@ -999,6 +1009,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                       y_hex_min,
                                                       y_hex_max,
                                                       y_hex_max};
+
                     const real_t hex_vertices_z[8] = {z_hex_min,
                                                       z_hex_min,
                                                       z_hex_min,
