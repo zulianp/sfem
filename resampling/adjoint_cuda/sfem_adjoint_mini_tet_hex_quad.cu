@@ -1,1 +1,0 @@
-#include "sfem_resample_field_adjoint_hex_quad.cuh"
