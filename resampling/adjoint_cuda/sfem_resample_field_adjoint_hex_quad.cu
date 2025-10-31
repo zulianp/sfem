@@ -1,6 +1,9 @@
 #include "sfem_resample_field_adjoint_hex_quad.cuh"
 
-extern "C" void                                                                            //
+#ifdef __cplusplus
+extern "C" {
+#endif
+void                                                                                       //
 call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_element,   // Mesh
                                                      const ptrdiff_t      end_element,     //
                                                      const ptrdiff_t      nelements,       //
@@ -58,7 +61,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
-    }
+    } // END if (error != cudaSuccess)
 
     // Launch kernel
     const unsigned int blocks_per_grid   = (end_element - start_element + 1);
@@ -105,7 +108,8 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     error = cudaGetLastError();
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
-    }
+        exit(EXIT_FAILURE);
+    } // END if (error != cudaSuccess)
 
     cudaEventRecord(stop_event, cuda_stream);
     cudaEventSynchronize(stop_event);
@@ -119,23 +123,25 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
         printf("*   Tet per second: %e \n\n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
         printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
         printf("=========================================================================\n");
-    }
+    } // END if (SFEM_LOG_LEVEL >= 5)
 
     cudaEventDestroy(start_event);
     cudaEventDestroy(stop_event);
 
     cudaStreamDestroy(cuda_stream);
 
-    cudaMemcpy((void*)data, (void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy((void*)data, (const void*)data_device, (n0 * n1 * n2) * sizeof(real_t), cudaMemcpyDeviceToHost);
 
+    // Cleanup (was unreachable due to early return)
     cudaFreeAsync((void*)weighted_field_device, cuda_stream_alloc);
-
     free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
-
     free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
-
+    cudaStreamSynchronize(cuda_stream_alloc);
     cudaFreeAsync(data_device, cuda_stream_alloc);
-
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
-}
+} // END Function: call_tet4_resample_field_adjoint_hex_quad_kernel_gpu
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif

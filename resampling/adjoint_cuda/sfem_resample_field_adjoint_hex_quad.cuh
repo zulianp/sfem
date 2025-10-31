@@ -1021,4 +1021,21 @@ tet4_resample_field_adjoint_hex_quad_kernel_gpu(const IntType           start_el
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_kernel_gpu
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t start_element, const ptrdiff_t end_element,
+                                                          const ptrdiff_t nelements, const ptrdiff_t nnodes,
+                                                          const idx_t** const elems, const geom_t** const xyz, const ptrdiff_t n0,
+                                                          const ptrdiff_t n1, const ptrdiff_t n2, const ptrdiff_t stride0,
+                                                          const ptrdiff_t stride1, const ptrdiff_t stride2, const geom_t origin0,
+                                                          const geom_t origin1, const geom_t origin2, const geom_t dx,
+                                                          const geom_t dy, const geom_t dz, const real_t* const weighted_field,
+                                                          real_t* const data);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
 #endif  // __SFEM_RESAMPLE_FIELD_ADJOINT_HEX_QUAD_CUH__
