@@ -24,7 +24,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     // printf("Strides = %ld %ld %ld ************************************************ \n", stride[0], stride[1], stride[2]);
 
-#define TEST_KERNEL_MODEL 3
+#define TEST_KERNEL_MODEL 4
 
     int         repetitions = 1;
     const char* env_reps    = getenv("SFEM_REPETITIONS_ADJOINT");
@@ -43,6 +43,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 #elif TEST_KERNEL_MODEL == 3
         call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(
 #endif
+#if TEST_KERNEL_MODEL >= 0 && TEST_KERNEL_MODEL <= 3
                 start_element,                  // Mesh
                 end_element,                    //
                 (end_element - start_element),  // nelements
@@ -64,6 +65,32 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
                 weighted_field,                 // Input weighted field
                 mini_tet_parameters,            // Threshold for alpha
                 data);                          //
+#endif
+
+#if TEST_KERNEL_MODEL == 4
+                call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(
+                    start_element,
+                    end_element,
+                    (end_element - start_element),
+                    nnodes,
+                    elems,
+                    xyz,
+                    n[0],
+                    n[1],
+                    n[2],
+                    stride[0],
+                    stride[1],
+                    stride[2],
+                    origin[0],
+                    origin[1],
+                    origin[2],
+                    delta[0],
+                    delta[1],
+                    delta[2],
+                    weighted_field,
+                    data);
+#endif
+
     }
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
