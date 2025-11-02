@@ -22,7 +22,8 @@
 #include "sfem_ssmgc.hpp"
 
 int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
-    
+    SFEM_TRACE_SCOPE("solve_obstacle_problem");
+
     if (argc != 6) {
         fprintf(stderr, "usage: %s <mesh> <sdf> <dirichlet_conditions> <contact_boundary> <output>\n", argv[0]);
         return SFEM_FAILURE;
@@ -51,9 +52,9 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         }
     }
 
-    auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
+    auto      mesh       = sfem::Mesh::create_from_file(comm, mesh_path);
     const int block_size = mesh->spatial_dimension();
-    auto fs = sfem::FunctionSpace::create(mesh, block_size);
+    auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     fs->semi_structured_mesh().apply_hierarchical_renumbering();
@@ -70,12 +71,19 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 #endif
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
-
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
-    f->add_constraint(dirichlet_conditions);
+
+#ifdef SFEM_ENABLE_CUDA
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        f->add_constraint(sfem::to_device(dirichlet_conditions));
+    } else
+#endif  // SFEM_ENABLE_CUDA
+    {
+        f->add_constraint(dirichlet_conditions);
+    }
 
     auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
     auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
@@ -119,7 +127,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     out->set_output_dir((output_path + "/out").c_str());
     out->enable_AoS_to_SoA(true);
 
-    out->write("rhs",  sfem::to_host(rhs)->data());
+    out->write("rhs", sfem::to_host(rhs)->data());
     out->write("disp", sfem::to_host(x)->data());
 
     if (es != sfem::EXECUTION_SPACE_DEVICE) {

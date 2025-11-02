@@ -5,6 +5,19 @@ import matplotlib.pyplot as plt
 
 # https://nalu-wind.readthedocs.io/en/latest/source/theory/discretizationApproach.html
 
+# a(u, v)
+# _________
+# |   |   |
+# |-------|
+# |   |   |
+# _________
+# atomicAdd
+# A_mb * x = A_mf * x
+# y = A_mf * x
+
+# AI 
+# Register pressure
+
 # Quad4 nodes
 p0 = sp.Matrix(2, 1, [x0, y0])
 p1 = sp.Matrix(2, 1, [x1, y1])
