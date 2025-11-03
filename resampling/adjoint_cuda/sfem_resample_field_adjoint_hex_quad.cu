@@ -25,6 +25,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
                                                      const real_t* const  weighted_field,  // Input weighted field
                                                      real_t* const        data) {
     //
+    PRINT_CURRENT_FUNCTION;
 
     cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
@@ -43,11 +44,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
 
     cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
 
-    cudaMemcpyAsync((void*)weighted_field_device,
-                    (void*)weighted_field,
-                    nnodes * sizeof(real_t),
-                    cudaMemcpyHostToDevice,
-                    cuda_stream_alloc);
+    cudaMemcpy((void*)weighted_field_device, (void*)weighted_field, nnodes * sizeof(real_t), cudaMemcpyHostToDevice);
 
     cudaMemset((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t));
 
@@ -61,11 +58,17 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
-    } // END if (error != cudaSuccess)
+    }  // END if (error != cudaSuccess)
 
     // Launch kernel
-    const unsigned int blocks_per_grid   = (end_element - start_element + 1);
+    const unsigned int blocks_per_grid   = (end_element - start_element + 1) * LANES_PER_TILE_HEX_QUAD / 32;
     const unsigned int threads_per_block = 256;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Launching tet4_resample_field_adjoint_hex_quad_kernel_gpu with: \n");
+    printf("* blocks_per_grid:   %u \n", blocks_per_grid);
+    printf("* threads_per_block: %u \n", threads_per_block);
+#endif
 
     cudaStream_t cuda_stream = NULL;  // default stream
     cudaStreamCreate(&cuda_stream);
@@ -79,28 +82,28 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     ////////////////////////////////////////////////////////////////////
     /// Launch the kernel //////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////
-    tet4_resample_field_adjoint_hex_quad_kernel_gpu<real_t, int32_t><<<blocks_per_grid,                       //
-                                                                       threads_per_block,                     //
-                                                                       0,                                     //
-                                                                       cuda_stream>>>(start_element,          //
-                                                                                      end_element,            //
-                                                                                      nelements,              //
-                                                                                      elements_device,        //
-                                                                                      xyz_device,             //
-                                                                                      n0,                     //
-                                                                                      n1,                     //
-                                                                                      n2,                     //
-                                                                                      stride0,                //
-                                                                                      stride1,                //
-                                                                                      stride2,                //
-                                                                                      origin0,                //
-                                                                                      origin1,                //
-                                                                                      origin2,                //
-                                                                                      dx,                     //
-                                                                                      dy,                     //
-                                                                                      dz,                     //
-                                                                                      weighted_field_device,  //
-                                                                                      data_device);           //
+    tet4_resample_field_adjoint_hex_quad_kernel_gpu<real_t, int><<<blocks_per_grid,                       //
+                                                                   threads_per_block,                     //
+                                                                   0,                                     //
+                                                                   cuda_stream>>>(start_element,          //
+                                                                                  end_element,            //
+                                                                                  nelements,              //
+                                                                                  elements_device,        //
+                                                                                  xyz_device,             //
+                                                                                  n0,                     //
+                                                                                  n1,                     //
+                                                                                  n2,                     //
+                                                                                  stride0,                //
+                                                                                  stride1,                //
+                                                                                  stride2,                //
+                                                                                  origin0,                //
+                                                                                  origin1,                //
+                                                                                  origin2,                //
+                                                                                  dx,                     //
+                                                                                  dy,                     //
+                                                                                  dz,                     //
+                                                                                  weighted_field_device,  //
+                                                                                  data_device);           //
 
     cudaStreamSynchronize(cuda_stream);
 
@@ -109,7 +112,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     if (error != cudaSuccess) {
         printf("CUDA error: %s, at file:%s:%d \n", cudaGetErrorString(error), __FILE__, __LINE__);
         exit(EXIT_FAILURE);
-    } // END if (error != cudaSuccess)
+    }  // END if (error != cudaSuccess)
 
     cudaEventRecord(stop_event, cuda_stream);
     cudaEventSynchronize(stop_event);
@@ -123,7 +126,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
         printf("*   Tet per second: %e \n\n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
         printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
         printf("=========================================================================\n");
-    } // END if (SFEM_LOG_LEVEL >= 5)
+    }  // END if (SFEM_LOG_LEVEL >= 5)
 
     cudaEventDestroy(start_event);
     cudaEventDestroy(stop_event);
@@ -140,7 +143,9 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     cudaFreeAsync(data_device, cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
-} // END Function: call_tet4_resample_field_adjoint_hex_quad_kernel_gpu
+
+    RETURN_FROM_FUNCTION();
+}  // END Function: call_tet4_resample_field_adjoint_hex_quad_kernel_gpu
 
 #ifdef __cplusplus
 }  // extern "C"
