@@ -1098,7 +1098,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
 
                             const ptrdiff_t base_index = i_grid_x * stride[0] +  //
                                                          j_grid_y * stride[1] +  //
-                                                         k_grid_z * stride[2];
+                                                         k_grid_z * stride[2];   //
 
                             data[base_index + off0] += hex_element_field[0];  //
                             data[base_index + off1] += hex_element_field[1];  //
