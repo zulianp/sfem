@@ -392,7 +392,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     }  // END: Find max and min total_size_local across all elements
 
     //// launch clustered kernel ////
-    const unsigned int elements_per_block_approx = 1500000; // TODO: tune this parameter
+    const unsigned int elements_per_block_approx = 1500000;  // TODO: tune this parameter
     const unsigned int cluster_size              = cluster_size_tmp;
     const unsigned int elements_per_block        = elements_per_block_approx;
     const ptrdiff_t    buffer_memory_size        = max_total_size_local * tets_per_block;
@@ -431,7 +431,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
             }
 
             const unsigned int total_threads_per_grid_prop = ((end_element_local - start_element_local + 1) / cluster_size) *  //
-                                                             LANES_PER_TILE;
+                                                             LANES_PER_TILE;                                                   //
 
             const unsigned int blocks_per_grid = (total_threads_per_grid_prop + threads_per_block - 1) / threads_per_block + 1;
 

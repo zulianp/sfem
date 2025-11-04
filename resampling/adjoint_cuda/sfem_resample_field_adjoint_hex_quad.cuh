@@ -668,8 +668,8 @@ midpoint_quadrature_gpu(const int  N,          //
     const FloatType weight = 1.0 / (FloatType)N;  // Equal weights for midpoint rule
 
     for (int i = 0; i < N; i++) {
-        nodes[i]   = (FloatType)(i + 0.5) / (FloatType)N;  // Midpoint in each subinterval
-        weights[i] = weight;                               // Assign equal weight
+        nodes[i]   = ((FloatType)(i) + 0.5) / (FloatType)N;  // Midpoint in each subinterval
+        weights[i] = weight;                                 // Assign equal weight
     }
 
     return 0;  // Success

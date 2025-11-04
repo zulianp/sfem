@@ -821,7 +821,7 @@ __device__ void main_tet_loop_gpu(const int                               L,
     using FloatType3 = typename Float3<FloatType>::type;
 
     FloatType3      Jacobian_c[6][3];
-    const FloatType h = FloatType(1.0) / FloatType(L);
+    const FloatType h = FloatType(1) / FloatType(L);
 
     for (int cat_i = 0; cat_i < 6; cat_i++) {
         bool status = get_category_Jacobian<FloatType>(cat_i, FloatType(L), Jacobian_c[cat_i]);
