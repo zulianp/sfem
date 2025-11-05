@@ -662,6 +662,34 @@ transform_and_check_quadrature_point_n(const int q_ijk,  //
     return result;
 }  // END: transform_and_check_quadrature_point
 
+static inline quadrature_point_result_t                                    //
+transform_quadrature_point_n(const int                         q_ijk,      //
+                             const real_t* const SFEM_RESTRICT Q_nodes_x,  //
+                             const real_t* const SFEM_RESTRICT Q_nodes_y,  //
+                             const real_t* const SFEM_RESTRICT Q_nodes_z,  //
+                             const real_t* const SFEM_RESTRICT Q_weights,  //
+                             const geom_t* const SFEM_RESTRICT origin,     //
+                             const geom_t* const SFEM_RESTRICT delta,      //
+                             const ptrdiff_t                   i_grid,     //
+                             const ptrdiff_t                   j_grid,     //
+                             const ptrdiff_t                   k_grid) {                     //
+
+    quadrature_point_result_t result;
+    result.is_inside = false;
+
+    // Transform to physical coordinates
+    // Q_nodes are in [0,1] reference space, need to map to the specific grid cell [i_grid, i_grid+1]
+
+    result.x = ((real_t)i_grid + Q_nodes_x[q_ijk]) * delta[0] + origin[0];
+    result.y = ((real_t)j_grid + Q_nodes_y[q_ijk]) * delta[1] + origin[1];
+    result.z = ((real_t)k_grid + Q_nodes_z[q_ijk]) * delta[2] + origin[2];
+
+    // Q_weights[q_ijk] is already the product of 3 1D weights, so just scale by volume
+    result.weight = Q_weights[q_ijk] * delta[0] * delta[1] * delta[2];
+
+    return result;
+}  // END: transform_and_check_quadrature_point
+
 /////////////////////////////////////////////////////////
 // is_hex_out_of_tet ////////////////////////////
 /////////////////////////////////////////////////////////
@@ -751,6 +779,7 @@ typedef struct ijk_index {
     ptrdiff_t i;
     ptrdiff_t j;
     ptrdiff_t k;
+    bool      inside_tet;
 } ijk_index_t;  // END ijk_index_t
 
 /////////////////////////////////////////////////////////
@@ -821,6 +850,84 @@ transfer_weighted_field_tet4_to_hex(const real_t                wf0,            
     hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
 
     return (ijk_index_t){i, j, k};
+}  // END transfer_weighted_field_tet4_to_hex
+
+/////////////////////////////////////////////////////////
+// transfer_weighted_field_tet4_to_hex //////////////////
+/////////////////////////////////////////////////////////
+ijk_index_t                                                                               //
+transfer_weighted_field_tet4_to_hex_ckp(const real_t                wf0,                  //
+                                        const real_t                wf1,                  //
+                                        const real_t                wf2,                  //
+                                        const real_t                wf3,                  //
+                                        const real_t                q_phys_x,             //
+                                        const real_t                q_phys_y,             //
+                                        const real_t                q_phys_z,             //
+                                        const real_t                q_ref_x,              //
+                                        const real_t                q_ref_y,              //
+                                        const real_t                q_ref_z,              //
+                                        const real_t                QW_phys_hex,          //
+                                        const real_t                ox,                   //
+                                        const real_t                oy,                   //
+                                        const real_t                oz,                   //
+                                        const real_t                dx,                   //
+                                        const real_t                dy,                   //
+                                        const real_t                dz,                   //
+                                        real_t* const SFEM_RESTRICT hex_element_field) {  //
+
+    // Compute the weighted contribution from the tetrahedron
+    // Using linear shape functions for tetrahedron
+
+    // Check if the reference coordinates are valid
+    // If they are outside the tetrahedron, skip the contribution
+    // Here we check if the ref coords are below the x-z, y-z, and x-y planes.
+    // The others check in a previous step.
+    if (q_ref_x < 0.0 || q_ref_y < 0.0 || q_ref_z < 0.0) {
+        return (ijk_index_t){-1, -1, -1, false};
+    }
+
+    const real_t grid_x = (q_phys_x - ox) / dx;
+    const real_t grid_y = (q_phys_y - oy) / dy;
+    const real_t grid_z = (q_phys_z - oz) / dz;
+
+    const ptrdiff_t i = floor(grid_x);
+    const ptrdiff_t j = floor(grid_y);
+    const ptrdiff_t k = floor(grid_z);
+
+    const real_t l_x = (grid_x - (real_t)i);
+    const real_t l_y = (grid_y - (real_t)j);
+    const real_t l_z = (grid_z - (real_t)k);
+
+    const real_t f0 = 1.0 - q_ref_x - q_ref_y - q_ref_z;
+    const real_t f1 = q_ref_x;
+    const real_t f2 = q_ref_y;
+    const real_t f3 = q_ref_z;
+
+    const real_t wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
+
+    real_t hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
+    hex_aa_8_eval_fun_V(l_x,        // Local coordinates
+                        l_y,        //
+                        l_z,        //
+                        &hex8_f0,   // Output shape functions
+                        &hex8_f1,   //
+                        &hex8_f2,   //
+                        &hex8_f3,   //
+                        &hex8_f4,   //
+                        &hex8_f5,   //
+                        &hex8_f6,   //
+                        &hex8_f7);  //
+
+    hex_element_field[0] += wf_quad * hex8_f0 * QW_phys_hex;
+    hex_element_field[1] += wf_quad * hex8_f1 * QW_phys_hex;
+    hex_element_field[2] += wf_quad * hex8_f2 * QW_phys_hex;
+    hex_element_field[3] += wf_quad * hex8_f3 * QW_phys_hex;
+    hex_element_field[4] += wf_quad * hex8_f4 * QW_phys_hex;
+    hex_element_field[5] += wf_quad * hex8_f5 * QW_phys_hex;
+    hex_element_field[6] += wf_quad * hex8_f6 * QW_phys_hex;
+    hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
+
+    return (ijk_index_t){i, j, k, true};
 }  // END transfer_weighted_field_tet4_to_hex
 
 //////////////////////////////////////////////////////////
@@ -1050,6 +1157,301 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                                                        (real_t[4]){y0_n, y1_n, y2_n, y3_n},   //
                                                                        (real_t[4]){z0_n, z1_n, z2_n, z3_n});  //
 
+                        if (Qpoint_phys.is_inside) {
+                            for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
+
+                            // printf("Element %td, grid (%td,%td,%td), quad point %d is inside tet at phys (%.6f,%.6f,%.6f) \n",
+                            //        element_i,
+                            //        i_grid_x,
+                            //        j_grid_y,
+                            //        k_grid_z,
+                            //        q_ijk,
+                            //        result.x,
+                            //        result.y,
+                            //        result.z);
+
+                            real_t Q_ref_x, Q_ref_y, Q_ref_z;
+
+                            tet4_inv_transform_J(inv_J_tet,      // Inverse Jacobian matrix
+                                                 Qpoint_phys.x,  // Physical coordinates of the quadrature point
+                                                 Qpoint_phys.y,  //
+                                                 Qpoint_phys.z,  //
+                                                 x0_n,           //
+                                                 y0_n,           //
+                                                 z0_n,           //
+                                                 &Q_ref_x,       // Reference coordinates of the quadrature point
+                                                 &Q_ref_y,       //
+                                                 &Q_ref_z);      //
+
+                            ijk_index_t ijk_indices =                                        //
+                                    transfer_weighted_field_tet4_to_hex(wf0,                 //
+                                                                        wf1,                 //
+                                                                        wf2,                 //
+                                                                        wf3,                 //
+                                                                        Qpoint_phys.x,       //
+                                                                        Qpoint_phys.y,       //
+                                                                        Qpoint_phys.z,       //
+                                                                        Q_ref_x,             //
+                                                                        Q_ref_y,             //
+                                                                        Q_ref_z,             //
+                                                                        Qpoint_phys.weight,  //
+                                                                        origin[0],           //
+                                                                        origin[1],           //
+                                                                        origin[2],           //
+                                                                        delta[0],            //
+                                                                        delta[1],            //
+                                                                        delta[2],            //
+                                                                        hex_element_field);  //
+
+                            const ptrdiff_t base_index = i_grid_x * stride[0] +  //
+                                                         j_grid_y * stride[1] +  //
+                                                         k_grid_z * stride[2];   //
+
+                            data[base_index + off0] += hex_element_field[0];  //
+                            data[base_index + off1] += hex_element_field[1];  //
+                            data[base_index + off2] += hex_element_field[2];  //
+                            data[base_index + off3] += hex_element_field[3];  //
+                            data[base_index + off4] += hex_element_field[4];  //
+                            data[base_index + off5] += hex_element_field[5];  //
+                            data[base_index + off6] += hex_element_field[6];  //
+                            data[base_index + off7] += hex_element_field[7];  //
+
+                        }  // END: if is_inside
+                    }  // END: for q_ijk
+                }  // END: for k_grid_z
+            }  // END: for i_grid_y
+        }  // END: for j_grid_y
+    }  // END: for element_i
+
+    RETURN_FROM_FUNCTION(0);
+}  // END: Function: tet4_resample_field_adjoint_hex_quad_data
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_refine_adjoint_hyteg ////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                                  //
+tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      start_element,        // Mesh
+                                          const ptrdiff_t                      end_element,          //
+                                          const ptrdiff_t                      nnodes,               //
+                                          const idx_t** const SFEM_RESTRICT    elems,                //
+                                          const geom_t** const SFEM_RESTRICT   xyz,                  //
+                                          const ptrdiff_t* const SFEM_RESTRICT n,                    // SDF
+                                          const ptrdiff_t* const SFEM_RESTRICT stride,               //
+                                          const geom_t* const SFEM_RESTRICT    origin,               //
+                                          const geom_t* const SFEM_RESTRICT    delta,                //
+                                          const real_t* const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                          const mini_tet_parameters_t          mini_tet_parameters,  //
+                                          real_t* const SFEM_RESTRICT          data) {                        //
+
+    PRINT_CURRENT_FUNCTION;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Processing elements from %td to %td \n", start_element, end_element);
+    printf("Stride: %td %td %td \n", stride[0], stride[1], stride[2]);
+#endif
+
+    const real_t volume_hex = delta[0] * delta[1] * delta[2];
+
+    const int off0 = 0;
+    const int off1 = stride[0];
+    const int off2 = stride[0] + stride[1];
+    const int off3 = stride[1];
+    const int off4 = stride[2];
+    const int off5 = stride[0] + stride[2];
+    const int off6 = stride[0] + stride[1] + stride[2];
+    const int off7 = stride[1] + stride[2];
+
+    const int N_midpoint = 4;
+    const int dim_quad   = N_midpoint * N_midpoint * N_midpoint;
+    real_t    Q_nodes_x[dim_quad];
+    real_t    Q_nodes_y[dim_quad];
+    real_t    Q_nodes_z[dim_quad];
+    real_t    Q_weights[dim_quad];
+
+    sfem_quad_rule_3D(TET_QUAD_MIDPOINT_NQP, N_midpoint, Q_nodes_x, Q_nodes_y, Q_nodes_z, Q_weights);
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // loop over the 4 vertices of the tetrahedron
+
+        idx_t  ev[4];
+        real_t inv_J_tet[9];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }  // END: for v
+
+#if SFEM_LOG_LEVEL >= 5
+        if (element_i % 100000 == 0) {
+            printf("*** Processing element %td / %td \n", element_i, end_element);
+        }
+#endif
+
+        // Read the coordinates of the vertices of the tetrahedron
+        // In the physical space
+        const real_t x0_n = xyz[0][ev[0]];
+        const real_t x1_n = xyz[0][ev[1]];
+        const real_t x2_n = xyz[0][ev[2]];
+        const real_t x3_n = xyz[0][ev[3]];
+
+        const real_t y0_n = xyz[1][ev[0]];
+        const real_t y1_n = xyz[1][ev[1]];
+        const real_t y2_n = xyz[1][ev[2]];
+        const real_t y3_n = xyz[1][ev[3]];
+
+        const real_t z0_n = xyz[2][ev[0]];
+        const real_t z1_n = xyz[2][ev[1]];
+        const real_t z2_n = xyz[2][ev[2]];
+        const real_t z3_n = xyz[2][ev[3]];
+
+        const real_t wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+        const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+        const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+        const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+        ptrdiff_t min_grid_x, max_grid_x;
+        ptrdiff_t min_grid_y, max_grid_y;
+        ptrdiff_t min_grid_z, max_grid_z;
+
+        real_t face_normals_array[4][3];
+        real_t faces_centroids_array[4][3];
+
+        // const real_t vol_tet_main = fabs(tet4_measure_v3(x0_n,    //
+        //                                                  x1_n,    //
+        //                                                  x2_n,    //
+        //                                                  x3_n,    //
+        //                                                  y0_n,    //
+        //                                                  y1_n,    //
+        //                                                  y2_n,    //
+        //                                                  y3_n,    //
+        //                                                  z0_n,    //
+        //                                                  z1_n,    //
+        //                                                  z2_n,    //
+        //                                                  z3_n));  //
+
+        tet4_faces_normals(x0_n,                    //
+                           x1_n,                    //
+                           x2_n,                    //
+                           x3_n,                    //
+                           y0_n,                    //
+                           y1_n,                    //
+                           y2_n,                    //
+                           y3_n,                    //
+                           z0_n,                    //
+                           z1_n,                    //
+                           z2_n,                    //
+                           z3_n,                    //
+                           face_normals_array,      //
+                           faces_centroids_array);  //
+
+        tet4_inv_Jacobian(x0_n,        //
+                          x1_n,        //
+                          x2_n,        //
+                          x3_n,        //
+                          y0_n,        //
+                          y1_n,        //
+                          y2_n,        //
+                          y3_n,        //
+                          z0_n,        //
+                          z1_n,        //
+                          z2_n,        //
+                          z3_n,        //
+                          inv_J_tet);  //
+
+        compute_tet_bounding_box(x0_n,          //
+                                 x1_n,          //
+                                 x2_n,          //
+                                 x3_n,          //
+                                 y0_n,          //
+                                 y1_n,          //
+                                 y2_n,          //
+                                 y3_n,          //
+                                 z0_n,          //
+                                 z1_n,          //
+                                 z2_n,          //
+                                 z3_n,          //
+                                 stride,        //
+                                 origin,        //
+                                 delta,         //
+                                 &min_grid_x,   //
+                                 &max_grid_x,   //
+                                 &min_grid_y,   //
+                                 &max_grid_y,   //
+                                 &min_grid_z,   //
+                                 &max_grid_z);  //
+
+        real_t hex_element_field[8] = {0.0};
+
+        for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
+            const real_t z_hex_min = ((real_t)k_grid_z) * delta[2] + origin[2];
+            const real_t z_hex_max = z_hex_min + delta[2];
+
+            for (int j_grid_y = min_grid_y; j_grid_y < max_grid_y; j_grid_y++) {
+                const real_t y_hex_min = ((real_t)j_grid_y) * delta[1] + origin[1];
+                const real_t y_hex_max = y_hex_min + delta[1];
+
+                for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x++) {
+                    const real_t x_hex_min = ((real_t)i_grid_x) * delta[0] + origin[0];
+                    const real_t x_hex_max = x_hex_min + delta[0];
+
+                    const real_t hex_vertices_x[8] = {x_hex_min,
+                                                      x_hex_max,
+                                                      x_hex_max,
+                                                      x_hex_min,  //
+                                                      x_hex_min,
+                                                      x_hex_max,
+                                                      x_hex_max,
+                                                      x_hex_min};
+
+                    const real_t hex_vertices_y[8] = {y_hex_min,
+                                                      y_hex_min,
+                                                      y_hex_max,
+                                                      y_hex_max,  //
+                                                      y_hex_min,
+                                                      y_hex_min,
+                                                      y_hex_max,
+                                                      y_hex_max};
+
+                    const real_t hex_vertices_z[8] = {z_hex_min,
+                                                      z_hex_min,
+                                                      z_hex_min,
+                                                      z_hex_min,  //
+                                                      z_hex_max,
+                                                      z_hex_max,
+                                                      z_hex_max,
+                                                      z_hex_max};
+
+                    const bool is_out_of_tet = is_hex_out_of_tet(inv_J_tet,        //
+                                                                 x0_n,             //
+                                                                 y0_n,             //
+                                                                 z0_n,             //
+                                                                 hex_vertices_x,   //
+                                                                 hex_vertices_y,   //
+                                                                 hex_vertices_z);  //
+
+                    if (is_out_of_tet) continue;  // Skip this hex cell
+
+                    // Midpoint quadrature rule in 3D
+
+                    for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
+                        quadrature_point_result_t Qpoint_phys =                //
+                                transform_and_check_quadrature_point_n(q_ijk,  //
+                                                                               //    vol_tet_main,                          //
+                                                                       face_normals_array,                    //
+                                                                       faces_centroids_array,                 //
+                                                                       Q_nodes_x,                             //
+                                                                       Q_nodes_y,                             //
+                                                                       Q_nodes_z,                             //
+                                                                       Q_weights,                             //
+                                                                       origin,                                //
+                                                                       delta,                                 //
+                                                                       i_grid_x,                              //
+                                                                       j_grid_y,                              //
+                                                                       k_grid_z,                              //
+                                                                       (real_t[4]){x0_n, x1_n, x2_n, x3_n},   //
+                                                                       (real_t[4]){y0_n, y1_n, y2_n, y3_n},   //
+                                                                       (real_t[4]){z0_n, z1_n, z2_n, z3_n});  //
                         if (Qpoint_phys.is_inside) {
                             for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
 
