@@ -477,7 +477,7 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(comm, &mpi_rank);
     MPI_Comm_size(comm, &mpi_size);
 
-    const function_XYZ_t mesh_fun_XYZ = mesh_fun_chainsaw_xyz;
+    const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig_pos;
 
 #if SFEM_LOG_LEVEL >= 5
 

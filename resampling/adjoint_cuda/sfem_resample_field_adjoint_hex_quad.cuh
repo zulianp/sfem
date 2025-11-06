@@ -55,15 +55,26 @@ tet4_inv_transform_J_gpu(const FloatType* const J_inv,  //
     *************************************************************************************************
     */
 
-    // Compute the difference between the physical point and the origin
+    // Compute the difference between the physical point and the origin (common subexpressions)
     const FloatType dx = pfx - px0;
     const FloatType dy = pfy - py0;
     const FloatType dz = pfz - pz0;
 
+    // Preload inverse Jacobian components for better register utilization
+    const FloatType J00 = J_inv[0];
+    const FloatType J01 = J_inv[1];
+    const FloatType J02 = J_inv[2];
+    const FloatType J10 = J_inv[3];
+    const FloatType J11 = J_inv[4];
+    const FloatType J12 = J_inv[5];
+    const FloatType J20 = J_inv[6];
+    const FloatType J21 = J_inv[7];
+    const FloatType J22 = J_inv[8];
+
     // Apply the inverse transformation using FMA for better precision
-    out_x = fast_fma(J_inv[0], dx, fast_fma(J_inv[1], dy, J_inv[2] * dz));
-    out_y = fast_fma(J_inv[3], dx, fast_fma(J_inv[4], dy, J_inv[5] * dz));
-    out_z = fast_fma(J_inv[6], dx, fast_fma(J_inv[7], dy, J_inv[8] * dz));
+    out_x = fast_fma(J00, dx, fast_fma(J01, dy, J02 * dz));
+    out_y = fast_fma(J10, dx, fast_fma(J11, dy, J12 * dz));
+    out_z = fast_fma(J20, dx, fast_fma(J21, dy, J22 * dz));
 }  // END Function: tet4_inv_transform_J_gpu
 
 //////////////////////////////////////////////////////////
@@ -127,26 +138,30 @@ transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  wf0,               
     // With respect to the hat functions of a cube element
     // In a local coordinate system
     //
-    const FloatType hex8_f0 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
-    const FloatType hex8_f1 = l_x * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
-    const FloatType hex8_f2 = l_x * l_y * (FloatType(1.0) - l_z);
-    const FloatType hex8_f3 = (FloatType(1.0) - l_x) * l_y * (FloatType(1.0) - l_z);
-    const FloatType hex8_f4 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * l_z;
-    const FloatType hex8_f5 = l_x * (FloatType(1.0) - l_y) * l_z;
+    const FloatType one_minus_lx = FloatType(1.0) - l_x;
+    const FloatType one_minus_ly = FloatType(1.0) - l_y;
+    const FloatType one_minus_lz = FloatType(1.0) - l_z;
+
+    const FloatType hex8_f0 = one_minus_lx * one_minus_ly * one_minus_lz;
+    const FloatType hex8_f1 = l_x * one_minus_ly * one_minus_lz;
+    const FloatType hex8_f2 = l_x * l_y * one_minus_lz;
+    const FloatType hex8_f3 = one_minus_lx * l_y * one_minus_lz;
+    const FloatType hex8_f4 = one_minus_lx * one_minus_ly * l_z;
+    const FloatType hex8_f5 = l_x * one_minus_ly * l_z;
     const FloatType hex8_f6 = l_x * l_y * l_z;
-    const FloatType hex8_f7 = (FloatType(1.0) - l_x) * l_y * l_z;
+    const FloatType hex8_f7 = one_minus_lx * l_y * l_z;
 
     // Accumulate contributions to hex element field using FMA for precision
     const FloatType contribution = wf_quad * QW_phys_hex;
 
-    hex_element_field[0] = fast_fma(contribution, hex8_f0, hex_element_field[0]);
-    hex_element_field[1] = fast_fma(contribution, hex8_f1, hex_element_field[1]);
-    hex_element_field[2] = fast_fma(contribution, hex8_f2, hex_element_field[2]);
-    hex_element_field[3] = fast_fma(contribution, hex8_f3, hex_element_field[3]);
-    hex_element_field[4] = fast_fma(contribution, hex8_f4, hex_element_field[4]);
-    hex_element_field[5] = fast_fma(contribution, hex8_f5, hex_element_field[5]);
-    hex_element_field[6] = fast_fma(contribution, hex8_f6, hex_element_field[6]);
-    hex_element_field[7] = fast_fma(contribution, hex8_f7, hex_element_field[7]);
+    hex_element_field[0] = contribution * hex8_f0;
+    hex_element_field[1] = contribution * hex8_f1;
+    hex_element_field[2] = contribution * hex8_f2;
+    hex_element_field[3] = contribution * hex8_f3;
+    hex_element_field[4] = contribution * hex8_f4;
+    hex_element_field[5] = contribution * hex8_f5;
+    hex_element_field[6] = contribution * hex8_f6;
+    hex_element_field[7] = contribution * hex8_f7;
 
     // Return grid indices via output reference parameters
     out_i = i;
@@ -1396,8 +1411,8 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
                                                      iy,         //
                                                      iz);        //
 
-            // #pragma unroll
-            // for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
+#pragma unroll
+            for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
 
             FloatType Q_ref_x, Q_ref_y, Q_ref_z;
 
@@ -1460,14 +1475,14 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
 extern "C" {
 #endif
 
-void call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t start_element, const ptrdiff_t end_element,
-                                                          const ptrdiff_t nelements, const ptrdiff_t nnodes,
-                                                          const idx_t** const elems, const geom_t** const xyz, const ptrdiff_t n0,
-                                                          const ptrdiff_t n1, const ptrdiff_t n2, const ptrdiff_t stride0,
-                                                          const ptrdiff_t stride1, const ptrdiff_t stride2, const geom_t origin0,
-                                                          const geom_t origin1, const geom_t origin2, const geom_t dx,
-                                                          const geom_t dy, const geom_t dz, const real_t* const weighted_field,
-                                                          real_t* const data);
+void call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t start_element,  //
+                                                          const ptrdiff_t end_element, const ptrdiff_t nelements,
+                                                          const ptrdiff_t nnodes, const idx_t** const elems,
+                                                          const geom_t** const xyz, const ptrdiff_t n0, const ptrdiff_t n1,
+                                                          const ptrdiff_t n2, const ptrdiff_t stride0, const ptrdiff_t stride1,
+                                                          const ptrdiff_t stride2, const geom_t origin0, const geom_t origin1,
+                                                          const geom_t origin2, const geom_t dx, const geom_t dy, const geom_t dz,
+                                                          const real_t* const weighted_field, real_t* const data);
 
 #ifdef __cplusplus
 }  // extern "C"
