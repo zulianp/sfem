@@ -1437,8 +1437,8 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
                                                      iy,         //
                                                      iz);        //
 
-#pragma unroll
-            for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
+// #pragma unroll
+            // for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
 
             // FloatType Q_ref_x, Q_ref_y, Q_ref_z;
 
