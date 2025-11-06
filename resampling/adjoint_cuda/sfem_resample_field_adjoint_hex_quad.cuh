@@ -72,6 +72,96 @@ tet4_inv_transform_J_gpu(const FloatType* const J_inv,  //
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 template <typename FloatType, typename IntType = ptrdiff_t>
+__device__ __inline__ bool                                                       //
+transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  wf0,                //
+                                            const FloatType  wf1,                //
+                                            const FloatType  wf2,                //
+                                            const FloatType  wf3,                //
+                                            const FloatType  q_phys_x,           //
+                                            const FloatType  q_phys_y,           //
+                                            const FloatType  q_phys_z,           //
+                                            const FloatType  q_ref_x,            //
+                                            const FloatType  q_ref_y,            //
+                                            const FloatType  q_ref_z,            //
+                                            const FloatType  QW_phys_hex,        //
+                                            const FloatType  ox,                 //
+                                            const FloatType  oy,                 //
+                                            const FloatType  oz,                 //
+                                            const FloatType  dx,                 //
+                                            const FloatType  dy,                 //
+                                            const FloatType  dz,                 //
+                                            FloatType* const hex_element_field,  //
+                                            IntType&         out_i,              //
+                                            IntType&         out_j,              //
+                                            IntType&         out_k) {                    //
+
+    // Compute the weighted contribution from the tetrahedron
+    // Using linear shape functions for tetrahedron
+
+    if (q_ref_x < 0.0 || q_ref_y < 0.0 || q_ref_z < 0.0 || (q_ref_x + q_ref_y + q_ref_z) > 1.0) {
+        return false;
+    }  // END if (outside tet)
+
+    const FloatType grid_x = (q_phys_x - ox) / dx;
+    const FloatType grid_y = (q_phys_y - oy) / dy;
+    const FloatType grid_z = (q_phys_z - oz) / dz;
+
+    const IntType i = (IntType)fast_floor(grid_x);
+    const IntType j = (IntType)fast_floor(grid_y);
+    const IntType k = (IntType)fast_floor(grid_z);
+
+    const FloatType l_x = grid_x - (FloatType)i;
+    const FloatType l_y = grid_y - (FloatType)j;
+    const FloatType l_z = grid_z - (FloatType)k;
+
+    // Tet4 linear shape functions in reference coordinates
+    const FloatType f0 = FloatType(1.0) - q_ref_x - q_ref_y - q_ref_z;
+    const FloatType f1 = q_ref_x;
+    const FloatType f2 = q_ref_y;
+    const FloatType f3 = q_ref_z;
+
+    // Interpolate weighted field at quadrature point using FMA for precision
+    const FloatType wf_quad = fast_fma(f0, wf0, fast_fma(f1, wf1, fast_fma(f2, wf2, f3 * wf3)));
+
+    // Quadrature point (local coordinates)
+    // With respect to the hat functions of a cube element
+    // In a local coordinate system
+    //
+    const FloatType hex8_f0 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
+    const FloatType hex8_f1 = l_x * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
+    const FloatType hex8_f2 = l_x * l_y * (FloatType(1.0) - l_z);
+    const FloatType hex8_f3 = (FloatType(1.0) - l_x) * l_y * (FloatType(1.0) - l_z);
+    const FloatType hex8_f4 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * l_z;
+    const FloatType hex8_f5 = l_x * (FloatType(1.0) - l_y) * l_z;
+    const FloatType hex8_f6 = l_x * l_y * l_z;
+    const FloatType hex8_f7 = (FloatType(1.0) - l_x) * l_y * l_z;
+
+    // Accumulate contributions to hex element field using FMA for precision
+    const FloatType contribution = wf_quad * QW_phys_hex;
+
+    hex_element_field[0] = fast_fma(contribution, hex8_f0, hex_element_field[0]);
+    hex_element_field[1] = fast_fma(contribution, hex8_f1, hex_element_field[1]);
+    hex_element_field[2] = fast_fma(contribution, hex8_f2, hex_element_field[2]);
+    hex_element_field[3] = fast_fma(contribution, hex8_f3, hex_element_field[3]);
+    hex_element_field[4] = fast_fma(contribution, hex8_f4, hex_element_field[4]);
+    hex_element_field[5] = fast_fma(contribution, hex8_f5, hex_element_field[5]);
+    hex_element_field[6] = fast_fma(contribution, hex8_f6, hex_element_field[6]);
+    hex_element_field[7] = fast_fma(contribution, hex8_f7, hex_element_field[7]);
+
+    // Return grid indices via output reference parameters
+    out_i = i;
+    out_j = j;
+    out_k = k;
+
+    return true;
+}  // END Function: transfer_weighted_field_tet4_to_hex_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// transfer_weighted_field_tet4_to_hex_gpu //////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType, typename IntType = ptrdiff_t>
 __device__ __inline__ void                                                   //
 transfer_weighted_field_tet4_to_hex_gpu(const FloatType  wf0,                //
                                         const FloatType  wf1,                //
@@ -239,6 +329,45 @@ __device__                                                                      
                                      &result.physical_y,  //
                                      &result.physical_z,  //
                                      &result.is_inside);  //
+
+    // Compute physical weight using FMA for precision
+    // Q_weights[q_ijk] is already the product of 3 1D weights, so just scale by volume
+    result.weight = Q_weights[q_ijk] * dx * dy * dz;
+
+    return result;
+}  // END Function: transform_and_check_quadrature_point_n_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// transform_quadrature_point_n_gpu //////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType, typename IntType = ptrdiff_t>
+__device__                                                                  //
+        quadrature_point_result_gpu_t<FloatType>                            //
+        transform_quadrature_point_n_gpu(const int              q_ijk,      //
+                                         const FloatType* const Q_nodes_x,  //
+                                         const FloatType* const Q_nodes_y,  //
+                                         const FloatType* const Q_nodes_z,  //
+                                         const FloatType* const Q_weights,  //
+                                         const FloatType        origin0,    //
+                                         const FloatType        origin1,    //
+                                         const FloatType        origin2,    //
+                                         const FloatType        dx,         //
+                                         const FloatType        dy,         //
+                                         const FloatType        dz,         //
+                                         const IntType          i_grid,     //
+                                         const IntType          j_grid,     //
+                                         const IntType          k_grid) {            //
+
+    quadrature_point_result_gpu_t<FloatType> result;
+    result.is_inside = false;
+
+    // Transform to physical coordinates
+    // Q_nodes are in [0,1] reference space, need to map to the specific grid cell [i_grid, i_grid+1]
+    result.physical_x = fast_fma((FloatType)i_grid + Q_nodes_x[q_ijk], dx, origin0);
+    result.physical_y = fast_fma((FloatType)j_grid + Q_nodes_y[q_ijk], dy, origin1);
+    result.physical_z = fast_fma((FloatType)k_grid + Q_nodes_z[q_ijk], dz, origin2);
 
     // Compute physical weight using FMA for precision
     // Q_weights[q_ijk] is already the product of 3 1D weights, so just scale by volume
@@ -882,26 +1011,6 @@ tet4_resample_field_adjoint_hex_quad_kernel_gpu(const IntType           start_el
                                                      min_grid_z,   //
                                                      max_grid_z);  //
 
-    // printf("Element %d x0_n: %f, y0_n: %f, z0_n: %f\n"
-    //        " origin: [%f, %f, %f], delta: [%f, %f, %f]\n"
-    //        " bounding box: x[%d, %d], y[%d, %d], z[%d, %d]\n",
-    //        (IntType)element_i,
-    //        (FloatType)x0_n,
-    //        (FloatType)y0_n,
-    //        (FloatType)z0_n,
-    //        (FloatType)origin0,
-    //        (FloatType)origin1,
-    //        (FloatType)origin2,
-    //        (FloatType)dx,
-    //        (FloatType)dy,
-    //        (FloatType)dz,
-    //        (IntType)min_grid_x,
-    //        (IntType)max_grid_x,
-    //        (IntType)min_grid_y,
-    //        (IntType)max_grid_y,
-    //        (IntType)min_grid_z,
-    //        (IntType)max_grid_z);
-
     FloatType hex_element_field[8] = {0.0};
 
     const IntType size_x = max_grid_x - min_grid_x + 1;
@@ -1050,6 +1159,299 @@ tet4_resample_field_adjoint_hex_quad_kernel_gpu(const IntType           start_el
                 atomicAdd(&data[base_index + off7], hex_element_field[7]);  //
 
             }  // END if (Qpoint_phys.is_inside)
+        }  // END for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
+    }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
+}  // END Function: tet4_resample_field_adjoint_hex_quad_kernel_gpu
+
+/////////////////////////////////////////////////////////////////////////////////
+// Kernel to perform adjoint mini-tetrahedron resampling Version 2
+/////////////////////////////////////////////////////////////////////////////////
+template <typename FloatType,                                                               //
+          typename IntType = ptrdiff_t>                                                     //
+__global__ void                                                                             //
+tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start_element,   // Mesh
+                                                   const IntType           end_element,     //
+                                                   const IntType           nnodes,          //
+                                                   const elems_tet4_device elems,           //
+                                                   const xyz_tet4_device   xyz,             //
+                                                   const IntType           n0,              // SDF
+                                                   const IntType           n1,              //
+                                                   const IntType           n2,              //
+                                                   const IntType           stride0,         // Stride
+                                                   const IntType           stride1,         //
+                                                   const IntType           stride2,         //
+                                                   const FloatType         origin0,         // Origin
+                                                   const FloatType         origin1,         //
+                                                   const FloatType         origin2,         //
+                                                   const FloatType         dx,              // Delta
+                                                   const FloatType         dy,              //
+                                                   const FloatType         dz,              //
+                                                   const FloatType* const  weighted_field,  // Input weighted field
+                                                   FloatType* const        data) {                 // Output data
+
+    // const int tet_id    = (blockIdx.x * blockDim.x + threadIdx.x) / LANES_PER_TILE_HEX_QUAD;
+    const int tet_id    = blockIdx.x;
+    const int element_i = start_element + tet_id;  // Global element index
+    const int warp_id   = threadIdx.x / LANES_PER_TILE_HEX_QUAD;
+    const int lane_id   = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
+    const int n_warps   = blockDim.x / LANES_PER_TILE_HEX_QUAD;
+
+    if (element_i >= end_element) return;  // Out of range
+
+    // printf("Processing element %ld / %ld\n", element_i, end_element);
+
+    const IntType off0 = 0;
+    const IntType off1 = stride0;
+    const IntType off2 = stride0 + stride1;
+    const IntType off3 = stride1;
+    const IntType off4 = stride2;
+    const IntType off5 = stride0 + stride2;
+    const IntType off6 = stride0 + stride1 + stride2;
+    const IntType off7 = stride1 + stride2;
+
+#define N_midpoint (4)
+#define dim_quad (N_midpoint * N_midpoint * N_midpoint)
+    FloatType Q_nodes_x[dim_quad];
+    FloatType Q_nodes_y[dim_quad];
+    FloatType Q_nodes_z[dim_quad];
+    FloatType Q_weights[dim_quad];
+    FloatType Q_Nodes[N_midpoint];
+    FloatType Q_Weights[N_midpoint];
+
+    sfem_quad_rule_3D_gpu<FloatType, IntType>(TET_QUAD_MIDPOINT_NQP,  //
+                                              N_midpoint,
+                                              Q_Nodes,
+                                              Q_Weights,
+                                              Q_nodes_x,
+                                              Q_nodes_y,
+                                              Q_nodes_z,
+                                              Q_weights);
+
+    const FloatType d_min             = dx < dy ? (dx < dz ? dx : dz) : (dy < dz ? dy : dz);
+    const FloatType hexahedron_volume = dx * dy * dz;
+
+    // printf("Exaedre volume: %e\n", hexahedron_volume);
+
+    IntType   ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
+    FloatType inv_J_tet[9];
+
+    ev[0] = elems.elems_v0[element_i];
+    ev[1] = elems.elems_v1[element_i];
+    ev[2] = elems.elems_v2[element_i];
+    ev[3] = elems.elems_v3[element_i];
+
+    // Read the coordinates of the vertices of the tetrahedron
+    // In the physical space
+    const FloatType x0_n = FloatType(xyz.x[ev[0]]);
+    const FloatType x1_n = FloatType(xyz.x[ev[1]]);
+    const FloatType x2_n = FloatType(xyz.x[ev[2]]);
+    const FloatType x3_n = FloatType(xyz.x[ev[3]]);
+
+    const FloatType y0_n = FloatType(xyz.y[ev[0]]);
+    const FloatType y1_n = FloatType(xyz.y[ev[1]]);
+    const FloatType y2_n = FloatType(xyz.y[ev[2]]);
+    const FloatType y3_n = FloatType(xyz.y[ev[3]]);
+
+    const FloatType z0_n = FloatType(xyz.z[ev[0]]);
+    const FloatType z1_n = FloatType(xyz.z[ev[1]]);
+    const FloatType z2_n = FloatType(xyz.z[ev[2]]);
+    const FloatType z3_n = FloatType(xyz.z[ev[3]]);
+
+    const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+    const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+    const FloatType wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+    const FloatType wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+    IntType min_grid_x, max_grid_x;
+    IntType min_grid_y, max_grid_y;
+    IntType min_grid_z, max_grid_z;
+
+    tet4_inv_Jacobian_gpu(x0_n,        //
+                          x1_n,        //
+                          x2_n,        //
+                          x3_n,        //
+                          y0_n,        //
+                          y1_n,        //
+                          y2_n,        //
+                          y3_n,        //
+                          z0_n,        //
+                          z1_n,        //
+                          z2_n,        //
+                          z3_n,        //
+                          inv_J_tet);  //
+
+    compute_tet_bounding_box_gpu<FloatType, IntType>(x0_n,         //
+                                                     x1_n,         //
+                                                     x2_n,         //
+                                                     x3_n,         //
+                                                     y0_n,         //
+                                                     y1_n,         //
+                                                     y2_n,         //
+                                                     y3_n,         //
+                                                     z0_n,         //
+                                                     z1_n,         //
+                                                     z2_n,         //
+                                                     z3_n,         //
+                                                     stride0,      //
+                                                     stride1,      //
+                                                     stride2,      //
+                                                     origin0,      //
+                                                     origin1,      //
+                                                     origin2,      //
+                                                     dx,           //
+                                                     dy,           //
+                                                     dz,           //
+                                                     min_grid_x,   //
+                                                     max_grid_x,   //
+                                                     min_grid_y,   //
+                                                     max_grid_y,   //
+                                                     min_grid_z,   //
+                                                     max_grid_z);  //
+
+    FloatType hex_element_field[8] = {0.0};
+
+    const IntType size_x = max_grid_x - min_grid_x + 1;
+    const IntType size_y = max_grid_y - min_grid_y + 1;
+    const IntType size_z = max_grid_z - min_grid_z + 1;
+
+    const IntType total_grid_points = size_x * size_y * size_z;
+
+    // Loop over all grid points in the bounding box
+    for (IntType idx = 0; idx < total_grid_points; idx += n_warps) {
+        const IntType grid_idx = idx + warp_id;
+        if (grid_idx >= total_grid_points) continue;
+
+        const IntType ix_local = grid_idx % size_x;
+        const IntType iy_local = (grid_idx / size_x) % size_y;
+        const IntType iz_local = grid_idx / (size_x * size_y);
+
+        // Convert to absolute grid coordinates
+        const IntType ix = min_grid_x + ix_local;
+        const IntType iy = min_grid_y + iy_local;
+        const IntType iz = min_grid_z + iz_local;
+
+        const FloatType z_hex_min = ((FloatType)iz) * dz + origin2;
+        const FloatType z_hex_max = z_hex_min + dz;
+
+        const FloatType y_hex_min = ((FloatType)iy) * dy + origin1;
+        const FloatType y_hex_max = y_hex_min + dy;
+
+        const FloatType x_hex_min = ((FloatType)ix) * dx + origin0;
+        const FloatType x_hex_max = x_hex_min + dx;
+
+        const FloatType hex_vertices_x[8] = {x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min,  //
+                                             x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min};
+
+        const FloatType hex_vertices_y[8] = {y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max,  //
+                                             y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max};
+
+        const FloatType hex_vertices_z[8] = {z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,  //
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max};
+
+        const bool is_out_of_tet = is_hex_out_of_tet_gpu(inv_J_tet,        //
+                                                         x0_n,             //
+                                                         y0_n,             //
+                                                         z0_n,             //
+                                                         hex_vertices_x,   //
+                                                         hex_vertices_y,   //
+                                                         hex_vertices_z);  //
+
+        if (is_out_of_tet) continue;  // Skip this hex cell
+
+        // printf("Element %d, Hex cell at (%d, %d, %d) may overlap tet\n", element_i, ix, iy, iz);
+
+        for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
+            //
+            quadrature_point_result_gpu_t Qpoint_phys =          //
+                    transform_quadrature_point_n_gpu(q_ijk,      //
+                                                     Q_nodes_x,  //
+                                                     Q_nodes_y,  //
+                                                     Q_nodes_z,  //
+                                                     Q_weights,  //
+                                                     origin0,    //
+                                                     origin1,    //
+                                                     origin2,    //
+                                                     dx,         //
+                                                     dy,         //
+                                                     dz,         //
+                                                     ix,         //
+                                                     iy,         //
+                                                     iz);        //
+
+            // #pragma unroll
+            // for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
+
+            FloatType Q_ref_x, Q_ref_y, Q_ref_z;
+
+            tet4_inv_transform_J_gpu(inv_J_tet,               //
+                                     Qpoint_phys.physical_x,  //
+                                     Qpoint_phys.physical_y,  //
+                                     Qpoint_phys.physical_z,  //
+                                     x0_n,                    //
+                                     y0_n,                    //
+                                     z0_n,                    //
+                                     Q_ref_x,                 //
+                                     Q_ref_y,                 //
+                                     Q_ref_z);                //
+
+            IntType out_i, out_j, out_k;
+
+            const bool is_in_tet =                                                                           //
+                    transfer_weighted_field_tet4_to_hex_ckp_gpu<FloatType, IntType>(wf0,                     //
+                                                                                    wf1,                     //
+                                                                                    wf2,                     //
+                                                                                    wf3,                     //
+                                                                                    Qpoint_phys.physical_x,  //
+                                                                                    Qpoint_phys.physical_y,  //
+                                                                                    Qpoint_phys.physical_z,  //
+                                                                                    Q_ref_x,                 //
+                                                                                    Q_ref_y,                 //
+                                                                                    Q_ref_z,                 //
+                                                                                    Qpoint_phys.weight,      //
+                                                                                    origin0,                 //
+                                                                                    origin1,                 //
+                                                                                    origin2,                 //
+                                                                                    dx,                      //
+                                                                                    dy,                      //
+                                                                                    dz,                      //
+                                                                                    hex_element_field,       //
+                                                                                    out_i,                   //
+                                                                                    out_j,                   //
+                                                                                    out_k);                  //
+
+            if (is_in_tet) {
+                const ptrdiff_t base_index = ix * stride0 +  //
+                                             iy * stride1 +  //
+                                             iz * stride2;   //
+
+                atomicAdd(&data[base_index + off0], hex_element_field[0]);  //
+                atomicAdd(&data[base_index + off1], hex_element_field[1]);  //
+                atomicAdd(&data[base_index + off2], hex_element_field[2]);  //
+                atomicAdd(&data[base_index + off3], hex_element_field[3]);  //
+                atomicAdd(&data[base_index + off4], hex_element_field[4]);  //
+                atomicAdd(&data[base_index + off5], hex_element_field[5]);  //
+                atomicAdd(&data[base_index + off6], hex_element_field[6]);  //
+                atomicAdd(&data[base_index + off7], hex_element_field[7]);  //
+            }
+
         }  // END for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_kernel_gpu

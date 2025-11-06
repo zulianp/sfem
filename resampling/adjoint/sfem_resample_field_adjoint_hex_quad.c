@@ -365,20 +365,51 @@ tet4_inv_Jacobian(const real_t px0,   //
     const real_t J32 = -pz0 + pz2;
     const real_t J33 = -pz0 + pz3;
 
-    // Compute the determinant of the Jacobian
-    const real_t det_J     = J11 * (J22 * J33 - J23 * J32) - J12 * (J21 * J33 - J23 * J31) + J13 * (J21 * J32 - J22 * J31);
+    // Compute common subexpressions for cofactor matrix
+    const real_t J22_J33 = J22 * J33;
+    const real_t J23_J32 = J23 * J32;
+    const real_t J21_J33 = J21 * J33;
+    const real_t J23_J31 = J23 * J31;
+    const real_t J21_J32 = J21 * J32;
+    const real_t J22_J31 = J22 * J31;
+    const real_t J11_J33 = J11 * J33;
+    const real_t J13_J31 = J13 * J31;
+    const real_t J11_J23 = J11 * J23;
+    const real_t J13_J21 = J13 * J21;
+    const real_t J11_J32 = J11 * J32;
+    const real_t J12_J31 = J12 * J31;
+    const real_t J11_J22 = J11 * J22;
+    const real_t J12_J21 = J12 * J21;
+    const real_t J12_J33 = J12 * J33;
+    const real_t J13_J32 = J13 * J32;
+    const real_t J12_J23 = J12 * J23;
+    const real_t J13_J22 = J13 * J22;
+
+    // Compute cofactor differences (reused in determinant and inverse)
+    const real_t cof00 = J22_J33 - J23_J32;
+    const real_t cof01 = J23_J31 - J21_J33;
+    const real_t cof02 = J21_J32 - J22_J31;
+    const real_t cof10 = J13_J32 - J12_J33;
+    const real_t cof11 = J11_J33 - J13_J31;
+    const real_t cof12 = J12_J31 - J11_J32;
+    const real_t cof20 = J12_J23 - J13_J22;
+    const real_t cof21 = J13_J21 - J11_J23;
+    const real_t cof22 = J11_J22 - J12_J21;
+
+    // Compute the determinant of the Jacobian using cofactors
+    const real_t det_J     = J11 * cof00 + J12 * cof01 + J13 * cof02;
     const real_t inv_det_J = 1.0 / det_J;
 
-    // Compute the inverse of the Jacobian matrix
-    J_inv[0] = (J22 * J33 - J23 * J32) * inv_det_J;
-    J_inv[1] = (J13 * J32 - J12 * J33) * inv_det_J;
-    J_inv[2] = (J12 * J23 - J13 * J22) * inv_det_J;
-    J_inv[3] = (J23 * J31 - J21 * J33) * inv_det_J;
-    J_inv[4] = (J11 * J33 - J13 * J31) * inv_det_J;
-    J_inv[5] = (J13 * J21 - J11 * J23) * inv_det_J;
-    J_inv[6] = (J21 * J32 - J22 * J31) * inv_det_J;
-    J_inv[7] = (J12 * J31 - J11 * J32) * inv_det_J;
-    J_inv[8] = (J11 * J22 - J12 * J21) * inv_det_J;
+    // Compute the inverse of the Jacobian matrix using precomputed cofactors
+    J_inv[0] = cof00 * inv_det_J;
+    J_inv[1] = cof10 * inv_det_J;
+    J_inv[2] = cof20 * inv_det_J;
+    J_inv[3] = cof01 * inv_det_J;
+    J_inv[4] = cof11 * inv_det_J;
+    J_inv[5] = cof21 * inv_det_J;
+    J_inv[6] = cof02 * inv_det_J;
+    J_inv[7] = cof12 * inv_det_J;
+    J_inv[8] = cof22 * inv_det_J;
 }  // END: sfem_resample_field_adjoint_hex_quad
 
 /////////////////////////////////////////////////////////
@@ -662,6 +693,9 @@ transform_and_check_quadrature_point_n(const int q_ijk,  //
     return result;
 }  // END: transform_and_check_quadrature_point
 
+/////////////////////////////////////////////////////////
+// transform_quadrature_point_n /////////////////////////
+/////////////////////////////////////////////////////////
 static inline quadrature_point_result_t                                    //
 transform_quadrature_point_n(const int                         q_ijk,      //
                              const real_t* const SFEM_RESTRICT Q_nodes_x,  //
@@ -675,10 +709,7 @@ transform_quadrature_point_n(const int                         q_ijk,      //
                              const ptrdiff_t                   k_grid) {                     //
 
     quadrature_point_result_t result;
-    result.is_inside = false;
-
-    // Transform to physical coordinates
-    // Q_nodes are in [0,1] reference space, need to map to the specific grid cell [i_grid, i_grid+1]
+    result.is_inside = true;
 
     result.x = ((real_t)i_grid + Q_nodes_x[q_ijk]) * delta[0] + origin[0];
     result.y = ((real_t)j_grid + Q_nodes_y[q_ijk]) * delta[1] + origin[1];
@@ -710,6 +741,15 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
      * This function return true if the hex is completely outside the tet.
      * And return false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
      * This must be used as a fast culling test before more expensive intersection tests.
+     *
+     * Tet reference space constraints for a point to be INSIDE:
+     *   ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND (ref_x + ref_y + ref_z) <= 1
+     *
+     * A hex is completely OUTSIDE if ALL vertices violate at least ONE of these constraints:
+     *   - All ref_x < 0 (all on negative x side)
+     *   - All ref_y < 0 (all on negative y side)
+     *   - All ref_z < 0 (all on negative z side)
+     *   - All sum > 1 (all beyond the diagonal plane)
      * *****************************************************************************************
      */
 
@@ -725,12 +765,10 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
     const real_t inv_J22 = inv_J_tet[8];
 
     // Track if all vertices violate each constraint
-    int all_negative_x      = 1;  // All ref_x < 0
-    int all_negative_y      = 1;  // All ref_y < 0
-    int all_negative_z      = 1;  // All ref_z < 0
-    int all_outside_sum     = 1;  // All ref_x + ref_y + ref_z > 1
-    int all_outside_sum_neg = 1;  // All ref_x + ref_y + ref_z < 0
-    // int all_larger_than_one = 1;  // All ref_x > 1, ref_y > 1, ref_z > 1 (not used slow)
+    bool all_negative_x  = true;  // All ref_x < 0
+    bool all_negative_y  = true;  // All ref_y < 0
+    bool all_negative_z  = true;  // All ref_z < 0
+    bool all_outside_sum = true;  // All ref_x + ref_y + ref_z > 1
 
     for (int v = 0; v < 8; v++) {
         // Transform hex vertex to tet reference space
@@ -742,33 +780,21 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
         const real_t ref_y = inv_J10 * dx + inv_J11 * dy + inv_J12 * dz;
         const real_t ref_z = inv_J20 * dx + inv_J21 * dy + inv_J22 * dz;
 
-        // Point is inside tet if: ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND ref_x + ref_y + ref_z <= 1
-        // Point is outside if it violates ANY of these constraints
-
-        // Update flags - use bitwise AND for branchless execution
-        all_negative_x &= (ref_x < 0.0);
-        all_negative_y &= (ref_y < 0.0);
-        all_negative_z &= (ref_z < 0.0);
+        // Update flags - a vertex that satisfies a constraint breaks that flag
+        all_negative_x = all_negative_x && (ref_x < 0.0);
+        all_negative_y = all_negative_y && (ref_y < 0.0);
+        all_negative_z = all_negative_z && (ref_z < 0.0);
 
         const real_t sum_ref = ref_x + ref_y + ref_z;
-        all_outside_sum &= (sum_ref > 1.0);
-        // all_outside_sum_neg &=
+        all_outside_sum      = all_outside_sum && (sum_ref > 1.0);
 
-        // Early exit optimization: if we know hex is not completely outside, stop
-        // if (!all_outside_sum &&  //
-        //     !all_outside_sum_neg) {
-        //     return false;
-        // }  // END if early exit
-
-        if (!all_negative_x &&   //
-            !all_negative_y &&   //
-            !all_negative_z &&   //
-            !all_outside_sum) {  //
+        // Early exit: if no constraint is satisfied by all vertices so far, we can't be completely outside
+        if (!all_negative_x && !all_negative_y && !all_negative_z && !all_outside_sum) {
             return false;
         }  // END if early exit
     }  // END for (int v = 0; v < 8; v++)
 
-    // Hex is completely outside if ALL vertices violate at least one constraint
+    // Hex is completely outside if ALL vertices violate at least one constraint together
     return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
 }  // END Function: is_hex_out_of_tet
 
@@ -840,14 +866,16 @@ transfer_weighted_field_tet4_to_hex(const real_t                wf0,            
                         &hex8_f6,   //
                         &hex8_f7);  //
 
-    hex_element_field[0] += wf_quad * hex8_f0 * QW_phys_hex;
-    hex_element_field[1] += wf_quad * hex8_f1 * QW_phys_hex;
-    hex_element_field[2] += wf_quad * hex8_f2 * QW_phys_hex;
-    hex_element_field[3] += wf_quad * hex8_f3 * QW_phys_hex;
-    hex_element_field[4] += wf_quad * hex8_f4 * QW_phys_hex;
-    hex_element_field[5] += wf_quad * hex8_f5 * QW_phys_hex;
-    hex_element_field[6] += wf_quad * hex8_f6 * QW_phys_hex;
-    hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
+    const real_t wf_quad_QW = wf_quad * QW_phys_hex;
+
+    hex_element_field[0] += wf_quad_QW * hex8_f0;
+    hex_element_field[1] += wf_quad_QW * hex8_f1;
+    hex_element_field[2] += wf_quad_QW * hex8_f2;
+    hex_element_field[3] += wf_quad_QW * hex8_f3;
+    hex_element_field[4] += wf_quad_QW * hex8_f4;
+    hex_element_field[5] += wf_quad_QW * hex8_f5;
+    hex_element_field[6] += wf_quad_QW * hex8_f6;
+    hex_element_field[7] += wf_quad_QW * hex8_f7;
 
     return (ijk_index_t){i, j, k};
 }  // END transfer_weighted_field_tet4_to_hex
@@ -882,9 +910,10 @@ transfer_weighted_field_tet4_to_hex_ckp(const real_t                wf0,        
     // If they are outside the tetrahedron, skip the contribution
     // Here we check if the ref coords are below the x-z, y-z, and x-y planes.
     // The others check in a previous step.
-    if (q_ref_x < 0.0 || q_ref_y < 0.0 || q_ref_z < 0.0) {
+    // Check if the reference coordinates are valid (all 4 tet constraints)
+    if (q_ref_x < 0.0 || q_ref_y < 0.0 || q_ref_z < 0.0 || (q_ref_x + q_ref_y + q_ref_z) > 1.0) {
         return (ijk_index_t){-1, -1, -1, false};
-    }
+    }  // END if (outside tet)
 
     const real_t grid_x = (q_phys_x - ox) / dx;
     const real_t grid_y = (q_phys_y - oy) / dy;
@@ -918,14 +947,16 @@ transfer_weighted_field_tet4_to_hex_ckp(const real_t                wf0,        
                         &hex8_f6,   //
                         &hex8_f7);  //
 
-    hex_element_field[0] += wf_quad * hex8_f0 * QW_phys_hex;
-    hex_element_field[1] += wf_quad * hex8_f1 * QW_phys_hex;
-    hex_element_field[2] += wf_quad * hex8_f2 * QW_phys_hex;
-    hex_element_field[3] += wf_quad * hex8_f3 * QW_phys_hex;
-    hex_element_field[4] += wf_quad * hex8_f4 * QW_phys_hex;
-    hex_element_field[5] += wf_quad * hex8_f5 * QW_phys_hex;
-    hex_element_field[6] += wf_quad * hex8_f6 * QW_phys_hex;
-    hex_element_field[7] += wf_quad * hex8_f7 * QW_phys_hex;
+    const real_t wf_quad_QW = wf_quad * QW_phys_hex;
+
+    hex_element_field[0] = wf_quad_QW * hex8_f0;
+    hex_element_field[1] = wf_quad_QW * hex8_f1;
+    hex_element_field[2] = wf_quad_QW * hex8_f2;
+    hex_element_field[3] = wf_quad_QW * hex8_f3;
+    hex_element_field[4] = wf_quad_QW * hex8_f4;
+    hex_element_field[5] = wf_quad_QW * hex8_f5;
+    hex_element_field[6] = wf_quad_QW * hex8_f6;
+    hex_element_field[7] = wf_quad_QW * hex8_f7;
 
     return (ijk_index_t){i, j, k, true};
 }  // END transfer_weighted_field_tet4_to_hex
@@ -1252,7 +1283,7 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
     printf("Stride: %td %td %td \n", stride[0], stride[1], stride[2]);
 #endif
 
-    const real_t volume_hex = delta[0] * delta[1] * delta[2];
+    // const real_t volume_hex = delta[0] * delta[1] * delta[2];
 
     const int off0 = 0;
     const int off1 = stride[0];
@@ -1316,34 +1347,6 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
 
         real_t face_normals_array[4][3];
         real_t faces_centroids_array[4][3];
-
-        // const real_t vol_tet_main = fabs(tet4_measure_v3(x0_n,    //
-        //                                                  x1_n,    //
-        //                                                  x2_n,    //
-        //                                                  x3_n,    //
-        //                                                  y0_n,    //
-        //                                                  y1_n,    //
-        //                                                  y2_n,    //
-        //                                                  y3_n,    //
-        //                                                  z0_n,    //
-        //                                                  z1_n,    //
-        //                                                  z2_n,    //
-        //                                                  z3_n));  //
-
-        tet4_faces_normals(x0_n,                    //
-                           x1_n,                    //
-                           x2_n,                    //
-                           x3_n,                    //
-                           y0_n,                    //
-                           y1_n,                    //
-                           y2_n,                    //
-                           y3_n,                    //
-                           z0_n,                    //
-                           z1_n,                    //
-                           z2_n,                    //
-                           z3_n,                    //
-                           face_normals_array,      //
-                           faces_centroids_array);  //
 
         tet4_inv_Jacobian(x0_n,        //
                           x1_n,        //
@@ -1430,56 +1433,42 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
                                                                  hex_vertices_y,   //
                                                                  hex_vertices_z);  //
 
-                    if (is_out_of_tet) continue;  // Skip this hex cell
+                    // printf("Is out of tet: %d \n", is_out_of_tet);
+
+                    if (is_out_of_tet) continue;  // c Skip this hex cell
 
                     // Midpoint quadrature rule in 3D
 
                     for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
-                        quadrature_point_result_t Qpoint_phys =                //
-                                transform_and_check_quadrature_point_n(q_ijk,  //
-                                                                               //    vol_tet_main,                          //
-                                                                       face_normals_array,                    //
-                                                                       faces_centroids_array,                 //
-                                                                       Q_nodes_x,                             //
-                                                                       Q_nodes_y,                             //
-                                                                       Q_nodes_z,                             //
-                                                                       Q_weights,                             //
-                                                                       origin,                                //
-                                                                       delta,                                 //
-                                                                       i_grid_x,                              //
-                                                                       j_grid_y,                              //
-                                                                       k_grid_z,                              //
-                                                                       (real_t[4]){x0_n, x1_n, x2_n, x3_n},   //
-                                                                       (real_t[4]){y0_n, y1_n, y2_n, y3_n},   //
-                                                                       (real_t[4]){z0_n, z1_n, z2_n, z3_n});  //
-                        if (Qpoint_phys.is_inside) {
-                            for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
+                        quadrature_point_result_t Qpoint_phys =          //
+                                transform_quadrature_point_n(q_ijk,      //
+                                                             Q_nodes_x,  //
+                                                             Q_nodes_y,  //
+                                                             Q_nodes_z,  //
+                                                             Q_weights,  //
+                                                             origin,     //
+                                                             delta,      //
+                                                             i_grid_x,   //
+                                                             j_grid_y,   //
+                                                             k_grid_z);  //
 
-                            // printf("Element %td, grid (%td,%td,%td), quad point %d is inside tet at phys (%.6f,%.6f,%.6f) \n",
-                            //        element_i,
-                            //        i_grid_x,
-                            //        j_grid_y,
-                            //        k_grid_z,
-                            //        q_ijk,
-                            //        result.x,
-                            //        result.y,
-                            //        result.z);
+                        real_t Q_ref_x, Q_ref_y, Q_ref_z;
 
-                            real_t Q_ref_x, Q_ref_y, Q_ref_z;
+                        tet4_inv_transform_J(inv_J_tet,      // Inverse Jacobian matrix
+                                             Qpoint_phys.x,  // Physical coordinates of the quadrature point
+                                             Qpoint_phys.y,  //
+                                             Qpoint_phys.z,  //
+                                             x0_n,           //
+                                             y0_n,           //
+                                             z0_n,           //
+                                             &Q_ref_x,       // Reference coordinates of the quadrature point
+                                             &Q_ref_y,       //
+                                             &Q_ref_z);      //
 
-                            tet4_inv_transform_J(inv_J_tet,      // Inverse Jacobian matrix
-                                                 Qpoint_phys.x,  // Physical coordinates of the quadrature point
-                                                 Qpoint_phys.y,  //
-                                                 Qpoint_phys.z,  //
-                                                 x0_n,           //
-                                                 y0_n,           //
-                                                 z0_n,           //
-                                                 &Q_ref_x,       // Reference coordinates of the quadrature point
-                                                 &Q_ref_y,       //
-                                                 &Q_ref_z);      //
+                        // for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
 
-                            ijk_index_t ijk_indices =                                        //
-                                    transfer_weighted_field_tet4_to_hex(wf0,                 //
+                        ijk_index_t ijk_indices =                                            //
+                                transfer_weighted_field_tet4_to_hex_ckp(wf0,                 //
                                                                         wf1,                 //
                                                                         wf2,                 //
                                                                         wf3,                 //
@@ -1498,6 +1487,7 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
                                                                         delta[2],            //
                                                                         hex_element_field);  //
 
+                        if (ijk_indices.inside_tet) {
                             const ptrdiff_t base_index = i_grid_x * stride[0] +  //
                                                          j_grid_y * stride[1] +  //
                                                          k_grid_z * stride[2];   //
@@ -1510,8 +1500,8 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
                             data[base_index + off5] += hex_element_field[5];  //
                             data[base_index + off6] += hex_element_field[6];  //
                             data[base_index + off7] += hex_element_field[7];  //
-
                         }  // END: if is_inside
+
                     }  // END: for q_ijk
                 }  // END: for k_grid_z
             }  // END: for i_grid_y

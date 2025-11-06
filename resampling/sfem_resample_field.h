@@ -717,6 +717,20 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                                        const mini_tet_parameters_t          mini_tet_parameters,  //
                                        real_t* const SFEM_RESTRICT          data);                         //
 
+int                                                                                                  //
+tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      start_element,        // Mesh
+                                          const ptrdiff_t                      end_element,          //
+                                          const ptrdiff_t                      nnodes,               //
+                                          const idx_t** const SFEM_RESTRICT    elems,                //
+                                          const geom_t** const SFEM_RESTRICT   xyz,                  //
+                                          const ptrdiff_t* const SFEM_RESTRICT n,                    // SDF
+                                          const ptrdiff_t* const SFEM_RESTRICT stride,               //
+                                          const geom_t* const SFEM_RESTRICT    origin,               //
+                                          const geom_t* const SFEM_RESTRICT    delta,                //
+                                          const real_t* const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                          const mini_tet_parameters_t          mini_tet_parameters,  //
+                                          real_t* const SFEM_RESTRICT          data);                         //
+
 /**
  * @brief
  *
