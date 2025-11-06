@@ -84,17 +84,18 @@ tet4_inv_transform_J_gpu(const FloatType* const J_inv,  //
 //////////////////////////////////////////////////////////
 template <typename FloatType, typename IntType = ptrdiff_t>
 __device__ __inline__ bool                                                       //
-transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  wf0,                //
+transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  inv_J_tet[9],       //
+                                            const FloatType  wf0,                //
                                             const FloatType  wf1,                //
                                             const FloatType  wf2,                //
                                             const FloatType  wf3,                //
                                             const FloatType  q_phys_x,           //
                                             const FloatType  q_phys_y,           //
                                             const FloatType  q_phys_z,           //
-                                            const FloatType  q_ref_x,            //
-                                            const FloatType  q_ref_y,            //
-                                            const FloatType  q_ref_z,            //
                                             const FloatType  QW_phys_hex,        //
+                                            const FloatType  x0_n,               //
+                                            const FloatType  y0_n,               //
+                                            const FloatType  z0_n,               //
                                             const FloatType  ox,                 //
                                             const FloatType  oy,                 //
                                             const FloatType  oz,                 //
@@ -108,6 +109,21 @@ transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  wf0,               
 
     // Compute the weighted contribution from the tetrahedron
     // Using linear shape functions for tetrahedron
+
+    FloatType q_ref_x;  //
+    FloatType q_ref_y;  //
+    FloatType q_ref_z;  //
+
+    tet4_inv_transform_J_gpu(inv_J_tet,  //
+                             q_phys_x,   //
+                             q_phys_y,   //
+                             q_phys_z,   //
+                             x0_n,       //
+                             y0_n,       //
+                             z0_n,       //
+                             q_ref_x,    //
+                             q_ref_y,    //
+                             q_ref_z);   //
 
     if (q_ref_x < 0.0 || q_ref_y < 0.0 || q_ref_z < 0.0 || (q_ref_x + q_ref_y + q_ref_z) > 1.0) {
         return false;
@@ -138,18 +154,28 @@ transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  wf0,               
     // With respect to the hat functions of a cube element
     // In a local coordinate system
     //
+    // Precompute common subexpressions for hex8 shape functions
     const FloatType one_minus_lx = FloatType(1.0) - l_x;
     const FloatType one_minus_ly = FloatType(1.0) - l_y;
     const FloatType one_minus_lz = FloatType(1.0) - l_z;
 
-    const FloatType hex8_f0 = one_minus_lx * one_minus_ly * one_minus_lz;
-    const FloatType hex8_f1 = l_x * one_minus_ly * one_minus_lz;
-    const FloatType hex8_f2 = l_x * l_y * one_minus_lz;
+    // Precompute products that are reused multiple times
+    const FloatType lx_ly           = l_x * l_y;
+    const FloatType lx_lz           = l_x * l_z;
+    const FloatType ly_lz           = l_y * l_z;
+    const FloatType one_minus_lx_ly = one_minus_lx * one_minus_ly;
+    const FloatType one_minus_lx_lz = one_minus_lx * l_z;
+    const FloatType lx_one_minus_ly = l_x * one_minus_ly;
+
+    // Compute hex8 shape functions using precomputed subexpressions
+    const FloatType hex8_f0 = one_minus_lx_ly * one_minus_lz;
+    const FloatType hex8_f1 = lx_one_minus_ly * one_minus_lz;
+    const FloatType hex8_f2 = lx_ly * one_minus_lz;
     const FloatType hex8_f3 = one_minus_lx * l_y * one_minus_lz;
-    const FloatType hex8_f4 = one_minus_lx * one_minus_ly * l_z;
-    const FloatType hex8_f5 = l_x * one_minus_ly * l_z;
-    const FloatType hex8_f6 = l_x * l_y * l_z;
-    const FloatType hex8_f7 = one_minus_lx * l_y * l_z;
+    const FloatType hex8_f4 = one_minus_lx_ly * l_z;
+    const FloatType hex8_f5 = lx_one_minus_ly * l_z;
+    const FloatType hex8_f6 = lx_ly * l_z;
+    const FloatType hex8_f7 = one_minus_lx_lz * l_y;
 
     // Accumulate contributions to hex element field using FMA for precision
     const FloatType contribution = wf_quad * QW_phys_hex;
@@ -1414,33 +1440,34 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
 #pragma unroll
             for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
 
-            FloatType Q_ref_x, Q_ref_y, Q_ref_z;
+            // FloatType Q_ref_x, Q_ref_y, Q_ref_z;
 
-            tet4_inv_transform_J_gpu(inv_J_tet,               //
-                                     Qpoint_phys.physical_x,  //
-                                     Qpoint_phys.physical_y,  //
-                                     Qpoint_phys.physical_z,  //
-                                     x0_n,                    //
-                                     y0_n,                    //
-                                     z0_n,                    //
-                                     Q_ref_x,                 //
-                                     Q_ref_y,                 //
-                                     Q_ref_z);                //
+            // tet4_inv_transform_J_gpu(inv_J_tet,               //
+            //                          Qpoint_phys.physical_x,  //
+            //                          Qpoint_phys.physical_y,  //
+            //                          Qpoint_phys.physical_z,  //
+            //                          x0_n,                    //
+            //                          y0_n,                    //
+            //                          z0_n,                    //
+            //                          Q_ref_x,                 //
+            //                          Q_ref_y,                 //
+            //                          Q_ref_z);                //
 
             IntType out_i, out_j, out_k;
 
             const bool is_in_tet =                                                                           //
-                    transfer_weighted_field_tet4_to_hex_ckp_gpu<FloatType, IntType>(wf0,                     //
+                    transfer_weighted_field_tet4_to_hex_ckp_gpu<FloatType, IntType>(inv_J_tet,               //
+                                                                                    wf0,                     //
                                                                                     wf1,                     //
                                                                                     wf2,                     //
                                                                                     wf3,                     //
                                                                                     Qpoint_phys.physical_x,  //
                                                                                     Qpoint_phys.physical_y,  //
                                                                                     Qpoint_phys.physical_z,  //
-                                                                                    Q_ref_x,                 //
-                                                                                    Q_ref_y,                 //
-                                                                                    Q_ref_z,                 //
                                                                                     Qpoint_phys.weight,      //
+                                                                                    x0_n,                    //
+                                                                                    y0_n,                    //
+                                                                                    z0_n,                    //
                                                                                     origin0,                 //
                                                                                     origin1,                 //
                                                                                     origin2,                 //
