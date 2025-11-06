@@ -1288,7 +1288,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
 #else
 
-            ret = tet4_resample_field_adjoint_hex_quad_d  //
+            ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
             // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                                             //
                      mesh->nelements,                               //

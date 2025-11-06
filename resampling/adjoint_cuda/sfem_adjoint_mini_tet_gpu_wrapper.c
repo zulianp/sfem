@@ -24,7 +24,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
     // printf("Strides = %ld %ld %ld ************************************************ \n", stride[0], stride[1], stride[2]);
 
-#define TEST_KERNEL_MODEL 3
+#define TEST_KERNEL_MODEL 4
 
     int         repetitions = 1;
     const char* env_reps    = getenv("SFEM_REPETITIONS_ADJOINT");

@@ -82,28 +82,28 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     ////////////////////////////////////////////////////////////////////
     /// Launch the kernel //////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////
-    tet4_resample_field_adjoint_hex_quad_kernel_gpu<real_t, int><<<blocks_per_grid,                       //
-                                                                   threads_per_block,                     //
-                                                                   0,                                     //
-                                                                   cuda_stream>>>(start_element,          //
-                                                                                  end_element,            //
-                                                                                  nelements,              //
-                                                                                  elements_device,        //
-                                                                                  xyz_device,             //
-                                                                                  n0,                     //
-                                                                                  n1,                     //
-                                                                                  n2,                     //
-                                                                                  stride0,                //
-                                                                                  stride1,                //
-                                                                                  stride2,                //
-                                                                                  origin0,                //
-                                                                                  origin1,                //
-                                                                                  origin2,                //
-                                                                                  dx,                     //
-                                                                                  dy,                     //
-                                                                                  dz,                     //
-                                                                                  weighted_field_device,  //
-                                                                                  data_device);           //
+    tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu<real_t, int><<<blocks_per_grid,                       //
+                                                                      threads_per_block,                     //
+                                                                      0,                                     //
+                                                                      cuda_stream>>>(start_element,          //
+                                                                                     end_element,            //
+                                                                                     nelements,              //
+                                                                                     elements_device,        //
+                                                                                     xyz_device,             //
+                                                                                     n0,                     //
+                                                                                     n1,                     //
+                                                                                     n2,                     //
+                                                                                     stride0,                //
+                                                                                     stride1,                //
+                                                                                     stride2,                //
+                                                                                     origin0,                //
+                                                                                     origin1,                //
+                                                                                     origin2,                //
+                                                                                     dx,                     //
+                                                                                     dy,                     //
+                                                                                     dz,                     //
+                                                                                     weighted_field_device,  //
+                                                                                     data_device);           //
 
     cudaStreamSynchronize(cuda_stream);
 
