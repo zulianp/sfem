@@ -1485,9 +1485,9 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
             }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
         }  // END: for (int q_i = 0; q_i < N_midpoint; q_i++)
 
-        const ptrdiff_t base_index = ix * stride0 +                 //
-                                     iy * stride1 +                 //
-                                     iz * stride2;                  //
+        const IntType base_index = ix * stride0 +                   //
+                                   iy * stride1 +                   //
+                                   iz * stride2;                    //
                                                                     //
         atomicAdd(&data[base_index + off0], hex_element_field[0]);  //
         atomicAdd(&data[base_index + off1], hex_element_field[1]);  //
