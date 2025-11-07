@@ -61,13 +61,14 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     }  // END if (error != cudaSuccess)
 
     // Launch kernel
-    const unsigned int blocks_per_grid   = (end_element - start_element + 1) * LANES_PER_TILE_HEX_QUAD / 32;
+    const unsigned int blocks_per_grid   = min((unsigned int)(end_element - start_element + 1), (unsigned int)pow(2, 17));
     const unsigned int threads_per_block = 256;
 
 #if SFEM_LOG_LEVEL >= 5
     printf("Launching tet4_resample_field_adjoint_hex_quad_kernel_gpu with: \n");
-    printf("* blocks_per_grid:   %u \n", blocks_per_grid);
-    printf("* threads_per_block: %u \n", threads_per_block);
+    printf("* blocks_per_grid:         %u \n", blocks_per_grid);
+    printf("* threads_per_block:       %u \n", threads_per_block);
+    printf("* LANES_PER_TILE_HEX_QUAD: %u \n", (unsigned int)LANES_PER_TILE_HEX_QUAD);
 #endif
 
     cudaStream_t cuda_stream = NULL;  // default stream
