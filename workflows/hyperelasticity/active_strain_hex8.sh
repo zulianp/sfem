@@ -53,7 +53,7 @@ echo "OMP_PROC_BIND=$OMP_PROC_BIND"
 export SFEM_ROTATE_SIDESET=hex8_geometry/outlet
 # export SFEM_ROTATE_ANGLE=3.14
 # export SFEM_ROTATE_STEPS=20
-export SFEM_ROTATE_ANGLE=2
+export SFEM_ROTATE_ANGLE=0
 export SFEM_ROTATE_STEPS=30
 export SFEM_ROTATE_RCENTER_X=0
 export SFEM_ROTATE_RCENTER_Y=0.5
@@ -66,6 +66,8 @@ export SFEM_USE_PACKED_MESH=1
 export SFEM_USE_PRECONDITIONER=0
 export SFEM_ENABLE_LINE_SEARCH=0
 export SFEM_OPERATOR=NeoHookeanOgdenActiveStrainPacked
+export SFEM_ACTIVE_STRAIN_RADIUS=1 
+export SFEM_LSOLVE_RTOL=1e-4
 
 # xctrace record --template 'Time Profiler'  --launch -- $SFEM_PATH/bin/hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
 $LAUNCH hyperelasticy hex8_geometry/box dirichlet_active_strain_hex8.yaml hex8_output
