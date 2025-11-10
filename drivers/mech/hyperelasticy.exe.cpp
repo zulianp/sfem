@@ -18,6 +18,8 @@
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
 
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -145,6 +147,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-9);
 
+
+    // Active strain setup marker
+    const bool use_active_strain =
+            (
+                // std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrain" ||
+             std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrainPacked");
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
         const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -199,6 +208,90 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
+
+    // Generate basic Fa if active strain operator is requested
+    std::shared_ptr<sfem::Buffer<real_t>> Fa_storage;
+    if (use_active_strain) {
+        auto as_op = std::dynamic_pointer_cast<sfem::NeoHookeanOgdenActiveStrainPacked>(op);
+        if (as_op) {
+            // Bounding box and sphere parameters
+            auto bbox      = mesh->compute_bounding_box();
+            auto bb_min    = bbox.first->data();
+            auto bb_max    = bbox.second->data();
+            geom_t center[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
+            for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
+            }
+            const geom_t dx     = bb_max[0] - bb_min[0];
+            const geom_t dy     = bb_max[1] - bb_min[1];
+            const geom_t dz     = bb_max[2] - bb_min[2];
+            const geom_t span   = std::min(dx, std::min(dy, dz));
+            geom_t       radius = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
+            const geom_t r2     = radius * radius;
+
+            const ptrdiff_t nelements = mesh->n_elements();
+            const int       nxe       = mesh->n_nodes_per_element();
+            auto            elements  = mesh->elements()->data();
+            auto            points    = mesh->points()->data();
+
+            // AoS layout: 9 values per element (row-major 3x3)
+            Fa_storage = sfem::create_host_buffer<real_t>(9 * nelements);
+            auto Fa    = Fa_storage->data();
+
+            for (ptrdiff_t e = 0; e < nelements; ++e) {
+                geom_t cx = 0, cy = 0, cz = 0;
+                for (int v = 0; v < nxe; ++v) {
+                    const idx_t i = elements[v][e];
+                    cx += points[0][i];
+                    cy += points[1][i];
+                    cz += points[2][i];
+                }
+                cx /= (geom_t)nxe;
+                cy /= (geom_t)nxe;
+                cz /= (geom_t)nxe;
+
+                const geom_t dx_c = cx - center[0];
+                const geom_t dy_c = cy - center[1];
+                const geom_t dz_c = cz - center[2];
+                const geom_t d2   = dx_c * dx_c + dy_c * dy_c + dz_c * dz_c;
+
+                const bool inside = (d2 <= r2);
+                const real_t a11  = inside ? (real_t)(dx_c * dx_c) : (real_t)1;
+                const real_t a22  = inside ? (real_t)(dy_c * dy_c) : (real_t)1;
+                const real_t a33  = inside ? (real_t)(dz_c * dz_c) : (real_t)1;
+
+                const ptrdiff_t base = 9 * e;
+                // Fa[base + 0]         = a11;
+                // Fa[base + 1]         = 0;
+                // Fa[base + 2]         = 0;
+                // Fa[base + 3]         = 0;
+                // Fa[base + 4]         = a22;
+                // Fa[base + 5]         = 0;
+                // Fa[base + 6]         = 0;
+                // Fa[base + 7]         = 0;
+                // Fa[base + 8]         = a33;
+
+
+                Fa[base + 0]         = inside ? 1.5 : 1;
+                Fa[base + 1]         = 0;
+                Fa[base + 2]         = 0;
+                Fa[base + 3]         = 0;
+                Fa[base + 4]         = 1;
+                Fa[base + 5]         = 0;
+                Fa[base + 6]         = 0;
+                Fa[base + 7]         = 0;
+                Fa[base + 8]         = 1;
+            }
+
+            // One global AoS buffer used for all blocks (single-block meshes recommended)
+            as_op->set_active_strain_global(Fa_storage->data(), 9);
+            
+        } else {
+            fprintf(stderr,
+                    "[Warning] Active strain requested but operator is not NeoHookeanOgdenActiveStrainPacked; ignoring Fa\n");
+        }
+    }
+
     f->add_operator(op);
     f->add_constraint(dirichlet_conditions);
 
@@ -257,6 +350,55 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     sfem::create_directory((output_path + "/out").c_str());
     out->set_output_dir((output_path + "/out").c_str());
     out->enable_AoS_to_SoA(true);
+
+    // Write the diagonal components of Fa to file (nodal averages, split by component)
+    if (use_active_strain && Fa_storage) {
+        const ptrdiff_t nnodes    = mesh->n_nodes();
+        const ptrdiff_t nelements = mesh->n_elements();
+        const int       nxe       = mesh->n_nodes_per_element();
+        auto            elements  = mesh->elements()->data();
+        auto            Fa        = Fa_storage->data();
+
+        auto sum11  = sfem::create_host_buffer<real_t>(nnodes);
+        auto sum22  = sfem::create_host_buffer<real_t>(nnodes);
+        auto sum33  = sfem::create_host_buffer<real_t>(nnodes);
+        auto counts = sfem::create_host_buffer<ptrdiff_t>(nnodes);
+
+        auto d_sum11  = sum11->data();
+        auto d_sum22  = sum22->data();
+        auto d_sum33  = sum33->data();
+        auto d_counts = counts->data();
+
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            const ptrdiff_t base = 9 * e;
+            const real_t    a11  = Fa[base + 0];
+            const real_t    a22  = Fa[base + 4];
+            const real_t    a33  = Fa[base + 8];
+            for (int v = 0; v < nxe; ++v) {
+                const idx_t node = elements[v][e];
+                d_sum11[node] += a11;
+                d_sum22[node] += a22;
+                d_sum33[node] += a33;
+                d_counts[node] += 1;
+            }
+        }
+
+        // Build AoS buffer (nnodes * 3) and write; AoS_to_SoA will split per component
+        auto fa_diag = sfem::create_host_buffer<real_t>(fs->n_dofs());
+        auto d_diag  = fa_diag->data();
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t inv = d_counts[i] > 0 ? (real_t)(1.0 / (double)d_counts[i]) : 0;
+            const real_t v11 = d_sum11[i] * inv;
+            const real_t v22 = d_sum22[i] * inv;
+            const real_t v33 = d_sum33[i] * inv;
+            const ptrdiff_t base = i * 3;
+            d_diag[base + 0]     = v11;
+            d_diag[base + 1]     = v22;
+            d_diag[base + 2]     = v33;
+        }
+
+        out->write("Fa_diag", fa_diag->data());
+    }
 
     if (sfem::Env::read("SFEM_USE_GRADIENT_DESCENT", false)) {
         for (int i = 0; i < nl_max_it; i++) {

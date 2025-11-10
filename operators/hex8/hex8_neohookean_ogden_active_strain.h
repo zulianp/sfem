@@ -1,5 +1,5 @@
-#ifndef HEX8_NEOHOOKEAN_OGDEN_H
-#define HEX8_NEOHOOKEAN_OGDEN_H
+#ifndef HEX8_NEOHOOKEAN_OGDEN_ACTIVE_STRAIN_H
+#define HEX8_NEOHOOKEAN_OGDEN_ACTIVE_STRAIN_H
 
 #include <stddef.h>
 #include "sfem_base.h"
@@ -16,8 +16,8 @@ int hex8_neohookean_active_strain_ogden_objective(const ptrdiff_t               
                                                   geom_t **const SFEM_RESTRICT      points,
                                                   const real_t                      mu,
                                                   const real_t                      lambda,
-                                                  const ptrdiff_t Fa_stride,
-                                                        const real_t **const Fa,
+                                                  const ptrdiff_t                   Fa_stride,
+                                                  const real_t **const              Fa,
                                                   const ptrdiff_t                   u_stride,
                                                   const real_t *const SFEM_RESTRICT ux,
                                                   const real_t *const SFEM_RESTRICT uy,
@@ -32,8 +32,8 @@ int hex8_neohookean_active_strain_ogden_objective_steps(const ptrdiff_t         
                                                         geom_t **const SFEM_RESTRICT      points,
                                                         const real_t                      mu,
                                                         const real_t                      lambda,
-                                                        const ptrdiff_t Fa_stride,
-                                                        const real_t **const Fa,
+                                                        const ptrdiff_t                   Fa_stride,
+                                                        const real_t **const              Fa,
                                                         const ptrdiff_t                   u_stride,
                                                         const real_t *const SFEM_RESTRICT ux,
                                                         const real_t *const SFEM_RESTRICT uy,
@@ -46,15 +46,52 @@ int hex8_neohookean_active_strain_ogden_objective_steps(const ptrdiff_t         
                                                         const real_t *const SFEM_RESTRICT steps,
                                                         real_t *const SFEM_RESTRICT       out);
 
-int hex8_neohookean_active_strain_ogden_gradient(const ptrdiff_t                   nelements,
+int hex8_neohookean_ogden_active_strain_objective(const ptrdiff_t                   nelements,
+                                                  const ptrdiff_t                   stride,
+                                                  const ptrdiff_t                   nnodes,
+                                                  idx_t **const SFEM_RESTRICT       elements,
+                                                  geom_t **const SFEM_RESTRICT      points,
+                                                  const real_t                      mu,
+                                                  const real_t                      lambda,
+                                                  const ptrdiff_t                   Fa_stride,
+                                                  const real_t **const              Fa,
+                                                  const ptrdiff_t                   u_stride,
+                                                  const real_t *const SFEM_RESTRICT ux,
+                                                  const real_t *const SFEM_RESTRICT uy,
+                                                  const real_t *const SFEM_RESTRICT uz,
+                                                  const int                         is_element_wise,
+                                                  real_t *const SFEM_RESTRICT       out);
+
+int hex8_neohookean_ogden_active_strain_objective_steps(const ptrdiff_t                   nelements,
+                                                        const ptrdiff_t                   stride,
+                                                        const ptrdiff_t                   nnodes,
+                                                        idx_t **const SFEM_RESTRICT       elements,
+                                                        geom_t **const SFEM_RESTRICT      points,
+                                                        const real_t                      mu,
+                                                        const real_t                      lambda,
+                                                        const ptrdiff_t                   Fa_stride,
+                                                        const real_t **const              Fa,
+                                                        const ptrdiff_t                   u_stride,
+                                                        const real_t *const SFEM_RESTRICT ux,
+                                                        const real_t *const SFEM_RESTRICT uy,
+                                                        const real_t *const SFEM_RESTRICT uz,
+                                                        const ptrdiff_t                   inc_stride,
+                                                        const real_t *const SFEM_RESTRICT incx,
+                                                        const real_t *const SFEM_RESTRICT incy,
+                                                        const real_t *const SFEM_RESTRICT incz,
+                                                        const int                         nsteps,
+                                                        const real_t *const SFEM_RESTRICT steps,
+                                                        real_t *const SFEM_RESTRICT       out);
+
+int hex8_neohookean_ogden_active_strain_gradient(const ptrdiff_t                   nelements,
                                                  const ptrdiff_t                   stride,
                                                  const ptrdiff_t                   nnodes,
                                                  idx_t **const SFEM_RESTRICT       elements,
                                                  geom_t **const SFEM_RESTRICT      points,
                                                  const real_t                      mu,
                                                  const real_t                      lambda,
-                                                 const ptrdiff_t Fa_stride,
-                                                        const real_t **const Fa,
+                                                 const ptrdiff_t                   Fa_stride,
+                                                 const real_t **const              Fa,
                                                  const ptrdiff_t                   u_stride,
                                                  const real_t *const SFEM_RESTRICT ux,
                                                  const real_t *const SFEM_RESTRICT uy,
@@ -64,19 +101,21 @@ int hex8_neohookean_active_strain_ogden_gradient(const ptrdiff_t                
                                                  real_t *const SFEM_RESTRICT       outy,
                                                  real_t *const SFEM_RESTRICT       outz);
 
-int hex8_neohookean_active_strain_ogden_hessian_partial_assembly(const ptrdiff_t                      nelements,
+int hex8_neohookean_ogden_active_strain_hessian_partial_assembly(const ptrdiff_t                      nelements,
                                                                  const ptrdiff_t                      stride,
                                                                  idx_t **const SFEM_RESTRICT          elements,
                                                                  geom_t **const SFEM_RESTRICT         points,
                                                                  const real_t                         mu,
                                                                  const real_t                         lambda,
+                                                                 const ptrdiff_t                      Fa_stride,
+                                                                 const real_t **const                 Fa,
                                                                  const ptrdiff_t                      u_stride,
                                                                  const real_t *const SFEM_RESTRICT    ux,
                                                                  const real_t *const SFEM_RESTRICT    uy,
                                                                  const real_t *const SFEM_RESTRICT    uz,
                                                                  metric_tensor_t *const SFEM_RESTRICT partial_assembly);
 
-int hex8_neohookean_active_strain_ogden_partial_assembly_apply(const ptrdiff_t                            nelements,
+int hex8_neohookean_ogden_active_strain_partial_assembly_apply(const ptrdiff_t                            nelements,
                                                                const ptrdiff_t                            stride,
                                                                idx_t **const SFEM_RESTRICT                elements,
                                                                const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
@@ -89,14 +128,14 @@ int hex8_neohookean_active_strain_ogden_partial_assembly_apply(const ptrdiff_t  
                                                                real_t *const SFEM_RESTRICT                outy,
                                                                real_t *const SFEM_RESTRICT                outz);
 
-int hex8_neohookean_active_strain_ogden_partial_assembly_diag(const ptrdiff_t                   nelements,
+int hex8_neohookean_ogden_active_strain_partial_assembly_diag(const ptrdiff_t                   nelements,
                                                               const ptrdiff_t                   stride,
                                                               idx_t **const SFEM_RESTRICT       elements,
                                                               geom_t **const SFEM_RESTRICT      points,
                                                               const real_t                      mu,
                                                               const real_t                      lambda,
-                                                              const ptrdiff_t Fa_stride,
-                                                        const real_t **const Fa,
+                                                              const ptrdiff_t                   Fa_stride,
+                                                              const real_t **const              Fa,
                                                               const ptrdiff_t                   u_stride,
                                                               const real_t *const SFEM_RESTRICT ux,
                                                               const real_t *const SFEM_RESTRICT uy,
@@ -106,7 +145,7 @@ int hex8_neohookean_active_strain_ogden_partial_assembly_diag(const ptrdiff_t   
                                                               real_t *const SFEM_RESTRICT       outy,
                                                               real_t *const SFEM_RESTRICT       outz);
 
-int hex8_neohookean_active_strain_ogden_compressed_partial_assembly_apply(const ptrdiff_t             nelements,
+int hex8_neohookean_ogden_active_strain_compressed_partial_assembly_apply(const ptrdiff_t             nelements,
                                                                           const ptrdiff_t             stride,
                                                                           idx_t **const SFEM_RESTRICT elements,
                                                                           const compressed_t *const SFEM_RESTRICT
@@ -121,15 +160,15 @@ int hex8_neohookean_active_strain_ogden_compressed_partial_assembly_apply(const 
                                                                           real_t *const SFEM_RESTRICT          outy,
                                                                           real_t *const SFEM_RESTRICT          outz);
 
-int hex8_neohookean_active_strain_ogden_elasticity_diag(const ptrdiff_t                   nelements,
+int hex8_neohookean_ogden_active_strain_elasticity_diag(const ptrdiff_t                   nelements,
                                                         const ptrdiff_t                   stride,
                                                         const ptrdiff_t                   nnodes,
                                                         idx_t **const SFEM_RESTRICT       elements,
                                                         geom_t **const SFEM_RESTRICT      points,
                                                         const real_t                      mu,
                                                         const real_t                      lambda,
-                                                        const ptrdiff_t Fa_stride,
-                                                        const real_t **const Fa,
+                                                        const ptrdiff_t                   Fa_stride,
+                                                        const real_t **const              Fa,
                                                         const ptrdiff_t                   u_stride,
                                                         const real_t *const SFEM_RESTRICT ux,
                                                         const real_t *const SFEM_RESTRICT uy,
@@ -139,12 +178,14 @@ int hex8_neohookean_active_strain_ogden_elasticity_diag(const ptrdiff_t         
                                                         real_t *const SFEM_RESTRICT       outy,
                                                         real_t *const SFEM_RESTRICT       outz);
 
-int hex8_neohookean_active_strain_ogden_bsr(const ptrdiff_t                    nelements,
+int hex8_neohookean_ogden_active_strain_bsr(const ptrdiff_t                    nelements,
                                             const ptrdiff_t                    stride,
                                             idx_t **const SFEM_RESTRICT        elements,
                                             geom_t **const SFEM_RESTRICT       points,
                                             const real_t                       mu,
                                             const real_t                       lambda,
+                                            const ptrdiff_t                    Fa_stride,
+                                            const real_t **const               Fa,
                                             const ptrdiff_t                    u_stride,
                                             const real_t *const SFEM_RESTRICT  ux,
                                             const real_t *const SFEM_RESTRICT  uy,
@@ -153,12 +194,14 @@ int hex8_neohookean_active_strain_ogden_bsr(const ptrdiff_t                    n
                                             const idx_t *const SFEM_RESTRICT   colidx,
                                             real_t *const SFEM_RESTRICT        values);
 
-int hex8_neohookean_active_strain_ogden_bcrs_sym(const ptrdiff_t                    nelements,
+int hex8_neohookean_ogden_active_strain_bcrs_sym(const ptrdiff_t                    nelements,
                                                  const ptrdiff_t                    stride,
                                                  idx_t **const SFEM_RESTRICT        elements,
                                                  geom_t **const SFEM_RESTRICT       points,
                                                  const real_t                       mu,
                                                  const real_t                       lambda,
+                                                 const ptrdiff_t                    Fa_stride,
+                                                 const real_t **const               Fa,
                                                  const ptrdiff_t                    u_stride,
                                                  const real_t *const SFEM_RESTRICT  ux,
                                                  const real_t *const SFEM_RESTRICT  uy,
@@ -173,4 +216,4 @@ int hex8_neohookean_active_strain_ogden_bcrs_sym(const ptrdiff_t                
 }
 #endif
 
-#endif  // HEX8_NEOHOOKEAN_OGDEN_H
+#endif  // HEX8_NEOHOOKEAN_OGDEN_ACTIVE_STRAIN_H
