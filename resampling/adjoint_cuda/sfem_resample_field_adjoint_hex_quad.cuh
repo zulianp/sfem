@@ -1281,6 +1281,7 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
     FloatType Q_weights[N_midpoint_loc];
 
     Gauss_Legendre_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
+    // midpoint_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
 
     // sfem_quad_rule_3D_gpu<FloatType, IntType>(TET_QUAD_MIDPOINT_NQP,  //
     //                                           N_midpoint,             //
