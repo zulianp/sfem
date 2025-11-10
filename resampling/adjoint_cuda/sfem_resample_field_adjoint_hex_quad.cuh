@@ -4,6 +4,7 @@
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_adjoint_mini_tet_fun.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
+#include "sfem_resample_field_quad_rules.cuh"
 
 typedef enum { TET_QUAD_MIDPOINT_NQP } tet_quad_midpoint_nqp_gpu_t;
 
@@ -844,6 +845,30 @@ midpoint_quadrature_gpu(const IntType N,       //
     return 0;  // Success
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// Gauss_Legendre_quadrature_gpu /////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType, typename IntType = ptrdiff_t>
+__device__ int                                       //
+Gauss_Legendre_quadrature_gpu(const int  N,          //
+                              FloatType* nodes,      //
+                              FloatType* weights) {  //
+    if (N <= 0) return -1;                           // Invalid number of points
+
+    using FloatType2_loc = typename declare_FloatType2<FloatType>::type;
+
+    for (int i = 0; i < N; i++) {
+        const FloatType2_loc quad_pair = Gauss_Legendre_quadrature_pairs<FloatType, FloatType2_loc, IntType>(N, i);
+
+        nodes[i]   = quad_pair.x;
+        weights[i] = quad_pair.y;
+    }  // END for (int i = 0; i < N; i++)
+
+    return 0;  // Success
+}  // END Function: Gauss_Legendre_quadrature_gpu
+
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 // sfem_quad_rule_3D ///////////////////////////////////
@@ -1255,7 +1280,7 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
     FloatType Q_nodes[N_midpoint_loc];
     FloatType Q_weights[N_midpoint_loc];
 
-    midpoint_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
+    Gauss_Legendre_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
 
     // sfem_quad_rule_3D_gpu<FloatType, IntType>(TET_QUAD_MIDPOINT_NQP,  //
     //                                           N_midpoint,             //
@@ -1584,6 +1609,7 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
     // const IntType elems_block_size = gridDim.x;
 
     for (int element_i = start_element + blockIdx.x; element_i < end_element; element_i += gridDim.x) {
+        //
         tet4_resample_field_adjoint_hex_quad_element_method_gpu<FloatType, IntType>(  //
                 element_i,                                                            //
                 nnodes,                                                               //
