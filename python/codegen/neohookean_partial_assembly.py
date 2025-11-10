@@ -669,7 +669,7 @@ static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
 
 def neohookean_smith(fe):
     name = "neohookean_smith_active_strain"
-    strain_energy_function = "mu / 2 * (I1 - 3) + lmbda/2 * (J - 1 + (3*mu)/(4*lmda)) - mu / 2 * log(I1 + 1)"
+    strain_energy_function = "mu / 2 * (I1 - 3) + lmbda/2 * (J - 1 - (3*mu)/(4*lmda))**2 - mu / 2 * log(I1 + 1)"
 
     active_strain = True
     op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function, active_strain)
