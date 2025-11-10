@@ -159,7 +159,7 @@ class SRHyperelasticity:
 
         F = self.F_symb
         if self.active_strain:
-            F = F * self.Fa_inv_symb * self.Ja_symb
+            F = F * self.Fa_inv_symb 
 
         det_F = sp.det(F)
         B = F.T * F
@@ -187,6 +187,9 @@ class SRHyperelasticity:
             I2b: det_F**sp.Rational(-4, 3) * I2, 
             J: det_F})
 
+        if self.active_strain:
+            self.fun = self.fun * self.Ja_symb
+
         reserved_syms = [I1b, I2b, J]
         params = []
         for s in symbol_names:
@@ -201,7 +204,7 @@ class SRHyperelasticity:
 
         F = self.F_symb
         if self.active_strain:
-            F = F * self.Fa_inv_symb * self.Ja_symb
+            F = F * self.Fa_inv_symb 
 
 
         C = F.T * F
@@ -225,6 +228,9 @@ class SRHyperelasticity:
             I1: sp.trace(C), 
             I2: sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2)), 
             J: sp.det(F)})
+
+        if self.active_strain:  
+            self.fun = self.fun * self.Ja_symb
 
         reserved_syms = [I1, I2, J]
         params = []
