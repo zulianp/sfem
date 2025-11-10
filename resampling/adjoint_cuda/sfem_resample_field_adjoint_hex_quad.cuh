@@ -1459,7 +1459,7 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
                 const FloatType q_ij_weight = Q_weights[q_j] * q_i_weight;
 
 #pragma unroll
-                for (int q_k = lane_id; q_k < N_midpoint_loc; q_k++) {
+                for (int q_k = 0; q_k < N_midpoint_loc; q_k++) {
                     // const int q_ijk = q_i * N_midpoint * N_midpoint + q_j * N_midpoint + q_k;
                     //
 
