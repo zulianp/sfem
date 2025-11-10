@@ -653,7 +653,7 @@ int main(int argc, char* argv[]) {
             field_cnt     = calloc(n_zyx, sizeof(unsigned int));
             field_alpha   = calloc(n_zyx, sizeof(real_t));
             field_volume  = calloc(n_zyx, sizeof(real_t));
-            field_fun_XYZ = calloc(n_zyx, sizeof(real_t));
+            // field_fun_XYZ = calloc(n_zyx, sizeof(real_t));
 
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
                 field[i] = (real_t)(temp[i]);
