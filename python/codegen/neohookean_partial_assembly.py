@@ -25,6 +25,7 @@ class PAKernelGenerator:
         self.expression_table = op.expression_table
         self.use_canonical = True
         self.S_ikmn_canonical_symb = op.S_ikmn_canonical_symb
+        self.material = op
         
     @staticmethod
     def _create_tensor4_symbol(name, size0, size1, size2, size3):
@@ -575,8 +576,8 @@ f"static SFEM_INLINE void {elem_type_lc}_SdotZ_expanded(\n"
             f"    const {real_t}                      jacobian_determinant,\n"
             f"{params_q}"
             f"    const {real_t} *const SFEM_RESTRICT F,\n"
-            f"    const {real_t}                      mu,\n"
-            f"    const {real_t}                      lmbda,\n"
+            f'{self.material.params_to_args()}'
+            f'{self.material.active_strain_args()}'
             f"    const {real_t}                      qw,\n"
             f"    {real_t} *const SFEM_RESTRICT       {tensor_name + "_canonical" if self.use_canonical else ""}) "
             "{\n"
@@ -667,10 +668,11 @@ static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
 
 
 def neohookean_ogden(fe):
-    name = "neohookean_ogden"
+    name = "neohookean_ogden_active_strain"
     strain_energy_function = "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2"
 
-    op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function)
+    active_strain = True
+    op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function, active_strain)
 
     elem_type_lc = fe.name().lower()
     elem_type_uc = fe.name().upper()
@@ -701,7 +703,7 @@ def compressible_mooney_rivlin(fe):
 
 if __name__ == "__main__":
     # fe = Tet4()
-    # fe = Hex8()
-    fe = Tet10()
+    fe = Hex8()
+    # fe = Tet10()
     neohookean_ogden(fe)
     # compressible_mooney_rivlin(fe)

@@ -135,19 +135,20 @@ def simplify_matrix(mat):
 
 class SRHyperelasticity:
     @staticmethod
-    def create_from_string(fe, name, str_expr: str):
+    def create_from_string(fe, name, str_expr: str, active_strain=False):
         fun = parse_expr(str_expr) 
-        return SRHyperelasticity(fe, name, fun)
+        return SRHyperelasticity(fe, name, fun, False, active_strain)
 
-    def create_from_string_unimodular(fe, name, str_expr: str):
+    def create_from_string_unimodular(fe, name, str_expr: str, active_strain=False):
         fun = parse_expr(str_expr) 
-        return SRHyperelasticity(fe, name, fun, True)
+        return SRHyperelasticity(fe, name, fun, True, active_strain)
 
-    def __init__(self, fe, name, fun, unimodular=False): 
+    def __init__(self, fe, name, fun, unimodular=False, active_strain=False): 
         self.fe = fe
         self.name = name
         self.expression_table = {}
         self.params = []
+        self.active_strain = active_strain
         if unimodular:
             self.__init_fun_unimodular(fun)
         else:
@@ -157,6 +158,9 @@ class SRHyperelasticity:
         self.__init_symbols(fun)
 
         F = self.F_symb
+        if self.active_strain:
+            F = F * self.Fa_inv_symb * self.Ja_symb
+
         det_F = sp.det(F)
         B = F.T * F
         I1 = sp.trace(B)
@@ -196,6 +200,10 @@ class SRHyperelasticity:
         self.__init_symbols(fun)
 
         F = self.F_symb
+        if self.active_strain:
+            F = F * self.Fa_inv_symb * self.Ja_symb
+
+
         C = F.T * F
        
         I1, I2, J = sp.symbols("I1 I2 J", real=True)
@@ -241,6 +249,16 @@ class SRHyperelasticity:
         self.gradz_symb = coeffs("gradz", self.fe.n_nodes())
         self.S_ikmn_canonical_symb = self.__create_tensor4_symbol_canonical("S_ikmn_canonical")
         self.S_ikmn_packed_symb = self.__create_tensor4_symbol_packed("S_ikmn_packed")
+        self.Fa_inv_symb = self.__create_matrix_symbol("Fa_inv")
+        self.Ja_symb = sp.symbols('Ja')
+
+    def active_strain_args(self):
+        if not self.active_strain:
+            return ""
+        return (
+            f'    const {real_t} *const SFEM_RESTRICT Fa_inv,\n'
+            f'    const {real_t} Ja,\n')
+
     
     def __create_tensor4_symbol_canonical(self, name):
         dim = self.fe.spatial_dim()
@@ -525,7 +543,7 @@ class SRHyperelasticity:
         self.expression_table["loperand"] = loperand
         return loperand
 
-    def __params_to_args(self):
+    def params_to_args(self):
         params = self.params
         lines = []
 
@@ -555,7 +573,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self.__params_to_args()}'
+            f'{self.params_to_args()}'
+            f'{self.active_strain_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -593,7 +612,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self.__params_to_args()}'
+            f'{self.params_to_args()}'
+            f'{self.active_strain_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -718,7 +738,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self.__params_to_args()}'
+            f'{self.params_to_args()}'
+            f'{self.active_strain_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -780,7 +801,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self.__params_to_args()}'
+            f'{self.params_to_args()}'
+            f'{self.active_strain_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -875,15 +897,16 @@ class SRHyperelasticity:
 
 
 if __name__ == "__main__":
-    # fe = Hex8()
+    fe = Hex8()
     # fe = Tet4()
-    fe = Tet10()
-    op = SRHyperelasticity.create_from_string(fe, "neohookean", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
+    # fe = Tet10()
+    active_strain = True
+    op = SRHyperelasticity.create_from_string(fe, "neohookean", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2", active_strain)
     # op = SRHyperelasticity.create_from_string_unimodular(fe, "mooney_rivlin", "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2")
     # op.check_metric_tensor_symmetries()
 
     
-    # op.emit_objective()
-    # op.emit_gradient()
+    op.emit_objective()
+    op.emit_gradient()
     op.emit_hessian()
-    # op.emit_hessian_diag()
+    op.emit_hessian_diag()
