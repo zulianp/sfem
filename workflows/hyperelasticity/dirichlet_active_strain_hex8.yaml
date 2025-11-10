@@ -1,0 +1,12 @@
+# dirichlet.yaml
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: hex8_geometry/inlet
+    value: [0, 0, 0]
+    component: [0, 1, 2]
+  - type: sideset
+    format: file
+    path: hex8_geometry/outlet
+    value: 0.1
+    component: 0
