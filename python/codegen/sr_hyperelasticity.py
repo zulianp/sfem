@@ -572,7 +572,7 @@ class SRHyperelasticity:
         dim = fe.spatial_dim()
 
         sig_objective = (
-            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_objective(\n'
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_objective_at_qp(\n'
             f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
             f'    const {real_t}                      jacobian_determinant,\n'
             f'    const {real_t}                      qx,\n'
@@ -907,7 +907,7 @@ if __name__ == "__main__":
     # fe = Tet4()
     # fe = Tet10()
     active_strain = True
-    op = SRHyperelasticity.create_from_string(fe, "neohookean", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2", active_strain)
+    op = SRHyperelasticity.create_from_string(fe, "neohookean_ogden_active_strain", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2", active_strain)
     # op = SRHyperelasticity.create_from_string_unimodular(fe, "mooney_rivlin", "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2")
     # op.check_metric_tensor_symmetries()
 

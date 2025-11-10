@@ -66,16 +66,29 @@ static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
         const real_t a22    = (real_t)1;
         const real_t a33    = (real_t)1;
 
+        const real_t detA = a11 * a22 * a33;
+
         const ptrdiff_t base = 9 * e;
-        Fa_aos[base + 0]     = a11;
+        Fa_aos[base + 0]     = a11/detA;
         Fa_aos[base + 1]     = 0;
         Fa_aos[base + 2]     = 0;
         Fa_aos[base + 3]     = 0;
-        Fa_aos[base + 4]     = a22;
+        Fa_aos[base + 4]     = a22/detA;
         Fa_aos[base + 5]     = 0;
         Fa_aos[base + 6]     = 0;
         Fa_aos[base + 7]     = 0;
-        Fa_aos[base + 8]     = a33;
+        Fa_aos[base + 8]     = a33/detA;
+
+        // const ptrdiff_t base = 9 * e;
+        // Fa_aos[base + 0]     = a11;
+        // Fa_aos[base + 1]     = 0;
+        // Fa_aos[base + 2]     = 0;
+        // Fa_aos[base + 3]     = 0;
+        // Fa_aos[base + 4]     = a22;
+        // Fa_aos[base + 5]     = 0;
+        // Fa_aos[base + 6]     = 0;
+        // Fa_aos[base + 7]     = 0;
+        // Fa_aos[base + 8]     = a33;
     }
 }
 
@@ -205,6 +218,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 // std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrain" ||
              std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrainPacked");
 
+    const real_t SFEM_ACTIVE_STRAIN_XX  = sfem::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
+
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
         const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -291,7 +306,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
             (void)elements;
             (void)points;
-            fill_active_strain_Fa(mesh, Fa, center, radius, (real_t)0.5, 1, 1);
+            fill_active_strain_Fa(mesh, Fa, center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
 
             // One global AoS buffer used for all blocks (single-block meshes recommended)
             as_op->set_active_strain_global(Fa_storage->data(), 9);
@@ -465,7 +480,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                     geom_t       radius_s =
                             sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
 
-                    fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, (real_t)0.5, step, steps);
+                    fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
                     as_op_step->set_active_strain_global(Fa_storage->data(), 9);
                 }
             }
