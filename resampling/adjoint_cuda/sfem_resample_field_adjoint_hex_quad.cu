@@ -1,4 +1,15 @@
+#include <cuda_runtime.h>
 #include "sfem_resample_field_adjoint_hex_quad.cuh"
+
+int getSMCount() {
+    int device;
+    cudaGetDevice(&device);
+
+    cudaDeviceProp props;
+    cudaGetDeviceProperties(&props, device);
+
+    return props.multiProcessorCount;
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,7 +72,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     }  // END if (error != cudaSuccess)
 
     // Launch kernel
-    const unsigned int blocks_per_grid   = min((unsigned int)(end_element - start_element + 1), (unsigned int)pow(2, 17));
+    const unsigned int blocks_per_grid   = min((unsigned int)(end_element - start_element + 1), getSMCount() * 15000);
     const unsigned int threads_per_block = 256;
 
 #if SFEM_LOG_LEVEL >= 5
