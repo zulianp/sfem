@@ -19,7 +19,7 @@
 #include "sfem_SFC.hpp"
 
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
-
+#include "sfem_NeoHookeanSmithActiveStrainPacked.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -40,8 +40,8 @@ static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
     auto            elements  = mesh->elements()->data();
     auto            points    = mesh->points()->data();
 
-    const geom_t r2 = radius * radius;
-    const double s  = (total_steps > 0) ? (double)step / (double)total_steps : 1.0;
+    const geom_t r2         = radius * radius;
+    const double s          = (total_steps > 0) ? (double)step / (double)total_steps : 1.0;
     const real_t a11_ramped = (real_t)(1.0 - (1.0 - (double)a11_final) * s);
 
     for (ptrdiff_t e = 0; e < nelements; ++e) {
@@ -69,15 +69,15 @@ static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
         const real_t detA = a11 * a22 * a33;
 
         const ptrdiff_t base = 9 * e;
-        Fa_aos[base + 0]     = a11/detA;
+        Fa_aos[base + 0]     = a11 / detA;
         Fa_aos[base + 1]     = 0;
         Fa_aos[base + 2]     = 0;
         Fa_aos[base + 3]     = 0;
-        Fa_aos[base + 4]     = a22/detA;
+        Fa_aos[base + 4]     = a22 / detA;
         Fa_aos[base + 5]     = 0;
         Fa_aos[base + 6]     = 0;
         Fa_aos[base + 7]     = 0;
-        Fa_aos[base + 8]     = a33/detA;
+        Fa_aos[base + 8]     = a33 / detA;
 
         // const ptrdiff_t base = 9 * e;
         // Fa_aos[base + 0]     = a11;
@@ -211,14 +211,11 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-9);
 
-
     // Active strain setup marker
-    const bool use_active_strain =
-            (
-                // std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrain" ||
-             std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrainPacked");
+    const bool use_active_strain = (std::string(SFEM_OPERATOR) == "NeoHookeanSmithActiveStrainPacked" ||
+                                    std::string(SFEM_OPERATOR) == "NeoHookeanOgdenActiveStrainPacked");
 
-    const real_t SFEM_ACTIVE_STRAIN_XX  = sfem::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
+    const real_t SFEM_ACTIVE_STRAIN_XX = sfem::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -279,11 +276,12 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     std::shared_ptr<sfem::Buffer<real_t>> Fa_storage;
     if (use_active_strain) {
         auto as_op = std::dynamic_pointer_cast<sfem::NeoHookeanOgdenActiveStrainPacked>(op);
-        if (as_op) {
+        auto as_op_smith = std::dynamic_pointer_cast<sfem::NeoHookeanSmithActiveStrainPacked>(op);
+        if (as_op || as_op_smith) {
             // Bounding box and sphere parameters
-            auto bbox      = mesh->compute_bounding_box();
-            auto bb_min    = bbox.first->data();
-            auto bb_max    = bbox.second->data();
+            auto   bbox      = mesh->compute_bounding_box();
+            auto   bb_min    = bbox.first->data();
+            auto   bb_max    = bbox.second->data();
             geom_t center[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
             for (int d = 0; d < mesh->spatial_dimension(); d++) {
                 center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
@@ -309,8 +307,13 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             fill_active_strain_Fa(mesh, Fa, center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
 
             // One global AoS buffer used for all blocks (single-block meshes recommended)
-            as_op->set_active_strain_global(Fa_storage->data(), 9);
-            
+            if (as_op) {
+                as_op->set_active_strain_global(Fa_storage->data(), 9);
+            }
+            if (as_op_smith) {
+                as_op_smith->set_active_strain_global(Fa_storage->data(), 9);
+            }
+
         } else {
             fprintf(stderr,
                     "[Warning] Active strain requested but operator is not NeoHookeanOgdenActiveStrainPacked; ignoring Fa\n");
@@ -331,9 +334,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
 
     const std::string SFEM_OP_TYPE = sfem::Env::read_string("SFEM_OP_TYPE", "MF");
-    auto linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
-    auto cg        = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose    = SFEM_VERBOSE;
+    auto              linear_op    = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
+    auto              cg           = sfem::create_cg<real_t>(linear_op, es);
+    cg->verbose                    = SFEM_VERBOSE;
     cg->set_max_it(20000);
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
@@ -466,19 +469,18 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
             if (use_active_strain) {
                 auto as_op_step = std::dynamic_pointer_cast<sfem::NeoHookeanOgdenActiveStrainPacked>(op);
                 if (as_op_step && Fa_storage) {
-                    auto bbox_step = mesh->compute_bounding_box();
-                    auto bb_min_s  = bbox_step.first->data();
-                    auto bb_max_s  = bbox_step.second->data();
+                    auto   bbox_step   = mesh->compute_bounding_box();
+                    auto   bb_min_s    = bbox_step.first->data();
+                    auto   bb_max_s    = bbox_step.second->data();
                     geom_t center_s[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
                     for (int d = 0; d < mesh->spatial_dimension(); d++) {
                         center_s[d] = (bb_min_s[d] + bb_max_s[d]) * (geom_t)0.5;
                     }
-                    const geom_t dx_s   = bb_max_s[0] - bb_min_s[0];
-                    const geom_t dy_s   = bb_max_s[1] - bb_min_s[1];
-                    const geom_t dz_s   = bb_max_s[2] - bb_min_s[2];
-                    const geom_t span_s = std::min(dx_s, std::min(dy_s, dz_s));
-                    geom_t       radius_s =
-                            sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
+                    const geom_t dx_s     = bb_max_s[0] - bb_min_s[0];
+                    const geom_t dy_s     = bb_max_s[1] - bb_min_s[1];
+                    const geom_t dz_s     = bb_max_s[2] - bb_min_s[2];
+                    const geom_t span_s   = std::min(dx_s, std::min(dy_s, dz_s));
+                    geom_t       radius_s = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
 
                     fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
                     as_op_step->set_active_strain_global(Fa_storage->data(), 9);
