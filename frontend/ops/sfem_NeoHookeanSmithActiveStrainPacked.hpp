@@ -50,9 +50,8 @@ namespace sfem {
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
         void override_element_types(const std::vector<enum ElemType> &element_types) override;
 
-        // Active strain Fa setters
-        void set_active_strain_global(const real_t *Fa_aos, const ptrdiff_t Fa_stride);
-        void set_active_strain_in_block(const std::string &block_name, const real_t *Fa_aos, const ptrdiff_t Fa_stride);
+        // Set external fields (e.g., active strain)
+        void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &v, const int component) override;
 
         void set_mu(const real_t mu);
         void set_lambda(const real_t lambda);
