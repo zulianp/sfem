@@ -23,6 +23,7 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <cstring>
 
 namespace sfem {
 
@@ -34,9 +35,9 @@ namespace sfem {
         real_t                                                      mu{1}, lambda{1}, lmda{1};
         std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
 
-        // Active strain data per block (AoS pointer and stride)
-        std::vector<const real_t *> Fa_aos_per_block;
-        std::vector<ptrdiff_t>      Fa_stride_per_block;
+        // Active strain data per block (AoS buffer and stride)
+        std::vector<SharedBuffer<real_t>> Fa;
+        std::vector<ptrdiff_t>            Fa_stride;
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -87,8 +88,7 @@ namespace sfem {
         impl_->packed = impl_->space->packed_mesh();
 
         impl_->assembly_data.resize(impl_->packed->n_blocks());
-        impl_->Fa_aos_per_block.resize(impl_->packed->n_blocks(), nullptr);
-        impl_->Fa_stride_per_block.resize(impl_->packed->n_blocks(), 9);
+
 
         for (int b = 0; b < impl_->packed->n_blocks(); b++) {
             auto name   = impl_->packed->block_name(b);
@@ -114,6 +114,19 @@ namespace sfem {
             impl_->assembly_data[b]->elements_stride = domain->second.block->n_nodes_per_element();
             impl_->assembly_data[b]->partial_assembly_buffer =
                     sfem::create_host_buffer<metric_tensor_t>(domain->second.block->n_elements() * HEX8_S_IKMN_SIZE);
+        }
+
+        if (impl_->Fa.empty()) {
+            impl_->Fa.resize(impl_->packed->n_blocks());
+            impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)0);
+            int dim = impl_->space->mesh_ptr()->spatial_dimension();
+
+            impl_->Fa[0] = sfem::create_host_buffer<real_t>(dim*dim);
+            for(int d1 = 0; d1 < dim; d1++) {
+                for(int d2 = 0; d2 < dim; d2++) {
+                    impl_->Fa[0]->data()[d1*dim+d2] = d1 == d2;
+                }
+            }
         }
 
         return SFEM_SUCCESS;
@@ -146,12 +159,12 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            const real_t *Fa   = impl_->Fa_aos_per_block[b];
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -187,12 +200,12 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            const real_t *Fa   = impl_->Fa_aos_per_block[b];
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -225,12 +238,12 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            const real_t *Fa   = impl_->Fa_aos_per_block[b];
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -291,12 +304,12 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            const real_t *Fa   = impl_->Fa_aos_per_block[b];
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -334,12 +347,12 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            const real_t *Fa   = impl_->Fa_aos_per_block[b];
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -389,25 +402,16 @@ namespace sfem {
     void NeoHookeanSmithActiveStrainPacked::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
     void NeoHookeanSmithActiveStrainPacked::set_lmda(const real_t lmda) { impl_->lmda = lmda; }
 
-    void NeoHookeanSmithActiveStrainPacked::set_active_strain_global(const real_t *Fa_aos, const ptrdiff_t Fa_stride) {
-        for (size_t b = 0; b < impl_->Fa_aos_per_block.size(); ++b) {
-            impl_->Fa_aos_per_block[b]    = Fa_aos;
-            impl_->Fa_stride_per_block[b] = Fa_stride;
+    void NeoHookeanSmithActiveStrainPacked::set_field(const char *name,
+                                                      const SharedBuffer<real_t> &v,
+                                                      const int /*component*/) {
+        if (impl_->Fa.empty()) {
+            impl_->Fa.resize(impl_->packed->n_blocks());
+            impl_->Fa_stride.resize(impl_->packed->n_blocks());
         }
-    }
 
-    void NeoHookeanSmithActiveStrainPacked::set_active_strain_in_block(const std::string &block_name,
-                                                                       const real_t      *Fa_aos,
-                                                                       const ptrdiff_t    Fa_stride) {
-        // Map block name to index b
-        for (int b = 0; b < impl_->packed->n_blocks(); ++b) {
-            if (impl_->packed->block_name(b) == block_name) {
-                impl_->Fa_aos_per_block[b]    = Fa_aos;
-                impl_->Fa_stride_per_block[b] = Fa_stride;
-                return;
-            }
-        }
-        SFEM_ERROR("Block %s not found in set_active_strain_in_block\n", block_name.c_str());
+        impl_->Fa[0] = v;
+        impl_->Fa_stride[0] = 9;
     }
 
     int NeoHookeanSmithActiveStrainPacked::hessian_bsr(const real_t *const  x,
@@ -422,12 +426,12 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             auto b           = *std::static_pointer_cast<int>(domain.user_data);
-            const real_t *Fa = impl_->Fa_aos_per_block[b];
+            const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
@@ -465,12 +469,12 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             auto b           = *std::static_pointer_cast<int>(domain.user_data);
-            const real_t *Fa = impl_->Fa_aos_per_block[b];
+            const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
             if (!Fa) {
                 SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
                 return SFEM_FAILURE;
             }
-            const ptrdiff_t Fa_stride = impl_->Fa_stride_per_block[b];
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
 
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
