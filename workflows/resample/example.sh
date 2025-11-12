@@ -66,9 +66,10 @@ else
 fi
 
 ## raw_to_xdmf.py $sdf
-sdf_test.py $sdf 125
+# sdf_test.py $sdf 125
 # sdf_test.py $sdf 250
 # sdf_test.py $sdf 500
+sdf_test.py $sdf 1200
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')

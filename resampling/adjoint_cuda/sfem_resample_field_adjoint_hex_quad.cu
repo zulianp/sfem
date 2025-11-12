@@ -43,9 +43,11 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
 
     real_t* data_device           = NULL;
     real_t* weighted_field_device = NULL;
+    real_t* tet_volumes_device    = NULL;
 
     cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
     cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
+    cudaMallocAsync((void**)&tet_volumes_device, nelements * sizeof(real_t), cuda_stream_alloc);
 
     elems_tet4_device elements_device = make_elems_tet4_device();
     cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
@@ -64,6 +66,38 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     copy_xyz_tet4_device_async(xyz, nnodes, &xyz_device, cuda_stream_alloc);
 
     cudaStreamSynchronize(cuda_stream_alloc);
+
+    cudaStream_t cuda_stream_vol = NULL;  // default stream
+    cudaStreamCreate(&cuda_stream_vol);
+
+    tet_grid_volumes<real_t, int><<<(nelements + 255) / 256,  //
+                                    256,                      //
+                                    0,                        //
+                                    cuda_stream_vol>>>(0,     //
+                                                       nelements,
+                                                       elements_device,
+                                                       xyz_device,
+                                                       tet_volumes_device);
+
+    cudaStreamSynchronize(cuda_stream_vol);
+
+    const real_t volume_tet_tot = thrust::reduce(thrust::cuda::par.on(cuda_stream_vol),  //
+                                                 tet_volumes_device,
+                                                 tet_volumes_device + nelements,
+                                                 (real_t)0,
+                                                 thrust::plus<real_t>());
+    cudaStreamSynchronize(cuda_stream_vol);
+    cudaStreamDestroy(cuda_stream_vol);
+    cuda_stream_vol = NULL;
+
+    const real_t volume_hex_grid      = dx * dy * dz * n0 * n1 * n2;
+    const int    num_hex              = n0 * n1 * n2;
+    const real_t tet_hex_volume_ratio = volume_tet_tot / volume_hex_grid;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Total volume (tet_grid_volumes): %e \n", (double)volume_tet_tot);
+    printf("Total volume (hex_grid):         %e \n", (double)volume_hex_grid);
+#endif  // END if (SFEM_LOG_LEVEL >= 5)
 
     // Optional: check for errors
     cudaError_t error = cudaGetLastError();
@@ -135,7 +169,9 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     if (SFEM_LOG_LEVEL >= 5) {
         printf("================= SFEM Adjoint Hex Quad Resampling GPU =================\n");
         printf("* Kernel execution time: %f ms\n", milliseconds);
-        printf("*   Tet per second: %e \n\n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
+        printf("*   Tet per second:   %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
+        printf("*   Hex per second:   %e (approx)\n", (float)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3));
+        printf("*   Nodes per second: %e (approx)\n", (float)(nnodes) / (milliseconds * 1.0e-3));
         printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
         printf("=========================================================================\n");
     }  // END if (SFEM_LOG_LEVEL >= 5)
@@ -153,6 +189,7 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaFreeAsync(data_device, cuda_stream_alloc);
+    cudaFreeAsync(tet_volumes_device, cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
 

@@ -255,14 +255,28 @@ transfer_weighted_field_tet4_to_hex_gpu(const FloatType  wf0,                //
     // With respect to the hat functions of a cube element
     // In a local coordinate system
     //
-    const FloatType hex8_f0 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
-    const FloatType hex8_f1 = l_x * (FloatType(1.0) - l_y) * (FloatType(1.0) - l_z);
-    const FloatType hex8_f2 = l_x * l_y * (FloatType(1.0) - l_z);
-    const FloatType hex8_f3 = (FloatType(1.0) - l_x) * l_y * (FloatType(1.0) - l_z);
-    const FloatType hex8_f4 = (FloatType(1.0) - l_x) * (FloatType(1.0) - l_y) * l_z;
-    const FloatType hex8_f5 = l_x * (FloatType(1.0) - l_y) * l_z;
-    const FloatType hex8_f6 = l_x * l_y * l_z;
-    const FloatType hex8_f7 = (FloatType(1.0) - l_x) * l_y * l_z;
+    // Precompute common subexpressions for hex8 shape functions
+    const FloatType one_minus_lx = FloatType(1.0) - l_x;
+    const FloatType one_minus_ly = FloatType(1.0) - l_y;
+    const FloatType one_minus_lz = FloatType(1.0) - l_z;
+
+    // Precompute products that are reused multiple times
+    const FloatType lx_ly           = l_x * l_y;
+    const FloatType lx_lz           = l_x * l_z;
+    const FloatType ly_lz           = l_y * l_z;
+    const FloatType one_minus_lx_ly = one_minus_lx * one_minus_ly;
+    const FloatType one_minus_lx_lz = one_minus_lx * l_z;
+    const FloatType lx_one_minus_ly = l_x * one_minus_ly;
+
+    // Compute hex8 shape functions using precomputed subexpressions
+    const FloatType hex8_f0 = one_minus_lx_ly * one_minus_lz;
+    const FloatType hex8_f1 = lx_one_minus_ly * one_minus_lz;
+    const FloatType hex8_f2 = lx_ly * one_minus_lz;
+    const FloatType hex8_f3 = one_minus_lx * l_y * one_minus_lz;
+    const FloatType hex8_f4 = one_minus_lx_ly * l_z;
+    const FloatType hex8_f5 = lx_one_minus_ly * l_z;
+    const FloatType hex8_f6 = lx_ly * l_z;
+    const FloatType hex8_f7 = one_minus_lx_lz * l_y;
 
     // Accumulate contributions to hex element field using FMA for precision
     const FloatType contribution = wf_quad * QW_phys_hex;
