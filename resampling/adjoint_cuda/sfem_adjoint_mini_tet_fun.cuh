@@ -681,4 +681,54 @@ cudaError_t reset_buffer_values(buffer_cluster_t<FloatType>& buffer_cluster, Flo
     return cudaMemsetAsync(buffer_cluster.buffer, value, buffer_cluster.size * sizeof(FloatType), stream);
 }
 
+template <typename FloatType, typename IntType>
+__global__ void tet_grid_volumes(const IntType           start_element,  // Mesh
+                                 const IntType           end_element,    //
+                                 const elems_tet4_device elems,          //
+                                 const xyz_tet4_device   xyz,            //
+                                 FloatType* const        tet_volumes) {         //
+
+    const IntType element_id = blockIdx.x * blockDim.x + threadIdx.x + start_element;
+    if (element_id >= end_element) return;
+    // Get vertex indices
+    const IntType v0 = elems.elems_v0[element_id];
+    const IntType v1 = elems.elems_v1[element_id];
+    const IntType v2 = elems.elems_v2[element_id];
+    const IntType v3 = elems.elems_v3[element_id];
+
+    // Get vertex coordinates
+    const FloatType p0x = xyz.x[v0];
+    const FloatType p0y = xyz.y[v0];
+    const FloatType p0z = xyz.z[v0];
+
+    const FloatType p1x = xyz.x[v1];
+    const FloatType p1y = xyz.y[v1];
+    const FloatType p1z = xyz.z[v1];
+
+    const FloatType p2x = xyz.x[v2];
+    const FloatType p2y = xyz.y[v2];
+    const FloatType p2z = xyz.z[v2];
+
+    const FloatType p3x = xyz.x[v3];
+    const FloatType p3y = xyz.y[v3];
+    const FloatType p3z = xyz.z[v3];
+
+    // Compute volume //
+    const FloatType volume =                     //
+            tet4_measure_v3_gpu<FloatType>(p0x,  //
+                                           p1x,
+                                           p2x,
+                                           p3x,
+                                           p0y,
+                                           p1y,
+                                           p2y,
+                                           p3y,  //
+                                           p0z,
+                                           p1z,
+                                           p2z,
+                                           p3z);  //
+    tet_volumes[element_id] = volume;
+    return;
+}  // END Kernel: tet_grid_volumes
+
 #endif  // __SFEM_ADJOINT_MINI_TET_FUN_CUH__
