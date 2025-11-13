@@ -78,17 +78,6 @@ static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
         Fa_aos[base + 6]     = 0;
         Fa_aos[base + 7]     = 0;
         Fa_aos[base + 8]     = a33 / detA;
-
-        // const ptrdiff_t base = 9 * e;
-        // Fa_aos[base + 0]     = a11;
-        // Fa_aos[base + 1]     = 0;
-        // Fa_aos[base + 2]     = 0;
-        // Fa_aos[base + 3]     = 0;
-        // Fa_aos[base + 4]     = a22;
-        // Fa_aos[base + 5]     = 0;
-        // Fa_aos[base + 6]     = 0;
-        // Fa_aos[base + 7]     = 0;
-        // Fa_aos[base + 8]     = a33;
     }
 }
 
