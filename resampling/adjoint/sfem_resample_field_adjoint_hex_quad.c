@@ -1052,19 +1052,6 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
         real_t face_normals_array[4][3];
         real_t faces_centroids_array[4][3];
 
-        // const real_t vol_tet_main = fabs(tet4_measure_v3(x0_n,    //
-        //                                                  x1_n,    //
-        //                                                  x2_n,    //
-        //                                                  x3_n,    //
-        //                                                  y0_n,    //
-        //                                                  y1_n,    //
-        //                                                  y2_n,    //
-        //                                                  y3_n,    //
-        //                                                  z0_n,    //
-        //                                                  z1_n,    //
-        //                                                  z2_n,    //
-        //                                                  z3_n));  //
-
         tet4_faces_normals(x0_n,                    //
                            x1_n,                    //
                            x2_n,                    //

@@ -100,9 +100,9 @@ transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  inv_J_tet[9],      
                                             const FloatType  ox,                 //
                                             const FloatType  oy,                 //
                                             const FloatType  oz,                 //
-                                            const FloatType  dx,                 //
-                                            const FloatType  dy,                 //
-                                            const FloatType  dz,                 //
+                                            const FloatType  inv_dx,             //
+                                            const FloatType  inv_dy,             //
+                                            const FloatType  inv_dz,             //
                                             FloatType* const hex_element_field,  //
                                             IntType&         out_i,              //
                                             IntType&         out_j,              //
@@ -130,9 +130,9 @@ transfer_weighted_field_tet4_to_hex_ckp_gpu(const FloatType  inv_J_tet[9],      
         return false;
     }  // END if (outside tet)
 
-    const FloatType grid_x = (q_phys_x - ox) / dx;
-    const FloatType grid_y = (q_phys_y - oy) / dy;
-    const FloatType grid_z = (q_phys_z - oz) / dz;
+    const FloatType grid_x = (q_phys_x - ox) * inv_dx;
+    const FloatType grid_y = (q_phys_y - oy) * inv_dy;
+    const FloatType grid_z = (q_phys_z - oz) * inv_dz;
 
     const IntType i = (IntType)fast_floor(grid_x);
     const IntType j = (IntType)fast_floor(grid_y);
@@ -1280,6 +1280,10 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
     const int lane_id = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
     const int n_warps = blockDim.x / LANES_PER_TILE_HEX_QUAD;
 
+    const FloatType inv_dx = FloatType(1.0) / dx;
+    const FloatType inv_dy = FloatType(1.0) / dy;
+    const FloatType inv_dz = FloatType(1.0) / dz;
+
     const IntType off0 = 0;
     const IntType off1 = stride0;
     const IntType off2 = stride0 + stride1;
@@ -1289,12 +1293,12 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
     const IntType off6 = stride0 + stride1 + stride2;
     const IntType off7 = stride1 + stride2;
 
-    const IntType N_midpoint_loc = 2;
+    const IntType N_quadnodes_loc = 2;
 
-    FloatType Q_nodes[N_midpoint_loc];
-    FloatType Q_weights[N_midpoint_loc];
+    FloatType Q_nodes[N_quadnodes_loc];
+    FloatType Q_weights[N_quadnodes_loc];
 
-    Gauss_Legendre_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
+    Gauss_Legendre_quadrature_gpu<FloatType, IntType>(N_quadnodes_loc, Q_nodes, Q_weights);
     // midpoint_quadrature_gpu<FloatType, IntType>(N_midpoint_loc, Q_nodes, Q_weights);
 
     // sfem_quad_rule_3D_gpu<FloatType, IntType>(TET_QUAD_MIDPOINT_NQP,  //
@@ -1463,17 +1467,17 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
         // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
 
 #pragma unroll(1)
-        for (int q_i = 0; q_i < N_midpoint_loc; q_i++) {
+        for (int q_i = 0; q_i < N_quadnodes_loc; q_i++) {
             const FloatType q_i_node   = Q_nodes[q_i];
             const FloatType q_i_weight = Q_weights[q_i];
 
 #pragma unroll
-            for (int q_j = 0; q_j < N_midpoint_loc; q_j++) {
+            for (int q_j = 0; q_j < N_quadnodes_loc; q_j++) {
                 const FloatType q_j_node    = Q_nodes[q_j];
                 const FloatType q_ij_weight = Q_weights[q_j] * q_i_weight;
 
 #pragma unroll
-                for (int q_k = 0; q_k < N_midpoint_loc; q_k++) {
+                for (int q_k = 0; q_k < N_quadnodes_loc; q_k++) {
                     // const int q_ijk = q_i * N_midpoint * N_midpoint + q_j * N_midpoint + q_k;
                     //
 
@@ -1513,9 +1517,9 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
                                                                                             origin0,                 //
                                                                                             origin1,                 //
                                                                                             origin2,                 //
-                                                                                            dx,                      //
-                                                                                            dy,                      //
-                                                                                            dz,                      //
+                                                                                            inv_dx,                  //
+                                                                                            inv_dy,                  //
+                                                                                            inv_dz,                  //
                                                                                             hex_element_field,       //
                                                                                             out_i,                   //
                                                                                             out_j,                   //

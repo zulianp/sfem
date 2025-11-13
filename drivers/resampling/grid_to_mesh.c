@@ -479,7 +479,7 @@ int main(int argc, char* argv[]) {
 
     const function_XYZ_t mesh_fun_XYZ = mesh_fun_trig;
 
-#if SFEM_LOG_LEVEL >= 5c
+#if SFEM_LOG_LEVEL >= 5
 
     if (mpi_rank == 0) {
         if (mesh_fun_XYZ == mesh_fun_par) {
