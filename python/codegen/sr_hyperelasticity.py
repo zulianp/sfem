@@ -265,7 +265,6 @@ class SRHyperelasticity:
             f'    const {real_t} *const SFEM_RESTRICT Fa_inv,\n'
             f'    const {real_t} Ja,\n')
 
-    
     def __create_tensor4_symbol_canonical(self, name):
         dim = self.fe.spatial_dim()
         N = (dim**2+1)*(dim**2)/2

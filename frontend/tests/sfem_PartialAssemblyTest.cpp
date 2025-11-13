@@ -74,7 +74,6 @@ int test_hyperelasticity_partial_assembly() {
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
 
-    // Basic sanity checks: results are finite and non-trivial
     auto   hy_mf    = sfem::to_host(y_mf);
     auto   hy_bsr   = sfem::to_host(y_bsr);
 
@@ -162,14 +161,13 @@ int test_hyperelasticity_active_strain_partial_assembly() {
     mf->apply(h->data(), y_mf->data());
     bsr->apply(h->data(), y_bsr->data());
 
-    // Basic sanity checks: results are finite and non-trivial
+
     auto   hy_mf    = sfem::to_host(y_mf);
     auto   hy_bsr   = sfem::to_host(y_bsr);
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
         SFEM_TEST_APPROXEQ(hy_mf->data()[i], hy_bsr->data()[i], (real_t)1e-10);
     }
     
-
     return SFEM_TEST_SUCCESS;
 }
 
