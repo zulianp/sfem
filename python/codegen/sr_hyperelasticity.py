@@ -319,7 +319,7 @@ class SRHyperelasticity:
 
         # Physical Gradient
         self.expression_table["disp_grad"] = disp_grad * Jinv
-        return disp_grad
+        return self.expression_table["disp_grad"]
 
     def __compute_inc_grad(self):
         if "inc_grad" in self.expression_table:
@@ -528,7 +528,7 @@ class SRHyperelasticity:
             for m in range(0, dims):
                 for p in range(0, nfun):
                     for n in range(0, dims):
-                        expr = g[i][m] * g[p][n] / self.fe.reference_measure()
+                        expr = g[i][m] * g[p][n] / self.fe.reference_measure() # TODO: Is this correct?
                         integr = self.fe.integrate(self.fe.quadrature_point(), expr)
                         terms.append(integr)
 
