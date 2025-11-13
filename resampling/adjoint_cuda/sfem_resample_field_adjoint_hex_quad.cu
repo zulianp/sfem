@@ -11,6 +11,43 @@ int getSMCount() {
     return props.multiProcessorCount;
 }
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// compute_total_tet_volume_gpu //////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType, typename IntType>
+FloatType                                                              //
+compute_total_tet_volume_gpu(const IntType           nelements,        //
+                             const elems_tet4_device elements_device,  //
+                             const xyz_tet4_device   xyz_device,       //
+                             FloatType*              tet_volumes_device) {          //
+    //
+    cudaStream_t cuda_stream_vol = NULL;  // default stream
+    cudaStreamCreate(&cuda_stream_vol);
+
+    tet_grid_volumes<FloatType, IntType><<<(nelements + 255) / 256,  //
+                                           256,                      //
+                                           0,                        //
+                                           cuda_stream_vol>>>(0,     //
+                                                              nelements,
+                                                              elements_device,
+                                                              xyz_device,
+                                                              tet_volumes_device);
+
+    cudaStreamSynchronize(cuda_stream_vol);
+
+    const FloatType volume_tet_tot = thrust::reduce(thrust::cuda::par.on(cuda_stream_vol),  //
+                                                    tet_volumes_device,
+                                                    tet_volumes_device + nelements,
+                                                    (FloatType)0,
+                                                    thrust::plus<FloatType>());
+    cudaStreamSynchronize(cuda_stream_vol);
+    cudaStreamDestroy(cuda_stream_vol);
+
+    return volume_tet_tot;
+}  // END Function: compute_total_tet_volume_gpu
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,28 +104,12 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
 
     cudaStreamSynchronize(cuda_stream_alloc);
 
-    cudaStream_t cuda_stream_vol = NULL;  // default stream
-    cudaStreamCreate(&cuda_stream_vol);
-
-    tet_grid_volumes<real_t, int><<<(nelements + 255) / 256,  //
-                                    256,                      //
-                                    0,                        //
-                                    cuda_stream_vol>>>(0,     //
-                                                       nelements,
-                                                       elements_device,
-                                                       xyz_device,
-                                                       tet_volumes_device);
-
-    cudaStreamSynchronize(cuda_stream_vol);
-
-    const real_t volume_tet_tot = thrust::reduce(thrust::cuda::par.on(cuda_stream_vol),  //
-                                                 tet_volumes_device,
-                                                 tet_volumes_device + nelements,
-                                                 (real_t)0,
-                                                 thrust::plus<real_t>());
-    cudaStreamSynchronize(cuda_stream_vol);
-    cudaStreamDestroy(cuda_stream_vol);
-    cuda_stream_vol = NULL;
+    const real_t volume_tet_tot =                                         //
+            compute_total_tet_volume_gpu<real_t,                          //
+                                         ptrdiff_t>(nelements,            //
+                                                    elements_device,      //
+                                                    xyz_device,           //
+                                                    tet_volumes_device);  //
 
     const real_t volume_hex_grid      = dx * dy * dz * n0 * n1 * n2;
     const int    num_hex              = n0 * n1 * n2;
@@ -168,10 +189,29 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
 
     if (SFEM_LOG_LEVEL >= 5) {
         printf("================= SFEM Adjoint Hex Quad Resampling GPU =================\n");
-        printf("* Kernel execution time: %f ms\n", milliseconds);
-        printf("*   Tet per second:   %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
-        printf("*   Hex per second:   %e (approx)\n", (float)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3));
-        printf("*   Nodes per second: %e (approx)\n", (float)(nnodes) / (milliseconds * 1.0e-3));
+        printf("* Kernel execution time:    %f ms\n", milliseconds);
+        printf("*   Tet per second:         %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
+        printf("*   Hex nodes per second:   %e (approx)\n",
+               (float)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3));
+        printf("*   Tet Nodes per second:   %e (approx)\n", (float)(nnodes) / (milliseconds * 1.0e-3));
+        printf(" -----------------------------------------------------------------------\n");
+        printf("<quad_bench_head> nelements, time(s), tet/s, hex_nodes/s, tet_nodes/s, n0, n1, n2, dx, dy, dz, origin0, origin1, "
+               "origin2 \n");
+        printf("<quad_bench> %d , %e, %e, %e , %e, %d , %d , %d , %e , %e , %e, %e , %e , %e \n",
+               (end_element - start_element),
+               (milliseconds * 1.0e-3),
+               (double)(end_element - start_element) / (milliseconds * 1.0e-3),
+               (double)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3),
+               (double)(nnodes) / (milliseconds * 1.0e-3),
+               n0,
+               n1,
+               n2,
+               (double)dx,
+               (double)dy,
+               (double)dz,
+               (double)origin0,
+               (double)origin1,
+               (double)origin2);
         printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
         printf("=========================================================================\n");
     }  // END if (SFEM_LOG_LEVEL >= 5)
