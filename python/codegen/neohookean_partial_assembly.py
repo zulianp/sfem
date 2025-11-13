@@ -667,27 +667,27 @@ static SFEM_INLINE void {elem_type_lc}_apply_{tensor_name}(
         print(f"Wrote {out_path}")
 
 
-def neohookean_smith(fe):
-    name = "neohookean_smith_active_strain"
-    strain_energy_function = "mu / 2 * (I1 - 3) + lmbda/2 * (J - 1 - (3*mu)/(4*lmda))**2 - mu / 2 * log(I1 + 1)"
+# def neohookean_smith(fe):
+#     name = "neohookean_smith_active_strain"
+#     strain_energy_function = "mu / 2 * (I1 - 3) + lmbda/2 * (J - 1 - (3*mu)/(4*lmda))**2 - mu / 2 * log(I1 + 1)"
 
-    active_strain = True
-    op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function, active_strain)
+#     active_strain = True
+#     op = SRHyperelasticity.create_from_string(fe, name, strain_energy_function, active_strain)
 
-    elem_type_lc = fe.name().lower()
-    elem_type_uc = fe.name().upper()
-    gen = PAKernelGenerator(name, op)
+#     elem_type_lc = fe.name().lower()
+#     elem_type_uc = fe.name().upper()
+#     gen = PAKernelGenerator(name, op)
 
-    output_dir = f"operators/{elem_type_lc}"
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
-                    guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
+#     output_dir = f"operators/{elem_type_lc}"
+#     if not os.path.exists(output_dir):
+#         os.mkdir(output_dir)
+#     gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
+#                     guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
 
-    op.emit_objective()
-    op.emit_gradient()
-    op.emit_hessian()
-    op.emit_hessian_diag()
+#     op.emit_objective()
+#     op.emit_gradient()
+#     op.emit_hessian()
+#     op.emit_hessian_diag()
 
 def neohookean_ogden(fe):
     name = "neohookean_ogden_active_strain"
@@ -727,6 +727,6 @@ if __name__ == "__main__":
     # fe = Tet4()
     fe = Hex8()
     # fe = Tet10()
-    # neohookean_ogden(fe)
+    neohookean_ogden(fe)
     # compressible_mooney_rivlin(fe)
-    neohookean_smith(fe)
+    # neohookean_smith(fe)
