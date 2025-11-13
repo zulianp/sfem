@@ -69,7 +69,10 @@ fi
 # sdf_test.py $sdf 125
 # sdf_test.py $sdf 250
 # sdf_test.py $sdf 500
-sdf_test.py $sdf 1000
+
+# Use HEX_SIZE environment variable if defined, otherwise use default
+SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-1000}
+sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
 origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
