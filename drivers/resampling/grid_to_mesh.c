@@ -460,6 +460,13 @@ int main(int argc, char* argv[]) {
     // printf("========================================\n\n");
     PRINT_CURRENT_FUNCTION;
 
+
+    printf("========================================\n");
+    printf("Starting sfem_resample_field_adjoint_hex_quad test\n");
+    printf("========================================\n\n");
+
+    printf("<sizeof_real_t> %zu\n", sizeof(real_t));
+
     // return test_field_mpi_domain(argc, argv);
 
     // sfem_queue_test();

@@ -1,5 +1,10 @@
 #include "sfem_adjoint_mini_tet_gpu_wrapper.h"
 #include "sfem_resample_field_adjoint_hyteg.h"
+#include "sfem_utils.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -26,11 +31,9 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 
 #define TEST_KERNEL_MODEL 4
 
-    int         repetitions = 1;
-    const char* env_reps    = getenv("SFEM_REPETITIONS_ADJOINT");
-    if (env_reps) {
-        repetitions = atoi(env_reps);
-    }
+    const int repetitions = read_env_as_int("SFEM_REPETITIONS_QUAD_ADJOINT",                         //
+                                            1,                                                       //
+                                            "Number of repetitions for quad adjoint kernel tests");  //
 
     for (int i = 0; i < repetitions; i++) {
         //
@@ -68,29 +71,27 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
 #endif
 
 #if TEST_KERNEL_MODEL == 4
-                call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(
-                    start_element,
-                    end_element,
-                    (end_element - start_element),
-                    nnodes,
-                    elems,
-                    xyz,
-                    n[0],
-                    n[1],
-                    n[2],
-                    stride[0],
-                    stride[1],
-                    stride[2],
-                    origin[0],
-                    origin[1],
-                    origin[2],
-                    delta[0],
-                    delta[1],
-                    delta[2],
-                    weighted_field,
-                    data);
+        call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(start_element,
+                                                             end_element,
+                                                             (end_element - start_element),
+                                                             nnodes,
+                                                             elems,
+                                                             xyz,
+                                                             n[0],
+                                                             n[1],
+                                                             n[2],
+                                                             stride[0],
+                                                             stride[1],
+                                                             stride[2],
+                                                             origin[0],
+                                                             origin[1],
+                                                             origin[2],
+                                                             delta[0],
+                                                             delta[1],
+                                                             delta[2],
+                                                             weighted_field,
+                                                             data);
 #endif
-
     }
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
