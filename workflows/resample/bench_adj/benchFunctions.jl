@@ -437,76 +437,61 @@ function plot_alpha_histogram(alpha_vec::Vector; bins=100, figsize=(10, 6),
     return fig
 end
 
-function plot_multiple_alpha_histograms(alpha_vectors::Vector{Vector{T}};
-                                        labels::Vector{String},
-                                        bins=100,
-                                        figsize=(12, 8),
-                                        colors=nothing,
-                                        alpha_val=0.6,
-                                        show_stats=false,
-                                        cut_at_bin=nothing,
-                                        fontsize=12) where {T<:Real}
-    //
-    if length(alpha_vectors) != length(labels)
-        throw(ArgumentError("Number of alpha vectors must match number of labels"))
-    end
+function plot_multiple_alpha_histograms(alpha_vectors::Vector{Vector{Float64}};
+    labels::Vector{String} = ["Data $(i)" for i in 1:length(alpha_vectors)],
+    bins::Int = 50,
+    figsize::Tuple{Int64,Int64} = (12, 8),
+    colors::Vector{String} = ["blue", "green", "red", "orange", "purple"],
+    alpha_val::Float64 = 0.7,
+    show_stats::Bool = false,
+    cut_at_bin::Float64 = Inf,
+    fontsize::Int = 12)
 
-    fig, ax = subplots(; figsize=figsize)
-
-    if isnothing(colors)
-        colors = ["steelblue", "orange", "green", "red", "purple", "brown"]
-    end
-
-    for (i, alpha_vec) in enumerate(alpha_vectors)
-        color = colors[mod(i - 1, length(colors)) + 1]
-
-        # Create histogram with a label for the legend
-        ax.hist(alpha_vec;
-                bins=bins,
-                alpha=alpha_val,
-                color=color,
-                edgecolor="black",
-                label=labels[i])
-
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    for (i, (alpha_vec, label, color)) in enumerate(zip(alpha_vectors, labels, colors))
+        # Filter data if cut_at_bin is specified
+        if cut_at_bin < Inf
+            filtered_data = alpha_vec[alpha_vec .<= cut_at_bin]
+        else
+            filtered_data = alpha_vec
+        end # END if cut_at_bin < Inf
+        
+        # Plot histogram
+        ax.hist(filtered_data, bins=bins, alpha=alpha_val, color=color, 
+                label=label, edgecolor="black", linewidth=0.5)
+        
+        # Print statistics if requested
         if show_stats
-            mean_val = mean(alpha_vec)
-            std_val = std(alpha_vec)
-
-            # Add vertical line for the mean, using the same color
-            ax.axvline(mean_val;
-                       color=color,
-                       linestyle="--",
-                       linewidth=2,
-                       label="$(labels[i]) Mean: $(round(mean_val, digits=2))")
-        end
-    end
-
-    # Add labels and title
-    ax.set_xlabel(L"$\alpha$ values"; fontsize=fontsize)
-    # ax.set_ylabel("Frequency"; fontsize=fontsize)
-    # ax.set_title("Alpha Distributions"; fontsize=fontsize)
-
-    # Set scientific notation on y-axis
-    ax.ticklabel_format(; style="scientific", axis="y", scilimits=(0, 0),
-                        fontsize=fontsize - 2)
-
-    # Add legend
-    legend_obj = ax.legend(; fontsize=fontsize - 2, loc="best", framealpha=0.8, frameon=true)
-    legend_obj.get_frame().set_edgecolor("none")
-
-    ax.tick_params(; axis="both", which="major", labelsize=fontsize - 2)
-    # ax.tick_params(; axis="both", which="minor", labelsize=fontsize - 2)
-
-    if !isnothing(cut_at_bin)
-        ax.set_xlim(0, cut_at_bin)
-    end
-
-    # Add grid
-    ax.grid(true; alpha=0.3)
-
+            println("\nStatistics for $(label):")
+            println("=" ^ 50)
+            println("Maximum:      $(maximum(filtered_data))")
+            println("Minimum:      $(minimum(filtered_data))")
+            println("Mean:         $(mean(filtered_data))")
+            println("Median:       $(median(filtered_data))")
+            println("Std Dev:      $(std(filtered_data))")
+            println("Count:        $(length(filtered_data))")
+            if cut_at_bin < Inf
+                println("Filtered:     $(length(alpha_vec) - length(filtered_data)) values > $(cut_at_bin)")
+            end # END if cut_at_bin < Inf
+            println("=" ^ 50)
+        end # END if show_stats
+    end # END for
+    
+    ax.set_xlabel("Alpha Value", fontsize=fontsize)
+    ax.set_ylabel("Frequency", fontsize=fontsize)
+    ax.set_title("Alpha Distribution Comparison", fontsize=fontsize)
+    ax.legend(fontsize=fontsize)
+    ax.grid(true, alpha=0.3)
+    
+    # Set tick label format and then set fontsize separately
+    ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+    ax.tick_params(axis="both", which="major", labelsize=fontsize)
+    
     plt.tight_layout()
+    
     return fig
-end
+end # END Function: plot_multiple_alpha_histograms
 
 """
 	alpha_statistics_table(alpha_vectors::Vector{Vector{T}}, labels::Vector{String}) where T <: Real
