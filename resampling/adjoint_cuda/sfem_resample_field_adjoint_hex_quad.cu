@@ -104,19 +104,19 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
 
     cudaStreamSynchronize(cuda_stream_alloc);
 
-    const real_t volume_tet_tot =                                         //
+    const real_t volume_tet_grid =                                         //
             compute_total_tet_volume_gpu<real_t,                          //
                                          ptrdiff_t>(nelements,            //
                                                     elements_device,      //
                                                     xyz_device,           //
                                                     tet_volumes_device);  //
 
-    const real_t volume_hex_grid      = dx * dy * dz * n0 * n1 * n2;
+    const real_t volume_hex_grid      = dx * dy * dz * ((real_t)(n0 * n1 * n2));
     const int    num_hex              = n0 * n1 * n2;
-    const real_t tet_hex_volume_ratio = volume_tet_tot / volume_hex_grid;
+    const real_t tet_hex_volume_ratio = volume_tet_grid / volume_hex_grid;
 
 #if SFEM_LOG_LEVEL >= 5
-    printf("Total volume (tet_grid_volumes): %e \n", (double)volume_tet_tot);
+    printf("Total volume (tet_grid_volumes): %e \n", (double)volume_tet_grid);
     printf("Total volume (hex_grid):         %e \n", (double)volume_hex_grid);
 #endif  // END if (SFEM_LOG_LEVEL >= 5)
 
@@ -194,15 +194,19 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
         printf("*   Hex nodes per second:   %e (approx)\n",
                (float)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3));
         printf("*   Tet Nodes per second:   %e (approx)\n", (float)(nnodes) / (milliseconds * 1.0e-3));
+        printf("*   Number of elements:      %d \n", (int)(end_element - start_element));
+        printf("*   Number of nodes:         %d \n", (int)(nnodes));
         printf(" -----------------------------------------------------------------------\n");
-        printf("<quad_bench_head> nelements, time(s), tet/s, hex_nodes/s, tet_nodes/s, n0, n1, n2, dx, dy, dz, origin0, origin1, "
-               "origin2 \n");
-        printf("<quad_bench> %d , %e, %e, %e , %e, %d , %d , %d , %e , %e , %e, %e , %e , %e \n",
+        printf("<quad_bench_head> nelements, time(s), tet/s, hex_nodes/s, tet_nodes/s, nnodes, n0, n1, n2, dx, dy, dz, origin0, "
+               "origin1, "
+               "origin2, volume_tet_grid \n");
+        printf("<quad_bench> %d , %e, %e, %e , %e, %d, %d , %d , %d , %e , %e , %e, %e , %e , %e, %e \n",
                (end_element - start_element),
                (milliseconds * 1.0e-3),
                (double)(end_element - start_element) / (milliseconds * 1.0e-3),
                (double)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3),
                (double)(nnodes) / (milliseconds * 1.0e-3),
+               nnodes,
                n0,
                n1,
                n2,
@@ -211,7 +215,8 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
                (double)dz,
                (double)origin0,
                (double)origin1,
-               (double)origin2);
+               (double)origin2,
+               (double)volume_tet_grid);
         printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
         printf("=========================================================================\n");
     }  // END if (SFEM_LOG_LEVEL >= 5)
