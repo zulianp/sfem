@@ -595,9 +595,9 @@ compute_tet_bounding_box_gpu(const FloatType x0,          //
                              const FloatType origin0,     //
                              const FloatType origin1,     //
                              const FloatType origin2,     //
-                             const FloatType delta0,      //
-                             const FloatType delta1,      //
-                             const FloatType delta2,      //
+                             const FloatType inv_delta0,  //
+                             const FloatType inv_delta1,  //
+                             const FloatType inv_delta2,  //
                              IntType&        min_grid_x,  //
                              IntType&        max_grid_x,  //
                              IntType&        min_grid_y,  //
@@ -615,9 +615,9 @@ compute_tet_bounding_box_gpu(const FloatType x0,          //
     const FloatType z_min = fast_min(fast_min(z0, z1), fast_min(z2, z3));
     const FloatType z_max = fast_max(fast_max(z0, z1), fast_max(z2, z3));
 
-    const FloatType dx = (FloatType)delta0;
-    const FloatType dy = (FloatType)delta1;
-    const FloatType dz = (FloatType)delta2;
+    // const FloatType dx = (FloatType)delta0;
+    // const FloatType dy = (FloatType)delta1;
+    // const FloatType dz = (FloatType)delta2;
 
     const FloatType ox = (FloatType)origin0;
     const FloatType oy = (FloatType)origin1;
@@ -626,14 +626,14 @@ compute_tet_bounding_box_gpu(const FloatType x0,          //
     // Step 2: Convert to grid indices accounting for the origin
     // Formula: grid_index = (physical_coord - origin) / delta
     // Using floor for minimum indices (with safety margin of -1)
-    min_grid_x = (IntType)fast_floor((x_min - ox) / dx) - 1;
-    min_grid_y = (IntType)fast_floor((y_min - oy) / dy) - 1;
-    min_grid_z = (IntType)fast_floor((z_min - oz) / dz) - 1;
+    min_grid_x = (IntType)fast_floor((x_min - ox) * inv_delta0) - 1;
+    min_grid_y = (IntType)fast_floor((y_min - oy) * inv_delta1) - 1;
+    min_grid_z = (IntType)fast_floor((z_min - oz) * inv_delta2) - 1;
 
     // Using ceil for maximum indices (with safety margin of +1)
-    max_grid_x = (IntType)fast_ceil((x_max - ox) / dx) + 1;
-    max_grid_y = (IntType)fast_ceil((y_max - oy) / dy) + 1;
-    max_grid_z = (IntType)fast_ceil((z_max - oz) / dz) + 1;
+    max_grid_x = (IntType)fast_ceil((x_max - ox) * inv_delta0) + 1;
+    max_grid_y = (IntType)fast_ceil((y_max - oy) * inv_delta1) + 1;
+    max_grid_z = (IntType)fast_ceil((z_max - oz) * inv_delta2) + 1;
 
     return 0;  // Success
 }  // END Function: compute_tet_bounding_box_gpu
@@ -1318,32 +1318,32 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
     IntType   ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
     FloatType inv_J_tet[9];
 
-    ev[0] = elems.elems_v0[element_i];
-    ev[1] = elems.elems_v1[element_i];
-    ev[2] = elems.elems_v2[element_i];
-    ev[3] = elems.elems_v3[element_i];
+    const IntType ev0 = __ldg(&elems.elems_v0[element_i]);
+    const IntType ev1 = __ldg(&elems.elems_v1[element_i]);
+    const IntType ev2 = __ldg(&elems.elems_v2[element_i]);
+    const IntType ev3 = __ldg(&elems.elems_v3[element_i]);
 
     // Read the coordinates of the vertices of the tetrahedron
     // In the physical space
-    const FloatType x0_n = FloatType(xyz.x[ev[0]]);
-    const FloatType x1_n = FloatType(xyz.x[ev[1]]);
-    const FloatType x2_n = FloatType(xyz.x[ev[2]]);
-    const FloatType x3_n = FloatType(xyz.x[ev[3]]);
+    const FloatType x0_n = FloatType(__ldg(&xyz.x[ev0]));
+    const FloatType x1_n = FloatType(__ldg(&xyz.x[ev1]));
+    const FloatType x2_n = FloatType(__ldg(&xyz.x[ev2]));
+    const FloatType x3_n = FloatType(__ldg(&xyz.x[ev3]));
 
-    const FloatType y0_n = FloatType(xyz.y[ev[0]]);
-    const FloatType y1_n = FloatType(xyz.y[ev[1]]);
-    const FloatType y2_n = FloatType(xyz.y[ev[2]]);
-    const FloatType y3_n = FloatType(xyz.y[ev[3]]);
+    const FloatType y0_n = FloatType(__ldg(&xyz.y[ev0]));
+    const FloatType y1_n = FloatType(__ldg(&xyz.y[ev1]));
+    const FloatType y2_n = FloatType(__ldg(&xyz.y[ev2]));
+    const FloatType y3_n = FloatType(__ldg(&xyz.y[ev3]));
 
-    const FloatType z0_n = FloatType(xyz.z[ev[0]]);
-    const FloatType z1_n = FloatType(xyz.z[ev[1]]);
-    const FloatType z2_n = FloatType(xyz.z[ev[2]]);
-    const FloatType z3_n = FloatType(xyz.z[ev[3]]);
+    const FloatType z0_n = FloatType(__ldg(&xyz.z[ev0]));
+    const FloatType z1_n = FloatType(__ldg(&xyz.z[ev1]));
+    const FloatType z2_n = FloatType(__ldg(&xyz.z[ev2]));
+    const FloatType z3_n = FloatType(__ldg(&xyz.z[ev3]));
 
-    const FloatType wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
-    const FloatType wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
-    const FloatType wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
-    const FloatType wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+    const FloatType wf0 = FloatType(__ldg(&weighted_field[ev0]));  // Weighted field at vertex 0
+    const FloatType wf1 = FloatType(__ldg(&weighted_field[ev1]));  // Weighted field at vertex 1
+    const FloatType wf2 = FloatType(__ldg(&weighted_field[ev2]));  // Weighted field at vertex 2
+    const FloatType wf3 = FloatType(__ldg(&weighted_field[ev3]));  // Weighted field at vertex 3
 
     IntType min_grid_x, max_grid_x;
     IntType min_grid_y, max_grid_y;
@@ -1381,9 +1381,9 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
                                                      origin0,      //
                                                      origin1,      //
                                                      origin2,      //
-                                                     dx,           //
-                                                     dy,           //
-                                                     dz,           //
+                                                     inv_dx,       //
+                                                     inv_dy,       //
+                                                     inv_dz,       //
                                                      min_grid_x,   //
                                                      max_grid_x,   //
                                                      min_grid_y,   //
@@ -1413,14 +1413,13 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
         const IntType iy = min_grid_y + iy_local;
         const IntType iz = min_grid_z + iz_local;
 
-        const FloatType z_hex_min = ((FloatType)iz) * dz + origin2;
-        const FloatType z_hex_max = z_hex_min + dz;
+        const FloatType x_hex_min = fast_fma((FloatType)ix, dx, origin0);
+        const FloatType y_hex_min = fast_fma((FloatType)iy, dy, origin1);
+        const FloatType z_hex_min = fast_fma((FloatType)iz, dz, origin2);
 
-        const FloatType y_hex_min = ((FloatType)iy) * dy + origin1;
-        const FloatType y_hex_max = y_hex_min + dy;
-
-        const FloatType x_hex_min = ((FloatType)ix) * dx + origin0;
         const FloatType x_hex_max = x_hex_min + dx;
+        const FloatType y_hex_max = y_hex_min + dy;
+        const FloatType z_hex_max = z_hex_min + dz;
 
         const FloatType hex_vertices_x[8] = {x_hex_min,
                                              x_hex_max,
@@ -1461,12 +1460,12 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
 
         // printf("Element %d, Hex cell at (%d, %d, %d) may overlap tet\n", element_i, ix, iy, iz);
 
-#pragma unroll(8)
+#pragma unroll
         for (int v = 0; v < 8; v++) hex_element_field[v] = FloatType(0.0);
 
         // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
 
-#pragma unroll(1)
+#pragma unroll
         for (int q_i = 0; q_i < N_quadnodes_loc; q_i++) {
             const FloatType q_i_node   = Q_nodes[q_i];
             const FloatType q_i_weight = Q_weights[q_i];
