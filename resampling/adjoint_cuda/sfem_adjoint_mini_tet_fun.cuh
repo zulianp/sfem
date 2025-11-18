@@ -731,4 +731,41 @@ __global__ void tet_grid_volumes(const IntType           start_element,  // Mesh
     return;
 }  // END Kernel: tet_grid_volumes
 
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// compute_total_tet_volume_gpu //////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType, typename IntType>
+FloatType                                                              //
+compute_total_tet_volume_gpu(const IntType           nelements,        //
+                             const elems_tet4_device elements_device,  //
+                             const xyz_tet4_device   xyz_device,       //
+                             FloatType*              tet_volumes_device) {          //
+    //
+    cudaStream_t cuda_stream_vol = NULL;  // default stream
+    cudaStreamCreate(&cuda_stream_vol);
+
+    tet_grid_volumes<FloatType, IntType><<<(nelements + 255) / 256,  //
+                                           256,                      //
+                                           0,                        //
+                                           cuda_stream_vol>>>(0,     //
+                                                              nelements,
+                                                              elements_device,
+                                                              xyz_device,
+                                                              tet_volumes_device);
+
+    cudaStreamSynchronize(cuda_stream_vol);
+
+    const FloatType volume_tet_tot = thrust::reduce(thrust::cuda::par.on(cuda_stream_vol),  //
+                                                    tet_volumes_device,
+                                                    tet_volumes_device + nelements,
+                                                    (FloatType)0,
+                                                    thrust::plus<FloatType>());
+    cudaStreamSynchronize(cuda_stream_vol);
+    cudaStreamDestroy(cuda_stream_vol);
+
+    return volume_tet_tot;
+}  // END Function: compute_total_tet_volume_gpu
+
 #endif  // __SFEM_ADJOINT_MINI_TET_FUN_CUH__

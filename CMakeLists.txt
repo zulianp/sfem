@@ -93,6 +93,7 @@ if(SFEM_ENABLE_CUDA)
         operators/hierarchical/cuda
         resampling/cuda
         resampling/adjoint_cuda
+        cuda/utils
         )
 endif()
 
