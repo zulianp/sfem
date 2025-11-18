@@ -5,6 +5,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
 
+#include "device_utils.cuh"
 #include "sfem_adjoint_mini_loc_tet.cuh"
 #include "sfem_adjoint_mini_tet.cuh"
 #include "sfem_adjoint_mini_tet10.cuh"
@@ -287,9 +288,11 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
 
     real_t* data_device           = NULL;
     real_t* weighted_field_device = NULL;
+    real_t* tet_volumes_device    = NULL;
 
     cudaMallocAsync((void**)&data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
     cudaMallocAsync((void**)&weighted_field_device, nnodes * sizeof(real_t), cuda_stream_alloc);
+    cudaMallocAsync((void**)&tet_volumes_device, nelements * sizeof(real_t), cuda_stream_alloc);
 
     cudaMemcpyAsync((void*)weighted_field_device,
                     (void*)weighted_field,
@@ -314,6 +317,27 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_memset);
     cudaStreamDestroy(cuda_stream_memset);
+
+#if SFEM_LOG_LEVEL >= 5
+    char* devive_desc = acc_get_device_properties(0);  // Just to ensure the device is set correctly
+    printf("%s\n", devive_desc);
+#endif
+
+    const real_t volume_tet_grid =                                        //
+            compute_total_tet_volume_gpu<real_t,                          //
+                                         ptrdiff_t>(nelements,            //
+                                                    elements_device,      //
+                                                    xyz_device,           //
+                                                    tet_volumes_device);  //
+
+    const real_t volume_hex_grid      = dx * dy * dz * ((real_t)(n0 * n1 * n2));
+    const int    num_hex              = n0 * n1 * n2;
+    const real_t tet_hex_volume_ratio = volume_tet_grid / volume_hex_grid;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Total volume (tet_grid_volumes): %e \n", (double)volume_tet_grid);
+    printf("Total volume (hex_grid):         %e \n", (double)volume_hex_grid);
+#endif  // END if (SFEM_LOG_LEVEL >= 5)
 
     // Optional: check for errors
     cudaError_t error = cudaGetLastError();
@@ -492,26 +516,40 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         float milliseconds = 0.0f;
         cudaEventElapsedTime(&milliseconds, start_event, stop_event);
 
-#if SFEM_LOG_LEVEL >= 5
-        printf("=== Cluster Buffer Kernel: SFEM Adjoint Mini-Tet Kernel GPU ================\n");
-        printf(" File: %s:%d \n", __FILE__, __LINE__);
-        printf(" Kernel execution time: %f ms\n", milliseconds);
-        printf(" Throughput: %e elements/s\n", (float)(end_element - start_element) / (milliseconds / 1000.0f));
-        printf("<cluster_bench>  %d , %d , %d , %e, %e \n",
-               cluster_size,
-               tets_per_block,
-               (end_element - start_element),
-               (milliseconds * 1.0e-3),
-               (float)(end_element - start_element) / (milliseconds * 1.0e-3));
-        printf("============================================================================\n");
-
-        printf("  Max total_size_local = %lld\n", (long long)max_total_size_local);
-        printf("  Max idx global       = %lld\n", (long long)max_idx_global);
-
-        printf("  Min total_size_local = %lld\n", (long long)min_total_size_local);
-        printf("  Min idx global       = %lld\n", (long long)min_idx_global);
-        printf("===================================================================\n");
-#endif
+        if (SFEM_LOG_LEVEL >= 5) {
+            printf("================= SFEM Adjoint Mini-Tet Buffer Kernel GPU ================\n");
+            printf("* Kernel execution time:    %f ms\n", milliseconds);
+            printf("*   Tet per second:         %e \n", (float)(end_element - start_element) / (milliseconds * 1.0e-3));
+            printf("*   Hex nodes per second:   %e (approx)\n",
+                   (float)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3));
+            printf("*   Tet Nodes per second:   %e (approx)\n", (float)(nnodes) / (milliseconds * 1.0e-3));
+            printf("*   Number of elements:      %d \n", (int)(end_element - start_element));
+            printf("*   Number of nodes:         %d \n", (int)(nnodes));
+            printf(" -----------------------------------------------------------------------\n");
+            printf("<quad_bench_head> nelements, time(s), tet/s, hex_nodes/s, tet_nodes/s, nnodes, n0, n1, n2, dx, dy, dz, "
+                   "origin0, "
+                   "origin1, "
+                   "origin2, volume_tet_grid \n");
+            printf("<quad_bench> %d , %e, %e, %e , %e, %d, %d , %d , %d , %e , %e , %e, %e , %e , %e, %e \n",
+                   (end_element - start_element),
+                   (milliseconds * 1.0e-3),
+                   (double)(end_element - start_element) / (milliseconds * 1.0e-3),
+                   (double)(n0 * n1 * n2) * (tet_hex_volume_ratio) / (milliseconds * 1.0e-3),
+                   (double)(nnodes) / (milliseconds * 1.0e-3),
+                   nnodes,
+                   n0,
+                   n1,
+                   n2,
+                   (double)dx,
+                   (double)dy,
+                   (double)dz,
+                   (double)origin0,
+                   (double)origin1,
+                   (double)origin2,
+                   (double)volume_tet_grid);
+            printf("*   function: %s, in file: %s:%d \n", __FUNCTION__, __FILE__, __LINE__);
+            printf("=========================================================================\n");
+        }  // END if (SFEM_LOG_LEVEL >= 5)
 
 #ifdef COLLECT_ALPHA_DATA
 
@@ -532,6 +570,7 @@ call_sfem_adjoint_mini_tet_buffer_cluster_info_kernel_gpu(const ptrdiff_t       
         cudaStreamDestroy(cuda_stream);
         cudaStreamDestroy(cuda_stream_clock);
 
+        cudaFreeAsync(tet_volumes_device, cuda_stream_alloc);
         clear_buffer_cluster_async(buffer_cluster, cuda_stream_alloc);
         tet_properties_info.free_async(cuda_stream_alloc);
 
