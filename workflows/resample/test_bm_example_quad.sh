@@ -73,7 +73,8 @@ export test_name="quad"
 hex_sizes=(100 125 150 175 200 225 250 300 350 400 450 500 600 700 800 900 1000 1250)
 hex_sizes=(100 125)
 
-input_data_dirs=()
+input_data_dirs=(data2 data3 data4)
+mesh_names=(torus2 torus3 torus4)
 
 export SFEM_REPETITIONS_QUAD_ADJOINT=10
 
@@ -85,9 +86,14 @@ if [ ${#input_data_dirs[@]} -eq 0 ]; then
     echo "Input data directories provided is empty. Running benchmark with current directory data."
     run_benchmark_for_hex_sizes hex_sizes "$test_name"
 else
+    i=0
     for data_dir in "${input_data_dirs[@]}"; do
         echo "Processing data directory: $data_dir"
         cp "$data_dir/"* ./
+
+        export SFEM_TORUS_MESH=${mesh_names[$i]}
+        ((i++))
+
         run_benchmark_for_hex_sizes hex_sizes "$test_name"
     done # END for data_dir in "${input_data_dirs[@]}"
 fi # END if [ ${#input_data_dirs[@]} -gt 0 ]
