@@ -528,7 +528,7 @@ class SRHyperelasticity:
             for m in range(0, dims):
                 for p in range(0, nfun):
                     for n in range(0, dims):
-                        expr = g[i][m] * g[p][n] / self.fe.reference_measure() # TODO: Is this correct?
+                        expr = g[i][m] * g[p][n] / self.fe.reference_measure() # This removes the reference measuere then added by the integration
                         integr = self.fe.integrate(self.fe.quadrature_point(), expr)
                         terms.append(integr)
 

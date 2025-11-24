@@ -19,7 +19,7 @@
 #include "sfem_SFC.hpp"
 
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
-#include "sfem_NeoHookeanSmithActiveStrainPacked.hpp"
+#include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"

@@ -1,4 +1,4 @@
-#include "sfem_NeoHookeanSmithActiveStrainPacked.hpp"
+#include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_Tracer.hpp"
 
 #include "sfem_Env.hpp"
@@ -7,8 +7,8 @@
 #include "sfem_macros.h"
 #include "sfem_mesh.h"
 
-#include "hex8_neohookean_smith_active_strain.h"
-#include "hex8_partial_assembly_neohookean_smith_active_strain_inline.h"
+#include "hex8_mooney_rivlin_active_strain.h"
+#include "hex8_partial_assembly_mooney_rivlin_active_strain_inline.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
@@ -27,7 +27,7 @@
 
 namespace sfem {
 
-    class NeoHookeanSmithActiveStrainPacked::Impl {
+    class MooneyRivlinActiveStrainPacked::Impl {
     public:
         std::shared_ptr<FunctionSpace>                              space;
         std::shared_ptr<MultiDomainOp>                              domains;
@@ -44,7 +44,7 @@ namespace sfem {
 #endif
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
 #if SFEM_PRINT_THROUGHPUT
-            op_profiler = std::make_unique<OpTracer>(space, "NeoHookeanSmithActiveStrainPacked::apply");
+            op_profiler = std::make_unique<OpTracer>(space, "MooneyRivlinActiveStrainPacked::apply");
 #endif
         }
         ~Impl() {}
@@ -54,36 +54,36 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
-    std::unique_ptr<Op> NeoHookeanSmithActiveStrainPacked::create(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret = std::make_unique<NeoHookeanSmithActiveStrainPacked>(space);
+    std::unique_ptr<Op> MooneyRivlinActiveStrainPacked::create(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret = std::make_unique<MooneyRivlinActiveStrainPacked>(space);
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanSmithActiveStrainPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret            = std::make_shared<NeoHookeanSmithActiveStrainPacked>(space);
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::lor_op(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
         ret->impl_->domains = impl_->domains->lor_op(space, {});
         return ret;
     }
 
-    std::shared_ptr<Op> NeoHookeanSmithActiveStrainPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        auto ret            = std::make_shared<NeoHookeanSmithActiveStrainPacked>(space);
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret            = std::make_shared<MooneyRivlinActiveStrainPacked>(space);
         ret->impl_->domains = impl_->domains->derefine_op(space, {});
         return ret;
     }
 
-    NeoHookeanSmithActiveStrainPacked::NeoHookeanSmithActiveStrainPacked(const std::shared_ptr<FunctionSpace> &space)
+    MooneyRivlinActiveStrainPacked::MooneyRivlinActiveStrainPacked(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>(space)) {}
 
-    NeoHookeanSmithActiveStrainPacked::~NeoHookeanSmithActiveStrainPacked() = default;
+    MooneyRivlinActiveStrainPacked::~MooneyRivlinActiveStrainPacked() = default;
 
-    int NeoHookeanSmithActiveStrainPacked::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::initialize");
+    int MooneyRivlinActiveStrainPacked::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
         if (!impl_->space->has_packed_mesh()) {
-            fprintf(stderr, "[Warning] NeoHookeanSmithActiveStrainPacked: Initializing packed mesh, outer states may be inconsistent!\n");
+            fprintf(stderr, "[Warning] MooneyRivlinActiveStrainPacked: Initializing packed mesh, outer states may be inconsistent!\n");
             impl_->space->initialize_packed_mesh();
-            fprintf(stderr, "[Warning] NeoHookeanSmithActiveStrainPacked: Packed mesh initialized\n");
+            fprintf(stderr, "[Warning] MooneyRivlinActiveStrainPacked: Packed mesh initialized\n");
         }
         impl_->packed = impl_->space->packed_mesh();
 
@@ -132,29 +132,29 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NeoHookeanSmithActiveStrainPacked::hessian_crs(const real_t *const,
+    int MooneyRivlinActiveStrainPacked::hessian_crs(const real_t *const,
                                                        const count_t *const,
                                                        const idx_t *const,
                                                        real_t *const) {
-        SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::hessian_crs not implemented");
+        SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_crs not implemented");
         return SFEM_FAILURE;
     }
 
-    int NeoHookeanSmithActiveStrainPacked::hessian_crs_sym(const real_t *const,
+    int MooneyRivlinActiveStrainPacked::hessian_crs_sym(const real_t *const,
                                                            const count_t *const,
                                                            const idx_t *const,
                                                            real_t *const,
                                                            real_t *const) {
-        SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::hessian_crs_sym not implemented");
+        SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_crs_sym not implemented");
         return SFEM_FAILURE;
     }
 
-    int NeoHookeanSmithActiveStrainPacked::hessian_diag(const real_t *const x, real_t *const values) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::hessian_diag");
+    int MooneyRivlinActiveStrainPacked::hessian_diag(const real_t *const x, real_t *const values) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_diag");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::hessian_diag only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_diag only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
@@ -169,7 +169,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_elasticity_diag(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_elasticity_diag(domain.block->n_elements(),
                                                                        assembly_data->elements_stride,
                                                                        mesh->n_nodes(),
                                                                        assembly_data->elements->data(),
@@ -190,12 +190,12 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::update(const real_t *const u) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::update");
+    int MooneyRivlinActiveStrainPacked::update(const real_t *const u) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::update");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::update only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::update only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
@@ -210,7 +210,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_hessian_partial_assembly(
+            return hex8_mooney_rivlin_active_strain_hessian_partial_assembly(
                     domain.block->n_elements(),
                     assembly_data->elements_stride,
                     assembly_data->elements->data(),
@@ -228,12 +228,12 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::gradient(const real_t *const x, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::gradient");
+    int MooneyRivlinActiveStrainPacked::gradient(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::gradient");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::gradient only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::gradient only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
@@ -248,7 +248,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_gradient(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_gradient(domain.block->n_elements(),
                                                                 assembly_data->elements_stride,
                                                                 mesh->n_nodes(),
                                                                 assembly_data->elements->data(),
@@ -269,16 +269,16 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::apply");
+    int MooneyRivlinActiveStrainPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::apply");
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::apply only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::apply only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
-            return hex8_neohookean_smith_active_strain_partial_assembly_apply(
+            return hex8_mooney_rivlin_active_strain_partial_assembly_apply(
                     domain.block->n_elements(),
                     assembly_data->elements_stride,
                     assembly_data->elements->data(),
@@ -294,12 +294,12 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::value(const real_t *x, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::value");
+    int MooneyRivlinActiveStrainPacked::value(const real_t *x, real_t *const out) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::value");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::value only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::value only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
@@ -314,7 +314,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_objective(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_objective(domain.block->n_elements(),
                                                                  assembly_data->elements_stride,
                                                                  mesh->n_nodes(),
                                                                  assembly_data->elements->data(),
@@ -333,16 +333,16 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::value_steps(const real_t       *x,
+    int MooneyRivlinActiveStrainPacked::value_steps(const real_t       *x,
                                                        const real_t       *h,
                                                        const int           nsteps,
                                                        const real_t *const steps,
                                                        real_t *const       out) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::value_steps");
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::value_steps");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::value_steps only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::value_steps only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
@@ -357,7 +357,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_objective_steps(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_objective_steps(domain.block->n_elements(),
                                                                        assembly_data->elements_stride,
                                                                        mesh->n_nodes(),
                                                                        assembly_data->elements->data(),
@@ -381,28 +381,28 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::report(const real_t *const) { return SFEM_SUCCESS; }
+    int MooneyRivlinActiveStrainPacked::report(const real_t *const) { return SFEM_SUCCESS; }
 
-    std::shared_ptr<Op> NeoHookeanSmithActiveStrainPacked::clone() const {
-        SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::clone not implemented\n");
+    std::shared_ptr<Op> MooneyRivlinActiveStrainPacked::clone() const {
+        SFEM_ERROR("MooneyRivlinActiveStrainPacked::clone not implemented\n");
         return nullptr;
     }
 
-    void NeoHookeanSmithActiveStrainPacked::set_value_in_block(const std::string &block_name,
+    void MooneyRivlinActiveStrainPacked::set_value_in_block(const std::string &block_name,
                                                                const std::string &var_name,
                                                                const real_t       value) {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void NeoHookeanSmithActiveStrainPacked::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void MooneyRivlinActiveStrainPacked::override_element_types(const std::vector<enum ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 
-    void NeoHookeanSmithActiveStrainPacked::set_mu(const real_t mu) { impl_->mu = mu; }
-    void NeoHookeanSmithActiveStrainPacked::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
-    void NeoHookeanSmithActiveStrainPacked::set_lmda(const real_t lmda) { impl_->lmda = lmda; }
+    void MooneyRivlinActiveStrainPacked::set_mu(const real_t mu) { impl_->mu = mu; }
+    void MooneyRivlinActiveStrainPacked::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
+    void MooneyRivlinActiveStrainPacked::set_lmda(const real_t lmda) { impl_->lmda = lmda; }
 
-    void NeoHookeanSmithActiveStrainPacked::set_field(const char *name,
+    void MooneyRivlinActiveStrainPacked::set_field(const char *name,
                                                       const SharedBuffer<real_t> &v,
                                                       const int /*component*/) {
         if (impl_->Fa.empty()) {
@@ -414,15 +414,15 @@ namespace sfem {
         impl_->Fa_stride[0] = 9;
     }
 
-    int NeoHookeanSmithActiveStrainPacked::hessian_bsr(const real_t *const  x,
+    int MooneyRivlinActiveStrainPacked::hessian_bsr(const real_t *const  x,
                                                        const count_t *const rowptr,
                                                        const idx_t *const   colidx,
                                                        real_t *const        values) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::hessian_bsr");
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_bsr");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::hessian_bsr only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_bsr only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b           = *std::static_pointer_cast<int>(domain.user_data);
@@ -436,7 +436,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_bsr(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_bsr(domain.block->n_elements(),
                                                            1,
                                                            domain.block->elements()->data(),
                                                            mesh->points()->data(),
@@ -455,17 +455,17 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanSmithActiveStrainPacked::hessian_bcrs_sym(const real_t *const  x,
+    int MooneyRivlinActiveStrainPacked::hessian_bcrs_sym(const real_t *const  x,
                                                             const count_t *const rowptr,
                                                             const idx_t *const   colidx,
                                                             const ptrdiff_t      block_stride,
                                                             real_t **const       diag_values,
                                                             real_t **const       off_diag_values) {
-        SFEM_TRACE_SCOPE("NeoHookeanSmithActiveStrainPacked::hessian_bcrs_sym");
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::hessian_bcrs_sym");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             if (domain.element_type != HEX8) {
-                SFEM_ERROR("NeoHookeanSmithActiveStrainPacked::hessian_bcrs_sym only implemented for HEX8\n");
+                SFEM_ERROR("MooneyRivlinActiveStrainPacked::hessian_bcrs_sym only implemented for HEX8\n");
                 return SFEM_FAILURE;
             }
             auto b           = *std::static_pointer_cast<int>(domain.user_data);
@@ -479,7 +479,7 @@ namespace sfem {
             const real_t *Fa_soa[9];
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
-            return hex8_neohookean_smith_active_strain_bcrs_sym(domain.block->n_elements(),
+            return hex8_mooney_rivlin_active_strain_bcrs_sym(domain.block->n_elements(),
                                                                 1,
                                                                 domain.block->elements()->data(),
                                                                 mesh->points()->data(),
@@ -500,6 +500,8 @@ namespace sfem {
         });
     }
 }  // namespace sfem
+
+
 
 
 

@@ -10,7 +10,7 @@
 #include "hex8_fff.h"
 #include "sshex8_laplacian.h"
 
-int test_hyperelasticity_partial_assembly() {
+int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -28,7 +28,7 @@ int test_hyperelasticity_partial_assembly() {
     fs->initialize_packed_mesh();
 
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, "NeoHookeanOgden", es);
+    auto op = sfem::create_op(fs, op_name.c_str(), es);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
 
@@ -84,7 +84,7 @@ int test_hyperelasticity_partial_assembly() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_hyperelasticity_active_strain_partial_assembly() {
+int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_name) {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
@@ -102,7 +102,7 @@ int test_hyperelasticity_active_strain_partial_assembly() {
     fs->initialize_packed_mesh();
 
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, "NeoHookeanOgdenActiveStrainPacked", es);
+    auto op = sfem::create_op(fs, op_name.c_str(), es);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
 
@@ -171,11 +171,21 @@ int test_hyperelasticity_active_strain_partial_assembly() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_hyperelasticity_partial_assembly_all() {
+    return test_hyperelasticity_partial_assembly("NeoHookeanOgden") +
+           test_hyperelasticity_partial_assembly("MooneyRivlin");
+}
+
+int test_hyperelasticity_active_strain_partial_assembly_all() {
+    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked") +
+           test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
-    SFEM_RUN_TEST(test_hyperelasticity_partial_assembly);
-    SFEM_RUN_TEST(test_hyperelasticity_active_strain_partial_assembly);
+    SFEM_RUN_TEST(test_hyperelasticity_partial_assembly_all);
+    SFEM_RUN_TEST(test_hyperelasticity_active_strain_partial_assembly_all);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
