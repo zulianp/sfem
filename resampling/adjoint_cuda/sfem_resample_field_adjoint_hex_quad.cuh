@@ -512,6 +512,86 @@ is_hex_out_of_tet_gpu(const FloatType inv_J_tet[9],         //
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+// is_hex_out_of_tet_gpu /////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType>
+__device__ bool                                                    //
+is_hex_out_of_tet_vertices_gpu(const FloatType inv_J_tet[9],       //
+                               const FloatType tet_origin_x,       //
+                               const FloatType tet_origin_y,       //
+                               const FloatType tet_origin_z,       //
+                               const FloatType hex_vertices_x[8],  //
+                               const FloatType hex_vertices_y[8],  //
+                               const FloatType hex_vertices_z[8],  //
+                               FloatType       is_vertex_outside[8]) {   //
+
+    /**
+     * ****************************************************************************************
+     * Check if a hexahedral element is completely outside a tetrahedral element
+     * Using the inverse Jacobian of the tetrahedron to transform hex vertices to tet reference space
+     * and check against tet reference space constraints.
+     * This function returns true if the hex is completely outside the tet.
+     * And returns false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
+     * This must be used as a fast culling test before more expensive intersection tests.
+     * *****************************************************************************************
+     */
+
+    // Precompute inverse Jacobian components for better cache utilization
+    const FloatType inv_J00 = inv_J_tet[0];
+    const FloatType inv_J01 = inv_J_tet[1];
+    const FloatType inv_J02 = inv_J_tet[2];
+    const FloatType inv_J10 = inv_J_tet[3];
+    const FloatType inv_J11 = inv_J_tet[4];
+    const FloatType inv_J12 = inv_J_tet[5];
+    const FloatType inv_J20 = inv_J_tet[6];
+    const FloatType inv_J21 = inv_J_tet[7];
+    const FloatType inv_J22 = inv_J_tet[8];
+
+    // Track if all vertices violate each constraint
+    int all_negative_x  = 1;  // All ref_x < 0
+    int all_negative_y  = 1;  // All ref_y < 0
+    int all_negative_z  = 1;  // All ref_z < 0
+    int all_outside_sum = 1;  // All ref_x + ref_y + ref_z > 1
+
+#pragma unroll
+    for (int v = 0; v < 8; v++) {
+        // Transform hex vertex to tet reference space
+        const FloatType dx = hex_vertices_x[v] - tet_origin_x;
+        const FloatType dy = hex_vertices_y[v] - tet_origin_y;
+        const FloatType dz = hex_vertices_z[v] - tet_origin_z;
+
+        // Use fast_fma for better precision in matrix-vector multiplication
+        const FloatType ref_x = fast_fma(inv_J00, dx, fast_fma(inv_J01, dy, inv_J02 * dz));
+        const FloatType ref_y = fast_fma(inv_J10, dx, fast_fma(inv_J11, dy, inv_J12 * dz));
+        const FloatType ref_z = fast_fma(inv_J20, dx, fast_fma(inv_J21, dy, inv_J22 * dz));
+
+        // Point is inside tet if: ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND ref_x + ref_y + ref_z <= 1
+        // Point is outside if it violates ANY of these constraints
+
+        // Update flags - use bitwise AND for branchless execution
+        all_negative_x &= (ref_x < FloatType(0.0));
+        all_negative_y &= (ref_y < FloatType(0.0));
+        all_negative_z &= (ref_z < FloatType(0.0));
+
+        const FloatType sum_ref = ref_x + ref_y + ref_z;
+        all_outside_sum &= (sum_ref > FloatType(1.0));
+
+        // Early exit optimization: if we know hex is not completely outside, stop
+        if (!all_negative_x &&   //
+            !all_negative_y &&   //
+            !all_negative_z &&   //
+            !all_outside_sum) {  //
+            return false;
+        }  // END if early exit
+    }  // END for (int v = 0; v < 8; v++)
+
+    // Hex is completely outside if ALL vertices violate at least one constraint
+    return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
+}  // END Function: is_hex_out_of_tet_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 // is_hex_out_of_tet_gpu_optimized //////////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -1650,6 +1730,276 @@ tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu(const IntType           start
     }  // END for ( int element_i = start_element + blockIdx.x; element_i < end_element;
 
 }  // END Function: tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// is_hex_out_of_tet_gpu /////////////////////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+template <typename FloatType>
+__device__ void                                                    //
+is_hex_vertices_out_of_tet_gpu(const FloatType inv_J_tet[9],       //
+                               const FloatType tet_origin_x,       //
+                               const FloatType tet_origin_y,       //
+                               const FloatType tet_origin_z,       //
+                               const FloatType hex_vertices_x[8],  //
+                               const FloatType hex_vertices_y[8],  //
+                               const FloatType hex_vertices_z[8],  //
+                               int32_t         is_outside[8]) {            //
+
+    /**
+     * ****************************************************************************************
+     * Check if a hexahedral element is completely outside a tetrahedral element
+     * Using the inverse Jacobian of the tetrahedron to transform hex vertices to tet reference space
+     * and check against tet reference space constraints.
+     * This function returns true if the hex is completely outside the tet.
+     * And returns false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
+     * This must be used as a fast culling test before more expensive intersection tests.
+     * *****************************************************************************************
+     */
+
+    // Precompute inverse Jacobian components for better cache utilization
+    const FloatType inv_J00 = inv_J_tet[0];
+    const FloatType inv_J01 = inv_J_tet[1];
+    const FloatType inv_J02 = inv_J_tet[2];
+    const FloatType inv_J10 = inv_J_tet[3];
+    const FloatType inv_J11 = inv_J_tet[4];
+    const FloatType inv_J12 = inv_J_tet[5];
+    const FloatType inv_J20 = inv_J_tet[6];
+    const FloatType inv_J21 = inv_J_tet[7];
+    const FloatType inv_J22 = inv_J_tet[8];
+
+    // Track if all vertices violate each constraint
+    int all_negative_x  = 1;  // All ref_x < 0
+    int all_negative_y  = 1;  // All ref_y < 0
+    int all_negative_z  = 1;  // All ref_z < 0
+    int all_outside_sum = 1;  // All ref_x + ref_y + ref_z > 1
+
+#pragma unroll
+    for (int v = 0; v < 8; v++) {
+        // Transform hex vertex to tet reference space
+        const FloatType dx = hex_vertices_x[v] - tet_origin_x;
+        const FloatType dy = hex_vertices_y[v] - tet_origin_y;
+        const FloatType dz = hex_vertices_z[v] - tet_origin_z;
+
+        // Use fast_fma for better precision in matrix-vector multiplication
+        const FloatType ref_x = fast_fma(inv_J00, dx, fast_fma(inv_J01, dy, inv_J02 * dz));
+        const FloatType ref_y = fast_fma(inv_J10, dx, fast_fma(inv_J11, dy, inv_J12 * dz));
+        const FloatType ref_z = fast_fma(inv_J20, dx, fast_fma(inv_J21, dy, inv_J22 * dz));
+
+        // Point is inside tet if: ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND ref_x + ref_y + ref_z <= 1
+        // Point is outside if it violates ANY of these constraints
+
+        // Update flags - use bitwise AND for branchless execution
+        all_negative_x &= (ref_x < FloatType(0.0));
+        all_negative_y &= (ref_y < FloatType(0.0));
+        all_negative_z &= (ref_z < FloatType(0.0));
+
+        const FloatType sum_ref = ref_x + ref_y + ref_z;
+        all_outside_sum &= (sum_ref > FloatType(1.0));
+
+        // Early exit optimization: if we know hex is not completely outside, stop
+        if (!all_negative_x &&   //
+            !all_negative_y &&   //
+            !all_negative_z &&   //
+            !all_outside_sum) {  //
+            is_outside[v] = false;
+        } else {
+            is_outside[v] = true;
+        }
+    }  // END for (int v = 0; v < 8; v++)
+
+}  // END Function: is_hex_out_of_tet_gpu
+
+/**
+ * @brief Kernel to identify hexahedral boundary elements from tetrahedral mesh.
+ */
+template <typename FloatType, typename IntType>
+__global__ void tet_grid_hex_boudary(const IntType           element_i,  // element index    //
+                                     const elems_tet4_device elems,      //
+                                     const xyz_tet4_device   xyz,        //
+                                     const IntType           n0,         // SDF
+                                     const IntType           n1,         //
+                                     const IntType           n2,         //
+                                     const IntType           stride0,    // Stride
+                                     const IntType           stride1,    //
+                                     const IntType           stride2,    //
+                                     const FloatType         origin0,    // Origin
+                                     const FloatType         origin1,    //
+                                     const FloatType         origin2,    //
+                                     const FloatType         dx,         // Delta
+                                     const FloatType         dy,         //
+                                     const FloatType         dz,         //
+                                     int32_t* const          hex_inout_device) {  //
+
+    const int warp_id = threadIdx.x / LANES_PER_TILE_HEX_QUAD;
+    const int lane_id = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
+    const int n_warps = blockDim.x / LANES_PER_TILE_HEX_QUAD;
+
+    const FloatType inv_dx = FloatType(1.0) / dx;
+    const FloatType inv_dy = FloatType(1.0) / dy;
+    const FloatType inv_dz = FloatType(1.0) / dz;
+
+    const IntType off0 = 0;
+    const IntType off1 = stride0;
+    const IntType off2 = stride0 + stride1;
+    const IntType off3 = stride1;
+    const IntType off4 = stride2;
+    const IntType off5 = stride0 + stride2;
+    const IntType off6 = stride0 + stride1 + stride2;
+    const IntType off7 = stride1 + stride2;
+
+    IntType   ev[4] = {0, 0, 0, 0};  // Indices of the vertices of the tetrahedron
+    FloatType inv_J_tet[9];
+
+    const IntType ev0 = __ldg(&elems.elems_v0[element_i]);
+    const IntType ev1 = __ldg(&elems.elems_v1[element_i]);
+    const IntType ev2 = __ldg(&elems.elems_v2[element_i]);
+    const IntType ev3 = __ldg(&elems.elems_v3[element_i]);
+
+    // Read the coordinates of the vertices of the tetrahedron
+    // In the physical space
+    const FloatType x0_n = FloatType(__ldg(&xyz.x[ev0]));
+    const FloatType x1_n = FloatType(__ldg(&xyz.x[ev1]));
+    const FloatType x2_n = FloatType(__ldg(&xyz.x[ev2]));
+    const FloatType x3_n = FloatType(__ldg(&xyz.x[ev3]));
+
+    const FloatType y0_n = FloatType(__ldg(&xyz.y[ev0]));
+    const FloatType y1_n = FloatType(__ldg(&xyz.y[ev1]));
+    const FloatType y2_n = FloatType(__ldg(&xyz.y[ev2]));
+    const FloatType y3_n = FloatType(__ldg(&xyz.y[ev3]));
+
+    const FloatType z0_n = FloatType(__ldg(&xyz.z[ev0]));
+    const FloatType z1_n = FloatType(__ldg(&xyz.z[ev1]));
+    const FloatType z2_n = FloatType(__ldg(&xyz.z[ev2]));
+    const FloatType z3_n = FloatType(__ldg(&xyz.z[ev3]));
+
+    IntType min_grid_x, max_grid_x;
+    IntType min_grid_y, max_grid_y;
+    IntType min_grid_z, max_grid_z;
+
+    tet4_inv_Jacobian_gpu<FloatType>(x0_n,        //
+                                     x1_n,        //
+                                     x2_n,        //
+                                     x3_n,        //
+                                     y0_n,        //
+                                     y1_n,        //
+                                     y2_n,        //
+                                     y3_n,        //
+                                     z0_n,        //
+                                     z1_n,        //
+                                     z2_n,        //
+                                     z3_n,        //
+                                     inv_J_tet);  //
+
+    compute_tet_bounding_box_gpu<FloatType, IntType>(x0_n,         //
+                                                     x1_n,         //
+                                                     x2_n,         //
+                                                     x3_n,         //
+                                                     y0_n,         //
+                                                     y1_n,         //
+                                                     y2_n,         //
+                                                     y3_n,         //
+                                                     z0_n,         //
+                                                     z1_n,         //
+                                                     z2_n,         //
+                                                     z3_n,         //
+                                                     stride0,      //
+                                                     stride1,      //
+                                                     stride2,      //
+                                                     origin0,      //
+                                                     origin1,      //
+                                                     origin2,      //
+                                                     inv_dx,       //
+                                                     inv_dy,       //
+                                                     inv_dz,       //
+                                                     min_grid_x,   //
+                                                     max_grid_x,   //
+                                                     min_grid_y,   //
+                                                     max_grid_y,   //
+                                                     min_grid_z,   //
+                                                     max_grid_z);  //
+
+    const IntType size_x = max_grid_x - min_grid_x + 1;
+    const IntType size_y = max_grid_y - min_grid_y + 1;
+    const IntType size_z = max_grid_z - min_grid_z + 1;
+
+    const IntType total_grid_points = size_x * size_y * size_z;
+
+    // Loop over all grid points in the bounding box
+    for (IntType idx = 0; idx < total_grid_points; idx += n_warps) {
+        const IntType grid_idx = idx + warp_id;
+
+        if (grid_idx >= total_grid_points) continue;
+
+        const IntType ix_local = grid_idx % size_x;
+        const IntType iy_local = (grid_idx / size_x) % size_y;
+        const IntType iz_local = grid_idx / (size_x * size_y);
+
+        // Convert to absolute grid coordinates
+        const IntType ix = min_grid_x + ix_local;
+        const IntType iy = min_grid_y + iy_local;
+        const IntType iz = min_grid_z + iz_local;
+
+        const FloatType x_hex_min = fast_fma((FloatType)ix, dx, origin0);
+        const FloatType y_hex_min = fast_fma((FloatType)iy, dy, origin1);
+        const FloatType z_hex_min = fast_fma((FloatType)iz, dz, origin2);
+
+        const FloatType x_hex_max = x_hex_min + dx;
+        const FloatType y_hex_max = y_hex_min + dy;
+        const FloatType z_hex_max = z_hex_min + dz;
+
+        const FloatType hex_vertices_x[8] = {x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min,  //
+                                             x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min};
+
+        const FloatType hex_vertices_y[8] = {y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max,  //
+                                             y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max};
+
+        const FloatType hex_vertices_z[8] = {z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,  //
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max};
+
+        int32_t is_outside[8];
+        is_hex_vertices_out_of_tet_gpu(inv_J_tet,       //
+                                       x0_n,            //
+                                       y0_n,            //
+                                       z0_n,            //
+                                       hex_vertices_x,  //
+                                       hex_vertices_y,  //
+                                       hex_vertices_z,  //
+                                       is_outside);     //
+
+        const IntType base_index = ix * stride0 +                       //
+                                   iy * stride1 +                       //
+                                   iz * stride2;                        //
+                                                                        //
+        atomicOr(&hex_inout_device[base_index + off0], is_outside[0]);  //
+        atomicOr(&hex_inout_device[base_index + off1], is_outside[1]);  //
+        atomicOr(&hex_inout_device[base_index + off2], is_outside[2]);  //
+        atomicOr(&hex_inout_device[base_index + off3], is_outside[3]);  //
+        atomicOr(&hex_inout_device[base_index + off4], is_outside[4]);  //
+        atomicOr(&hex_inout_device[base_index + off5], is_outside[5]);  //
+        atomicOr(&hex_inout_device[base_index + off6], is_outside[6]);  //
+        atomicOr(&hex_inout_device[base_index + off7], is_outside[7]);  //
+    }
+}
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,23 +1,14 @@
 #ifndef __SFEM_ADJOINT_MINI_TET_FUN_CUH__
 #define __SFEM_ADJOINT_MINI_TET_FUN_CUH__
 
-#include <assert.h>
-#include <cooperative_groups.h>
 #include <cuda_runtime.h>
-#include <curand.h>
-#include <curand_kernel.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-#include <thrust/sequence.h>
-#include <thrust/sort.h>
-#include <cuda/atomic>
-#include <set>
+#include <thrust/reduce.h>
 
 #include "quadratures_rule_cuda.cuh"
-#include "sfem_adjoint_mini_tet_fun.cuh"
 #include "sfem_config.h"
 #include "sfem_resample_field_adjoint_hyteg.h"
 #include "sfem_resample_field_cuda_fun.cuh"
@@ -672,6 +663,20 @@ bool is_buffer_valid(const buffer_cluster_t<FloatType>& buffer_cluster, ptrdiff_
     return true;
 }
 
+/**
+ * @brief Reset the values in the buffer cluster to a specified value asynchronously.
+ *
+ * This function sets all elements in the buffer cluster to the specified value
+ * using cudaMemsetAsync. It is important to note that cudaMemsetAsync sets bytes,
+ * so this function is suitable for setting values like 0 or -1. For other values,
+ * a custom kernel would be needed.
+ *
+ * @tparam FloatType The data type of the buffer elements (e.g., float, double).
+ * @param buffer_cluster The buffer cluster to reset.
+ * @param value The value to set each element to (should be a byte value like 0 or -1).
+ * @param stream The CUDA stream to perform the operation in.
+ * @return cudaError_t Returns cudaSuccess on success, or an error code on failure.
+ */
 template <typename FloatType>
 cudaError_t reset_buffer_values(buffer_cluster_t<FloatType>& buffer_cluster, FloatType value, cudaStream_t stream) {
     if (!buffer_cluster.buffer) {
@@ -681,6 +686,20 @@ cudaError_t reset_buffer_values(buffer_cluster_t<FloatType>& buffer_cluster, Flo
     return cudaMemsetAsync(buffer_cluster.buffer, value, buffer_cluster.size * sizeof(FloatType), stream);
 }
 
+/**
+ * @brief Kernel to compute the volumes of tetrahedral elements in a mesh.
+ *
+ * This CUDA kernel computes the volume of each tetrahedral element in a mesh
+ * defined by its vertex coordinates. The volumes are stored in the provided
+ * output array.
+ *
+ * @param start_element The starting index of the elements to process.
+ * @param end_element The ending index (exclusive) of the elements to process.
+ * @param elems The device structure containing tetrahedral element connectivity.
+ * @param xyz The device structure containing vertex coordinates.
+ * @param tet_volumes The output array to store the computed volumes of the tetrahedra
+ *                   (size should be at least end_element).
+ */
 template <typename FloatType, typename IntType>
 __global__ void tet_grid_volumes(const IntType           start_element,  // Mesh
                                  const IntType           end_element,    //
