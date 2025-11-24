@@ -4,9 +4,9 @@
 
 namespace sfem {
 
-    class NeoHookeanSmithActiveStrainPacked final : public Op {
+    class MooneyRivlinActiveStrainPacked final : public Op {
     public:
-        const char *name() const override { return "NeoHookeanSmithActiveStrainPacked"; }
+        const char *name() const override { return "MooneyRivlinActiveStrainPacked"; }
         inline bool is_linear() const override { return true; }
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
@@ -16,8 +16,8 @@ namespace sfem {
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
-        NeoHookeanSmithActiveStrainPacked(const std::shared_ptr<FunctionSpace> &space);
-        ~NeoHookeanSmithActiveStrainPacked();
+        MooneyRivlinActiveStrainPacked(const std::shared_ptr<FunctionSpace> &space);
+        ~MooneyRivlinActiveStrainPacked();
 
         int update(const real_t *const u) override;
 
@@ -75,6 +75,8 @@ namespace sfem {
     };
 
 }  // namespace sfem
+
+
 
 
 

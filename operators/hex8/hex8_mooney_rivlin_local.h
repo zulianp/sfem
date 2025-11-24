@@ -1,9 +1,9 @@
-#ifndef SFEM_HEX8_NEOHOOKEAN_SMITH_LOCAL_H
-#define SFEM_HEX8_NEOHOOKEAN_SMITH_LOCAL_H
+#ifndef SFEM_HEX8_MOONEY_RIVLIN_LOCAL_H
+#define SFEM_HEX8_MOONEY_RIVLIN_LOCAL_H
 
 #include "hex8_neohookean_inline.h"
 
-static SFEM_INLINE void hex8_neohookean_smith_active_strain_objective_at_qp(const scalar_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void hex8_mooney_rivlin_active_strain_objective_at_qp(const scalar_t *const SFEM_RESTRICT adjugate,
                                                                             const scalar_t jacobian_determinant,
                                                                             const scalar_t qx,
                                                                             const scalar_t qy,
@@ -75,7 +75,7 @@ static SFEM_INLINE void hex8_neohookean_smith_active_strain_objective_at_qp(cons
              mu * (x27 - 3) - mu * log(x27 + 1));
 }
 
-static SFEM_INLINE void hex8_neohookean_smith_active_strain_grad(const scalar_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void hex8_mooney_rivlin_active_strain_grad(const scalar_t *const SFEM_RESTRICT adjugate,
                                                                  const scalar_t                      jacobian_determinant,
                                                                  const scalar_t                      qx,
                                                                  const scalar_t                      qy,
@@ -403,7 +403,7 @@ static SFEM_INLINE void hex8_neohookean_smith_active_strain_grad(const scalar_t 
                      x152 * (-adjugate[0] * x184 + adjugate[1] * x182 - adjugate[2] * x187));
     gz[7] += -x140 * (x152 * x195 + x201 + x202);
 }
-static SFEM_INLINE void hex8_neohookean_smith_active_strain_hessian(const scalar_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void hex8_mooney_rivlin_active_strain_hessian(const scalar_t *const SFEM_RESTRICT adjugate,
                                                                     const scalar_t                      jacobian_determinant,
                                                                     const scalar_t                      qx,
                                                                     const scalar_t                      qy,
@@ -3642,7 +3642,7 @@ static SFEM_INLINE void hex8_neohookean_smith_active_strain_hessian(const scalar
 // Substituting 22/24...DONE
 // Substituting 23/24...DONE
 // Substituting 24/24...DONE
-static SFEM_INLINE void hex8_neohookean_smith_active_strain_hessian_diag(const scalar_t *const SFEM_RESTRICT adjugate,
+static SFEM_INLINE void hex8_mooney_rivlin_active_strain_hessian_diag(const scalar_t *const SFEM_RESTRICT adjugate,
                                                                          const scalar_t                      jacobian_determinant,
                                                                          const scalar_t                      qx,
                                                                          const scalar_t                      qy,
@@ -4050,4 +4050,4 @@ static SFEM_INLINE void hex8_neohookean_smith_active_strain_hessian_diag(const s
     H_diagz[7] += x140 * (x248 * x287 + x248 * x288 + x249 * x283 + x249 * x284 + x250 * x285 + x250 * x286 + x294 + x296 + x300);
 }
 
-#endif /* SFEM_HEX8_NEOHOOKEAN_SMITH_LOCAL_H */
+#endif /* SFEM_HEX8_MOONEY_RIVLIN_LOCAL_H */

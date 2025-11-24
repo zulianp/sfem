@@ -706,6 +706,11 @@ def neohookean_ogden(fe):
     gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
                     guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
 
+    op.emit_objective()
+    op.emit_gradient()
+    op.emit_hessian()
+    op.emit_hessian_diag()
+
 def compressible_mooney_rivlin(fe):
     name = "compressible_mooney_rivlin"
     strain_energy_function = "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2"
@@ -724,8 +729,8 @@ def compressible_mooney_rivlin(fe):
 
 
 if __name__ == "__main__":
-    # fe = Tet4()
-    fe = Hex8()
+    fe = Tet4()
+    # fe = Hex8()
     # fe = Tet10()
     neohookean_ogden(fe)
     # compressible_mooney_rivlin(fe)

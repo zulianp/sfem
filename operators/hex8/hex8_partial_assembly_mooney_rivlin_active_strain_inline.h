@@ -1,23 +1,24 @@
-#ifndef SFEM_HEX8_PARTIAL_ASSEMBLY_NEOHOOKEAN_SMITH_ACTIVE_STRAIN_INLINE_H
-#define SFEM_HEX8_PARTIAL_ASSEMBLY_NEOHOOKEAN_SMITH_ACTIVE_STRAIN_INLINE_H
+#ifndef SFEM_HEX8_PARTIAL_ASSEMBLY_MOONEY_RIVLIN_ACTIVE_STRAIN_INLINE_H
+#define SFEM_HEX8_PARTIAL_ASSEMBLY_MOONEY_RIVLIN_ACTIVE_STRAIN_INLINE_H
 
 #include "sfem_macros.h"
 
 
 #define HEX8_S_IKMN_SIZE 45
-static SFEM_INLINE void hex8_S_ikmn_neohookean_smith_active_strain(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                                   const scalar_t                      jacobian_determinant,
-                                                                   const scalar_t                      qx,
-                                                                   const scalar_t                      qy,
-                                                                   const scalar_t                      qz,
-                                                                   const scalar_t                      qw,
-                                                                   const scalar_t *const SFEM_RESTRICT F,
-                                                                   const scalar_t                      lmda,
-                                                                   const scalar_t                      mu,
-                                                                   const scalar_t                      lmbda,
-                                                                   const scalar_t *const SFEM_RESTRICT Fa_inv,
-                                                                   const scalar_t                      Ja,
-                                                                   scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
+static SFEM_INLINE void hex8_S_ikmn_mooney_rivlin_active_strain(const scalar_t *const SFEM_RESTRICT adjugate,
+                                                                const scalar_t                      jacobian_determinant,
+                                                                const scalar_t                      qx,
+                                                                const scalar_t                      qy,
+                                                                const scalar_t                      qz,
+                                                                const scalar_t                      qw,
+                                                                const scalar_t *const SFEM_RESTRICT F,
+                                                                const scalar_t                      lmda,
+                                                                const scalar_t                      mu,
+                                                                const scalar_t                      lmbda,
+                                                                const scalar_t *const SFEM_RESTRICT Fa_inv,
+                                                                const scalar_t                      Ja,
+                                                                scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
+    // Adapted for Mooney–Rivlin active strain
     // mundane ops: 1494 divs: 3 sqrts: 0
     // total ops: 1518
     const scalar_t x0  = F[4] * Fa_inv[4];
@@ -373,19 +374,20 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean_smith_active_strain(const scalar_
                                    adjugate[8] * (adjugate[6] * x268 - adjugate[7] * x272 + adjugate[8] * x271));
 }
 
-static SFEM_INLINE void hex8_S_ikmn_neohookean_smith_active_strain_add(const scalar_t *const SFEM_RESTRICT adjugate,
-                                                                   const scalar_t                      jacobian_determinant,
-                                                                   const scalar_t                      qx,
-                                                                   const scalar_t                      qy,
-                                                                   const scalar_t                      qz,
-                                                                   const scalar_t                      qw,
-                                                                   const scalar_t *const SFEM_RESTRICT F,
-                                                                   const scalar_t                      lmda,
-                                                                   const scalar_t                      mu,
-                                                                   const scalar_t                      lmbda,
-                                                                   const scalar_t *const SFEM_RESTRICT Fa_inv,
-                                                                   const scalar_t                      Ja,
-                                                                   scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
+static SFEM_INLINE void hex8_S_ikmn_mooney_rivlin_active_strain_add(const scalar_t *const SFEM_RESTRICT adjugate,
+                                                                const scalar_t                      jacobian_determinant,
+                                                                const scalar_t                      qx,
+                                                                const scalar_t                      qy,
+                                                                const scalar_t                      qz,
+                                                                const scalar_t                      qw,
+                                                                const scalar_t *const SFEM_RESTRICT F,
+                                                                const scalar_t                      lmda,
+                                                                const scalar_t                      mu,
+                                                                const scalar_t                      lmbda,
+                                                                const scalar_t *const SFEM_RESTRICT Fa_inv,
+                                                                const scalar_t                      Ja,
+                                                                scalar_t *const SFEM_RESTRICT       S_ikmn_canonical) {
+    // Adapted for Mooney–Rivlin active strain
     // mundane ops: 1494 divs: 3 sqrts: 0
     // total ops: 1518
     const scalar_t x0  = F[4] * Fa_inv[4];
@@ -740,4 +742,6 @@ static SFEM_INLINE void hex8_S_ikmn_neohookean_smith_active_strain_add(const sca
                                    adjugate[7] * (-adjugate[6] * x269 + adjugate[7] * x274 - adjugate[8] * x272) +
                                    adjugate[8] * (adjugate[6] * x268 - adjugate[7] * x272 + adjugate[8] * x271));
 }
-#endif /* SFEM_HEX8_PARTIAL_ASSEMBLY_NEOHOOKEAN_SMITH_ACTIVE_STRAIN_INLINE_H */
+#endif /* SFEM_HEX8_PARTIAL_ASSEMBLY_MOONEY_RIVLIN_ACTIVE_STRAIN_INLINE_H */
+
+
