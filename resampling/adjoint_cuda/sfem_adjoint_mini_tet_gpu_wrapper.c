@@ -36,7 +36,7 @@ tet4_resample_field_local_refine_adjoint_hyteg_gpu(const ptrdiff_t              
     for (int i = 0; i < repetitions; i++) {
         //
 
-#define TEST_KERNEL_MODEL 3
+#define TEST_KERNEL_MODEL 4
 
 #if TEST_KERNEL_MODEL == 0
         call_sfem_adjoint_mini_tet_kernel_gpu(
