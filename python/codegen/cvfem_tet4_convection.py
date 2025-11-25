@@ -188,6 +188,8 @@ def ref_subs(expr):
         expr = expr.subs(x3, 0)
         expr = expr.subs(y3, 0)
         expr = expr.subs(z3, 1)
+
+        # expr = expr.subs({x0:0, y0: })
     return expr
 
 
@@ -277,7 +279,7 @@ if not debug:
         print("det(Jacobian)")
         print("----------------------------")
 
-        expr = det3(Jx)
+        expr = ast.Assignment(sp.symbols("det"), det3(Jx))
         c_code(expr)
 
     print("----------------------------")
