@@ -123,9 +123,6 @@ typedef int element_idx_t;
 typedef int16_t local_idx_t;
 #define d_LOCAL_IDX_T "hd"
 
-// #define SFEM_RESTRICT __restrict__
-#define SFEM_RESTRICT
-
 #define SFEM_MAX_PATH_LENGTH 2056
 #define SFEM_OK 0
 

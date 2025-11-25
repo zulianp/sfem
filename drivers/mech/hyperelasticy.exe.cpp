@@ -18,6 +18,8 @@
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
 
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_blas.h"
@@ -25,6 +27,59 @@
 #endif
 
 #include "sfem_ssmgc.hpp"
+
+static void fill_active_strain_Fa(const std::shared_ptr<sfem::Mesh> &mesh,
+                                  real_t *const                      Fa_aos,
+                                  const geom_t *const                center,
+                                  const geom_t                       radius,
+                                  const real_t                       a11_final,
+                                  const int                          step,
+                                  const int                          total_steps) {
+    const ptrdiff_t nelements = mesh->n_elements();
+    const int       nxe       = mesh->n_nodes_per_element();
+    auto            elements  = mesh->elements()->data();
+    auto            points    = mesh->points()->data();
+
+    const geom_t r2         = radius * radius;
+    const double s          = (total_steps > 0) ? (double)step / (double)total_steps : 1.0;
+    const real_t a11_ramped = (real_t)(1.0 - (1.0 - (double)a11_final) * s);
+
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
+        geom_t cx = 0, cy = 0, cz = 0;
+        for (int v = 0; v < nxe; ++v) {
+            const idx_t i = elements[v][e];
+            cx += points[0][i];
+            cy += points[1][i];
+            cz += points[2][i];
+        }
+        cx /= (geom_t)nxe;
+        cy /= (geom_t)nxe;
+        cz /= (geom_t)nxe;
+
+        const geom_t dx_c = cx - center[0];
+        const geom_t dy_c = cy - center[1];
+        const geom_t dz_c = cz - center[2];
+        const geom_t d2   = dx_c * dx_c + dy_c * dy_c + dz_c * dz_c;
+
+        const bool   inside = (d2 <= r2);
+        const real_t a11    = inside ? a11_ramped : (real_t)1;
+        const real_t a22    = (real_t)1;
+        const real_t a33    = (real_t)1;
+
+        const real_t detA = a11 * a22 * a33;
+
+        const ptrdiff_t base = 9 * e;
+        Fa_aos[base + 0]     = a11 / detA;
+        Fa_aos[base + 1]     = 0;
+        Fa_aos[base + 2]     = 0;
+        Fa_aos[base + 3]     = 0;
+        Fa_aos[base + 4]     = a22 / detA;
+        Fa_aos[base + 5]     = 0;
+        Fa_aos[base + 6]     = 0;
+        Fa_aos[base + 7]     = 0;
+        Fa_aos[base + 8]     = a33 / detA;
+    }
+}
 
 struct RotateYZ {
     std::shared_ptr<sfem::FunctionSpace>  space;
@@ -144,6 +199,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const bool   SFEM_VERBOSE     = sfem::Env::read("SFEM_VERBOSE", 0);
     const real_t SFEM_LSOLVE_RTOL = sfem::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL      = sfem::Env::read("SFEM_NL_TOL", 1e-9);
+    bool SFEM_USE_ACTIVE_STRAIN = sfem::Env::read("SFEM_USE_ACTIVE_STRAIN", false);
+
+    const real_t SFEM_ACTIVE_STRAIN_XX = sfem::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
     {
@@ -199,6 +257,29 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
+
+    // Generate basic Fa if active strain operator is requested
+    std::shared_ptr<sfem::Buffer<real_t>> Fa_storage;
+    if (SFEM_USE_ACTIVE_STRAIN) {
+        auto   bbox      = mesh->compute_bounding_box();
+        auto   bb_min    = bbox.first->data();
+        auto   bb_max    = bbox.second->data();
+        geom_t center[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
+        for (int d = 0; d < mesh->spatial_dimension(); d++) {
+            center[d] = (bb_min[d] + bb_max[d]) * (geom_t)0.5;
+        }
+        const geom_t dx     = bb_max[0] - bb_min[0];
+        const geom_t dy     = bb_max[1] - bb_min[1];
+        const geom_t dz     = bb_max[2] - bb_min[2];
+        const geom_t span   = std::min(dx, std::min(dy, dz));
+        geom_t       radius = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span));
+        const ptrdiff_t nelements = mesh->n_elements();    
+        Fa_storage = sfem::create_host_buffer<real_t>(9 * nelements);
+        auto Fa    = Fa_storage->data();
+        fill_active_strain_Fa(mesh, Fa, center, radius, SFEM_ACTIVE_STRAIN_XX, 1, 1);
+        op->set_field("active_strain", Fa_storage, 0);
+    }
+
     f->add_operator(op);
     f->add_constraint(dirichlet_conditions);
 
@@ -213,9 +294,9 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            rhs          = sfem::create_buffer<real_t>(ndofs, es);
 
     const std::string SFEM_OP_TYPE = sfem::Env::read_string("SFEM_OP_TYPE", "MF");
-    auto linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
-    auto cg        = sfem::create_cg<real_t>(linear_op, es);
-    cg->verbose    = SFEM_VERBOSE;
+    auto              linear_op    = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, displacement, es);
+    auto              cg           = sfem::create_cg<real_t>(linear_op, es);
+    cg->verbose                    = SFEM_VERBOSE;
     cg->set_max_it(20000);
     cg->set_op(linear_op);
     cg->set_rtol(SFEM_LSOLVE_RTOL);
@@ -293,6 +374,25 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         for (int step = 1; step <= steps; step++) {
             if (rotate_conds) {
                 rotate_conds->update(step);
+            }
+
+            // Update active strain field per step (incremental loading)
+            if (SFEM_USE_ACTIVE_STRAIN) {
+                    auto   bbox_step   = mesh->compute_bounding_box();
+                    auto   bb_min_s    = bbox_step.first->data();
+                    auto   bb_max_s    = bbox_step.second->data();
+                    geom_t center_s[3] = {(geom_t)0, (geom_t)0, (geom_t)0};
+                    for (int d = 0; d < mesh->spatial_dimension(); d++) {
+                        center_s[d] = (bb_min_s[d] + bb_max_s[d]) * (geom_t)0.5;
+                    }
+                    const geom_t dx_s     = bb_max_s[0] - bb_min_s[0];
+                    const geom_t dy_s     = bb_max_s[1] - bb_min_s[1];
+                    const geom_t dz_s     = bb_max_s[2] - bb_min_s[2];
+                    const geom_t span_s   = std::min(dx_s, std::min(dy_s, dz_s));
+                    geom_t       radius_s = sfem::Env::read("SFEM_ACTIVE_STRAIN_RADIUS", (double)(0.25 * span_s));
+
+                    fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
+                    op->set_field("active_strain", Fa_storage, 0);
             }
 
             for (int i = 0; i < nl_max_it; i++) {
