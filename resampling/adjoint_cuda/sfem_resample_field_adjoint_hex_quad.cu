@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 #include "device_utils.cuh"
-#include "sfem_resample_field_adjoint_hex_quad.cuh"
+#include "sfem_resample_field_adjoint_hex_wquad.cuh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,26 +107,26 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     cudaEventCreate(&boundary_stop_event);
     cudaEventRecord(boundary_start_event, cuda_stream);  // Record on the SAME stream
 
-    tet_grid_hex_boudary_kernel_gpu<float_t, int><<<blocks_per_grid,    //
-                                                    threads_per_block,  //
-                                                    0,                  //
-                                                    cuda_stream>>>(0,
-                                                                   nelements,  //
-                                                                   elements_device,
-                                                                   xyz_device,    //
-                                                                   n0,            //
-                                                                   n1,            //
-                                                                   n2,            //
-                                                                   stride0,       //
-                                                                   stride1,       //
-                                                                   stride2,       //
-                                                                   origin0,       //
-                                                                   origin1,       //
-                                                                   origin2,       //
-                                                                   dx,            //
-                                                                   dy,            //
-                                                                   dz,            //
-                                                                   in_out_mesh);  //
+    tet_grid_hex_indicator_IO_kernel_gpu<float_t, int><<<blocks_per_grid,    //
+                                                         threads_per_block,  //
+                                                         0,                  //
+                                                         cuda_stream>>>(0,
+                                                                        nelements,  //
+                                                                        elements_device,
+                                                                        xyz_device,    //
+                                                                        n0,            //
+                                                                        n1,            //
+                                                                        n2,            //
+                                                                        stride0,       //
+                                                                        stride1,       //
+                                                                        stride2,       //
+                                                                        origin0,       //
+                                                                        origin1,       //
+                                                                        origin2,       //
+                                                                        dx,            //
+                                                                        dy,            //
+                                                                        dz,            //
+                                                                        in_out_mesh);  //
 
     cudaEventRecord(boundary_stop_event, cuda_stream);  // Record on the SAME stream
     cudaEventSynchronize(boundary_stop_event);          // Wait for completion
@@ -147,10 +147,8 @@ call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_
     // if (true) {
     //     // Debug: copy back the in_out_mesh
     //     int32_t* in_out_mesh_host = (int32_t*)malloc((n0 * n1 * n2) * sizeof(int32_t));
-    //     cudaMemcpy((void*)in_out_mesh_host, (const void*)in_out_mesh, (n0 * n1 * n2) * sizeof(int32_t), cudaMemcpyDeviceToHost);
-    //     size_t count_in  = 0;
-    //     size_t count_out = 0;
-    //     for (ptrdiff_t i = 0; i < (n0 * n1 * n2); i++) {
+    //     cudaMemcpy((void*)in_out_mesh_host, (const void*)in_out_mesh, (n0 * n1 * n2) * sizeof(int32_t),
+    //     cudaMemcpyDeviceToHost); size_t count_in  = 0; size_t count_out = 0; for (ptrdiff_t i = 0; i < (n0 * n1 * n2); i++) {
     //         if (in_out_mesh_host[i] == 1) count_in++;
     //         if (in_out_mesh_host[i] == 0) count_out++;
     //     }
