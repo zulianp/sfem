@@ -1790,23 +1790,23 @@ is_hex_vertices_out_of_tet_gpu(const FloatType inv_J_tet[9],       //
  * @brief Kernel to identify hexahedral boundary elements from tetrahedral mesh.
  */
 template <typename FloatType, typename IntType>
-__device__ __forceinline__                                                //
-        void tet_grid_hex_boudary_gpu(const IntType           element_i,  // element index    //
-                                      const elems_tet4_device elems,      //
-                                      const xyz_tet4_device   xyz,        //
-                                      const IntType           n0,         // SDF
-                                      const IntType           n1,         //
-                                      const IntType           n2,         //
-                                      const IntType           stride0,    // Stride
-                                      const IntType           stride1,    //
-                                      const IntType           stride2,    //
-                                      const FloatType         origin0,    // Origin
-                                      const FloatType         origin1,    //
-                                      const FloatType         origin2,    //
-                                      const FloatType         dx,         // Delta
-                                      const FloatType         dy,         //
-                                      const FloatType         dz,         //
-                                      int32_t* const          hex_inout_device) {  //
+__device__ __forceinline__                                                     //
+        void tet_grid_hex_indicator_IO_gpu(const IntType           element_i,  // element index    //
+                                           const elems_tet4_device elems,      //
+                                           const xyz_tet4_device   xyz,        //
+                                           const IntType           n0,         // SDF
+                                           const IntType           n1,         //
+                                           const IntType           n2,         //
+                                           const IntType           stride0,    // Stride
+                                           const IntType           stride1,    //
+                                           const IntType           stride2,    //
+                                           const FloatType         origin0,    // Origin
+                                           const FloatType         origin1,    //
+                                           const FloatType         origin2,    //
+                                           const FloatType         dx,         // Delta
+                                           const FloatType         dy,         //
+                                           const FloatType         dz,         //
+                                           int32_t* const          hex_inout_device) {  //
 
     const int warp_id = threadIdx.x / LANES_PER_TILE_HEX_QUAD;
     const int lane_id = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
@@ -1979,41 +1979,41 @@ __device__ __forceinline__                                                //
  * @brief Kernel wrapper to identify hexahedral boundary elements from tetrahedral mesh.
  */
 template <typename FloatType, typename IntType>
-__global__ void tet_grid_hex_boudary_kernel_gpu(const IntType           start_element,  // element index    //
-                                                const IntType           end_element,    //
-                                                const elems_tet4_device elems,          //
-                                                const xyz_tet4_device   xyz,            //
-                                                const IntType           n0,             // SDF
-                                                const IntType           n1,             //
-                                                const IntType           n2,             //
-                                                const IntType           stride0,        // Stride
-                                                const IntType           stride1,        //
-                                                const IntType           stride2,        //
-                                                const FloatType         origin0,        // Origin
-                                                const FloatType         origin1,        //
-                                                const FloatType         origin2,        //
-                                                const FloatType         dx,             // Delta
-                                                const FloatType         dy,             //
-                                                const FloatType         dz,             //
-                                                int32_t* const          hex_inout_device) {      //
+__global__ void tet_grid_hex_indicator_IO_kernel_gpu(const IntType           start_element,  // element index    //
+                                                     const IntType           end_element,    //
+                                                     const elems_tet4_device elems,          //
+                                                     const xyz_tet4_device   xyz,            //
+                                                     const IntType           n0,             // SDF
+                                                     const IntType           n1,             //
+                                                     const IntType           n2,             //
+                                                     const IntType           stride0,        // Stride
+                                                     const IntType           stride1,        //
+                                                     const IntType           stride2,        //
+                                                     const FloatType         origin0,        // Origin
+                                                     const FloatType         origin1,        //
+                                                     const FloatType         origin2,        //
+                                                     const FloatType         dx,             // Delta
+                                                     const FloatType         dy,             //
+                                                     const FloatType         dz,             //
+                                                     int32_t* const          hex_inout_device) {      //
 
     for (int element_i = start_element + blockIdx.x; element_i < end_element; element_i += gridDim.x) {
-        tet_grid_hex_boudary_gpu<FloatType, IntType>(element_i,          //
-                                                     elems,              //
-                                                     xyz,                //
-                                                     n0,                 //
-                                                     n1,                 //
-                                                     n2,                 //
-                                                     stride0,            //
-                                                     stride1,            //
-                                                     stride2,            //
-                                                     origin0,            //
-                                                     origin1,            //
-                                                     origin2,            //
-                                                     dx,                 //
-                                                     dy,                 //
-                                                     dz,                 //
-                                                     hex_inout_device);  //
+        tet_grid_hex_indicator_IO_gpu<FloatType, IntType>(element_i,          //
+                                                          elems,              //
+                                                          xyz,                //
+                                                          n0,                 //
+                                                          n1,                 //
+                                                          n2,                 //
+                                                          stride0,            //
+                                                          stride1,            //
+                                                          stride2,            //
+                                                          origin0,            //
+                                                          origin1,            //
+                                                          origin2,            //
+                                                          dx,                 //
+                                                          dy,                 //
+                                                          dz,                 //
+                                                          hex_inout_device);  //
     }
 }
 
