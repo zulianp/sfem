@@ -124,30 +124,33 @@ call_tet4_resample_field_adjoint_hex_wquad_kernel_gpu(const ptrdiff_t      start
 
     cudaEventRecord(start_event, cuda_stream);
 
-    tet4_resample_field_adjoint_hex_quad_nw_kernel_gpu<real_t, int, _N_VF_>  //
-            <<<blocks_per_grid,                                              //
-               threads_per_block,                                            //
-               0,                                                            //
-               cuda_stream>>>(start_element,                                 //
-                              end_element,                                   //
-                              nnodes,                                        //
-                              elements_device,
-                              xyz_device,
-                              n0,                     //
-                              n1,                     //
-                              n2,                     //
-                              stride0,                //
-                              stride1,                //
-                              stride2,                //
-                              origin0,                //
-                              origin1,                //
-                              origin2,                //
-                              dx,                     //
-                              dy,                     //
-                              dz,                     //
-                              weighted_field_device,  //
-                              data_device,            //
-                              I_data);                //
+    tet4_resample_field_adjoint_hex_quad_nw_kernel_gpu<real_t,  //
+                                                       int,     //
+                                                       _N_VF_,  //
+                                                       true>    //
+            <<<blocks_per_grid,                                 //
+               threads_per_block,                               //
+               0,                                               //
+               cuda_stream>>>(start_element,                    //
+                              end_element,                      //
+                              nnodes,                           //
+                              elements_device,                  //
+                              xyz_device,                       //
+                              n0,                               //
+                              n1,                               //
+                              n2,                               //
+                              stride0,                          //
+                              stride1,                          //
+                              stride2,                          //
+                              origin0,                          //
+                              origin1,                          //
+                              origin2,                          //
+                              dx,                               //
+                              dy,                               //
+                              dz,                               //
+                              weighted_field_device,            //
+                              data_device,                      //
+                              I_data);                          //
 
     cudaEventRecord(stop_event, cuda_stream);
     cudaEventSynchronize(stop_event);
