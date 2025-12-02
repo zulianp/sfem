@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include "device_utils.cuh"
 #include "sfem_resample_field_adjoint_hex_wquad.cuh"
+#include "sfem_resample_field_adjoint_hex_wquad_stride.cuh"
 
 #define _N_VF_ (4)  // Number of weighted fields
 

@@ -1,37 +1,34 @@
-#ifndef SFEM_RESAMPLE_FIELD_ADJOINT_HEX_WQUAD_CUH
-#define SFEM_RESAMPLE_FIELD_ADJOINT_HEX_WQUAD_CUH
-
-#include "sfem_resample_field_adjoint_hex_quad.cuh"
+#include "sfem_resample_field_adjoint_hex_wquad.cuh"
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // transfer_weighted_field_tet4_to_hex_gpu //////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-template <typename FloatType,                                                            //
-          typename IntType = ptrdiff_t,                                                  //
-          IntType N_wf,                                                                  //
-          bool    Generate_I_data>                                                          //
-__device__ __inline__ bool                                                               //
-transfer_weighted_field_tet4_to_hex_vec_gpu(const FloatType inv_J_tet[9],                //
-                                            const FloatType wf0[N_wf],                   //
-                                            const FloatType wf1[N_wf],                   //
-                                            const FloatType wf2[N_wf],                   //
-                                            const FloatType wf3[N_wf],                   //
-                                            const FloatType q_phys_x,                    //
-                                            const FloatType q_phys_y,                    //
-                                            const FloatType q_phys_z,                    //
-                                            const FloatType QW_phys_hex,                 //
-                                            const FloatType x0_n,                        //
-                                            const FloatType y0_n,                        //
-                                            const FloatType z0_n,                        //
-                                            const FloatType ox,                          //
-                                            const FloatType oy,                          //
-                                            const FloatType oz,                          //
-                                            const FloatType inv_dx,                      //
-                                            const FloatType inv_dy,                      //
-                                            const FloatType inv_dz,                      //
-                                            FloatType       hex_element_field[N_wf + 1][8]) {  //
+template <typename FloatType,                                                                    //
+          typename IntType = ptrdiff_t,                                                          //
+          IntType N_wf,                                                                          //
+          bool    Generate_I_data>                                                                  //
+__device__ __inline__ bool                                                                       //
+transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9],                //
+                                                    const FloatType wf0[N_wf],                   //
+                                                    const FloatType wf1[N_wf],                   //
+                                                    const FloatType wf2[N_wf],                   //
+                                                    const FloatType wf3[N_wf],                   //
+                                                    const FloatType q_phys_x,                    //
+                                                    const FloatType q_phys_y,                    //
+                                                    const FloatType q_phys_z,                    //
+                                                    const FloatType QW_phys_hex,                 //
+                                                    const FloatType x0_n,                        //
+                                                    const FloatType y0_n,                        //
+                                                    const FloatType z0_n,                        //
+                                                    const FloatType ox,                          //
+                                                    const FloatType oy,                          //
+                                                    const FloatType oz,                          //
+                                                    const FloatType inv_dx,                      //
+                                                    const FloatType inv_dy,                      //
+                                                    const FloatType inv_dz,                      //
+                                                    FloatType       hex_element_field[N_wf + 1][8]) {  //
 
     // Compute the weighted contribution from the tetrahedron
     // Using linear shape functions for tetrahedron
@@ -130,30 +127,33 @@ transfer_weighted_field_tet4_to_hex_vec_gpu(const FloatType inv_J_tet[9],       
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling Version 2
 /////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType,                                                                        //
-          typename IntType,                                                                          //
-          IntType N_wf,                                                                              //
-          bool    Generate_I_data>                                                                      //
-__device__ __forceinline__ void                                                                      //
-tet4_resample_field_adjoint_hex_quad_element_nw_gpu(const IntType           element_i,               // element index
-                                                    const IntType           nnodes,                  //
-                                                    const elems_tet4_device elems,                   //
-                                                    const xyz_tet4_device   xyz,                     //
-                                                    const IntType           n0,                      // SDF
-                                                    const IntType           n1,                      //
-                                                    const IntType           n2,                      //
-                                                    const IntType           stride0,                 // Stride
-                                                    const IntType           stride1,                 //
-                                                    const IntType           stride2,                 //
-                                                    const FloatType         origin0,                 // Origin
-                                                    const FloatType         origin1,                 //
-                                                    const FloatType         origin2,                 //
-                                                    const FloatType         dx,                      // Delta
-                                                    const FloatType         dy,                      //
-                                                    const FloatType         dz,                      //
-                                                    const FloatType* const  weighted_field_v[N_wf],  // Input weighted field
-                                                    FloatType* const        data[N_wf],              //
-                                                    FloatType*              I_data) {                             // Output data
+template <typename FloatType,                                 //
+          typename IntType,                                   //
+          IntType N_wf,                                       //
+          bool    Generate_I_data>                               //
+__device__ __forceinline__ void                               //
+tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
+        const IntType           element_i,                    // element index
+        const IntType           nnodes,                       //
+        const elems_tet4_device elems,                        //
+        const xyz_tet4_device   xyz,                          //
+        const IntType           n0,                           // SDF
+        const IntType           n1,                           //
+        const IntType           n2,                           //
+        const IntType           stride0,                      // Stride
+        const IntType           stride1,                      //
+        const IntType           stride2,                      //
+        const FloatType         origin0,                      // Origin
+        const FloatType         origin1,                      //
+        const FloatType         origin2,                      //
+        const FloatType         dx,                           // Delta
+        const FloatType         dy,                           //
+        const FloatType         dz,                           //
+        const FloatType* const  weighted_field_v[N_wf],       // Input weighted field
+        const IntType           stride_field_in[N_wf][2],     // Strides IN
+        FloatType* const        data[N_wf],                   // Output data
+        const IntType           stride_field_out[N_wf][2],    // Strides OUT
+        FloatType*              I_data) {                                  // Output data
 
     // printf("Processing element %ld / %ld\n", element_i, end_element);
 
@@ -219,10 +219,6 @@ tet4_resample_field_adjoint_hex_quad_element_nw_gpu(const IntType           elem
         wf2[wf_i] = weighted_field_v[wf_i][ev2];
         wf3[wf_i] = weighted_field_v[wf_i][ev3];
     }
-    // const FloatType wf0 = FloatType(__ldg(&weighted_field[ev0]));  // Weighted field at vertex 0
-    // const FloatType wf1 = FloatType(__ldg(&weighted_field[ev1]));  // Weighted field at vertex 1
-    // const FloatType wf2 = FloatType(__ldg(&weighted_field[ev2]));  // Weighted field at vertex 2
-    // const FloatType wf3 = FloatType(__ldg(&weighted_field[ev3]));  // Weighted field at vertex 3
 
     IntType min_grid_x, max_grid_x;
     IntType min_grid_y, max_grid_y;
@@ -379,29 +375,29 @@ tet4_resample_field_adjoint_hex_quad_element_nw_gpu(const IntType           elem
                                                                       iy,            //
                                                                       iz);           //
 
-                    const bool is_in_tet =                                                                        //
-                            transfer_weighted_field_tet4_to_hex_vec_gpu<FloatType,                                //
-                                                                        IntType,                                  //
-                                                                        N_wf,                                     //
-                                                                        Generate_I_data>(inv_J_tet,               //
-                                                                                         wf0,                     //
-                                                                                         wf1,                     //
-                                                                                         wf2,                     //
-                                                                                         wf3,                     //
-                                                                                         Qpoint_phys.physical_x,  //
-                                                                                         Qpoint_phys.physical_y,  //
-                                                                                         Qpoint_phys.physical_z,  //
-                                                                                         Qpoint_phys.weight,      //
-                                                                                         x0_n,                    //
-                                                                                         y0_n,                    //
-                                                                                         z0_n,                    //
-                                                                                         origin0,                 //
-                                                                                         origin1,                 //
-                                                                                         origin2,                 //
-                                                                                         inv_dx,                  //
-                                                                                         inv_dy,                  //
-                                                                                         inv_dz,                  //
-                                                                                         hex_element_field);      //
+                    // const bool is_in_tet =                                                                                //
+                    //         transfer_weighted_field_tet4_to_hex_strides_vec_gpu<FloatType,                                //
+                    //                                                             IntType,                                  //
+                    //                                                             N_wf,                                     //
+                    //                                                             Generate_I_data>(inv_J_tet,               //
+                    //                                                                              wf0,                     //
+                    //                                                                              wf1,                     //
+                    //                                                                              wf2,                     //
+                    //                                                                              wf3,                     //
+                    //                                                                              Qpoint_phys.physical_x,  //
+                    //                                                                              Qpoint_phys.physical_y,  //
+                    //                                                                              Qpoint_phys.physical_z,  //
+                    //                                                                              Qpoint_phys.weight,      //
+                    //                                                                              x0_n,                    //
+                    //                                                                              y0_n,                    //
+                    //                                                                              z0_n,                    //
+                    //                                                                              origin0,                 //
+                    //                                                                              origin1,                 //
+                    //                                                                              origin2,                 //
+                    //                                                                              inv_dx,                  //
+                    //                                                                              inv_dy,                  //
+                    //                                                                              inv_dz,                  //
+                    //                                                                              hex_element_field);      //
 
                 }  // END: for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
             }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
@@ -436,66 +432,3 @@ tet4_resample_field_adjoint_hex_quad_element_nw_gpu(const IntType           elem
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu
-
-
-
-/////////////////////////////////////////////////////////////////////////////////
-// Kernel to perform adjoint mini-tetrahedron resampling
-/////////////////////////////////////////////////////////////////////////////////
-template <typename FloatType,                                                                       //
-          typename IntType,                                                                         //
-          IntType N_wf,                                                                             //
-          bool    Generate_I_data>                                                                     //
-__global__ void                                                                                     //
-tet4_resample_field_adjoint_hex_quad_nw_kernel_gpu(const IntType           start_element,           // Mesh
-                                                   const IntType           end_element,             //
-                                                   const IntType           nnodes,                  //
-                                                   const elems_tet4_device elems,                   //
-                                                   const xyz_tet4_device   xyz,                     //
-                                                   const IntType           n0,                      // SDF
-                                                   const IntType           n1,                      //
-                                                   const IntType           n2,                      //
-                                                   const IntType           stride0,                 // Stride
-                                                   const IntType           stride1,                 //
-                                                   const IntType           stride2,                 //
-                                                   const FloatType         origin0,                 // Origin
-                                                   const FloatType         origin1,                 //
-                                                   const FloatType         origin2,                 //
-                                                   const FloatType         dx,                      // Delta
-                                                   const FloatType         dy,                      //
-                                                   const FloatType         dz,                      //
-                                                   const FloatType* const  weighted_field_v[N_wf],  // Input weighted field
-                                                   FloatType* const        data_v[N_wf],
-                                                   FloatType*              I_data) {  // Output data
-
-    // const IntType elems_block_size = gridDim.x;
-
-    for (int element_i = start_element + blockIdx.x; element_i < end_element; element_i += gridDim.x) {
-        //
-        tet4_resample_field_adjoint_hex_quad_element_nw_gpu<FloatType,                          //
-                                                            IntType,                            //
-                                                            N_wf,                               //
-                                                            Generate_I_data>(element_i,         //
-                                                                             nnodes,            //
-                                                                             elems,             //
-                                                                             xyz,               //
-                                                                             n0,                //
-                                                                             n1,                //
-                                                                             n2,                //
-                                                                             stride0,           //
-                                                                             stride1,           //
-                                                                             stride2,           //
-                                                                             origin0,           //
-                                                                             origin1,           //
-                                                                             origin2,           //
-                                                                             dx,                //
-                                                                             dy,                //
-                                                                             dz,                //
-                                                                             weighted_field_v,  //
-                                                                             data_v,            //
-                                                                             I_data);           //
-    }  // END for ( int element_i = start_element + blockIdx.x; element_i < end_element;
-
-}  // END Function: tet4_resample_field_adjoint_hex_quad_v2_kernel_gpu
-
-#endif  // SFEM_RESAMPLE_FIELD_ADJOINT_HEX_WQUAD_CUH
