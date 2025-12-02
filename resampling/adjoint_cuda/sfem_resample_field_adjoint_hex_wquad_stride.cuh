@@ -1,5 +1,10 @@
 #include "sfem_resample_field_adjoint_hex_wquad.cuh"
 
+enum matrix_ordering_t {
+    ROW_MAJOR = 0,  //
+    COL_MAJOR = 1   //
+};
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // transfer_weighted_field_tet4_to_hex_gpu //////////////
@@ -8,6 +13,7 @@
 template <typename FloatType,                                                                    //
           typename IntType = ptrdiff_t,                                                          //
           IntType N_wf,                                                                          //
+          IntType max_stride,                                                                    //
           bool    Generate_I_data>                                                                  //
 __device__ __inline__ bool                                                                       //
 transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9],                //
@@ -129,8 +135,11 @@ transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9]
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType,                                 //
           typename IntType,                                   //
-          IntType N_wf,                                       //
-          bool    Generate_I_data>                               //
+          IntType           N_wf,                             //
+          matrix_ordering_t Ordering_IN,                      //
+          matrix_ordering_t Ordering_OUT,                     //
+          IntType           max_stride,                       //
+          bool              Generate_I_data>                               //
 __device__ __forceinline__ void                               //
 tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
         const IntType           element_i,                    // element index
@@ -150,9 +159,9 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
         const FloatType         dy,                           //
         const FloatType         dz,                           //
         const FloatType* const  weighted_field_v[N_wf],       // Input weighted field
-        const IntType           stride_field_in[N_wf][2],     // Strides IN
+        const IntType           stride_dim_in[N_wf],          // Strides IN
         FloatType* const        data[N_wf],                   // Output data
-        const IntType           stride_field_out[N_wf][2],    // Strides OUT
+        const IntType           stride_dim_out[N_wf],         // Strides OUT
         FloatType*              I_data) {                                  // Output data
 
     // printf("Processing element %ld / %ld\n", element_i, end_element);
@@ -160,6 +169,11 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
     const int warp_id = threadIdx.x / LANES_PER_TILE_HEX_QUAD;
     const int lane_id = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
     const int n_warps = blockDim.x / LANES_PER_TILE_HEX_QUAD;
+
+    __shared__ FloatType wf0_shared[N_wf][max_stride];
+    __shared__ FloatType wf1_shared[N_wf][max_stride];
+    __shared__ FloatType wf2_shared[N_wf][max_stride];
+    __shared__ FloatType wf3_shared[N_wf][max_stride];
 
     FloatType wf0[N_wf];
     FloatType wf1[N_wf];
@@ -218,6 +232,11 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
         wf1[wf_i] = weighted_field_v[wf_i][ev1];
         wf2[wf_i] = weighted_field_v[wf_i][ev2];
         wf3[wf_i] = weighted_field_v[wf_i][ev3];
+    }
+
+    if (lane_id == 0 and warp_id == 0) {
+        for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+        }
     }
 
     IntType min_grid_x, max_grid_x;
