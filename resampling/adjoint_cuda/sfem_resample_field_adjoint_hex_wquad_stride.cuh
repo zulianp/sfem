@@ -113,17 +113,18 @@ transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9]
     if constexpr (Generate_I_data) {
 #pragma unroll
         for (int v = 0; v < 8; v++) {
-            hex_element_field[0][v] += QW_phys_hex;
+            hex_element_field[0][0][v] += QW_phys_hex;
         }  // END for (v < 8)
     }
 
-    for (IntType wf_i = 1; wf_i < N_wf + 1; wf_i++) {
-        for (IntType si = 0; si < stride_dim_in[wf_i - 1]; si++) {
+    for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+        const IntType wf_i_plus_1 = wf_i + 1;
 
-            const FloatType wf0 = wf0_shared[wf_i - 1][si];
-            const FloatType wf1 = wf1_shared[wf_i - 1][si];
-            const FloatType wf2 = wf2_shared[wf_i - 1][si];
-            const FloatType wf3 = wf3_shared[wf_i - 1][si];
+        for (IntType si = 0; si < stride_dim_in[wf_i]; si++) {
+            const FloatType wf0 = wf0_shared[wf_i][si];
+            const FloatType wf1 = wf1_shared[wf_i][si];
+            const FloatType wf2 = wf2_shared[wf_i][si];
+            const FloatType wf3 = wf3_shared[wf_i][si];
             // Interpolate weighted field at quadrature point using FMA for precision
             const FloatType wf_quad = fast_fma(f0, wf0, fast_fma(f1, wf1, fast_fma(f2, wf2, f3 * wf3)));
 
@@ -131,7 +132,7 @@ transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9]
             const FloatType contribution = wf_quad * QW_phys_hex;
 
             for (int v = 0; v < 8; v++) {
-                hex_element_field[wf_i][v] += contribution * hex8_f[v];
+                hex_element_field[wf_i_plus_1][si][v] += contribution * hex8_f[v];
             }  // END for (v < 8)
         }
     }
@@ -393,8 +394,6 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
         // #pragma unroll
         //                 for (int v = 0; v < 8; v++) hex_element_field[wf_i][si][v] = FloatType(0.0);
 
-        // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
-
 #pragma unroll
         for (int q_i = 0; q_i < N_quadnodes_loc; q_i++) {
             const FloatType q_i_node   = Q_nodes[q_i];
@@ -428,29 +427,31 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
                                                                       iy,            //
                                                                       iz);           //
 
-                    // const bool is_in_tet =                                                                                //
-                    //         transfer_weighted_field_tet4_to_hex_strides_vec_gpu<FloatType,                                //
-                    //                                                             IntType,                                  //
-                    //                                                             N_wf,                                     //
-                    //                                                             Generate_I_data>(inv_J_tet,               //
-                    //                                                                              wf0,                     //
-                    //                                                                              wf1,                     //
-                    //                                                                              wf2,                     //
-                    //                                                                              wf3,                     //
-                    //                                                                              Qpoint_phys.physical_x,  //
-                    //                                                                              Qpoint_phys.physical_y,  //
-                    //                                                                              Qpoint_phys.physical_z,  //
-                    //                                                                              Qpoint_phys.weight,      //
-                    //                                                                              x0_n,                    //
-                    //                                                                              y0_n,                    //
-                    //                                                                              z0_n,                    //
-                    //                                                                              origin0,                 //
-                    //                                                                              origin1,                 //
-                    //                                                                              origin2,                 //
-                    //                                                                              inv_dx,                  //
-                    //                                                                              inv_dy,                  //
-                    //                                                                              inv_dz,                  //
-                    //                                                                              hex_element_field);      //
+                    const bool is_in_tet =                                                                                //
+                            transfer_weighted_field_tet4_to_hex_strides_vec_gpu<FloatType,                                //
+                                                                                IntType,                                  //
+                                                                                N_wf,                                     //
+                                                                                Generate_I_data>(inv_J_tet,               //
+                                                                                                 wf0_shared,              //
+                                                                                                 wf1_shared,              //
+                                                                                                 wf2_shared,              //
+                                                                                                 wf3_shared,              //
+                                                                                                 Qpoint_phys.physical_x,  //
+                                                                                                 Qpoint_phys.physical_y,  //
+                                                                                                 Qpoint_phys.physical_z,  //
+                                                                                                 Qpoint_phys.weight,      //
+                                                                                                 x0_n,                    //
+                                                                                                 y0_n,                    //
+                                                                                                 z0_n,                    //
+                                                                                                 origin0,                 //
+                                                                                                 origin1,                 //
+                                                                                                 origin2,                 //
+                                                                                                 inv_dx,                  //
+                                                                                                 inv_dy,                  //
+                                                                                                 inv_dz,                  //
+                                                                                                 stride_dim_in,           //
+                                                                                                 stride_dim_out,          //
+                                                                                                 hex_element_field);      //
 
                 }  // END: for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
             }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
@@ -461,27 +462,90 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
                                    iz * stride2;   //
 
         if constexpr (Generate_I_data) {
-            atomicAdd(&I_data[base_index + off0], hex_element_field[0][0]);  //
-            atomicAdd(&I_data[base_index + off1], hex_element_field[0][1]);  //
-            atomicAdd(&I_data[base_index + off2], hex_element_field[0][2]);  //
-            atomicAdd(&I_data[base_index + off3], hex_element_field[0][3]);  //
-            atomicAdd(&I_data[base_index + off4], hex_element_field[0][4]);  //
-            atomicAdd(&I_data[base_index + off5], hex_element_field[0][5]);  //
-            atomicAdd(&I_data[base_index + off6], hex_element_field[0][6]);  //
-            atomicAdd(&I_data[base_index + off7], hex_element_field[0][7]);  //
+            atomicAdd(&I_data[base_index + off0], hex_element_field[0][0][0]);  //
+            atomicAdd(&I_data[base_index + off1], hex_element_field[0][0][1]);  //
+            atomicAdd(&I_data[base_index + off2], hex_element_field[0][0][2]);  //
+            atomicAdd(&I_data[base_index + off3], hex_element_field[0][0][3]);  //
+            atomicAdd(&I_data[base_index + off4], hex_element_field[0][0][4]);  //
+            atomicAdd(&I_data[base_index + off5], hex_element_field[0][0][5]);  //
+            atomicAdd(&I_data[base_index + off6], hex_element_field[0][0][6]);  //
+            atomicAdd(&I_data[base_index + off7], hex_element_field[0][0][7]);  //
         }
 
-        // #pragma unroll
-        //         for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-        //             atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i + 1][0]);  //
-        //             atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i + 1][1]);  //
-        //             atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i + 1][2]);  //
-        //             atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i + 1][3]);  //
-        //             atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i + 1][4]);  //
-        //             atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i + 1][5]);  //
-        //             atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i + 1][6]);  //
-        //             atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i + 1][7]);  //
-        // }
+        const IntType row_major_stride = n0 * n1 * n2;
+
+#pragma unroll
+        for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+            const IntType wf_i_plus_1 = wf_i + 1;
+
+            for (IntType si = 0; si < stride_dim_out[wf_i]; si++) {
+                if constexpr (Ordering_OUT == ROW_MAJOR) {
+                    //
+                    atomicAdd(&data[wf_i][(base_index + off0) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][0]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off1) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][1]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off2) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][2]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off3) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][3]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off4) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][4]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off5) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][5]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off6) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][6]);                    //
+
+                    atomicAdd(&data[wf_i][(base_index + off7) + si * row_major_stride],  //
+                              hex_element_field[wf_i_plus_1][si][7]);                    //
+
+                } else if constexpr (Ordering_OUT == COL_MAJOR) {
+                    atomicAdd(&data[wf_i][(base_index + off0) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][0]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off1) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][1]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off2) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][2]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off3) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][3]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off4) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][4]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off5) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][5]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off6) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][6]);  //
+
+                    atomicAdd(&data[wf_i][(base_index + off7) * stride_dim_out[wf_i] + si],
+                              hex_element_field[wf_i_plus_1][si][7]);  //
+
+                } else {
+                    // Unsupported ordering
+                    printf("ERROR: Unsupported Ordering_OUT=%d\n", Ordering_OUT);
+                    __trap();
+                }
+
+                // atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i_plus_1][si][0]);  //
+                // atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i_plus_1][si][1]);  //
+                // atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i_plus_1][si][2]);  //
+                // atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i_plus_1][si][3]);  //
+                // atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i_plus_1][si][4]);  //
+                // atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i_plus_1][si][5]);  //
+                // atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i_plus_1][si][6]);  //
+                // atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i_plus_1][si][7]);  //
+            }
+        }
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu

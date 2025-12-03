@@ -113,7 +113,8 @@ transfer_weighted_field_tet4_to_hex_vec_gpu(const FloatType inv_J_tet[9],       
 #pragma unroll
     for (IntType wf_i = 1; wf_i < N_wf + 1; wf_i++) {
         // Interpolate weighted field at quadrature point using FMA for precision
-        const FloatType wf_quad = fast_fma(f0, wf0[wf_i], fast_fma(f1, wf1[wf_i], fast_fma(f2, wf2[wf_i], f3 * wf3[wf_i])));
+        const FloatType wf_quad =
+                fast_fma(f0, wf0[wf_i - 1], fast_fma(f1, wf1[wf_i - 1], fast_fma(f2, wf2[wf_i - 1], f3 * wf3[wf_i - 1])));
 
         // Accumulate contributions to hex element field using FMA for precision
         const FloatType contribution = wf_quad * QW_phys_hex;
@@ -436,8 +437,6 @@ tet4_resample_field_adjoint_hex_quad_element_nw_gpu(const IntType           elem
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu
-
-
 
 /////////////////////////////////////////////////////////////////////////////////
 // Kernel to perform adjoint mini-tetrahedron resampling
