@@ -460,7 +460,6 @@ int main(int argc, char* argv[]) {
     // printf("========================================\n\n");
     PRINT_CURRENT_FUNCTION;
 
-
     printf("========================================\n");
     printf("Starting sfem_resample_field_adjoint_hex_quad test\n");
     printf("========================================\n\n");
@@ -657,9 +656,9 @@ int main(int argc, char* argv[]) {
             field = malloc(n_zyx * sizeof(real_t));
 
             // TODO: are data to analyze the results
-            field_cnt     = calloc(n_zyx, sizeof(unsigned int));
-            field_alpha   = calloc(n_zyx, sizeof(real_t));
-            field_volume  = calloc(n_zyx, sizeof(real_t));
+            field_cnt    = calloc(n_zyx, sizeof(unsigned int));
+            field_alpha  = calloc(n_zyx, sizeof(real_t));
+            field_volume = calloc(n_zyx, sizeof(real_t));
             // field_fun_XYZ = calloc(n_zyx, sizeof(real_t));
 
             for (ptrdiff_t i = 0; i < n_zyx; i++) {
@@ -742,7 +741,10 @@ int main(int argc, char* argv[]) {
         field = pfield;
     }
 
-    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
+    const int multi_field = 3;
+
+    real_t* g       = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* multi_g = calloc(mesh.nnodes * multi_field, sizeof(real_t));
 
     {  // begin resample_field_mesh
         /////////////////////////////////
@@ -1019,7 +1021,10 @@ int main(int argc, char* argv[]) {
                     if (env_out_filename && strlen(env_out_filename) > 0) {
                         snprintf(out_filename_raw, 1000, "%s", env_out_filename);
                     } else {
-                        snprintf(out_filename_raw, 1000, "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw", mpi_rank);
+                        snprintf(out_filename_raw,
+                                 1000,
+                                 "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw",
+                                 mpi_rank);
                     }
 
 #if SFEM_LOG_LEVEL >= 5

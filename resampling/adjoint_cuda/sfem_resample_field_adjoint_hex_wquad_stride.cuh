@@ -534,18 +534,9 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
                     // Unsupported ordering
                     printf("ERROR: Unsupported Ordering_OUT=%d\n", Ordering_OUT);
                     __trap();
-                }
-
-                // atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i_plus_1][si][0]);  //
-                // atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i_plus_1][si][1]);  //
-                // atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i_plus_1][si][2]);  //
-                // atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i_plus_1][si][3]);  //
-                // atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i_plus_1][si][4]);  //
-                // atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i_plus_1][si][5]);  //
-                // atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i_plus_1][si][6]);  //
-                // atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i_plus_1][si][7]);  //
-            }
-        }
+                }  // END if constexpr (Ordering_OUT == ROW_MAJOR)
+            }  // END for (IntType si = 0; si < stride_dim_out[wf_i]; si++
+        }  // END for (IntType wf_i = 0; wf_i < N_wf; wf_i++)
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu
