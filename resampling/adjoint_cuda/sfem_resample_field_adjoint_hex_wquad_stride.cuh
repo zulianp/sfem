@@ -10,31 +10,35 @@ enum matrix_ordering_t {
 // transfer_weighted_field_tet4_to_hex_gpu //////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-template <typename FloatType,                                                                    //
-          typename IntType = ptrdiff_t,                                                          //
-          IntType N_wf,                                                                          //
-          IntType max_stride,                                                                    //
-          bool    Generate_I_data>                                                                  //
-__device__ __inline__ bool                                                                       //
-transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9],                //
-                                                    const FloatType wf0[N_wf],                   //
-                                                    const FloatType wf1[N_wf],                   //
-                                                    const FloatType wf2[N_wf],                   //
-                                                    const FloatType wf3[N_wf],                   //
-                                                    const FloatType q_phys_x,                    //
-                                                    const FloatType q_phys_y,                    //
-                                                    const FloatType q_phys_z,                    //
-                                                    const FloatType QW_phys_hex,                 //
-                                                    const FloatType x0_n,                        //
-                                                    const FloatType y0_n,                        //
-                                                    const FloatType z0_n,                        //
-                                                    const FloatType ox,                          //
-                                                    const FloatType oy,                          //
-                                                    const FloatType oz,                          //
-                                                    const FloatType inv_dx,                      //
-                                                    const FloatType inv_dy,                      //
-                                                    const FloatType inv_dz,                      //
-                                                    FloatType       hex_element_field[N_wf + 1][8]) {  //
+template <typename FloatType,                                                                                //
+          typename IntType,                                                                                  //
+          IntType           N_wf,                                                                            //
+          matrix_ordering_t Ordering_IN,                                                                     //
+          matrix_ordering_t Ordering_OUT,                                                                    //
+          IntType           max_stride,                                                                      //
+          bool              Generate_I_data>                                                                              //
+__device__ __inline__ bool                                                                                   //
+transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9],                            //
+                                                    const FloatType wf0_shared[N_wf][max_stride],            //
+                                                    const FloatType wf1_shared[N_wf][max_stride],            //
+                                                    const FloatType wf2_shared[N_wf][max_stride],            //
+                                                    const FloatType wf3_shared[N_wf][max_stride],            //
+                                                    const FloatType q_phys_x,                                //
+                                                    const FloatType q_phys_y,                                //
+                                                    const FloatType q_phys_z,                                //
+                                                    const FloatType QW_phys_hex,                             //
+                                                    const FloatType x0_n,                                    //
+                                                    const FloatType y0_n,                                    //
+                                                    const FloatType z0_n,                                    //
+                                                    const FloatType ox,                                      //
+                                                    const FloatType oy,                                      //
+                                                    const FloatType oz,                                      //
+                                                    const FloatType inv_dx,                                  //
+                                                    const FloatType inv_dy,                                  //
+                                                    const FloatType inv_dz,                                  //
+                                                    const IntType   stride_dim_in[N_wf],                     // Strides IN
+                                                    const IntType   stride_dim_out[N_wf],                    // Strides OUT
+                                                    FloatType       hex_element_field[N_wf + 1][max_stride][8]) {  //
 
     // Compute the weighted contribution from the tetrahedron
     // Using linear shape functions for tetrahedron
@@ -113,18 +117,23 @@ transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9]
         }  // END for (v < 8)
     }
 
-#pragma unroll
     for (IntType wf_i = 1; wf_i < N_wf + 1; wf_i++) {
-        // Interpolate weighted field at quadrature point using FMA for precision
-        const FloatType wf_quad = fast_fma(f0, wf0[wf_i], fast_fma(f1, wf1[wf_i], fast_fma(f2, wf2[wf_i], f3 * wf3[wf_i])));
+        for (IntType si = 0; si < stride_dim_in[wf_i - 1]; si++) {
 
-        // Accumulate contributions to hex element field using FMA for precision
-        const FloatType contribution = wf_quad * QW_phys_hex;
+            const FloatType wf0 = wf0_shared[wf_i - 1][si];
+            const FloatType wf1 = wf1_shared[wf_i - 1][si];
+            const FloatType wf2 = wf2_shared[wf_i - 1][si];
+            const FloatType wf3 = wf3_shared[wf_i - 1][si];
+            // Interpolate weighted field at quadrature point using FMA for precision
+            const FloatType wf_quad = fast_fma(f0, wf0, fast_fma(f1, wf1, fast_fma(f2, wf2, f3 * wf3)));
 
-#pragma unroll
-        for (int v = 0; v < 8; v++) {
-            hex_element_field[wf_i][v] += contribution * hex8_f[v];
-        }  // END for (v < 8)
+            // Accumulate contributions to hex element field using FMA for precision
+            const FloatType contribution = wf_quad * QW_phys_hex;
+
+            for (int v = 0; v < 8; v++) {
+                hex_element_field[wf_i][v] += contribution * hex8_f[v];
+            }  // END for (v < 8)
+        }
     }
 
     return true;
@@ -175,10 +184,10 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
     __shared__ FloatType wf2_shared[N_wf][max_stride];
     __shared__ FloatType wf3_shared[N_wf][max_stride];
 
-    FloatType wf0[N_wf];
-    FloatType wf1[N_wf];
-    FloatType wf2[N_wf];
-    FloatType wf3[N_wf];
+    // FloatType wf0[N_wf];
+    // FloatType wf1[N_wf];
+    // FloatType wf2[N_wf];
+    // FloatType wf3[N_wf];
 
     const FloatType inv_dx = FloatType(1.0) / dx;
     const FloatType inv_dy = FloatType(1.0) / dy;
@@ -226,18 +235,40 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
     const FloatType z2_n = FloatType(__ldg(&xyz.z[ev2]));
     const FloatType z3_n = FloatType(__ldg(&xyz.z[ev3]));
 
-#pragma unroll
-    for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-        wf0[wf_i] = weighted_field_v[wf_i][ev0];
-        wf1[wf_i] = weighted_field_v[wf_i][ev1];
-        wf2[wf_i] = weighted_field_v[wf_i][ev2];
-        wf3[wf_i] = weighted_field_v[wf_i][ev3];
-    }
+    // #pragma unroll
+    //     for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+    //         wf0[wf_i] = weighted_field_v[wf_i][ev0];
+    //         wf1[wf_i] = weighted_field_v[wf_i][ev1];
+    //         wf2[wf_i] = weighted_field_v[wf_i][ev2];
+    //         wf3[wf_i] = weighted_field_v[wf_i][ev3];
+    //     }
 
     if (lane_id == 0 and warp_id == 0) {
+        // Load weighted field values into shared memory
+#pragma unroll
         for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+            if constexpr (Ordering_IN == ROW_MAJOR) {
+                for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
+                    wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 + n * nnodes];
+                    wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 + n * nnodes];
+                    wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 + n * nnodes];
+                    wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 + n * nnodes];
+                }
+            } else if constexpr (Ordering_IN == COL_MAJOR) {
+                for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
+                    wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 * stride_dim_in[wf_i] + n];
+                    wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 * stride_dim_in[wf_i] + n];
+                    wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 * stride_dim_in[wf_i] + n];
+                    wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 * stride_dim_in[wf_i] + n];
+                }
+            } else {
+                // Unsupported ordering
+                printf("ERROR: Unsupported Ordering_IN=%d\n", Ordering_IN);
+                __trap();
+            }
         }
     }
+    __syncthreads();
 
     IntType min_grid_x, max_grid_x;
     IntType min_grid_y, max_grid_y;
@@ -285,7 +316,7 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
                                                      min_grid_z,   //
                                                      max_grid_z);  //
 
-    FloatType hex_element_field[N_wf + 1][8] = {0.0};
+    FloatType hex_element_field[N_wf + 1][max_stride][8] = {0.0};
 
     const IntType size_x = max_grid_x - min_grid_x + 1;
     const IntType size_y = max_grid_y - min_grid_y + 1;
@@ -354,10 +385,13 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
 
         // printf("Element %d, Hex cell at (%d, %d, %d) may overlap tet\n", element_i, ix, iy, iz);
 
-#pragma unroll
-        for (IntType wf_i = 0; wf_i < N_wf + 1; wf_i++)
-#pragma unroll
-            for (int v = 0; v < 8; v++) hex_element_field[wf_i][v] = FloatType(0.0);
+        memset(hex_element_field, 0, sizeof(hex_element_field));
+
+        // #pragma unroll
+        //         for (IntType wf_i = 0; wf_i < N_wf + 1; wf_i++)
+        //             for (IntType si = 0; si < max_stride; si++)
+        // #pragma unroll
+        //                 for (int v = 0; v < 8; v++) hex_element_field[wf_i][si][v] = FloatType(0.0);
 
         // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
 
@@ -437,17 +471,17 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
             atomicAdd(&I_data[base_index + off7], hex_element_field[0][7]);  //
         }
 
-#pragma unroll
-        for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-            atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i + 1][0]);  //
-            atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i + 1][1]);  //
-            atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i + 1][2]);  //
-            atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i + 1][3]);  //
-            atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i + 1][4]);  //
-            atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i + 1][5]);  //
-            atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i + 1][6]);  //
-            atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i + 1][7]);  //
-        }
+        // #pragma unroll
+        //         for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+        //             atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i + 1][0]);  //
+        //             atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i + 1][1]);  //
+        //             atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i + 1][2]);  //
+        //             atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i + 1][3]);  //
+        //             atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i + 1][4]);  //
+        //             atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i + 1][5]);  //
+        //             atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i + 1][6]);  //
+        //             atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i + 1][7]);  //
+        // }
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu
