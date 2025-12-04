@@ -178,15 +178,10 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
     const int lane_id = threadIdx.x % LANES_PER_TILE_HEX_QUAD;
     const int n_warps = blockDim.x / LANES_PER_TILE_HEX_QUAD;
 
-    __shared__ FloatType wf0_shared[N_wf][max_stride];
-    __shared__ FloatType wf1_shared[N_wf][max_stride];
-    __shared__ FloatType wf2_shared[N_wf][max_stride];
-    __shared__ FloatType wf3_shared[N_wf][max_stride];
-
-    // FloatType wf0[N_wf];
-    // FloatType wf1[N_wf];
-    // FloatType wf2[N_wf];
-    // FloatType wf3[N_wf];
+    FloatType wf0_shared[N_wf][max_stride];
+    FloatType wf1_shared[N_wf][max_stride];
+    FloatType wf2_shared[N_wf][max_stride];
+    FloatType wf3_shared[N_wf][max_stride];
 
     const FloatType inv_dx = FloatType(1.0) / dx;
     const FloatType inv_dy = FloatType(1.0) / dy;
@@ -234,40 +229,29 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
     const FloatType z2_n = FloatType(__ldg(&xyz.z[ev2]));
     const FloatType z3_n = FloatType(__ldg(&xyz.z[ev3]));
 
-    // #pragma unroll
-    //     for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-    //         wf0[wf_i] = weighted_field_v[wf_i][ev0];
-    //         wf1[wf_i] = weighted_field_v[wf_i][ev1];
-    //         wf2[wf_i] = weighted_field_v[wf_i][ev2];
-    //         wf3[wf_i] = weighted_field_v[wf_i][ev3];
-    //     }
-
-    if (lane_id == 0 and warp_id == 0) {
-        // Load weighted field values into shared memory
+    // Load weighted field values into local arrays
 #pragma unroll
-        for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-            if constexpr (Ordering_IN == ROW_MAJOR) {
-                for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
-                    wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 + n * nnodes];
-                    wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 + n * nnodes];
-                    wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 + n * nnodes];
-                    wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 + n * nnodes];
-                }
-            } else if constexpr (Ordering_IN == COL_MAJOR) {
-                for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
-                    wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 * stride_dim_in[wf_i] + n];
-                    wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 * stride_dim_in[wf_i] + n];
-                    wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 * stride_dim_in[wf_i] + n];
-                    wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 * stride_dim_in[wf_i] + n];
-                }
-            } else {
-                // Unsupported ordering
-                printf("ERROR: Unsupported Ordering_IN=%d\n", Ordering_IN);
-                __trap();
+    for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
+        if constexpr (Ordering_IN == ROW_MAJOR) {
+            for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
+                wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 + n * nnodes];
+                wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 + n * nnodes];
+                wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 + n * nnodes];
+                wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 + n * nnodes];
             }
+        } else if constexpr (Ordering_IN == COL_MAJOR) {
+            for (IntType n = 0; n < stride_dim_in[wf_i]; n++) {
+                wf0_shared[wf_i][n] = weighted_field_v[wf_i][ev0 * stride_dim_in[wf_i] + n];
+                wf1_shared[wf_i][n] = weighted_field_v[wf_i][ev1 * stride_dim_in[wf_i] + n];
+                wf2_shared[wf_i][n] = weighted_field_v[wf_i][ev2 * stride_dim_in[wf_i] + n];
+                wf3_shared[wf_i][n] = weighted_field_v[wf_i][ev3 * stride_dim_in[wf_i] + n];
+            }
+        } else {
+            // Unsupported ordering
+            printf("ERROR: Unsupported Ordering_IN=%d\n", Ordering_IN);
+            __trap();
         }
     }
-    __syncthreads();
 
     IntType min_grid_x, max_grid_x;
     IntType min_grid_y, max_grid_y;

@@ -36,29 +36,38 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
     cudaStream_t cuda_stream_alloc = NULL;  // default stream
     cudaStreamCreate(&cuda_stream_alloc);
 
-    real_t*  data_device[_N_VF_]           = {NULL};
-    real_t*  weighted_field_device[_N_VF_] = {NULL};
-    real_t*  I_data_device                 = NULL;
-    real_t*  tet_volumes_device            = NULL;
-    int32_t* in_out_mesh                   = NULL;
+    // Host arrays to hold device pointers
+    real_t* h_data_device[_N_VF_]           = {NULL};
+    real_t* h_weighted_field_device[_N_VF_] = {NULL};
+
+    // Device arrays of pointers
+    real_t** data_device           = NULL;
+    real_t** weighted_field_device = NULL;
+
+    cudaMallocAsync((void**)&data_device, _N_VF_ * sizeof(real_t*), cuda_stream_alloc);
+    cudaMallocAsync((void**)&weighted_field_device, _N_VF_ * sizeof(real_t*), cuda_stream_alloc);
+
+    real_t* I_data_device      = NULL;
+    real_t* tet_volumes_device = NULL;
+    // int32_t* in_out_mesh        = NULL;
 
     for (int i = 0; i < _N_VF_; i++) {
-        cudaMallocAsync((void**)&data_device[i], nnodes * sizeof(real_t), cuda_stream_alloc);
-        cudaMallocAsync((void**)&weighted_field_device[i], nnodes * sizeof(real_t), cuda_stream_alloc);
-        cudaMemcpyAsync(  //
-                weighted_field_device[i],
-                weighted_field[i],
-                nnodes * sizeof(real_t),
-                cudaMemcpyHostToDevice,
-                cuda_stream_alloc);
-    }
+        cudaMallocAsync((void**)&h_data_device[i], nnodes * sizeof(real_t), cuda_stream_alloc);
+        cudaMallocAsync((void**)&h_weighted_field_device[i], nnodes * sizeof(real_t), cuda_stream_alloc);
+    }  // END for (int i = 0; i < _N_VF_; i++)
 
-    int stride_dim_in[_N_VF_]  = {1, 1, 1, 1};  //
-    int stride_dim_out[_N_VF_] = {1, 1, 1, 1};  //
+    int h_stride_dim_in[_N_VF_]  = {1, 1, 1, 1};  //
+    int h_stride_dim_out[_N_VF_] = {1, 1, 1, 1};  //
+
+    int* stride_dim_in  = NULL;
+    int* stride_dim_out = NULL;
+
+    cudaMallocAsync((void**)&stride_dim_in, _N_VF_ * sizeof(int), cuda_stream_alloc);
+    cudaMallocAsync((void**)&stride_dim_out, _N_VF_ * sizeof(int), cuda_stream_alloc);
 
     cudaMallocAsync((void**)&tet_volumes_device, nelements * sizeof(real_t), cuda_stream_alloc);
-    cudaMallocAsync((void**)&in_out_mesh, (n0 * n1 * n2) * sizeof(int32_t), cuda_stream_alloc);
-    cudaMallocAsync((void**)&I_data, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
+    // cudaMallocAsync((void**)&in_out_mesh, (n0 * n1 * n2) * sizeof(int32_t), cuda_stream_alloc);
+    cudaMallocAsync((void**)&I_data_device, (n0 * n1 * n2) * sizeof(real_t), cuda_stream_alloc);
 
     elems_tet4_device elements_device = make_elems_tet4_device();
     cuda_allocate_elems_tet4_device_async(&elements_device, nelements, cuda_stream_alloc);
@@ -68,10 +77,29 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
 
     cudaStreamSynchronize(cuda_stream_alloc);  /// Ensure allocations are done before proceeding further with copies
 
-    cudaMemcpy((void*)weighted_field_device, (void*)weighted_field, nnodes * sizeof(real_t), cudaMemcpyHostToDevice);
+    // Now perform all memory copies after allocations are complete
+    for (int i = 0; i < _N_VF_; i++) {
+        cudaMemcpyAsync(  //
+                h_weighted_field_device[i],
+                weighted_field[i],
+                nnodes * sizeof(real_t),
+                cudaMemcpyHostToDevice,
+                cuda_stream_alloc);
+    }  // END for (int i = 0; i < _N_VF_; i++)
+
+    // Copy the arrays of pointers to device
+    cudaMemcpyAsync(data_device, h_data_device, _N_VF_ * sizeof(real_t*), cudaMemcpyHostToDevice, cuda_stream_alloc);
+    cudaMemcpyAsync(weighted_field_device,     //
+                    h_weighted_field_device,   //
+                    _N_VF_ * sizeof(real_t*),  //
+                    cudaMemcpyHostToDevice,    //
+                    cuda_stream_alloc);        //
+
+    cudaMemcpyAsync(stride_dim_in, h_stride_dim_in, _N_VF_ * sizeof(int), cudaMemcpyHostToDevice, cuda_stream_alloc);
+    cudaMemcpyAsync(stride_dim_out, h_stride_dim_out, _N_VF_ * sizeof(int), cudaMemcpyHostToDevice, cuda_stream_alloc);
 
     cudaMemset((void*)data_device, 0, (n0 * n1 * n2) * sizeof(real_t));
-    cudaMemset((void*)in_out_mesh, 0, (n0 * n1 * n2) * sizeof(int32_t));
+    // cudaMemset((void*)in_out_mesh, 0, (n0 * n1 * n2) * sizeof(int32_t));
 
     copy_elems_tet4_device_async(elems, nelements, &elements_device, cuda_stream_alloc);
 
@@ -170,14 +198,14 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
     for (int i = 0; i < _N_VF_; i++) {
         cudaStreamCreate(&streams_copy[i]);
         cudaMemcpyAsync((void*)data[i],
-                        (const void*)data_device[i],
+                        (const void*)h_data_device[i],
                         (n0 * n1 * n2) * sizeof(real_t),
                         cudaMemcpyDeviceToHost,
                         streams_copy[i]);
-        cudaFreeAsync((void*)weighted_field_device[i], cuda_stream_alloc);
-    }
+        cudaFreeAsync((void*)h_weighted_field_device[i], cuda_stream_alloc);
+    }  // END for (int i = 0; i < _N_VF_; i++)
     cudaMemcpyAsync((void*)I_data,  //
-                    (const void*)I_data,
+                    (const void*)I_data_device,
                     (n0 * n1 * n2) * sizeof(real_t),
                     cudaMemcpyDeviceToHost,
                     cuda_stream_alloc);
@@ -185,23 +213,28 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
     for (int i = 0; i < _N_VF_; i++) {
         cudaStreamSynchronize(streams_copy[i]);
         cudaStreamDestroy(streams_copy[i]);
-    }
+    }  // END for (int i = 0; i < _N_VF_; i++)
     cudaStreamSynchronize(cuda_stream_alloc);
 
-    // Cleanup (was unreachable due to early return)
-
-    cudaFreeAsync((void*)in_out_mesh, cuda_stream_alloc);
+    // Cleanup
+    for (int i = 0; i < _N_VF_; i++) {
+        cudaFreeAsync(h_data_device[i], cuda_stream_alloc);
+    }  // END for (int i = 0; i < _N_VF_; i++)
+    cudaFreeAsync(data_device, cuda_stream_alloc);
+    cudaFreeAsync(weighted_field_device, cuda_stream_alloc);
+    cudaFreeAsync(stride_dim_in, cuda_stream_alloc);
+    cudaFreeAsync(stride_dim_out, cuda_stream_alloc);
+    // cudaFreeAsync((void*)in_out_mesh, cuda_stream_alloc);
     free_xyz_tet4_device_async(&xyz_device, cuda_stream_alloc);
     free_elems_tet4_device_async(&elements_device, cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_alloc);
-    cudaFreeAsync(data_device, cuda_stream_alloc);
-    cudaFreeAsync(I_data, cuda_stream_alloc);
+    cudaFreeAsync(I_data_device, cuda_stream_alloc);
     cudaFreeAsync(tet_volumes_device, cuda_stream_alloc);
     cudaStreamSynchronize(cuda_stream_alloc);
     cudaStreamDestroy(cuda_stream_alloc);
 
     RETURN_FROM_FUNCTION();
-}
+}  // END Function: call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu
 
 #ifdef __cplusplus
 }
