@@ -7,16 +7,14 @@ enum matrix_ordering_t {
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-// transfer_weighted_field_tet4_to_hex_gpu //////////////
+// transfer_weighted_field_tet4_to_hex_gpu ///////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 template <typename FloatType,                                                                                //
           typename IntType,                                                                                  //
-          IntType           N_wf,                                                                            //
-          matrix_ordering_t Ordering_IN,                                                                     //
-          matrix_ordering_t Ordering_OUT,                                                                    //
-          IntType           max_stride,                                                                      //
-          bool              Generate_I_data>                                                                              //
+          IntType N_wf,                                                                                      //
+          IntType max_stride,                                                                                //
+          bool    Generate_I_data>                                                                              //
 __device__ __inline__ bool                                                                                   //
 transfer_weighted_field_tet4_to_hex_strides_vec_gpu(const FloatType inv_J_tet[9],                            //
                                                     const FloatType wf0_shared[N_wf][max_stride],            //
@@ -431,6 +429,7 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
                             transfer_weighted_field_tet4_to_hex_strides_vec_gpu<FloatType,                                //
                                                                                 IntType,                                  //
                                                                                 N_wf,                                     //
+                                                                                max_stride,                               //
                                                                                 Generate_I_data>(inv_J_tet,               //
                                                                                                  wf0_shared,              //
                                                                                                  wf1_shared,              //
@@ -540,3 +539,66 @@ tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu(  //
 
     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_quad_element_method_gpu
+
+template <typename FloatType,                                        //
+          typename IntType,                                          //
+          IntType           N_wf,                                    //
+          matrix_ordering_t Ordering_IN,                             //
+          matrix_ordering_t Ordering_OUT,                            //
+          IntType           max_stride,                              //
+          bool              Generate_I_data>                                      //
+__global__ void                                                      //
+tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu_kernel(  //
+        const IntType           start_element,                       // Mesh
+        const IntType           end_element,                         //
+        const IntType           nnodes,                              //
+        const elems_tet4_device elems,                               //
+        const xyz_tet4_device   xyz,                                 //
+        const IntType           n0,                                  // SDF
+        const IntType           n1,                                  //
+        const IntType           n2,                                  //
+        const IntType           stride0,                             // Stride
+        const IntType           stride1,                             //
+        const IntType           stride2,                             //
+        const FloatType         origin0,                             // Origin
+        const FloatType         origin1,                             //
+        const FloatType         origin2,                             //
+        const FloatType         dx,                                  // Delta
+        const FloatType         dy,                                  //
+        const FloatType         dz,                                  //
+        const FloatType* const* weighted_field_v,                    // Device array of pointers
+        const IntType*          stride_dim_in,                       // Device array
+        FloatType* const*       data,                                // Device array of pointers
+        const IntType*          stride_dim_out,                      // Device array
+        FloatType*              I_data) {                                         //
+
+    for (int element_i = start_element + blockIdx.x; element_i < end_element; element_i += gridDim.x) {
+        tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu<FloatType,                          //
+                                                                    IntType,                            //
+                                                                    N_wf,                               //
+                                                                    Ordering_IN,                        //
+                                                                    Ordering_OUT,                       //
+                                                                    max_stride,                         //
+                                                                    Generate_I_data>(element_i,         //
+                                                                                     nnodes,            //
+                                                                                     elems,             //
+                                                                                     xyz,               //
+                                                                                     n0,                //
+                                                                                     n1,                //
+                                                                                     n2,                //
+                                                                                     stride0,           //
+                                                                                     stride1,           //
+                                                                                     stride2,           //
+                                                                                     origin0,           //
+                                                                                     origin1,           //
+                                                                                     origin2,           //
+                                                                                     dx,                //
+                                                                                     dy,                //
+                                                                                     dz,                //
+                                                                                     weighted_field_v,  //
+                                                                                     stride_dim_in,     //
+                                                                                     data,              //
+                                                                                     stride_dim_out,    //
+                                                                                     I_data);           //
+    }
+}

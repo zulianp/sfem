@@ -744,7 +744,7 @@ int main(int argc, char* argv[]) {
     const int multi_field = 3;
 
     real_t* g       = calloc(mesh.nnodes, sizeof(real_t));
-    real_t* multi_g = calloc(mesh.nnodes * multi_field, sizeof(real_t));
+    // real_t* multi_g = calloc(mesh.nnodes * multi_field, sizeof(real_t));
 
     {  // begin resample_field_mesh
         /////////////////////////////////
