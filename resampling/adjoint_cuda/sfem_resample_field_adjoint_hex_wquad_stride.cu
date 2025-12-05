@@ -2,6 +2,7 @@
 #include "device_utils.cuh"
 #include "sfem_resample_field_adjoint_hex_wquad.cuh"
 #include "sfem_resample_field_adjoint_hex_wquad_stride.cuh"
+#include "sfem_resample_field_adjoint_hex_wquad_stride_gen.cuh"
 
 #define _N_VF_ (1)  // Number of weighted fields
 
