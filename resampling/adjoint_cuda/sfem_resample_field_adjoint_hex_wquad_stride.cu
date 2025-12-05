@@ -3,7 +3,7 @@
 #include "sfem_resample_field_adjoint_hex_wquad.cuh"
 #include "sfem_resample_field_adjoint_hex_wquad_stride.cuh"
 
-#define _N_VF_ (4)  // Number of weighted fields
+#define _N_VF_ (1)  // Number of weighted fields
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,8 +28,8 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
                                                              const geom_t         dy,                      //
                                                              const geom_t         dz,                      //
                                                              const real_t* const  weighted_field[_N_VF_],  // Input weighted field
-                                                             real_t* const        data[_N_VF_],
-                                                             real_t* const        I_data) {  //
+                                                             real_t* const        data[_N_VF_],            //
+                                                             real_t* const        I_data) {                       //
 
     PRINT_CURRENT_FUNCTION;
 
@@ -56,8 +56,8 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
         cudaMallocAsync((void**)&h_weighted_field_device[i], nnodes * sizeof(real_t), cuda_stream_alloc);
     }  // END for (int i = 0; i < _N_VF_; i++)
 
-    int h_stride_dim_in[_N_VF_]  = {1, 1, 1, 1};  //
-    int h_stride_dim_out[_N_VF_] = {1, 1, 1, 1};  //
+    int h_stride_dim_in[_N_VF_]  = {1};  //
+    int h_stride_dim_out[_N_VF_] = {1};  //
 
     int* stride_dim_in  = NULL;
     int* stride_dim_out = NULL;
@@ -156,12 +156,12 @@ call_tet4_resample_field_adjoint_hex_wquad_stride_kernel_gpu(const ptrdiff_t    
 
     cudaEventRecord(start_event, cuda_stream);
 
-    tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu_kernel<real_t,                        //
-                                                                       int,                           //
-                                                                       _N_VF_,                        //
-                                                                       matrix_ordering_t::COL_MAJOR,  //
-                                                                       matrix_ordering_t::COL_MAJOR,  //
-                                                                       3,
+    tet4_resample_field_adjoint_hex_quad_element_nw_strides_gpu_kernel<real_t,                                         //
+                                                                       int,                                            //
+                                                                       _N_VF_,                                         //
+                                                                       matrix_ordering_t::COL_MAJOR,                   //
+                                                                       matrix_ordering_t::COL_MAJOR,                   //
+                                                                       3,                                              //
                                                                        false><<<blocks_per_grid,                       //
                                                                                 threads_per_block,                     //
                                                                                 0,                                     //
