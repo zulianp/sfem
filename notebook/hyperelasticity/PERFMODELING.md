@@ -67,10 +67,10 @@ NeoHookeanOgdenPacked     MF             2.030e-01         952.984       1905.96
 ```
 
 
-`1e-9 * (64000000 * 1558 + 8 * 3) / (   2.030e-01   ) = 491.19 GLOPS/s`
-Percentage of achievable peak: `491.19 / 1392.64 * 100%         = 35.2%`
+`1e-9 * (64000000 * 1558 + 8 * 3) / (   1.859e-01   ) = 536.37 	GLOPS/s`
+Percentage of achievable peak: `536.37 / 1392.64 * 100%         = 38.5%`
 
-<!-- -ffp-contract=fast ? -->
+<!-- cmake .. -DCMAKE_CXX_FLAGS="-fopenmp-simd -ffp-contract=fast" -->
 
 
 # TET10

@@ -4,6 +4,8 @@ from sympy.printing.c import ccode
 import sympy.codegen.ast as ast
 from sympy.codegen.cfunctions import fma
 
+import synthesis as syn
+
 # Symbols
 a, b, c, d, e, f = sp.symbols("a b c d e f")
 
@@ -53,17 +55,30 @@ def fma_rewrite(expr):
     # Factor common terms from Add
     if isinstance(expr2, sp.Add):
         factored = sp.factor_terms(expr2)
+        # print(f'expr2={expr2}, factored={factored}')
+
+        if isinstance(factored, sp.Add):
+            for f in factored.args:
+                if isinstance(f, sp.Mul):
+                    print(f)
+
         if isinstance(factored, sp.Mul):  # something was factored out
             coeff, inside = factored.as_coeff_Mul()
+            print("as_coeff_Mul: ", coeff, inside)
             # coeff may include numbers and symbols
             if inside.is_Add:
                 return coeff * _pack_fmas_balanced(list(inside.args))
             else:
                 return coeff * inside
+        # elif isinstance(expr2.args[0], sp.Mul):
+        #     if len(expr2.args[0].args) == 2:
+        #         print(expr2.args[0].args)
 
-
+            
         # otherwise no common factor
         return _pack_fmas_balanced(list(expr2.args))
+
+
 
     return expr2
 
@@ -111,25 +126,34 @@ examples = [
     a*b*(c + d*e)*(a*b + c) + c + sp.log(c)
 ]
 
-for ex in examples:
-    print("orig :", ex)
-    print("fma  :", generate_c_code(ex))
-    print()
+# for ex in examples:
+#     print("orig :", ex)
+#     print("fma  :", generate_c_code(ex))
+#     print()
 
 expr = []
 idx = 0
 for ex in examples:
-    expr.append(ast.Assignment(sp.symbols(f"v[{idx}]"), cleanup(fma_rewrite(ex))))
+    expr.append(ast.Assignment(sp.symbols(f"v[{idx}]"), (ex)))
     idx += 1
 
 
 cse_repls, reduced = sp.cse(expr, symbols=sp.numbered_symbols("t"))
+smap = syn.build_def_map(cse_repls, reduced)
+# smap = {}
 
 lines = []
 for sym, rhs in cse_repls:
-    lines.append(f"double {sym} = {ccode(cleanup(fma_rewrite(rhs)))};")
+    lines.append(f"double {sym} = {ccode(syn.match_fma(rhs, smap))};")
 
 for r in reduced:
-    lines.append(ccode(cleanup(fma_rewrite(r))));
+
+    if isinstance(r, ast.Assignment):
+        temp = ast.Assignment(r.args[0], syn.match_fma(r.args[1], smap))
+    else:
+        temp = syn.match_fma(r, {})
+    # temp = cleanup(fma_rewrite(r))
+    # temp = cleanup(fma_rewrite(temp))
+    lines.append(ccode(temp));
 
 print( "\n".join(lines))
