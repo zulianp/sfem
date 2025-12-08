@@ -133,28 +133,72 @@ def simplify_matrix(mat):
     rows, cols = mat.shape
     return sp.Matrix(rows, cols, [simplify(mat[i, j]) for i in range(0, rows) for j in range(0, cols)])
 
-class SRHyperelasticity:
+class SRViscoHyperelasticity:
     @staticmethod
-    def create_from_string(fe, name, str_expr: str):
-        fun = parse_expr(str_expr) 
-        return SRHyperelasticity(fe, name, fun)
+    def create_from_string(fe, name, str_expr, num_prony_terms=0, include_geometric_stiffness=True):
+        if isinstance(str_expr, list) or isinstance(str_expr, tuple):
+            assert len(str_expr) == 2
+            fun_vol = parse_expr(str_expr[0])
+            fun_dev = parse_expr(str_expr[1])
+        else:
+            # If only one string is provided, we assume it is the TOTAL energy
+            # But for optimal performance, one should provide them separately
+            fun_vol = 0
+            fun_dev = parse_expr(str_expr)
+            
+        return SRViscoHyperelasticity(fe, name, fun_vol, fun_dev, unimodular=False, num_prony_terms=num_prony_terms, include_geometric_stiffness=include_geometric_stiffness)
 
-    def create_from_string_unimodular(fe, name, str_expr: str):
-        fun = parse_expr(str_expr) 
-        return SRHyperelasticity(fe, name, fun, True)
+    @staticmethod
+    def create_from_string_unimodular(fe, name, str_expr, num_prony_terms=0, include_geometric_stiffness=True):
+        if isinstance(str_expr, list) or isinstance(str_expr, tuple):
+            assert len(str_expr) == 2
+            fun_vol = parse_expr(str_expr[0])
+            fun_dev = parse_expr(str_expr[1])
+        else:
+            fun_vol = 0
+            fun_dev = parse_expr(str_expr)
 
-    def __init__(self, fe, name, fun, unimodular=False): 
+        return SRViscoHyperelasticity(fe, name, fun_vol, fun_dev, unimodular=True, num_prony_terms=num_prony_terms, include_geometric_stiffness=include_geometric_stiffness)
+
+    def __init__(self, fe, name, fun_vol, fun_dev, unimodular=False, num_prony_terms=0, include_geometric_stiffness=True): 
         self.fe = fe
         self.name = name
         self.expression_table = {}
         self.params = []
-        if unimodular:
-            self._init_fun_unimodular(fun)
-        else:
-            self._init_fun(fun)
+        self.num_prony_terms = num_prony_terms
+        self.include_geometric_stiffness = include_geometric_stiffness
 
-    def _init_fun_unimodular(self, fun):
-        self._init_symbols(fun)
+        if unimodular:
+            self.__init_fun_unimodular(fun_vol, fun_dev)
+        else:
+            self.__init_fun(fun_vol, fun_dev)
+
+        self.__init_visco_params()
+
+    def __init_visco_params(self):
+        if self.num_prony_terms <= 0:
+            return
+            
+        self.dt_symb = sp.symbols("dt", real=True)
+        self.params.append(self.dt_symb)
+        
+        self.prony_coeffs = []
+        for i in range(self.num_prony_terms):
+            # g_i, tau_i
+            gi = sp.symbols(f"g{i+1}", real=True)
+            taui = sp.symbols(f"tau{i+1}", real=True)
+            self.prony_coeffs.append((gi, taui))
+            self.params.append(gi)
+            self.params.append(taui)
+
+    def __init_fun_unimodular(self, fun_vol, fun_dev):
+        # Merge for symbol detection
+        fun_total = fun_vol + fun_dev
+        self.__init_symbols(fun_total)
+        
+        self.fun_vol_invariants = fun_vol
+        self.fun_dev_invariants = fun_dev
+        self.fun_invariants = fun_total # For compatibility or total energy if needed
 
         F = self.F_symb
         det_F = sp.det(F)
@@ -164,7 +208,7 @@ class SRHyperelasticity:
 
         I1b, I2b, J = sp.symbols("I1b I2b J", real=True)
         invariants = [I1b, I2b, J]
-        symbol_names = list(self.fun.free_symbols)
+        symbol_names = list(fun_total.free_symbols)
         all_symbols = []
 
         for s in symbol_names + invariants:
@@ -177,8 +221,18 @@ class SRHyperelasticity:
                     I2b = s
                 elif sname == "J":
                     J = s
+        
+        # Save invariant symbols for later reconstruction
+        self.invariants_map = {
+            "I1b": I1b,
+            "I2b": I2b,
+            "J": J,
+            "type": "unimodular"
+        }
 
-        self.fun = self.fun.subs({
+        # We don't substitute into self.fun yet, we keep components
+        # But we need self.fun for backward compatibility or total energy
+        self.fun = fun_total.subs({
             I1b: det_F**sp.Rational(-2, 3) * I1, 
             I2b: det_F**sp.Rational(-4, 3) * I2, 
             J: det_F})
@@ -192,15 +246,21 @@ class SRHyperelasticity:
 
         self.params = params
 
-    def _init_fun(self, fun):
-        self._init_symbols(fun)
+    def __init_fun(self, fun_vol, fun_dev):
+        # Merge for symbol detection
+        fun_total = fun_vol + fun_dev
+        self.__init_symbols(fun_total)
+        
+        self.fun_vol_invariants = fun_vol
+        self.fun_dev_invariants = fun_dev
+        self.fun_invariants = fun_total
 
         F = self.F_symb
         C = F.T * F
        
         I1, I2, J = sp.symbols("I1 I2 J", real=True)
         invariants = [I1, I2, J]
-        symbol_names = list(self.fun.free_symbols)
+        symbol_names = list(fun_total.free_symbols)
         all_symbols = []
         for s in symbol_names + invariants:
             if str(s) not in [str(sym) for sym in all_symbols]:
@@ -213,7 +273,15 @@ class SRHyperelasticity:
                 elif sname == "J":
                     J = s
 
-        self.fun = self.fun.subs({
+        # Save invariant symbols for later reconstruction
+        self.invariants_map = {
+            "I1": I1,
+            "I2": I2,
+            "J": J,
+            "type": "standard"
+        }
+
+        self.fun = fun_total.subs({
             I1: sp.trace(C), 
             I2: sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2)), 
             J: sp.det(F)})
@@ -225,24 +293,24 @@ class SRHyperelasticity:
                 params.append(s)
         self.params = params
 
-    def _init_symbols(self, fun):
+    def __init_symbols(self, fun):
         dims = self.fe.manifold_dim()
         self.fun = simplify(fun)
 
-        self.F_symb = self._create_matrix_symbol("F")
-        self.S_lin_symb = self._create_tensor4_symbol("S_lin")
+        self.F_symb = self.__create_matrix_symbol("F")
+        self.S_lin_symb = self.__create_tensor4_symbol("S_lin")
         self.disp_symb = coeffs_SoA("disp", dims, self.fe.n_nodes())
         self.inc_symb = coeffs_SoA("inc", dims, self.fe.n_nodes())
-        self.inc_grad_symb = self._create_matrix_symbol("inc_grad")
-        self.S_ikmn_symb = self._create_tensor4_symbol("S_ikmn")
-        self.SdotH_km_symb = self._create_matrix_symbol("SdotH_km")
+        self.inc_grad_symb = self.__create_matrix_symbol("inc_grad")
+        self.S_ikmn_symb = self.__create_tensor4_symbol("S_ikmn")
+        self.SdotH_km_symb = self.__create_matrix_symbol("SdotH_km")
         self.gradx_symb = coeffs("gradx", self.fe.n_nodes())
         self.grady_symb = coeffs("grady", self.fe.n_nodes())
         self.gradz_symb = coeffs("gradz", self.fe.n_nodes())
-        self.S_ikmn_canonical_symb = self._create_tensor4_symbol_canonical("S_ikmn_canonical")
-        self.S_ikmn_packed_symb = self._create_tensor4_symbol_packed("S_ikmn_packed")
+        self.S_ikmn_canonical_symb = self.__create_tensor4_symbol_canonical("S_ikmn_canonical")
+        self.S_ikmn_packed_symb = self.__create_tensor4_symbol_packed("S_ikmn_packed")
     
-    def _create_tensor4_symbol_canonical(self, name):
+    def __create_tensor4_symbol_canonical(self, name):
         dim = self.fe.spatial_dim()
         N = (dim**2+1)*(dim**2)/2
         can = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
@@ -250,44 +318,44 @@ class SRHyperelasticity:
         canon_reconstruct = canon.reconstruct_full(can, can_map, dim, as_sympy=True)
         return canon_reconstruct
 
-    def _create_tensor4_symbol_packed(self, name):
+    def __create_tensor4_symbol_packed(self, name):
         dim = self.fe.spatial_dim()
         N = (dim**2+1)*(dim**2)/2
         packed = [sp.symbols(f"{name}[{i}]") for i in range(int(N))]
         return packed
 
-    def _create_matrix_symbol(self, name):
+    def __create_matrix_symbol(self, name):
         dim = self.fe.spatial_dim()
         return create_matrix_symbol(name, dim, dim)
 
-    def _create_zero_matrix(self):
+    def __create_zero_matrix(self):
         return sp.zeros(self.fe.spatial_dim(), self.fe.spatial_dim())
 
-    def _create_tensor4_symbol(self, name):
+    def __create_tensor4_symbol(self, name):
         dim = self.fe.spatial_dim()
         return create_tensor4_symbol(name, dim, dim, dim, dim)
 
-    def _compute_dV(self):
+    def __compute_dV(self):
         dV = self.fe.jacobian_determinant(self.fe.quadrature_point()) * (self.fe.reference_measure() *  self.fe.quadrature_weight())
         self.expression_table["dV"] = dV
         return dV
 
-    def _compute_jacobian_adjugate(self):
+    def __compute_jacobian_adjugate(self):
         Jadj = simplify_matrix(self.fe.jacobian(self.fe.quadrature_point()) / self.fe.jacobian_determinant(self.fe.quadrature_point()))
         self.expression_table["Jadj"] = Jadj
         return Jadj
 
-    def _compute_Jinv(self):
+    def __compute_Jinv(self):
         Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
         self.expression_table["Jinv"] = Jinv
         return Jinv
 
-    def _compute_disp_grad(self):
+    def __compute_disp_grad(self):
         if "disp_grad" in self.expression_table:
             return self.expression_table["disp_grad"]
 
         dims = self.fe.manifold_dim()
-        disp_grad = self._create_zero_matrix()
+        disp_grad = self.__create_zero_matrix()
         ref_grad = self.fe.tgrad(self.fe.quadrature_point())
         for i in range(0, self.fe.n_nodes() * dims):
             disp_grad += ref_grad[i] * self.disp_symb[i]
@@ -298,12 +366,12 @@ class SRHyperelasticity:
         self.expression_table["disp_grad"] = disp_grad * Jinv
         return disp_grad
 
-    def _compute_inc_grad(self):
+    def __compute_inc_grad(self):
         if "inc_grad" in self.expression_table:
             return self.expression_table["inc_grad"]
 
         dims = self.fe.manifold_dim()
-        inc_grad = self._create_zero_matrix()
+        inc_grad = self.__create_zero_matrix()
         ref_grad = self.fe.tgrad(self.fe.quadrature_point())
         for i in range(0, self.fe.n_nodes() * dims):
             inc_grad += ref_grad[i] * self.inc_symb[i]
@@ -313,7 +381,7 @@ class SRHyperelasticity:
         return inc_grad
         
 
-    def _compute_F(self):
+    def __compute_F(self):
         if "F" in self.expression_table:
             return self.expression_table["F"]
 
@@ -323,29 +391,210 @@ class SRHyperelasticity:
         self.expression_table["F"] = F
         return F
 
-    def _compute_piola_stress(self):
+    def __sub_matrix(self, expr, mat_sym, mat_val):
+        rows, cols = mat_sym.shape
+        for r in range(rows):
+            for c in range(cols):
+                expr = expr.subs(mat_sym[r, c], mat_val[r, c])
+        return expr
+
+    def __compute_piola_stress(self):
         if "P" in self.expression_table:
             return self.expression_table["P"]
 
+        # 1. Compute S_elastic symbolically (2nd PK Stress)
+        # We define S_elastic = 2 * dW/dC
+        
+        C = self.__create_matrix_symbol("C") 
+        
+        # Reconstruct W in terms of C
+        W_C = self.fun_invariants
+        
+        if self.invariants_map["type"] == "standard":
+            I1 = sp.trace(C)
+            I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+            # J = sqrt(det(C)). J>0
+            J = sp.sqrt(sp.det(C))
+            
+            W_C = W_C.subs({
+                self.invariants_map["I1"]: I1,
+                self.invariants_map["I2"]: I2,
+                self.invariants_map["J"]: J
+            })
+            
+        elif self.invariants_map["type"] == "unimodular":
+            J = sp.sqrt(sp.det(C))
+            I1 = sp.trace(C)
+            I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+            
+            I1b = J**sp.Rational(-2, 3) * I1
+            I2b = J**sp.Rational(-4, 3) * I2
+            
+            W_C = W_C.subs({
+                self.invariants_map["I1b"]: I1b,
+                self.invariants_map["I2b"]: I2b,
+                self.invariants_map["J"]: J
+            })
+        
+        # S = 2 * dW/dC
+        def get_W_C(expr_invariants):
+            if expr_invariants == 0:
+                return 0
+            
+            if self.invariants_map["type"] == "standard":
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                J = sp.sqrt(sp.det(C))
+                
+                return expr_invariants.subs({
+                    self.invariants_map["I1"]: I1,
+                    self.invariants_map["I2"]: I2,
+                    self.invariants_map["J"]: J
+                })
+                
+            elif self.invariants_map["type"] == "unimodular":
+                J = sp.sqrt(sp.det(C))
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                
+                I1b = J**sp.Rational(-2, 3) * I1
+                I2b = J**sp.Rational(-4, 3) * I2
+                
+                return expr_invariants.subs({
+                    self.invariants_map["I1b"]: I1b,
+                    self.invariants_map["I2b"]: I2b,
+                    self.invariants_map["J"]: J
+                })
+            return 0
+
+        W_vol_C = get_W_C(self.fun_vol_invariants)
+        W_dev_C = get_W_C(self.fun_dev_invariants)
+        
+        # Compute stresses S = 2 * dW/dC
+        def compute_S(W_expr):
+            if W_expr == 0: return sp.zeros(3, 3)
+            S = sp.zeros(3, 3)
+            for i in range(3):
+                for j in range(3):
+                    S[i, j] = 2 * sp.diff(W_expr, C[i, j])
+            return S
+
+        S_vol_C = compute_S(W_vol_C)
+        S_dev_C = compute_S(W_dev_C)
+
+        # Substitute C -> F.T*F
         F = self.F_symb
-        P = self._create_zero_matrix()
-        for i in range(0, P.shape[0]):
-            for j in range(0, P.shape[1]):
-                P[i, j] = sp.diff(self.fun, F[i, j])
+        C_expr = F.T * F
+        
+        def sub_C(S_matrix):
+            S_out = sp.zeros(3, 3)
+            for i in range(3):
+                for j in range(3):
+                    S_out[i, j] = self.__sub_matrix(S_matrix[i, j], C, C_expr)
+            return simplify_matrix(S_out)
+
+        S_vol = sub_C(S_vol_C)
+        S_dev = sub_C(S_dev_C)
+
+        if self.num_prony_terms == 0:
+            # Pure elastic
+            S_total = S_vol + S_dev
+            P = F * S_total
+            P = simplify_matrix(P)
+            self.expression_table["P"] = P
+            return P
+
+        # 2. Viscoelasticity
+        dt = self.dt_symb
+        
+        # Calculate algorithmic modulus coefficient gamma
+        # gamma = g_inf + sum(beta_i)
+        sum_gi = sum(g for g, tau in self.prony_coeffs)
+        g_inf = 1 - sum_gi
+        
+        gamma = g_inf
+        betas = []
+        alphas = []
+        
+        for i in range(self.num_prony_terms):
+            gi, taui = self.prony_coeffs[i]
+            alpha = sp.exp(-dt / taui)
+            x = dt / taui
+            # beta = gi * (1 - exp(-x)) / x
+            beta = gi * (1 - alpha) / x
+            
+            alphas.append(alpha)
+            betas.append(beta)
+            gamma += beta
+            
+        # Construct Algorithmic Energy W_algo
+        # W_algo = W_vol + gamma * W_dev
+        # This is much cleaner for differentiation
+        W_algo_C = W_vol_C + gamma * W_dev_C
+        
+        # S_algo = 2 * d(W_algo)/dC
+        S_algo_C = compute_S(W_algo_C)
+        S_algo = sub_C(S_algo_C)
+        
+        # Calculate History Stress S_hist
+        # S_hist = sum( alpha_i * H_i^n - beta_i * S_dev^n )
+        
+        idx_map = [(0,0), (1,1), (2,2), (0,1), (0,2), (1,2)]
+        hist_ptr = 0
+        
+        # Read S_dev_n
+        S_dev_n = sp.zeros(3, 3)
+        for r, c in idx_map:
+            val = sp.symbols(f"history[{hist_ptr}]", real=True)
+            S_dev_n[r, c] = val
+            S_dev_n[c, r] = val
+            hist_ptr += 1
+            
+        S_hist = sp.zeros(3, 3)
+        
+        for i in range(self.num_prony_terms):
+            alpha = alphas[i]
+            beta = betas[i]
+            
+            H_old = sp.zeros(3, 3)
+            for r, c in idx_map:
+                val = sp.symbols(f"history[{hist_ptr}]", real=True)
+                H_old[r, c] = val
+                H_old[c, r] = val
+                hist_ptr += 1
+            
+            # Contribution to S_hist
+            S_hist += alpha * H_old - beta * S_dev_n
+            
+        # Total Stress
+        S_total = S_algo + S_hist
+        
+        # Compute P_total
+        P = F * S_total
         P = simplify_matrix(P)
+        
         self.expression_table["P"] = P
+        self.expression_table["S"] = S_total
+        
         return P
 
-    def _compute_linearized_stress(self):
+    def __compute_linearized_stress(self):
         # TODO: This tensor has symmetries and it can be compressed
         # S_lin_symb, S_lin_names, S_lin_vals = compress_tensor4("S_lin", S_lin)
         if "S_lin" in self.expression_table:
             return self.expression_table["S_lin"]
 
-
         P = self.expression_table["P"]
         F = self.F_symb
         dim = self.fe.spatial_dim()
+        
+        # Automatic differentiation
+        # SymPy includes ALL dependencies on F, including geometric stiffness from history:
+        # d(F * S_history)/dF = I x S_history (approx)
+        
+        # If we want to exclude it (inconsistent tangent), we must manually construct P without history
+        # But for now, we trust the consistent tangent provided by SymPy
+        
         terms = []
         for i in range(0, dim):
             for j in range(0, dim):
@@ -356,7 +605,7 @@ class SRHyperelasticity:
         self.expression_table["S_lin"] = S_lin
         return S_lin
         
-    def _compute_metric_tensor(self):
+    def __compute_metric_tensor(self):
         if "S_ikmn" in self.expression_table:
             return self.expression_table["S_ikmn"]
 
@@ -386,14 +635,14 @@ class SRHyperelasticity:
         self.expression_table["S_ikmn"] = S_ikmn
         return S_ikmn  
 
-    def _compute_SdotH_km(self):
+    def __compute_SdotH_km(self):
         if "SdotH_km" in self.expression_table:
             return self.expression_table["SdotH_km"] 
 
         S_ikmn = self.S_ikmn_symb
         inc_grad = self.inc_grad_symb
         dim = self.fe.spatial_dim()
-        SdotH_km = self._create_zero_matrix()
+        SdotH_km = self.__create_zero_matrix()
         for k in range(0, dim):
             for m in range(0, dim):
                 for i in range(0, dim):
@@ -403,7 +652,7 @@ class SRHyperelasticity:
         self.expression_table["SdotH_km"] = SdotH_km
         return SdotH_km
 
-    def _compute_metric_tensor_canonical(self):
+    def __compute_metric_tensor_canonical(self):
         if "S_ikmn_canonical" in self.expression_table:
             return self.expression_table["S_ikmn_canonical"]
 
@@ -436,7 +685,7 @@ class SRHyperelasticity:
         self.expression_table["S_ikmn_canonical"] = S_ikmn_canonical
         return S_ikmn_canonical
 
-    def _compute_SdotH_km_canonical(self):
+    def __compute_SdotH_km_canonical(self):
         if "SdotH_km_canonical" in self.expression_table:
             return self.expression_table["SdotH_km_canonical"]
 
@@ -444,7 +693,7 @@ class SRHyperelasticity:
         dim = self.fe.spatial_dim()
         inc_grad = self.inc_grad_symb
         dim = self.fe.spatial_dim()
-        SdotH_km_canonical = self._create_zero_matrix()
+        SdotH_km_canonical = self.__create_zero_matrix()
         for k in range(0, dim):
             for m in range(0, dim):
                 for i in range(0, dim):
@@ -454,11 +703,11 @@ class SRHyperelasticity:
         self.expression_table["SdotH_km_canonical"] = SdotH_km_canonical
         return SdotH_km_canonical
 
-    def _compute_apply(self):
+    def __compute_apply(self):
         if "eoutx" in self.expression_table:
             return
 
-        SdotH_km = self._create_matrix_symbol("SdotH_km")
+        SdotH_km = self.__create_matrix_symbol("SdotH_km")
         nnodes = self.fe.n_nodes()
         eoutx = sp.Matrix(nnodes, 1, [0] * nnodes)
         eouty = sp.Matrix(nnodes, 1, [0] * nnodes)
@@ -474,7 +723,7 @@ class SRHyperelasticity:
         self.expression_table["eouty"] = eouty
         self.expression_table["eoutz"] = eoutz
 
-    def _compute_apply_canonical(self):
+    def __compute_apply_canonical(self):
         SdotH_km_canonical = self.expression_table["SdotH_km_canonical"]
         nnodes = self.fe.n_nodes()
         eoutx = sp.Matrix(nnodes, 1, [0] * nnodes)
@@ -492,7 +741,7 @@ class SRHyperelasticity:
         self.expression_table["eoutz"] = eoutz
         return SdotH_km_canonical
 
-    def _compute_constant_grad_tp(self):
+    def __compute_constant_grad_tp(self):
         if "Wimpn" in self.expression_table:
             return self.expression_table["Wimpn"]
 
@@ -513,7 +762,7 @@ class SRHyperelasticity:
         self.expression_table["Wimpn"] = Wimpn
         return Wimpn
 
-    def _compute_loperand(self):
+    def __compute_loperand(self):
         if "loperand" in self.expression_table:
             return self.expression_table["loperand"] 
 
@@ -525,7 +774,7 @@ class SRHyperelasticity:
         self.expression_table["loperand"] = loperand
         return loperand
 
-    def _params_to_args(self):
+    def __params_to_args(self):
         params = self.params
         lines = []
 
@@ -534,11 +783,16 @@ class SRHyperelasticity:
 
         return "".join(lines)
 
+    def __history_to_args(self):
+        if self.num_prony_terms <= 0:
+            return ""
+        return f'    const {real_t} *const SFEM_RESTRICT history,\n'
+
     def emit_objective(self):
-        self._compute_dV()
-        self._compute_Jinv()
-        self._compute_disp_grad()
-        self._compute_F()
+        self.__compute_dV()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
         
         dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
         fun = self.fun * dV
@@ -555,7 +809,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self._params_to_args()}'
+            f'{self.__params_to_args()}'
+            f'{self.__history_to_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -575,13 +830,13 @@ class SRHyperelasticity:
         
         
     def emit_gradient(self):
-        self._compute_dV()
-        self._compute_jacobian_adjugate()
-        self._compute_Jinv()
-        self._compute_disp_grad()
-        self._compute_F()
-        self._compute_piola_stress()
-        self._compute_loperand()
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_loperand()
 
         fe = self.fe
 
@@ -593,7 +848,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self._params_to_args()}'
+            f'{self.__params_to_args()}'
+            f'{self.__history_to_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -635,7 +891,7 @@ class SRHyperelasticity:
         print(grad_S + grad_body)
 
 
-    def _subs_tensor4(self, expr, syms, vals):
+    def __subs_tensor4(self, expr, syms, vals):
         s0, s1, s2, s3 = syms.shape
 
         assert s0 == vals.shape[0]
@@ -650,7 +906,7 @@ class SRHyperelasticity:
                         expr = expr.subs(syms[i0, i1, i2, i3], vals[i0, i1, i2, i3])
         return expr
 
-    def _compute_hessian(self):
+    def __compute_hessian(self):
         # Lazy
         if "hessian" in self.expression_table:
             return self.expression_table["hessian"]
@@ -678,7 +934,7 @@ class SRHyperelasticity:
         self.expression_table["hessian_diag"] = H_diag
         return H
 
-    def _assign_tensor4(self, name, tensor):
+    def __assign_tensor4(self, name, tensor):
         s0, s1, s2, s3 = tensor.shape
 
         expr = []
@@ -694,16 +950,166 @@ class SRHyperelasticity:
         return expr
 
 
+    def emit_history_update(self):
+        if self.num_prony_terms == 0:
+            print("// No history update needed for pure elasticity")
+            return
+
+        # Prepare necessary quantities
+        self.__compute_dV()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        
+        # Re-compute Elastic Deviatoric Stress S_dev (Pure Elastic)
+        # We need to reconstruct the calculation locally or extract it
+        # But since __compute_piola_stress is complex, we just re-calculate S_dev here
+        
+        C = self.__create_matrix_symbol("C") 
+        
+        def get_W_C(expr_invariants):
+            if expr_invariants == 0: return 0
+            
+            if self.invariants_map["type"] == "standard":
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                J = sp.sqrt(sp.det(C))
+                return expr_invariants.subs({
+                    self.invariants_map["I1"]: I1,
+                    self.invariants_map["I2"]: I2,
+                    self.invariants_map["J"]: J
+                })
+            elif self.invariants_map["type"] == "unimodular":
+                J = sp.sqrt(sp.det(C))
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                I1b = J**sp.Rational(-2, 3) * I1
+                I2b = J**sp.Rational(-4, 3) * I2
+                return expr_invariants.subs({
+                    self.invariants_map["I1b"]: I1b,
+                    self.invariants_map["I2b"]: I2b,
+                    self.invariants_map["J"]: J
+                })
+            return 0
+
+        W_dev_C = get_W_C(self.fun_dev_invariants)
+        
+        # S_dev_C = 2 * d(W_dev)/dC
+        S_dev_C = sp.zeros(3, 3)
+        for i in range(3):
+            for j in range(3):
+                S_dev_C[i, j] = 2 * sp.diff(W_dev_C, C[i, j])
+        
+        # Substitute C -> F.T*F
+        F = self.F_symb
+        C_expr = F.T * F
+        
+        S_dev_next = sp.zeros(3, 3)
+        for i in range(3):
+            for j in range(3):
+                S_dev_next[i, j] = self.__sub_matrix(S_dev_C[i, j], C, C_expr)
+        
+        # We don't need to simplify fully here, CSE will handle it
+        
+        # Parameters
+        dt = self.dt_symb
+        
+        # Update Logic
+        # We need to read old values, compute new values, and assign them back
+        # Layout: [S_dev_n (6), H_1_n (6), H_2_n (6), ...]
+        
+        idx_map = [(0,0), (1,1), (2,2), (0,1), (0,2), (1,2)] # Voigt notation for symmetry
+        
+        hist_ptr_read = 0
+        hist_ptr_write = 0
+        
+        assignments = []
+        
+        # 1. Read S_dev_n (old elastic stress)
+        S_dev_n = sp.zeros(3, 3)
+        for r, c in idx_map:
+            # history is input pointer (const)
+            val = sp.symbols(f"history[{hist_ptr_read}]", real=True)
+            S_dev_n[r, c] = val
+            S_dev_n[c, r] = val
+            hist_ptr_read += 1
+            
+        # 2. Write S_dev_next (current elastic stress becomes new history)
+        # new_history is output pointer (mutable)
+        for r, c in idx_map:
+            # Store S_dev_next into new_history[0...5]
+            lhs = sp.symbols(f"new_history[{hist_ptr_write}]")
+            rhs = S_dev_next[r, c]
+            assignments.append(ast.Assignment(lhs, rhs))
+            hist_ptr_write += 1
+            
+        # 3. Update and Write H_i
+        for i in range(self.num_prony_terms):
+            gi, taui = self.prony_coeffs[i]
+            
+            # Coefficients
+            x = dt / taui
+            alpha = sp.exp(-x)
+            beta = gi * (1 - alpha) / x
+            
+            for r, c in idx_map:
+                # Read H_old
+                h_old = sp.symbols(f"history[{hist_ptr_read}]", real=True)
+                hist_ptr_read += 1
+                
+                # Calculate H_new
+                # H_new = alpha * H_old + beta * (S_dev_next - S_dev_n)
+                h_new_val = alpha * h_old + beta * (S_dev_next[r, c] - S_dev_n[r, c])
+                
+                # Write H_new
+                lhs = sp.symbols(f"new_history[{hist_ptr_write}]")
+                assignments.append(ast.Assignment(lhs, h_new_val))
+                hist_ptr_write += 1
+
+        # Generate C Function
+        fe = self.fe
+        dim = fe.spatial_dim()
+        
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_update_history(\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'{self.__params_to_args()}'
+            f'    const {real_t} *const SFEM_RESTRICT history,\n'     # Read-only old history
+            f'    {real_t} *const SFEM_RESTRICT       new_history,\n' # Write-only new history
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz)'
+            f'\n'
+        )
+        
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        update_code = c_gen(assignments)
+        
+        body = (
+            f'{{\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'{update_code}\n'
+            f'}}\n'
+        )
+        
+        print(signature + body)
+
     def emit_hessian(self):
-        self._compute_dV()
-        self._compute_jacobian_adjugate()
-        self._compute_Jinv()
-        self._compute_disp_grad()
-        self._compute_F()
-        self._compute_piola_stress()
-        self._compute_linearized_stress()
-        self._compute_metric_tensor()
-        self._compute_hessian()
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_linearized_stress()
+        self.__compute_metric_tensor()
+        self.__compute_hessian()
 
         H = self.expression_table["hessian"]
         
@@ -718,7 +1124,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self._params_to_args()}'
+            f'{self.__params_to_args()}'
+            f'{self.__history_to_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -727,7 +1134,7 @@ class SRHyperelasticity:
         )
 
         F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
-        S_actual = c_gen(self._assign_tensor4("S_lin", self.expression_table["S_lin"]))
+        S_actual = c_gen(self.__assign_tensor4("S_lin", self.expression_table["S_lin"]))
         combined_code = c_gen(add_assign_matrix("H", H))
 
         body = (
@@ -748,15 +1155,15 @@ class SRHyperelasticity:
 
 
     def emit_hessian_diag(self):
-        self._compute_dV()
-        self._compute_jacobian_adjugate()
-        self._compute_Jinv()
-        self._compute_disp_grad()
-        self._compute_F()
-        self._compute_piola_stress()
-        self._compute_linearized_stress()
-        self._compute_metric_tensor()
-        self._compute_hessian()
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_linearized_stress()
+        self.__compute_metric_tensor()
+        self.__compute_hessian()
 
         fe = self.fe
         dim = fe.spatial_dim()
@@ -768,7 +1175,7 @@ class SRHyperelasticity:
         if sub_S_lin:
             for test in range(0, nfun * dim):
                 print(f"// Substituting {test+1}/{nfun * dim}...", end="")
-                H_diag[test] = self._subs_tensor4(H_diag[test], self.S_lin_symb, self.expression_table["S_lin"])
+                H_diag[test] = self.__subs_tensor4(H_diag[test], self.S_lin_symb, self.expression_table["S_lin"])
                 print("DONE")
         
         
@@ -780,7 +1187,8 @@ class SRHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
-            f'{self._params_to_args()}'
+            f'{self.__params_to_args()}'
+            f'{self.__history_to_args()}'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -791,7 +1199,7 @@ class SRHyperelasticity:
         F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
         S_code = ""
         if not sub_S_lin:
-            S_actual = c_gen(self._assign_tensor4("S_lin", self.expression_table["S_lin"]))
+            S_actual = c_gen(self.__assign_tensor4("S_lin", self.expression_table["S_lin"]))
             S_code = f'{real_t} S_lin[{dim**4}];\n'
             f'{{\n'
             f'{S_actual}\n'
@@ -812,23 +1220,23 @@ class SRHyperelasticity:
         
 
     def partial_assembly(self):
-        self._compute_dV()
-        self._compute_jacobian_adjugate()
-        self._compute_Jinv()
-        self._compute_disp_grad()
-        self._compute_inc_grad()
-        self._compute_F()
-        self._compute_piola_stress()
-        self._compute_linearized_stress()
-        self._compute_metric_tensor()
-        self._compute_SdotH_km()
-        self._compute_apply()
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_inc_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_linearized_stress()
+        self.__compute_metric_tensor()
+        self.__compute_SdotH_km()
+        self.__compute_apply()
 
-        self._compute_metric_tensor_canonical()
-        self._compute_SdotH_km_canonical()
-        self._compute_apply_canonical()
+        self.__compute_metric_tensor_canonical()
+        self.__compute_SdotH_km_canonical()
+        self.__compute_apply_canonical()
 
-        self._compute_constant_grad_tp()
+        self.__compute_constant_grad_tp()
 
     def check_metric_tensor_symmetries(self):
         self.partial_assembly()
@@ -875,15 +1283,30 @@ class SRHyperelasticity:
 
 
 if __name__ == "__main__":
-    # fe = Hex8()
+    fe = Hex8()
     # fe = Tet4()
-    fe = Tet10()
-    op = SRHyperelasticity.create_from_string(fe, "neohookean", "mu / 2 * (I1 - 3) - mu * log(J) + (lmbda/2) * log(J)**2")
-    # op = SRHyperelasticity.create_from_string_unimodular(fe, "mooney_rivlin", "C01 * (I2b - 3) + C10 * (I1b - 3) + 1/D1 * (J - 1)**2")
-    # op.check_metric_tensor_symmetries()
-
+    # fe = Tet10()
     
-    # op.emit_objective()
-    # op.emit_gradient()
+    # Mooney-Rivlin Model with Viscoelasticity
+    # 1. Volumetric part (Penalty for incompressibility)
+    w_vol = "K / 2 * (J - 1)**2"
+    
+    # 2. Deviatoric part (Mooney-Rivlin)
+    # Using I1b (I1_bar) and I2b (I2_bar) for isochoric invariants
+    w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
+    
+    op = SRViscoHyperelasticity.create_from_string_unimodular(
+        fe, 
+        "mooney_rivlin", 
+        [w_vol, w_dev], 
+        num_prony_terms=3
+    )
+    
+    # op.check_metric_tensor_symmetries()
+    
+    op.emit_objective()
+    op.emit_gradient()
+    print("// -------------------------------------------------")
+    op.emit_history_update()
     op.emit_hessian()
-    # op.emit_hessian_diag()
+    op.emit_hessian_diag()
