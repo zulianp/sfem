@@ -139,8 +139,11 @@ int test_mooney_rivlin_visco_relaxation() {
         blas->copy(ndofs, v->data(), v_prev->data());
         blas->copy(ndofs, a->data(), a_prev->data());
 
-        // Newton Loop (QUASI-STATIC: no inertia terms for debugging)
-        for (int iter = 0; iter < 20; ++iter) {  // More iterations
+        // Newton Loop (QUASI-STATIC: no inertia terms)
+        // TODO: Add full Newmark time integration when hessian is fully consistent
+        // Currently using damped Newton (alpha=0.5) due to ~5% gradient/hessian inconsistency
+        // Root cause: S_hist_mat computed but not used in hessian (missing geometric stiffness)
+        for (int iter = 0; iter < 20; ++iter) {
             // Residual = F_int(x) - F_ext (no M*a for quasi-static)
             blas->zeros(ndofs, rhs->data());
             
