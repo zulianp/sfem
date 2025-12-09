@@ -22,6 +22,7 @@
 #include "sfem_NeoHookeanOgdenPacked.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
+#include "sfem_MooneyRivlinVisco.hpp"
 
 #include <map>
 
@@ -66,6 +67,7 @@ namespace sfem {
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
+            instance_.private_register_op("MooneyRivlinVisco", MooneyRivlinVisco::create);
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
             instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
