@@ -116,7 +116,7 @@ int test_mooney_rivlin_visco_relaxation() {
     cg->set_n_dofs(ndofs);
     cg->set_max_it(2000);
     cg->set_rtol(1e-5);
-    cg->verbose = true; // Check if CG converges
+    cg->verbose = false; // Quiet CG
     
     // Preconditioner (Jacobi)
     auto jacobi = sfem::create_shiftable_jacobi(diag, es);
@@ -197,7 +197,7 @@ int test_mooney_rivlin_visco_relaxation() {
         blas->copy(ndofs, a->data(), a_prev->data());
 
         // Newton Loop (QUASI-STATIC: no inertia terms for debugging)
-        for (int iter = 0; iter < 10; ++iter) {
+        for (int iter = 0; iter < 20; ++iter) {  // More iterations
             // Residual = F_int(x) - F_ext (no M*a for quasi-static)
             blas->zeros(ndofs, rhs->data());
             
@@ -260,14 +260,15 @@ int test_mooney_rivlin_visco_relaxation() {
             blas->zeros(ndofs, delta_x->data());
             cg->apply(rhs->data(), delta_x->data());
             
-            // Update x: x = x + dx
+            // Update x: x = x + alpha * dx  (damped Newton with alpha=0.5)
             real_t dx_norm = blas->norm2(ndofs, delta_x->data());
+            real_t alpha = 0.5; // Damping factor
             // Print dx at a right-side node (node index depends on mesh)
             // For 2x1x1 cube, right nodes are at x=2
             if (iter == 0) {
-                printf("    |dx|=%e, dx[last_node_x]=%e\n", dx_norm, delta_x->data()[ndofs-3]);
+                printf("    |dx|=%e, dx[last_node_x]=%e, alpha=%f\n", dx_norm, delta_x->data()[ndofs-3], alpha);
             }
-            blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
+            blas->axpy(ndofs, alpha, delta_x->data(), x->data());
         }
         
         // Update history (only for MooneyRivlinVisco)
