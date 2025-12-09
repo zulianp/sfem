@@ -151,16 +151,20 @@ int mooney_rivlin_visco_bsr(const enum ElemType element_type,
                             real_t *const SFEM_RESTRICT values) {
     switch (element_type) {
         case HEX8: {
-            // Fixed: added u_stride parameter
+            // hex8_mooney_rivlin_visco_bsr signature:
+            // (nelements, stride, nnodes, elements, points, C10, K, C01, dt,
+            //  num_prony_terms, g, tau, history_stride, history,
+            //  u_stride, ux, uy, uz, out_stride, values, row_stride, rowptr, colidx)
             return hex8_mooney_rivlin_visco_bsr(
                 nelements, 1, nnodes, elements, points, 
                 C10, K, C01, dt, num_prony_terms, g, tau, 
                 history_stride, history, 
                 u_stride, ux, uy, uz, 
-                1, // out_stride (for values? No, values is packed. Wait, let's check signature)
-                values, // values is flattened array
-                1, // row_stride
-                rowptr, colidx);
+                1,              // out_stride
+                values,         // values
+                1,              // row_stride
+                (const idx_t*)rowptr,  // rowptr (cast count_t* to idx_t* - they should be same size)
+                colidx);
         }
         default: {
             SFEM_ERROR("mooney_rivlin_visco_bsr not implemented for type %d\n", element_type);

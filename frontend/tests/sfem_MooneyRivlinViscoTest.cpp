@@ -31,7 +31,7 @@ int test_mooney_rivlin_visco_relaxation() {
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);
     mass_op->initialize();
     
-    // Material Parameters
+    // Material Parameters - use small values for debugging
     op->set_C10(1.0);
     op->set_C01(0.5);
     op->set_K(100.0); // Nearly incompressible
@@ -62,8 +62,8 @@ int test_mooney_rivlin_visco_relaxation() {
     auto conds = sfem::create_dirichlet_conditions(fs, {left_bc_x, left_bc_y, left_bc_z}, es);
     f->add_constraint(conds);
 
-    // Pull Right (x=2) with Neumann Force
-    sfem::NeumannConditions::Condition right_bc_force{.sidesets = right_sideset, .value = 0.5, .component = 0};
+    // Pull Right (x=2) with Neumann Force (use very small force for debugging)
+    sfem::NeumannConditions::Condition right_bc_force{.sidesets = right_sideset, .value = 0.0001, .component = 0};
     auto neumann_op = sfem::create_neumann_conditions(fs, {right_bc_force}, es);
     f->add_operator(neumann_op);
 
@@ -116,12 +116,71 @@ int test_mooney_rivlin_visco_relaxation() {
     cg->set_n_dofs(ndofs);
     cg->set_max_it(2000);
     cg->set_rtol(1e-5);
-    cg->verbose = false;
+    cg->verbose = true; // Check if CG converges
     
     // Preconditioner (Jacobi)
     auto jacobi = sfem::create_shiftable_jacobi(diag, es);
     cg->set_preconditioner_op(jacobi);
 
+    // ==== FINITE DIFFERENCE CHECK ====
+    printf("\n=== Finite Difference Check ===\n");
+    {
+        auto g0 = sfem::create_buffer<real_t>(ndofs, es);
+        auto g1 = sfem::create_buffer<real_t>(ndofs, es);
+        auto x0 = sfem::create_buffer<real_t>(ndofs, es);
+        auto dx_test = sfem::create_buffer<real_t>(ndofs, es);
+        auto Hdx = sfem::create_buffer<real_t>(ndofs, es);
+        
+        // Use zero displacement for testing (simpler case)
+        blas->zeros(ndofs, x0->data());
+        printf("  x0 norm = %e\n", blas->norm2(ndofs, x0->data()));
+        
+        // Set a small perturbation dx (in x-direction of node 5)
+        blas->zeros(ndofs, dx_test->data());
+        real_t eps = 1e-4;  // Larger eps for better FD accuracy
+        dx_test->data()[3*5] = 1.0; // Perturb x of node 5
+        
+        // g0 = gradient(x0)
+        blas->zeros(ndofs, g0->data());
+        op->gradient(x0->data(), g0->data());
+        printf("  |g0| = %e\n", blas->norm2(ndofs, g0->data()));
+        
+        // g1 = gradient(x0 + eps*dx)
+        blas->copy(ndofs, x0->data(), x->data());
+        blas->axpy(ndofs, eps, dx_test->data(), x->data());
+        blas->zeros(ndofs, g1->data());
+        op->gradient(x->data(), g1->data());
+        printf("  |g1| = %e\n", blas->norm2(ndofs, g1->data()));
+        
+        // FD approximation: (g1 - g0) / eps ≈ H * dx
+        blas->axpy(ndofs, -1.0, g0->data(), g1->data()); // g1 = g1 - g0
+        blas->scal(ndofs, 1.0/eps, g1->data()); // g1 = (g1 - g0) / eps
+        
+        // Hessian * dx
+        blas->zeros(values->size(), values->data());
+        op->hessian_bsr(x0->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
+        sfem::bsr_spmv<count_t, idx_t, real_t>(
+            n_nodes, n_nodes, block_size,
+            graph->rowptr()->data(), graph->colidx()->data(), values->data(),
+            0.0, dx_test->data(), Hdx->data());
+        
+        // Compare
+        real_t fd_norm = blas->norm2(ndofs, g1->data());
+        real_t hdx_norm = blas->norm2(ndofs, Hdx->data());
+        
+        // Compute difference
+        blas->axpy(ndofs, -1.0, Hdx->data(), g1->data());
+        real_t diff_norm = blas->norm2(ndofs, g1->data());
+        
+        printf("  |FD gradient| = %e\n", fd_norm);
+        printf("  |H * dx|      = %e\n", hdx_norm);
+        printf("  |FD - H*dx|   = %e\n", diff_norm);
+        printf("  Relative diff = %e\n", diff_norm / (fd_norm + 1e-16));
+        
+        blas->zeros(ndofs, x->data()); // Reset x to 0
+    }
+    printf("=== End FD Check ===\n\n");
+    
     // 5. Time Loop
     int n_steps = 3;
     
@@ -137,39 +196,27 @@ int test_mooney_rivlin_visco_relaxation() {
         blas->copy(ndofs, v->data(), v_prev->data());
         blas->copy(ndofs, a->data(), a_prev->data());
 
-        // Newton Loop
+        // Newton Loop (QUASI-STATIC: no inertia terms for debugging)
         for (int iter = 0; iter < 10; ++iter) {
-            // 1. Update acceleration: a = c0 * (x - u_prev) - c0*dt*v_prev - (1-2beta)/(2beta)*a_prev
-            real_t c0 = 1.0 / (beta * dt * dt);
-            blas->copy(ndofs, x->data(), a->data());
-            blas->axpy(ndofs, -1.0, u_prev->data(), a->data());
-            blas->scal(ndofs, c0, a->data());
-            blas->axpy(ndofs, -c0 * dt, v_prev->data(), a->data());
-            blas->axpy(ndofs, -(1.0 - 2.0 * beta) / (2.0 * beta), a_prev->data(), a->data());
-            
-            // 2. Update velocity: v = v_prev + dt*((1-gamma)*a_prev + gamma*a)
-            blas->copy(ndofs, v_prev->data(), v->data());
-            blas->axpy(ndofs, dt * (1.0 - gamma), a_prev->data(), v->data());
-            blas->axpy(ndofs, dt * gamma, a->data(), v->data());
-
-            // 3. Residual = M*a + F_int(x) - F_ext
+            // Residual = F_int(x) - F_ext (no M*a for quasi-static)
             blas->zeros(ndofs, rhs->data());
-            
-            // M*a using lumped mass: element-wise multiply
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                Ma->data()[i] = mass_diag->data()[i] * a->data()[i];
-            }
-            blas->axpy(ndofs, 1.0, Ma->data(), rhs->data());
             
             // F_int(x)
             blas->zeros(ndofs, f_int->data());
             op->gradient(x->data(), f_int->data());
+            real_t f_int_norm = blas->norm2(ndofs, f_int->data());
             blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
 
-            // F_ext (Neumann) - this is negative in residual
+            // F_ext (Neumann) - already negative
             blas->zeros(ndofs, f_neumann->data());
             neumann_op->gradient(x->data(), f_neumann->data());
+            real_t f_ext_norm = blas->norm2(ndofs, f_neumann->data());
             blas->axpy(ndofs, 1.0, f_neumann->data(), rhs->data());
+            
+            if (iter == 0) {
+                real_t x_norm = blas->norm2(ndofs, x->data());
+                printf("    |x|=%e, |F_int|=%e, |F_ext|=%e\n", x_norm, f_int_norm, f_ext_norm);
+            }
             
             // Check convergence
             f->set_value_to_constrained_dofs(0.0, rhs->data()); 
@@ -178,31 +225,14 @@ int test_mooney_rivlin_visco_relaxation() {
             if(iter == 0 || iter % 1 == 0) printf("  Iter %d: |R| = %e\n", iter, r_norm);
             if (r_norm < 1e-8) break;
 
-            // Hessian Assembly: K_eff = c0 * M + K_tan
-            // For lumped mass, we add c0*M to diagonal
+            // Hessian Assembly: K_tan only (quasi-static), using BSR format
             blas->zeros(values->size(), values->data());
-            op->hessian_crs(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
+            op->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
             
-            
-            // Add c0*M to diagonal entries in BSR format
             auto rowptr = graph->rowptr()->data();
             auto colidx = graph->colidx()->data();
             auto vals = values->data();
             const int bs2 = block_size * block_size; // 9 for 3x3 blocks
-            
-            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-                // Find diagonal block
-                for (count_t k = rowptr[node]; k < rowptr[node+1]; ++k) {
-                    if (colidx[k] == (idx_t)node) {
-                        // Add c0*M to diagonal elements within the 3x3 block
-                        for (int d = 0; d < block_size; ++d) {
-                            ptrdiff_t dof_idx = node * block_size + d;
-                            vals[k * bs2 + d * block_size + d] += c0 * mass_diag->data()[dof_idx];
-                        }
-                        break;
-                    }
-                }
-            }
             
             // Apply Dirichlet BC to matrix: set BC rows to identity (using BSR format)
             conds->hessian_bsr(x->data(), rowptr, colidx, vals);
@@ -231,10 +261,16 @@ int test_mooney_rivlin_visco_relaxation() {
             cg->apply(rhs->data(), delta_x->data());
             
             // Update x: x = x + dx
+            real_t dx_norm = blas->norm2(ndofs, delta_x->data());
+            // Print dx at a right-side node (node index depends on mesh)
+            // For 2x1x1 cube, right nodes are at x=2
+            if (iter == 0) {
+                printf("    |dx|=%e, dx[last_node_x]=%e\n", dx_norm, delta_x->data()[ndofs-3]);
+            }
             blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
         }
         
-        // Update history
+        // Update history (only for MooneyRivlinVisco)
         op->update_history(x->data());
     }
 
