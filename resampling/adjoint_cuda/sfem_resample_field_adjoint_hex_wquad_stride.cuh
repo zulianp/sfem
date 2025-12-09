@@ -130,8 +130,10 @@ transfer_weighted_field_tet4_to_hex_dim_vec_gpu(const FloatType inv_J_tet[9],   
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType,                                                                           //
           typename IntType,                                                                             //
-          IntType DIM,                                                                                  //
-          bool    Generate_I_data>                                                                         //
+          IntType           DIM,                                                                        //
+          matrix_ordering_t Ordering_IN,                                                                //
+          matrix_ordering_t Ordering_OUT,                                                               //
+          bool              Generate_I_data>                                                                         //
 __device__ __forceinline__ void                                                                         //
 tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu(const IntType           element_i,              // element index
                                                         const IntType           nnodes,                 //
@@ -210,63 +212,69 @@ tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu(const IntType           
     const FloatType z2_n = FloatType(__ldg(&xyz.z[ev2]));
     const FloatType z3_n = FloatType(__ldg(&xyz.z[ev3]));
 
-    // #pragma unroll
-    //     for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-    //         wf0[wf_i] = weighted_field_v[wf_i][ev0];
-    //         wf1[wf_i] = weighted_field_v[wf_i][ev1];
-    //         wf2[wf_i] = weighted_field_v[wf_i][ev2];
-    //         wf3[wf_i] = weighted_field_v[wf_i][ev3];
-    //     }
-    //     // const FloatType wf0 = FloatType(__ldg(&weighted_field[ev0]));  // Weighted field at vertex 0
-    //     // const FloatType wf1 = FloatType(__ldg(&weighted_field[ev1]));  // Weighted field at vertex 1
-    //     // const FloatType wf2 = FloatType(__ldg(&weighted_field[ev2]));  // Weighted field at vertex 2
-    //     // const FloatType wf3 = FloatType(__ldg(&weighted_field[ev3]));  // Weighted field at vertex 3
+#pragma unroll
+    for (IntType di = 0; di < DIM; di++) {
+        IntType wi = 0;
+        if constexpr (Ordering_IN == matrix_ordering_t::ROW_MAJOR)
+            wi = di * nnodes + ev0;
+        else if constexpr (Ordering_IN == matrix_ordering_t::COL_MAJOR)
+            wi = ev0 * DIM + di;
+        else
+            static_assert(Ordering_IN == matrix_ordering_t::ROW_MAJOR ||        //
+                                  Ordering_IN == matrix_ordering_t::COL_MAJOR,  //
+                          "Invalid Ordering_IN");                               //
 
-    //     IntType min_grid_x, max_grid_x;
-    //     IntType min_grid_y, max_grid_y;
-    //     IntType min_grid_z, max_grid_z;
+        wf0[di] = FloatType(weighted_field_v[wi]);
+        wf1[di] = FloatType(weighted_field_v[wi]);
+        wf2[di] = FloatType(weighted_field_v[wi]);
+        wf3[di] = FloatType(weighted_field_v[wi]);
+    }
 
-    //     tet4_inv_Jacobian_gpu<FloatType>(x0_n,        //
-    //                                      x1_n,        //
-    //                                      x2_n,        //
-    //                                      x3_n,        //
-    //                                      y0_n,        //
-    //                                      y1_n,        //
-    //                                      y2_n,        //
-    //                                      y3_n,        //
-    //                                      z0_n,        //
-    //                                      z1_n,        //
-    //                                      z2_n,        //
-    //                                      z3_n,        //
-    //                                      inv_J_tet);  //
+    IntType min_grid_x, max_grid_x;
+    IntType min_grid_y, max_grid_y;
+    IntType min_grid_z, max_grid_z;
 
-    //     compute_tet_bounding_box_gpu<FloatType, IntType>(x0_n,         //
-    //                                                      x1_n,         //
-    //                                                      x2_n,         //
-    //                                                      x3_n,         //
-    //                                                      y0_n,         //
-    //                                                      y1_n,         //
-    //                                                      y2_n,         //
-    //                                                      y3_n,         //
-    //                                                      z0_n,         //
-    //                                                      z1_n,         //
-    //                                                      z2_n,         //
-    //                                                      z3_n,         //
-    //                                                      stride0,      //
-    //                                                      stride1,      //
-    //                                                      stride2,      //
-    //                                                      origin0,      //
-    //                                                      origin1,      //
-    //                                                      origin2,      //
-    //                                                      inv_dx,       //
-    //                                                      inv_dy,       //
-    //                                                      inv_dz,       //
-    //                                                      min_grid_x,   //
-    //                                                      max_grid_x,   //
-    //                                                      min_grid_y,   //
-    //                                                      max_grid_y,   //
-    //                                                      min_grid_z,   //
-    //                                                      max_grid_z);  //
+    tet4_inv_Jacobian_gpu<FloatType>(x0_n,        //
+                                     x1_n,        //
+                                     x2_n,        //
+                                     x3_n,        //
+                                     y0_n,        //
+                                     y1_n,        //
+                                     y2_n,        //
+                                     y3_n,        //
+                                     z0_n,        //
+                                     z1_n,        //
+                                     z2_n,        //
+                                     z3_n,        //
+                                     inv_J_tet);  //
+
+    compute_tet_bounding_box_gpu<FloatType, IntType>(x0_n,         //
+                                                     x1_n,         //
+                                                     x2_n,         //
+                                                     x3_n,         //
+                                                     y0_n,         //
+                                                     y1_n,         //
+                                                     y2_n,         //
+                                                     y3_n,         //
+                                                     z0_n,         //
+                                                     z1_n,         //
+                                                     z2_n,         //
+                                                     z3_n,         //
+                                                     stride0,      //
+                                                     stride1,      //
+                                                     stride2,      //
+                                                     origin0,      //
+                                                     origin1,      //
+                                                     origin2,      //
+                                                     inv_dx,       //
+                                                     inv_dy,       //
+                                                     inv_dz,       //
+                                                     min_grid_x,   //
+                                                     max_grid_x,   //
+                                                     min_grid_y,   //
+                                                     max_grid_y,   //
+                                                     min_grid_z,   //
+                                                     max_grid_z);  //
 
     //     FloatType hex_element_field[N_wf + 1][8] = {0.0};
 
