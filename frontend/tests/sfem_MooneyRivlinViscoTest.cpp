@@ -5,8 +5,8 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
+#include "sfem_bsr_SpMV.hpp"
 #include "sfem_test.h"
-#include "spmv.h" // C spmv
 
 int test_mooney_rivlin_visco_relaxation() {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -95,15 +95,20 @@ int test_mooney_rivlin_visco_relaxation() {
     real_t beta = 0.25;
     real_t gamma = 0.5;
 
-    // Matrix assembly buffers
+    // Matrix assembly buffers (BSR format: 3x3 blocks)
     auto graph = fs->node_to_node_graph();
-    auto values = sfem::create_buffer<real_t>(graph->nnz(), es);
+    const int block_size = 3;
+    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    auto values = sfem::create_buffer<real_t>(graph->nnz() * block_size * block_size, es);
     
-    // Linear Solver Wrapper
+    // Linear Solver Wrapper (BSR SpMV)
     auto linear_op_apply = sfem::make_op<real_t>(
         ndofs, ndofs,
         [=](const real_t *const in, real_t *const out) {
-            crs_spmv(ndofs, graph->rowptr()->data(), graph->colidx()->data(), values->data(), in, out);
+            sfem::bsr_spmv<count_t, idx_t, real_t>(
+                n_nodes, n_nodes, block_size,
+                graph->rowptr()->data(), graph->colidx()->data(), values->data(),
+                0.0, in, out);
         },
         es);
         
@@ -178,39 +183,55 @@ int test_mooney_rivlin_visco_relaxation() {
             blas->zeros(values->size(), values->data());
             op->hessian_crs(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
             
-            // Add c0*M to diagonal entries in CRS
-            // For lumped mass, we need to add c0*mass_diag[i] to values[rowptr[i]] (first entry in each row)
+            
+            // Add c0*M to diagonal entries in BSR format
             auto rowptr = graph->rowptr()->data();
             auto colidx = graph->colidx()->data();
             auto vals = values->data();
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                // Find diagonal entry
-                for (count_t k = rowptr[i]; k < rowptr[i+1]; ++k) {
-                    if (colidx[k] == (idx_t)i) {
-                        vals[k] += c0 * mass_diag->data()[i];
+            const int bs2 = block_size * block_size; // 9 for 3x3 blocks
+            
+            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                // Find diagonal block
+                for (count_t k = rowptr[node]; k < rowptr[node+1]; ++k) {
+                    if (colidx[k] == (idx_t)node) {
+                        // Add c0*M to diagonal elements within the 3x3 block
+                        for (int d = 0; d < block_size; ++d) {
+                            ptrdiff_t dof_idx = node * block_size + d;
+                            vals[k * bs2 + d * block_size + d] += c0 * mass_diag->data()[dof_idx];
+                        }
                         break;
                     }
                 }
             }
             
-            // Extract diagonal for Jacobi preconditioner
+            // Apply Dirichlet BC to matrix: set BC rows to identity (using BSR format)
+            conds->hessian_bsr(x->data(), rowptr, colidx, vals);
+            
+            // Extract diagonal for Jacobi preconditioner (from BSR format)
             blas->zeros(ndofs, diag->data());
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                for (count_t k = rowptr[i]; k < rowptr[i+1]; ++k) {
-                    if (colidx[k] == (idx_t)i) {
-                        diag->data()[i] = vals[k];
+            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                for (count_t k = rowptr[node]; k < rowptr[node+1]; ++k) {
+                    if (colidx[k] == (idx_t)node) {
+                        // Extract diagonal elements from the 3x3 block
+                        for (int d = 0; d < block_size; ++d) {
+                            ptrdiff_t dof_idx = node * block_size + d;
+                            diag->data()[dof_idx] = vals[k * bs2 + d * block_size + d];
+                        }
                         break;
                     }
                 }
             }
-            f->set_value_to_constrained_dofs(1.0, diag->data());
             
-            // Solve K * dx = -R
+            // Update Jacobi preconditioner with new diagonal
+            jacobi->set_diag(diag);
+            
+            // Solve K * dx = -R  (negate rhs first)
+            blas->scal(ndofs, -1.0, rhs->data());
             blas->zeros(ndofs, delta_x->data());
             cg->apply(rhs->data(), delta_x->data());
             
-            // Update x
-            blas->axpy(ndofs, -1.0, delta_x->data(), x->data());
+            // Update x: x = x + dx
+            blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
         }
         
         // Update history
