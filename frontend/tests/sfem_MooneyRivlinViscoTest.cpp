@@ -8,47 +8,6 @@
 #include "sfem_test.h"
 #include "spmv.h" // C spmv
 
-// Simple solver setup for the test
-std::shared_ptr<sfem::Operator<real_t>> create_linear_solver(
-    const std::shared_ptr<sfem::FunctionSpace> &fs,
-    const std::shared_ptr<sfem::Buffer<real_t>> &x,
-    const std::shared_ptr<sfem::Function> &f,
-    const std::shared_ptr<sfem::MooneyRivlinVisco> &op) {
-    
-    auto es = sfem::EXECUTION_SPACE_HOST;
-    
-    // We need to construct the CRS graph for the Hessian
-    auto graph = fs->node_to_node_graph();
-    auto rowptr = graph->rowptr();
-    auto colidx = graph->colidx();
-    
-    // Buffer for Hessian values
-    auto values = sfem::create_buffer<real_t>(graph->nnz(), es);
-    
-    // Linear operator wrapper that applies A * y using the pre-assembled values
-    auto linear_op = sfem::make_op<real_t>(
-        fs->n_dofs(), fs->n_dofs(),
-        [=](const real_t *const y, real_t *const z) {
-            crs_spmv(fs->n_dofs(), rowptr->data(), colidx->data(), values->data(), y, z);
-        },
-        es);
-        
-    // CG Solver
-    auto cg = sfem::create_cg<real_t>(linear_op, es);
-    cg->set_max_it(1000);
-    cg->set_rtol(1e-6);
-    cg->verbose = false;
-    
-    auto solver_op = sfem::make_op<real_t>(
-        fs->n_dofs(), fs->n_dofs(),
-        [cg](const real_t *const rhs, real_t *const x) {
-            cg->apply(rhs, x);
-        },
-        es);
-
-    return solver_op;
-}
-
 int test_mooney_rivlin_visco_relaxation() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto es = sfem::EXECUTION_SPACE_HOST;
@@ -67,7 +26,10 @@ int test_mooney_rivlin_visco_relaxation() {
 
     // 2. Create & Configure Operator
     auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
-    auto mass_op = sfem::create_op(fs, "Mass", es);
+    
+    // Create LumpedMass and get mass vector (diagonal)
+    auto mass_op = sfem::create_op(fs, "LumpedMass", es);
+    mass_op->initialize();
     
     // Material Parameters
     op->set_C10(1.0);
@@ -112,12 +74,18 @@ int test_mooney_rivlin_visco_relaxation() {
     auto delta_x = sfem::create_buffer<real_t>(ndofs, es);
     auto diag = sfem::create_buffer<real_t>(ndofs, es);
     
+    // Lumped mass vector (diagonal of M)
+    auto mass_diag = sfem::create_buffer<real_t>(ndofs, es);
+    mass_op->hessian_diag(nullptr, mass_diag->data());
+    f->set_value_to_constrained_dofs(1.0, mass_diag->data()); // Set 1 for BC nodes
+    
     // Newmark state
     auto v = sfem::create_buffer<real_t>(ndofs, es);
     auto a = sfem::create_buffer<real_t>(ndofs, es);
     auto u_prev = sfem::create_buffer<real_t>(ndofs, es);
     auto v_prev = sfem::create_buffer<real_t>(ndofs, es);
     auto a_prev = sfem::create_buffer<real_t>(ndofs, es);
+    auto Ma = sfem::create_buffer<real_t>(ndofs, es); // M * a buffer
     
     auto blas = sfem::blas<real_t>(es);
     blas->zeros(ndofs, x->data());
@@ -140,6 +108,7 @@ int test_mooney_rivlin_visco_relaxation() {
         es);
         
     auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
+    cg->set_n_dofs(ndofs);
     cg->set_max_it(2000);
     cg->set_rtol(1e-5);
     cg->verbose = false;
@@ -151,7 +120,6 @@ int test_mooney_rivlin_visco_relaxation() {
     // 5. Time Loop
     int n_steps = 3;
     
-    auto vals_mass = sfem::create_buffer<real_t>(graph->nnz(), es);
     auto f_int = sfem::create_buffer<real_t>(ndofs, es);
     auto f_neumann = sfem::create_buffer<real_t>(ndofs, es);
     
@@ -179,18 +147,21 @@ int test_mooney_rivlin_visco_relaxation() {
             blas->axpy(ndofs, dt * (1.0 - gamma), a_prev->data(), v->data());
             blas->axpy(ndofs, dt * gamma, a->data(), v->data());
 
-            // 3. Residual = M*a + F_int(x) + F_neumann
+            // 3. Residual = M*a + F_int(x) - F_ext
             blas->zeros(ndofs, rhs->data());
             
-            // M*a
-            mass_op->apply(nullptr, a->data(), rhs->data());
+            // M*a using lumped mass: element-wise multiply
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                Ma->data()[i] = mass_diag->data()[i] * a->data()[i];
+            }
+            blas->axpy(ndofs, 1.0, Ma->data(), rhs->data());
             
             // F_int(x)
+            blas->zeros(ndofs, f_int->data());
             op->gradient(x->data(), f_int->data());
             blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
 
-            // F_ext (Neumann)
-            // Note: Neumann gradient adds the contribution to the residual (usually -F_ext)
+            // F_ext (Neumann) - this is negative in residual
             blas->zeros(ndofs, f_neumann->data());
             neumann_op->gradient(x->data(), f_neumann->data());
             blas->axpy(ndofs, 1.0, f_neumann->data(), rhs->data());
@@ -203,34 +174,36 @@ int test_mooney_rivlin_visco_relaxation() {
             if (r_norm < 1e-8) break;
 
             // Hessian Assembly: K_eff = c0 * M + K_tan
-            // Mass part
-            blas->zeros(vals_mass->size(), vals_mass->data());
-            mass_op->hessian_crs(x->data(), graph->rowptr()->data(), graph->colidx()->data(), vals_mass->data());
-            blas->scal(vals_mass->size(), c0, vals_mass->data());
-            
-            // Stiffness part
+            // For lumped mass, we add c0*M to diagonal
             blas->zeros(values->size(), values->data());
             op->hessian_crs(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
             
-            // Combine
-            blas->axpy(values->size(), 1.0, vals_mass->data(), values->data());
+            // Add c0*M to diagonal entries in CRS
+            // For lumped mass, we need to add c0*mass_diag[i] to values[rowptr[i]] (first entry in each row)
+            auto rowptr = graph->rowptr()->data();
+            auto colidx = graph->colidx()->data();
+            auto vals = values->data();
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                // Find diagonal entry
+                for (count_t k = rowptr[i]; k < rowptr[i+1]; ++k) {
+                    if (colidx[k] == (idx_t)i) {
+                        vals[k] += c0 * mass_diag->data()[i];
+                        break;
+                    }
+                }
+            }
             
-            // Fix BC rows in matrix
+            // Extract diagonal for Jacobi preconditioner
             blas->zeros(ndofs, diag->data());
-            // Diagonal of mass + stiffness
-            // Note: hessian_diag might only return stiffness diag. We need mass diag too.
-            // For simplicity, let's re-extract diagonal from CSR values or just trust the solver handles it.
-            // Or: op->hessian_diag(x, diag); mass_op->hessian_diag(x, diag_mass); ...
-            // Let's just use 1.0 for constrained dofs
-            
-            // Apply BCs to matrix diagonal for Jacobi
-            f->set_value_to_constrained_dofs(1.0, diag->data()); // This is actually unused if we set diag in jacobi manually
-            // But wait, we need the actual diagonal for the preconditioner.
-            // Since we have the full matrix in 'values', let's extract diagonal?
-            // Too complex for this test snippet.
-            // Let's just use identity preconditioner for now or simple one.
-            // Or just ignore diag update and hope CG converges. 
-            // With identity diag for BCs, it should be fine.
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                for (count_t k = rowptr[i]; k < rowptr[i+1]; ++k) {
+                    if (colidx[k] == (idx_t)i) {
+                        diag->data()[i] = vals[k];
+                        break;
+                    }
+                }
+            }
+            f->set_value_to_constrained_dofs(1.0, diag->data());
             
             // Solve K * dx = -R
             blas->zeros(ndofs, delta_x->data());
@@ -244,6 +217,7 @@ int test_mooney_rivlin_visco_relaxation() {
         op->update_history(x->data());
     }
 
+    printf("Test completed successfully!\n");
     return SFEM_TEST_SUCCESS;
 }
 
@@ -253,5 +227,4 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-
 
