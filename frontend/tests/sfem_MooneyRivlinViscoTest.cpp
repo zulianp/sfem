@@ -122,64 +122,7 @@ int test_mooney_rivlin_visco_relaxation() {
     auto jacobi = sfem::create_shiftable_jacobi(diag, es);
     cg->set_preconditioner_op(jacobi);
 
-    // ==== FINITE DIFFERENCE CHECK ====
-    printf("\n=== Finite Difference Check ===\n");
-    {
-        auto g0 = sfem::create_buffer<real_t>(ndofs, es);
-        auto g1 = sfem::create_buffer<real_t>(ndofs, es);
-        auto x0 = sfem::create_buffer<real_t>(ndofs, es);
-        auto dx_test = sfem::create_buffer<real_t>(ndofs, es);
-        auto Hdx = sfem::create_buffer<real_t>(ndofs, es);
-        
-        // Use zero displacement for testing (simpler case)
-        blas->zeros(ndofs, x0->data());
-        printf("  x0 norm = %e\n", blas->norm2(ndofs, x0->data()));
-        
-        // Set a small perturbation dx (in x-direction of node 5)
-        blas->zeros(ndofs, dx_test->data());
-        real_t eps = 1e-4;  // Larger eps for better FD accuracy
-        dx_test->data()[3*5] = 1.0; // Perturb x of node 5
-        
-        // g0 = gradient(x0)
-        blas->zeros(ndofs, g0->data());
-        op->gradient(x0->data(), g0->data());
-        printf("  |g0| = %e\n", blas->norm2(ndofs, g0->data()));
-        
-        // g1 = gradient(x0 + eps*dx)
-        blas->copy(ndofs, x0->data(), x->data());
-        blas->axpy(ndofs, eps, dx_test->data(), x->data());
-        blas->zeros(ndofs, g1->data());
-        op->gradient(x->data(), g1->data());
-        printf("  |g1| = %e\n", blas->norm2(ndofs, g1->data()));
-        
-        // FD approximation: (g1 - g0) / eps ≈ H * dx
-        blas->axpy(ndofs, -1.0, g0->data(), g1->data()); // g1 = g1 - g0
-        blas->scal(ndofs, 1.0/eps, g1->data()); // g1 = (g1 - g0) / eps
-        
-        // Hessian * dx
-        blas->zeros(values->size(), values->data());
-        op->hessian_bsr(x0->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data());
-        sfem::bsr_spmv<count_t, idx_t, real_t>(
-            n_nodes, n_nodes, block_size,
-            graph->rowptr()->data(), graph->colidx()->data(), values->data(),
-            0.0, dx_test->data(), Hdx->data());
-        
-        // Compare
-        real_t fd_norm = blas->norm2(ndofs, g1->data());
-        real_t hdx_norm = blas->norm2(ndofs, Hdx->data());
-        
-        // Compute difference
-        blas->axpy(ndofs, -1.0, Hdx->data(), g1->data());
-        real_t diff_norm = blas->norm2(ndofs, g1->data());
-        
-        printf("  |FD gradient| = %e\n", fd_norm);
-        printf("  |H * dx|      = %e\n", hdx_norm);
-        printf("  |FD - H*dx|   = %e\n", diff_norm);
-        printf("  Relative diff = %e\n", diff_norm / (fd_norm + 1e-16));
-        
-        blas->zeros(ndofs, x->data()); // Reset x to 0
-    }
-    printf("=== End FD Check ===\n\n");
+    // FD check removed for cleaner test output
     
     // 5. Time Loop
     int n_steps = 3;
