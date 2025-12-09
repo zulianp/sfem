@@ -7,14 +7,14 @@
 //////////////////////////////////////////////////////////
 template <typename FloatType,                                                               //
           typename IntType = ptrdiff_t,                                                     //
-          IntType Dim,                                                                      //
+          IntType DIM,                                                                      //
           bool    Generate_I_data>                                                             //
 __device__ __inline__ bool                                                                  //
 transfer_weighted_field_tet4_to_hex_dim_vec_gpu(const FloatType inv_J_tet[9],               //
-                                                const FloatType wf0[Dim],                   //
-                                                const FloatType wf1[Dim],                   //
-                                                const FloatType wf2[Dim],                   //
-                                                const FloatType wf3[Dim],                   //
+                                                const FloatType wf0[DIM],                   //
+                                                const FloatType wf1[DIM],                   //
+                                                const FloatType wf2[DIM],                   //
+                                                const FloatType wf3[DIM],                   //
                                                 const FloatType q_phys_x,                   //
                                                 const FloatType q_phys_y,                   //
                                                 const FloatType q_phys_z,                   //
@@ -28,7 +28,7 @@ transfer_weighted_field_tet4_to_hex_dim_vec_gpu(const FloatType inv_J_tet[9],   
                                                 const FloatType inv_dx,                     //
                                                 const FloatType inv_dy,                     //
                                                 const FloatType inv_dz,                     //
-                                                FloatType       hex_element_field[Dim + 1][8]) {  //
+                                                FloatType       hex_element_field[DIM + 1][8]) {  //
 
     // Compute the weighted contribution from the tetrahedron
     // Using linear shape functions for tetrahedron
@@ -108,7 +108,7 @@ transfer_weighted_field_tet4_to_hex_dim_vec_gpu(const FloatType inv_J_tet[9],   
     }
 
 #pragma unroll
-    for (IntType di = 1; di < Dim + 1; di++) {
+    for (IntType di = 1; di < DIM + 1; di++) {
         // Interpolate weighted field at quadrature point using FMA for precision
         const FloatType wf_quad =
                 fast_fma(f0, wf0[di - 1], fast_fma(f1, wf1[di - 1], fast_fma(f2, wf2[di - 1], f3 * wf3[di - 1])));
@@ -178,6 +178,8 @@ tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu(const IntType           
     const IntType off5 = stride0 + stride2;
     const IntType off6 = stride0 + stride1 + stride2;
     const IntType off7 = stride1 + stride2;
+
+    const IntType n_nodes_data = n0 * n1 * n2;
 
     const IntType N_quadnodes_loc = 2;
 
@@ -276,169 +278,247 @@ tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu(const IntType           
                                                      min_grid_z,   //
                                                      max_grid_z);  //
 
-    //     FloatType hex_element_field[N_wf + 1][8] = {0.0};
+    FloatType hex_element_field[DIM + 1][8] = {0.0};
 
-    //     const IntType size_x = max_grid_x - min_grid_x + 1;
-    //     const IntType size_y = max_grid_y - min_grid_y + 1;
-    //     const IntType size_z = max_grid_z - min_grid_z + 1;
+    const IntType size_x = max_grid_x - min_grid_x + 1;
+    const IntType size_y = max_grid_y - min_grid_y + 1;
+    const IntType size_z = max_grid_z - min_grid_z + 1;
 
-    //     const IntType total_grid_points = size_x * size_y * size_z;
+    const IntType total_grid_points = size_x * size_y * size_z;
 
-    //     // Loop over all grid points in the bounding box
-    //     for (IntType idx = 0; idx < total_grid_points; idx += n_warps) {
-    //         const IntType grid_idx = idx + warp_id;
-    //         if (grid_idx >= total_grid_points) continue;
+    // Loop over all grid points in the bounding box
+    for (IntType idx = 0; idx < total_grid_points; idx += n_warps) {
+        const IntType grid_idx = idx + warp_id;
+        if (grid_idx >= total_grid_points) continue;
 
-    //         const IntType ix_local = grid_idx % size_x;
-    //         const IntType iy_local = (grid_idx / size_x) % size_y;
-    //         const IntType iz_local = grid_idx / (size_x * size_y);
+        const IntType ix_local = grid_idx % size_x;
+        const IntType iy_local = (grid_idx / size_x) % size_y;
+        const IntType iz_local = grid_idx / (size_x * size_y);
 
-    //         // Convert to absolute grid coordinates
-    //         const IntType ix = min_grid_x + ix_local;
-    //         const IntType iy = min_grid_y + iy_local;
-    //         const IntType iz = min_grid_z + iz_local;
+        // Convert to absolute grid coordinates
+        const IntType ix = min_grid_x + ix_local;
+        const IntType iy = min_grid_y + iy_local;
+        const IntType iz = min_grid_z + iz_local;
 
-    //         const FloatType x_hex_min = fast_fma((FloatType)ix, dx, origin0);
-    //         const FloatType y_hex_min = fast_fma((FloatType)iy, dy, origin1);
-    //         const FloatType z_hex_min = fast_fma((FloatType)iz, dz, origin2);
+        const FloatType x_hex_min = fast_fma((FloatType)ix, dx, origin0);
+        const FloatType y_hex_min = fast_fma((FloatType)iy, dy, origin1);
+        const FloatType z_hex_min = fast_fma((FloatType)iz, dz, origin2);
 
-    //         const FloatType x_hex_max = x_hex_min + dx;
-    //         const FloatType y_hex_max = y_hex_min + dy;
-    //         const FloatType z_hex_max = z_hex_min + dz;
+        const FloatType x_hex_max = x_hex_min + dx;
+        const FloatType y_hex_max = y_hex_min + dy;
+        const FloatType z_hex_max = z_hex_min + dz;
 
-    //         const FloatType hex_vertices_x[8] = {x_hex_min,
-    //                                              x_hex_max,
-    //                                              x_hex_max,
-    //                                              x_hex_min,  //
-    //                                              x_hex_min,
-    //                                              x_hex_max,
-    //                                              x_hex_max,
-    //                                              x_hex_min};
+        const FloatType hex_vertices_x[8] = {x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min,  //
+                                             x_hex_min,
+                                             x_hex_max,
+                                             x_hex_max,
+                                             x_hex_min};
 
-    //         const FloatType hex_vertices_y[8] = {y_hex_min,
-    //                                              y_hex_min,
-    //                                              y_hex_max,
-    //                                              y_hex_max,  //
-    //                                              y_hex_min,
-    //                                              y_hex_min,
-    //                                              y_hex_max,
-    //                                              y_hex_max};
+        const FloatType hex_vertices_y[8] = {y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max,  //
+                                             y_hex_min,
+                                             y_hex_min,
+                                             y_hex_max,
+                                             y_hex_max};
 
-    //         const FloatType hex_vertices_z[8] = {z_hex_min,
-    //                                              z_hex_min,
-    //                                              z_hex_min,
-    //                                              z_hex_min,  //
-    //                                              z_hex_max,
-    //                                              z_hex_max,
-    //                                              z_hex_max,
-    //                                              z_hex_max};
+        const FloatType hex_vertices_z[8] = {z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,
+                                             z_hex_min,  //
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max,
+                                             z_hex_max};
 
-    //         const bool is_out_of_tet = is_hex_out_of_tet_gpu(inv_J_tet,        //
-    //                                                          x0_n,             //
-    //                                                          y0_n,             //
-    //                                                          z0_n,             //
-    //                                                          hex_vertices_x,   //
-    //                                                          hex_vertices_y,   //
-    //                                                          hex_vertices_z);  //
+        const bool is_out_of_tet = is_hex_out_of_tet_gpu(inv_J_tet,        //
+                                                         x0_n,             //
+                                                         y0_n,             //
+                                                         z0_n,             //
+                                                         hex_vertices_x,   //
+                                                         hex_vertices_y,   //
+                                                         hex_vertices_z);  //
 
-    //         if (is_out_of_tet) continue;  // Skip this hex cell
+        if (is_out_of_tet) continue;  // Skip this hex cell
 
-    //         // printf("Element %d, Hex cell at (%d, %d, %d) may overlap tet\n", element_i, ix, iy, iz);
+        // printf("Element %d, Hex cell at (%d, %d, %d) may overlap tet\n", element_i, ix, iy, iz);
 
-    // #pragma unroll
-    //         for (IntType wf_i = 0; wf_i < N_wf + 1; wf_i++)
-    // #pragma unroll
-    //             for (int v = 0; v < 8; v++) hex_element_field[wf_i][v] = FloatType(0.0);
+        // #pragma unroll
+        //         for (IntType di = 0; di < DIM + 1; di++)
+        // #pragma unroll
+        //             for (int v = 0; v < 8; v++) hex_element_field[di][v] = FloatType(0.0);
 
-    //         // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
+        memset(hex_element_field, 0, sizeof(hex_element_field));
 
-    // #pragma unroll
-    //         for (int q_i = 0; q_i < N_quadnodes_loc; q_i++) {
-    //             const FloatType q_i_node   = Q_nodes[q_i];
-    //             const FloatType q_i_weight = Q_weights[q_i];
+        // for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD) {
 
-    // #pragma unroll
-    //             for (int q_j = 0; q_j < N_quadnodes_loc; q_j++) {
-    //                 const FloatType q_j_node    = Q_nodes[q_j];
-    //                 const FloatType q_ij_weight = Q_weights[q_j] * q_i_weight;
+#pragma unroll
+        for (int q_i = 0; q_i < N_quadnodes_loc; q_i++) {
+            const FloatType q_i_node   = Q_nodes[q_i];
+            const FloatType q_i_weight = Q_weights[q_i];
 
-    // #pragma unroll
-    //                 for (int q_k = 0; q_k < N_quadnodes_loc; q_k++) {
-    //                     // const int q_ijk = q_i * N_midpoint * N_midpoint + q_j * N_midpoint + q_k;
-    //                     //
+#pragma unroll
+            for (int q_j = 0; q_j < N_quadnodes_loc; q_j++) {
+                const FloatType q_j_node    = Q_nodes[q_j];
+                const FloatType q_ij_weight = Q_weights[q_j] * q_i_weight;
 
-    //                     const FloatType Q_weight = q_ij_weight * Q_weights[q_k];
+#pragma unroll
+                for (int q_k = 0; q_k < N_quadnodes_loc; q_k++) {
+                    // const int q_ijk = q_i * N_midpoint * N_midpoint + q_j * N_midpoint + q_k;
+                    //
 
-    //                     quadrature_point_result_gpu_t Qpoint_phys =                      //
-    //                             transform_quadrature_point_n_gpu<FloatType,              //
-    //                                                              IntType>(q_i_node,      //
-    //                                                                       q_j_node,      //
-    //                                                                       Q_nodes[q_k],  //
-    //                                                                       Q_weight,      //
-    //                                                                       origin0,       //
-    //                                                                       origin1,       //
-    //                                                                       origin2,       //
-    //                                                                       dx,            //
-    //                                                                       dy,            //
-    //                                                                       dz,            //
-    //                                                                       ix,            //
-    //                                                                       iy,            //
-    //                                                                       iz);           //
+                    const FloatType Q_weight = q_ij_weight * Q_weights[q_k];
 
-    //                     const bool is_in_tet =                                                                        //
-    //                             transfer_weighted_field_tet4_to_hex_vec_gpu<FloatType,                                //
-    //                                                                         IntType,                                  //
-    //                                                                         N_wf,                                     //
-    //                                                                         Generate_I_data>(inv_J_tet,               //
-    //                                                                                          wf0,                     //
-    //                                                                                          wf1,                     //
-    //                                                                                          wf2,                     //
-    //                                                                                          wf3,                     //
-    //                                                                                          Qpoint_phys.physical_x,  //
-    //                                                                                          Qpoint_phys.physical_y,  //
-    //                                                                                          Qpoint_phys.physical_z,  //
-    //                                                                                          Qpoint_phys.weight,      //
-    //                                                                                          x0_n,                    //
-    //                                                                                          y0_n,                    //
-    //                                                                                          z0_n,                    //
-    //                                                                                          origin0,                 //
-    //                                                                                          origin1,                 //
-    //                                                                                          origin2,                 //
-    //                                                                                          inv_dx,                  //
-    //                                                                                          inv_dy,                  //
-    //                                                                                          inv_dz,                  //
-    //                                                                                          hex_element_field);      //
+                    quadrature_point_result_gpu_t Qpoint_phys =                      //
+                            transform_quadrature_point_n_gpu<FloatType,              //
+                                                             IntType>(q_i_node,      //
+                                                                      q_j_node,      //
+                                                                      Q_nodes[q_k],  //
+                                                                      Q_weight,      //
+                                                                      origin0,       //
+                                                                      origin1,       //
+                                                                      origin2,       //
+                                                                      dx,            //
+                                                                      dy,            //
+                                                                      dz,            //
+                                                                      ix,            //
+                                                                      iy,            //
+                                                                      iz);           //
 
-    //                 }  // END: for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
-    //             }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
-    //         }  // END: for (int q_i = 0; q_i < N_midpoint; q_i++)
+                    const bool is_in_tet =                                                                            //
+                            transfer_weighted_field_tet4_to_hex_dim_vec_gpu<FloatType,                                //
+                                                                            IntType,                                  //
+                                                                            DIM,                                      //
+                                                                            Generate_I_data>(inv_J_tet,               //
+                                                                                             wf0,                     //
+                                                                                             wf1,                     //
+                                                                                             wf2,                     //
+                                                                                             wf3,                     //
+                                                                                             Qpoint_phys.physical_x,  //
+                                                                                             Qpoint_phys.physical_y,  //
+                                                                                             Qpoint_phys.physical_z,  //
+                                                                                             Qpoint_phys.weight,      //
+                                                                                             x0_n,                    //
+                                                                                             y0_n,                    //
+                                                                                             z0_n,                    //
+                                                                                             origin0,                 //
+                                                                                             origin1,                 //
+                                                                                             origin2,                 //
+                                                                                             inv_dx,                  //
+                                                                                             inv_dy,                  //
+                                                                                             inv_dz,                  //
+                                                                                             hex_element_field);      //
 
-    //         const IntType base_index = ix * stride0 +  //
-    //                                    iy * stride1 +  //
-    //                                    iz * stride2;   //
+                }  // END: for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
+            }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
+        }  // END: for (int q_i = 0; q_i < N_midpoint; q_i++)
 
-    //         if constexpr (Generate_I_data) {
-    //             atomicAdd(&I_data[base_index + off0], hex_element_field[0][0]);  //
-    //             atomicAdd(&I_data[base_index + off1], hex_element_field[0][1]);  //
-    //             atomicAdd(&I_data[base_index + off2], hex_element_field[0][2]);  //
-    //             atomicAdd(&I_data[base_index + off3], hex_element_field[0][3]);  //
-    //             atomicAdd(&I_data[base_index + off4], hex_element_field[0][4]);  //
-    //             atomicAdd(&I_data[base_index + off5], hex_element_field[0][5]);  //
-    //             atomicAdd(&I_data[base_index + off6], hex_element_field[0][6]);  //
-    //             atomicAdd(&I_data[base_index + off7], hex_element_field[0][7]);  //
-    //         }
+        const IntType base_index = ix * stride0 +  //
+                                   iy * stride1 +  //
+                                   iz * stride2;   //
 
-    // #pragma unroll
-    //         for (IntType wf_i = 0; wf_i < N_wf; wf_i++) {
-    //             atomicAdd(&data[wf_i][base_index + off0], hex_element_field[wf_i + 1][0]);  //
-    //             atomicAdd(&data[wf_i][base_index + off1], hex_element_field[wf_i + 1][1]);  //
-    //             atomicAdd(&data[wf_i][base_index + off2], hex_element_field[wf_i + 1][2]);  //
-    //             atomicAdd(&data[wf_i][base_index + off3], hex_element_field[wf_i + 1][3]);  //
-    //             atomicAdd(&data[wf_i][base_index + off4], hex_element_field[wf_i + 1][4]);  //
-    //             atomicAdd(&data[wf_i][base_index + off5], hex_element_field[wf_i + 1][5]);  //
-    //             atomicAdd(&data[wf_i][base_index + off6], hex_element_field[wf_i + 1][6]);  //
-    //             atomicAdd(&data[wf_i][base_index + off7], hex_element_field[wf_i + 1][7]);  //
-    //         }
+        if constexpr (Generate_I_data) {
+            atomicAdd(&I_data[base_index + off0], hex_element_field[0][0]);  //
+            atomicAdd(&I_data[base_index + off1], hex_element_field[0][1]);  //
+            atomicAdd(&I_data[base_index + off2], hex_element_field[0][2]);  //
+            atomicAdd(&I_data[base_index + off3], hex_element_field[0][3]);  //
+            atomicAdd(&I_data[base_index + off4], hex_element_field[0][4]);  //
+            atomicAdd(&I_data[base_index + off5], hex_element_field[0][5]);  //
+            atomicAdd(&I_data[base_index + off6], hex_element_field[0][6]);  //
+            atomicAdd(&I_data[base_index + off7], hex_element_field[0][7]);  //
+        }
 
-    //     }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
+        {  // Block for data accumulation //////////////////////////
+#pragma unroll
+            for (IntType di = 0; di < DIM; di++) {
+                IntType data_i = 0;
+                if constexpr (Ordering_IN == matrix_ordering_t::ROW_MAJOR) {
+                    data_i = di * n_nodes_data + base_index;
+
+                    atomicAdd(&data[data_i + off0], hex_element_field[di + 1][0]);  //
+                    atomicAdd(&data[data_i + off1], hex_element_field[di + 1][1]);  //
+                    atomicAdd(&data[data_i + off2], hex_element_field[di + 1][2]);  //
+                    atomicAdd(&data[data_i + off3], hex_element_field[di + 1][3]);  //
+                    atomicAdd(&data[data_i + off4], hex_element_field[di + 1][4]);  //
+                    atomicAdd(&data[data_i + off5], hex_element_field[di + 1][5]);  //
+                    atomicAdd(&data[data_i + off6], hex_element_field[di + 1][6]);  //
+                    atomicAdd(&data[data_i + off7], hex_element_field[di + 1][7]);  //
+
+                } else if constexpr (Ordering_IN == matrix_ordering_t::COL_MAJOR) {
+                    atomicAdd(&data[(base_index + off0) * DIM + di], hex_element_field[di + 1][0]);  //
+                    atomicAdd(&data[(base_index + off1) * DIM + di], hex_element_field[di + 1][1]);  //
+                    atomicAdd(&data[(base_index + off2) * DIM + di], hex_element_field[di + 1][2]);  //
+                    atomicAdd(&data[(base_index + off3) * DIM + di], hex_element_field[di + 1][3]);  //
+                    atomicAdd(&data[(base_index + off4) * DIM + di], hex_element_field[di + 1][4]);  //
+                    atomicAdd(&data[(base_index + off5) * DIM + di], hex_element_field[di + 1][5]);  //
+                    atomicAdd(&data[(base_index + off6) * DIM + di], hex_element_field[di + 1][6]);  //
+                    atomicAdd(&data[(base_index + off7) * DIM + di], hex_element_field[di + 1][7]);  //
+                } else {
+                    static_assert(Ordering_IN == matrix_ordering_t::ROW_MAJOR ||        //
+                                          Ordering_IN == matrix_ordering_t::COL_MAJOR,  //
+                                  "Invalid Ordering_IN");                               //
+                }
+            }
+        }  // END block for data accumulation //////////////////////////
+    }  // END for (IntType idx = 0; idx < total_grid_points; idx += n_warps)
 }  // END Function: tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu
+
+template <typename FloatType,                                                                       //
+          typename IntType,                                                                         //
+          IntType           DIM,                                                                    //
+          matrix_ordering_t Ordering_IN,                                                            //
+          matrix_ordering_t Ordering_OUT,                                                           //
+          bool              Generate_I_data>                                                                     //
+__global__ void tet_grid_hex_dim_quad_element_nw_kernel_gpu(const IntType           start_element,  // element index    //
+                                                            const IntType           end_element,    //
+                                                            const IntType           nnodes,         //
+                                                            const elems_tet4_device elems,          //
+                                                            const xyz_tet4_device   xyz,            //
+                                                            const IntType           n0,             // SDF
+                                                            const IntType           n1,             //
+                                                            const IntType           n2,             //
+                                                            const IntType           stride0,        // Stride
+                                                            const IntType           stride1,        //
+                                                            const IntType           stride2,        //
+                                                            const FloatType         origin0,        // Origin
+                                                            const FloatType         origin1,        //
+                                                            const FloatType         origin2,        //
+                                                            const FloatType         dx,             // Delta
+                                                            const FloatType         dy,             //
+                                                            const FloatType         dz,             //
+                                                            FloatType* const        weighted_field_v[DIM],
+                                                            FloatType* const        data[DIM],  //
+                                                            int32_t* const          hex_inout_device) {  //
+
+    for (int element_i = start_element + blockIdx.x; element_i < end_element; element_i += gridDim.x) {
+        tet4_resample_field_adjoint_hex_dim_quad_element_nw_gpu<FloatType,         //
+                                                                IntType,           //
+                                                                DIM,               //
+                                                                Ordering_IN,       //
+                                                                Ordering_OUT,      //
+                                                                Generate_I_data>(  //
+                element_i,                                                         //
+                nnodes,                                                            //
+                elems,                                                             //
+                xyz,                                                               //
+                n0,                                                                //
+                n1,                                                                //
+                n2,                                                                //
+                stride0,                                                           //
+                stride1,                                                           //
+                stride2,                                                           //
+                origin0,                                                           //
+                origin1,                                                           //
+                origin2,                                                           //
+                dx,                                                                //
+                dy,                                                                //
+                dz,                                                                //
+                weighted_field_v,                                                  //
+                data,                                                              //
+                (Generate_I_data ? hex_inout_device : nullptr));                   //
+    }
+}
