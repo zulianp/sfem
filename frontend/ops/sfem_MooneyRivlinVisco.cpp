@@ -137,6 +137,8 @@ namespace sfem {
         // We assume line_q2 (8 QPs) for HEX8. 
         const int n_qp = 8; 
         const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
+        // history_stride is the history size per ELEMENT (not cumulative offset!)
+        const ptrdiff_t history_stride = n_qp * history_per_qp;
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -154,13 +156,13 @@ namespace sfem {
                 impl_->num_prony_terms,
                 impl_->prony_g.data(),
                 impl_->prony_tau.data(),
-                history_offset, // This needs to be passed correctly. For now using simplified approach assuming 1 block or manual offset tracking
-                impl_->history_buffer->data() + history_offset,
+                history_stride,  // Per-element history size
+                impl_->history_buffer->data() + history_offset,  // Pointer to start of this block's history
                 3, &x[0], &x[1], &x[2],
                 rowptr, colidx, values);
                 
             // Advance history offset for next block
-            history_offset += nelements * n_qp * history_per_qp;
+            history_offset += nelements * history_stride;
             return ret;
         });
     }
@@ -177,6 +179,7 @@ namespace sfem {
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
         const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
+        const ptrdiff_t history_stride = n_qp * history_per_qp;
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -194,11 +197,11 @@ namespace sfem {
                 impl_->num_prony_terms,
                 impl_->prony_g.data(),
                 impl_->prony_tau.data(),
-                history_offset,
+                history_stride,
                 impl_->history_buffer->data() + history_offset,
                 x, out);
                 
-            history_offset += nelements * n_qp * history_per_qp;
+            history_offset += nelements * history_stride;
             return ret;
         });
     }
@@ -215,6 +218,7 @@ namespace sfem {
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
         const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
+        const ptrdiff_t history_stride = n_qp * history_per_qp;
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -232,11 +236,11 @@ namespace sfem {
                 impl_->num_prony_terms,
                 impl_->prony_g.data(),
                 impl_->prony_tau.data(),
-                history_offset,
+                history_stride,
                 impl_->history_buffer->data() + history_offset,
                 x, out);
                 
-            history_offset += nelements * n_qp * history_per_qp;
+            history_offset += nelements * history_stride;
             return ret;
         });
     }
@@ -253,6 +257,7 @@ namespace sfem {
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
         const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
+        const ptrdiff_t history_stride = n_qp * history_per_qp;
 
         int ret = impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -270,12 +275,12 @@ namespace sfem {
                 impl_->num_prony_terms,
                 impl_->prony_g.data(),
                 impl_->prony_tau.data(),
-                history_offset,
+                history_stride,
                 impl_->history_buffer->data() + history_offset,
                 impl_->new_history_buffer->data() + history_offset, // Output to new buffer
                 x);
                 
-            history_offset += nelements * n_qp * history_per_qp;
+            history_offset += nelements * history_stride;
             return r;
         });
         
