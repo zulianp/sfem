@@ -134,7 +134,7 @@ transfer_weighted_field_tet4_to_hex_vec_gpu(const FloatType inv_J_tet[9],       
 }  // END Function: transfer_weighted_field_tet4_to_hex_gpu
 
 /////////////////////////////////////////////////////////////////////////////////
-// Kernel to perform adjoint mini-tetrahedron resampling Version 2
+// Main method to perform adjoint mini-tetrahedron resampling Version 2
 /////////////////////////////////////////////////////////////////////////////////
 template <typename FloatType,                                                                        //
           typename IntType,                                                                          //
