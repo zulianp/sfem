@@ -190,6 +190,9 @@ class SRViscoHyperelasticity:
             self.prony_coeffs.append((gi, taui))
             self.params.append(gi)
             self.params.append(taui)
+        
+        # Symbolic gamma for flexible Prony term version
+        self.gamma_symb = sp.symbols("gamma", real=True)
 
     def __init_fun_unimodular(self, fun_vol, fun_dev):
         # Merge for symbol detection
@@ -573,10 +576,190 @@ class SRViscoHyperelasticity:
         P = F * S_total
         P = simplify_matrix(P)
         
+        # Also store P_algo (elastic only, without S_hist) for loop-based hessian
+        P_algo = F * S_algo
+        P_algo = simplify_matrix(P_algo)
+        
         self.expression_table["P"] = P
+        self.expression_table["P_algo"] = P_algo  # For elastic-only hessian
         self.expression_table["S"] = S_total
+        self.expression_table["S_algo"] = S_algo  # Algorithmic stress (without history)
         
         return P
+
+    def __compute_piola_stress_flexible(self):
+        """Compute Piola stress using symbolic gamma (for flexible Prony terms).
+        
+        This version uses a single symbol 'gamma' instead of expanding all Prony terms.
+        The gamma value should be computed at runtime:
+            gamma = g_inf + sum(beta_i) where beta_i = g_i * (1 - exp(-dt/tau_i)) / (dt/tau_i)
+        
+        This allows the generated hessian to work with ANY number of Prony terms.
+        """
+        if "P_flexible" in self.expression_table:
+            return self.expression_table["P_flexible"]
+
+        F = self.F_symb
+        
+        # Use SYMBOLIC C matrix for differentiation, then substitute C -> F.T * F
+        C = self.__create_matrix_symbol("C")
+        
+        inv_map = self.invariants_map
+        inv_type = inv_map.get("type", "standard")
+        
+        # Build W in terms of symbolic C
+        def get_W_C(expr_invariants):
+            if expr_invariants == 0:
+                return 0
+            
+            if inv_type == "standard":
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                J = sp.sqrt(sp.det(C))
+                
+                return expr_invariants.subs({
+                    inv_map["I1"]: I1,
+                    inv_map["I2"]: I2,
+                    inv_map["J"]: J
+                })
+                
+            elif inv_type == "unimodular":
+                J = sp.sqrt(sp.det(C))
+                I1 = sp.trace(C)
+                I2 = sp.Rational(1, 2) * (sp.trace(C)**2 - sp.trace(C**2))
+                
+                I1b = J**sp.Rational(-2, 3) * I1
+                I2b = J**sp.Rational(-4, 3) * I2
+                
+                return expr_invariants.subs({
+                    inv_map["I1b"]: I1b,
+                    inv_map["I2b"]: I2b,
+                    inv_map["J"]: J
+                })
+            return 0
+        
+        W_vol_C = get_W_C(self.fun_vol_invariants)
+        W_dev_C = get_W_C(self.fun_dev_invariants)
+        
+        # Compute S = 2 * dW/dC in terms of symbolic C
+        def compute_S(W_expr):
+            if W_expr == 0:
+                return sp.zeros(3, 3)
+            S = sp.zeros(3, 3)
+            for i in range(3):
+                for j in range(3):
+                    S[i, j] = 2 * sp.diff(W_expr, C[i, j])
+            return S
+        
+        S_vol_C = compute_S(W_vol_C)
+        S_dev_C = compute_S(W_dev_C)
+        
+        # Substitute C -> F.T * F
+        C_expr = F.T * F
+        
+        def sub_C(S_matrix):
+            S_out = sp.zeros(3, 3)
+            for i in range(3):
+                for j in range(3):
+                    S_out[i, j] = self.__sub_matrix(S_matrix[i, j], C, C_expr)
+            return simplify_matrix(S_out)
+        
+        S_vol = sub_C(S_vol_C)
+        S_dev = sub_C(S_dev_C)
+        
+        # Use symbolic gamma instead of expanding Prony series!
+        gamma = self.gamma_symb
+        
+        # S_algo = S_vol + gamma * S_dev
+        S_algo_flexible = S_vol + gamma * S_dev
+        S_algo_flexible = simplify_matrix(S_algo_flexible)
+        
+        # P = F * S (without history, history added at runtime via loops)
+        P_flexible = F * S_algo_flexible
+        P_flexible = simplify_matrix(P_flexible)
+        
+        self.expression_table["P_flexible"] = P_flexible
+        self.expression_table["S_algo_flexible"] = S_algo_flexible
+        self.expression_table["S_vol"] = S_vol
+        self.expression_table["S_dev"] = S_dev
+        
+        return P_flexible
+
+    def __compute_linearized_stress_flexible(self):
+        """Compute linearized stress using symbolic gamma.
+        
+        dP_flexible/dF where P_flexible = F * (S_vol + gamma * S_dev)
+        gamma is a symbol, not expanded.
+        """
+        if "S_lin_flexible" in self.expression_table:
+            return self.expression_table["S_lin_flexible"]
+
+        P_flexible = self.__compute_piola_stress_flexible()
+        F = self.F_symb
+        dim = self.fe.spatial_dim()
+        
+        terms = []
+        for i in range(0, dim):
+            for j in range(0, dim):
+                for k in range(0, dim):
+                    for l in range(0, dim):
+                        terms.append(sp.diff(P_flexible[i, j], F[k, l]))
+        S_lin_flexible = Array(terms, shape=(dim, dim, dim, dim))
+        self.expression_table["S_lin_flexible"] = S_lin_flexible
+        return S_lin_flexible
+
+    def __compute_metric_tensor_flexible(self):
+        """Compute metric tensor using symbolic gamma."""
+        if "S_ikmn_flexible" in self.expression_table:
+            return self.expression_table["S_ikmn_flexible"]
+
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        dim = self.fe.spatial_dim()
+        S_lin = self.__compute_linearized_stress_flexible()
+
+        terms = []
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
+                        S_ikmn = 0
+                        for j in range(0, dim):
+                            reduce_l = 0
+                            for l in range(0, dim):
+                                reduce_l += S_lin[i, j, k, l] * Jinv[m, l]
+                            S_ikmn += reduce_l * Jinv[n, j]
+                        terms.append(S_ikmn)
+
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() * self.fe.quadrature_weight())
+        for i in range(0, dim**4):
+            terms[i] *= dV
+
+        S_ikmn_flexible = Array(terms, shape=(dim, dim, dim, dim))
+        self.expression_table["S_ikmn_flexible"] = S_ikmn_flexible
+        return S_ikmn_flexible
+
+    def __compute_hessian_flexible(self):
+        """Compute hessian using symbolic gamma."""
+        if "hessian_flexible" in self.expression_table:
+            return self.expression_table["hessian_flexible"]
+
+        S_ikmn_flexible = self.__compute_metric_tensor_flexible()
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        
+        dim = self.fe.spatial_dim()
+        nfun = self.fe.n_nodes()
+        H_flexible = sp.zeros(dim*nfun, dim*nfun)
+
+        for test in range(0, nfun * dim):
+            for trial in range(0, nfun * dim):
+                for k in range(0, dim): 
+                    for m in range(0, dim):
+                        for i in range(0, dim):
+                            for n in range(0, dim):
+                                H_flexible[test, trial] += S_ikmn_flexible[i, k, m, n] * refgrad[trial][i, n] * refgrad[test][k, m]
+
+        self.expression_table["hessian_flexible"] = H_flexible
+        return H_flexible
 
     def __compute_linearized_stress(self):
         # TODO: This tensor has symmetries and it can be compressed
@@ -604,6 +787,36 @@ class SRViscoHyperelasticity:
         S_lin = Array(terms, shape=(dim, dim, dim, dim))
         self.expression_table["S_lin"] = S_lin
         return S_lin
+
+    def __compute_linearized_stress_algo(self):
+        """Compute linearized stress for algorithmic part only (without S_hist).
+        
+        This allows loop-based computation of history contributions at runtime,
+        enabling flexible number of Prony terms.
+        
+        S_lin_algo = dP_algo/dF where P_algo = F * S_algo
+        """
+        if "S_lin_algo" in self.expression_table:
+            return self.expression_table["S_lin_algo"]
+
+        if "P_algo" not in self.expression_table:
+            # For pure elastic case, P_algo = P
+            P_algo = self.expression_table.get("P")
+        else:
+            P_algo = self.expression_table["P_algo"]
+            
+        F = self.F_symb
+        dim = self.fe.spatial_dim()
+        
+        terms = []
+        for i in range(0, dim):
+            for j in range(0, dim):
+                for k in range(0, dim):
+                    for l in range(0, dim):
+                        terms.append(sp.diff(P_algo[i, j], F[k, l]))
+        S_lin_algo = Array(terms, shape=(dim, dim, dim, dim))
+        self.expression_table["S_lin_algo"] = S_lin_algo
+        return S_lin_algo
         
     def __compute_metric_tensor(self):
         if "S_ikmn" in self.expression_table:
@@ -1153,6 +1366,191 @@ class SRViscoHyperelasticity:
 
         print(signature + body)
 
+    def __compute_metric_tensor_algo(self):
+        """Compute metric tensor for algorithmic part only."""
+        if "S_ikmn_algo" in self.expression_table:
+            return self.expression_table["S_ikmn_algo"]
+
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        dim = self.fe.spatial_dim()     
+        S_lin_algo = self.expression_table["S_lin_algo"]
+
+        terms = []
+        for i in range(0, dim):
+            for k in range(0, dim):
+                for m in range(0, dim):
+                    for n in range(0, dim):
+                        S_ikmn = 0
+                        for j in range(0, dim):
+                            reduce_l = 0
+                            for l in range(0, dim):
+                                reduce_l += S_lin_algo[i, j, k, l] * Jinv[m, l] 
+                            S_ikmn += reduce_l * Jinv[n, j]
+                        
+                        terms.append(S_ikmn)
+
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() *  self.fe.quadrature_weight())
+        for i in range(0, dim**4):
+            terms[i] *= dV
+
+        S_ikmn_algo = Array(terms, shape=(dim, dim, dim, dim))
+        self.expression_table["S_ikmn_algo"] = S_ikmn_algo
+        return S_ikmn_algo
+
+    def __compute_hessian_algo(self):
+        """Compute element hessian for algorithmic part only."""
+        if "hessian_algo" in self.expression_table:
+            return self.expression_table["hessian_algo"]
+
+        S_ikmn_algo = self.expression_table["S_ikmn_algo"]
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        
+        dim = self.fe.spatial_dim()
+        nfun = self.fe.n_nodes()
+        H_algo = sp.zeros(dim*nfun, dim*nfun)
+
+        for test in range(0, nfun * dim):
+            for trial in range(0, nfun * dim):
+                for k in range(0, dim): 
+                    for m in range(0, dim):
+                        for i in range(0, dim):
+                            for n in range(0, dim):
+                                 H_algo[test, trial] += S_ikmn_algo[i, k, m, n] * refgrad[trial][i, n] * refgrad[test][k, m]
+        
+        self.expression_table["hessian_algo"] = H_algo
+        return H_algo
+
+    def emit_hessian_algo(self):
+        """Emit hessian for algorithmic part only (elastic + gamma*deviatoric, no S_hist).
+        
+        This version does NOT include history contributions in the generated code.
+        History contributions (geometric stiffness I x S_hist) should be added
+        at runtime using loops, enabling flexible number of Prony terms.
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress()
+        self.__compute_linearized_stress_algo()
+        self.__compute_metric_tensor_algo()
+        self.__compute_hessian_algo()
+
+        H_algo = self.expression_table["hessian_algo"]
+        
+        fe = self.fe
+        dim = fe.spatial_dim()
+
+        # Note: this version does NOT take history parameter - it's handled at runtime
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_hessian_algo(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'{self.__params_to_args()}'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       H)'
+            f'\n'
+        )
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        S_actual = c_gen(self.__assign_tensor4("S_lin", self.expression_table["S_lin_algo"]))
+        combined_code = c_gen(add_assign_matrix("H", H_algo))
+
+        body = (
+            f'{{\n'
+            f'// Algorithmic hessian only (no history contributions)\n'
+            f'// History geometric stiffness (I x S_hist) should be added at runtime\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'{real_t} S_lin[{dim**4}];\n'
+            f'{{\n'
+            f'{S_actual}\n'
+            f'}}\n'
+            f'{combined_code}\n'
+            f'}}\n'
+        )
+
+        print(signature + body)
+
+    def emit_hessian_flexible(self):
+        """Emit S_lin (linearized stress tensor) using symbolic gamma.
+        
+        This version generates ONLY S_lin[81] - the 4th order tensor.
+        The caller assembles the Hessian using loops in C code.
+        
+        This is much faster to generate and produces shorter code.
+        
+        Usage in C:
+            1. Compute gamma = g_inf + sum(g_i * (1 - exp(-dt/tau_i)) / (dt/tau_i))
+            2. Call this function to get S_lin[81]
+            3. Assemble Hessian with loops: H[test,trial] += S_lin[i,k,m,n] * grad[trial][i,n] * grad[test][k,m]
+            4. Add history geometric stiffness (I x S_hist) via loops
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress_flexible()
+        self.__compute_linearized_stress_flexible()
+        self.__compute_metric_tensor_flexible()
+        # Skip __compute_hessian_flexible() - we only need S_lin!
+        
+        fe = self.fe
+        dim = fe.spatial_dim()
+        
+        S_ikmn_flexible = self.expression_table["S_ikmn_flexible"]
+
+        # Use only basic params (K, C10, C01) + gamma, no Prony terms!
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_S_lin_flexible(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      K,\n'
+            f'    const {real_t}                      C10,\n'
+            f'    const {real_t}                      C01,\n'
+            f'    const {real_t}                      gamma,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       S_lin)'
+            f'\n'
+        )
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        S_actual = c_gen(self.__assign_tensor4("S_lin", S_ikmn_flexible))
+
+        body = (
+            f'{{\n'
+            f'// S_lin (metric tensor) with symbolic gamma\n'
+            f'// Caller should:\n'
+            f'//   1. Compute gamma = g_inf + sum(g_i * (1 - exp(-dt/tau_i)) / (dt/tau_i))\n'
+            f'//   2. Assemble Hessian: H[test,trial] += S_lin[idx] * grad[trial] * grad[test]\n'
+            f'//   3. Add history geometric stiffness (I x S_hist) via loops\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'{{\n'
+            f'{S_actual}\n'
+            f'}}\n'
+            f'}}\n'
+        )
+
+        print(signature + body)
 
     def emit_hessian_diag(self):
         self.__compute_dV()
@@ -1295,18 +1693,27 @@ if __name__ == "__main__":
     # Using I1b (I1_bar) and I2b (I2_bar) for isochoric invariants
     w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
     
+    # num_prony_terms for unrolled version (hardcoded history indices)
+    # For loop-based version, use emit_hessian_algo() which doesn't depend on num_prony_terms
+    num_prony = 10  # Must match what C code expects for unrolled version
+    
     op = SRViscoHyperelasticity.create_from_string_unimodular(
         fe, 
         "mooney_rivlin", 
         [w_vol, w_dev], 
-        num_prony_terms=3
+        num_prony_terms=num_prony
     )
     
     # op.check_metric_tensor_symmetries()
     
-    op.emit_objective()
-    op.emit_gradient()
-    print("// -------------------------------------------------")
-    op.emit_history_update()
-    op.emit_hessian()
-    op.emit_hessian_diag()
+    # op.emit_objective()
+    # op.emit_gradient()
+    # print("// -------------------------------------------------")
+    # op.emit_history_update()
+    
+    # print("// ============= UNROLLED VERSION (fixed {} Prony terms) =============".format(num_prony))
+    # op.emit_hessian()
+    # op.emit_hessian_diag()
+    
+    print("// ============= FLEXIBLE VERSION (gamma as parameter, works with ANY Prony terms) =============")
+    op.emit_hessian_flexible()
