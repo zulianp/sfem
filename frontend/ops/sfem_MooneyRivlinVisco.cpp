@@ -37,6 +37,9 @@ namespace sfem {
         std::vector<real_t> prony_g;
         std::vector<real_t> prony_tau;
         
+        // Use flexible hessian (loop-based) vs fixed (unrolled)
+        bool use_flexible_hessian{false};
+        
         // History buffer: managed internally
         // Stores [S_dev_n (6), H_1^n (6), H_2^n (6), ...] per quadrature point
         std::shared_ptr<Buffer<real_t>> history_buffer;
@@ -91,6 +94,7 @@ namespace sfem {
         ret->impl_->K   = sfem::Env::read("SFEM_MOONEY_RIVLIN_K", ret->impl_->K);
         ret->impl_->C01 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C01", ret->impl_->C01);
         ret->impl_->dt  = sfem::Env::read("SFEM_DT", ret->impl_->dt);
+        ret->impl_->use_flexible_hessian = sfem::Env::read("SFEM_USE_FLEXIBLE_HESSIAN", 0) != 0;
         return ret;
     }
 
@@ -143,23 +147,46 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
             
-            int ret = mooney_rivlin_visco_bsr(
-                domain.element_type,
-                nelements,
-                mesh->n_nodes(),
-                domain.block->elements()->data(),
-                mesh->points()->data(),
-                impl_->C10,
-                impl_->K,
-                impl_->C01,
-                impl_->dt,
-                impl_->num_prony_terms,
-                impl_->prony_g.data(),
-                impl_->prony_tau.data(),
-                history_stride,  // Per-element history size
-                impl_->history_buffer->data() + history_offset,  // Pointer to start of this block's history
-                3, &x[0], &x[1], &x[2],
-                rowptr, colidx, values);
+            int ret;
+            if (impl_->use_flexible_hessian) {
+                // Use loop-based flexible version (supports arbitrary Prony terms)
+                ret = mooney_rivlin_visco_bsr_flexible(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->K,
+                    impl_->C01,
+                    impl_->dt,
+                    impl_->num_prony_terms,
+                    impl_->prony_g.data(),
+                    impl_->prony_tau.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    3, &x[0], &x[1], &x[2],
+                    rowptr, colidx, values);
+            } else {
+                // Use unrolled fixed version (hardcoded for 10 Prony terms)
+                ret = mooney_rivlin_visco_bsr(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->K,
+                    impl_->C01,
+                    impl_->dt,
+                    impl_->num_prony_terms,
+                    impl_->prony_g.data(),
+                    impl_->prony_tau.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    3, &x[0], &x[1], &x[2],
+                    rowptr, colidx, values);
+            }
                 
             // Advance history offset for next block
             history_offset += nelements * history_stride;
@@ -306,6 +333,10 @@ namespace sfem {
         if (impl_->history_buffer) {
             initialize_history(); 
         }
+    }
+    
+    void MooneyRivlinVisco::set_use_flexible_hessian(bool use_flexible) {
+        impl_->use_flexible_hessian = use_flexible;
     }
 
     MooneyRivlinVisco::Impl::~Impl() {}

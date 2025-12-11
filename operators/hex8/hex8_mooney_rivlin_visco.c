@@ -347,6 +347,112 @@ int hex8_mooney_rivlin_visco_bsr(const ptrdiff_t                   nelements,
     return SFEM_SUCCESS;
 }
 
+// Flexible version: supports arbitrary number of Prony terms at runtime
+int hex8_mooney_rivlin_visco_bsr_flexible(const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      C10,
+                                          const real_t                      K,
+                                          const real_t                      C01,
+                                          const real_t                      dt,
+                                          const int                         num_prony_terms,
+                                          const real_t *const SFEM_RESTRICT g,
+                                          const real_t *const SFEM_RESTRICT tau,
+                                          const ptrdiff_t                   history_stride,
+                                          const real_t *const SFEM_RESTRICT history,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   out_stride,
+                                          real_t *const SFEM_RESTRICT       values,
+                                          const ptrdiff_t                   row_stride,
+                                          const idx_t *const SFEM_RESTRICT  rowptr,
+                                          const idx_t *const SFEM_RESTRICT  colidx) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+    // History size per quadrature point
+    const ptrdiff_t history_per_qp = 6 + num_prony_terms * 6;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t edispx[8];
+        scalar_t edispy[8];
+        scalar_t edispz[8];
+
+        scalar_t element_matrix[24 * 24] = {0}; // Initialize to 0
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int d = 0; d < 8; d++) {
+            lx[d] = x[ev[d]];
+            ly[d] = y[ev[d]];
+            lz[d] = z[ev[d]];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t idx = ev[v] * u_stride;
+            edispx[v]           = ux[idx];
+            edispy[v]           = uy[idx];
+            edispz[v]           = uz[idx];
+        }
+
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
+                    assert(jacobian_determinant == jacobian_determinant);
+                    assert(jacobian_determinant != 0);
+
+                    const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
+                    const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+                    const real_t *const qp_history = history + hist_offset;
+
+                    // Use flexible hessian kernel
+                    hex8_mooney_rivlin_hessian_flexible(jacobian_adjugate,
+                                                        jacobian_determinant,
+                                                        qx[kx],
+                                                        qx[ky],
+                                                        qx[kz],
+                                                        qw[kx] * qw[ky] * qw[kz],
+                                                        K,    // K comes before C10!
+                                                        C10,
+                                                        C01,
+                                                        dt,
+                                                        num_prony_terms,
+                                                        g,
+                                                        tau,
+                                                        qp_history,
+                                                        edispx,
+                                                        edispy,
+                                                        edispz,
+                                                        element_matrix);
+                }
+            }
+        }
+
+        hex8_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
+    }
+    return SFEM_SUCCESS;
+}
+
 int hex8_mooney_rivlin_visco_hessian_diag(const ptrdiff_t                   nelements,
                                           const ptrdiff_t                   stride,
                                           const ptrdiff_t                   nnodes,

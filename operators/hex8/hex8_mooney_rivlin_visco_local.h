@@ -5137,6 +5137,175 @@ S_lin[80] = x252*(adjugate[6]*x600 + adjugate[7]*x599 + adjugate[8]*x598);
 }
 }
 
+// ============= FLEXIBLE HESSIAN WRAPPER (uses S_lin_flexible + loops) =============
+// This function supports arbitrary number of Prony terms at runtime
+static SFEM_INLINE void hex8_mooney_rivlin_hessian_flexible(
+    const scalar_t *const SFEM_RESTRICT adjugate,
+    const scalar_t                      jacobian_determinant,
+    const scalar_t                      qx,
+    const scalar_t                      qy,
+    const scalar_t                      qz,
+    const scalar_t                      qw,
+    const scalar_t                      K,
+    const scalar_t                      C10,
+    const scalar_t                      C01,
+    const scalar_t                      dt,
+    const int                           num_prony_terms,
+    const scalar_t *const SFEM_RESTRICT g,
+    const scalar_t *const SFEM_RESTRICT tau,
+    const scalar_t *const SFEM_RESTRICT history,
+    const scalar_t *const SFEM_RESTRICT dispx,
+    const scalar_t *const SFEM_RESTRICT dispy,
+    const scalar_t *const SFEM_RESTRICT dispz,
+    scalar_t *const SFEM_RESTRICT       H)
+{
+    // 1. Compute gamma = g_inf + sum(beta_i)
+    scalar_t sum_gi = 0;
+    for (int i = 0; i < num_prony_terms; i++) {
+        sum_gi += g[i];
+    }
+    scalar_t g_inf = 1.0 - sum_gi;
+    
+    scalar_t gamma = g_inf;
+    for (int i = 0; i < num_prony_terms; i++) {
+        scalar_t x = dt / tau[i];
+        scalar_t alpha = exp(-x);
+        scalar_t beta = g[i] * (1.0 - alpha) / x;
+        gamma += beta;
+    }
+    
+    // 2. Compute S_lin using the flexible kernel
+    scalar_t S_lin[81];
+    hex8_mooney_rivlin_S_lin_flexible(
+        adjugate, jacobian_determinant,
+        qx, qy, qz, qw,
+        K, C10, C01, gamma,
+        dispx, dispy, dispz,
+        S_lin);
+    
+    // 3. Assemble Hessian using loops
+    const scalar_t x0 = 1.0 / jacobian_determinant;
+    const scalar_t dV = jacobian_determinant * qw;  // Integration weight
+    
+    // Reference gradients
+    scalar_t grad[8][3];
+    {
+        const scalar_t qy_qz = qy * qz;
+        const scalar_t qy_1mz = qy * (1 - qz);
+        const scalar_t _1my_qz = (1 - qy) * qz;
+        const scalar_t _1my_1mz = (1 - qy) * (1 - qz);
+        const scalar_t qx_qz = qx * qz;
+        const scalar_t qx_1mz = qx * (1 - qz);
+        const scalar_t _1mx_qz = (1 - qx) * qz;
+        const scalar_t _1mx_1mz = (1 - qx) * (1 - qz);
+        const scalar_t qx_qy = qx * qy;
+        const scalar_t qx_1my = qx * (1 - qy);
+        const scalar_t _1mx_qy = (1 - qx) * qy;
+        const scalar_t _1mx_1my = (1 - qx) * (1 - qy);
+        
+        grad[0][0] = -_1my_1mz; grad[0][1] = -_1mx_1mz; grad[0][2] = -_1mx_1my;
+        grad[1][0] = _1my_1mz;  grad[1][1] = -qx_1mz;   grad[1][2] = -qx_1my;
+        grad[2][0] = qy_1mz;    grad[2][1] = qx_1mz;    grad[2][2] = -qx_qy;
+        grad[3][0] = -qy_1mz;   grad[3][1] = _1mx_1mz;  grad[3][2] = -_1mx_qy;
+        grad[4][0] = -_1my_qz;  grad[4][1] = -_1mx_qz;  grad[4][2] = _1mx_1my;
+        grad[5][0] = _1my_qz;   grad[5][1] = -qx_qz;    grad[5][2] = qx_1my;
+        grad[6][0] = qy_qz;     grad[6][1] = qx_qz;     grad[6][2] = qx_qy;
+        grad[7][0] = -qy_qz;    grad[7][1] = _1mx_qz;   grad[7][2] = _1mx_qy;
+    }
+    
+    // Transform to physical gradients
+    scalar_t phys_grad[8][3];
+    for (int node = 0; node < 8; node++) {
+        phys_grad[node][0] = x0 * (adjugate[0] * grad[node][0] + adjugate[3] * grad[node][1] + adjugate[6] * grad[node][2]);
+        phys_grad[node][1] = x0 * (adjugate[1] * grad[node][0] + adjugate[4] * grad[node][1] + adjugate[7] * grad[node][2]);
+        phys_grad[node][2] = x0 * (adjugate[2] * grad[node][0] + adjugate[5] * grad[node][1] + adjugate[8] * grad[node][2]);
+    }
+    
+    // Assemble H[24x24]
+    for (int test_node = 0; test_node < 8; test_node++) {
+        for (int test_dim = 0; test_dim < 3; test_dim++) {
+            int test = test_node * 3 + test_dim;
+            for (int trial_node = 0; trial_node < 8; trial_node++) {
+                for (int trial_dim = 0; trial_dim < 3; trial_dim++) {
+                    int trial = trial_node * 3 + trial_dim;
+                    
+                    scalar_t val = 0;
+                    for (int i = 0; i < 3; i++) {
+                        for (int k = 0; k < 3; k++) {
+                            for (int m = 0; m < 3; m++) {
+                                for (int n = 0; n < 3; n++) {
+                                    int idx = i * 27 + k * 9 + m * 3 + n;
+                                    if (trial_dim == i && test_dim == k) {
+                                        val += S_lin[idx] * phys_grad[trial_node][n] * phys_grad[test_node][m];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    H[test * 24 + trial] += val * dV;  // Multiply by integration weight
+                }
+            }
+        }
+    }
+    
+    // 4. Add history geometric stiffness
+    if (num_prony_terms > 0 && history != NULL) {
+        const int idx_map[6][2] = {{0,0}, {1,1}, {2,2}, {0,1}, {0,2}, {1,2}};
+        scalar_t S_dev_n[3][3];
+        for (int c = 0; c < 6; c++) {
+            int r = idx_map[c][0];
+            int s = idx_map[c][1];
+            S_dev_n[r][s] = history[c];
+            S_dev_n[s][r] = history[c];
+        }
+        
+        scalar_t S_hist[3][3] = {{0}};
+        int hist_ptr = 6;
+        
+        for (int term = 0; term < num_prony_terms; term++) {
+            scalar_t x = dt / tau[term];
+            scalar_t alpha = exp(-x);
+            scalar_t beta = g[term] * (1.0 - alpha) / x;
+            
+            scalar_t H_old[3][3];
+            for (int c = 0; c < 6; c++) {
+                int r = idx_map[c][0];
+                int s = idx_map[c][1];
+                H_old[r][s] = history[hist_ptr + c];
+                H_old[s][r] = history[hist_ptr + c];
+            }
+            hist_ptr += 6;
+            
+            for (int r = 0; r < 3; r++) {
+                for (int s = 0; s < 3; s++) {
+                    S_hist[r][s] += alpha * H_old[r][s] - beta * S_dev_n[r][s];
+                }
+            }
+        }
+        
+        // Use the same dV as above (already computed: dV = jacobian_determinant * qw)
+        for (int test_node = 0; test_node < 8; test_node++) {
+            for (int test_dim = 0; test_dim < 3; test_dim++) {
+                int test = test_node * 3 + test_dim;
+                for (int trial_node = 0; trial_node < 8; trial_node++) {
+                    for (int trial_dim = 0; trial_dim < 3; trial_dim++) {
+                        int trial = trial_node * 3 + trial_dim;
+                        
+                        if (trial_dim == test_dim) {
+                            scalar_t val = 0;
+                            for (int j = 0; j < 3; j++) {
+                                for (int l = 0; l < 3; l++) {
+                                    val += S_hist[j][l] * phys_grad[trial_node][j] * phys_grad[test_node][l];
+                                }
+                            }
+                            H[test * 24 + trial] += val * dV;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 #ifdef __cplusplus
 }
