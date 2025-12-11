@@ -19,9 +19,6 @@ import numpy as np
 
 import canon
 
-# https://github.com/tzakharko/m4-sme-exploration
-# https://en.wikipedia.org/wiki/Mooney%E2%80%93Rivlin_solid
-
 
 def compress_tensor4(tensor, tensor_name):
     unique_values = {}
@@ -233,8 +230,6 @@ class SRViscoHyperelasticity:
             "type": "unimodular"
         }
 
-        # We don't substitute into self.fun yet, we keep components
-        # But we need self.fun for backward compatibility or total energy
         self.fun = fun_total.subs({
             I1b: det_F**sp.Rational(-2, 3) * I1, 
             I2b: det_F**sp.Rational(-4, 3) * I2, 
@@ -532,7 +527,6 @@ class SRViscoHyperelasticity:
             
         # Construct Algorithmic Energy W_algo
         # W_algo = W_vol + gamma * W_dev
-        # This is much cleaner for differentiation
         W_algo_C = W_vol_C + gamma * W_dev_C
         
         # S_algo = 2 * d(W_algo)/dC
@@ -770,13 +764,6 @@ class SRViscoHyperelasticity:
         P = self.expression_table["P"]
         F = self.F_symb
         dim = self.fe.spatial_dim()
-        
-        # Automatic differentiation
-        # SymPy includes ALL dependencies on F, including geometric stiffness from history:
-        # d(F * S_history)/dF = I x S_history (approx)
-        
-        # If we want to exclude it (inconsistent tangent), we must manually construct P without history
-        # But for now, we trust the consistent tangent provided by SymPy
         
         terms = []
         for i in range(0, dim):
@@ -1552,6 +1539,96 @@ class SRViscoHyperelasticity:
 
         print(signature + body)
 
+    def __compute_hessian_flexible_micro(self):
+        """Compute full 24x24 Hessian (algorithmic part only, with symbolic gamma)."""
+        if "hessian_flexible_micro" in self.expression_table:
+            return self.expression_table["hessian_flexible_micro"]
+
+        S_ikmn_flexible = self.__compute_metric_tensor_flexible()
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        
+        dim = self.fe.spatial_dim()
+        nfun = self.fe.n_nodes()
+        H_flexible = sp.zeros(dim * nfun, dim * nfun)
+
+        for test in range(0, nfun * dim):
+            for trial in range(0, nfun * dim):
+                for k in range(0, dim):
+                    for m in range(0, dim):
+                        for i in range(0, dim):
+                            for n in range(0, dim):
+                                H_flexible[test, trial] += (
+                                    S_ikmn_flexible[i, k, m, n]
+                                    * refgrad[trial][i, n]
+                                    * refgrad[test][k, m]
+                                )
+
+        self.expression_table["hessian_flexible_micro"] = H_flexible
+        return H_flexible
+
+    def emit_hessian_flexible_micro(self):
+        """Emit 24x24 Hessian (algorithmic only, gamma param, history added at runtime).
+        
+        Args include K/C10/C01/gamma and displacements; Prony arrays stay runtime.
+        Use when Prony term count must be flexible but you want an unrolled kernel.
+        (not finished yet)
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress_flexible()
+        self.__compute_linearized_stress_flexible()
+        self.__compute_metric_tensor_flexible()
+        self.__compute_hessian_flexible_micro()
+
+        H_micro = self.expression_table["hessian_flexible_micro"]
+
+        fe = self.fe
+        dim = fe.spatial_dim()
+        # real_t comes from sfem_codegen.py (import *), not stored on self
+        real_t = globals().get("real_t", "scalar_t")
+
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_hessian_algo_micro(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      K,\n'
+            f'    const {real_t}                      C10,\n'
+            f'    const {real_t}                      C01,\n'
+            f'    const {real_t}                      gamma,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       H)\n'
+        )
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        S_actual = c_gen(self.__assign_tensor4("S_lin", self.expression_table["S_lin_flexible"]))
+        combined_code = c_gen(add_assign_matrix("H", H_micro))
+
+        body = (
+            f'{{\n'
+            f'// Fully unrolled flexible Hessian (algorithmic part only, no history)\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'{real_t} S_lin[{dim**4}];\n'
+            f'{{\n'
+            f'{S_actual}\n'
+            f'}}\n'
+            f'{combined_code}\n'
+            f'}}\n'
+        )
+
+        print(signature + body)
+
     def emit_hessian_diag(self):
         self.__compute_dV()
         self.__compute_jacobian_adjugate()
@@ -1684,12 +1761,11 @@ if __name__ == "__main__":
     fe = Hex8()
     # fe = Tet4()
     # fe = Tet10()
-    
-    # Mooney-Rivlin Model with Viscoelasticity
-    # 1. Volumetric part (Penalty for incompressibility)
+
+    # Volumetric part
     w_vol = "K / 2 * (J - 1)**2"
     
-    # 2. Deviatoric part (Mooney-Rivlin)
+    # Deviatoric part (Mooney-Rivlin)
     # Using I1b (I1_bar) and I2b (I2_bar) for isochoric invariants
     w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
     
@@ -1710,10 +1786,14 @@ if __name__ == "__main__":
     # op.emit_gradient()
     # print("// -------------------------------------------------")
     # op.emit_history_update()
+    # op.emit_hessian()
     
     # print("// ============= UNROLLED VERSION (fixed {} Prony terms) =============".format(num_prony))
     # op.emit_hessian()
     # op.emit_hessian_diag()
     
-    print("// ============= FLEXIBLE VERSION (gamma as parameter, works with ANY Prony terms) =============")
-    op.emit_hessian_flexible()
+    # print("// ============= FLEXIBLE VERSION (gamma as parameter, works with ANY Prony terms) =============")
+    # op.emit_hessian_flexible()
+    
+    print("\n// ============= FLEXIBLE MICRO-KERNEL (unrolled 24x24, gamma param, no history) =============")
+    op.emit_hessian_flexible_micro()

@@ -236,3 +236,45 @@ int mooney_rivlin_visco_hessian_diag_soa(const enum ElemType element_type,
     }
     return SFEM_FAILURE;
 }
+
+// Flexible version: supports arbitrary number of Prony terms at runtime
+int mooney_rivlin_visco_bsr_flexible(const enum ElemType element_type,
+                                     const ptrdiff_t nelements,
+                                     const ptrdiff_t nnodes,
+                                     idx_t **const SFEM_RESTRICT elements,
+                                     geom_t **const SFEM_RESTRICT points,
+                                     const real_t C10,
+                                     const real_t K,
+                                     const real_t C01,
+                                     const real_t dt,
+                                     const int num_prony_terms,
+                                     const real_t *const SFEM_RESTRICT g,
+                                     const real_t *const SFEM_RESTRICT tau,
+                                     const ptrdiff_t history_stride,
+                                     const real_t *const SFEM_RESTRICT history,
+                                     const ptrdiff_t u_stride,
+                                     const real_t *const SFEM_RESTRICT ux,
+                                     const real_t *const SFEM_RESTRICT uy,
+                                     const real_t *const SFEM_RESTRICT uz,
+                                     const count_t *const SFEM_RESTRICT rowptr,
+                                     const idx_t *const SFEM_RESTRICT colidx,
+                                     real_t *const SFEM_RESTRICT values) {
+    switch (element_type) {
+        case HEX8: {
+            return hex8_mooney_rivlin_visco_bsr_flexible(
+                nelements, 1, nnodes, elements, points, 
+                C10, K, C01, dt, num_prony_terms, g, tau, 
+                history_stride, history, 
+                u_stride, ux, uy, uz, 
+                1,              // out_stride
+                values,         // values
+                1,              // row_stride
+                (const idx_t*)rowptr,
+                colidx);
+        }
+        default: {
+            SFEM_ERROR("mooney_rivlin_visco_bsr_flexible not implemented for type %d\n", element_type);
+        }
+    }
+    return SFEM_FAILURE;
+}

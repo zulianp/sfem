@@ -33,6 +33,10 @@ namespace sfem {
         
         // Initialize history buffer
         void initialize_history();
+        
+        // Use flexible hessian (loop-based, supports arbitrary Prony terms)
+        // vs fixed version (unrolled, hardcoded for 10 Prony terms)
+        void set_use_flexible_hessian(bool use_flexible);
 
         int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,

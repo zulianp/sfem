@@ -133,7 +133,31 @@ int mooney_rivlin_visco_hessian_diag_soa(const enum ElemType element_type,
                                          real_t **const SFEM_RESTRICT u,
                                          real_t **const SFEM_RESTRICT out);
 
+// Flexible version: supports arbitrary number of Prony terms at runtime
+int mooney_rivlin_visco_bsr_flexible(const enum ElemType element_type,
+                                     const ptrdiff_t nelements,
+                                     const ptrdiff_t nnodes,
+                                     idx_t **const SFEM_RESTRICT elements,
+                                     geom_t **const SFEM_RESTRICT points,
+                                     const real_t C10,
+                                     const real_t K,
+                                     const real_t C01,
+                                     const real_t dt,
+                                     const int num_prony_terms,
+                                     const real_t *const SFEM_RESTRICT g,
+                                     const real_t *const SFEM_RESTRICT tau,
+                                     const ptrdiff_t history_stride,
+                                     const real_t *const SFEM_RESTRICT history,
+                                     const ptrdiff_t u_stride,
+                                     const real_t *const SFEM_RESTRICT ux,
+                                     const real_t *const SFEM_RESTRICT uy,
+                                     const real_t *const SFEM_RESTRICT uz,
+                                     const count_t *const SFEM_RESTRICT rowptr,
+                                     const idx_t *const SFEM_RESTRICT colidx,
+                                     real_t *const SFEM_RESTRICT values);
+
 #ifdef __cplusplus
 }
 #endif
 #endif // MOONEY_RIVLIN_VISCO_H
+
