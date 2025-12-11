@@ -731,6 +731,39 @@ tet4_resample_field_adjoint_hex_quad_d_v2(const ptrdiff_t                      s
                                           const mini_tet_parameters_t          mini_tet_parameters,  //
                                           real_t* const SFEM_RESTRICT          data);                         //
 
+int                                                                            //
+tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       //
+                                       const real_t                x1_n,       //
+                                       const real_t                x2_n,       //
+                                       const real_t                x3_n,       //
+                                       const real_t                y0_n,       //
+                                       const real_t                y1_n,       //
+                                       const real_t                y2_n,       //
+                                       const real_t                y3_n,       //
+                                       const real_t                z0_n,       //
+                                       const real_t                z1_n,       //
+                                       const real_t                z2_n,       //
+                                       const real_t                z3_n,       //
+                                       const real_t                wf0,        //
+                                       const real_t                wf1,        //
+                                       const real_t                wf2,        //
+                                       const real_t                wf3,        //
+                                       const ptrdiff_t             stride0,    //
+                                       const ptrdiff_t             stride1,    //
+                                       const ptrdiff_t             stride2,    //
+                                       const geom_t                origin0,    //
+                                       const geom_t                origin1,    //
+                                       const geom_t                origin2,    //
+                                       const geom_t                delta0,     //
+                                       const geom_t                delta1,     //
+                                       const geom_t                delta2,     //
+                                       const int                   dim_quad,   //
+                                       const real_t const*         Q_nodes_x,  //
+                                       const real_t const*         Q_nodes_y,  //
+                                       const real_t const*         Q_nodes_z,  //
+                                       const real_t const*         Q_weights,  //
+                                       real_t* const SFEM_RESTRICT data);      //
+
 /**
  * @brief
  *
