@@ -17,6 +17,8 @@
 
 #include "quadratures_rule.h"
 
+#include "sfem_resample_field_adjoint_hex_quad.h"
+
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 // generate_poly_bounding_box //////////////////////////
@@ -605,8 +607,6 @@ midpoint_quadrature(const int N,        //
     return 0;  // Success
 }
 
-typedef enum { TET_QUAD_MIDPOINT_NQP } tet_quad_midpoint_nqp_t;
-
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 // sfem_quad_rule_3D ///////////////////////////////////
@@ -647,12 +647,6 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
             return -1;  // Unknown rule
     }  // END switch
 }  // END sfem_quad_rule_3D
-
-typedef struct {
-    real_t x, y, z;    // Physical coordinates
-    real_t weight;     // Physical weight
-    bool   is_inside;  // Containment result
-} quadrature_point_result_t;
 
 static inline quadrature_point_result_t                       //
 transform_and_check_quadrature_point(                         //
@@ -712,23 +706,22 @@ transform_and_check_quadrature_point(                         //
     return result;
 }  // END: transform_and_check_quadrature_point
 
-static inline quadrature_point_result_t                  //
-transform_and_check_quadrature_point_n(const int q_ijk,  //
-                                                         // const real_t                      volume_main_tet,           //
-                                       const real_t                      tet4_faces_normals[4][3],  //
-                                       const real_t                      faces_centroids[4][3],     //
-                                       const real_t* const SFEM_RESTRICT Q_nodes_x,                 //
-                                       const real_t* const SFEM_RESTRICT Q_nodes_y,                 //
-                                       const real_t* const SFEM_RESTRICT Q_nodes_z,                 //
-                                       const real_t* const SFEM_RESTRICT Q_weights,                 //
-                                       const geom_t* const SFEM_RESTRICT origin,                    //
-                                       const geom_t* const SFEM_RESTRICT delta,                     //
-                                       const ptrdiff_t                   i_grid,                    //
-                                       const ptrdiff_t                   j_grid,                    //
-                                       const ptrdiff_t                   k_grid,                    //
-                                       const real_t                      tet_vertices_x[4],         //
-                                       const real_t                      tet_vertices_y[4],         //
-                                       const real_t                      tet_vertices_z[4]) {                            //
+quadrature_point_result_t                                                             //
+transform_and_check_quadrature_point_n(const int           q_ijk,                     //
+                                       const real_t        tet4_faces_normals[4][3],  //
+                                       const real_t        faces_centroids[4][3],     //
+                                       const real_t* const Q_nodes_x,                 //
+                                       const real_t* const Q_nodes_y,                 //
+                                       const real_t* const Q_nodes_z,                 //
+                                       const real_t* const Q_weights,                 //
+                                       const geom_t* const origin,                    //
+                                       const geom_t* const delta,                     //
+                                       const ptrdiff_t     i_grid,                    //
+                                       const ptrdiff_t     j_grid,                    //
+                                       const ptrdiff_t     k_grid,                    //
+                                       const real_t        tet_vertices_x[4],         //
+                                       const real_t        tet_vertices_y[4],         //
+                                       const real_t        tet_vertices_z[4]) {              //
 
     quadrature_point_result_t result;
 
@@ -745,12 +738,12 @@ transform_and_check_quadrature_point_n(const int q_ijk,  //
 
     // Compute physical weight
 
-    is_point_in_tet_n(1,                   //
-                      tet4_faces_normals,  //
-                      faces_centroids,     //
-                      &result.x,           //
-                      &result.y,           //
-                      &result.z,           //
+    is_point_in_tet_n(1,  //
+                      tet4_faces_normals,
+                      faces_centroids,
+                      &result.x,
+                      &result.y,
+                      &result.z,
                       &result.is_inside);  //
 
     // Q_weights[q_ijk] is already the product of 3 1D weights, so just scale by volume
@@ -762,7 +755,7 @@ transform_and_check_quadrature_point_n(const int q_ijk,  //
 /////////////////////////////////////////////////////////
 // transform_quadrature_point_n /////////////////////////
 /////////////////////////////////////////////////////////
-static inline quadrature_point_result_t                                    //
+quadrature_point_result_t                                                  //
 transform_quadrature_point_n(const int                         q_ijk,      //
                              const real_t* const SFEM_RESTRICT Q_nodes_x,  //
                              const real_t* const SFEM_RESTRICT Q_nodes_y,  //
@@ -867,13 +860,6 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
 //////////////////////////////////////////////////////////
 // ijk_index_t ////////////////////////////
 //////////////////////////////////////////////////////////
-typedef struct ijk_index {
-    ptrdiff_t i;
-    ptrdiff_t j;
-    ptrdiff_t k;
-    bool      inside_tet;
-} ijk_index_t;  // END ijk_index_t
-
 /////////////////////////////////////////////////////////
 // transfer_weighted_field_tet4_to_hex //////////////////
 /////////////////////////////////////////////////////////
@@ -1223,9 +1209,8 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
                     // Midpoint quadrature rule in 3D
 
                     for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
-                        quadrature_point_result_t Qpoint_phys =                //
-                                transform_and_check_quadrature_point_n(q_ijk,  //
-                                                                               //    vol_tet_main,                          //
+                        quadrature_point_result_t Qpoint_phys =                                               //
+                                transform_and_check_quadrature_point_n(q_ijk,                                 //
                                                                        face_normals_array,                    //
                                                                        faces_centroids_array,                 //
                                                                        Q_nodes_x,                             //
@@ -1316,7 +1301,7 @@ tet4_resample_field_adjoint_hex_quad_d(const ptrdiff_t                      star
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 int                                                                            //
-tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       //
+tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       // Tet vertices //
                                        const real_t                x1_n,       //
                                        const real_t                x2_n,       //
                                        const real_t                x3_n,       //
@@ -1328,25 +1313,25 @@ tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       /
                                        const real_t                z1_n,       //
                                        const real_t                z2_n,       //
                                        const real_t                z3_n,       //
-                                       const real_t                wf0,        //
+                                       const real_t                wf0,        // Weighted field at tet vertices
                                        const real_t                wf1,        //
                                        const real_t                wf2,        //
                                        const real_t                wf3,        //
-                                       const ptrdiff_t             stride0,    //
+                                       const ptrdiff_t             stride0,    // Stride of hex grid
                                        const ptrdiff_t             stride1,    //
                                        const ptrdiff_t             stride2,    //
-                                       const geom_t                origin0,    //
+                                       const geom_t                origin0,    // Origin of hex grid
                                        const geom_t                origin1,    //
                                        const geom_t                origin2,    //
-                                       const geom_t                delta0,     //
+                                       const geom_t                delta0,     // Delta of hex grid
                                        const geom_t                delta1,     //
                                        const geom_t                delta2,     //
-                                       const int                   dim_quad,   //
-                                       const real_t const*         Q_nodes_x,  //
-                                       const real_t const*         Q_nodes_y,  //
-                                       const real_t const*         Q_nodes_z,  //
-                                       const real_t const*         Q_weights,  //
-                                       real_t* const SFEM_RESTRICT data) {     //
+                                       const int                   dim_quad,   // Number of quadrature points
+                                       const real_t* const         Q_nodes_x,  // Quadrature nodes and weights
+                                       const real_t* const         Q_nodes_y,  //
+                                       const real_t* const         Q_nodes_z,  //
+                                       const real_t* const         Q_weights,  //
+                                       real_t* const SFEM_RESTRICT data) {     // Outut data array HEX
                                                                                // Placeholder implementation
 
     const int off0 = 0;
