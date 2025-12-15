@@ -640,6 +640,9 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
                 }  // END for j
             }  // END for i
 
+            free(nodes);
+            free(weights);
+
             return N * N * N;  // Total number of quadrature points
         }  // END case TET_QUAD_MIDPOINT_NQP
 

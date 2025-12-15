@@ -743,7 +743,7 @@ int main(int argc, char* argv[]) {
 
     const int multi_field = 3;
 
-    real_t* g       = calloc(mesh.nnodes, sizeof(real_t));
+    real_t* g = calloc(mesh.nnodes, sizeof(real_t));
     // real_t* multi_g = calloc(mesh.nnodes * multi_field, sizeof(real_t));
 
     {  // begin resample_field_mesh
@@ -924,6 +924,23 @@ int main(int argc, char* argv[]) {
                         printf("info.adjoint_refine_type = UNKNOWN\n");
                     }
 #endif
+
+                    normalize_mesh(mesh.nnodes,            //
+                                   (geom_t**)mesh.points,  //
+                                   delta[0],               //
+                                   delta[1],               //
+                                   delta[2],               //
+                                   origin[0],              //
+                                   origin[1],              //
+                                   origin[2]);             //
+
+                    delta[0] = 1.0;
+                    delta[1] = 1.0;
+                    delta[2] = 1.0;
+
+                    origin[0] = 0.0;
+                    origin[1] = 0.0;
+                    origin[2] = 0.0;
 
                     ret_resample_adjoint =                                     //
                             resample_field_adjoint_tet4(mpi_size,              //

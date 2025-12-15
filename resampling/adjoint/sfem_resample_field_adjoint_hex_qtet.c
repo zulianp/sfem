@@ -32,9 +32,9 @@ static real_t Q_weights_p[N_QUADRATURE_POINTS_MAX] = {1.0};
 int init_quad_points_hex_qtet(const int dim_quad) {
     const int dim_quad_cube = dim_quad * dim_quad * dim_quad;
 
-    if (dim_quad_cube <= N_QUADRATURE_POINTS_MAX) {
+    if (dim_quad_cube < N_QUADRATURE_POINTS_MAX) {
         dim_quad_cube_p = dim_quad_cube;
-        sfem_quad_rule_3D(dim_quad_cube, dim_quad_cube_p, Q_nodes_x_p, Q_nodes_y_p, Q_nodes_z_p, Q_weights_p);
+        sfem_quad_rule_3D(TET_QUAD_MIDPOINT_NQP, dim_quad, Q_nodes_x_p, Q_nodes_y_p, Q_nodes_z_p, Q_weights_p);
     } else {
         return -1;  // Unsupported quadrature
     }
@@ -206,32 +206,27 @@ transfer_weighted_field_tet4_to_hex_norm(const real_t                wf0,       
 // tet4_resample_field_adjoint_tet_quad_d ////////////////
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int                                                              //
-tet4_resample_field_adjoint_tet_qtet_d(const real_t    x0_n,     // Tet vertices //
-                                       const real_t    x1_n,     //
-                                       const real_t    x2_n,     //
-                                       const real_t    x3_n,     //
-                                       const real_t    y0_n,     //
-                                       const real_t    y1_n,     //
-                                       const real_t    y2_n,     //
-                                       const real_t    y3_n,     //
-                                       const real_t    z0_n,     //
-                                       const real_t    z1_n,     //
-                                       const real_t    z2_n,     //
-                                       const real_t    z3_n,     //
-                                       const real_t    wf0,      // Weighted field at tet vertices
-                                       const real_t    wf1,      //
-                                       const real_t    wf2,      //
-                                       const real_t    wf3,      //
-                                       const ptrdiff_t stride0,  // Stride of hex grid
-                                       const ptrdiff_t stride1,  //
-                                       //    const int                   dim_quad,   // Number of quadrature points
-                                       //    const real_t* const         Q_nodes_x,  // Quadrature nodes and weights
-                                       //    const real_t* const         Q_nodes_y,  //
-                                       //    const real_t* const         Q_nodes_z,  //
-                                       //    const real_t* const         Q_weights,  //
-                                       out_real_t* const SFEM_RESTRICT data) {  // Outut data array HEX
-                                                                                // Placeholder implementation
+int                                                                            //
+tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     // Tet vertices //
+                                     const real_t                    x1_n,     //
+                                     const real_t                    x2_n,     //
+                                     const real_t                    x3_n,     //
+                                     const real_t                    y0_n,     //
+                                     const real_t                    y1_n,     //
+                                     const real_t                    y2_n,     //
+                                     const real_t                    y3_n,     //
+                                     const real_t                    z0_n,     //
+                                     const real_t                    z1_n,     //
+                                     const real_t                    z2_n,     //
+                                     const real_t                    z3_n,     //
+                                     const real_t                    wf0,      // Weighted field at tet vertices
+                                     const real_t                    wf1,      //
+                                     const real_t                    wf2,      //
+                                     const real_t                    wf3,      //
+                                     const ptrdiff_t                 stride0,  // Stride of hex grid
+                                     const ptrdiff_t                 stride1,  //
+                                     out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
+                                                                               // Placeholder implementation
 
     const int off0 = 0;
     const int off1 = stride0;
@@ -303,8 +298,10 @@ tet4_resample_field_adjoint_tet_qtet_d(const real_t    x0_n,     // Tet vertices
             const real_t y_hex_max = y_hex_min + 1.0;
 
             for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x++) {
-                const real_t x_hex_min         = ((real_t)i_grid_x);
-                const real_t x_hex_max         = x_hex_min + 1.0;
+                //
+                const real_t x_hex_min = ((real_t)i_grid_x);
+                const real_t x_hex_max = x_hex_min + 1.0;
+
                 const real_t hex_vertices_x[8] = {x_hex_min,
                                                   x_hex_max,
                                                   x_hex_max,
@@ -374,25 +371,19 @@ tet4_resample_field_adjoint_tet_qtet_d(const real_t    x0_n,     // Tet vertices
 
                     // for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
 
-                    ijk_index_t ijk_indices =                                            //
-                            transfer_weighted_field_tet4_to_hex_ckp(wf0,                 //
-                                                                    wf1,                 //
-                                                                    wf2,                 //
-                                                                    wf3,                 //
-                                                                    Qpoint_phys.x,       //
-                                                                    Qpoint_phys.y,       //
-                                                                    Qpoint_phys.z,       //
-                                                                    Q_ref_x,             //
-                                                                    Q_ref_y,             //
-                                                                    Q_ref_z,             //
-                                                                    Qpoint_phys.weight,  //
-                                                                    0.0,                 //
-                                                                    0.0,                 //
-                                                                    0.0,                 //
-                                                                    1.0,                 //
-                                                                    1.0,                 //
-                                                                    1.0,                 //
-                                                                    hex_element_field);  //
+                    ijk_index_t ijk_indices =                                             //
+                            transfer_weighted_field_tet4_to_hex_norm(wf0,                 //
+                                                                     wf1,                 //
+                                                                     wf2,                 //
+                                                                     wf3,                 //
+                                                                     Qpoint_phys.x,       //
+                                                                     Qpoint_phys.y,       //
+                                                                     Qpoint_phys.z,       //
+                                                                     Q_ref_x,             //
+                                                                     Q_ref_y,             //
+                                                                     Q_ref_z,             //
+                                                                     Qpoint_phys.weight,  //
+                                                                     hex_element_field);  //
 
                 }  // END: for q_ijk
 
@@ -413,5 +404,85 @@ tet4_resample_field_adjoint_tet_qtet_d(const real_t    x0_n,     // Tet vertices
         }  // END: for i_grid_y
     }  // END: for j_grid_y
 
-    RETURN_FROM_FUNCTION(0);
+    return 0;
 }  // END: Function: tet4_resample_field_adjoint_tet_quad_d
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_local_refine_adjoint_hyteg ////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                                  //
+tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      start_element,        // Mesh
+                                          const ptrdiff_t                      end_element,          //
+                                          const ptrdiff_t                      nnodes,               //
+                                          const idx_t** const SFEM_RESTRICT    elems,                //
+                                          const geom_t** const SFEM_RESTRICT   xyz,                  //
+                                          const ptrdiff_t* const SFEM_RESTRICT n,                    // SDF
+                                          const ptrdiff_t* const SFEM_RESTRICT stride,               //
+                                          const geom_t* const SFEM_RESTRICT    origin,               //
+                                          const geom_t* const SFEM_RESTRICT    delta,                //
+                                          const real_t* const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                          const mini_tet_parameters_t          mini_tet_parameters,  //
+                                          real_t* const SFEM_RESTRICT          data) {                        //
+
+    init_quad_points_hex_qtet(2);  //
+
+    for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
+        // Read the element vertex indices
+        idx_t ev[4];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elems[v][element_i];
+        }  // END: for v
+
+#if SFEM_LOG_LEVEL >= 5
+        if (element_i % 100000 == 0) {
+            printf("*** Processing element %td / %td \n", element_i, end_element);
+        }
+#endif
+
+        // Read the coordinates of the vertices of the tetrahedron
+        // In the physical space
+        const real_t x0_n = xyz[0][ev[0]];
+        const real_t x1_n = xyz[0][ev[1]];
+        const real_t x2_n = xyz[0][ev[2]];
+        const real_t x3_n = xyz[0][ev[3]];
+
+        const real_t y0_n = xyz[1][ev[0]];
+        const real_t y1_n = xyz[1][ev[1]];
+        const real_t y2_n = xyz[1][ev[2]];
+        const real_t y3_n = xyz[1][ev[3]];
+
+        const real_t z0_n = xyz[2][ev[0]];
+        const real_t z1_n = xyz[2][ev[1]];
+        const real_t z2_n = xyz[2][ev[2]];
+        const real_t z3_n = xyz[2][ev[3]];
+
+        const real_t wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
+        const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
+        const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
+        const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+        tet4_resample_field_adjoint_tet_norm(x0_n,       //
+                                             x1_n,       //
+                                             x2_n,       //
+                                             x3_n,       //
+                                             y0_n,       //
+                                             y1_n,       //
+                                             y2_n,       //
+                                             y3_n,       //
+                                             z0_n,       //
+                                             z1_n,       //
+                                             z2_n,       //
+                                             z3_n,       //
+                                             wf0,        //
+                                             wf1,        //
+                                             wf2,        //
+                                             wf3,        //
+                                             stride[0],  //
+                                             stride[1],  //
+                                             data);      //
+    }
+
+}  // END: Function: tet4_resample_field_adjoint_hex_quad_norm
