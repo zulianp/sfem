@@ -53,6 +53,86 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
     RETURN_FROM_FUNCTION(0);
 }
 
+int                                      //
+normalize_mesh(const ptrdiff_t nnodes,   // Mesh
+               geom_t** const  xyz,      //
+               const real_t    delta0,   //
+               const real_t    delta1,   //
+               const real_t    delta2,   //
+               const real_t    origin0,  //
+               const real_t    origin1,  //
+               const real_t    origin2) {   //
+
+    PRINT_CURRENT_FUNCTION;
+
+    const real_t norm_factor_x = 1.0 / delta0;
+    const real_t norm_factor_y = 1.0 / delta1;
+    const real_t norm_factor_z = 1.0 / delta2;
+
+    printf("Normalization factors: (%f, %f, %f)\n", norm_factor_x, norm_factor_y, norm_factor_z);
+    printf("Origin offsets:       (%f, %f, %f)\n", origin0, origin1, origin2);
+    printf("Number of nodes:      %td\n", nnodes);
+
+    for (ptrdiff_t node = 0; node < nnodes; node++) {
+        real_t x0_n = xyz[0][node];
+        real_t x1_n = xyz[0][node];
+        real_t x2_n = xyz[0][node];
+        real_t x3_n = xyz[0][node];
+
+        real_t y0_n = xyz[1][node];
+        real_t y1_n = xyz[1][node];
+        real_t y2_n = xyz[1][node];
+        real_t y3_n = xyz[1][node];
+
+        real_t z0_n = xyz[2][node];
+        real_t z1_n = xyz[2][node];
+        real_t z2_n = xyz[2][node];
+        real_t z3_n = xyz[2][node];
+
+        // Move the origin to 0,0,0 and normalize
+        x0_n = (x0_n - origin0) * norm_factor_x;
+        x1_n = (x1_n - origin0) * norm_factor_x;
+        x2_n = (x2_n - origin0) * norm_factor_x;
+        x3_n = (x3_n - origin0) * norm_factor_x;
+
+        y0_n = (y0_n - origin1) * norm_factor_y;
+        y1_n = (y1_n - origin1) * norm_factor_y;
+        y2_n = (y2_n - origin1) * norm_factor_y;
+        y3_n = (y3_n - origin1) * norm_factor_y;
+
+        z0_n = (z0_n - origin2) * norm_factor_z;
+        z1_n = (z1_n - origin2) * norm_factor_z;
+        z2_n = (z2_n - origin2) * norm_factor_z;
+        z3_n = (z3_n - origin2) * norm_factor_z;
+
+        // // print  check for between the input and output
+        // printf("Node %td: Input (%f, %f, %f) -> Output (%f, %f, %f) \n",
+        //        node,
+        //        xyz[0][node],
+        //        xyz[1][node],
+        //        xyz[2][node],
+        //        x0_n,
+        //        y0_n,
+        //        z0_n);
+
+        xyz[0][node] = x0_n;
+        xyz[0][node] = x1_n;
+        xyz[0][node] = x2_n;
+        xyz[0][node] = x3_n;
+
+        xyz[1][node] = y0_n;
+        xyz[1][node] = y1_n;
+        xyz[1][node] = y2_n;
+        xyz[1][node] = y3_n;
+
+        xyz[2][node] = z0_n;
+        xyz[2][node] = z1_n;
+        xyz[2][node] = z2_n;
+        xyz[2][node] = z3_n;
+    }
+}
+// END: Function: normalize_mesh
+
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
@@ -1266,7 +1346,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-// #define TEST_GPU_HYTEG_REFINEMENT
+            // #define TEST_GPU_HYTEG_REFINEMENT
             // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
@@ -1287,8 +1367,9 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             break;
 
 #else
-
-            ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+                ret = tet4_resample_field_adjoint_hex_quad_norm
+            // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+                                                             // ret = tet4_resample_field_adjoint_hex_quad_norm  //
                                                              // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                                      //
                      mesh->nelements,                        //

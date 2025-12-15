@@ -351,6 +351,20 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
                             sfem_resample_field_info*            info,           // Info struct with options and flags
                             const mini_tet_parameters_t          mini_tet_parameters);    // Mini tet params
 
+int                                                                                                  //
+tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      start_element,        // Mesh
+                                          const ptrdiff_t                      end_element,          //
+                                          const ptrdiff_t                      nnodes,               //
+                                          const idx_t** const SFEM_RESTRICT    elems,                //
+                                          const geom_t** const SFEM_RESTRICT   xyz,                  //
+                                          const ptrdiff_t* const SFEM_RESTRICT n,                    // SDF
+                                          const ptrdiff_t* const SFEM_RESTRICT stride,               //
+                                          const geom_t* const SFEM_RESTRICT    origin,               //
+                                          const geom_t* const SFEM_RESTRICT    delta,                //
+                                          const real_t* const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                          const mini_tet_parameters_t          mini_tet_parameters,  //
+                                          real_t* const SFEM_RESTRICT          data);                         // SDF: data (output)
+
 /// @brief  DEBUG code for testing the adjoint resampling operation
 /// @param mpi_size
 /// @param mpi_rank
@@ -925,6 +939,56 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,    // Mesh
                   const geom_t** const SFEM_RESTRICT xyz,       // Mesh
                   const function_XYZ_t               fun,       // Function
                   real_t* const SFEM_RESTRICT        weighted_field);  //   Output (weighted field)
+
+/**
+ * @brief Normalize mesh coordinates
+ *
+ * @param nnodes [in] Number of nodes in the mesh
+ * @param xyz [in,out] Pointer to the array of geometric coordinates of the nodes
+ * @param delta0 [in] Normalization factor for x-coordinates
+ * @param delta1 [in] Normalization factor for y-coordinates
+ * @param delta2 [in] Normalization factor for z-coordinates
+ * @param origin0 [in] Origin offset for x-coordinates
+ * @param origin1 [in] Origin offset for y-coordinates
+ * @param origin2 [in] Origin offset for z-coordinates
+ *
+ * @details deltaN are the delta values along each axis (dx, dy, dz) used for the structired hexaedral grid.
+ *          originN are the origin values along each axis (ox, oy, oz), used to move it to (0,0,0).
+ *
+ * @return int Returns 0 on success
+ */
+int                                                   //
+normalize_mesh(const ptrdiff_t              nnodes,   // Mesh
+               geom_t** const SFEM_RESTRICT xyz,      //
+               const real_t                 delta0,   //
+               const real_t                 delta1,   //
+               const real_t                 delta2,   //
+               const real_t                 origin0,  //
+               const real_t                 origin1,  //
+               const real_t                 origin2);                 //
+
+#define out_real_t real_t
+
+int                                                                            //
+tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     // Tet vertices //
+                                     const real_t                    x1_n,     //
+                                     const real_t                    x2_n,     //
+                                     const real_t                    x3_n,     //
+                                     const real_t                    y0_n,     //
+                                     const real_t                    y1_n,     //
+                                     const real_t                    y2_n,     //
+                                     const real_t                    y3_n,     //
+                                     const real_t                    z0_n,     //
+                                     const real_t                    z1_n,     //
+                                     const real_t                    z2_n,     //
+                                     const real_t                    z3_n,     //
+                                     const real_t                    wf0,      // Weighted field at tet vertices
+                                     const real_t                    wf1,      //
+                                     const real_t                    wf2,      //
+                                     const real_t                    wf3,      //
+                                     const ptrdiff_t                 stride0,  // Stride of hex grid
+                                     const ptrdiff_t                 stride1,  //
+                                     out_real_t* const SFEM_RESTRICT data);
 
 #ifdef __cplusplus
 }
