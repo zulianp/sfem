@@ -969,6 +969,17 @@ normalize_mesh(const ptrdiff_t              nnodes,   // Mesh
 
 #define out_real_t real_t
 
+/**
+ * @brief Resample field from tetrahedral element to hexahedral grid (adjoint).
+ *
+ * @param x0_n, x1_n, x2_n, x3_n Tet vertices X-coordinates
+ * @param y0_n, y1_n, y2_n, y3_n Tet vertices Y-coordinates
+ * @param z0_n, z1_n, z2_n, z3_n Tet vertices Z-coordinates
+ * @param wf0, wf1, wf2, wf3 Weighted field at tet vertices
+ * @param stride0, stride1 Stride of hex grid (this code assumes column-major order) and the stride2 is inplicit and set to 1
+ * @param data Outut data array HEX
+ * @return int
+ */
 int                                                                            //
 tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     // Tet vertices //
                                      const real_t                    x1_n,     //

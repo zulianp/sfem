@@ -122,7 +122,7 @@ LAUNCH="${Nsight_PATH}/ncu \
 fi
 
 GRID_TO_MESH="grid_to_mesh"
-#GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
+GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 # LAUNCH="lldb --"
 

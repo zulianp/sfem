@@ -4,6 +4,7 @@
 #include <stddef.h>  // Add this for ptrdiff_t type
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "sfem_base.h"
 #include "sfem_config.h"  // Include the generated config header
 
@@ -1367,22 +1368,35 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             break;
 
 #else
-                ret = tet4_resample_field_adjoint_hex_quad_norm
-            // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
-                                                             // ret = tet4_resample_field_adjoint_hex_quad_norm  //
-                                                             // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
-                    (0,                                      //
-                     mesh->nelements,                        //
-                     mesh->nnodes,                           //
-                     (const idx_t**)mesh->elements,          //
-                     (const geom_t**)mesh->points,           //
-                     n,                                      //
-                     stride,                                 //
-                     origin,                                 //
-                     delta,                                  //
-                     mass_vector,                            //
-                     mini_tet_parameters,                    //
-                     data);                                  //
+
+#if SFEM_LOG_LEVEL >= 5
+            struct timespec t_start;
+            clock_gettime(CLOCK_MONOTONIC, &t_start);
+#endif
+
+            ret = tet4_resample_field_adjoint_hex_quad_norm
+                    // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+                    // ret = tet4_resample_field_adjoint_hex_quad_norm  //
+                    // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
+                    (0,                              //
+                     mesh->nelements,                //
+                     mesh->nnodes,                   //
+                     (const idx_t**)mesh->elements,  //
+                     (const geom_t**)mesh->points,   //
+                     n,                              //
+                     stride,                         //
+                     origin,                         //
+                     delta,                          //
+                     mass_vector,                    //
+                     mini_tet_parameters,            //
+                     data);                          //
+
+#if SFEM_LOG_LEVEL >= 5
+            struct timespec t_end;
+            clock_gettime(CLOCK_MONOTONIC, &t_end);
+            double elapsed = (t_end.tv_sec - t_start.tv_sec) + (t_end.tv_nsec - t_start.tv_nsec) * 1e-9;
+            printf("Elapsed: %.6f s\n", elapsed);
+#endif
 
 #ifdef COMPUTE_FUN_XYZ_HEX
             if (fun_XYZ != NULL && data_fun_XYZ != NULL) {

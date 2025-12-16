@@ -175,17 +175,26 @@ transfer_weighted_field_tet4_to_hex_norm(const real_t                wf0,       
     const real_t wf_quad = f0 * wf0 + f1 * wf1 + f2 * wf2 + f3 * wf3;
 
     real_t hex8_f0, hex8_f1, hex8_f2, hex8_f3, hex8_f4, hex8_f5, hex8_f6, hex8_f7;
-    hex_aa_8_eval_fun_V(l_x,        // Local coordinates
-                        l_y,        //
-                        l_z,        //
-                        &hex8_f0,   // Output shape functions
-                        &hex8_f1,   //
-                        &hex8_f2,   //
-                        &hex8_f3,   //
-                        &hex8_f4,   //
-                        &hex8_f5,   //
-                        &hex8_f6,   //
-                        &hex8_f7);  //
+    // hex_aa_8_eval_fun_V(l_x,        // Local coordinates
+    //                     l_y,        //
+    //                     l_z,        //
+    //                     &hex8_f0,   // Output shape functions
+    //                     &hex8_f1,   //
+    //                     &hex8_f2,   //
+    //                     &hex8_f3,   //
+    //                     &hex8_f4,   //
+    //                     &hex8_f5,   //
+    //                     &hex8_f6,   //
+    //                     &hex8_f7);  //
+
+    hex8_f0 = (1.0 - l_x) * (1.0 - l_y) * (1.0 - l_z);
+    hex8_f1 = l_x * (1.0 - l_y) * (1.0 - l_z);
+    hex8_f2 = l_x * l_y * (1.0 - l_z);
+    hex8_f3 = (1.0 - l_x) * l_y * (1.0 - l_z);
+    hex8_f4 = (1.0 - l_x) * (1.0 - l_y) * l_z;
+    hex8_f5 = l_x * (1.0 - l_y) * l_z;
+    hex8_f6 = l_x * l_y * l_z;
+    hex8_f7 = (1.0 - l_x) * l_y * l_z;
 
     const real_t wf_quad_QW = wf_quad * QW_phys_hex;
 
@@ -200,6 +209,180 @@ transfer_weighted_field_tet4_to_hex_norm(const real_t                wf0,       
 
     return (ijk_index_t){i, j, k, true};
 }  // END transfer_weighted_field_tet4_to_hex
+
+/////////////////////////////////////////////////////////
+// is_hex_out_of_tet ////////////////////////////
+/////////////////////////////////////////////////////////
+bool                                                        //
+is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
+                         const real_t tet_origin_x,         //
+                         const real_t tet_origin_y,         //
+                         const real_t tet_origin_z,         //
+                         const real_t hex_vertices_x[8],    //
+                         const real_t hex_vertices_y[8],    //
+                         const real_t hex_vertices_z[8]) {  //
+
+    /**
+     * ****************************************************************************************
+     * Check if a hexahedral element is completely outside a tetrahedral element
+     * Using the inverse Jacobian of the tetrahedron to transform hex vertices to tet reference space
+     * and check against tet reference space constraints.
+     * This function return true if the hex is completely outside the tet.
+     * And return false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
+     * This must be used as a fast culling test before more expensive intersection tests.
+     *
+     * Tet reference space constraints for a point to be INSIDE:
+     *   ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND (ref_x + ref_y + ref_z) <= 1
+     *
+     * A hex is completely OUTSIDE if ALL vertices violate at least ONE of these constraints:
+     *   - All ref_x < 0 (all on negative x side)
+     *   - All ref_y < 0 (all on negative y side)
+     *   - All ref_z < 0 (all on negative z side)
+     *   - All sum > 1 (all beyond the diagonal plane)
+     * *****************************************************************************************
+     */
+    // Precompute inverse Jacobian components
+    const real_t inv_J00 = inv_J_tet[0];
+    const real_t inv_J01 = inv_J_tet[1];
+    const real_t inv_J02 = inv_J_tet[2];
+    const real_t inv_J10 = inv_J_tet[3];
+    const real_t inv_J11 = inv_J_tet[4];
+    const real_t inv_J12 = inv_J_tet[5];
+    const real_t inv_J20 = inv_J_tet[6];
+    const real_t inv_J21 = inv_J_tet[7];
+    const real_t inv_J22 = inv_J_tet[8];
+
+    // Use 512-bit AVX-512 vectors (8 doubles at a time - perfect for 8 vertices!)
+    typedef double vec8 __attribute__((vector_size(8 * sizeof(double))));
+
+    // Load all 8 hex vertices at once
+    vec8 hex_x, hex_y, hex_z;
+    for (int i = 0; i < 8; i++) {
+        hex_x[i] = hex_vertices_x[i];
+        hex_y[i] = hex_vertices_y[i];
+        hex_z[i] = hex_vertices_z[i];
+    }
+
+    // Broadcast tet origin to all 8 lanes
+    vec8 origin_x = {
+            tet_origin_x, tet_origin_x, tet_origin_x, tet_origin_x, tet_origin_x, tet_origin_x, tet_origin_x, tet_origin_x};
+    vec8 origin_y = {
+            tet_origin_y, tet_origin_y, tet_origin_y, tet_origin_y, tet_origin_y, tet_origin_y, tet_origin_y, tet_origin_y};
+    vec8 origin_z = {
+            tet_origin_z, tet_origin_z, tet_origin_z, tet_origin_z, tet_origin_z, tet_origin_z, tet_origin_z, tet_origin_z};
+
+    // Compute dx, dy, dz for all 8 vertices simultaneously
+    vec8 dx = hex_x - origin_x;
+    vec8 dy = hex_y - origin_y;
+    vec8 dz = hex_z - origin_z;
+
+    // Broadcast inverse Jacobian elements to all 8 lanes
+    vec8 J00 = {inv_J00, inv_J00, inv_J00, inv_J00, inv_J00, inv_J00, inv_J00, inv_J00};
+    vec8 J01 = {inv_J01, inv_J01, inv_J01, inv_J01, inv_J01, inv_J01, inv_J01, inv_J01};
+    vec8 J02 = {inv_J02, inv_J02, inv_J02, inv_J02, inv_J02, inv_J02, inv_J02, inv_J02};
+    vec8 J10 = {inv_J10, inv_J10, inv_J10, inv_J10, inv_J10, inv_J10, inv_J10, inv_J10};
+    vec8 J11 = {inv_J11, inv_J11, inv_J11, inv_J11, inv_J11, inv_J11, inv_J11, inv_J11};
+    vec8 J12 = {inv_J12, inv_J12, inv_J12, inv_J12, inv_J12, inv_J12, inv_J12, inv_J12};
+    vec8 J20 = {inv_J20, inv_J20, inv_J20, inv_J20, inv_J20, inv_J20, inv_J20, inv_J20};
+    vec8 J21 = {inv_J21, inv_J21, inv_J21, inv_J21, inv_J21, inv_J21, inv_J21, inv_J21};
+    vec8 J22 = {inv_J22, inv_J22, inv_J22, inv_J22, inv_J22, inv_J22, inv_J22, inv_J22};
+
+    // Transform all 8 vertices to reference space simultaneously
+    vec8 ref_x = J00 * dx + J01 * dy + J02 * dz;
+    vec8 ref_y = J10 * dx + J11 * dy + J12 * dz;
+    vec8 ref_z = J20 * dx + J21 * dy + J22 * dz;
+
+    // Compute sum for all 8 vertices
+    vec8 sum_ref = ref_x + ref_y + ref_z;
+
+    // Constants for comparison
+    vec8 zero = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    vec8 one  = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+
+    // Perform comparisons (returns vector of comparison results)
+    vec8 neg_x   = ref_x < zero;
+    vec8 neg_y   = ref_y < zero;
+    vec8 neg_z   = ref_z < zero;
+    vec8 out_sum = sum_ref > one;
+
+    // Check if all 8 vertices satisfy each constraint
+    // All bits set means all comparisons were true
+    bool all_negative_x = (neg_x[0] && neg_x[1] && neg_x[2] && neg_x[3] && neg_x[4] && neg_x[5] && neg_x[6] && neg_x[7]);
+    bool all_negative_y = (neg_y[0] && neg_y[1] && neg_y[2] && neg_y[3] && neg_y[4] && neg_y[5] && neg_y[6] && neg_y[7]);
+    bool all_negative_z = (neg_z[0] && neg_z[1] && neg_z[2] && neg_z[3] && neg_z[4] && neg_z[5] && neg_z[6] && neg_z[7]);
+    bool all_outside_sum =
+            (out_sum[0] && out_sum[1] && out_sum[2] && out_sum[3] && out_sum[4] && out_sum[5] && out_sum[6] && out_sum[7]);
+
+    // Hex is completely outside if ALL vertices violate at least one constraint together
+    return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
+
+}  // END Function: is_hex_out_of_tet
+
+#if defined(__AVX512F__)
+#include <immintrin.h>
+
+bool is_hex_out_of_tet_norm_v_avx512(const real_t inv_J_tet[9],         //
+                                     const real_t tet_origin_x,         //
+                                     const real_t tet_origin_y,         //
+                                     const real_t tet_origin_z,         //
+                                     const real_t hex_vertices_x[8],    //
+                                     const real_t hex_vertices_y[8],    //
+                                     const real_t hex_vertices_z[8]) {  //
+    // Load all 8 vertices
+    __m512d hex_x = _mm512_loadu_pd(hex_vertices_x);
+    __m512d hex_y = _mm512_loadu_pd(hex_vertices_y);
+    __m512d hex_z = _mm512_loadu_pd(hex_vertices_z);
+
+    // Broadcast tet origin
+    __m512d origin_x = _mm512_set1_pd(tet_origin_x);
+    __m512d origin_y = _mm512_set1_pd(tet_origin_y);
+    __m512d origin_z = _mm512_set1_pd(tet_origin_z);
+
+    // Compute dx, dy, dz
+    __m512d dx = _mm512_sub_pd(hex_x, origin_x);
+    __m512d dy = _mm512_sub_pd(hex_y, origin_y);
+    __m512d dz = _mm512_sub_pd(hex_z, origin_z);
+
+    // Broadcast inverse Jacobian elements
+    __m512d J00 = _mm512_set1_pd(inv_J_tet[0]);
+    __m512d J01 = _mm512_set1_pd(inv_J_tet[1]);
+    __m512d J02 = _mm512_set1_pd(inv_J_tet[2]);
+    __m512d J10 = _mm512_set1_pd(inv_J_tet[3]);
+    __m512d J11 = _mm512_set1_pd(inv_J_tet[4]);
+    __m512d J12 = _mm512_set1_pd(inv_J_tet[5]);
+    __m512d J20 = _mm512_set1_pd(inv_J_tet[6]);
+    __m512d J21 = _mm512_set1_pd(inv_J_tet[7]);
+    __m512d J22 = _mm512_set1_pd(inv_J_tet[8]);
+
+    // Transform to reference space using FMA
+    __m512d ref_x = _mm512_fmadd_pd(J00, dx, _mm512_fmadd_pd(J01, dy, _mm512_mul_pd(J02, dz)));
+    __m512d ref_y = _mm512_fmadd_pd(J10, dx, _mm512_fmadd_pd(J11, dy, _mm512_mul_pd(J12, dz)));
+    __m512d ref_z = _mm512_fmadd_pd(J20, dx, _mm512_fmadd_pd(J21, dy, _mm512_mul_pd(J22, dz)));
+
+    // Compute sum
+    __m512d sum_ref = _mm512_add_pd(_mm512_add_pd(ref_x, ref_y), ref_z);
+
+    // Constants
+    __m512d zero = _mm512_setzero_pd();
+    __m512d one  = _mm512_set1_pd(1.0);
+
+    // Perform comparisons and get masks
+    __mmask8 mask_neg_x   = _mm512_cmp_pd_mask(ref_x, zero, _CMP_LT_OQ);
+    __mmask8 mask_neg_y   = _mm512_cmp_pd_mask(ref_y, zero, _CMP_LT_OQ);
+    __mmask8 mask_neg_z   = _mm512_cmp_pd_mask(ref_z, zero, _CMP_LT_OQ);
+    __mmask8 mask_out_sum = _mm512_cmp_pd_mask(sum_ref, one, _CMP_GT_OQ);
+
+    // Reduce masks: check if ALL vertices satisfy each constraint
+    // For 8 elements, all bits set = 0xFF
+    bool all_negative_x  = (mask_neg_x == 0xFF);
+    bool all_negative_y  = (mask_neg_y == 0xFF);
+    bool all_negative_z  = (mask_neg_z == 0xFF);
+    bool all_outside_sum = (mask_out_sum == 0xFF);
+
+    // Return true if at least one constraint is satisfied by all vertices
+    return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
+}
+#endif
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -226,7 +409,11 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                      const ptrdiff_t                 stride0,  // Stride of hex grid
                                      const ptrdiff_t                 stride1,  //
                                      out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
-                                                                               // Placeholder implementation
+    // Placeholder implementation
+
+#if SFEM_LOG_LEVEL >= 5
+    // printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
+#endif
 
     const int off0 = 0;
     const int off1 = stride0;
@@ -243,9 +430,9 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
     const real_t* const Q_nodes_z = Q_nodes_z_p;
     const real_t* const Q_weights = Q_weights_p;
 
-    const real_t inv_dx = 1.0;
-    const real_t inv_dy = 1.0;
-    const real_t inv_dz = 1.0;
+    // const real_t inv_dx = 1.0;
+    // const real_t inv_dy = 1.0;
+    // const real_t inv_dz = 1.0;
 
     real_t    inv_J_tet[9];
     ptrdiff_t min_grid_x, max_grid_x;
@@ -329,13 +516,15 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
-                const bool is_out_of_tet = is_hex_out_of_tet(inv_J_tet,        //
-                                                             x0_n,             //
-                                                             y0_n,             //
-                                                             z0_n,             //
-                                                             hex_vertices_x,   //
-                                                             hex_vertices_y,   //
-                                                             hex_vertices_z);  //
+                // const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512 //
+                const bool is_out_of_tet = is_hex_out_of_tet  //
+                        (inv_J_tet,                           //
+                         x0_n,                                //
+                         y0_n,                                //
+                         z0_n,                                //
+                         hex_vertices_x,                      //
+                         hex_vertices_y,                      //
+                         hex_vertices_z);                     //
 
                 // printf("Is out of tet: %d \n", is_out_of_tet);
 
@@ -434,7 +623,7 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
 
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][element_i];
-        }  // END: for v
+        }  // END: for vq
 
 #if SFEM_LOG_LEVEL >= 5
         if (element_i % 100000 == 0) {
@@ -480,7 +669,7 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
                                              wf1,        //
                                              wf2,        //
                                              wf3,        //
-                                             stride[0],  //
+                                             stride[2],  //
                                              stride[1],  //
                                              data);      //
     }
