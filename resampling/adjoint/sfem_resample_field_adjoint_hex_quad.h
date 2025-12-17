@@ -148,6 +148,16 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],        //
                   const real_t hex_vertices_y[8],   //
                   const real_t hex_vertices_z[8]);  //
 
+void                                                           //
+is_hex_out_of_tet_step2h(const real_t inv_J_tet[9],            //
+                         const real_t tet_origin_x,            //
+                         const real_t tet_origin_y,            //
+                         const real_t tet_origin_z,            //
+                         const real_t hex_vertices_x_arg[16],  //
+                         const real_t hex_vertices_y_arg[16],  //
+                         const real_t hex_vertices_z_arg[16],  //
+                         bool         in_out[2]);                      //
+
 int                                                    //
 sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
                   const int                     N,     //

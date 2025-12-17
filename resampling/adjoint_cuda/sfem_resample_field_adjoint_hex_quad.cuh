@@ -1580,29 +1580,30 @@ tet4_resample_field_adjoint_hex_quad_element_method_gpu(const IntType           
 
                     IntType out_i, out_j, out_k;
 
-                    const bool is_in_tet =                                                                           //
-                            transfer_weighted_field_tet4_to_hex_ckp_gpu<FloatType, IntType>(inv_J_tet,               //
-                                                                                            wf0,                     //
-                                                                                            wf1,                     //
-                                                                                            wf2,                     //
-                                                                                            wf3,                     //
-                                                                                            Qpoint_phys.physical_x,  //
-                                                                                            Qpoint_phys.physical_y,  //
-                                                                                            Qpoint_phys.physical_z,  //
-                                                                                            Qpoint_phys.weight,      //
-                                                                                            x0_n,                    //
-                                                                                            y0_n,                    //
-                                                                                            z0_n,                    //
-                                                                                            origin0,                 //
-                                                                                            origin1,                 //
-                                                                                            origin2,                 //
-                                                                                            inv_dx,                  //
-                                                                                            inv_dy,                  //
-                                                                                            inv_dz,                  //
-                                                                                            hex_element_field,       //
-                                                                                            out_i,                   //
-                                                                                            out_j,                   //
-                                                                                            out_k);                  //
+                    const bool is_in_tet =                                                                //
+                            transfer_weighted_field_tet4_to_hex_ckp_gpu<FloatType,                        //
+                                                                        IntType>(inv_J_tet,               //
+                                                                                 wf0,                     //
+                                                                                 wf1,                     //
+                                                                                 wf2,                     //
+                                                                                 wf3,                     //
+                                                                                 Qpoint_phys.physical_x,  //
+                                                                                 Qpoint_phys.physical_y,  //
+                                                                                 Qpoint_phys.physical_z,  //
+                                                                                 Qpoint_phys.weight,      //
+                                                                                 x0_n,                    //
+                                                                                 y0_n,                    //
+                                                                                 z0_n,                    //
+                                                                                 origin0,                 //
+                                                                                 origin1,                 //
+                                                                                 origin2,                 //
+                                                                                 inv_dx,                  //
+                                                                                 inv_dy,                  //
+                                                                                 inv_dz,                  //
+                                                                                 hex_element_field,       //
+                                                                                 out_i,                   //
+                                                                                 out_j,                   //
+                                                                                 out_k);                  //
 
                 }  // END: for (int q_ijk = lane_id; q_ijk < dim_quad; q_ijk += LANES_PER_TILE_HEX_QUAD)
             }  // END: for (int q_j = 0; q_j < N_midpoint; q_j++)
