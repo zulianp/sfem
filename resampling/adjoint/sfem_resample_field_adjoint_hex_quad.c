@@ -860,6 +860,97 @@ is_hex_out_of_tet(const real_t inv_J_tet[9],         //
     return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
 }  // END Function: is_hex_out_of_tet
 
+/////////////////////////////////////////////////////////
+// is_hex_out_of_tet ////////////////////////////
+/////////////////////////////////////////////////////////
+void                                                           //
+is_hex_out_of_tet_step2h(const real_t inv_J_tet[9],            //
+                         const real_t tet_origin_x,            //
+                         const real_t tet_origin_y,            //
+                         const real_t tet_origin_z,            //
+                         const real_t hex_vertices_x_arg[16],  //
+                         const real_t hex_vertices_y_arg[16],  //
+                         const real_t hex_vertices_z_arg[16],  //
+                         bool         in_out[2]) {                     //
+
+    /**
+     * ****************************************************************************************
+     * Check if a hexahedral element is completely outside a tetrahedral element
+     * Using the inverse Jacobian of the tetrahedron to transform hex vertices to tet reference space
+     * and check against tet reference space constraints.
+     * This function return true if the hex is completely outside the tet.
+     * And return false if it is unsure (partially inside, intersecting, completely inside, or UNDETECTED outside).
+     * This must be used as a fast culling test before more expensive intersection tests.
+     *
+     * Tet reference space constraints for a point to be INSIDE:
+     *   ref_x >= 0 AND ref_y >= 0 AND ref_z >= 0 AND (ref_x + ref_y + ref_z) <= 1
+     *
+     * A hex is completely OUTSIDE if ALL vertices violate at least ONE of these constraints:
+     *   - All ref_x < 0 (all on negative x side)
+     *   - All ref_y < 0 (all on negative y side)
+     *   - All ref_z < 0 (all on negative z side)
+     *   - All sum > 1 (all beyond the diagonal plane)
+     * *****************************************************************************************
+     */
+
+    // Precompute inverse Jacobian components for better cache utilization
+    const real_t inv_J00 = inv_J_tet[0];
+    const real_t inv_J01 = inv_J_tet[1];
+    const real_t inv_J02 = inv_J_tet[2];
+    const real_t inv_J10 = inv_J_tet[3];
+    const real_t inv_J11 = inv_J_tet[4];
+    const real_t inv_J12 = inv_J_tet[5];
+    const real_t inv_J20 = inv_J_tet[6];
+    const real_t inv_J21 = inv_J_tet[7];
+    const real_t inv_J22 = inv_J_tet[8];
+
+    // // Track if all vertices violate each constraint
+    // bool all_negative_x  = true;  // All ref_x < 0
+    // bool all_negative_y  = true;  // All ref_y < 0
+    // bool all_negative_z  = true;  // All ref_z < 0
+    // bool all_outside_sum = true;  // All ref_x + ref_y + ref_z > 1
+
+    in_out[0] = true;
+    in_out[1] = true;
+
+    for (int i = 0; i < 2; i++) {
+        bool all_negative_x  = true;  // All ref_x < 0
+        bool all_negative_y  = true;  // All ref_y < 0
+        bool all_negative_z  = true;  // All ref_z < 0
+        bool all_outside_sum = true;  // All ref_x + ref_y + ref_z > 1
+
+        real_t* hex_vertices_x = (real_t*)&hex_vertices_x_arg[i * 8];
+        real_t* hex_vertices_y = (real_t*)&hex_vertices_y_arg[i * 8];
+        real_t* hex_vertices_z = (real_t*)&hex_vertices_z_arg[i * 8];
+
+        for (int v = 0; v < 8; v++) {
+            // Transform hex vertex to tet reference space
+            const real_t dx = hex_vertices_x[v] - tet_origin_x;
+            const real_t dy = hex_vertices_y[v] - tet_origin_y;
+            const real_t dz = hex_vertices_z[v] - tet_origin_z;
+
+            const real_t ref_x = inv_J00 * dx + inv_J01 * dy + inv_J02 * dz;
+            const real_t ref_y = inv_J10 * dx + inv_J11 * dy + inv_J12 * dz;
+            const real_t ref_z = inv_J20 * dx + inv_J21 * dy + inv_J22 * dz;
+
+            // Update flags - a vertex that satisfies a constraint breaks that flag
+            all_negative_x = all_negative_x && (ref_x < 0.0);
+            all_negative_y = all_negative_y && (ref_y < 0.0);
+            all_negative_z = all_negative_z && (ref_z < 0.0);
+
+            const real_t sum_ref = ref_x + ref_y + ref_z;
+            all_outside_sum      = all_outside_sum && (sum_ref > 1.0);
+
+            // Early exit: if no constraint is satisfied by all vertices so far, we can't be completely outside
+            if (!all_negative_x && !all_negative_y && !all_negative_z && !all_outside_sum) {
+                in_out[i] = false;
+                break;
+            }  // END if early exit
+        }  // END for (int v = 0; v < 8; v++)
+    }
+    // Hex is completely outside if ALL vertices violate at least one constraint together
+}  // END Function: is_hex_out_of_tet
+
 //////////////////////////////////////////////////////////
 // ijk_index_t ////////////////////////////
 //////////////////////////////////////////////////////////

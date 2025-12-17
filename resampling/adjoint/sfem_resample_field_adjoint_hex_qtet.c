@@ -318,71 +318,163 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
 
 }  // END Function: is_hex_out_of_tet
 
-#if defined(__AVX512F__)
+// #if defined(__AVX512F__)
 #include <immintrin.h>
 
-bool is_hex_out_of_tet_norm_v_avx512(const real_t inv_J_tet[9],         //
-                                     const real_t tet_origin_x,         //
-                                     const real_t tet_origin_y,         //
-                                     const real_t tet_origin_z,         //
-                                     const real_t hex_vertices_x[8],    //
-                                     const real_t hex_vertices_y[8],    //
-                                     const real_t hex_vertices_z[8]) {  //
-    // Load all 8 vertices
-    __m512d hex_x = _mm512_loadu_pd(hex_vertices_x);
-    __m512d hex_y = _mm512_loadu_pd(hex_vertices_y);
-    __m512d hex_z = _mm512_loadu_pd(hex_vertices_z);
+// Macro for 3x1 matrix-vector multiplication using FP32 and YMM registers
+#define MATVEC_MUL_3x1_PS(result, j0, j1, j2, d0, d1, d2)                    \
+    do {                                                                     \
+        __m256 _tmp0_##result = _mm256_mul_ps((j2), (d2));                   \
+        __m256 _tmp1_##result = _mm256_fmadd_ps((j1), (d1), _tmp0_##result); \
+        (result)              = _mm256_fmadd_ps((j0), (d0), _tmp1_##result); \
+    } while (0)
 
-    // Broadcast tet origin
-    __m512d origin_x = _mm512_set1_pd(tet_origin_x);
-    __m512d origin_y = _mm512_set1_pd(tet_origin_y);
-    __m512d origin_z = _mm512_set1_pd(tet_origin_z);
+bool is_hex_out_of_tet_norm_v_avx512_fp32(const real_t inv_J_tet[9],         //
+                                          const real_t tet_origin_x,         //
+                                          const real_t tet_origin_y,         //
+                                          const real_t tet_origin_z,         //
+                                          const real_t hex_vertices_x[8],    //
+                                          const real_t hex_vertices_y[8],    //
+                                          const real_t hex_vertices_z[8]) {  //
+
+    // Load all 8 vertices (8 floats = 256 bits)
+    __m256 hex_x = _mm256_loadu_ps(hex_vertices_x);
+    __m256 hex_y = _mm256_loadu_ps(hex_vertices_y);
+    __m256 hex_z = _mm256_loadu_ps(hex_vertices_z);
+
+    // Broadcast tet origin (single float to all 8 lanes)
+    __m256 origin_x = _mm256_set1_ps(tet_origin_x);
+    __m256 origin_y = _mm256_set1_ps(tet_origin_y);
+    __m256 origin_z = _mm256_set1_ps(tet_origin_z);
 
     // Compute dx, dy, dz
-    __m512d dx = _mm512_sub_pd(hex_x, origin_x);
-    __m512d dy = _mm512_sub_pd(hex_y, origin_y);
-    __m512d dz = _mm512_sub_pd(hex_z, origin_z);
+    __m256 dx = _mm256_sub_ps(hex_x, origin_x);
+    __m256 dy = _mm256_sub_ps(hex_y, origin_y);
+    __m256 dz = _mm256_sub_ps(hex_z, origin_z);
 
-    // Broadcast inverse Jacobian elements
-    __m512d J00 = _mm512_set1_pd(inv_J_tet[0]);
-    __m512d J01 = _mm512_set1_pd(inv_J_tet[1]);
-    __m512d J02 = _mm512_set1_pd(inv_J_tet[2]);
-    __m512d J10 = _mm512_set1_pd(inv_J_tet[3]);
-    __m512d J11 = _mm512_set1_pd(inv_J_tet[4]);
-    __m512d J12 = _mm512_set1_pd(inv_J_tet[5]);
-    __m512d J20 = _mm512_set1_pd(inv_J_tet[6]);
-    __m512d J21 = _mm512_set1_pd(inv_J_tet[7]);
-    __m512d J22 = _mm512_set1_pd(inv_J_tet[8]);
+    // Broadcast inverse Jacobian elements (single float to all 8 lanes)
+    __m256 J00 = _mm256_set1_ps(inv_J_tet[0]);
+    __m256 J01 = _mm256_set1_ps(inv_J_tet[1]);
+    __m256 J02 = _mm256_set1_ps(inv_J_tet[2]);
+    __m256 J10 = _mm256_set1_ps(inv_J_tet[3]);
+    __m256 J11 = _mm256_set1_ps(inv_J_tet[4]);
+    __m256 J12 = _mm256_set1_ps(inv_J_tet[5]);
+    __m256 J20 = _mm256_set1_ps(inv_J_tet[6]);
+    __m256 J21 = _mm256_set1_ps(inv_J_tet[7]);
+    __m256 J22 = _mm256_set1_ps(inv_J_tet[8]);
 
-    // Transform to reference space using FMA
-    __m512d ref_x = _mm512_fmadd_pd(J00, dx, _mm512_fmadd_pd(J01, dy, _mm512_mul_pd(J02, dz)));
-    __m512d ref_y = _mm512_fmadd_pd(J10, dx, _mm512_fmadd_pd(J11, dy, _mm512_mul_pd(J12, dz)));
-    __m512d ref_z = _mm512_fmadd_pd(J20, dx, _mm512_fmadd_pd(J21, dy, _mm512_mul_pd(J22, dz)));
+    // Transform to reference space using FMA (FP32)
+    __m256 ref_x, ref_y, ref_z;
+    MATVEC_MUL_3x1_PS(ref_x, J00, J01, J02, dx, dy, dz);
+    MATVEC_MUL_3x1_PS(ref_y, J10, J11, J12, dx, dy, dz);
+    MATVEC_MUL_3x1_PS(ref_z, J20, J21, J22, dx, dy, dz);
 
     // Compute sum
-    __m512d sum_ref = _mm512_add_pd(_mm512_add_pd(ref_x, ref_y), ref_z);
+    __m256 sum_ref = _mm256_add_ps(_mm256_add_ps(ref_x, ref_y), ref_z);
 
     // Constants
-    __m512d zero = _mm512_setzero_pd();
-    __m512d one  = _mm512_set1_pd(1.0);
+    __m256 zero = _mm256_setzero_ps();
+    __m256 one  = _mm256_set1_ps(1.0f);
 
-    // Perform comparisons and get masks
-    __mmask8 mask_neg_x   = _mm512_cmp_pd_mask(ref_x, zero, _CMP_LT_OQ);
-    __mmask8 mask_neg_y   = _mm512_cmp_pd_mask(ref_y, zero, _CMP_LT_OQ);
-    __mmask8 mask_neg_z   = _mm512_cmp_pd_mask(ref_z, zero, _CMP_LT_OQ);
-    __mmask8 mask_out_sum = _mm512_cmp_pd_mask(sum_ref, one, _CMP_GT_OQ);
+    // Perform comparisons and get masks (using k registers)
+    // Note: AVX-512 mask registers work with 256-bit ops via _mm256_cmp_ps_mask
+    __mmask8 k1 = _mm256_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);   // ref_x < 0
+    __mmask8 k2 = _mm256_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);   // ref_y < 0
+    __mmask8 k3 = _mm256_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);   // ref_z < 0
+    __mmask8 k4 = _mm256_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);  // sum > 1
 
     // Reduce masks: check if ALL vertices satisfy each constraint
-    // For 8 elements, all bits set = 0xFF
-    bool all_negative_x  = (mask_neg_x == 0xFF);
-    bool all_negative_y  = (mask_neg_y == 0xFF);
-    bool all_negative_z  = (mask_neg_z == 0xFF);
-    bool all_outside_sum = (mask_out_sum == 0xFF);
+    // For 8 elements (8 floats), all bits set = 0xFF
+    bool all_negative_x  = (k1 == 0xFF);
+    bool all_negative_y  = (k2 == 0xFF);
+    bool all_negative_z  = (k3 == 0xFF);
+    bool all_outside_sum = (k4 == 0xFF);
 
     // Return true if at least one constraint is satisfied by all vertices
     return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
 }
-#endif
+
+// Macro for 3x1 matrix-vector multiplication using FP32 and YMM registers
+#define MATVEC_MUL_3x1_PS_512(result, j0, j1, j2, d0, d1, d2)                \
+    do {                                                                     \
+        __m512 _tmp0_##result = _mm512_mul_ps((j2), (d2));                   \
+        __m512 _tmp1_##result = _mm512_fmadd_ps((j1), (d1), _tmp0_##result); \
+        (result)              = _mm512_fmadd_ps((j0), (d0), _tmp1_##result); \
+    } while (0)
+
+void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],        //
+                                                 const float tet_origin_x,        //
+                                                 const float tet_origin_y,        //
+                                                 const float tet_origin_z,        //
+                                                 const float hex_vertices_x[16],  //
+                                                 const float hex_vertices_y[16],  //
+                                                 const float hex_vertices_z[16],  //
+                                                 bool        in_out[2]) {                //
+
+    // Load all 8 vertices (8 floats = 256 bits)
+    __m512 hex_x = _mm512_loadu_ps(hex_vertices_x);
+    __m512 hex_y = _mm512_loadu_ps(hex_vertices_y);
+    __m512 hex_z = _mm512_loadu_ps(hex_vertices_z);
+
+    // Broadcast tet origin (single float to all 8 lanes)
+    __m512 origin_x = _mm512_set1_ps(tet_origin_x);
+    __m512 origin_y = _mm512_set1_ps(tet_origin_y);
+    __m512 origin_z = _mm512_set1_ps(tet_origin_z);
+
+    // Compute dx, dy, dz
+    __m512 dx = _mm512_sub_ps(hex_x, origin_x);
+    __m512 dy = _mm512_sub_ps(hex_y, origin_y);
+    __m512 dz = _mm512_sub_ps(hex_z, origin_z);
+
+    // Broadcast inverse Jacobian elements (single float to all 8 lanes)
+    __m512 J00 = _mm512_set1_ps(inv_J_tet[0]);
+    __m512 J01 = _mm512_set1_ps(inv_J_tet[1]);
+    __m512 J02 = _mm512_set1_ps(inv_J_tet[2]);
+    __m512 J10 = _mm512_set1_ps(inv_J_tet[3]);
+    __m512 J11 = _mm512_set1_ps(inv_J_tet[4]);
+    __m512 J12 = _mm512_set1_ps(inv_J_tet[5]);
+    __m512 J20 = _mm512_set1_ps(inv_J_tet[6]);
+    __m512 J21 = _mm512_set1_ps(inv_J_tet[7]);
+    __m512 J22 = _mm512_set1_ps(inv_J_tet[8]);
+
+    // Transform to reference space using FMA (FP32)
+    __m512 ref_x, ref_y, ref_z;
+    MATVEC_MUL_3x1_PS_512(ref_x, J00, J01, J02, dx, dy, dz);
+    MATVEC_MUL_3x1_PS_512(ref_y, J10, J11, J12, dx, dy, dz);
+    MATVEC_MUL_3x1_PS_512(ref_z, J20, J21, J22, dx, dy, dz);
+
+    // Compute sum
+    __m512 sum_ref = _mm512_add_ps(_mm512_add_ps(ref_x, ref_y), ref_z);
+
+    // Constants
+    __m512 zero = _mm512_setzero_ps();
+    __m512 one  = _mm512_set1_ps(1.0f);
+    // Perform comparisons and get masks (using k registers)
+    // Note: AVX-512 mask registers work with 256-bit ops via _mm256_cmp_ps_mask
+    __mmask16 k1 = _mm512_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);   // ref_x < 0
+    __mmask16 k2 = _mm512_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);   // ref_y < 0
+    __mmask16 k3 = _mm512_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);   // ref_z < 0
+    __mmask16 k4 = _mm512_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);  // sum > 1
+
+    // Reduce masks: check if ALL vertices satisfy each constraint
+    // For 8 elements (8 floats), all bits set = 0xFF
+    bool all_negative_x_0  = (k1 == 0xFF00);
+    bool all_negative_y_0  = (k2 == 0xFF00);
+    bool all_negative_z_0  = (k3 == 0xFF00);
+    bool all_outside_sum_0 = (k4 == 0xFF00);
+
+    bool all_negative_x_1  = (k1 == 0x00FF);
+    bool all_negative_y_1  = (k2 == 0x00FF);
+    bool all_negative_z_1  = (k3 == 0x00FF);
+    bool all_outside_sum_1 = (k4 == 0x00FF);
+
+    // Return true if at least one constraint is satisfied by all vertices
+    in_out[0] = (all_negative_x_0 || all_negative_y_0 || all_negative_z_0 || all_outside_sum_0);
+    in_out[1] = (all_negative_x_1 || all_negative_y_1 || all_negative_z_1 || all_outside_sum_1);
+}
+// #endif
+
+// #endif
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -476,6 +568,29 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
 
     real_t hex_element_field[8] = {0.0};
 
+    const int size_x            = max_grid_x - min_grid_x + 1;
+    const int size_y            = max_grid_y - min_grid_y + 1;
+    const int size_z            = max_grid_z - min_grid_z + 1;
+    const int total_grid_points = size_x * size_y * size_z;
+
+    // for (int idx = 0; idx < total_grid_points; idx += 1) {
+    //     const int ix_local = idx % size_x;
+    //     const int iy_local = (idx / size_x) % size_y;
+    //     const int iz_local = idx / (size_x * size_y);
+
+    //     // Convert to absolute grid coordinates
+    //     const int i_grid_x = min_grid_x + ix_local;
+    //     const int j_grid_y = min_grid_y + iy_local;
+    //     const int k_grid_z = min_grid_z + iz_local;
+
+    //     const real_t x_hex_min = (real_t)i_grid_x;
+    //     const real_t y_hex_min = (real_t)j_grid_y;
+    //     const real_t z_hex_min = (real_t)k_grid_z;
+
+    //     const real_t x_hex_max = x_hex_min + 1.0;
+    //     const real_t y_hex_max = y_hex_min + 1.0;
+    //     const real_t z_hex_max = z_hex_min + 1.0;
+
     for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
         const real_t z_hex_min = ((real_t)k_grid_z);
         const real_t z_hex_max = z_hex_min + 1.0;
@@ -516,15 +631,15 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
-                // const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512 //
-                const bool is_out_of_tet = is_hex_out_of_tet  //
-                        (inv_J_tet,                           //
-                         x0_n,                                //
-                         y0_n,                                //
-                         z0_n,                                //
-                         hex_vertices_x,                      //
-                         hex_vertices_y,                      //
-                         hex_vertices_z);                     //
+                const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
+                                                                                 // is_hex_out_of_tet  //
+                        (inv_J_tet,                                              //
+                         x0_n,                                                   //
+                         y0_n,                                                   //
+                         z0_n,                                                   //
+                         hex_vertices_x,                                         //
+                         hex_vertices_y,                                         //
+                         hex_vertices_z);                                        //
 
                 // printf("Is out of tet: %d \n", is_out_of_tet);
 
@@ -589,9 +704,320 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                 data[base_index + off6] += hex_element_field[6];  //
                 data[base_index + off7] += hex_element_field[7];  //
 
+                // }  // END: for i_grid_x
+
             }  // END: for k_grid_z
         }  // END: for i_grid_y
     }  // END: for j_grid_y
+
+    return 0;
+}  // END: Function: tet4_resample_field_adjoint_tet_quad_d
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// tet4_resample_field_adjoint_tet_quad_d ////////////////
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int                                                                                   //
+tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n,     // Tet vertices //
+                                            const real_t                    x1_n,     //
+                                            const real_t                    x2_n,     //
+                                            const real_t                    x3_n,     //
+                                            const real_t                    y0_n,     //
+                                            const real_t                    y1_n,     //
+                                            const real_t                    y2_n,     //
+                                            const real_t                    y3_n,     //
+                                            const real_t                    z0_n,     //
+                                            const real_t                    z1_n,     //
+                                            const real_t                    z2_n,     //
+                                            const real_t                    z3_n,     //
+                                            const real_t                    wf0,      // Weighted field at tet vertices
+                                            const real_t                    wf1,      //
+                                            const real_t                    wf2,      //
+                                            const real_t                    wf3,      //
+                                            const ptrdiff_t                 stride0,  // Stride of hex grid
+                                            const ptrdiff_t                 stride1,  //
+                                            out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
+    // Placeholder implementation
+
+#if SFEM_LOG_LEVEL >= 5
+    // printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
+#endif
+
+    const int off0 = 0;
+    const int off1 = stride0;
+    const int off2 = stride0 + stride1;
+    const int off3 = stride1;
+    const int off4 = 0;
+    const int off5 = stride0;
+    const int off6 = stride0 + stride1;
+    const int off7 = stride1;
+
+    const int           dim_quad  = get_dim_qad();
+    const real_t* const Q_nodes_x = Q_nodes_x_p;
+    const real_t* const Q_nodes_y = Q_nodes_y_p;
+    const real_t* const Q_nodes_z = Q_nodes_z_p;
+    const real_t* const Q_weights = Q_weights_p;
+
+    // const real_t inv_dx = 1.0;
+    // const real_t inv_dy = 1.0;
+    // const real_t inv_dz = 1.0;
+
+    real_t    inv_J_tet[9];
+    ptrdiff_t min_grid_x, max_grid_x;
+    ptrdiff_t min_grid_y, max_grid_y;
+    ptrdiff_t min_grid_z, max_grid_z;
+
+    tet4_inv_Jacobian(x0_n,        //
+                      x1_n,        //
+                      x2_n,        //
+                      x3_n,        //
+                      y0_n,        //
+                      y1_n,        //
+                      y2_n,        //
+                      y3_n,        //
+                      z0_n,        //
+                      z1_n,        //
+                      z2_n,        //
+                      z3_n,        //
+                      inv_J_tet);  //
+
+    compute_tet_bounding_box_norm(x0_n,          //
+                                  x1_n,          //
+                                  x2_n,          //
+                                  x3_n,          //
+                                  y0_n,          //
+                                  y1_n,          //
+                                  y2_n,          //
+                                  y3_n,          //
+                                  z0_n,          //
+                                  z1_n,          //
+                                  z2_n,          //
+                                  z3_n,          //
+                                  stride0,       //
+                                  stride1,       //
+                                  &min_grid_x,   //
+                                  &max_grid_x,   //
+                                  &min_grid_y,   //
+                                  &max_grid_y,   //
+                                  &min_grid_z,   //
+                                  &max_grid_z);  //
+
+    real_t hex_element_field[8] = {0.0};
+
+    int       size_x = max_grid_x - min_grid_x + 1;
+    const int size_y = max_grid_y - min_grid_y + 1;
+    const int size_z = max_grid_z - min_grid_z + 1;
+
+    if (size_x % 2 != 0) {
+        // Ensure size_x is even for step2h processing
+        // This is a simple fix; in practice, you might want to handle this differently
+        size_x += 1;
+    }
+
+    const int total_grid_points = size_x * size_y * size_z;
+
+    bool* in_out_array = NULL;
+    in_out_array       = (bool*)malloc(total_grid_points * sizeof(bool));
+    // memset(in_out_array, 0, total_grid_points * sizeof(bool));
+
+    for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
+        const real_t z_hex_min = ((real_t)k_grid_z);
+        const real_t z_hex_max = z_hex_min + 1.0;
+
+        for (int j_grid_y = min_grid_y; j_grid_y < max_grid_y; j_grid_y++) {
+            const real_t y_hex_min = ((real_t)j_grid_y);
+            const real_t y_hex_max = y_hex_min + 1.0;
+
+            for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x += 2) {
+                //
+                const real_t x_hex_min_0 = ((real_t)i_grid_x);
+                const real_t x_hex_max_0 = x_hex_min_0 + 1.0;
+
+                const real_t x_hex_min_1 = ((real_t)(i_grid_x + 1));
+                const real_t x_hex_max_1 = x_hex_min_1 + 1.0;
+
+                int local_idx = (i_grid_x - min_grid_x) +                   //
+                                (j_grid_y - min_grid_y) * size_x +          //
+                                (k_grid_z - min_grid_z) * size_x * size_y;  //
+
+                const real_t hex_vertices_x[16] = {x_hex_min_0,
+                                                   x_hex_max_0,
+                                                   x_hex_max_0,
+                                                   x_hex_min_0,  //
+                                                   x_hex_min_0,
+                                                   x_hex_max_0,
+                                                   x_hex_max_0,
+                                                   x_hex_min_0,  // second hex
+                                                   x_hex_min_1,
+                                                   x_hex_max_1,
+                                                   x_hex_max_1,
+                                                   x_hex_min_1,  //
+                                                   x_hex_min_1,
+                                                   x_hex_max_1,
+                                                   x_hex_max_1,
+                                                   x_hex_min_1};
+
+                const real_t hex_vertices_y[16] = {y_hex_min,
+                                                   y_hex_min,
+                                                   y_hex_max,
+                                                   y_hex_max,  //
+                                                   y_hex_min,
+                                                   y_hex_min,
+                                                   y_hex_max,
+                                                   y_hex_max,  // second hex
+                                                   y_hex_min,
+                                                   y_hex_min,
+                                                   y_hex_max,
+                                                   y_hex_max,  //
+                                                   y_hex_min,
+                                                   y_hex_min,
+                                                   y_hex_max,
+                                                   y_hex_max};
+
+                const real_t hex_vertices_z[16] = {z_hex_min,
+                                                   z_hex_min,
+                                                   z_hex_min,
+                                                   z_hex_min,  //
+                                                   z_hex_max,
+                                                   z_hex_max,
+                                                   z_hex_max,
+                                                   z_hex_max,
+                                                   z_hex_min,  // second hex
+                                                   z_hex_min,
+                                                   z_hex_min,
+                                                   z_hex_min,  //
+                                                   z_hex_max,
+                                                   z_hex_max,
+                                                   z_hex_max,
+                                                   z_hex_max};
+
+                is_hex_out_of_tet_norm_v_avx512_fp32_step2h  //
+                                                             // is_hex_out_of_tet_step2h//
+                        (inv_J_tet,                          //
+                         x0_n,                               //
+                         y0_n,                               //
+                         z0_n,                               //
+                         hex_vertices_x,                     //
+                         hex_vertices_y,                     //
+                         hex_vertices_z,                     //
+                         &in_out_array[local_idx]);          //
+            }
+        }
+    }
+
+    for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
+        const real_t z_hex_min = ((real_t)k_grid_z);
+        const real_t z_hex_max = z_hex_min + 1.0;
+
+        const real_t hex_vertices_z[8] = {z_hex_min,
+                                          z_hex_min,
+                                          z_hex_min,
+                                          z_hex_min,  //
+                                          z_hex_max,
+                                          z_hex_max,
+                                          z_hex_max,
+                                          z_hex_max};
+
+        for (int j_grid_y = min_grid_y; j_grid_y < max_grid_y; j_grid_y++) {
+            const real_t y_hex_min = ((real_t)j_grid_y);
+            const real_t y_hex_max = y_hex_min + 1.0;
+
+            const real_t hex_vertices_y[8] = {y_hex_min,
+                                              y_hex_min,
+                                              y_hex_max,
+                                              y_hex_max,  //
+                                              y_hex_min,
+                                              y_hex_min,
+                                              y_hex_max,
+                                              y_hex_max};
+
+            for (int i_grid_x = min_grid_x; i_grid_x < max_grid_x; i_grid_x++) {
+                //
+                const real_t x_hex_min = ((real_t)i_grid_x);
+                const real_t x_hex_max = x_hex_min + 1.0;
+
+                int local_idx = (i_grid_x - min_grid_x) +                   //
+                                (j_grid_y - min_grid_y) * size_x +          //
+                                (k_grid_z - min_grid_z) * size_x * size_y;  //
+
+                const real_t hex_vertices_x[8] = {x_hex_min,
+                                                  x_hex_max,
+                                                  x_hex_max,
+                                                  x_hex_min,  //
+                                                  x_hex_min,
+                                                  x_hex_max,
+                                                  x_hex_max,
+                                                  x_hex_min};
+
+                // printf("Is out of tet: %d \n", is_out_of_tet);
+
+                if (in_out_array[local_idx]) continue;  // c Skip this hex cell
+
+                // Midpoint quadrature rule in 3D
+
+                memset(hex_element_field, 0, 8 * sizeof(real_t));
+
+                for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
+                    quadrature_point_result_t Qpoint_phys =             //
+                            transform_quadrature_point_norm(q_ijk,      //
+                                                            Q_nodes_x,  //
+                                                            Q_nodes_y,  //
+                                                            Q_nodes_z,  //
+                                                            Q_weights,  //
+                                                            i_grid_x,   //
+                                                            j_grid_y,   //
+                                                            k_grid_z);  //
+
+                    real_t Q_ref_x, Q_ref_y, Q_ref_z;
+
+                    tet4_inv_transform_J(inv_J_tet,      // Inverse Jacobian matrix
+                                         Qpoint_phys.x,  // Physical coordinates of the quadrature point
+                                         Qpoint_phys.y,  //
+                                         Qpoint_phys.z,  //
+                                         x0_n,           //
+                                         y0_n,           //
+                                         z0_n,           //
+                                         &Q_ref_x,       // Reference coordinates of the quadrature point
+                                         &Q_ref_y,       //
+                                         &Q_ref_z);      //
+
+                    // for (int v = 0; v < 8; v++) hex_element_field[v] = 0.0;
+
+                    ijk_index_t ijk_indices =                                             //
+                            transfer_weighted_field_tet4_to_hex_norm(wf0,                 //
+                                                                     wf1,                 //
+                                                                     wf2,                 //
+                                                                     wf3,                 //
+                                                                     Qpoint_phys.x,       //
+                                                                     Qpoint_phys.y,       //
+                                                                     Qpoint_phys.z,       //
+                                                                     Q_ref_x,             //
+                                                                     Q_ref_y,             //
+                                                                     Q_ref_z,             //
+                                                                     Qpoint_phys.weight,  //
+                                                                     hex_element_field);  //
+
+                }  // END: for q_ijk
+
+                const ptrdiff_t base_index = i_grid_x * stride0 +  //
+                                             j_grid_y * stride1 +  //
+                                             k_grid_z;             //
+
+                data[base_index + off0] += hex_element_field[0];  //
+                data[base_index + off1] += hex_element_field[1];  //
+                data[base_index + off2] += hex_element_field[2];  //
+                data[base_index + off3] += hex_element_field[3];  //
+                data[base_index + off4] += hex_element_field[4];  //
+                data[base_index + off5] += hex_element_field[5];  //
+                data[base_index + off6] += hex_element_field[6];  //
+                data[base_index + off7] += hex_element_field[7];  //
+
+            }  // END: for k_grid_z
+        }  // END: for i_grid_y
+    }  // END: for j_grid_y
+
+    free(in_out_array);
 
     return 0;
 }  // END: Function: tet4_resample_field_adjoint_tet_quad_d
