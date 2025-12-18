@@ -329,13 +329,14 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
         (result)              = _mm256_fmadd_ps((j0), (d0), _tmp1_##result); \
     } while (0)
 
-bool is_hex_out_of_tet_norm_v_avx512_fp32(const real_t inv_J_tet[9],         //
-                                          const real_t tet_origin_x,         //
-                                          const real_t tet_origin_y,         //
-                                          const real_t tet_origin_z,         //
-                                          const real_t hex_vertices_x[8],    //
-                                          const real_t hex_vertices_y[8],    //
-                                          const real_t hex_vertices_z[8]) {  //
+bool                                                                    //
+is_hex_out_of_tet_norm_v_avx512_fp32(const real_t inv_J_tet[9],         //
+                                     const real_t tet_origin_x,         //
+                                     const real_t tet_origin_y,         //
+                                     const real_t tet_origin_z,         //
+                                     const real_t hex_vertices_x[8],    //
+                                     const real_t hex_vertices_y[8],    //
+                                     const real_t hex_vertices_z[8]) {  //
 
     // Load all 8 vertices (8 floats = 256 bits)
     __m256 hex_x = _mm256_loadu_ps(hex_vertices_x);
@@ -503,8 +504,8 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                      out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
     // Placeholder implementation
 
-#if SFEM_LOG_LEVEL >= 5
-    // printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
+#if SFEM_LOG_LEVEL >= 6
+    printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
 #endif
 
     const int off0 = 0;
@@ -568,10 +569,10 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
 
     real_t hex_element_field[8] = {0.0};
 
-    const int size_x            = max_grid_x - min_grid_x + 1;
-    const int size_y            = max_grid_y - min_grid_y + 1;
-    const int size_z            = max_grid_z - min_grid_z + 1;
-    const int total_grid_points = size_x * size_y * size_z;
+    // const int size_x            = max_grid_x - min_grid_x + 1;
+    // const int size_y            = max_grid_y - min_grid_y + 1;
+    // const int size_z            = max_grid_z - min_grid_z + 1;
+    // const int total_grid_points = size_x * size_y * size_z;
 
     // for (int idx = 0; idx < total_grid_points; idx += 1) {
     //     const int ix_local = idx % size_x;
