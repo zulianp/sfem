@@ -21,7 +21,6 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
         
         // Viscoelasticity specific: history update
-        // Updates history variables based on current displacement x
         int update_history(const real_t *const x);
         
         // Setters for material parameters
@@ -34,9 +33,21 @@ namespace sfem {
         // Initialize history buffer
         void initialize_history();
         
-        // Use flexible hessian (loop-based, supports arbitrary Prony terms)
-        // vs fixed version (unrolled, hardcoded for 10 Prony terms)
-        void set_use_flexible_hessian(bool use_flexible);
+        // Set flexible mode:
+        // false = FIXED (stores S_dev, hardcoded 10 Prony terms)
+        // true  = FLEXIBLE (stores only H_i, uses precomputed alpha/beta/gamma, optimized)
+        void set_use_flexible(bool flexible);
+        
+        // WLF (Williams-Landel-Ferry) time-temperature superposition
+        // Formula: log10(a_T) = C1 * (T - T_ref) / (C2 + T - T_ref)
+        // Effect: tau_eff = tau_ref / a_T
+        //   When T > T_ref: a_T > 1, tau_eff < tau_ref (faster relaxation)
+        //   When T < T_ref: a_T < 1, tau_eff > tau_ref (slower relaxation)
+        // Note: All temperatures in °C
+        // Default EPDM values: C1=16.6253, C2=47.4781°C, T_ref=-54.29°C
+        void set_wlf_params(real_t C1, real_t C2, real_t T_ref);  // C2 and T_ref in °C
+        void set_temperature(real_t T);  // Current temperature in °C
+        void enable_wlf(bool enable);
 
         int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,

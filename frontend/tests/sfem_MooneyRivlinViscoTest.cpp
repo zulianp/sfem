@@ -70,7 +70,7 @@ int test_mooney_rivlin_visco_relaxation() {
     
     int SFEM_USE_FLEXIBLE_HESSIAN = 0;
     SFEM_READ_ENV(SFEM_USE_FLEXIBLE_HESSIAN, atoi);
-    op->set_use_flexible_hessian(SFEM_USE_FLEXIBLE_HESSIAN != 0);
+    op->set_use_flexible(SFEM_USE_FLEXIBLE_HESSIAN != 0);
     
     if (SFEM_USE_FLEXIBLE_HESSIAN) {
         printf("Using FLEXIBLE hessian (loop-based)\n");
