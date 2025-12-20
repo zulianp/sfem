@@ -16,7 +16,7 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 #include "sfem_Buffer.hpp"
-#include "sfem_API.hpp" // Added for blas
+#include "sfem_API.hpp"
 
 #include <math.h>
 #include <mpi.h>
@@ -32,69 +32,153 @@ namespace sfem {
         // Material parameters
         real_t C10{1}, K{1}, C01{1}, dt{0.1};
         
-        // Prony Series parameters
+        // Prony Series parameters (at reference temperature)
         int num_prony_terms{0};
         std::vector<real_t> prony_g;
-        std::vector<real_t> prony_tau;
+        std::vector<real_t> prony_tau;  // tau at T_ref
         
-        // Use flexible hessian (loop-based) vs fixed (unrolled)
-        bool use_flexible_hessian{false};
+        // WLF (Williams-Landel-Ferry) temperature shift parameters
+        // log10(a_T) = C1 * (T - T_ref) / (C2 + T - T_ref)
+        // When T > T_ref: a_T > 1, tau_eff = tau/a_T < tau (faster relaxation)
+        // Default values from EPDM rubber validation data (T_g ≈ -54°C)
+        real_t wlf_C1{16.6253};      // From EPDM fitting
+        real_t wlf_C2{47.4781};      // °C (same unit as temperature input)
+        real_t wlf_T_ref{-54.29};    // Reference temperature (°C), glass transition
+        real_t current_T{20.0};      // Current temperature (°C), room temperature
+        bool use_wlf{false};         // Enable WLF shift
         
-        // History buffer: managed internally
-        // Stores [S_dev_n (6), H_1^n (6), H_2^n (6), ...] per quadrature point
+        // Precomputed Prony coefficients (for FLEXIBLE mode)
+        std::vector<real_t> prony_alpha;  // exp(-dt/tau_eff_i)
+        std::vector<real_t> prony_beta;   // g_i * (1 - alpha_i) / (dt/tau_eff_i)
+        real_t prony_gamma{1.0};          // g_inf + sum(beta_i)
+        
+        // Mode: false = FIXED (stores S_dev, hardcoded 10 Prony terms)
+        //       true  = FLEXIBLE (stores only H_i, uses alpha/beta/gamma)
+        bool use_flexible{false};
+        
+        // History buffer
         std::shared_ptr<Buffer<real_t>> history_buffer;
-        std::shared_ptr<Buffer<real_t>> new_history_buffer; // Temp buffer for update
+        std::shared_ptr<Buffer<real_t>> new_history_buffer;
+        
+        // Previous displacement (for FLEXIBLE mode)
+        std::shared_ptr<Buffer<real_t>> prev_u_buffer;
 
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         ~Impl();
         
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
         
-        void allocate_history_buffers() {
-            // Calculate total quadrature points across all elements
-            auto mesh = space->mesh_ptr();
-            // FIXME: Assuming HEX8 for now (8 nodes, 27 or 8 QPs depending on order)
-            // For now we assume standard HEX8 with 27 QPs (3x3x3) or 8 QPs (2x2x2)
-            // We need to ask the element type about its quadrature count.
-            // This is a simplification. A robust impl would query quadrature size.
+        // Compute WLF shift factor a_T
+        // log10(a_T) = C1 * (T - T_ref) / (C2 + T - T_ref)
+        // tau_eff = tau_ref / a_T
+        real_t compute_wlf_shift() const {
+            if (!use_wlf) return 1.0;
             
+            real_t dT = current_T - wlf_T_ref;
+            real_t denom = wlf_C2 + dT;
+            
+            // Prevent division by zero
+            if (fabs(denom) < 1e-10) {
+                return 1.0;
+            }
+            
+            // log10(a_T) = C1 * dT / (C2 + dT)
+            real_t log10_aT = wlf_C1 * dT / denom;
+            real_t aT = pow(10.0, log10_aT);
+            
+            return aT;
+        }
+        
+        void compute_prony_coefficients() {
+            prony_alpha.resize(num_prony_terms);
+            prony_beta.resize(num_prony_terms);
+            
+            // Compute WLF shift factor
+            real_t aT = compute_wlf_shift();
+            
+            real_t sum_g = 0;
+            for (int i = 0; i < num_prony_terms; ++i) {
+                sum_g += prony_g[i];
+            }
+            prony_gamma = 1.0 - sum_g;  // g_inf
+            
+            for (int i = 0; i < num_prony_terms; ++i) {
+                // Apply WLF shift: tau_eff = tau_ref / a_T
+                // When T > T_ref: a_T > 1, tau_eff < tau_ref (faster relaxation)
+                real_t tau_eff = prony_tau[i] / aT;
+                
+                real_t x = dt / tau_eff;
+                prony_alpha[i] = exp(-x);
+                prony_beta[i] = prony_g[i] * (1.0 - prony_alpha[i]) / x;
+                prony_gamma += prony_beta[i];
+            }
+        }
+        
+        ptrdiff_t history_per_qp() const {
+            if (use_flexible) {
+                // FLEXIBLE: only store H_i (no S_dev)
+                return num_prony_terms * 6;
+            } else {
+                // FIXED: store S_dev + H_i
+                return 6 + num_prony_terms * 6;
+            }
+        }
+        
+        void allocate_history_buffers() {
             ptrdiff_t total_elements = 0;
             iterate([&](const OpDomain &domain) -> int {
                 total_elements += domain.block->n_elements();
                 return SFEM_SUCCESS;
             });
 
-            // Assuming HEX8 with 27 QPs (line_q3) for higher accuracy or 8 (line_q2)
-            // From hex8_mooney_rivlin_visco.c, it uses line_q2 (2 points per edge) -> 8 QPs total
             const int n_qp = 8; 
-            
-            // History size per QP: 6 (S_dev) + num_prony * 6 (H_i)
-            const ptrdiff_t history_per_qp = 6 + num_prony_terms * 6;
-            const ptrdiff_t total_size = total_elements * n_qp * history_per_qp;
+            const ptrdiff_t total_size = total_elements * n_qp * history_per_qp();
             
             history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
             new_history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
             
-            // Initialize with zeros
             auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
             blas->zeros(total_size, history_buffer->data());
             blas->zeros(total_size, new_history_buffer->data());
+            
+            // Allocate prev_u buffer for FLEXIBLE mode
+            if (use_flexible) {
+                ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
+                prev_u_buffer = create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+                blas->zeros(ndofs, prev_u_buffer->data());
+            }
         }
         
         void swap_history_buffers() {
             std::swap(history_buffer, new_history_buffer);
+        }
+        
+        void save_prev_u(const real_t *x) {
+            if (prev_u_buffer) {
+                ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
+                memcpy(prev_u_buffer->data(), x, ndofs * sizeof(real_t));
+            }
         }
     };
 
     std::unique_ptr<Op> MooneyRivlinVisco::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::create");
         auto ret = std::make_unique<MooneyRivlinVisco>(space);
-        // Read env vars or defaults
+        
+        // Material parameters
         ret->impl_->C10 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C10", ret->impl_->C10);
         ret->impl_->K   = sfem::Env::read("SFEM_MOONEY_RIVLIN_K", ret->impl_->K);
         ret->impl_->C01 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C01", ret->impl_->C01);
         ret->impl_->dt  = sfem::Env::read("SFEM_DT", ret->impl_->dt);
-        ret->impl_->use_flexible_hessian = sfem::Env::read("SFEM_USE_FLEXIBLE_HESSIAN", 0) != 0;
+        ret->impl_->use_flexible = sfem::Env::read("SFEM_USE_FLEXIBLE_VISCO", 0) != 0;
+        
+        // WLF temperature shift parameters (all temperatures in °C)
+        ret->impl_->wlf_C1    = sfem::Env::read("SFEM_WLF_C1", ret->impl_->wlf_C1);
+        ret->impl_->wlf_C2    = sfem::Env::read("SFEM_WLF_C2", ret->impl_->wlf_C2);
+        ret->impl_->wlf_T_ref = sfem::Env::read("SFEM_WLF_T_REF", ret->impl_->wlf_T_ref);
+        ret->impl_->current_T = sfem::Env::read("SFEM_TEMPERATURE", ret->impl_->current_T);
+        ret->impl_->use_wlf   = sfem::Env::read("SFEM_USE_WLF", 0) != 0;
+        
         return ret;
     }
 
@@ -117,11 +201,6 @@ namespace sfem {
                                        const idx_t *const colidx,
                                        real_t *const values) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::hessian_crs");
-        // Currently delegating to BSR if structure matches, or we might need general implementation
-        // Since the C backend is BSR, we should use BSR assembly generally.
-        // If the user requests CRS values, we assume they want BSR packed into CRS array 
-        // (which is valid for block solvers) OR we implement a true CRS assembly.
-        // For now, let's reuse BSR logic as it's the primary path for 3D elasticity.
         return hessian_bsr(x, rowptr, colidx, values);
     }
 
@@ -138,18 +217,14 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
-        // We assume line_q2 (8 QPs) for HEX8. 
         const int n_qp = 8; 
-        const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
-        // history_stride is the history size per ELEMENT (not cumulative offset!)
-        const ptrdiff_t history_stride = n_qp * history_per_qp;
+        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
-            
             int ret;
-            if (impl_->use_flexible_hessian) {
-                // Use loop-based flexible version (supports arbitrary Prony terms)
+            
+            if (impl_->use_flexible) {
                 ret = mooney_rivlin_visco_bsr_flexible(
                     domain.element_type,
                     nelements,
@@ -157,18 +232,21 @@ namespace sfem {
                     domain.block->elements()->data(),
                     mesh->points()->data(),
                     impl_->C10,
-                    impl_->K,
                     impl_->C01,
-                    impl_->dt,
+                    impl_->K,
                     impl_->num_prony_terms,
-                    impl_->prony_g.data(),
-                    impl_->prony_tau.data(),
+                    impl_->prony_alpha.data(),
+                    impl_->prony_beta.data(),
+                    impl_->prony_gamma,
                     history_stride,
                     impl_->history_buffer->data() + history_offset,
-                    3, &x[0], &x[1], &x[2],
+                    3, 
+                    &impl_->prev_u_buffer->data()[0],
+                    &impl_->prev_u_buffer->data()[1],
+                    &impl_->prev_u_buffer->data()[2],
+                    &x[0], &x[1], &x[2],
                     rowptr, colidx, values);
             } else {
-                // Use unrolled fixed version (hardcoded for 10 Prony terms)
                 ret = mooney_rivlin_visco_bsr(
                     domain.element_type,
                     nelements,
@@ -176,8 +254,8 @@ namespace sfem {
                     domain.block->elements()->data(),
                     mesh->points()->data(),
                     impl_->C10,
-                    impl_->K,
                     impl_->C01,
+                    impl_->K,
                     impl_->dt,
                     impl_->num_prony_terms,
                     impl_->prony_g.data(),
@@ -188,7 +266,6 @@ namespace sfem {
                     rowptr, colidx, values);
             }
                 
-            // Advance history offset for next block
             history_offset += nelements * history_stride;
             return ret;
         });
@@ -205,28 +282,52 @@ namespace sfem {
 
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
-        const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
-        const ptrdiff_t history_stride = n_qp * history_per_qp;
+        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
+            int ret;
             
-            int ret = mooney_rivlin_visco_hessian_diag_aos(
-                domain.element_type,
-                nelements,
-                mesh->n_nodes(),
-                domain.block->elements()->data(),
-                mesh->points()->data(),
-                impl_->C10,
-                impl_->K,
-                impl_->C01,
-                impl_->dt,
-                impl_->num_prony_terms,
-                impl_->prony_g.data(),
-                impl_->prony_tau.data(),
-                history_stride,
-                impl_->history_buffer->data() + history_offset,
-                x, out);
+            if (impl_->use_flexible) {
+                ret = mooney_rivlin_visco_hessian_diag_flexible(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->num_prony_terms,
+                    impl_->prony_alpha.data(),
+                    impl_->prony_beta.data(),
+                    impl_->prony_gamma,
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    3,
+                    &impl_->prev_u_buffer->data()[0],
+                    &impl_->prev_u_buffer->data()[1],
+                    &impl_->prev_u_buffer->data()[2],
+                    &x[0], &x[1], &x[2],
+                    out);
+            } else {
+                ret = mooney_rivlin_visco_hessian_diag_aos(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->dt,
+                    impl_->num_prony_terms,
+                    impl_->prony_g.data(),
+                    impl_->prony_tau.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    x, out);
+            }
                 
             history_offset += nelements * history_stride;
             return ret;
@@ -244,28 +345,52 @@ namespace sfem {
 
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
-        const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
-        const ptrdiff_t history_stride = n_qp * history_per_qp;
+        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
+            int ret;
             
-            int ret = mooney_rivlin_visco_gradient_aos(
-                domain.element_type,
-                nelements,
-                mesh->n_nodes(),
-                domain.block->elements()->data(),
-                mesh->points()->data(),
-                impl_->C10,
-                impl_->K,
-                impl_->C01,
-                impl_->dt,
-                impl_->num_prony_terms,
-                impl_->prony_g.data(),
-                impl_->prony_tau.data(),
-                history_stride,
-                impl_->history_buffer->data() + history_offset,
-                x, out);
+            if (impl_->use_flexible) {
+                ret = mooney_rivlin_visco_gradient_flexible(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->num_prony_terms,
+                    impl_->prony_alpha.data(),
+                    impl_->prony_beta.data(),
+                    impl_->prony_gamma,
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    3,
+                    &impl_->prev_u_buffer->data()[0],
+                    &impl_->prev_u_buffer->data()[1],
+                    &impl_->prev_u_buffer->data()[2],
+                    &x[0], &x[1], &x[2],
+                    out);
+            } else {
+                ret = mooney_rivlin_visco_gradient_aos(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->dt,
+                    impl_->num_prony_terms,
+                    impl_->prony_g.data(),
+                    impl_->prony_tau.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    x, out);
+            }
                 
             history_offset += nelements * history_stride;
             return ret;
@@ -283,37 +408,62 @@ namespace sfem {
 
         ptrdiff_t history_offset = 0;
         const int n_qp = 8; 
-        const ptrdiff_t history_per_qp = 6 + impl_->num_prony_terms * 6;
-        const ptrdiff_t history_stride = n_qp * history_per_qp;
+        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
 
         int ret = impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
+            int r;
             
-            int r = mooney_rivlin_visco_update_history_aos(
-                domain.element_type,
-                nelements,
-                mesh->n_nodes(),
-                domain.block->elements()->data(),
-                mesh->points()->data(),
-                impl_->C10,
-                impl_->K,
-                impl_->C01,
-                impl_->dt,
-                impl_->num_prony_terms,
-                impl_->prony_g.data(),
-                impl_->prony_tau.data(),
-                history_stride,
-                impl_->history_buffer->data() + history_offset,
-                impl_->new_history_buffer->data() + history_offset, // Output to new buffer
-                x);
+            if (impl_->use_flexible) {
+                r = mooney_rivlin_visco_update_history_flexible(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->num_prony_terms,
+                    impl_->prony_alpha.data(),
+                    impl_->prony_beta.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    impl_->new_history_buffer->data() + history_offset,
+                    3,
+                    &impl_->prev_u_buffer->data()[0],
+                    &impl_->prev_u_buffer->data()[1],
+                    &impl_->prev_u_buffer->data()[2],
+                    &x[0], &x[1], &x[2]);
+            } else {
+                r = mooney_rivlin_visco_update_history_aos(
+                    domain.element_type,
+                    nelements,
+                    mesh->n_nodes(),
+                    domain.block->elements()->data(),
+                    mesh->points()->data(),
+                    impl_->C10,
+                    impl_->C01,
+                    impl_->K,
+                    impl_->dt,
+                    impl_->num_prony_terms,
+                    impl_->prony_g.data(),
+                    impl_->prony_tau.data(),
+                    history_stride,
+                    impl_->history_buffer->data() + history_offset,
+                    impl_->new_history_buffer->data() + history_offset,
+                    x);
+            }
                 
             history_offset += nelements * history_stride;
             return r;
         });
         
         if(ret == SFEM_SUCCESS) {
-            // Swap buffers so new becomes current
             impl_->swap_history_buffers();
+            if (impl_->use_flexible) {
+                impl_->save_prev_u(x);
+            }
         }
         return ret;
     }
@@ -321,22 +471,62 @@ namespace sfem {
     void MooneyRivlinVisco::set_C10(const real_t val) { impl_->C10 = val; }
     void MooneyRivlinVisco::set_K(const real_t val) { impl_->K = val; }
     void MooneyRivlinVisco::set_C01(const real_t val) { impl_->C01 = val; }
-    void MooneyRivlinVisco::set_dt(const real_t val) { impl_->dt = val; }
+    
+    void MooneyRivlinVisco::set_dt(const real_t val) { 
+        impl_->dt = val; 
+        if (impl_->use_flexible && impl_->num_prony_terms > 0) {
+            impl_->compute_prony_coefficients();
+        }
+    }
     
     void MooneyRivlinVisco::set_prony_terms(const int n, const real_t *g, const real_t *tau) {
         impl_->num_prony_terms = n;
         impl_->prony_g.assign(g, g + n);
         impl_->prony_tau.assign(tau, tau + n);
         
-        // Reallocate history because size per QP changed
-        // WARNING: This clears previous history!
+        impl_->compute_prony_coefficients();
+        
         if (impl_->history_buffer) {
             initialize_history(); 
         }
     }
     
-    void MooneyRivlinVisco::set_use_flexible_hessian(bool use_flexible) {
-        impl_->use_flexible_hessian = use_flexible;
+    void MooneyRivlinVisco::set_use_flexible(bool flexible) {
+        bool old = impl_->use_flexible;
+        impl_->use_flexible = flexible;
+        
+        if (old != flexible && impl_->history_buffer) {
+            initialize_history();
+        }
+    }
+    
+    void MooneyRivlinVisco::set_wlf_params(real_t C1, real_t C2, real_t T_ref) {
+        impl_->wlf_C1 = C1;
+        impl_->wlf_C2 = C2;
+        impl_->wlf_T_ref = T_ref;
+        
+        // Recompute coefficients if WLF is enabled
+        if (impl_->use_wlf && impl_->num_prony_terms > 0) {
+            impl_->compute_prony_coefficients();
+        }
+    }
+    
+    void MooneyRivlinVisco::set_temperature(real_t T) {
+        impl_->current_T = T;
+        
+        // Recompute coefficients with new temperature
+        if (impl_->use_wlf && impl_->num_prony_terms > 0) {
+            impl_->compute_prony_coefficients();
+        }
+    }
+    
+    void MooneyRivlinVisco::enable_wlf(bool enable) {
+        impl_->use_wlf = enable;
+        
+        // Recompute coefficients
+        if (impl_->num_prony_terms > 0) {
+            impl_->compute_prony_coefficients();
+        }
     }
 
     MooneyRivlinVisco::Impl::~Impl() {}

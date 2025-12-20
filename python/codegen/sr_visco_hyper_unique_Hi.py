@@ -1165,6 +1165,464 @@ class SRViscoHyperelasticity:
         return expr
 
 
+    def emit_single_prony_update(self):
+        """Emit update kernel for a single Prony term Hi.
+
+        This kernel updates one Voigt-6 history tensor H_i using
+            H_new = alpha * H_old + beta * (S_dev_curr - S_dev_prev)
+        where
+            x     = dt / tau
+            alpha = exp(-x)
+            beta  = g * (1 - alpha) / x
+        """
+        # real_t comes from sfem_codegen (import *)
+        real_t = globals().get("real_t", "scalar_t")
+
+        signature = f"""
+static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
+    const {real_t}                      dt,
+    const {real_t}                      g,
+    const {real_t}                      tau,
+    const {real_t} *const SFEM_RESTRICT S_dev_prev,  // 6 Voigt components
+    const {real_t} *const SFEM_RESTRICT S_dev_curr,  // 6 Voigt components
+    const {real_t} *const SFEM_RESTRICT H_old,       // 6 Voigt components
+          {real_t} *const SFEM_RESTRICT H_new)       // 6 Voigt components
+"""
+
+        body_lines = [
+            "{",
+            f"    const {real_t} x = dt / tau;",
+            "    const " + real_t + " alpha = exp(-x);",
+            "    const " + real_t + " beta  = g * (1 - alpha) / x;",
+            "",
+            "    // Voigt order: (xx, yy, zz, xy, xz, yz)",
+            "    for (int c = 0; c < 6; ++c) {",
+            "        const " + real_t + " S_prev = S_dev_prev[c];",
+            "        const " + real_t + " S_curr = S_dev_curr[c];",
+            "        const " + real_t + " H_i    = H_old[c];",
+            "        H_new[c] = alpha * H_i + beta * (S_curr - S_prev);",
+            "    }",
+            "}",
+            "",
+        ]
+
+        body = "\n".join(body_lines)
+        print(signature + body)
+
+
+    def emit_S_dev_from_disp(self):
+        """Emit kernel: compute elastic deviatoric stress S_dev from displacement.
+
+        This kernel:
+        - Depends only on the displacement field, does NOT access history
+        - Outputs S_dev in Voigt-6 form (xx, yy, zz, xy, xz, yz)
+        - Only requires material params K, C10, C01 (NO dt, g, tau)
+        
+        Used together with emit_single_prony_update for arbitrary Prony terms.
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress_flexible()
+
+        fe = self.fe
+        dim = fe.spatial_dim()
+        real_t = globals().get("real_t", "scalar_t")
+
+        S_dev = self.expression_table["S_dev"]
+
+        # Only C10, C01, K - NO dt, g, tau!
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_S_dev_from_disp(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      C10,\n'
+            f'    const {real_t}                      C01,\n'
+            f'    const {real_t}                      K,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       S_dev)\n'
+        )
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+
+        # Pack 3x3 S_dev into Voigt-6
+        idx_map = [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)]
+        assignments = []
+        for idx, (r, c) in enumerate(idx_map):
+            lhs = sp.symbols(f"S_dev[{idx}]")
+            rhs = S_dev[r, c]
+            assignments.append(ast.Assignment(lhs, rhs))
+
+        S_assign = c_gen(assignments)
+
+        body = (
+            f'{{\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'{S_assign}\n'
+            f'}}\n'
+        )
+
+        print(signature + body)
+
+    def __compute_loperand_flexible(self):
+        """Compute loperand using P_flexible (with gamma symbol)."""
+        if "loperand_flexible" in self.expression_table:
+            return self.expression_table["loperand_flexible"]
+
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        P_flexible = self.expression_table["P_flexible"]
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() * self.fe.quadrature_weight())
+
+        loperand_flexible = P_flexible * Jinv.T * dV
+        self.expression_table["loperand_flexible"] = loperand_flexible
+        return loperand_flexible
+
+    def emit_gradient_flexible(self):
+        """Emit gradient kernel using symbolic gamma (supports arbitrary Prony terms).
+
+        This kernel computes the ALGORITHMIC part of the gradient only:
+            g = integral( P_algo : grad(phi) dV )
+        where P_algo = F * (S_vol + gamma * S_dev)
+
+        The HISTORY contribution to the gradient must be added at runtime in C:
+            g += integral( F * S_hist : grad(phi) dV )
+        where S_hist = sum_i( alpha_i * H_i - beta_i * S_dev_prev )
+
+        Parameters: K, C10, C01, gamma (computed at runtime from Prony coeffs)
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_piola_stress_flexible()
+        self.__compute_loperand_flexible()
+
+        fe = self.fe
+        dim = fe.spatial_dim()
+        real_t = globals().get("real_t", "scalar_t")
+
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_grad_flexible(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      C10,\n'
+            f'    const {real_t}                      C01,\n'
+            f'    const {real_t}                      K,\n'
+            f'    const {real_t}                      gamma,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gx,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gy,\n'
+            f'    {real_t} *const SFEM_RESTRICT       gz)\n'
+        )
+
+        loperand = self.expression_table["loperand_flexible"]
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        grads = []
+
+        for d in range(0, fe.spatial_dim()):
+            gradd = []
+            for i in range(0, fe.n_nodes()):
+                gradd.append(inner(loperand, refgrad[d * fe.n_nodes() + i]))
+            grads.append(gradd)
+
+        expr = []
+        syms = ["x", "y", "z"]
+        for d in range(0, fe.spatial_dim()):
+            for i in range(0, fe.n_nodes()):
+                expr.append(ast.AddAugmentedAssignment(sp.symbols(f"g{syms[d]}[{i}]"), grads[d][i]))
+
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+
+        body = (
+            f'{{\n'
+            f'// Algorithmic gradient only (no history contribution)\n'
+            f'// History contribution (F * S_hist : grad(phi)) should be added at runtime\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n'
+            f'{c_gen(expr)}\n'
+            f'}}\n'
+        )
+
+        print(signature + body)
+
+    def __compute_S_single_symb(self):
+        """Create symbolic placeholders for S_single = alpha * H_i - beta * S_dev_prev.
+        
+        Uses simple symbols as placeholders, actual values substituted at c_gen time.
+        Returns a 3x3 symmetric matrix from Voigt-6 placeholders.
+        """
+        if "S_single_symb" in self.expression_table:
+            return self.expression_table["S_single_symb"]
+        
+        # Create simple placeholder symbols (not the full expression)
+        # These will be declared as local variables in the generated C code
+        S00 = sp.Symbol('S_s00')  # xx
+        S11 = sp.Symbol('S_s11')  # yy
+        S22 = sp.Symbol('S_s22')  # zz
+        S01 = sp.Symbol('S_s01')  # xy
+        S02 = sp.Symbol('S_s02')  # xz
+        S12 = sp.Symbol('S_s12')  # yz
+        
+        # Build 3x3 symmetric matrix from Voigt-6
+        S_single = sp.Matrix([
+            [S00, S01, S02],
+            [S01, S11, S12],
+            [S02, S12, S22]
+        ])
+        
+        # Store the symbols for later substitution
+        self.S_single_voigt_symb = [S00, S11, S22, S01, S02, S12]
+        self.expression_table["S_single_symb"] = S_single
+        return S_single
+
+    def __compute_P_single(self):
+        """Compute P_single = F * S_single symbolically."""
+        if "P_single" in self.expression_table:
+            return self.expression_table["P_single"]
+        
+        F = self.expression_table["F"]
+        S_single = self.__compute_S_single_symb()
+        
+        P_single = F * S_single
+        # Don't simplify here - keep placeholders simple
+        self.expression_table["P_single"] = P_single
+        return P_single
+
+    def __compute_loperand_single(self):
+        """Compute loperand = P_single * Jinv.T * dV for single-term history contribution."""
+        if "loperand_single" in self.expression_table:
+            return self.expression_table["loperand_single"]
+        
+        P_single = self.__compute_P_single()
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() * self.fe.quadrature_weight())
+        
+        loperand_single = P_single * Jinv.T * dV
+        self.expression_table["loperand_single"] = loperand_single
+        return loperand_single
+
+    def emit_grad_hist_single(self):
+        """Emit kernel: gradient contribution from a SINGLE Prony term.
+        
+        Computes:
+            S_single = alpha * H_i - beta * S_dev_prev
+            F = I + grad(u)
+            P_single = F * S_single
+            grad += P_single : grad(phi) * dV
+        
+        This kernel is called in a loop over Prony terms in C code.
+        Uses symbolic placeholders for intermediate computation, CSE at the end.
+        """
+        # Prepare symbolic expressions
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_disp_grad()
+        self.__compute_F()
+        self.__compute_loperand_single()
+        
+        fe = self.fe
+        dim = fe.spatial_dim()
+        real_t = globals().get("real_t", "scalar_t")
+        
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_grad_hist_single(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      alpha,\n'
+            f'    const {real_t}                      beta,\n'
+            f'    const {real_t} *const SFEM_RESTRICT H_i,        // 6 Voigt: history tensor\n'
+            f'    const {real_t} *const SFEM_RESTRICT S_dev_prev, // 6 Voigt: previous S_dev\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
+            f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
+            f'    accumulator_t *const SFEM_RESTRICT  gx,\n'
+            f'    accumulator_t *const SFEM_RESTRICT  gy,\n'
+            f'    accumulator_t *const SFEM_RESTRICT  gz)\n'
+        )
+        
+        # Compute gradient symbolically using placeholders
+        loperand = self.expression_table["loperand_single"]
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        
+        grads = []
+        for d in range(dim):
+            gradd = []
+            for i in range(fe.n_nodes()):
+                gradd.append(inner(loperand, refgrad[d * fe.n_nodes() + i]))
+            grads.append(gradd)
+        
+        # Build assignment expressions
+        expr = []
+        syms = ["x", "y", "z"]
+        for d in range(dim):
+            for i in range(fe.n_nodes()):
+                expr.append(ast.AddAugmentedAssignment(sp.symbols(f"g{syms[d]}[{i}]"), grads[d][i]))
+        
+        # Generate F computation code
+        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        
+        # Generate S_single computation: S_s00 = alpha * H_i[0] - beta * S_dev_prev[0], etc.
+        voigt_names = ["S_s00", "S_s11", "S_s22", "S_s01", "S_s02", "S_s12"]
+        S_single_code_lines = []
+        for idx, name in enumerate(voigt_names):
+            S_single_code_lines.append(f"const {real_t} {name} = alpha * H_i[{idx}] - beta * S_dev_prev[{idx}];")
+        S_single_code = "\n".join(S_single_code_lines)
+        
+        # Generate gradient contribution code (CSE happens here)
+        grad_code = c_gen(expr)
+        
+        body = (
+            f'{{\n'
+            f'// Single Prony term history contribution to gradient\n'
+            f'{real_t} F[{dim**2}];\n'
+            f'{{\n'
+            f'{F_actual}'
+            f'}}\n\n'
+            f'// S_single = alpha * H_i - beta * S_dev_prev (Voigt-6)\n'
+            f'{S_single_code}\n\n'
+            f'{grad_code}\n'
+            f'}}\n'
+        )
+        
+        print(signature + body)
+
+    def __compute_geom_stiff_single(self):
+        """Compute geometric stiffness contribution for single Prony term.
+        
+        Geometric stiffness: dP/dF|_S = I ⊗ S
+        H[test*3+i, trial*3+k] += delta_ik * (grad[test] · S · grad[trial]) * dV
+        
+        Uses symbolic placeholders for S_single.
+        """
+        if "geom_stiff_single" in self.expression_table:
+            return self.expression_table["geom_stiff_single"]
+        
+        S_single = self.__compute_S_single_symb()
+        Jinv = self.fe.symbol_jacobian_inverse_as_adjugate()
+        dV = self.fe.symbol_jacobian_determinant() * (self.fe.reference_measure() * self.fe.quadrature_weight())
+        refgrad = self.fe.tgrad(self.fe.quadrature_point())
+        
+        fe = self.fe
+        dim = fe.spatial_dim()
+        nfun = fe.n_nodes()
+        
+        # Compute physical gradients symbolically
+        # phys_grad[node][d] = sum_k Jinv[d,k] * refgrad[node][k]
+        phys_grads = []
+        for node in range(nfun):
+            pg = []
+            for d in range(dim):
+                pg_d = 0
+                for k in range(dim):
+                    pg_d += Jinv[d, k] * refgrad[node][0, k]
+                pg.append(pg_d)
+            phys_grads.append(pg)
+        
+        # Build geometric stiffness matrix
+        # H[test*3+i, trial*3+k] += delta_ik * (grad[test]^T * S * grad[trial]) * dV
+        H_geom = sp.zeros(nfun * dim, nfun * dim)
+        
+        for test_node in range(nfun):
+            for trial_node in range(nfun):
+                # grad_S_grad = phys_grads[test]^T * S_single * phys_grads[trial]
+                grad_S_grad = 0
+                for j in range(dim):
+                    for l in range(dim):
+                        grad_S_grad += phys_grads[test_node][j] * S_single[j, l] * phys_grads[trial_node][l]
+                grad_S_grad = grad_S_grad * dV
+                
+                # Add to diagonal blocks (i == k)
+                for d in range(dim):
+                    row = test_node * dim + d
+                    col = trial_node * dim + d
+                    H_geom[row, col] = grad_S_grad
+        
+        self.expression_table["geom_stiff_single"] = H_geom
+        return H_geom
+
+    def emit_geom_stiff_single(self):
+        """Emit kernel: geometric stiffness contribution from a SINGLE Prony term.
+        
+        Computes:
+            S_single = alpha * H_i - beta * S_dev_prev
+            H += I ⊗ S_single (geometric stiffness)
+        
+        Uses symbolic placeholders, CSE optimization at the end.
+        """
+        self.__compute_dV()
+        self.__compute_jacobian_adjugate()
+        self.__compute_Jinv()
+        self.__compute_geom_stiff_single()
+        
+        fe = self.fe
+        dim = fe.spatial_dim()
+        nfun = fe.n_nodes()
+        real_t = globals().get("real_t", "scalar_t")
+        
+        signature = (
+            f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_geom_stiff_single(\n'
+            f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
+            f'    const {real_t}                      jacobian_determinant,\n'
+            f'    const {real_t}                      qx,\n'
+            f'    const {real_t}                      qy,\n'
+            f'    const {real_t}                      qz,\n'
+            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      alpha,\n'
+            f'    const {real_t}                      beta,\n'
+            f'    const {real_t} *const SFEM_RESTRICT H_i,        // 6 Voigt: history tensor\n'
+            f'    const {real_t} *const SFEM_RESTRICT S_dev_prev, // 6 Voigt: previous S_dev\n'
+            f'          {real_t} *const SFEM_RESTRICT H)          // 24x24 Hessian\n'
+        )
+        
+        H_geom = self.expression_table["geom_stiff_single"]
+        
+        # Generate S_single computation code
+        voigt_names = ["S_s00", "S_s11", "S_s22", "S_s01", "S_s02", "S_s12"]
+        S_single_code_lines = []
+        for idx, name in enumerate(voigt_names):
+            S_single_code_lines.append(f"const {real_t} {name} = alpha * H_i[{idx}] - beta * S_dev_prev[{idx}];")
+        S_single_code = "\n".join(S_single_code_lines)
+        
+        # Generate Hessian assignment (CSE happens here)
+        H_code = c_gen(add_assign_matrix("H", H_geom))
+        
+        body = (
+            f'{{\n'
+            f'// Single Prony term geometric stiffness contribution\n'
+            f'// S_single = alpha * H_i - beta * S_dev_prev (Voigt-6)\n'
+            f'{S_single_code}\n\n'
+            f'{H_code}\n'
+            f'}}\n'
+        )
+        
+        print(signature + body)
+
+
     def emit_history_update(self):
         if self.num_prony_terms == 0:
             print("// No history update needed for pure elasticity")
@@ -1554,39 +2012,17 @@ class SRViscoHyperelasticity:
 
         print(signature + body)
 
-    def __compute_hessian_flexible_micro(self):
-        """Compute full 24x24 Hessian (algorithmic part only, with symbolic gamma)."""
-        if "hessian_flexible_micro" in self.expression_table:
-            return self.expression_table["hessian_flexible_micro"]
-
-        S_ikmn_flexible = self.__compute_metric_tensor_flexible()
-        refgrad = self.fe.tgrad(self.fe.quadrature_point())
-        
-        dim = self.fe.spatial_dim()
-        nfun = self.fe.n_nodes()
-        H_flexible = sp.zeros(dim * nfun, dim * nfun)
-
-        for test in range(0, nfun * dim):
-            for trial in range(0, nfun * dim):
-                for k in range(0, dim):
-                    for m in range(0, dim):
-                        for i in range(0, dim):
-                            for n in range(0, dim):
-                                H_flexible[test, trial] += (
-                                    S_ikmn_flexible[i, k, m, n]
-                                    * refgrad[trial][i, n]
-                                    * refgrad[test][k, m]
-                                )
-
-        self.expression_table["hessian_flexible_micro"] = H_flexible
-        return H_flexible
-
     def emit_hessian_flexible_micro(self):
         """Emit 24x24 Hessian (algorithmic only, gamma param, history added at runtime).
         
+        FAST VERSION: Uses symbolic placeholders (S_lin_symb) for Hessian computation,
+        then substitutes S_lin_flexible expressions at code generation time.
+        
+        This is MUCH faster than computing with full expressions because:
+        - 24x24 Hessian computation only manipulates simple symbols
+        - Actual expressions are processed once via CSE at the end
+        
         Args include K/C10/C01/gamma and displacements; Prony arrays stay runtime.
-        Use when Prony term count must be flexible but you want an unrolled kernel.
-        (not finished yet)
         """
         self.__compute_dV()
         self.__compute_jacobian_adjugate()
@@ -1595,14 +2031,17 @@ class SRViscoHyperelasticity:
         self.__compute_F()
         self.__compute_piola_stress_flexible()
         self.__compute_linearized_stress_flexible()
-        self.__compute_metric_tensor_flexible()
-        self.__compute_hessian_flexible_micro()
-
-        H_micro = self.expression_table["hessian_flexible_micro"]
+        
+        # KEY: Use __compute_metric_tensor() which uses S_lin_symb (placeholders!)
+        # NOT __compute_metric_tensor_flexible() which uses full expressions
+        self.__compute_metric_tensor()
+        self.__compute_hessian()
+        
+        # H contains placeholders like S_lin_0, S_lin_1, ..., S_lin_80
+        H = self.expression_table["hessian"]
 
         fe = self.fe
         dim = fe.spatial_dim()
-        # real_t comes from sfem_codegen.py (import *), not stored on self
         real_t = globals().get("real_t", "scalar_t")
 
         signature = (
@@ -1624,8 +2063,11 @@ class SRViscoHyperelasticity:
         )
 
         F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
+        # KEY: Use S_lin_flexible for the actual S_lin values!
+        # The C code will be: const scalar_t S_lin_0 = <flexible expr>; ...
+        # Then: H[0] += a0*S_lin_0 + a1*S_lin_1 + ...;
         S_actual = c_gen(self.__assign_tensor4("S_lin", self.expression_table["S_lin_flexible"]))
-        combined_code = c_gen(add_assign_matrix("H", H_micro))
+        combined_code = c_gen(add_assign_matrix("H", H))
 
         body = (
             f'{{\n'
@@ -1789,25 +2231,46 @@ if __name__ == "__main__":
     num_prony = 10  # Must match what C code expects for unrolled version
     
     op = SRViscoHyperelasticity.create_from_string_unimodular(
-        fe, 
-        "mooney_rivlin", 
-        [w_vol, w_dev], 
-        num_prony_terms=num_prony
+        fe,
+        "mooney_rivlin",
+        [w_vol, w_dev],
+        num_prony_terms=num_prony,
     )
-    
-    # op.check_metric_tensor_symmetries()
-    
-    # op.emit_objective()
-    # op.emit_gradient()
-    # print("// -------------------------------------------------")
-    # op.emit_history_update()
-    
-    # print("// ============= UNROLLED VERSION (fixed {} Prony terms) =============".format(num_prony))
-    # op.emit_hessian()
-    # op.emit_hessian_diag()
-    
-    # print("// ============= FLEXIBLE VERSION (gamma as parameter, works with ANY Prony terms) =============")
-    # op.emit_hessian_flexible()
-    
-    print("\n// ============= FLEXIBLE MICRO-KERNEL (unrolled 24x24, gamma param, no history) =============")
+
+    # ========================================================================
+    # UNIQUE_HI ARCHITECTURE: Only store H_i + displacement
+    # All kernels below support arbitrary number of Prony terms at runtime
+    # ========================================================================
+
+    print("// =================================================================")
+    print("// UNIQUE_HI KERNELS - Arbitrary Prony terms, only store H_i")
+    print("// Generated by sr_visco_hyper_unique_Hi.py")
+    print("// =================================================================")
+
+    print("\n// ============= 1. SINGLE PRONY-TERM Hi UPDATE =============")
+    print("// Updates one H_i tensor. Loop over all Prony terms in C.")
+    op.emit_single_prony_update()
+
+    print("\n// ============= 2. S_DEV FROM DISPLACEMENT =============")
+    print("// Computes elastic deviatoric stress S_dev from displacement.")
+    print("// No history access needed. Used for S_dev_prev and S_dev_curr.")
+    op.emit_S_dev_from_disp()
+
+    print("\n// ============= 3. FLEXIBLE GRADIENT (gamma param) =============")
+    print("// Algorithmic gradient only. History contribution added at runtime.")
+    op.emit_gradient_flexible()
+
+    print("\n// ============= 4. FLEXIBLE HESSIAN (gamma param, 24x24 unrolled) =============")
+    print("// Algorithmic hessian only. History geometric stiffness added at runtime.")
     op.emit_hessian_flexible_micro()
+
+    print("\n// ============= 5. SINGLE-TERM GRADIENT HISTORY CONTRIBUTION =============")
+    print("// Compute grad contribution from ONE Prony term: F*(alpha*H_i - beta*S_dev_prev).")
+    print("// Call this in a loop over Prony terms in C code.")
+    op.emit_grad_hist_single()
+
+    print("\n// ============= 6. SINGLE-TERM GEOMETRIC STIFFNESS CONTRIBUTION =============")
+    print("// Add geometric stiffness from ONE Prony term: I ⊗ (alpha*H_i - beta*S_dev_prev).")
+    print("// Call this in a loop over Prony terms in C code.")
+    op.emit_geom_stiff_single()
+
