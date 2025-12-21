@@ -979,7 +979,7 @@ class SRViscoHyperelasticity:
         param_order = ['C10', 'C01', 'K']
         params = self.params
         sorted_params = []
-        
+
         # First add params in the defined order
         for name in param_order:
             for p in params:
@@ -2036,7 +2036,7 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
         # NOT __compute_metric_tensor_flexible() which uses full expressions
         self.__compute_metric_tensor()
         self.__compute_hessian()
-        
+
         # H contains placeholders like S_lin_0, S_lin_1, ..., S_lin_80
         H = self.expression_table["hessian"]
 
@@ -2222,21 +2222,21 @@ if __name__ == "__main__":
     # Volumetric part
     w_vol = "K / 2 * (J - 1)**2"
     
-    # Deviatoric part (Mooney-Rivlin)
-    # Using I1b (I1_bar) and I2b (I2_bar) for isochoric invariants
+    # Deviatoric part (Mooney-Rivlin) - Unimodular form
+    # Uses I1b = J^{-2/3}*I1, I2b = J^{-4/3}*I2 for near-incompressible materials
+    # Note: Standard MR (I1, I2) doesn't work well with large K (volumetric sensitivity)
     w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
     
-    # num_prony_terms for unrolled version (hardcoded history indices)
-    # For loop-based version, use emit_hessian_algo() which doesn't depend on num_prony_terms
     num_prony = 10  # Must match what C code expects for unrolled version
     
+    # Use create_from_string_unimodular (Isochoric MR) - required for near-incompressible
     op = SRViscoHyperelasticity.create_from_string_unimodular(
-        fe,
-        "mooney_rivlin",
-        [w_vol, w_dev],
+        fe, 
+        "mooney_rivlin", 
+        [w_vol, w_dev], 
         num_prony_terms=num_prony,
     )
-
+    
     # ========================================================================
     # UNIQUE_HI ARCHITECTURE: Only store H_i + displacement
     # All kernels below support arbitrary number of Prony terms at runtime
@@ -2259,7 +2259,7 @@ if __name__ == "__main__":
     print("\n// ============= 3. FLEXIBLE GRADIENT (gamma param) =============")
     print("// Algorithmic gradient only. History contribution added at runtime.")
     op.emit_gradient_flexible()
-
+    
     print("\n// ============= 4. FLEXIBLE HESSIAN (gamma param, 24x24 unrolled) =============")
     print("// Algorithmic hessian only. History geometric stiffness added at runtime.")
     op.emit_hessian_flexible_micro()
