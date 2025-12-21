@@ -975,25 +975,10 @@ class SRViscoHyperelasticity:
         return loperand
 
     def __params_to_args(self):
-        # Enforce consistent parameter order: C10, C01, K
-        param_order = ['C10', 'C01', 'K']
         params = self.params
-        sorted_params = []
-        
-        # First add params in the defined order
-        for name in param_order:
-            for p in params:
-                if str(p) == name:
-                    sorted_params.append(p)
-                    break
-        
-        # Then add any remaining params not in the order list
-        for p in params:
-            if str(p) not in param_order:
-                sorted_params.append(p)
-        
         lines = []
-        for p in sorted_params:
+
+        for p in params:
             lines.append(f'    const {real_t}                      {str(p)},\n')
 
         return "".join(lines)
@@ -1512,7 +1497,7 @@ class SRViscoHyperelasticity:
         
         S_ikmn_flexible = self.expression_table["S_ikmn_flexible"]
 
-        # Use only basic params (C10, C01, K) + gamma, no Prony terms!
+        # Use only basic params (K, C10, C01) + gamma, no Prony terms!
         signature = (
             f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_S_lin_flexible(\n'
             f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
@@ -1521,9 +1506,9 @@ class SRViscoHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      K,\n'
             f'    const {real_t}                      C10,\n'
             f'    const {real_t}                      C01,\n'
-            f'    const {real_t}                      K,\n'
             f'    const {real_t}                      gamma,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
@@ -1613,9 +1598,9 @@ class SRViscoHyperelasticity:
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
             f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      K,\n'
             f'    const {real_t}                      C10,\n'
             f'    const {real_t}                      C01,\n'
-            f'    const {real_t}                      K,\n'
             f'    const {real_t}                      gamma,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
@@ -1781,14 +1766,19 @@ if __name__ == "__main__":
     w_vol = "K / 2 * (J - 1)**2"
     
     # Deviatoric part (Mooney-Rivlin)
-    # Using I1b (I1_bar) and I2b (I2_bar) for isochoric invariants
-    w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
+    # Option 1: Unimodular (using I1b, I2b - isochoric invariants)
+    # w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
+    
+    # Option 2: Standard (using I1, I2 - like Marc)
+    # This matches Marc's Mooney-Rivlin implementation
+    w_dev = "C10 * (I1 - 3) + C01 * (I2 - 3)"
     
     # num_prony_terms for unrolled version (hardcoded history indices)
     # For loop-based version, use emit_hessian_algo() which doesn't depend on num_prony_terms
     num_prony = 10  # Must match what C code expects for unrolled version
     
-    op = SRViscoHyperelasticity.create_from_string_unimodular(
+    # Use create_from_string (Standard MR) to match Marc
+    op = SRViscoHyperelasticity.create_from_string(
         fe, 
         "mooney_rivlin", 
         [w_vol, w_dev], 

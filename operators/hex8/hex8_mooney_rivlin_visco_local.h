@@ -138,24 +138,37 @@ F[8] = -adjugate[2]*x0*x22 - adjugate[5]*x0*x23 - adjugate[8]*x0*x24 + 1;
 }
 
 // Prony series: compute gamma and S_hist using loops
+// gamma = g_inf + sum(beta_i), where g_inf = 1 - sum(g_i)
 
-    // Prony series: calculate gamma using loop
-    scalar_t gamma = 1.0;
+    // First compute g_inf = 1 - sum(g_i)
+    scalar_t sum_g = 0;
     for (int i = 0; i < num_prony_terms; i++) {
-        const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
-        gamma += beta_i;
+        sum_g += g[i];
     }
+    scalar_t gamma = 1.0 - sum_g;  // g_inf
     
     // Calculate S_hist = sum(alpha_i * H_i^n - beta_i * S_dev_n) using loop
+    // Also accumulate gamma += beta_i
     scalar_t S_hist[6] = {0};
     ptrdiff_t hist_ptr = 6;  // Skip S_dev_n (first 6 elements)
     
+    // Threshold for fully relaxed terms (dt >> tau)
+    const scalar_t relax_threshold = 100.0;
+    
     for (int i = 0; i < num_prony_terms; i++) {
         const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
+        scalar_t alpha_i, beta_i;
+        
+        if (x > relax_threshold) {
+            // Fully relaxed: alpha_i → 0, add g_i to gamma
+            alpha_i = 0.0;
+            beta_i = 0.0;
+            gamma += g[i];
+        } else {
+            alpha_i = exp(-x);
+            beta_i = g[i] * (1.0 - alpha_i) / x;
+            gamma += beta_i;  // gamma = g_inf + sum(beta_i)
+        }
         
         // Read H_i^n from history
         scalar_t H_i[6];
@@ -633,26 +646,37 @@ F[7] = -x0*(adjugate[1]*x22 + adjugate[4]*x23 + adjugate[7]*x24);
 F[8] = -adjugate[2]*x0*x22 - adjugate[5]*x0*x23 - adjugate[8]*x0*x24 + 1;}
 
 // Prony series: compute gamma and S_hist using loops
-// Note: S_lin uses expanded form from symbolic computation
-// but array parameters (g[], tau[]) make it work with any number of terms
+// gamma = g_inf + sum(beta_i), where g_inf = 1 - sum(g_i)
 
-    // Prony series: calculate gamma using loop
-    scalar_t gamma = 1.0;
+    // First compute g_inf = 1 - sum(g_i)
+    scalar_t sum_g = 0;
     for (int i = 0; i < num_prony_terms; i++) {
-        const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
-        gamma += beta_i;
+        sum_g += g[i];
     }
+    scalar_t gamma = 1.0 - sum_g;  // g_inf
     
     // Calculate S_hist = sum(alpha_i * H_i^n - beta_i * S_dev_n) using loop
+    // Also accumulate gamma += beta_i
     scalar_t S_hist[6] = {0};
     ptrdiff_t hist_ptr = 6;  // Skip S_dev_n (first 6 elements)
     
+    // Threshold for fully relaxed terms (dt >> tau)
+    const scalar_t relax_threshold = 100.0;
+    
     for (int i = 0; i < num_prony_terms; i++) {
         const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
+        scalar_t alpha_i, beta_i;
+        
+        if (x > relax_threshold) {
+            // Fully relaxed: alpha_i → 0, add g_i to gamma
+            alpha_i = 0.0;
+            beta_i = 0.0;
+            gamma += g[i];
+        } else {
+            alpha_i = exp(-x);
+            beta_i = g[i] * (1.0 - alpha_i) / x;
+            gamma += beta_i;  // gamma = g_inf + sum(beta_i)
+        }
         
         // Read H_i^n from history
         scalar_t H_i[6];
@@ -4142,25 +4166,37 @@ F[7] = -x0*(adjugate[1]*x22 + adjugate[4]*x23 + adjugate[7]*x24);
 F[8] = -adjugate[2]*x0*x22 - adjugate[5]*x0*x23 - adjugate[8]*x0*x24 + 1;}
 
 // Prony series: compute gamma and S_hist using loops
-// Note: S_lin uses expanded form from symbolic computation
+// gamma = g_inf + sum(beta_i), where g_inf = 1 - sum(g_i)
 
-    // Prony series: calculate gamma using loop
-    scalar_t gamma = 1.0;
+    // First compute g_inf = 1 - sum(g_i)
+    scalar_t sum_g = 0;
     for (int i = 0; i < num_prony_terms; i++) {
-        const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
-        gamma += beta_i;
+        sum_g += g[i];
     }
+    scalar_t gamma = 1.0 - sum_g;  // g_inf
     
     // Calculate S_hist = sum(alpha_i * H_i^n - beta_i * S_dev_n) using loop
+    // Also accumulate gamma += beta_i
     scalar_t S_hist[6] = {0};
     ptrdiff_t hist_ptr = 6;  // Skip S_dev_n (first 6 elements)
     
+    // Threshold for fully relaxed terms (dt >> tau)
+    const scalar_t relax_threshold = 100.0;
+    
     for (int i = 0; i < num_prony_terms; i++) {
         const scalar_t x = dt / tau[i];
-        const scalar_t alpha_i = exp(-x);
-        const scalar_t beta_i = g[i] * (1.0 - alpha_i) / x;
+        scalar_t alpha_i, beta_i;
+        
+        if (x > relax_threshold) {
+            // Fully relaxed: alpha_i → 0, add g_i to gamma
+            alpha_i = 0.0;
+            beta_i = 0.0;
+            gamma += g[i];
+        } else {
+            alpha_i = exp(-x);
+            beta_i = g[i] * (1.0 - alpha_i) / x;
+            gamma += beta_i;  // gamma = g_inf + sum(beta_i)
+        }
         
         // Read H_i^n from history
         scalar_t H_i[6];
@@ -5166,13 +5202,9 @@ static SFEM_INLINE void hex8_mooney_rivlin_hessian_flexible(
     }
     scalar_t g_inf = 1.0 - sum_gi;
     
-    scalar_t gamma = g_inf;
-    for (int i = 0; i < num_prony_terms; i++) {
-        scalar_t x = dt / tau[i];
-        scalar_t alpha = exp(-x);
-        scalar_t beta = g[i] * (1.0 - alpha) / x;
-        gamma += beta;
-    }
+    // For long-term moduli input: gamma = 1 (no scaling)
+    scalar_t gamma = 1.0;
+    (void)g_inf;  // suppress unused warning
     
     // 2. Compute S_lin using the flexible kernel
     scalar_t S_lin[81];

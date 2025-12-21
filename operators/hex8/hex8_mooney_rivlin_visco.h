@@ -25,10 +25,10 @@ extern "C" {
 int hex8_mooney_rivlin_visco_gradient(
     // 1. Mesh geometry
     const ptrdiff_t                   nelements,
-    const ptrdiff_t                   stride,
-    const ptrdiff_t                   nnodes,
-    idx_t **const SFEM_RESTRICT       elements,
-    geom_t **const SFEM_RESTRICT      points,
+                                    const ptrdiff_t                   stride,
+                                    const ptrdiff_t                   nnodes,
+                                    idx_t **const SFEM_RESTRICT       elements,
+                                    geom_t **const SFEM_RESTRICT      points,
     // 2. Material parameters
     const real_t                      C10,
     const real_t                      C01,
@@ -42,10 +42,10 @@ int hex8_mooney_rivlin_visco_gradient(
     const ptrdiff_t                   history_stride,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
-    const ptrdiff_t                   u_stride,
-    const real_t *const SFEM_RESTRICT ux,
-    const real_t *const SFEM_RESTRICT uy,
-    const real_t *const SFEM_RESTRICT uz,
+                                    const ptrdiff_t                   u_stride,
+                                    const real_t *const SFEM_RESTRICT ux,
+                                    const real_t *const SFEM_RESTRICT uy,
+                                    const real_t *const SFEM_RESTRICT uz,
     // 6. Output
     const ptrdiff_t                   out_stride,
     real_t *const SFEM_RESTRICT       outx,
@@ -55,10 +55,10 @@ int hex8_mooney_rivlin_visco_gradient(
 int hex8_mooney_rivlin_visco_update_history(
     // 1. Mesh geometry
     const ptrdiff_t                   nelements,
-    const ptrdiff_t                   stride,
-    const ptrdiff_t                   nnodes,
-    idx_t **const SFEM_RESTRICT       elements,
-    geom_t **const SFEM_RESTRICT      points,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
     // 2. Material parameters
     const real_t                      C10,
     const real_t                      C01,
@@ -73,18 +73,18 @@ int hex8_mooney_rivlin_visco_update_history(
     const real_t *const SFEM_RESTRICT history,
     real_t *const SFEM_RESTRICT       new_history,
     // 5. Displacement input
-    const ptrdiff_t                   u_stride,
-    const real_t *const SFEM_RESTRICT ux,
-    const real_t *const SFEM_RESTRICT uy,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
     const real_t *const SFEM_RESTRICT uz);
 
 int hex8_mooney_rivlin_visco_bsr(
     // 1. Mesh geometry
     const ptrdiff_t                   nelements,
-    const ptrdiff_t                   stride,
-    const ptrdiff_t                   nnodes,
-    idx_t **const SFEM_RESTRICT       elements,
-    geom_t **const SFEM_RESTRICT      points,
+                                   const ptrdiff_t                   stride,
+                                   const ptrdiff_t                   nnodes,
+                                   idx_t **const SFEM_RESTRICT       elements,
+                                   geom_t **const SFEM_RESTRICT      points,
     // 2. Material parameters
     const real_t                      C10,
     const real_t                      C01,
@@ -98,12 +98,12 @@ int hex8_mooney_rivlin_visco_bsr(
     const ptrdiff_t                   history_stride,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
-    const ptrdiff_t                   u_stride,
-    const real_t *const SFEM_RESTRICT ux,
-    const real_t *const SFEM_RESTRICT uy,
-    const real_t *const SFEM_RESTRICT uz,
+                                   const ptrdiff_t                   u_stride,
+                                   const real_t *const SFEM_RESTRICT ux,
+                                   const real_t *const SFEM_RESTRICT uy,
+                                   const real_t *const SFEM_RESTRICT uz,
     // 6. BSR output
-    const ptrdiff_t                   out_stride,
+                                   const ptrdiff_t                   out_stride,
     real_t *const SFEM_RESTRICT       values,
     const idx_t *const SFEM_RESTRICT  rowptr,
     const idx_t *const SFEM_RESTRICT  colidx);
@@ -111,10 +111,10 @@ int hex8_mooney_rivlin_visco_bsr(
 int hex8_mooney_rivlin_visco_hessian_diag(
     // 1. Mesh geometry
     const ptrdiff_t                   nelements,
-    const ptrdiff_t                   stride,
-    const ptrdiff_t                   nnodes,
-    idx_t **const SFEM_RESTRICT       elements,
-    geom_t **const SFEM_RESTRICT      points,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
     // 2. Material parameters
     const real_t                      C10,
     const real_t                      C01,
@@ -128,15 +128,15 @@ int hex8_mooney_rivlin_visco_hessian_diag(
     const ptrdiff_t                   history_stride,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
-    const ptrdiff_t                   u_stride,
-    const real_t *const SFEM_RESTRICT ux,
-    const real_t *const SFEM_RESTRICT uy,
-    const real_t *const SFEM_RESTRICT uz,
+                                          const ptrdiff_t                   u_stride,
+                                          const real_t *const SFEM_RESTRICT ux,
+                                          const real_t *const SFEM_RESTRICT uy,
+                                          const real_t *const SFEM_RESTRICT uz,
     // 6. Output
-    const ptrdiff_t                   out_stride,
-    real_t *const SFEM_RESTRICT       outx,
-    real_t *const SFEM_RESTRICT       outy,
-    real_t *const SFEM_RESTRICT       outz);
+                                          const ptrdiff_t                   out_stride,
+                                          real_t *const SFEM_RESTRICT       outx,
+                                          real_t *const SFEM_RESTRICT       outy,
+                                          real_t *const SFEM_RESTRICT       outz);
 
 #ifdef __cplusplus
 }

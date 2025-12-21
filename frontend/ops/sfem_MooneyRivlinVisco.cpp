@@ -48,13 +48,20 @@ namespace sfem {
         bool use_wlf{false};         // Enable WLF shift
         
         // Precomputed Prony coefficients (for FLEXIBLE mode)
-        std::vector<real_t> prony_alpha;  // exp(-dt/tau_eff_i)
-        std::vector<real_t> prony_beta;   // g_i * (1 - alpha_i) / (dt/tau_eff_i)
-        real_t prony_gamma{1.0};          // g_inf + sum(beta_i)
+        // Only contains ACTIVE terms (tau not much smaller than dt)
+        // Fully relaxed terms (dt >> tau) are absorbed into gamma
+        std::vector<real_t> prony_alpha;  // exp(-dt/tau_eff_i) for active terms
+        std::vector<real_t> prony_beta;   // g_i * (1 - alpha_i) / (dt/tau_eff_i) for active terms
+        real_t prony_gamma{1.0};          // g_inf + sum(g_i for relaxed) + sum(beta_i for active)
+        int num_active_terms{0};          // Number of active Prony terms
         
         // Mode: false = FIXED (stores S_dev, hardcoded 10 Prony terms)
         //       true  = FLEXIBLE (stores only H_i, uses alpha/beta/gamma)
         bool use_flexible{false};
+        
+        // If true, C10/C01 are instantaneous moduli and gamma = 1
+        // If false, C10/C01 are long-term moduli and gamma = g_inf + sum(beta_i)
+        bool use_instantaneous_moduli{false};
         
         // History buffer
         std::shared_ptr<Buffer<real_t>> history_buffer;
@@ -90,36 +97,62 @@ namespace sfem {
         }
         
         void compute_prony_coefficients() {
-            prony_alpha.resize(num_prony_terms);
-            prony_beta.resize(num_prony_terms);
-            
             // Compute WLF shift factor
             real_t aT = compute_wlf_shift();
             
+            // g_inf = 1 - sum(g_i)
             real_t sum_g = 0;
             for (int i = 0; i < num_prony_terms; ++i) {
                 sum_g += prony_g[i];
             }
-            prony_gamma = 1.0 - sum_g;  // g_inf
+            real_t g_inf = 1.0 - sum_g;
+            
+            // Threshold: if x = dt/tau > this, term is fully relaxed
+            // Fully relaxed terms are absorbed into gamma, not passed to operator
+            const real_t relax_threshold = 100.0;
+            
+            // First pass: count active terms and compute gamma
+            prony_gamma = g_inf;
+            num_active_terms = 0;
             
             for (int i = 0; i < num_prony_terms; ++i) {
-                // Apply WLF shift: tau_eff = tau_ref / a_T
-                // When T > T_ref: a_T > 1, tau_eff < tau_ref (faster relaxation)
                 real_t tau_eff = prony_tau[i] / aT;
-                
                 real_t x = dt / tau_eff;
-                prony_alpha[i] = exp(-x);
-                prony_beta[i] = prony_g[i] * (1.0 - prony_alpha[i]) / x;
-                prony_gamma += prony_beta[i];
+                
+                if (x > relax_threshold) {
+                    // Fully relaxed: absorb g_i into gamma
+                    prony_gamma += prony_g[i];
+                } else {
+                    // Active term: will contribute alpha, beta
+                    num_active_terms++;
+                }
+            }
+            
+            // Second pass: compute alpha, beta for active terms only
+            prony_alpha.resize(num_active_terms);
+            prony_beta.resize(num_active_terms);
+            
+            int active_idx = 0;
+            for (int i = 0; i < num_prony_terms; ++i) {
+                real_t tau_eff = prony_tau[i] / aT;
+                real_t x = dt / tau_eff;
+                
+                if (x <= relax_threshold) {
+                    // Active term
+                    prony_alpha[active_idx] = exp(-x);
+                    prony_beta[active_idx] = prony_g[i] * (1.0 - prony_alpha[active_idx]) / x;
+                    prony_gamma += prony_beta[active_idx];
+                    active_idx++;
+                }
             }
         }
         
         ptrdiff_t history_per_qp() const {
             if (use_flexible) {
-                // FLEXIBLE: only store H_i (no S_dev)
-                return num_prony_terms * 6;
+                // FLEXIBLE: only store H_i for active terms (no S_dev)
+                return num_active_terms * 6;
             } else {
-                // FIXED: store S_dev + H_i
+                // FIXED: store S_dev + H_i (uses all terms)
                 return 6 + num_prony_terms * 6;
             }
         }
@@ -171,6 +204,7 @@ namespace sfem {
         ret->impl_->C01 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C01", ret->impl_->C01);
         ret->impl_->dt  = sfem::Env::read("SFEM_DT", ret->impl_->dt);
         ret->impl_->use_flexible = sfem::Env::read("SFEM_USE_FLEXIBLE_VISCO", 0) != 0;
+        ret->impl_->use_instantaneous_moduli = sfem::Env::read("SFEM_USE_INSTANTANEOUS_MODULI", 0) != 0;
         
         // WLF temperature shift parameters (all temperatures in °C)
         ret->impl_->wlf_C1    = sfem::Env::read("SFEM_WLF_C1", ret->impl_->wlf_C1);
@@ -234,7 +268,7 @@ namespace sfem {
                     impl_->C10,
                     impl_->C01,
                     impl_->K,
-                    impl_->num_prony_terms,
+                    impl_->num_active_terms,  // Only active Prony terms
                     impl_->prony_alpha.data(),
                     impl_->prony_beta.data(),
                     impl_->prony_gamma,
@@ -298,7 +332,7 @@ namespace sfem {
                     impl_->C10,
                     impl_->C01,
                     impl_->K,
-                    impl_->num_prony_terms,
+                    impl_->num_active_terms,  // Only active Prony terms
                     impl_->prony_alpha.data(),
                     impl_->prony_beta.data(),
                     impl_->prony_gamma,
@@ -361,7 +395,7 @@ namespace sfem {
                     impl_->C10,
                     impl_->C01,
                     impl_->K,
-                    impl_->num_prony_terms,
+                    impl_->num_active_terms,  // Only active Prony terms
                     impl_->prony_alpha.data(),
                     impl_->prony_beta.data(),
                     impl_->prony_gamma,
@@ -424,7 +458,7 @@ namespace sfem {
                     impl_->C10,
                     impl_->C01,
                     impl_->K,
-                    impl_->num_prony_terms,
+                    impl_->num_active_terms,  // Only active Prony terms
                     impl_->prony_alpha.data(),
                     impl_->prony_beta.data(),
                     history_stride,
@@ -500,6 +534,15 @@ namespace sfem {
         }
     }
     
+    void MooneyRivlinVisco::set_use_instantaneous_moduli(bool use_instant) {
+        impl_->use_instantaneous_moduli = use_instant;
+        
+        // Recompute gamma coefficient
+        if (impl_->num_prony_terms > 0) {
+            impl_->compute_prony_coefficients();
+        }
+    }
+    
     void MooneyRivlinVisco::set_wlf_params(real_t C1, real_t C2, real_t T_ref) {
         impl_->wlf_C1 = C1;
         impl_->wlf_C2 = C2;
@@ -526,6 +569,32 @@ namespace sfem {
         // Recompute coefficients
         if (impl_->num_prony_terms > 0) {
             impl_->compute_prony_coefficients();
+        }
+    }
+    
+    real_t MooneyRivlinVisco::get_gamma() const {
+        return impl_->prony_gamma;
+    }
+    
+    int MooneyRivlinVisco::get_num_active_terms() const {
+        return impl_->num_active_terms;
+    }
+    
+    void MooneyRivlinVisco::set_prony_coefficients(int n_active, const real_t* alpha, const real_t* beta, real_t gamma) {
+        // Directly set precomputed coefficients (bypasses internal WLF/filtering)
+        impl_->num_active_terms = n_active;
+        impl_->prony_alpha.resize(n_active);
+        impl_->prony_beta.resize(n_active);
+        
+        for (int i = 0; i < n_active; ++i) {
+            impl_->prony_alpha[i] = alpha[i];
+            impl_->prony_beta[i] = beta[i];
+        }
+        impl_->prony_gamma = gamma;
+        
+        // Reinitialize history buffer with new number of active terms
+        if (impl_->history_buffer) {
+            initialize_history();
         }
     }
 

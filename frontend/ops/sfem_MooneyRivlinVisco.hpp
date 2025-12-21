@@ -38,6 +38,11 @@ namespace sfem {
         // true  = FLEXIBLE (stores only H_i, uses precomputed alpha/beta/gamma, optimized)
         void set_use_flexible(bool flexible);
         
+        // Set moduli type:
+        // false = C10, C01 are long-term (equilibrium) moduli, gamma = g_inf + sum(beta_i)
+        // true  = C10, C01 are instantaneous (short-term) moduli, gamma = 1
+        void set_use_instantaneous_moduli(bool use_instant);
+        
         // WLF (Williams-Landel-Ferry) time-temperature superposition
         // Formula: log10(a_T) = C1 * (T - T_ref) / (C2 + T - T_ref)
         // Effect: tau_eff = tau_ref / a_T
@@ -48,6 +53,19 @@ namespace sfem {
         void set_wlf_params(real_t C1, real_t C2, real_t T_ref);  // C2 and T_ref in °C
         void set_temperature(real_t T);  // Current temperature in °C
         void enable_wlf(bool enable);
+        
+        // Getters for debugging/external control
+        real_t get_gamma() const;
+        int get_num_active_terms() const;
+        
+        // Advanced interface: set precomputed Prony coefficients directly
+        // This allows external computation of temperature-shifted tau and filtering
+        // Parameters:
+        //   n_active: number of active Prony terms (after filtering dt >> tau terms)
+        //   alpha: exp(-dt/tau_eff) for each active term
+        //   beta: g_i * (1 - alpha_i) / (dt/tau_eff_i) for each active term  
+        //   gamma: g_inf + sum(g_i for relaxed) + sum(beta_i for active)
+        void set_prony_coefficients(int n_active, const real_t* alpha, const real_t* beta, real_t gamma);
 
         int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,
