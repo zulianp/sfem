@@ -129,12 +129,12 @@ GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 # export OMP_NUM_THREADS=8
 # export OMP_PROC_BIND=true
 
-set -x
+
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 export SFEM_ADJOINT=1
 
-export SFEM_CLUSTER_SIZE=${SFEM_CLUSTER_SIZE:-32}
+# export SFEM_CLUSTER_SIZE=${SFEM_CLUSTER_SIZE:-32}
 
 if [[ $SFEM_ADJOINT -eq 1 ]]
 then
@@ -148,7 +148,17 @@ then
 	echo Starting adjoint run with $n_procs processes ++++++++++++++++
 fi
 
+echo "Running resampling from grid to mesh..."
+echo Sizes:       $sizes
+echo Origins:     $origins
+echo Scaling:     $scaling
+echo SDF:         $sdf
+echo Target mesh: $resample_target
+echo Field:       $field
+
+set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
+set +x
 
 PRECISION=float32
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION

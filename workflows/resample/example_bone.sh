@@ -26,13 +26,12 @@ export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
 
 field=field.raw
-
-mesh=mesh
+mesh=bone
 
 # refine torus torus2
 # refine torus2 torus3
 # refine torus3 torus4
-mesh=${SFEM_TORUS_MESH:-torus2}
+# mesh=${SFEM_TORUS_MESH:-bone}
 # mesh=impeller_tet4
 
 echo "Using mesh: $mesh"
@@ -62,15 +61,21 @@ else
     echo "Creating skinned mesh and SDF from $mesh ..."
 	# create_sphere.sh 3
 	
-    sfc $mesh $mesh_sorted
+    set -x
+
+    # sfc $mesh $mesh_sorted
 
     mesh_sorted=$mesh
 	mkdir -p $skinned
-	SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
+	# SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
 
-	# mesh_to_sdf.py $skinned $sdf --hmax=0.01 --margin=0.1
-	# mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
+	mesh_to_sdf.py bone sdf.float32.raw --hmax=0.01 --margin=0.1
+	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
 	# raw_to_xdmf.py $sdf
+
+    set +x
+
+    echo "End creating skinned mesh and SDF."  
 fi
 
 mesh_sorted=$mesh
@@ -140,7 +145,7 @@ GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 # export OMP_NUM_THREADS=8
 # export OMP_PROC_BIND=true
 
-set -x
+
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
 export SFEM_ADJOINT=1
@@ -159,7 +164,18 @@ then
 	echo Starting adjoint run with $n_procs processes ++++++++++++++++
 fi
 
+
+echo "Running resampling from grid to mesh..."
+echo "Sizes:       $sizes "
+echo "Origins:     $origins "
+echo "Scaling:     $scaling "
+echo "SDF:         $sdf "
+echo "Target mesh: $resample_target "
+echo "Field:       $field "
+
+set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
+set +x
 
 PRECISION=float32
 raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION
