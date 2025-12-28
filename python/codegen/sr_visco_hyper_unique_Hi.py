@@ -2222,20 +2222,38 @@ if __name__ == "__main__":
     # Volumetric part
     w_vol = "K / 2 * (J - 1)**2"
     
-    # Deviatoric part (Mooney-Rivlin) - Unimodular form
-    # Uses I1b = J^{-2/3}*I1, I2b = J^{-4/3}*I2 for near-incompressible materials
-    # Note: Standard MR (I1, I2) doesn't work well with large K (volumetric sensitivity)
-    w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
+    # =====================================================================
+    # CHOOSE FORMULATION: Unimodular or Standard
+    # =====================================================================
+    USE_STANDARD = False  # Set to True for Standard MR (matches Marc), False for Unimodular
     
-    num_prony = 10  # Must match what C code expects for unrolled version
-    
-    # Use create_from_string_unimodular (Isochoric MR) - required for near-incompressible
-    op = SRViscoHyperelasticity.create_from_string_unimodular(
-        fe, 
-        "mooney_rivlin", 
-        [w_vol, w_dev], 
-        num_prony_terms=num_prony,
-    )
+    if USE_STANDARD:
+        # Deviatoric part (Mooney-Rivlin) - Standard form
+        # Uses I1 = tr(C), I2 = (1/2)*(tr(C)^2 - tr(C^2))
+        # This matches Marc's Mooney-Rivlin implementation
+        w_dev = "C10 * (I1 - 3) + C01 * (I2 - 3)"
+        
+        num_prony = 10
+        
+        op = SRViscoHyperelasticity.create_from_string(
+            fe, 
+            "mooney_rivlin", 
+            [w_vol, w_dev], 
+            num_prony_terms=num_prony,
+        )
+    else:
+        # Deviatoric part (Mooney-Rivlin) - Unimodular form
+        # Uses I1b = J^{-2/3}*I1, I2b = J^{-4/3}*I2 for near-incompressible materials
+        w_dev = "C10 * (I1b - 3) + C01 * (I2b - 3)"
+        
+        num_prony = 10
+        
+        op = SRViscoHyperelasticity.create_from_string_unimodular(
+            fe, 
+            "mooney_rivlin", 
+            [w_vol, w_dev], 
+            num_prony_terms=num_prony,
+        )
     
     # ========================================================================
     # UNIQUE_HI ARCHITECTURE: Only store H_i + displacement

@@ -57,7 +57,7 @@ namespace sfem {
         
         // Mode: false = FIXED (stores S_dev, hardcoded 10 Prony terms)
         //       true  = FLEXIBLE (stores only H_i, uses alpha/beta/gamma)
-        bool use_flexible{false};
+        bool use_flexible{true};
         
         // If true, C10/C01 are instantaneous moduli and gamma = 1
         // If false, C10/C01 are long-term moduli and gamma = g_inf + sum(beta_i)
@@ -101,6 +101,8 @@ namespace sfem {
             real_t aT = compute_wlf_shift();
             
             // g_inf = 1 - sum(g_i)
+            // For pure elastic (num_prony_terms = 0): g_inf = 1.0
+            // For viscoelastic: g_inf = 1 - sum(g_i) is the long-term modulus ratio
             real_t sum_g = 0;
             for (int i = 0; i < num_prony_terms; ++i) {
                 sum_g += prony_g[i];
@@ -112,7 +114,10 @@ namespace sfem {
             const real_t relax_threshold = 100.0;
             
             // First pass: count active terms and compute gamma
-            prony_gamma = g_inf;
+            // For Short Term params: gamma = g_inf + Σβ_i
+            // For Long Term params (Marc): gamma = 1 + Σβ_i
+            // Using Long Term basis for Marc compatibility
+            prony_gamma = 1.0;  // Long Term basis (Marc compatible)
             num_active_terms = 0;
             
             for (int i = 0; i < num_prony_terms; ++i) {
@@ -120,12 +125,25 @@ namespace sfem {
                 real_t x = dt / tau_eff;
                 
                 if (x > relax_threshold) {
-                    // Fully relaxed: absorb g_i into gamma
-                    prony_gamma += prony_g[i];
+                    // Fully relaxed: term has equilibrated within one time step
+                    // At equilibrium, Prony term contribution → 0 (NOT g_i!)
+                    // Prony series represents deviation from equilibrium
+                    // Do NOT add g_i to gamma!
                 } else {
                     // Active term: will contribute alpha, beta
                     num_active_terms++;
                 }
+            }
+            
+            /* Print term activation info from C++ for verification */
+            printf("[compute_prony_coefficients] aT=%g dt=%g relax_threshold=%g num_prony_terms=%d\\n",
+                   (double)aT, (double)dt, (double)relax_threshold, num_prony_terms);
+            for (int i = 0; i < num_prony_terms; ++i) {
+                real_t tau_eff = prony_tau[i] / aT;
+                real_t x = dt / tau_eff;
+                bool active = (x <= relax_threshold);
+                printf("  term %2d: tau=%g tau_eff=%g dt/tau_eff=%g g=%g active=%s\\n",
+                       i+1, (double)prony_tau[i], (double)tau_eff, (double)x, (double)prony_g[i], active ? "YES" : "NO");
             }
             
             // Second pass: compute alpha, beta for active terms only
@@ -141,10 +159,12 @@ namespace sfem {
                     // Active term
                     prony_alpha[active_idx] = exp(-x);
                     prony_beta[active_idx] = prony_g[i] * (1.0 - prony_alpha[active_idx]) / x;
+                    // Add beta to gamma for correct S_total = gamma_eff * S_curr + S_hist
                     prony_gamma += prony_beta[active_idx];
                     active_idx++;
                 }
             }
+            printf("[compute_prony_coefficients] num_active_terms=%d prony_gamma=%g\\n", num_active_terms, (double)prony_gamma);
         }
         
         ptrdiff_t history_per_qp() const {

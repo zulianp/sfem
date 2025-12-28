@@ -29,12 +29,17 @@ enum TestMode {
     MODE_PURE_SHEAR = 2
 };
 
-// EPDM material parameters (scaled 6.6x for T_ref with hysteresis)
-static double EPDM_C10 = 3.294;    // MPa (0.499 * 6.6)
-static double EPDM_C01 = 3.808;    // MPa (0.577 * 6.6)
-static double EPDM_K = 10000.0;    // MPa
+// EPDM material parameters
+// g_inf = 1 - sum(g_i) = 0.004434 for the 22-term Prony series
+// Short Term = Long Term / g_inf
+// Long Term: C10 = 0.499, C01 = 0.577 MPa
+// Short Term: C10 = 112.53, C01 = 130.12 MPa
+static const double EPDM_G_INF = 0.004434;
+static double EPDM_C10 = 0.499 / EPDM_G_INF;   // MPa (Short Term)
+static double EPDM_C01 = 0.577 / EPDM_G_INF;   // MPa (Short Term)
+static double EPDM_K = 10000.0;                // MPa
 
-// Prony series (22 terms)
+// Prony series (22 terms) - original full set
 static const int NUM_PRONY = 22;
 static const double prony_g[] = {
     0.0454189, 0.057786, 0.0274103, 0.0332453, 0.0392706,
@@ -175,7 +180,7 @@ int run_test(TestMode mode) {
     
     // Configuration
     double TEST_TEMPERATURE = 20.0;
-    int USE_WLF = 1;
+    int USE_WLF = 0;
     double DT = 0.01;
     int VERBOSE = 1;
     
@@ -183,9 +188,10 @@ int run_test(TestMode mode) {
     SFEM_READ_ENV(USE_WLF, atoi);
     SFEM_READ_ENV(DT, atof);
     SFEM_READ_ENV(VERBOSE, atoi);
-    SFEM_READ_ENV(EPDM_C10, atof);
-    SFEM_READ_ENV(EPDM_C01, atof);
     SFEM_READ_ENV(EPDM_K, atof);
+    
+    // Using original Long Term parameters without scaling
+    // prony_gamma = g_inf formula is restored
     
     printf("Configuration:\n");
     printf("  Mode: %s\n", get_mode_name(mode));
