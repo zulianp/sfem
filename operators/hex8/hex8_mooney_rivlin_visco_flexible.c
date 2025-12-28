@@ -15,7 +15,8 @@
 #include "hex8_inline_cpu.h"
 #include "line_quadrature.h"
 
-#include "hex8_mooney_rivlin_visco_unique_Hi_local.h"
+#include "hex8_mooney_rivlin_visco_unique_Hi_local.h"  // Unimodular form
+// #include "hex8_mooney_rivlin_visco_unique_Hi_standard.h"   // Standard form (has non-zero initial stress)
 
 // ============================================================================
 // HISTORY UPDATE
@@ -194,7 +195,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                                           jacobian_adjugate, &jacobian_determinant);
                     assert(jacobian_determinant > 0);
 
-                    // Algorithmic gradient
+                    // Algorithmic gradient 
                     hex8_mooney_rivlin_grad_flexible(
                         jacobian_adjugate, jacobian_determinant,
                         qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
