@@ -77,7 +77,6 @@ int test_mooney_rivlin_visco_relaxation() {
     SFEM_READ_ENV(SFEM_USE_FLEXIBLE_HESSIAN, atoi);
     op->set_use_flexible(SFEM_USE_FLEXIBLE_HESSIAN != 0);
 
-
     int SFEM_ENABLE_CONTACT = false;
     SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
 
@@ -99,17 +98,15 @@ int test_mooney_rivlin_visco_relaxation() {
     // BC
     auto left_sideset = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < 1e-5; });
-    
+
     auto right_sideset = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 1.0 - 1e-5; });
 
-    
-
-    if(!SFEM_ENABLE_CONTACT) {
+    if (!SFEM_ENABLE_CONTACT) {
         sfem::DirichletConditions::Condition left_bc_x{.sidesets = left_sideset, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition left_bc_y{.sidesets = left_sideset, .value = 0, .component = 1};
         sfem::DirichletConditions::Condition left_bc_z{.sidesets = left_sideset, .value = 0, .component = 2};
-        auto conds = sfem::create_dirichlet_conditions(fs, {left_bc_x, left_bc_y, left_bc_z}, es);
+        auto                                 conds = sfem::create_dirichlet_conditions(fs, {left_bc_x, left_bc_y, left_bc_z}, es);
         f->add_constraint(conds);
     }
 
@@ -180,8 +177,8 @@ int test_mooney_rivlin_visco_relaxation() {
             es);
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
-    auto jacobi = sfem::create_shiftable_jacobi(diag, es);
-    sfem::SharedBuffer<real_t> lower_bound;
+    auto                                                  jacobi = sfem::create_shiftable_jacobi(diag, es);
+    sfem::SharedBuffer<real_t>                            lower_bound;
 
     if (!SFEM_ENABLE_CONTACT) {
         auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
@@ -198,11 +195,7 @@ int test_mooney_rivlin_visco_relaxation() {
 
     } else {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
-        
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
-
-
-
 
         {  // Fill default upper-bound value
             auto lb = lower_bound->data();
@@ -210,20 +203,18 @@ int test_mooney_rivlin_visco_relaxation() {
                 lb[i] = -1000;
             }
 
-            auto lnodes = sfem::create_nodeset_from_sideset(fs,left_sideset[0]);
-            ptrdiff_t nbnodes = lnodes->size();
-            
-            for(ptrdiff_t i = 0; i < nbnodes; i++) {
-                const ptrdiff_t idx = lnodes->data()[i];
+            auto      lnodes  = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
+            const ptrdiff_t nbnodes = lnodes->size();
+            for (ptrdiff_t i = 0; i < nbnodes; i++) {
+                const ptrdiff_t idx  = lnodes->data()[i];
                 lb[idx * block_size] = 0;
             }
         }
 
-
         mprgp->verbose = false;
         mprgp->set_lower_bound(lower_bound);
 
-        solver     = mprgp;
+        solver = mprgp;
     }
 
     // FD check removed for cleaner test output
@@ -267,6 +258,11 @@ int test_mooney_rivlin_visco_relaxation() {
 
         blas->copy(ndofs, v->data(), v_pred->data());
         blas->axpy(ndofs, (1.0 - gamma_nm) * dt, a->data(), v_pred->data());
+
+        if (SFEM_ENABLE_CONTACT) {
+            blas->axpy(ndofs, 1, x->data(), lower_bound->data());
+            blas->axpy(ndofs, -1, u_pred->data(), lower_bound->data());
+        }
 
         // Use prediction as initial guess for Newton
         blas->copy(ndofs, u_pred->data(), x->data());
@@ -362,7 +358,7 @@ int test_mooney_rivlin_visco_relaxation() {
             }
             blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
 
-            if(SFEM_ENABLE_CONTACT) {
+            if (SFEM_ENABLE_CONTACT) {
                 blas->axpy(ndofs, -1, delta_x->data(), lower_bound->data());
             }
         }
