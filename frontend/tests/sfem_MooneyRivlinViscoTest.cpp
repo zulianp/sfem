@@ -181,6 +181,7 @@ int test_mooney_rivlin_visco_relaxation() {
 
     std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> solver;
     auto jacobi = sfem::create_shiftable_jacobi(diag, es);
+    sfem::SharedBuffer<real_t> lower_bound;
 
     if (!SFEM_ENABLE_CONTACT) {
         auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
@@ -198,7 +199,7 @@ int test_mooney_rivlin_visco_relaxation() {
     } else {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         
-        auto lower_bound = sfem::create_buffer<real_t>(ndofs, es);
+        lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
         {  // Fill default upper-bound value
             auto lb = lower_bound->data();
@@ -354,6 +355,10 @@ int test_mooney_rivlin_visco_relaxation() {
                 printf("    |dx|=%e\n", dx_norm);
             }
             blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
+
+            if(SFEM_ENABLE_CONTACT) {
+                blas->axpy(ndofs, -1, delta_x->data(), lower_bound->data());
+            }
         }
 
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
