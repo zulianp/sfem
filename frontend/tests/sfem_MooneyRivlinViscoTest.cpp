@@ -201,15 +201,21 @@ int test_mooney_rivlin_visco_relaxation() {
         
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
+
+
+
         {  // Fill default upper-bound value
             auto lb = lower_bound->data();
             for (ptrdiff_t i = 0; i < ndofs; i++) {
                 lb[i] = -1000;
             }
 
-
-            for(ptrdiff_t i = 0; i < n_nodes; i++) {
-                lb[i * block_size] = 0;
+            auto lnodes = sfem::create_nodeset_from_sideset(fs,left_sideset[0]);
+            ptrdiff_t nbnodes = lnodes->size();
+            
+            for(ptrdiff_t i = 0; i < nbnodes; i++) {
+                const ptrdiff_t idx = lnodes->data()[i];
+                lb[idx * block_size] = 0;
             }
         }
 
