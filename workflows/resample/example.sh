@@ -149,12 +149,12 @@ then
 fi
 
 echo "Running resampling from grid to mesh..."
-echo Sizes:       $sizes
-echo Origins:     $origins
-echo Scaling:     $scaling
-echo SDF:         $sdf
-echo Target mesh: $resample_target
-echo Field:       $field
+echo "  Sizes:       $sizes"
+echo "  Origins:     $origins"
+echo "  Scaling:     $scaling"
+echo "  SDF:         $sdf"
+echo "  Target mesh: $resample_target"
+echo "  Field:       $field"
 
 set -x
 time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA

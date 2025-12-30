@@ -20,7 +20,7 @@ PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 NCORES=8
 
-export CUDA_LAUNCH_BLOCKING=1
+# export CUDA_LAUNCH_BLOCKING=1
 
 export OMP_PROC_BIND=true
 export OMP_NUM_THREADS=$NCORES
@@ -40,58 +40,13 @@ out=resampled
 skinned=skinned
 sdf=sdf.float32.raw
 
-mesh_sorted=sorted
-# mesh_sorted=
-# mesh_sorted=impeller_tet4
-
-resample_target=$mesh_sorted
-
-# resample_target=$skinned
-
-if [[ -d "refined" ]]
-then
-	resample_target=refined
-	echo "resample_target=$resample_target"
-fi
-
-if [[ -d "$skinned" ]] 
-then
-	echo "Reusing existing mesh $skinned and SDF!"
-else
-    echo "Creating skinned mesh and SDF from $mesh ..."
-	# create_sphere.sh 3
-	
-    set -x
-
-    # sfc $mesh $mesh_sorted
-
-    mesh_sorted=$mesh
-	mkdir -p $skinned
-	# SFEM_ORDER_WITH_COORDINATE=2 skin $mesh $skinned
-
-	mesh_to_sdf.py bone sdf.float32.raw --hmax=0.01 --margin=0.1
-	mesh_to_sdf.py $skinned $sdf --hmax=0.1 --margin=1
-	# raw_to_xdmf.py $sdf
-
-    set +x
-
-    echo "End creating skinned mesh and SDF."  
-fi
-
-mesh_sorted=$mesh
-
-## raw_to_xdmf.py $sdf
-# sdf_test.py $sdf 125
-# sdf_test.py $sdf 250
-# sdf_test.py $sdf 500
-
 # Use HEX_SIZE environment variable if defined, otherwise use default
 echo "Testing SDF quality ..."
 SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-125}
-sdf_test.py $sdf $SFEM_HEX_SIZE
+# sdf_test.py $sdf $SFEM_HEX_SIZE
 
-sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
-origins=$(head -8 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
+sizes=$(echo "$SFEM_HEX_SIZE $SFEM_HEX_SIZE $SFEM_HEX_SIZE")
+origins=$(head -8 metadata_sdf.float32.yml 	    | tail -3 | awk '{print $2}' | tr '\n' ' ')
 scaling=$(head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
 
 echo $sizes
@@ -159,27 +114,25 @@ else
 	echo "Running in forward mode"
 fi
 
-if [[ SFEM_ADJOINT -eq 1 ]]
+if [[ $SFEM_ADJOINT -eq 1 ]]
 then
-	echo Starting adjoint run with $n_procs processes ++++++++++++++++
+	echo "Starting adjoint run with $n_procs processes ++++++++++++++++"
 fi
 
-
 echo "Running resampling from grid to mesh..."
-echo "Sizes:       $sizes "
-echo "Origins:     $origins "
-echo "Scaling:     $scaling "
-echo "SDF:         $sdf "
-echo "Target mesh: $resample_target "
-echo "Field:       $field "
+echo "  Sizes:       $sizes "
+echo "  Origins:     $origins "
+echo "  Scaling:     $scaling "
+echo "  SDF:         $sdf "
+echo "  Target mesh: $mesh "
+echo "  Field:       $field "
 
 set -x
-time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $resample_target $field TET4 CUDA
+time $LAUNCH $GRID_TO_MESH $sizes $origins $scaling $sdf $mesh $field TET4 CUDA
 set +x
 
 PRECISION=float32
-raw_to_db.py $resample_target out.vtk --point_data=$field  --point_data_type=$PRECISION
-
+raw_to_db.py $mesh out.vtk --point_data=$field  --point_data_type=$PRECISION
 
 # Function to create metadata and convert raw files to XDMF format
 # Usage: process_raw_file filename
@@ -197,9 +150,9 @@ function process_raw_file() {
     fi
 }
 
+process_raw_file test_field
 process_raw_file field_cnt
 process_raw_file bit_array
-process_raw_file test_field
 process_raw_file test_field_fun_XYZ
 process_raw_file test_field_alpha
 process_raw_file test_field_volume

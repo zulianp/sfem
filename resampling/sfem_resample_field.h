@@ -772,10 +772,10 @@ tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       /
                                        const geom_t                delta1,     //
                                        const geom_t                delta2,     //
                                        const int                   dim_quad,   //
-                                       const real_t const*         Q_nodes_x,  //
-                                       const real_t const*         Q_nodes_y,  //
-                                       const real_t const*         Q_nodes_z,  //
-                                       const real_t const*         Q_weights,  //
+                                       const real_t* const         Q_nodes_x,  //
+                                       const real_t* const         Q_nodes_y,  //
+                                       const real_t* const         Q_nodes_z,  //
+                                       const real_t* const         Q_weights,  //
                                        real_t* const SFEM_RESTRICT data);      //
 
 /**
@@ -966,6 +966,15 @@ normalize_mesh(const ptrdiff_t              nnodes,   // Mesh
                const real_t                 origin0,  //
                const real_t                 origin1,  //
                const real_t                 origin2);                 //
+
+int                                                               //
+mesh_cube_bounding_box(const ptrdiff_t              nnodes,       // Mesh
+                       geom_t** const SFEM_RESTRICT xyz,          //
+                       const real_t                 side_margin,  //
+                       real_t*                      side,         //
+                       real_t*                      origin0,      //
+                       real_t*                      origin1,      //
+                       real_t*                      origin2);                          //
 
 #define out_real_t real_t
 

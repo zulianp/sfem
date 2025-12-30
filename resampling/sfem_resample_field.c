@@ -54,6 +54,11 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,     // Mesh
     RETURN_FROM_FUNCTION(0);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// normalize_mesh /////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 int                                      //
 normalize_mesh(const ptrdiff_t nnodes,   // Mesh
                geom_t** const  xyz,      //
@@ -133,6 +138,89 @@ normalize_mesh(const ptrdiff_t nnodes,   // Mesh
     }
 }
 // END: Function: normalize_mesh
+
+int                                                               //
+mesh_cube_bounding_box(const ptrdiff_t              nnodes,       // Mesh
+                       geom_t** const SFEM_RESTRICT xyz,          //
+                       const real_t                 side_margin,  //
+                       real_t*                      side,         //
+                       real_t*                      origin0,      //
+                       real_t*                      origin1,      //
+                       real_t*                      origin2) {
+    PRINT_CURRENT_FUNCTION;
+
+    int ret = 0;
+
+    real_t xmin = DBL_MAX;
+    real_t xmax = -DBL_MAX;
+    real_t ymin = DBL_MAX;
+    real_t ymax = -DBL_MAX;
+    real_t zmin = DBL_MAX;
+    real_t zmax = -DBL_MAX;
+
+    for (ptrdiff_t node = 0; node < nnodes; node++) {
+        const real_t x = xyz[0][node];
+        const real_t y = xyz[1][node];
+        const real_t z = xyz[2][node];
+
+        if (x < xmin) {
+            xmin = x;
+        }
+        if (x > xmax) {
+            xmax = x;
+        }
+
+        if (y < ymin) {
+            ymin = y;
+        }
+        if (y > ymax) {
+            ymax = y;
+        }
+
+        if (z < zmin) {
+            zmin = z;
+        }
+        if (z > zmax) {
+            zmax = z;
+        }
+    }
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Mesh bounding box before cube adjustment:\n");
+    printf("  X: [%f, %f]\n", xmin, xmax);
+    printf("  Y: [%f, %f]\n", ymin, ymax);
+    printf("  Z: [%f, %f]\n", zmin, zmax);
+#endif
+
+    const real_t xside = xmax - xmin;
+    const real_t yside = ymax - ymin;
+    const real_t zside = zmax - zmin;
+
+    real_t side_l = MAX(xside, MAX(yside, zside));
+
+    xmax = xmin + side_l;
+    ymax = ymin + side_l;
+    zmax = zmin + side_l;
+
+    real_t margin = (side_margin)*side_l;
+
+    xmin = xmin - margin;
+    ymin = ymin - margin;
+    zmin = zmin - margin;
+
+    xmax = xmax + margin;
+    ymax = ymax + margin;
+    zmax = zmax + margin;
+
+    side_l = xmax - xmin;
+
+    *side    = side_l;
+    *origin0 = xmin;
+    *origin1 = ymin;
+    *origin2 = zmin;
+
+    RETURN_FROM_FUNCTION(ret);
+}  // END: Function: mesh_cube_bounding_box
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
