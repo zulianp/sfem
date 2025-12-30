@@ -601,6 +601,8 @@ int main(int argc, char* argv[]) {
 
     info.quad_nodes_cnt = TET_QUAD_NQP;
 
+    printf("Reading mesh from folder: %s\n", folder);
+
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
         return EXIT_FAILURE;
@@ -818,7 +820,7 @@ int main(int argc, char* argv[]) {
 
             apply_fun_to_mesh(mesh.nnodes,                  //
                               (const geom_t**)mesh.points,  //
-                              mesh_fun_XYZ,                 //
+                              mesh_fun_ones,                //
                               g);                           //
 
             const real_t alpha_th_tet10 = 2.5;
@@ -925,6 +927,43 @@ int main(int argc, char* argv[]) {
                     }
 #endif
 
+                    {
+                        real_t side;
+                        real_t origin_bb[3];
+
+                        mesh_cube_bounding_box(mesh.nnodes,            //
+                                               (geom_t**)mesh.points,  //
+                                               0.05,                   //
+                                               &side,                  //
+                                               &origin_bb[0],          //
+                                               &origin_bb[1],          //
+                                               &origin_bb[2]);         //
+
+                        origin[0] = origin_bb[0];
+                        origin[1] = origin_bb[1];
+                        origin[2] = origin_bb[2];
+
+                        delta[0] = side / (real_t)(nlocal[0] - 1);
+                        delta[1] = side / (real_t)(nlocal[1] - 1);
+                        delta[2] = side / (real_t)(nlocal[2] - 1);
+
+#if SFEM_LOG_LEVEL >= 5
+                        printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
+                               origin_bb[0],
+                               origin_bb[1],
+                               origin_bb[2],
+                               side,
+                               __FILE__,
+                               __LINE__);
+
+                        printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
+                        printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
+                        printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
+#endif
+
+                        // return 0;
+                    }
+
                     normalize_mesh(mesh.nnodes,            //
                                    (geom_t**)mesh.points,  //
                                    delta[0],               //
@@ -1005,7 +1044,8 @@ int main(int argc, char* argv[]) {
                            max_field_coords[0],
                            max_field_coords[1],
                            max_field_coords[2],
-                           (stride[0] * max_field_coords[0] + stride[1] * max_field_coords[1] + stride[2] * max_field_coords[2]));
+                           (int)(stride[0] * max_field_coords[0] + stride[1] * max_field_coords[1] +
+                                 stride[2] * max_field_coords[2]));
 
                     print_rank_info(mpi_rank,              //
                                     mpi_size,              //
@@ -1038,10 +1078,7 @@ int main(int argc, char* argv[]) {
                     if (env_out_filename && strlen(env_out_filename) > 0) {
                         snprintf(out_filename_raw, 1000, "%s", env_out_filename);
                     } else {
-                        snprintf(out_filename_raw,
-                                 1000,
-                                 "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw",
-                                 mpi_rank);
+                        snprintf(out_filename_raw, 1000, "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw");
                     }
 
 #if SFEM_LOG_LEVEL >= 5
@@ -1064,8 +1101,7 @@ int main(int argc, char* argv[]) {
                         } else {
                             snprintf(out_filename_fun_xyz,
                                      1000,
-                                     "/home/simone/git/sfem_d/sfem/workflows/resample/test_field_fun_XYZ.raw",
-                                     mpi_rank);
+                                     "/home/simone/git/sfem_d/sfem/workflows/resample/test_field_fun_XYZ.raw");
                         }
                         ndarray_write(MPI_COMM_WORLD,
                                       out_filename_fun_xyz,
