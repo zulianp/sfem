@@ -295,43 +295,6 @@ int check_string_in_args(const int argc, const char* argv[], const char* target,
     return 0;
 }
 
-// /**
-//  * @brief Builds a field_mpi_domain_t structure.
-//  *
-//  * @param mpi_rank The MPI rank associated with this domain.
-//  * @param n_zyx Total number of elements in the z, y, and x directions for this rank.
-//  * @param nlocal Number of local elements in the z, y, and x directions.
-//  * @param origin Local origin coordinates in the z, y, and x directions.
-//  * @param delta Grid spacing in the z, y, and x directions.
-//  * @return field_mpi_domain_t The populated structure.
-//  */
-// field_mpi_domain_t make_field_mpi_domain(const int mpi_rank, const ptrdiff_t n_zyx, const ptrdiff_t* nlocal,
-//                                           const geom_t* origin, const geom_t* delta) {
-//     field_mpi_domain_t domain;
-
-//     domain.mpi_rank = mpi_rank;
-//     domain.n_zyx    = n_zyx;
-
-//     memcpy(domain.nlocal, nlocal, 3 * sizeof(ptrdiff_t));
-//     memcpy(domain.origin, origin, 3 * sizeof(geom_t));
-
-//     // Calculate start indices based on the logic from print_rank_info
-//     domain.start_indices[0] = 0;  // Assuming x index starts at 0 for all ranks
-//     domain.start_indices[1] = 0;  // Assuming y index starts at 0 for all ranks
-//     // Ensure delta[2] is not zero to avoid division by zero
-//     if (delta[2] != 0) {
-//         // Use round to get the nearest integer index, handle potential floating point inaccuracies
-//         domain.start_indices[2] = (int)round(origin[2] / delta[2]);
-//     } else {
-//         // Handle the case where delta[2] is zero, perhaps set to 0 or report an error
-//         domain.start_indices[2] = 0;
-//         // Optionally print an error or warning
-//         // fprintf(stderr, "Warning: delta[2] is zero, cannot calculate start_index_z accurately.\n");
-//     }
-
-//     return domain;
-// }
-
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 // print_rank_info ////////////////////////////////////////////////////////////////////
@@ -447,6 +410,53 @@ real_t mesh_fun_chainsaw_xyz(real_t x, real_t y, real_t z) {
     const real_t xyz    = (copysign(1, x) * copysign(1, y) * copysign(1, z)) * sqrt(x * x + y * y + z * z);
 
     return amp * (xyz / period - floor(0.5 + xyz / period));
+}
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// make_metadata
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int make_metadata(ptrdiff_t nglobal[3], float_t delta[3], float_t origin[3], const char* folder) {
+    char metadata_path[1000];
+    snprintf(metadata_path, sizeof(metadata_path), "%s/metadata_sdf.float32.yml", folder);
+
+    FILE* metadata_file = fopen(metadata_path, "w");
+    if (metadata_file == NULL) {
+        fprintf(stderr, "Error: Could not open metadata file for writing: %s\n", metadata_path);
+        RETURN_FROM_FUNCTION(EXIT_FAILURE);
+    }  // END if (metadata_file == NULL)
+
+    char raw_path[1000];
+    snprintf(raw_path, sizeof(raw_path), "%s/data.float32.raw", folder);
+
+    fprintf(metadata_file, "nx: %ld\n", (long)nglobal[0]);
+    fprintf(metadata_file, "ny: %ld\n", (long)nglobal[1]);
+    fprintf(metadata_file, "nz: %ld\n", (long)nglobal[2]);
+    fprintf(metadata_file, "block_size: 1\n");
+    fprintf(metadata_file, "type: float\n");
+    fprintf(metadata_file, "ox: %.17g\n", (double)origin[0]);
+    fprintf(metadata_file, "oy: %.17g\n", (double)origin[1]);
+    fprintf(metadata_file, "oz: %.17g\n", (double)origin[2]);
+    fprintf(metadata_file, "dx: %.17g\n", (double)delta[0]);
+    fprintf(metadata_file, "dy: %.17g\n", (double)delta[1]);
+    fprintf(metadata_file, "dz: %.17g\n", (double)delta[2]);
+    fprintf(metadata_file, "path: %s\n", raw_path);
+
+    fclose(metadata_file);
+    RETURN_FROM_FUNCTION(EXIT_SUCCESS);
+}  // END Function: make_metadata
+
+int main_adjoint_hex_quad(int argc, char* argv[]) {
+    PRINT_CURRENT_FUNCTION;
+
+    printf("========================================\n");
+    printf("Starting sfem_resample_field_adjoint_hex_quad test\n");
+    printf("========================================\n\n");
+
+    printf("<sizeof_real_t> %zu\n", sizeof(real_t));
+
+    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -605,6 +615,7 @@ int main(int argc, char* argv[]) {
 
     mesh_t mesh;
     if (mesh_read(comm, folder, &mesh)) {
+        fprintf(stderr, "Error: mesh_read failed %s:%d\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
 
@@ -626,7 +637,7 @@ int main(int argc, char* argv[]) {
     {
         double ndarray_read_tick = MPI_Wtime();
 
-        if (SFEM_READ_FP32) {
+        if (SFEM_READ_FP32 && SFEM_ADJOINT == 0) {
             float* temp = NULL;
 
             // int ndarray_create_from_file_segmented(
@@ -647,7 +658,7 @@ int main(int argc, char* argv[]) {
                                          nlocal,         //
                                          nglobal)) {     //
 
-                fprintf(stderr, "Error: ndarray_create_from_file failed %s:%d\n", __FILE__, __LINE__);
+                fprintf(stderr, "Error: ndarray_create_from_file failed, data_path: %s  %s:%d\n", data_path, __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
             }
 
@@ -669,10 +680,23 @@ int main(int argc, char* argv[]) {
 
             free(temp);
 
-        } else {
+        } else if (SFEM_ADJOINT == 0) {
             if (ndarray_create_from_file(comm, data_path, SFEM_MPI_REAL_T, 3, (void**)&field, nlocal, nglobal)) {
                 return EXIT_FAILURE;
             }
+        } else if (SFEM_ADJOINT == 1) {
+            // In adjoint mode the field is not read from file
+            // It is generated using the mesh_fun_XYZ function
+            nlocal[0] = nglobal[0];
+            nlocal[1] = nglobal[1];
+            nlocal[2] = nglobal[2];
+
+            n_zyx = nlocal[0] * nlocal[1] * nlocal[2];
+
+            printf("nlocal: %ld %ld %ld, %s:%d\n", nlocal[0], nlocal[1], nlocal[2], __FILE__, __LINE__);
+
+            field = calloc(n_zyx, sizeof(real_t));
+            // field_fun_XYZ = calloc(n_zyx, sizeof(real_t));
         }
 
         // { /// DEBUG ///
@@ -947,6 +971,8 @@ int main(int argc, char* argv[]) {
                         delta[1] = side / (real_t)(nlocal[1] - 1);
                         delta[2] = side / (real_t)(nlocal[2] - 1);
 
+                        make_metadata(nglobal, delta, origin, "/home/simone/git/sfem_d/sfem/workflows/resample/");
+
 #if SFEM_LOG_LEVEL >= 5
                         printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
                                origin_bb[0],
@@ -960,8 +986,6 @@ int main(int argc, char* argv[]) {
                         printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
                         printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
 #endif
-
-                        // return 0;
                     }
 
                     normalize_mesh(mesh.nnodes,            //
@@ -980,6 +1004,8 @@ int main(int argc, char* argv[]) {
                     origin[0] = 0.0;
                     origin[1] = 0.0;
                     origin[2] = 0.0;
+
+                    printf("Stride: (%ld %ld %ld) \n", stride[0], stride[1], stride[2]);
 
                     ret_resample_adjoint =                                     //
                             resample_field_adjoint_tet4(mpi_size,              //

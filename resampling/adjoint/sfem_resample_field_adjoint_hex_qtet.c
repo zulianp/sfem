@@ -499,8 +499,8 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                      const real_t                    wf1,      //
                                      const real_t                    wf2,      //
                                      const real_t                    wf3,      //
-                                     const ptrdiff_t                 stride0,  // Stride of hex grid
-                                     const ptrdiff_t                 stride1,  //
+                                     const ptrdiff_t                 stride1,  // Stride of hex grid
+                                     const ptrdiff_t                 stride2,  //
                                      out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
     // Placeholder implementation
 
@@ -508,14 +508,23 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
     printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
 #endif
 
+    // const int off0 = 0;
+    // const int off1 = stride0;
+    // const int off2 = stride0 + stride1;
+    // const int off3 = stride1;
+    // const int off4 = 0;
+    // const int off5 = stride0;
+    // const int off6 = stride0 + stride1;
+    // const int off7 = stride1;
+
     const int off0 = 0;
-    const int off1 = stride0;
-    const int off2 = stride0 + stride1;
+    const int off1 = 1;
+    const int off2 = 1 + stride1;
     const int off3 = stride1;
-    const int off4 = 0;
-    const int off5 = stride0;
-    const int off6 = stride0 + stride1;
-    const int off7 = stride1;
+    const int off4 = stride2;
+    const int off5 = 1 + stride2;
+    const int off6 = 1 + stride1 + stride2;
+    const int off7 = stride1 + stride2;
 
     const int           dim_quad  = get_dim_qad();
     const real_t* const Q_nodes_x = Q_nodes_x_p;
@@ -558,8 +567,8 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                   z1_n,          //
                                   z2_n,          //
                                   z3_n,          //
-                                  stride0,       //
                                   stride1,       //
+                                  stride2,       //
                                   &min_grid_x,   //
                                   &max_grid_x,   //
                                   &min_grid_y,   //
@@ -692,9 +701,9 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
 
                 }  // END: for q_ijk
 
-                const ptrdiff_t base_index = i_grid_x * stride0 +  //
+                const ptrdiff_t base_index = i_grid_x * 1 +        //
                                              j_grid_y * stride1 +  //
-                                             k_grid_z;             //
+                                             k_grid_z * stride2;   //
 
                 data[base_index + off0] += hex_element_field[0];  //
                 data[base_index + off1] += hex_element_field[1];  //
@@ -736,8 +745,8 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                                             const real_t                    wf1,      //
                                             const real_t                    wf2,      //
                                             const real_t                    wf3,      //
-                                            const ptrdiff_t                 stride0,  // Stride of hex grid
-                                            const ptrdiff_t                 stride1,  //
+                                            const ptrdiff_t                 stride1,  // Stride of hex grid
+                                            const ptrdiff_t                 stride2,  //
                                             out_real_t* const SFEM_RESTRICT data) {   // Outut data array HEX
     // Placeholder implementation
 
@@ -745,14 +754,23 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
     // printf("Stride0: %td, Stride1: %td \n", stride0, stride1);
 #endif
 
+    // const int off0 = 0;
+    // const int off1 = stride0;
+    // const int off2 = stride0 + stride1;
+    // const int off3 = stride1;
+    // const int off4 = 0;
+    // const int off5 = stride0;
+    // const int off6 = stride0 + stride1;
+    // const int off7 = stride1;
+
     const int off0 = 0;
-    const int off1 = stride0;
-    const int off2 = stride0 + stride1;
+    const int off1 = 1;
+    const int off2 = 1 + stride1;
     const int off3 = stride1;
-    const int off4 = 0;
-    const int off5 = stride0;
-    const int off6 = stride0 + stride1;
-    const int off7 = stride1;
+    const int off4 = stride2;
+    const int off5 = 1 + stride2;
+    const int off6 = 1 + stride1 + stride2;
+    const int off7 = stride1 + stride2;
 
     const int           dim_quad  = get_dim_qad();
     const real_t* const Q_nodes_x = Q_nodes_x_p;
@@ -795,8 +813,8 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                                   z1_n,          //
                                   z2_n,          //
                                   z3_n,          //
-                                  stride0,       //
                                   stride1,       //
+                                  stride2,       //
                                   &min_grid_x,   //
                                   &max_grid_x,   //
                                   &min_grid_y,   //
@@ -1001,7 +1019,7 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
 
                 }  // END: for q_ijk
 
-                const ptrdiff_t base_index = i_grid_x * stride0 +  //
+                const ptrdiff_t base_index = i_grid_x * 1 +        //
                                              j_grid_y * stride1 +  //
                                              k_grid_z;             //
 
@@ -1096,8 +1114,8 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
                                              wf1,        //
                                              wf2,        //
                                              wf3,        //
-                                             stride[2],  //
                                              stride[1],  //
+                                             stride[2],  //
                                              data);      //
     }
 

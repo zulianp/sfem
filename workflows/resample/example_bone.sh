@@ -46,8 +46,8 @@ SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-125}
 # sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(echo "$SFEM_HEX_SIZE $SFEM_HEX_SIZE $SFEM_HEX_SIZE")
-origins=$(head -8 metadata_sdf.float32.yml 	    | tail -3 | awk '{print $2}' | tr '\n' ' ')
-scaling=$(head -11 metadata_sdf.float32.yml 	| tail -3 | awk '{print $2}' | tr '\n' ' ')
+origins=$(echo "0.0 0.0 0.0")
+scaling=$(echo "1.0 1.0 1.0")
 
 echo $sizes
 echo $origins

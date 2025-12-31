@@ -1462,10 +1462,10 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             clock_gettime(CLOCK_MONOTONIC, &t_start);
 #endif
 
-            ret = tet4_resample_field_adjoint_hex_quad_norm
-                    // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
-                    // ret = tet4_resample_field_adjoint_hex_quad_norm  //
-                    // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
+            ret = tet4_resample_field_adjoint_hex_quad_norm  //
+                                                             // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+                                                             // ret = tet4_resample_field_adjoint_hex_quad_norm  //
+                                                             // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                              //
                      mesh->nelements,                //
                      mesh->nnodes,                   //
