@@ -16,7 +16,7 @@ Achievable peak: `2.07142857143 * 512 = 1'060.5714285722 GFLOP/s`
 828.2632949052 / 1060.5714285722  = 0.7809594645 = 78% of achievable peak
 
 
-2398.150 [MDOF/s]       (64481201, 64481201)
+2398.150 [MDOF/s]  (64481201, 64481201) Double Precision
 
 
 Original: 
@@ -33,6 +33,14 @@ New (fp64)             348     168    2.0714       1035.7       828.3  80.0%  22
 Original (fp64)        348     216    1.6111        805.6           -      -      -
 ```
 
+
+## Single Precision
+
+AI = `(340 + 8) / (6 * 4 + 8 * 4 + 8 * 4 + 8 * 2) = 3.346` FLOPS/Byte (memory bound)
+Achievable peak: `3.346 * 512 = 1713.152 GFLOP/s`
+3465.576 [MDDF/s]  (64481201, 64481201) Single Precision (1196.776 GFLOP/s)
+70% of achievable peak
+Speed-up over double precision: 1.45x
 
 
 # Vector 
