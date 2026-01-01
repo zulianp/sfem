@@ -3,41 +3,37 @@
 
 #include "tet10_inline_cpu.h"
 
-static SFEM_INLINE void tet10_laplacian_trial_operand(const scalar_t qx,
-                                                      const scalar_t qy,
-                                                      const scalar_t qz,
-                                                      const scalar_t qw,
+static SFEM_INLINE void tet10_laplacian_trial_operand(const scalar_t                      qx,
+                                                      const scalar_t                      qy,
+                                                      const scalar_t                      qz,
+                                                      const scalar_t                      qw,
                                                       const scalar_t *const SFEM_RESTRICT fff,
                                                       const scalar_t *const SFEM_RESTRICT u,
-                                                      scalar_t *const SFEM_RESTRICT out) {
-    const scalar_t x0 = 4 * qx;
-    const scalar_t x1 = 4 * qy;
-    const scalar_t x2 = 4 * qz;
-    const scalar_t x3 = x1 + x2;
-    const scalar_t x4 = -u[6] * x1;
-    const scalar_t x5 = u[0] * (x0 + x3 - 3);
-    const scalar_t x6 = -u[7] * x2 + x5;
-    const scalar_t x7 =
-            u[1] * (x0 - 1) + u[4] * (-8 * qx - x3 + 4) + u[5] * x1 + u[8] * x2 + x4 + x6;
-    const scalar_t x8 = x0 - 4;
-    const scalar_t x9 = -u[4] * x0;
-    const scalar_t x10 =
-            u[2] * (x1 - 1) + u[5] * x0 + u[6] * (-8 * qy - x2 - x8) + u[9] * x2 + x6 + x9;
-    const scalar_t x11 =
-            u[3] * (x2 - 1) + u[7] * (-8 * qz - x1 - x8) + u[8] * x0 + u[9] * x1 + x4 + x5 + x9;
-    out[0] = qw * (fff[0] * x7 + fff[1] * x10 + fff[2] * x11);
-    out[1] = qw * (fff[1] * x7 + fff[3] * x10 + fff[4] * x11);
-    out[2] = qw * (fff[2] * x7 + fff[4] * x10 + fff[5] * x11);
+                                                      scalar_t *const SFEM_RESTRICT       out) {
+    const scalar_t x0  = 4 * qx;
+    const scalar_t x1  = 4 * qy;
+    const scalar_t x2  = 4 * qz;
+    const scalar_t x3  = x1 + x2;
+    const scalar_t x4  = -u[6] * x1;
+    const scalar_t x5  = u[0] * (x0 + x3 - 3);
+    const scalar_t x6  = -u[7] * x2 + x5;
+    const scalar_t x7  = u[1] * (x0 - 1) + u[4] * (-8 * qx - x3 + 4) + u[5] * x1 + u[8] * x2 + x4 + x6;
+    const scalar_t x8  = x0 - 4;
+    const scalar_t x9  = -u[4] * x0;
+    const scalar_t x10 = u[2] * (x1 - 1) + u[5] * x0 + u[6] * (-8 * qy - x2 - x8) + u[9] * x2 + x6 + x9;
+    const scalar_t x11 = u[3] * (x2 - 1) + u[7] * (-8 * qz - x1 - x8) + u[8] * x0 + u[9] * x1 + x4 + x5 + x9;
+    out[0]             = qw * (fff[0] * x7 + fff[1] * x10 + fff[2] * x11);
+    out[1]             = qw * (fff[1] * x7 + fff[3] * x10 + fff[4] * x11);
+    out[2]             = qw * (fff[2] * x7 + fff[4] * x10 + fff[5] * x11);
 }
 
-static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t qx,
-                                                     const scalar_t qy,
-                                                     const scalar_t qz,
-                                                     const scalar_t qw,
+static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t                      qx,
+                                                     const scalar_t                      qy,
+                                                     const scalar_t                      qz,
+                                                     const scalar_t                      qw,
                                                      const scalar_t *const SFEM_RESTRICT fff,
                                                      const scalar_t *const SFEM_RESTRICT u,
-                                                     accumulator_t *const SFEM_RESTRICT
-                                                             element_vector) {
+                                                     accumulator_t *const SFEM_RESTRICT  element_vector) {
     // Evaluate gradient fe function transformed with fff and scaling factors
 
     scalar_t trial_operand[3];
@@ -70,16 +66,16 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t qx,
         }
     }
 #else
-    const scalar_t x0 = 4 * qx;
-    const scalar_t x1 = 4 * qy;
-    const scalar_t x2 = 4 * qz;
-    const scalar_t x3 = x1 + x2;
-    const scalar_t x4 = x0 + x3 - 3;
-    const scalar_t x5 = trial_operand[1] * x0;
-    const scalar_t x6 = trial_operand[2] * x0;
-    const scalar_t x7 = trial_operand[0] * x1;
-    const scalar_t x8 = trial_operand[2] * x1;
-    const scalar_t x9 = x0 - 4;
+    const scalar_t x0  = 4 * qx;
+    const scalar_t x1  = 4 * qy;
+    const scalar_t x2  = 4 * qz;
+    const scalar_t x3  = x1 + x2;
+    const scalar_t x4  = x0 + x3 - 3;
+    const scalar_t x5  = trial_operand[1] * x0;
+    const scalar_t x6  = trial_operand[2] * x0;
+    const scalar_t x7  = trial_operand[0] * x1;
+    const scalar_t x8  = trial_operand[2] * x1;
+    const scalar_t x9  = x0 - 4;
     const scalar_t x10 = trial_operand[0] * x2;
     const scalar_t x11 = trial_operand[1] * x2;
     element_vector[0] += trial_operand[0] * x4 + trial_operand[1] * x4 + trial_operand[2] * x4;
@@ -97,7 +93,7 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff(const scalar_t qx,
 
 static SFEM_INLINE void tet10_laplacian_apply_add_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                       const scalar_t *const SFEM_RESTRICT ex,
-                                                      accumulator_t *const SFEM_RESTRICT ey) {
+                                                      accumulator_t *const SFEM_RESTRICT  ey) {
     // Numerical quadrature
     tet10_laplacian_apply_qp_fff(0, 0, 0, 0.025, fff, ex, ey);
     tet10_laplacian_apply_qp_fff(1, 0, 0, 0.025, fff, ex, ey);
@@ -111,18 +107,382 @@ static SFEM_INLINE void tet10_laplacian_apply_add_fff(const scalar_t *const SFEM
     tet10_laplacian_apply_qp_fff(athird, athird, athird, 0.225, fff, ex, ey);
 }
 
-static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff,
-                                                    accumulator_t *element_matrix) {
-    const scalar_t x0 = (1.0 / 10.0) * fff[0];
-    const scalar_t x1 = (1.0 / 10.0) * fff[3];
-    const scalar_t x2 = (1.0 / 10.0) * fff[5];
-    const scalar_t x3 = (1.0 / 30.0) * fff[1];
-    const scalar_t x4 = (1.0 / 30.0) * fff[0];
-    const scalar_t x5 = (1.0 / 30.0) * fff[2];
-    const scalar_t x6 = x4 + x5;
-    const scalar_t x7 = x3 + x6;
-    const scalar_t x8 = (1.0 / 30.0) * fff[3];
-    const scalar_t x9 = (1.0 / 30.0) * fff[4];
+// SoA-style quadrature point kernel (useful for vectorization over element index)
+static SFEM_INLINE void tet10_laplacian_apply_qp_fff_soa(const scalar_t                     qx,
+                                                         const scalar_t                     qy,
+                                                         const scalar_t                     qz,
+                                                         const scalar_t                     qw,
+                                                         const scalar_t                     fff0,
+                                                         const scalar_t                     fff1,
+                                                         const scalar_t                     fff2,
+                                                         const scalar_t                     fff3,
+                                                         const scalar_t                     fff4,
+                                                         const scalar_t                     fff5,
+                                                         const scalar_t                     u0,
+                                                         const scalar_t                     u1,
+                                                         const scalar_t                     u2,
+                                                         const scalar_t                     u3,
+                                                         const scalar_t                     u4,
+                                                         const scalar_t                     u5,
+                                                         const scalar_t                     u6,
+                                                         const scalar_t                     u7,
+                                                         const scalar_t                     u8,
+                                                         const scalar_t                     u9,
+                                                         accumulator_t *const SFEM_RESTRICT e0,
+                                                         accumulator_t *const SFEM_RESTRICT e1,
+                                                         accumulator_t *const SFEM_RESTRICT e2,
+                                                         accumulator_t *const SFEM_RESTRICT e3,
+                                                         accumulator_t *const SFEM_RESTRICT e4,
+                                                         accumulator_t *const SFEM_RESTRICT e5,
+                                                         accumulator_t *const SFEM_RESTRICT e6,
+                                                         accumulator_t *const SFEM_RESTRICT e7,
+                                                         accumulator_t *const SFEM_RESTRICT e8,
+                                                         accumulator_t *const SFEM_RESTRICT e9) {
+    // Evaluate gradient fe function transformed with fff and scaling factors
+    // (inline version of tet10_laplacian_trial_operand)
+    const scalar_t x0  = 4 * qx;
+    const scalar_t x1  = 4 * qy;
+    const scalar_t x2  = 4 * qz;
+    const scalar_t x3  = x1 + x2;
+    const scalar_t x4  = -u6 * x1;
+    const scalar_t x5  = u0 * (x0 + x3 - 3);
+    const scalar_t x6  = -u7 * x2 + x5;
+    const scalar_t x7  = u1 * (x0 - 1) + u4 * (-8 * qx - x3 + 4) + u5 * x1 + u8 * x2 + x4 + x6;
+    const scalar_t x8  = x0 - 4;
+    const scalar_t x9  = -u4 * x0;
+    const scalar_t x10 = u2 * (x1 - 1) + u5 * x0 + u6 * (-8 * qy - x2 - x8) + u9 * x2 + x6 + x9;
+    const scalar_t x11 = u3 * (x2 - 1) + u7 * (-8 * qz - x1 - x8) + u8 * x0 + u9 * x1 + x4 + x5 + x9;
+
+    const scalar_t trial0 = qw * (fff0 * x7 + fff1 * x10 + fff2 * x11);
+    const scalar_t trial1 = qw * (fff1 * x7 + fff3 * x10 + fff4 * x11);
+    const scalar_t trial2 = qw * (fff2 * x7 + fff4 * x10 + fff5 * x11);
+
+    // Inline the default branch of tet10_laplacian_apply_qp_fff (matches existing implementation)
+    const scalar_t y0  = 4 * qx;
+    const scalar_t y1  = 4 * qy;
+    const scalar_t y2  = 4 * qz;
+    const scalar_t y3  = y1 + y2;
+    const scalar_t y4  = y0 + y3 - 3;
+    const scalar_t y5  = trial1 * y0;
+    const scalar_t y6  = trial2 * y0;
+    const scalar_t y7  = trial0 * y1;
+    const scalar_t y8  = trial2 * y1;
+    const scalar_t y9  = y0 - 4;
+    const scalar_t y10 = trial0 * y2;
+    const scalar_t y11 = trial1 * y2;
+
+    *e0 += trial0 * y4 + trial1 * y4 + trial2 * y4;
+    *e1 += trial0 * (y0 - 1);
+    *e2 += trial1 * (y1 - 1);
+    *e3 += trial2 * (y2 - 1);
+    *e4 += trial0 * (-8 * qx - y3 + 4) - y5 - y6;
+    *e5 += y5 + y7;
+    *e6 += trial1 * (-8 * qy - y2 - y9) - y7 - y8;
+    *e7 += trial2 * (-8 * qz - y1 - y9) - y10 - y11;
+    *e8 += y10 + y6;
+    *e9 += y11 + y8;
+}
+
+// SoA-style wrapper (useful for vectorization over element index)
+static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t                     fff0,
+                                                      const scalar_t                     fff1,
+                                                      const scalar_t                     fff2,
+                                                      const scalar_t                     fff3,
+                                                      const scalar_t                     fff4,
+                                                      const scalar_t                     fff5,
+                                                      const scalar_t                     u0,
+                                                      const scalar_t                     u1,
+                                                      const scalar_t                     u2,
+                                                      const scalar_t                     u3,
+                                                      const scalar_t                     u4,
+                                                      const scalar_t                     u5,
+                                                      const scalar_t                     u6,
+                                                      const scalar_t                     u7,
+                                                      const scalar_t                     u8,
+                                                      const scalar_t                     u9,
+                                                      accumulator_t *const SFEM_RESTRICT e0,
+                                                      accumulator_t *const SFEM_RESTRICT e1,
+                                                      accumulator_t *const SFEM_RESTRICT e2,
+                                                      accumulator_t *const SFEM_RESTRICT e3,
+                                                      accumulator_t *const SFEM_RESTRICT e4,
+                                                      accumulator_t *const SFEM_RESTRICT e5,
+                                                      accumulator_t *const SFEM_RESTRICT e6,
+                                                      accumulator_t *const SFEM_RESTRICT e7,
+                                                      accumulator_t *const SFEM_RESTRICT e8,
+                                                      accumulator_t *const SFEM_RESTRICT e9) {
+    *e0 = 0;
+    *e1 = 0;
+    *e2 = 0;
+    *e3 = 0;
+    *e4 = 0;
+    *e5 = 0;
+    *e6 = 0;
+    *e7 = 0;
+    *e8 = 0;
+    *e9 = 0;
+
+    // Numerical quadrature (same points/weights as tet10_laplacian_apply_add_fff)
+    tet10_laplacian_apply_qp_fff_soa(0,
+                                     0,
+                                     0,
+                                     0.025,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(1,
+                                     0,
+                                     0,
+                                     0.025,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(0,
+                                     1,
+                                     0,
+                                     0.025,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(0,
+                                     0,
+                                     1,
+                                     0.025,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    static const scalar_t athird = 1. / 3;
+    tet10_laplacian_apply_qp_fff_soa(athird,
+                                     athird,
+                                     0.,
+                                     0.225,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(athird,
+                                     0.,
+                                     athird,
+                                     0.225,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(0.,
+                                     athird,
+                                     athird,
+                                     0.225,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+
+    tet10_laplacian_apply_qp_fff_soa(athird,
+                                     athird,
+                                     athird,
+                                     0.225,
+                                     fff0,
+                                     fff1,
+                                     fff2,
+                                     fff3,
+                                     fff4,
+                                     fff5,
+                                     u0,
+                                     u1,
+                                     u2,
+                                     u3,
+                                     u4,
+                                     u5,
+                                     u6,
+                                     u7,
+                                     u8,
+                                     u9,
+                                     e0,
+                                     e1,
+                                     e2,
+                                     e3,
+                                     e4,
+                                     e5,
+                                     e6,
+                                     e7,
+                                     e8,
+                                     e9);
+}
+
+static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff, accumulator_t *element_matrix) {
+    const scalar_t x0  = (1.0 / 10.0) * fff[0];
+    const scalar_t x1  = (1.0 / 10.0) * fff[3];
+    const scalar_t x2  = (1.0 / 10.0) * fff[5];
+    const scalar_t x3  = (1.0 / 30.0) * fff[1];
+    const scalar_t x4  = (1.0 / 30.0) * fff[0];
+    const scalar_t x5  = (1.0 / 30.0) * fff[2];
+    const scalar_t x6  = x4 + x5;
+    const scalar_t x7  = x3 + x6;
+    const scalar_t x8  = (1.0 / 30.0) * fff[3];
+    const scalar_t x9  = (1.0 / 30.0) * fff[4];
     const scalar_t x10 = x8 + x9;
     const scalar_t x11 = x10 + x3;
     const scalar_t x12 = (1.0 / 30.0) * fff[5];
@@ -191,17 +551,16 @@ static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff,
     const scalar_t x75 = x59 + x61;
     const scalar_t x76 = -x15 - x26 - x58;
     const scalar_t x77 = x53 + x60;
-    element_matrix[0] =
-            (1.0 / 5.0) * fff[1] + (1.0 / 5.0) * fff[2] + (1.0 / 5.0) * fff[4] + x0 + x1 + x2;
-    element_matrix[1] = x7;
-    element_matrix[2] = x11;
-    element_matrix[3] = x14;
-    element_matrix[4] = x19;
-    element_matrix[5] = x21;
-    element_matrix[6] = x25;
-    element_matrix[7] = x27;
-    element_matrix[8] = x29;
-    element_matrix[9] = x31;
+    element_matrix[0]  = (1.0 / 5.0) * fff[1] + (1.0 / 5.0) * fff[2] + (1.0 / 5.0) * fff[4] + x0 + x1 + x2;
+    element_matrix[1]  = x7;
+    element_matrix[2]  = x11;
+    element_matrix[3]  = x14;
+    element_matrix[4]  = x19;
+    element_matrix[5]  = x21;
+    element_matrix[6]  = x25;
+    element_matrix[7]  = x27;
+    element_matrix[8]  = x29;
+    element_matrix[9]  = x31;
     element_matrix[10] = x7;
     element_matrix[11] = x0;
     element_matrix[12] = x32;
@@ -295,21 +654,19 @@ static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff,
 }
 
 static SFEM_INLINE void tet10_laplacian_diag_fff(const scalar_t *const SFEM_RESTRICT fff,
-                                                 accumulator_t *const SFEM_RESTRICT
-                                                         element_vector) {
-    const real_t x0 = (1.0 / 10.0) * fff[0];
-    const real_t x1 = (1.0 / 10.0) * fff[3];
-    const real_t x2 = (1.0 / 10.0) * fff[5];
-    const real_t x3 = (4.0 / 15.0) * fff[0];
-    const real_t x4 = (4.0 / 15.0) * fff[3];
-    const real_t x5 = x3 + x4;
-    const real_t x6 = (4.0 / 15.0) * fff[1] + x5;
-    const real_t x7 = (4.0 / 15.0) * fff[5];
-    const real_t x8 = (4.0 / 15.0) * fff[2] + x7;
-    const real_t x9 = (4.0 / 15.0) * fff[4];
-    const real_t x10 = x7 + x9;
-    element_vector[0] =
-            (1.0 / 5.0) * fff[1] + (1.0 / 5.0) * fff[2] + (1.0 / 5.0) * fff[4] + x0 + x1 + x2;
+                                                 accumulator_t *const SFEM_RESTRICT  element_vector) {
+    const real_t x0   = (1.0 / 10.0) * fff[0];
+    const real_t x1   = (1.0 / 10.0) * fff[3];
+    const real_t x2   = (1.0 / 10.0) * fff[5];
+    const real_t x3   = (4.0 / 15.0) * fff[0];
+    const real_t x4   = (4.0 / 15.0) * fff[3];
+    const real_t x5   = x3 + x4;
+    const real_t x6   = (4.0 / 15.0) * fff[1] + x5;
+    const real_t x7   = (4.0 / 15.0) * fff[5];
+    const real_t x8   = (4.0 / 15.0) * fff[2] + x7;
+    const real_t x9   = (4.0 / 15.0) * fff[4];
+    const real_t x10  = x7 + x9;
+    element_vector[0] = (1.0 / 5.0) * fff[1] + (1.0 / 5.0) * fff[2] + (1.0 / 5.0) * fff[4] + x0 + x1 + x2;
     element_vector[1] = x0;
     element_vector[2] = x1;
     element_vector[3] = x2;
@@ -323,18 +680,17 @@ static SFEM_INLINE void tet10_laplacian_diag_fff(const scalar_t *const SFEM_REST
 
 static SFEM_INLINE void tet10_laplacian_energy_fff(const scalar_t *const SFEM_RESTRICT fff,
                                                    const scalar_t *const SFEM_RESTRICT u,
-                                                   accumulator_t *const SFEM_RESTRICT
-                                                           element_scalar) {
-    const real_t x0 = (1.0 / 30.0) * fff[0];
-    const real_t x1 = u[0] * x0;
-    const real_t x2 = (2.0 / 15.0) * fff[0];
-    const real_t x3 = u[4] * x2;
-    const real_t x4 = u[1] * x0;
-    const real_t x5 = (4.0 / 15.0) * fff[0];
-    const real_t x6 = u[5] * u[6];
-    const real_t x7 = u[5] * u[7];
-    const real_t x8 = u[5] * u[8];
-    const real_t x9 = u[6] * u[7];
+                                                   accumulator_t *const SFEM_RESTRICT  element_scalar) {
+    const real_t x0  = (1.0 / 30.0) * fff[0];
+    const real_t x1  = u[0] * x0;
+    const real_t x2  = (2.0 / 15.0) * fff[0];
+    const real_t x3  = u[4] * x2;
+    const real_t x4  = u[1] * x0;
+    const real_t x5  = (4.0 / 15.0) * fff[0];
+    const real_t x6  = u[5] * u[6];
+    const real_t x7  = u[5] * u[7];
+    const real_t x8  = u[5] * u[8];
+    const real_t x9  = u[6] * u[7];
     const real_t x10 = u[6] * u[8];
     const real_t x11 = u[7] * u[8];
     const real_t x12 = (1.0 / 30.0) * u[1];
@@ -410,35 +766,26 @@ static SFEM_INLINE void tet10_laplacian_energy_fff(const scalar_t *const SFEM_RE
     const real_t x82 = POW2(u[9]);
     const real_t x83 = (1.0 / 20.0) * fff[5];
     element_scalar[0] =
-            -fff[1] * x20 + fff[1] * x23 - fff[1] * x25 + fff[1] * x80 + fff[2] * u[6] * x12 +
-            fff[2] * x23 - fff[2] * x25 + fff[2] * x80 + fff[4] * u[4] * x58 + fff[4] * u[9] * x43 -
-            fff[4] * x20 + fff[4] * x80 - u[0] * x3 + u[0] * x51 - u[0] * x53 + u[0] * x61 +
-            u[0] * x66 - u[0] * x70 + u[0] * x71 + POW2(u[1]) * x74 + u[1] * x1 - u[1] * x3 +
-            POW2(u[2]) * x81 + u[2] * x50 - u[2] * x51 - u[2] * x53 + POW2(u[3]) * x83 -
-            u[3] * x61 - u[3] * x70 - u[3] * x71 - u[4] * x28 - u[4] * x39 - u[4] * x42 -
-            u[4] * x48 - u[4] * x50 + u[4] * x54 + (1.0 / 30.0) * u[4] * x57 - u[4] * x60 +
-            u[5] * x1 + (1.0 / 10.0) * u[5] * x14 - u[5] * x4 - u[6] * x1 +
-            (1.0 / 30.0) * u[6] * x38 + u[6] * x4 - u[6] * x41 - u[6] * x48 + u[6] * x66 -
-            u[6] * x68 - u[7] * x1 + (1.0 / 30.0) * u[7] * x14 - u[7] * x28 - u[7] * x39 +
-            u[7] * x4 - u[7] * x44 - u[7] * x50 + u[7] * x54 + u[8] * x1 - u[8] * x4 + u[8] * x41 +
-            u[8] * x42 + u[8] * x44 - u[8] * x65 + u[9] * x50 - u[9] * x54 +
-            (1.0 / 10.0) * u[9] * x57 + u[9] * x60 - u[9] * x65 - u[9] * x66 + u[9] * x68 -
-            x10 * x2 - x10 * x69 - x11 * x27 - x11 * x47 - x11 * x5 - x11 * x64 + x12 * x13 -
-            x12 * x14 + x12 * x21 + x12 * x37 - x12 * x38 + x13 * x22 + x14 * x15 - x14 * x22 -
-            x14 * x26 + x15 * x38 + x15 * x57 - x15 * x67 - x16 * x17 - x16 * x62 - x17 * x24 +
-            x18 * x19 - x18 * x21 + x19 * x24 - x2 * x7 + x2 * x75 + x2 * x76 + x2 * x77 +
-            x2 * x78 + x2 * x79 + x2 * x8 + x2 * x9 - x22 * x57 + x22 * x59 - x26 * x57 +
-            x27 * x29 - x27 * x35 + x27 * x36 - x27 * x6 + x27 * x78 + x29 * x45 + x29 * x64 +
-            x29 * x69 + x30 * x31 - x30 * x32 + x30 * x33 - x30 * x34 + x30 * x75 + x30 * x76 +
-            x30 * x77 + x30 * x8 + x30 * x9 + x31 * x47 + x31 * x52 + x31 * x64 - x32 * x72 +
-            x33 * x47 + x33 * x52 + x33 * x64 - x34 * x47 - x34 * x63 - x34 * x72 - x35 * x45 -
-            x35 * x55 - x35 * x63 + x36 * x45 + x36 * x64 + x36 * x69 + x37 * x40 - x38 * x40 -
-            x43 * x62 - x45 * x46 + x45 * x75 + x45 * x78 + x45 * x79 + x45 * x8 + x45 * x9 -
-            x46 * x55 - x46 * x63 - x47 * x6 + x47 * x77 - x5 * x6 - x52 * x56 - x52 * x7 +
-            x52 * x75 + x52 * x76 + x52 * x77 + x52 * x78 + x52 * x82 - x56 * x69 - x57 * x58 +
-            x58 * x59 + x58 * x67 - x6 * x64 + x63 * x75 + x63 * x8 + x63 * x9 + x64 * x77 +
-            x64 * x78 + x64 * x82 + x69 * x75 + x69 * x77 + x69 * x78 + x69 * x79 + x69 * x82 +
-            x73 * x74 + x73 * x81 + x73 * x83;
+            -fff[1] * x20 + fff[1] * x23 - fff[1] * x25 + fff[1] * x80 + fff[2] * u[6] * x12 + fff[2] * x23 - fff[2] * x25 +
+            fff[2] * x80 + fff[4] * u[4] * x58 + fff[4] * u[9] * x43 - fff[4] * x20 + fff[4] * x80 - u[0] * x3 + u[0] * x51 -
+            u[0] * x53 + u[0] * x61 + u[0] * x66 - u[0] * x70 + u[0] * x71 + POW2(u[1]) * x74 + u[1] * x1 - u[1] * x3 +
+            POW2(u[2]) * x81 + u[2] * x50 - u[2] * x51 - u[2] * x53 + POW2(u[3]) * x83 - u[3] * x61 - u[3] * x70 - u[3] * x71 -
+            u[4] * x28 - u[4] * x39 - u[4] * x42 - u[4] * x48 - u[4] * x50 + u[4] * x54 + (1.0 / 30.0) * u[4] * x57 - u[4] * x60 +
+            u[5] * x1 + (1.0 / 10.0) * u[5] * x14 - u[5] * x4 - u[6] * x1 + (1.0 / 30.0) * u[6] * x38 + u[6] * x4 - u[6] * x41 -
+            u[6] * x48 + u[6] * x66 - u[6] * x68 - u[7] * x1 + (1.0 / 30.0) * u[7] * x14 - u[7] * x28 - u[7] * x39 + u[7] * x4 -
+            u[7] * x44 - u[7] * x50 + u[7] * x54 + u[8] * x1 - u[8] * x4 + u[8] * x41 + u[8] * x42 + u[8] * x44 - u[8] * x65 +
+            u[9] * x50 - u[9] * x54 + (1.0 / 10.0) * u[9] * x57 + u[9] * x60 - u[9] * x65 - u[9] * x66 + u[9] * x68 - x10 * x2 -
+            x10 * x69 - x11 * x27 - x11 * x47 - x11 * x5 - x11 * x64 + x12 * x13 - x12 * x14 + x12 * x21 + x12 * x37 - x12 * x38 +
+            x13 * x22 + x14 * x15 - x14 * x22 - x14 * x26 + x15 * x38 + x15 * x57 - x15 * x67 - x16 * x17 - x16 * x62 -
+            x17 * x24 + x18 * x19 - x18 * x21 + x19 * x24 - x2 * x7 + x2 * x75 + x2 * x76 + x2 * x77 + x2 * x78 + x2 * x79 +
+            x2 * x8 + x2 * x9 - x22 * x57 + x22 * x59 - x26 * x57 + x27 * x29 - x27 * x35 + x27 * x36 - x27 * x6 + x27 * x78 +
+            x29 * x45 + x29 * x64 + x29 * x69 + x30 * x31 - x30 * x32 + x30 * x33 - x30 * x34 + x30 * x75 + x30 * x76 +
+            x30 * x77 + x30 * x8 + x30 * x9 + x31 * x47 + x31 * x52 + x31 * x64 - x32 * x72 + x33 * x47 + x33 * x52 + x33 * x64 -
+            x34 * x47 - x34 * x63 - x34 * x72 - x35 * x45 - x35 * x55 - x35 * x63 + x36 * x45 + x36 * x64 + x36 * x69 +
+            x37 * x40 - x38 * x40 - x43 * x62 - x45 * x46 + x45 * x75 + x45 * x78 + x45 * x79 + x45 * x8 + x45 * x9 - x46 * x55 -
+            x46 * x63 - x47 * x6 + x47 * x77 - x5 * x6 - x52 * x56 - x52 * x7 + x52 * x75 + x52 * x76 + x52 * x77 + x52 * x78 +
+            x52 * x82 - x56 * x69 - x57 * x58 + x58 * x59 + x58 * x67 - x6 * x64 + x63 * x75 + x63 * x8 + x63 * x9 + x64 * x77 +
+            x64 * x78 + x64 * x82 + x69 * x75 + x69 * x77 + x69 * x78 + x69 * x79 + x69 * x82 + x73 * x74 + x73 * x81 + x73 * x83;
 }
 
 #endif  // TET10_LAPLACIAN_INLINE_CPU_HPP

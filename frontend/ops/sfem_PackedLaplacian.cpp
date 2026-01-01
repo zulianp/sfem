@@ -174,37 +174,70 @@ struct Tet4MicroKernel {
                                   const jacobian_t *const SFEM_RESTRICT fff,
                                   const scalar_t *const SFEM_RESTRICT   in,
                                   accumulator_t *const SFEM_RESTRICT    out) {
-        constexpr int NXE = 4;
-        for (ptrdiff_t e = e_start; e < e_end; e++) {
-            pack_idx_t ev[NXE];
-            for (int v = 0; v < NXE; ++v) {
-                ev[v] = elements[v][e];
+        static constexpr int VECTOR_SIZE = 64;
+
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
+
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+        for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+            const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+
+            // NOTE(zulianp): This transposition could be avoided by having the SoA layout from the start
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = (evbegin + e) * 6;
+                fff0[e]              = fff[eidx];
+                fff1[e]              = fff[eidx + 1];
+                fff2[e]              = fff[eidx + 2];
+                fff3[e]              = fff[eidx + 3];
+                fff4[e]              = fff[eidx + 4];
+                fff5[e]              = fff[eidx + 5];
             }
 
-            scalar_t element_u[NXE];
-            for (int v = 0; v < NXE; ++v) {
-                element_u[v] = in[ev[v]];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                u0[e]                = in[elements[0][eidx]];
+                u1[e]                = in[elements[1][eidx]];
+                u2[e]                = in[elements[2][eidx]];
+                u3[e]                = in[elements[3][eidx]];
             }
 
-            accumulator_t element_out[NXE] = {0};
-            scalar_t      fff_i[6];
-
-            for (int d = 0; d < 6; ++d) {
-                fff_i[d] = fff[e * 6 + d];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                tet4_laplacian_apply_fff_soa(fff0[e],
+                                             fff1[e],
+                                             fff2[e],
+                                             fff3[e],
+                                             fff4[e],
+                                             fff5[e],
+                                             u0[e],
+                                             u1[e],
+                                             u2[e],
+                                             u3[e],
+                                             &out0[e],
+                                             &out1[e],
+                                             &out2[e],
+                                             &out3[e]);
             }
 
-            tet4_laplacian_apply_fff(fff_i,
-                                     element_u[0],
-                                     element_u[1],
-                                     element_u[2],
-                                     element_u[3],
-                                     &element_out[0],
-                                     &element_out[1],
-                                     &element_out[2],
-                                     &element_out[3]);
-
-            for (int v = 0; v < NXE; ++v) {
-                out[ev[v]] += element_out[v];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                out[elements[0][eidx]] += out0[e];
+                out[elements[1][eidx]] += out1[e];
+                out[elements[2][eidx]] += out2[e];
+                out[elements[3][eidx]] += out3[e];
             }
         }
     }
@@ -269,7 +302,7 @@ struct Hex8MicroKernel {
                 u7[e]                = in[elements[7][eidx]];
             }
 
-            for (ptrdiff_t e = 0; e < VECTOR_SIZE; e++) {
+            for (ptrdiff_t e = 0; e < nelems; e++) {
                 hex8_laplacian_apply_fff_integral_soa(fff0[e],
                                                       fff1[e],
                                                       fff2[e],
@@ -317,33 +350,106 @@ struct Tet10MicroKernel {
                                   const jacobian_t *const SFEM_RESTRICT fff,
                                   const scalar_t *const SFEM_RESTRICT   in,
                                   accumulator_t *const SFEM_RESTRICT    out) {
-        constexpr int NXE = 10;
-        for (ptrdiff_t e = e_start; e < e_end; e++) {
-            pack_idx_t ev[NXE];
-            for (int v = 0; v < NXE; ++v) {
-                ev[v] = elements[v][e];
+        static constexpr int VECTOR_SIZE = 32;
+
+        scalar_t out0[VECTOR_SIZE];
+        scalar_t out1[VECTOR_SIZE];
+        scalar_t out2[VECTOR_SIZE];
+        scalar_t out3[VECTOR_SIZE];
+        scalar_t out4[VECTOR_SIZE];
+        scalar_t out5[VECTOR_SIZE];
+        scalar_t out6[VECTOR_SIZE];
+        scalar_t out7[VECTOR_SIZE];
+        scalar_t out8[VECTOR_SIZE];
+        scalar_t out9[VECTOR_SIZE];
+
+        scalar_t u0[VECTOR_SIZE];
+        scalar_t u1[VECTOR_SIZE];
+        scalar_t u2[VECTOR_SIZE];
+        scalar_t u3[VECTOR_SIZE];
+        scalar_t u4[VECTOR_SIZE];
+        scalar_t u5[VECTOR_SIZE];
+        scalar_t u6[VECTOR_SIZE];
+        scalar_t u7[VECTOR_SIZE];
+        scalar_t u8[VECTOR_SIZE];
+        scalar_t u9[VECTOR_SIZE];
+
+        scalar_t fff0[VECTOR_SIZE];
+        scalar_t fff1[VECTOR_SIZE];
+        scalar_t fff2[VECTOR_SIZE];
+        scalar_t fff3[VECTOR_SIZE];
+        scalar_t fff4[VECTOR_SIZE];
+        scalar_t fff5[VECTOR_SIZE];
+
+        for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
+            const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
+
+            // NOTE(zulianp): This transposition could be avoided by having the SoA layout from the start
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = (evbegin + e) * 6;
+                fff0[e]              = fff[eidx];
+                fff1[e]              = fff[eidx + 1];
+                fff2[e]              = fff[eidx + 2];
+                fff3[e]              = fff[eidx + 3];
+                fff4[e]              = fff[eidx + 4];
+                fff5[e]              = fff[eidx + 5];
             }
 
-            scalar_t element_u[NXE];
-            for (int v = 0; v < NXE; ++v) {
-                element_u[v] = in[ev[v]];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                u0[e]                = in[elements[0][eidx]];
+                u1[e]                = in[elements[1][eidx]];
+                u2[e]                = in[elements[2][eidx]];
+                u3[e]                = in[elements[3][eidx]];
+                u4[e]                = in[elements[4][eidx]];
+                u5[e]                = in[elements[5][eidx]];
+                u6[e]                = in[elements[6][eidx]];
+                u7[e]                = in[elements[7][eidx]];
+                u8[e]                = in[elements[8][eidx]];
+                u9[e]                = in[elements[9][eidx]];
             }
 
-            accumulator_t element_out[NXE] = {0};
-            scalar_t      fff_i[6];
-
-            for (int d = 0; d < 6; ++d) {
-                fff_i[d] = fff[e * 6 + d];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                tet10_laplacian_apply_fff_soa(fff0[e],
+                                              fff1[e],
+                                              fff2[e],
+                                              fff3[e],
+                                              fff4[e],
+                                              fff5[e],
+                                              u0[e],
+                                              u1[e],
+                                              u2[e],
+                                              u3[e],
+                                              u4[e],
+                                              u5[e],
+                                              u6[e],
+                                              u7[e],
+                                              u8[e],
+                                              u9[e],
+                                              &out0[e],
+                                              &out1[e],
+                                              &out2[e],
+                                              &out3[e],
+                                              &out4[e],
+                                              &out5[e],
+                                              &out6[e],
+                                              &out7[e],
+                                              &out8[e],
+                                              &out9[e]);
             }
 
-            for (int i = 0; i < 10; i++) {
-                element_out[i] = 0;
-            }
-
-            tet10_laplacian_apply_add_fff(fff_i, element_u, element_out);
-
-            for (int v = 0; v < NXE; ++v) {
-                out[ev[v]] += element_out[v];
+            for (ptrdiff_t e = 0; e < nelems; e++) {
+                const ptrdiff_t eidx = evbegin + e;
+                out[elements[0][eidx]] += out0[e];
+                out[elements[1][eidx]] += out1[e];
+                out[elements[2][eidx]] += out2[e];
+                out[elements[3][eidx]] += out3[e];
+                out[elements[4][eidx]] += out4[e];
+                out[elements[5][eidx]] += out5[e];
+                out[elements[6][eidx]] += out6[e];
+                out[elements[7][eidx]] += out7[e];
+                out[elements[8][eidx]] += out8[e];
+                out[elements[9][eidx]] += out9[e];
             }
         }
     }
