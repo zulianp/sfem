@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import random
 import sys
 import zipfile
 from dataclasses import dataclass
@@ -60,6 +61,150 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import regression_hyperelasticity as rh
+
+def _try_import_numba_numpy():
+    """
+    Returns (np, nb) if both numpy and numba are importable, else (None, None).
+    Kept runtime-only to avoid hard dependency for users without these packages.
+    """
+    try:
+        import importlib
+
+        np = importlib.import_module("numpy")
+        nb = importlib.import_module("numba")
+        return np, nb
+    except (ImportError, ModuleNotFoundError):
+        return None, None
+
+
+def _numba_kernels():
+    """
+    Build and return compiled numba kernels (cached on first call).
+    """
+    np, nb = _try_import_numba_numpy()
+    if np is None or nb is None:
+        return None
+
+    @nb.njit(cache=True)
+    def soft_threshold(z, alpha):
+        if z > alpha:
+            return z - alpha
+        if z < -alpha:
+            return z + alpha
+        return 0.0
+
+    @nb.njit(cache=True)
+    def soft_threshold_nonneg(z, alpha):
+        out = z - alpha
+        return out if out > 0.0 else 0.0
+
+    @nb.njit(cache=True)
+    def compute_qk(t, sigma_el, tau):
+        n = t.shape[0]
+        k = tau.shape[0]
+        out = np.zeros((n, k), dtype=np.float64)
+        q = np.empty(k, dtype=np.float64)
+        for j in range(k):
+            q[j] = sigma_el[0]
+        for i in range(n):
+            for j in range(k):
+                out[i, j] = q[j]
+            if i + 1 == n:
+                break
+            dt = t[i + 1] - t[i]
+            if dt < 0.0:
+                dt = 0.0
+            for j in range(k):
+                tk = tau[j]
+                if tk <= 0.0 or dt == 0.0:
+                    q[j] = sigma_el[i + 1]
+                else:
+                    a = math.exp(-dt / tk)
+                    q[j] = a * q[j] + (1.0 - a) * sigma_el[i + 1]
+        return out
+
+    @nb.njit(cache=True)
+    def weighted_lasso_intercept_alpha_vec(X, y, w, alpha_vec, max_iter, tol, nonnegative):
+        """
+        X: (n,p) with intercept in col0 (all ones for intercept)
+        alpha_vec: length p-1 penalties for cols 1..p-1 (0 allowed)
+        """
+        n, p = X.shape
+        wsum = 0.0
+        for i in range(n):
+            wsum += w[i]
+        if wsum <= 0.0:
+            raise ValueError("sum weights must be > 0")
+
+        # weighted mean for intercept init
+        b = np.zeros(p, dtype=np.float64)
+        num = 0.0
+        for i in range(n):
+            num += w[i] * y[i]
+        b[0] = num / wsum
+
+        r = np.empty(n, dtype=np.float64)
+        for i in range(n):
+            r[i] = y[i] - b[0]
+
+        # norms for columns 1..p-1
+        col_norm = np.zeros(p, dtype=np.float64)
+        for j in range(1, p):
+            s = 0.0
+            for i in range(n):
+                s += w[i] * X[i, j] * X[i, j]
+            col_norm[j] = s
+
+        for _ in range(max_iter):
+            max_delta = 0.0
+
+            # intercept update
+            num = 0.0
+            for i in range(n):
+                num += w[i] * (r[i] + b[0])
+            new_b0 = num / wsum
+            d0 = new_b0 - b[0]
+            if d0 != 0.0:
+                b[0] = new_b0
+                for i in range(n):
+                    r[i] -= d0
+                ad0 = abs(d0)
+                if ad0 > max_delta:
+                    max_delta = ad0
+
+            for j in range(1, p):
+                denom = col_norm[j]
+                if denom == 0.0:
+                    continue
+                rho = 0.0
+                for i in range(n):
+                    xij = X[i, j]
+                    rho += w[i] * xij * (r[i] + xij * b[j])
+                aj = alpha_vec[j - 1]
+                if nonnegative:
+                    new_bj = soft_threshold_nonneg(rho, aj) / denom
+                else:
+                    new_bj = soft_threshold(rho, aj) / denom
+                dj = new_bj - b[j]
+                if dj != 0.0:
+                    b[j] = new_bj
+                    for i in range(n):
+                        r[i] -= X[i, j] * dj
+                    adj = abs(dj)
+                    if adj > max_delta:
+                        max_delta = adj
+
+            if max_delta < tol:
+                break
+
+        return b
+
+    return {
+        "np": np,
+        "nb": nb,
+        "compute_qk": compute_qk,
+        "lasso_alpha_vec": weighted_lasso_intercept_alpha_vec,
+    }
 
 
 @dataclass(frozen=True)
@@ -158,6 +303,11 @@ def _soft_threshold(z: float, alpha: float) -> float:
     return 0.0
 
 
+def _soft_threshold_nonneg(z: float, alpha: float) -> float:
+    # Nonnegative LASSO: argmin_{b>=0} 0.5*(b - z)^2 + alpha*b
+    return max(0.0, z - alpha)
+
+
 def _weighted_lasso_with_intercept(
     X: List[List[float]],
     y: List[float],
@@ -167,6 +317,8 @@ def _weighted_lasso_with_intercept(
     max_iter: int = 5000,
     tol: float = 1e-10,
     standardize: bool = True,
+    nonnegative: bool = False,
+    init_beta: Optional[List[float]] = None,
 ) -> List[float]:
     """
     Weighted LASSO with an unpenalized intercept in column 0.
@@ -230,6 +382,19 @@ def _weighted_lasso_with_intercept(
     # residual r = y - X beta
     r = [y[i] - beta[0] for i in range(n)]
 
+    # Optional warm-start for penalized coefficients (columns 1..p-1).
+    if init_beta is not None:
+        if len(init_beta) != p:
+            raise ValueError("init_beta must have length p (same number of columns as X)")
+        for j in range(1, p):
+            bj = float(init_beta[j])
+            if nonnegative and bj < 0.0:
+                bj = 0.0
+            if bj != 0.0:
+                beta[j] = bj
+                for i in range(n):
+                    r[i] -= X[i][j] * bj
+
     for _it in range(max_iter):
         max_delta = 0.0
 
@@ -258,7 +423,10 @@ def _weighted_lasso_with_intercept(
                 xij = X[i][j]
                 rho += w[i] * xij * (r[i] + xij * beta[j])
 
-            new_bj = _soft_threshold(rho, alpha) / denom
+            if nonnegative:
+                new_bj = _soft_threshold_nonneg(rho, alpha) / denom
+            else:
+                new_bj = _soft_threshold(rho, alpha) / denom
             dj = new_bj - beta[j]
             if dj != 0.0:
                 beta[j] = new_bj
@@ -290,6 +458,8 @@ def _weighted_lasso_with_intercept_alpha_vec(
     max_iter: int = 5000,
     tol: float = 1e-10,
     standardize: bool = True,
+    nonnegative: bool = False,
+    init_beta: Optional[List[float]] = None,
 ) -> List[float]:
     """
     Weighted LASSO with an unpenalized intercept in column 0, and per-feature penalties for columns 1..p-1.
@@ -355,6 +525,18 @@ def _weighted_lasso_with_intercept_alpha_vec(
 
     r = [y[i] - beta[0] for i in range(n)]
 
+    if init_beta is not None:
+        if len(init_beta) != p:
+            raise ValueError("init_beta must have length p (same number of columns as X)")
+        for j in range(1, p):
+            bj = float(init_beta[j])
+            if nonnegative and bj < 0.0:
+                bj = 0.0
+            if bj != 0.0:
+                beta[j] = bj
+                for i in range(n):
+                    r[i] -= X[i][j] * bj
+
     for _it in range(max_iter):
         max_delta = 0.0
 
@@ -381,7 +563,10 @@ def _weighted_lasso_with_intercept_alpha_vec(
                 rho += w[i] * xij * (r[i] + xij * beta[j])
 
             aj = alpha_vec[j - 1]
-            new_bj = _soft_threshold(rho, aj) / denom
+            if nonnegative:
+                new_bj = _soft_threshold_nonneg(rho, aj) / denom
+            else:
+                new_bj = _soft_threshold(rho, aj) / denom
             dj = new_bj - beta[j]
             if dj != 0.0:
                 beta[j] = new_bj
@@ -859,6 +1044,7 @@ def _select_tau_from_dma(
     xlsx_path: Path,
     tau_grid: List[float],
     alpha: float,
+    nonnegative_weights: bool,
     temps: str,
     top_k: int,
     weight_storage: float,
@@ -867,7 +1053,7 @@ def _select_tau_from_dma(
     tol: float,
     standardize: bool,
     verbose: bool,
-) -> List[int]:
+) -> Tuple[List[int], List[float]]:
     rows = _extract_dma_rows(xlsx_path)
     by_temp: Dict[float, List[DMARow]] = {}
     for r in rows:
@@ -914,6 +1100,7 @@ def _select_tau_from_dma(
             max_iter=max_iter,
             tol=tol,
             standardize=standardize,
+            nonnegative=nonnegative_weights,
         )
 
         g = beta[1:]
@@ -926,7 +1113,7 @@ def _select_tau_from_dma(
 
     idx_sorted = sorted(range(len(agg)), key=lambda k: agg[k], reverse=True)
     idx = [k for k in idx_sorted if agg[k] > 0.0][: max(1, top_k)]
-    return idx
+    return idx, agg
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -997,6 +1184,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Alpha for DMA prefit selection. Defaults to --alpha if not set.",
     )
     ap.add_argument(
+        "--init-from-dma",
+        action="store_true",
+        help="In QLV mode (with --tau-from-dma), warm-start g_k using the DMA g-profile (normalized).",
+    )
+    ap.add_argument(
+        "--no-init-from-dma",
+        action="store_true",
+        help="Disable DMA-based warm-start even if --tau-from-dma is set.",
+    )
+    ap.add_argument(
         "--c10",
         type=float,
         default=0.31949710763216704,
@@ -1027,7 +1224,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     ap.add_argument("--top-k", type=int, default=10, help="Print top-K g_k by magnitude per temperature")
     ap.add_argument("--verbose", action="store_true", help="Print extra diagnostics")
+    ap.add_argument(
+        "--allow-negative-weights",
+        action="store_true",
+        help="Allow negative Prony weights (disables nonnegative constraint). Default enforces g_k >= 0.",
+    )
+    ap.add_argument(
+        "--random-init",
+        action="store_true",
+        help="Warm-start optimization with random initial weights (mainly useful for experimentation).",
+    )
+    ap.add_argument("--seed", type=int, default=0, help="RNG seed for --random-init")
+    ap.add_argument(
+        "--init-scale",
+        type=float,
+        default=10,
+        help="Scale for random initialization (uniform in [0, init-scale]).",
+    )
+    ap.add_argument(
+        "--numba",
+        action="store_true",
+        help="Use NumPy+Numba accelerated kernels if available (recommended for larger fits).",
+    )
+    ap.add_argument(
+        "--no-numba",
+        action="store_true",
+        help="Force pure-Python implementation even if numba is available.",
+    )
     args = ap.parse_args(argv)
+
+    nonnegative_weights = not args.allow_negative_weights
+    if args.random_init:
+        random.seed(args.seed)
 
     if not args.xlsx.exists():
         print(f"[sfem] ERROR: workbook not found: {args.xlsx}", file=sys.stderr)
@@ -1078,6 +1306,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 y.append(rr.loss_mpa)
                 w.append(args.weight_loss)
 
+            init_beta = None
+            if args.random_init:
+                # intercept + g_k; g_k in [0, init_scale] (or symmetric if unconstrained)
+                init_beta = [0.0] * (1 + len(tau))
+                for j in range(1, len(init_beta)):
+                    if nonnegative_weights:
+                        init_beta[j] = random.random() * args.init_scale
+                    else:
+                        init_beta[j] = (2.0 * random.random() - 1.0) * args.init_scale
+
             beta = _weighted_lasso_with_intercept(
                 X,
                 y,
@@ -1086,6 +1324,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 max_iter=args.max_iter,
                 tol=args.tol,
                 standardize=(not args.no_standardize),
+                nonnegative=nonnegative_weights,
+                init_beta=init_beta,
             )
 
             g_inf = beta[0]
@@ -1133,12 +1373,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 )
     else:
         # QLV on mechanical sheets.
+        qlv_init_beta_from_dma: Optional[List[float]] = None
+
         if args.tau_from_dma:
             dma_alpha = args.alpha if args.tau_from_dma_alpha is None else float(args.tau_from_dma_alpha)
-            keep_idx = _select_tau_from_dma(
+            keep_idx, dma_g_profile = _select_tau_from_dma(
                 xlsx_path=args.xlsx,
                 tau_grid=tau,
                 alpha=dma_alpha,
+                nonnegative_weights=nonnegative_weights,
                 temps=args.tau_from_dma_temps,
                 top_k=args.tau_from_dma_top_k,
                 weight_storage=args.weight_storage,
@@ -1151,6 +1394,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             tau = [tau[i] for i in keep_idx]
             if args.verbose:
                 print(f"[sfem] QLV: using tau subset from DMA (k={len(tau)}): {tau}")
+
+            init_from_dma = (args.init_from_dma or args.tau_from_dma) and (not args.no_init_from_dma)
+            if init_from_dma:
+                g_profile_sub = [dma_g_profile[i] for i in keep_idx]
+                m = max(g_profile_sub) if g_profile_sub else 0.0
+                if m > 0.0:
+                    g0 = [(gi / m) * args.init_scale for gi in g_profile_sub]
+                else:
+                    g0 = [0.0 for _ in g_profile_sub]
+
+                qlv_init_beta_from_dma = [0.0] * (2 + len(tau))
+                qlv_init_beta_from_dma[1] = 1.0
+                for j, gj in enumerate(g0):
+                    qlv_init_beta_from_dma[2 + j] = gj
 
         sheet_paths = {
             "uniax": "xl/worksheets/sheet2.xml",
@@ -1191,6 +1448,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         y: List[float] = []
         w: List[float] = []
 
+        kernels = None
+        if args.numba and (not args.no_numba):
+            kernels = _numba_kernels()
+            if kernels is None and args.verbose:
+                print("[sfem] NOTE: --numba requested, but numpy/numba not available; falling back to pure Python")
+
         for mode, sp in sheet_paths.items():
             t, e, s_meas = _extract_mechanical_rows(args.xlsx, sp)
             if args.first_half:
@@ -1201,7 +1464,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 s_meas = s_meas[:n_fit]
 
             sigma_el = [_mr_nominal_stress(mode, ee, c10, c01) for ee in e]
-            qk = _compute_qk(t, sigma_el, tau)
+            if kernels is not None:
+                np = kernels["np"]
+                t_np = np.asarray(t, dtype=np.float64)
+                se_np = np.asarray(sigma_el, dtype=np.float64)
+                tau_np = np.asarray(tau, dtype=np.float64)
+                qk_np = kernels["compute_qk"](t_np, se_np, tau_np)
+                qk = qk_np.tolist()
+            else:
+                qk = _compute_qk(t, sigma_el, tau)
 
             # per-sample weight scaled by 1/N so setups weights behave as intended
             base_w = setup_weights[mode] / max(1, len(t))
@@ -1216,15 +1487,54 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         # alpha for columns: sigma_el unpenalized, qk penalized.
         alpha_vec = [0.0] + [args.alpha] * len(tau)
-        beta = _weighted_lasso_with_intercept_alpha_vec(
-            X,
-            y,
-            w,
-            alpha_vec,
-            max_iter=args.max_iter,
-            tol=args.tol,
-            standardize=(not args.no_standardize),
-        )
+        init_beta = None
+        if qlv_init_beta_from_dma is not None and (not args.random_init):
+            init_beta = qlv_init_beta_from_dma
+        elif args.random_init:
+            # beta = [b0, g_inf, g_1..g_K]; start near g_inf ~ 1, small g_k
+            init_beta = [0.0] * (2 + len(tau))
+            init_beta[1] = 1.0
+            for j in range(2, len(init_beta)):
+                if nonnegative_weights:
+                    init_beta[j] = random.random() * args.init_scale
+                else:
+                    init_beta[j] = (2.0 * random.random() - 1.0) * args.init_scale
+
+        if kernels is not None:
+            np = kernels["np"]
+            X_np = np.asarray(X, dtype=np.float64)
+            y_np = np.asarray(y, dtype=np.float64)
+            w_np = np.asarray(w, dtype=np.float64)
+            alpha_np = np.asarray(alpha_vec, dtype=np.float64)
+            if not args.no_standardize:
+                # Keep the existing python standardization logic for now (simple and stable).
+                beta = _weighted_lasso_with_intercept_alpha_vec(
+                    X,
+                    y,
+                    w,
+                    alpha_vec,
+                    max_iter=args.max_iter,
+                    tol=args.tol,
+                    standardize=True,
+                    nonnegative=nonnegative_weights,
+                    init_beta=init_beta,
+                )
+            else:
+                # Numba path does not currently support random init; keep deterministic.
+                beta_np = kernels["lasso_alpha_vec"](X_np, y_np, w_np, alpha_np, args.max_iter, args.tol, nonnegative_weights)
+                beta = beta_np.tolist()
+        else:
+            beta = _weighted_lasso_with_intercept_alpha_vec(
+                X,
+                y,
+                w,
+                alpha_vec,
+                max_iter=args.max_iter,
+                tol=args.tol,
+                standardize=(not args.no_standardize),
+                nonnegative=nonnegative_weights,
+                init_beta=init_beta,
+            )
 
         b0 = beta[0]
         g_inf = beta[1]
