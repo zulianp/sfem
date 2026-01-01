@@ -24,6 +24,17 @@ AI = `(340 + 8) / (6 * 4 + 8 * 8 + 8 * 8 + 8 * 8) = 1.61` FLOPS/Byte (memory bou
 Achievable peak: `1.61 * 512 = 824.32 GFLOP/s`
 828.2632949052/824.32 = 1.004 = 100.4783694324% of originally achievable peak  
 
+```
+Peak: 3688.00 GFLOP/s, BW: 500.00 GB/s, ridge OI: 7.376 FLOP/B
+
+case             FLOP/elem  B/elem  OI [F/B]  roof [GF/s]  ach [GF/s]  %roof  %peak
+---------------  ---------  ------  --------  -----------  ----------  -----  -----
+New (fp64)             348     168    2.0714       1035.7       828.3  80.0%  22.5%
+Original (fp64)        348     216    1.6111        805.6           -      -      -
+```
+
+
+
 # Vector 
 
 6 * 4     READS (float)
