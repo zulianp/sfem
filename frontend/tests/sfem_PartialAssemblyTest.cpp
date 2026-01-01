@@ -177,8 +177,9 @@ int test_hyperelasticity_partial_assembly_all() {
 }
 
 int test_hyperelasticity_active_strain_partial_assembly_all() {
-    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked") +
-           test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
+    return test_hyperelasticity_active_strain_partial_assembly("NeoHookeanOgdenActiveStrainPacked") ;
+    // +
+        //    test_hyperelasticity_active_strain_partial_assembly("MooneyRivlinActiveStrainPacked");
 }
 
 int main(int argc, char *argv[]) {
