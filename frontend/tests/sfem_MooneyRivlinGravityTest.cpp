@@ -61,7 +61,7 @@ static void compute_contact_lower_bound_stepped(
         const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
         
         // Use REFERENCE coordinate (stable constraint throughout simulation)
-        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx];
+        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx] +displacement[node_idx * block_size + slope_dir];
         
         // Compute which step this node is on based on reference y position
         int step_num = (int)(ref_slope_coord / step_height);
@@ -99,7 +99,7 @@ static void compute_contact_lower_bound_triangular(
         const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
         
         // Get reference coordinate in slope direction (coords stored as [dim][node])
-        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx];
+        const real_t ref_slope_coord = ref_coords[slope_dir][node_idx]+displacement[node_idx * block_size + slope_dir];
         
         // Compute local contact plane position: plane = base + slope * y
         const real_t local_plane = base_plane + slope * ref_slope_coord;
@@ -109,135 +109,73 @@ static void compute_contact_lower_bound_triangular(
     }
 }
 
-// Penalty contact force for triangular/ramp obstacle
-// This properly handles contacts with non-axis-aligned surfaces
-// Returns the penalty force to be added to the residual
-static void compute_penalty_contact_force(
-    real_t* force,                // Output: force vector (adds to existing)
-    const real_t* displacement,
-    geom_t * const * ref_coords,  // Reference coordinates
-    const ptrdiff_t n_nodes,      // Total number of nodes
-    const real_t base_plane,      // Base contact plane (at y=0)
-    const real_t slope,           // Slope: how much plane moves per unit y
-    const int contact_dir,        // Direction of contact (0=x)
-    const int slope_dir,          // Direction for slope calculation (1=y)
-    const int block_size,
-    const real_t penalty_param)   // Penalty parameter (stiffness)
-{
-    // For a ramp surface: x_surface = base_plane + slope * y
-    // Surface normal (unnormalized): n = (1, -slope, 0) for slope in y
-    // Normalized: n = (1, -slope, 0) / sqrt(1 + slope^2)
-    const real_t norm_factor = 1.0 / sqrt(1.0 + slope * slope);
-    const real_t nx = norm_factor;
-    const real_t ny = -slope * norm_factor;
-    
-    for (ptrdiff_t node = 0; node < n_nodes; node++) {
-        // Current position = reference + displacement
-        const real_t ref_x = ref_coords[contact_dir][node];
-        const real_t ref_y = ref_coords[slope_dir][node];
-        const real_t disp_x = displacement[node * block_size + contact_dir];
-        const real_t disp_y = displacement[node * block_size + slope_dir];
-        
-        const real_t cur_x = ref_x + disp_x;
-        const real_t cur_y = ref_y + disp_y;
-        
-        // Surface position at this y coordinate
-        const real_t surface_x = base_plane + slope * cur_y;
-        
-        // Gap: positive = no contact, negative = penetration
-        // Gap is distance along normal direction
-        const real_t gap = (cur_x - surface_x) * nx;
-        
-        if (gap < 0) {
-            // Penetration detected - apply penalty force
-            // Force = -penalty * gap * normal (pushes out of surface)
-            const real_t penalty_force = -penalty_param * gap;
-            force[node * block_size + contact_dir] += penalty_force * nx;
-            force[node * block_size + slope_dir] += penalty_force * ny;
-        }
-    }
-}
-
-// Penalty contact stiffness contribution to Hessian (diagonal approximation)
-static void compute_penalty_contact_hessian_diag(
-    real_t* hessian_diag,         // Output: diagonal contributions
+// Hemisphere obstacle: contact with a hemispherical surface
+// Object falls from above (in -y direction) onto the hemisphere
+// Hemisphere equation: (x-cx)² + (y-cy)² + (z-cz)² = R², y ≤ cy (upper hemisphere pointing up)
+static void compute_contact_lower_bound_hemisphere(
+    real_t* lower_bound,
     const real_t* displacement,
     geom_t * const * ref_coords,
-    const ptrdiff_t n_nodes,
-    const real_t base_plane,
-    const real_t slope,
-    const int contact_dir,
-    const int slope_dir,
+    const ptrdiff_t* contact_nodes,
+    const ptrdiff_t n_contact_nodes,
+    const real_t center_x,
+    const real_t center_y,
+    const real_t center_z,
+    const real_t radius,
+    const int contact_dir,        // Direction of constraint (0=x)
     const int block_size,
-    const real_t penalty_param)
+    const ptrdiff_t ndofs,
+    const real_t default_lb = -1000.0)
 {
-    const real_t norm_factor = 1.0 / sqrt(1.0 + slope * slope);
-    const real_t nx = norm_factor;
-    const real_t ny = -slope * norm_factor;
-    
-    for (ptrdiff_t node = 0; node < n_nodes; node++) {
-        const real_t ref_x = ref_coords[contact_dir][node];
-        const real_t ref_y = ref_coords[slope_dir][node];
-        const real_t disp_x = displacement[node * block_size + contact_dir];
-        const real_t disp_y = displacement[node * block_size + slope_dir];
-        
-        const real_t cur_x = ref_x + disp_x;
-        const real_t cur_y = ref_y + disp_y;
-        const real_t surface_x = base_plane + slope * cur_y;
-        const real_t gap = (cur_x - surface_x) * nx;
-        
-        if (gap < 0) {
-            // Add penalty stiffness to diagonal
-            hessian_diag[node * block_size + contact_dir] += penalty_param * nx * nx;
-            hessian_diag[node * block_size + slope_dir] += penalty_param * ny * ny;
-        }
-    }
-}
-
-// Project penetrating nodes back onto the surface
-// This is a post-processing step after Newton convergence
-static int project_to_surface(
-    real_t* displacement,
-    geom_t * const * ref_coords,
-    const ptrdiff_t n_nodes,
-    const real_t base_plane,
-    const real_t slope,
-    const int contact_dir,
-    const int slope_dir,
-    const int block_size)
-{
-    // Surface normal (normalized)
-    const real_t norm_factor = 1.0 / sqrt(1.0 + slope * slope);
-    const real_t nx = norm_factor;
-    const real_t ny = -slope * norm_factor;
-    
-    int n_projected = 0;
-    
-    for (ptrdiff_t node = 0; node < n_nodes; node++) {
-        const real_t ref_x = ref_coords[contact_dir][node];
-        const real_t ref_y = ref_coords[slope_dir][node];
-        real_t disp_x = displacement[node * block_size + contact_dir];
-        real_t disp_y = displacement[node * block_size + slope_dir];
-        
-        const real_t cur_x = ref_x + disp_x;
-        const real_t cur_y = ref_y + disp_y;
-        
-        // Surface position at current y
-        const real_t surface_x = base_plane + slope * cur_y;
-        
-        // Gap along normal
-        const real_t gap = (cur_x - surface_x) * nx;
-        
-        if (gap < 0) {
-            // Penetration: project back along normal
-            // Move by -gap in normal direction
-            displacement[node * block_size + contact_dir] -= gap * nx;
-            displacement[node * block_size + slope_dir] -= gap * ny;
-            n_projected++;
-        }
+    for (ptrdiff_t i = 0; i < ndofs; i++) {
+        lower_bound[i] = default_lb;
     }
     
-    return n_projected;
+    // Determine the two perpendicular directions
+    int h1, h2;
+    if (contact_dir == 0) { h1 = 1; h2 = 2; }       // contact in x, perpendicular: y,z
+    else if (contact_dir == 1) { h1 = 0; h2 = 2; }  // contact in y, perpendicular: x,z
+    else { h1 = 0; h2 = 1; }                         // contact in z, perpendicular: x,y
+    
+    real_t center[3] = {center_x, center_y, center_z};
+    
+    static bool first_call = true;
+    
+    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
+        const ptrdiff_t node_idx = contact_nodes[i];
+        const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
+        
+        // Current position in perpendicular directions (reference + displacement)
+        real_t cur_h1 = ref_coords[h1][node_idx] + displacement[node_idx * block_size + h1];
+        real_t cur_h2 = ref_coords[h2][node_idx] + displacement[node_idx * block_size + h2];
+        
+        // Distance squared from center in perpendicular plane
+        real_t dh1 = cur_h1 - center[h1];
+        real_t dh2 = cur_h2 - center[h2];
+        real_t dist_h_sq = dh1*dh1 + dh2*dh2;
+        
+        // Hemisphere surface position in contact direction
+        real_t surface_coord;
+        if (dist_h_sq < radius * radius) {
+            // Inside hemisphere projection: surface = center + sqrt(R² - d²)
+            surface_coord = center[contact_dir] + sqrt(radius*radius - dist_h_sq);
+        } else {
+            // Outside hemisphere: use flat plane at hemisphere center
+            surface_coord = center[contact_dir];
+        }
+        
+        // Same pattern as triangular/stepped: lower_bound = surface - current_disp
+        const real_t current_disp = displacement[dof_idx];
+        lower_bound[dof_idx] = surface_coord - current_disp;
+        
+        // Debug output for first call
+        if (first_call && i < 5) {
+            printf("  DEBUG hemisphere node %ld: ref_y=%.3f ref_z=%.3f dh1=%.3f dh2=%.3f dist=%.3f surface=%.3f disp=%.3f lb=%.3f\n",
+                   (long)node_idx, ref_coords[h1][node_idx], ref_coords[h2][node_idx], 
+                   dh1, dh2, sqrt(dist_h_sq), surface_coord, current_disp, lower_bound[dof_idx]);
+        }
+    }
+    first_call = false;
 }
 
 
@@ -428,6 +366,102 @@ void export_stepped_obstacle_mesh(const std::string &output_dir,
     printf("  %d steps, step_height=%.3f, step_depth=%.3f\n", n_steps, step_height, step_depth);
 }
 
+// Export hemisphere obstacle geometry
+void export_hemisphere_obstacle_mesh(const std::string &output_dir,
+                                     real_t center_x, real_t center_y, real_t center_z,
+                                     real_t radius,
+                                     int n_segments = 16) {
+    std::string obstacle_dir = output_dir + "/obstacle";
+    sfem::create_directory(obstacle_dir.c_str());
+    
+    // Generate hemisphere mesh using spherical coordinates
+    // Hemisphere faces +x direction: x = cx + sqrt(R² - (y-cy)² - (z-cz)²)
+    // This matches the contact constraint direction
+    int n_rings = n_segments / 2;  // Number of latitude rings
+    int n_points = 1 + n_rings * n_segments;  // Tip point + ring points
+    int n_triangles = n_segments + (n_rings - 1) * n_segments * 2;  // Tip cap + body
+    
+    std::vector<float> x_coords(n_points), y_coords(n_points), z_coords(n_points);
+    
+    // Tip point of hemisphere (rightmost point, facing +x)
+    x_coords[0] = center_x + radius;
+    y_coords[0] = center_y;
+    z_coords[0] = center_z;
+    
+    int pt_idx = 1;
+    for (int ring = 1; ring <= n_rings; ring++) {
+        real_t phi = M_PI / 2.0 * ring / n_rings;  // 0 to pi/2 (tip to equator)
+        real_t r_ring = radius * sin(phi);         // radius in y-z plane
+        real_t x_ring = center_x + radius * cos(phi);  // x position along hemisphere
+        
+        for (int seg = 0; seg < n_segments; seg++) {
+            real_t theta = 2.0 * M_PI * seg / n_segments;
+            x_coords[pt_idx] = x_ring;
+            y_coords[pt_idx] = center_y + r_ring * cos(theta);
+            z_coords[pt_idx] = center_z + r_ring * sin(theta);
+            pt_idx++;
+        }
+    }
+    
+    // Write coordinates
+    FILE* fx = fopen((obstacle_dir + "/x.raw").c_str(), "wb");
+    FILE* fy = fopen((obstacle_dir + "/y.raw").c_str(), "wb");
+    FILE* fz = fopen((obstacle_dir + "/z.raw").c_str(), "wb");
+    fwrite(x_coords.data(), sizeof(float), n_points, fx);
+    fwrite(y_coords.data(), sizeof(float), n_points, fy);
+    fwrite(z_coords.data(), sizeof(float), n_points, fz);
+    fclose(fx);
+    fclose(fy);
+    fclose(fz);
+    
+    // Generate triangles
+    std::vector<int32_t> i0(n_triangles), i1(n_triangles), i2(n_triangles);
+    int tri_idx = 0;
+    
+    // Top cap triangles (connect to top point)
+    for (int seg = 0; seg < n_segments; seg++) {
+        i0[tri_idx] = 0;  // Top point
+        i1[tri_idx] = 1 + seg;
+        i2[tri_idx] = 1 + (seg + 1) % n_segments;
+        tri_idx++;
+    }
+    
+    // Body triangles (between rings)
+    for (int ring = 0; ring < n_rings - 1; ring++) {
+        int ring_start = 1 + ring * n_segments;
+        int next_ring_start = 1 + (ring + 1) * n_segments;
+        
+        for (int seg = 0; seg < n_segments; seg++) {
+            int next_seg = (seg + 1) % n_segments;
+            
+            // First triangle
+            i0[tri_idx] = ring_start + seg;
+            i1[tri_idx] = next_ring_start + seg;
+            i2[tri_idx] = ring_start + next_seg;
+            tri_idx++;
+            
+            // Second triangle
+            i0[tri_idx] = ring_start + next_seg;
+            i1[tri_idx] = next_ring_start + seg;
+            i2[tri_idx] = next_ring_start + next_seg;
+            tri_idx++;
+        }
+    }
+    
+    FILE* fi0 = fopen((obstacle_dir + "/i0.raw").c_str(), "wb");
+    FILE* fi1 = fopen((obstacle_dir + "/i1.raw").c_str(), "wb");
+    FILE* fi2 = fopen((obstacle_dir + "/i2.raw").c_str(), "wb");
+    fwrite(i0.data(), sizeof(int32_t), n_triangles, fi0);
+    fwrite(i1.data(), sizeof(int32_t), n_triangles, fi1);
+    fwrite(i2.data(), sizeof(int32_t), n_triangles, fi2);
+    fclose(fi0);
+    fclose(fi1);
+    fclose(fi2);
+    
+    printf("Hemisphere obstacle mesh exported to: %s\n", obstacle_dir.c_str());
+    printf("  Center: (%.3f, %.3f, %.3f), Radius: %.3f\n", center_x, center_y, center_z, radius);
+}
+
 int test_mooney_rivlin_gravity() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
@@ -547,21 +581,38 @@ int test_mooney_rivlin_gravity() {
     op->initialize_history();
     f->add_operator(op);
 
+    // Read contact direction early (needed for BC selection)
+    int SFEM_CONTACT_DIR = 0;          // Contact direction: 0=x, 1=y, 2=z
+    SFEM_READ_ENV(SFEM_CONTACT_DIR, atoi);
+
     // BC - Sidesets
     auto left_sideset = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < 1e-5; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 2.0 - 1e-5; });
+    
+    auto top_sideset = sfem::Sideset::create_from_selector(
+            mesh, [](const geom_t, const geom_t y, const geom_t) -> bool { return y > 1.0 - 1e-5; });
 
-    // **RIGHT END FIXED** (same as original when contact disabled)
+    // **Boundary conditions based on contact direction**
     if (!SFEM_ENABLE_CONTACT) {
+        // No contact: fix right end completely
         sfem::DirichletConditions::Condition right_bc_x{.sidesets = right_sideset, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition right_bc_y{.sidesets = right_sideset, .value = 0, .component = 1};
         sfem::DirichletConditions::Condition right_bc_z{.sidesets = right_sideset, .value = 0, .component = 2};
         auto                                 conds = sfem::create_dirichlet_conditions(fs, {right_bc_x, right_bc_y, right_bc_z}, es);
         f->add_constraint(conds);
+    } else if (SFEM_CONTACT_DIR == 1) {
+        // Y-direction contact (vertical drop): fix top surface in x and z only (allow vertical motion)
+        // This prevents lateral drift while allowing the object to fall
+        sfem::DirichletConditions::Condition top_bc_x{.sidesets = top_sideset, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition top_bc_z{.sidesets = top_sideset, .value = 0, .component = 2};
+        auto                                 conds = sfem::create_dirichlet_conditions(fs, {top_bc_x, top_bc_z}, es);
+        f->add_constraint(conds);
+        printf("Y-direction contact: fixed top surface in x,z directions\n");
     }
+    // For x-direction contact (CONTACT_DIR=0), no BC is needed - object is free to move in -x
 
     // **GRAVITY as body force instead of Neumann surface force**
     real_t SFEM_GRAVITY = 9.81;  // Positive value, direction handled below
@@ -584,18 +635,25 @@ int test_mooney_rivlin_gravity() {
     blas->scal(ndofs, density, mass_diag->data());
     f->set_value_to_constrained_dofs(1.0, mass_diag->data());  // Set 1 for BC nodes
 
-    // **Gravity force vector** (negative x direction, like pushing from right to left)
+    // **Gravity force vector** (negative direction of SFEM_CONTACT_DIR)
     // This replaces the Neumann surface force
     auto f_gravity_neg = sfem::create_buffer<real_t>(ndofs, es);
     blas->zeros(ndofs, f_gravity_neg->data());
     
-    // Gravity direction: -x (pushing left, like Neumann did)
-    // F_gravity = -m * g * direction
-    // For gradient convention (negative), we store -F_gravity
+    // Gravity direction: -SFEM_CONTACT_DIR (e.g., -x if CONTACT_DIR=0, -y if CONTACT_DIR=1)
+    // F_gravity = m * g in -CONTACT_DIR direction = -m*g in +CONTACT_DIR direction
+    // For gradient convention (we add -gradient to RHS), we need to store -F_gravity
+    // So we store -(-m*g) = +m*g when gravity is in +CONTACT_DIR direction
+    // But for hemisphere test, gravity should be in -CONTACT_DIR (downward)
+    // So the sign needs to be NEGATIVE for the gravity to pull DOWN
     const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
     for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-        // f_gravity_neg = -F_gravity = +m*g (in -x direction means component 0 is positive when stored as negative gradient)
-        f_gravity_neg->data()[node * 3 + 0] = mass_diag->data()[node * 3 + 0] * SFEM_GRAVITY;  // -(-m*g) in x
+        // For gravity in -CONTACT_DIR direction: F_gravity[CONTACT_DIR] = -m*g
+        // Stored as -F_gravity = +m*g (POSITIVE value causes motion in -CONTACT_DIR)
+        // Wait, let me check the original code logic for x-direction:
+        // Original: pushed in -x, contact on left (x=0 plane), worked correctly
+        // So positive f_gravity_neg causes motion in -CONTACT_DIR
+        f_gravity_neg->data()[node * 3 + SFEM_CONTACT_DIR] = mass_diag->data()[node * 3 + SFEM_CONTACT_DIR] * SFEM_GRAVITY;
     }
     // Apply BC to gravity force (zero at constrained DOFs)
     f->set_value_to_constrained_dofs(0.0, f_gravity_neg->data());
@@ -648,12 +706,11 @@ int test_mooney_rivlin_gravity() {
 
     // Contact parameters (LEFT side contact, same as original)
     real_t SFEM_CONTACT_PLANE = -0.1;  // Position of contact plane (left of x=0)
-    int SFEM_CONTACT_DIR = 0;          // Contact direction: 0=x, 1=y, 2=z
+    // Note: SFEM_CONTACT_DIR is declared earlier (before gravity setup)
     SFEM_READ_ENV(SFEM_CONTACT_PLANE, atof);
-    SFEM_READ_ENV(SFEM_CONTACT_DIR, atoi);
 
-    // Obstacle type: 0=flat, 1=triangular (NOT RECOMMENDED), 2=stepped
-    int SFEM_OBSTACLE_TYPE = 0;
+    // Obstacle type: 0=flat, 1=triangular (NOT RECOMMENDED), 2=stepped, 4=hemisphere
+    int SFEM_OBSTACLE_TYPE = 4;
     real_t SFEM_OBSTACLE_SLOPE = 0.2;  // For triangular: slope per unit y
     int SFEM_SLOPE_DIR = 1;            // Direction for slope (1=y, 2=z)
     
@@ -667,16 +724,15 @@ int test_mooney_rivlin_gravity() {
     SFEM_READ_ENV(SFEM_STEP_HEIGHT, atof);
     SFEM_READ_ENV(SFEM_STEP_DEPTH, atof);
     
-    // Penalty contact parameters (for obstacle type 3)
-    real_t SFEM_PENALTY_PARAM = 100000.0;  // Penalty stiffness for contact
-    SFEM_READ_ENV(SFEM_PENALTY_PARAM, atof);
-    
-    // Legacy support
-    int SFEM_TRIANGULAR_OBSTACLE = 0;
-    SFEM_READ_ENV(SFEM_TRIANGULAR_OBSTACLE, atoi);
-    if (SFEM_TRIANGULAR_OBSTACLE && SFEM_OBSTACLE_TYPE == 0) {
-        SFEM_OBSTACLE_TYPE = 1;  // Triangular
-    }
+    // Hemisphere obstacle parameters (type=4)
+    real_t SFEM_HEMISPHERE_CENTER_X = 1.0;   // Default: center of mesh in x
+    real_t SFEM_HEMISPHERE_CENTER_Y = -0.3;  // Below the mesh
+    real_t SFEM_HEMISPHERE_CENTER_Z = 0.5;   // Center of mesh in z
+    real_t SFEM_HEMISPHERE_RADIUS = 0.5;
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_X, atof);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Y, atof);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_CENTER_Z, atof);
+    SFEM_READ_ENV(SFEM_HEMISPHERE_RADIUS, atof);
 
     // Get reference coordinates for obstacle
     auto coords = mesh->points();
@@ -684,10 +740,7 @@ int test_mooney_rivlin_gravity() {
     // Store contact node indices
     std::vector<ptrdiff_t> contact_node_indices;
 
-    // Penalty contact (type=3) uses CG solver, not MPRGP
-    bool use_penalty_contact = (SFEM_ENABLE_CONTACT && SFEM_OBSTACLE_TYPE == 3);
-
-    if (!SFEM_ENABLE_CONTACT || use_penalty_contact) {
+    if (!SFEM_ENABLE_CONTACT) {
         auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
         cg->set_n_dofs(ndofs);
         cg->set_max_it(2000);
@@ -698,17 +751,13 @@ int test_mooney_rivlin_gravity() {
         cg->set_preconditioner_op(jacobi);
 
         solver = cg;
-        
-        if (use_penalty_contact) {
-            printf("Using PENALTY contact method with parameter %.2e\n", SFEM_PENALTY_PARAM);
-        }
-
     } else {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
-        // For non-flat obstacles, use ALL nodes for contact detection
-        if (SFEM_OBSTACLE_TYPE != 0) {
+        // For stepped/triangular obstacles, use ALL nodes for contact detection
+        // For hemisphere, use left boundary nodes (same as flat plane)
+        if (SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) {
             contact_node_indices.resize(n_nodes);
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 contact_node_indices[i] = i;
@@ -716,12 +765,16 @@ int test_mooney_rivlin_gravity() {
             printf("Non-flat obstacle (type=%d): using ALL %ld nodes for contact detection\n", 
                    SFEM_OBSTACLE_TYPE, (long)n_nodes);
         } else {
-            // For flat plane, only use left boundary nodes
+            // For flat plane and hemisphere, only use left boundary nodes
             auto lnodes = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
             const ptrdiff_t nbnodes = lnodes->size();
             contact_node_indices.resize(nbnodes);
             for (ptrdiff_t i = 0; i < nbnodes; i++) {
                 contact_node_indices[i] = lnodes->data()[i];
+            }
+            if (SFEM_OBSTACLE_TYPE == 4) {
+                printf("Hemisphere obstacle (type=%d): using %ld left boundary nodes\n", 
+                       SFEM_OBSTACLE_TYPE, (long)nbnodes);
             }
         }
 
@@ -754,6 +807,21 @@ int test_mooney_rivlin_gravity() {
                 SFEM_OBSTACLE_SLOPE,
                 SFEM_CONTACT_DIR,
                 SFEM_SLOPE_DIR,
+                block_size,
+                ndofs);
+        } else if (SFEM_OBSTACLE_TYPE == 4) {
+            // Hemisphere obstacle
+            compute_contact_lower_bound_hemisphere(
+                lower_bound->data(),
+                x->data(),
+                coords_ptr,
+                contact_node_indices.data(),
+                (ptrdiff_t)contact_node_indices.size(),
+                SFEM_HEMISPHERE_CENTER_X,
+                SFEM_HEMISPHERE_CENTER_Y,
+                SFEM_HEMISPHERE_CENTER_Z,
+                SFEM_HEMISPHERE_RADIUS,
+                SFEM_CONTACT_DIR,
                 block_size,
                 ndofs);
         } else {
@@ -792,8 +860,8 @@ int test_mooney_rivlin_gravity() {
     printf("Mesh: %ld nodes, %ld DOFs\n", (long)n_nodes, (long)ndofs);
     printf("Newmark parameters: beta=%.2f, gamma=%.2f, c0=%.2e, dt=%.3f, density=%.1f\n", beta_nm, gamma_nm, c0, dt, density);
     printf("Time: T=%.2f, dt=%.3f\n", SFEM_T, dt);
-    printf("Gravity: %.2f m/s^2 in -x direction\n", SFEM_GRAVITY);
-    printf("Contact: plane at x=%.2f, enabled=%d, obstacle_type=%d\n", SFEM_CONTACT_PLANE, SFEM_ENABLE_CONTACT, SFEM_OBSTACLE_TYPE);
+    printf("Gravity: %.2f m/s^2 in direction %d\n", SFEM_GRAVITY, -SFEM_CONTACT_DIR);
+    printf("Contact: enabled=%d, obstacle_type=%d\n", SFEM_ENABLE_CONTACT, SFEM_OBSTACLE_TYPE);
     if (SFEM_OBSTACLE_TYPE == 1) {
         printf("Triangular obstacle (MPRGP): slope=%.3f in direction %d\n", SFEM_OBSTACLE_SLOPE, SFEM_SLOPE_DIR);
         printf("  WARNING: May have penetration issues with box constraints!\n");
@@ -803,10 +871,9 @@ int test_mooney_rivlin_gravity() {
         printf("Stepped obstacle (MPRGP): step_height=%.3f, step_depth=%.3f\n", SFEM_STEP_HEIGHT, SFEM_STEP_DEPTH);
         printf("  Obstacle equation: x_contact = %.2f + floor(coord[%d]/%.3f) * %.3f\n", 
                SFEM_CONTACT_PLANE, SFEM_SLOPE_DIR, SFEM_STEP_HEIGHT, SFEM_STEP_DEPTH);
-    } else if (SFEM_OBSTACLE_TYPE == 3) {
-        printf("Triangular obstacle (PENALTY): slope=%.3f, penalty=%.2e\n", SFEM_OBSTACLE_SLOPE, SFEM_PENALTY_PARAM);
-        printf("  Obstacle equation: x_contact = %.2f + %.3f * coord[%d]\n", 
-               SFEM_CONTACT_PLANE, SFEM_OBSTACLE_SLOPE, SFEM_SLOPE_DIR);
+    } else if (SFEM_OBSTACLE_TYPE == 4) {
+        printf("Hemisphere obstacle (MPRGP): center=(%.3f, %.3f, %.3f), radius=%.3f\n",
+               SFEM_HEMISPHERE_CENTER_X, SFEM_HEMISPHERE_CENTER_Y, SFEM_HEMISPHERE_CENTER_Z, SFEM_HEMISPHERE_RADIUS);
     }
 
     // Export obstacle mesh for visualization
@@ -825,8 +892,15 @@ int test_mooney_rivlin_gravity() {
                                          SFEM_STEP_DEPTH,
                                          n_steps,
                                          z_min, z_max);
-        } else if (SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 3) {
-            // Triangular obstacle (both MPRGP and penalty versions)
+        } else if (SFEM_OBSTACLE_TYPE == 4) {
+            // Hemisphere obstacle
+            export_hemisphere_obstacle_mesh("test_mooney_rivlin_gravity",
+                                            SFEM_HEMISPHERE_CENTER_X,
+                                            SFEM_HEMISPHERE_CENTER_Y,
+                                            SFEM_HEMISPHERE_CENTER_Z,
+                                            SFEM_HEMISPHERE_RADIUS);
+        } else if (SFEM_OBSTACLE_TYPE == 1) {
+            // Triangular obstacle
             export_obstacle_mesh("test_mooney_rivlin_gravity",
                                 SFEM_CONTACT_PLANE,
                                 SFEM_OBSTACLE_SLOPE,
@@ -889,6 +963,21 @@ int test_mooney_rivlin_gravity() {
                     SFEM_SLOPE_DIR,
                     block_size,
                     ndofs);
+            } else if (SFEM_OBSTACLE_TYPE == 4) {
+                // Hemisphere obstacle
+                compute_contact_lower_bound_hemisphere(
+                    lower_bound->data(),
+                    x->data(),
+                    coords_ptr,
+                    contact_node_indices.data(),
+                    (ptrdiff_t)contact_node_indices.size(),
+                    SFEM_HEMISPHERE_CENTER_X,
+                    SFEM_HEMISPHERE_CENTER_Y,
+                    SFEM_HEMISPHERE_CENTER_Z,
+                    SFEM_HEMISPHERE_RADIUS,
+                    SFEM_CONTACT_DIR,
+                    block_size,
+                    ndofs);
             } else if (SFEM_OBSTACLE_TYPE == 1) {
                 // Triangular obstacle
                 compute_contact_lower_bound_triangular(
@@ -941,24 +1030,6 @@ int test_mooney_rivlin_gravity() {
             real_t f_grav_norm = blas->norm2(ndofs, f_gravity_neg->data());
             blas->axpy(ndofs, 1.0, f_gravity_neg->data(), rhs->data());
 
-            // Penalty contact force (type=3)
-            real_t f_contact_norm = 0.0;
-            if (use_penalty_contact) {
-                geom_t* const* coords_ptr = coords->data();
-                compute_penalty_contact_force(
-                    rhs->data(),
-                    x->data(),
-                    coords_ptr,
-                    n_nodes,
-                    SFEM_CONTACT_PLANE,
-                    SFEM_OBSTACLE_SLOPE,
-                    SFEM_CONTACT_DIR,
-                    SFEM_SLOPE_DIR,
-                    block_size,
-                    SFEM_PENALTY_PARAM);
-                // Note: penalty force is added directly to rhs (residual)
-            }
-
             // Apply BC to residual
             f->set_value_to_constrained_dofs(0.0, rhs->data());
             real_t r_norm = blas->norm2(ndofs, rhs->data());
@@ -1006,21 +1077,6 @@ int test_mooney_rivlin_gravity() {
                 }
             }
             
-            // Add penalty contact stiffness to diagonal (type=3)
-            if (use_penalty_contact) {
-                geom_t* const* coords_ptr = coords->data();
-                compute_penalty_contact_hessian_diag(
-                    diag->data(),
-                    x->data(),
-                    coords_ptr,
-                    n_nodes,
-                    SFEM_CONTACT_PLANE,
-                    SFEM_OBSTACLE_SLOPE,
-                    SFEM_CONTACT_DIR,
-                    SFEM_SLOPE_DIR,
-                    block_size,
-                    SFEM_PENALTY_PARAM);
-            }
             jacobi->set_diag(diag);
 
             blas->scal(ndofs, -1.0, rhs->data());
@@ -1030,7 +1086,7 @@ int test_mooney_rivlin_gravity() {
             // u = u + dx
             blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
 
-            if (SFEM_ENABLE_CONTACT && !use_penalty_contact) {
+            if (SFEM_ENABLE_CONTACT) {
                 blas->axpy(ndofs, -1, delta_x->data(), lower_bound->data());
             }
         }
