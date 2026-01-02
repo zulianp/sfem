@@ -221,16 +221,16 @@ def plot_roofline(
     y_min, y_max = nice_log_limits(perf_vals, pad=6.0)
 
     # 16:9 aspect ratio (presentation-friendly), smaller footprint
-    fig, ax = plt.subplots(figsize=(9.6 * 0.75, 5.4 * 0.75), dpi=170, constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(9.6 * 0.75, 5.4 * 0.5), dpi=170, constrained_layout=True)
 
     # Roofline curve and compute roof
-    ax.loglog(oi_curve, roof, linewidth=2.2, color="black", label="Roofline: min(Peak, BW·OI)")
+    ax.loglog(oi_curve, roof, linewidth=2.2, color="black", label="Min(Peak, BW·OI)")
     ax.axhline(peak_gflops,
                linewidth=1.4,
                linestyle="--",
                color="black",
                alpha=0.75,
-               label=f"Compute peak = {peak_gflops:.0f} GFLOP/s")
+               label=f"Peak = {peak_gflops:.0f} GFLOP/s")
 
     # Ridge point marker
     ax.axvline(ridge_oi,
@@ -289,7 +289,7 @@ def plot_roofline(
                 label,
                 (p.op_intensity, p.achieved_gflops),
                 textcoords="offset points",
-                xytext=(12, -24),
+                xytext=(12, -28),
                 fontsize=9,
                 bbox=dict(boxstyle="round,pad=0.20", alpha=0.12, linewidth=0.6),
             )
@@ -326,7 +326,7 @@ def plot_roofline(
 
     handles, labels = ax.get_legend_handles_labels()
     handles = [proxy_ach, proxy_roof] + handles
-    labels = ["Achieved", "Theoretical bound @ OI"] + labels
+    labels = ["Achieved", "Theoretical (OI)"] + labels
     ax.legend(handles, labels, loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=9, frameon=True)
 
     # Add a small info box (numbers used)
@@ -389,7 +389,8 @@ def main() -> None:
         points=points,
         peak_gflops=peak_gflops,
         mem_bw_gbs=mem_bw_gbs,
-        title="Laplace operator, NVIDIA Grace CPU (72 cores)",
+        # title="Laplace operator, NVIDIA Grace CPU (72 cores)",
+        title=None,
         out_png=Path(args.out_png) if args.out_png else None,
         out_pdf=Path(args.out_pdf) if args.out_pdf else None,
     )
