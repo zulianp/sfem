@@ -5,6 +5,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/////////////////////////////////////////////////////////////////////////
+// Function: call_tet4_resample_field_adjoint_hex_quad_kernel_gpu
+/////////////////////////////////////////////////////////////////////////
 void                                                                                       //
 call_tet4_resample_field_adjoint_hex_quad_kernel_gpu(const ptrdiff_t      start_element,   // Mesh
                                                      const ptrdiff_t      end_element,     //
