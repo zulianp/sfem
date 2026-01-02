@@ -220,7 +220,6 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     op->set_C01(PAPER_C01);
     op->set_K(PAPER_K);
     op->set_dt(dt);
-    op->set_use_flexible(true);
     
     // Option to test pure elastic (for debugging)
     bool pure_elastic = (strain_rate >= 10000.0);  // Use very high rate as "pure elastic" test

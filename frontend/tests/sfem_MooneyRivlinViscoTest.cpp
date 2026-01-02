@@ -2,12 +2,39 @@
 #include <stdio.h>
 #include <chrono>
 #include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_bsr_SpMV.hpp"
 #include "sfem_test.h"
+
+
+static void compute_contact_lower_bound(
+    real_t* lower_bound,
+    const real_t* displacement,
+    const ptrdiff_t* contact_nodes,
+    const ptrdiff_t n_contact_nodes,
+    const real_t contact_plane,
+    const int contact_dir,
+    const int block_size,
+    const ptrdiff_t ndofs,
+    const real_t default_lb = -1000.0)
+{
+    for (ptrdiff_t i = 0; i < ndofs; i++) {
+        lower_bound[i] = default_lb;
+    }
+    for (ptrdiff_t i = 0; i < n_contact_nodes; i++) {
+        const ptrdiff_t node_idx = contact_nodes[i];
+        const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
+        const real_t current_disp = displacement[dof_idx];
+        lower_bound[dof_idx] = contact_plane - current_disp;
+    }
+}
+
 
 std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto fs = f->space();
@@ -29,11 +56,9 @@ int test_mooney_rivlin_visco_relaxation() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    // Read environment variables
     int SFEM_BASE_RESOLUTION = 10;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    // 1. Create Mesh (4:1:1 ratio)
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,
@@ -73,23 +98,74 @@ int test_mooney_rivlin_visco_relaxation() {
     real_t dt = SFEM_DT;
     op->set_dt(dt);
 
-    int SFEM_USE_FLEXIBLE_HESSIAN = 0;
-    SFEM_READ_ENV(SFEM_USE_FLEXIBLE_HESSIAN, atoi);
-    op->set_use_flexible(SFEM_USE_FLEXIBLE_HESSIAN != 0);
 
     int SFEM_ENABLE_CONTACT = false;
     SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
 
-    if (SFEM_USE_FLEXIBLE_HESSIAN) {
-        printf("Using FLEXIBLE hessian (loop-based)\n");
-    } else {
-        printf("Using FIXED hessian (unrolled, 10 Prony terms)\n");
+    // WLF temperature shift parameters (set BEFORE Prony terms to avoid redundant calculations)
+    int SFEM_USE_WLF = 1;
+    real_t SFEM_WLF_C1 = 16.6253;
+    real_t SFEM_WLF_C2 = 47.4781;
+    real_t SFEM_WLF_T_REF = -54.29;
+    real_t SFEM_TEMPERATURE = 20.0;
+    SFEM_READ_ENV(SFEM_USE_WLF, atoi);
+    SFEM_READ_ENV(SFEM_WLF_C1, atof);
+    SFEM_READ_ENV(SFEM_WLF_C2, atof);
+    SFEM_READ_ENV(SFEM_WLF_T_REF, atof);
+    SFEM_READ_ENV(SFEM_TEMPERATURE, atof);
+    
+    if (SFEM_USE_WLF) {
+        // Set WLF params and enable BEFORE setting Prony terms
+        op->set_wlf_params(SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF);
+        op->set_temperature(SFEM_TEMPERATURE);
+        op->enable_wlf(true);
+        printf("WLF enabled: C1=%.4f, C2=%.4f, T_ref=%.2f, T=%.2f\n",
+               SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF, SFEM_TEMPERATURE);
+        fflush(stdout);
     }
 
-    // 10 Prony terms (for fixed version)
-    real_t g_prony[]   = {0.10, 0.08, 0.07, 0.06, 0.05, 0.05, 0.04, 0.04, 0.03, 0.03};
-    real_t tau_prony[] = {0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0, 3000.0};
-    op->set_prony_terms(10, g_prony, tau_prony);
+    // Prony series parameters from environment
+    // Format: comma-separated values, e.g., "0.15,0.15,0.10,0.05"
+    // Default: 4 terms with sum(g) = 0.45, g_inf = 0.55
+    std::vector<real_t> g_prony   = {0.15, 0.15, 0.10, 0.05};
+    std::vector<real_t> tau_prony = {0.1, 1.0, 10.0, 100.0};
+    
+    // Read from environment if provided
+    const char* env_g   = getenv("SFEM_PRONY_G");
+    const char* env_tau = getenv("SFEM_PRONY_TAU");
+    
+    if (env_g && env_tau) {
+        g_prony.clear();
+        tau_prony.clear();
+        
+        // Parse comma-separated g values
+        std::string g_str(env_g);
+        std::stringstream g_ss(g_str);
+        std::string token;
+        while (std::getline(g_ss, token, ',')) {
+            g_prony.push_back(std::stod(token));
+        }
+        
+        // Parse comma-separated tau values
+        std::string tau_str(env_tau);
+        std::stringstream tau_ss(tau_str);
+        while (std::getline(tau_ss, token, ',')) {
+            tau_prony.push_back(std::stod(token));
+        }
+        
+        if (g_prony.size() != tau_prony.size()) {
+            printf("Error: SFEM_PRONY_G and SFEM_PRONY_TAU must have the same number of terms!\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        
+        printf("Prony series from environment: %zu terms\n", g_prony.size());
+        for (size_t i = 0; i < g_prony.size(); ++i) {
+            printf("  term %zu: g=%.6f, tau=%.6f\n", i+1, g_prony[i], tau_prony[i]);
+        }
+    }
+    
+    // set_prony_terms will call compute_prony_coefficients() with WLF already enabled
+    op->set_prony_terms((int)g_prony.size(), g_prony.data(), tau_prony.data());
 
     op->initialize();
     op->initialize_history();
@@ -100,7 +176,7 @@ int test_mooney_rivlin_visco_relaxation() {
             mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < 1e-5; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 1.0 - 1e-5; });
+            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 2.0 - 1e-5; });
 
     if (!SFEM_ENABLE_CONTACT) {
         sfem::DirichletConditions::Condition left_bc_x{.sidesets = left_sideset, .value = 0, .component = 0};
@@ -180,6 +256,15 @@ int test_mooney_rivlin_visco_relaxation() {
     auto                                                  jacobi = sfem::create_shiftable_jacobi(diag, es);
     sfem::SharedBuffer<real_t>                            lower_bound;
 
+    // Contact parameters
+    real_t SFEM_CONTACT_PLANE = -0.1;  // Position of contact plane
+    int SFEM_CONTACT_DIR = 0;          // Contact direction: 0=x, 1=y, 2=z
+    SFEM_READ_ENV(SFEM_CONTACT_PLANE, atof);
+    SFEM_READ_ENV(SFEM_CONTACT_DIR, atoi);
+
+    // Store contact node indices
+    std::vector<ptrdiff_t> contact_node_indices;
+
     if (!SFEM_ENABLE_CONTACT) {
         auto cg = sfem::create_cg<real_t>(linear_op_apply, es);
         cg->set_n_dofs(ndofs);
@@ -197,22 +282,30 @@ int test_mooney_rivlin_visco_relaxation() {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
-        {  // Fill default upper-bound value
-            auto lb = lower_bound->data();
-            for (ptrdiff_t i = 0; i < ndofs; i++) {
-                lb[i] = -1000;
-            }
-
-            auto      lnodes  = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
-            const ptrdiff_t nbnodes = lnodes->size();
-            for (ptrdiff_t i = 0; i < nbnodes; i++) {
-                const ptrdiff_t idx  = lnodes->data()[i];
-                lb[idx * block_size] = 0;
-            }
+        // Get contact boundary nodes
+        auto lnodes = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
+        const ptrdiff_t nbnodes = lnodes->size();
+        contact_node_indices.resize(nbnodes);
+        for (ptrdiff_t i = 0; i < nbnodes; i++) {
+            contact_node_indices[i] = lnodes->data()[i];
         }
+
+        // Initial lower bound computation (displacement = 0 at start)
+        compute_contact_lower_bound(
+            lower_bound->data(),
+            x->data(),  // Initial displacement
+            contact_node_indices.data(),
+            (ptrdiff_t)contact_node_indices.size(),
+            SFEM_CONTACT_PLANE,
+            SFEM_CONTACT_DIR,
+            block_size,
+            ndofs);
 
         mprgp->verbose = false;
         mprgp->set_lower_bound(lower_bound);
+        mprgp->set_preconditioner_op(jacobi);  // Must set preconditioner!
+        mprgp->set_max_it(2000);
+        mprgp->set_rtol(1e-5);
 
         solver = mprgp;
     }
@@ -259,13 +352,21 @@ int test_mooney_rivlin_visco_relaxation() {
         blas->copy(ndofs, v->data(), v_pred->data());
         blas->axpy(ndofs, (1.0 - gamma_nm) * dt, a->data(), v_pred->data());
 
-        if (SFEM_ENABLE_CONTACT) {
-            blas->axpy(ndofs, 1, x->data(), lower_bound->data());
-            blas->axpy(ndofs, -1, u_pred->data(), lower_bound->data());
-        }
-
         // Use prediction as initial guess for Newton
         blas->copy(ndofs, u_pred->data(), x->data());
+
+        // Compute lower_bound based on current displacement (before solve)
+        if (SFEM_ENABLE_CONTACT && !contact_node_indices.empty()) {
+            compute_contact_lower_bound(
+                lower_bound->data(),
+                x->data(),
+                contact_node_indices.data(),
+                (ptrdiff_t)contact_node_indices.size(),
+                SFEM_CONTACT_PLANE,
+                SFEM_CONTACT_DIR,
+                block_size,
+                ndofs);
+        }
 
         // Newton Loop with Inertia
         for (int iter = 0; iter < 20; ++iter) {
@@ -295,7 +396,7 @@ int test_mooney_rivlin_visco_relaxation() {
             if (iter == 0) {
                 real_t x_norm       = blas->norm2(ndofs, x->data());
                 real_t inertia_norm = blas->norm2(ndofs, inertia_term->data());
-                printf("    |u|=%e, |M*a|=%e, |F_int|=%e, |F_ext|=%e\n", x_norm, inertia_norm, f_int_norm, f_ext_norm);
+                // printf("    |u|=%e, |M*a|=%e, |F_int|=%e, |F_ext|=%e\n", x_norm, inertia_norm, f_int_norm, f_ext_norm);
             }
 
             // Apply BC to residual
@@ -353,9 +454,9 @@ int test_mooney_rivlin_visco_relaxation() {
 
             // u = u + dx
             real_t dx_norm = blas->norm2(ndofs, delta_x->data());
-            if (iter == 0) {
-                printf("    |dx|=%e\n", dx_norm);
-            }
+            // if (iter == 0) {
+            //     printf("    |dx|=%e\n", dx_norm);
+            // }
             blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
 
             if (SFEM_ENABLE_CONTACT) {

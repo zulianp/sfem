@@ -30,18 +30,13 @@ namespace sfem {
         void set_dt(const real_t val);
         void set_prony_terms(const int n, const real_t *g, const real_t *tau);
         
-        // Initialize history buffer
+        // Initialize history buffer (computes coefficients + allocates buffers)
+        // Must be called after setting all parameters
         void initialize_history();
         
-        // Set flexible mode:
-        // false = FIXED (stores S_dev, hardcoded 10 Prony terms)
-        // true  = FLEXIBLE (stores only H_i, uses precomputed alpha/beta/gamma, optimized)
-        void set_use_flexible(bool flexible);
-        
-        // Set moduli type:
-        // false = C10, C01 are long-term (equilibrium) moduli, gamma = g_inf + sum(beta_i)
-        // true  = C10, C01 are instantaneous (short-term) moduli, gamma = 1
-        void set_use_instantaneous_moduli(bool use_instant);
+        // Reinitialize coefficients after parameter changes (e.g., temperature)
+        // Only recomputes coefficients; reallocates history buffer if num_active_terms changed
+        void reinitialize();
         
         // WLF (Williams-Landel-Ferry) time-temperature superposition
         // Formula: log10(a_T) = C1 * (T - T_ref) / (C2 + T - T_ref)

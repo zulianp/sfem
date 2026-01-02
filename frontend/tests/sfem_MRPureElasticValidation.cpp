@@ -17,7 +17,6 @@
  * Operators exercised:
  * - MooneyRivlinVisco::set_C10, set_C01, set_K
  * - MooneyRivlinVisco::set_prony_terms(0, ...) for pure elastic
- * - MooneyRivlinVisco::set_use_flexible(true/false)
  * - MooneyRivlinVisco::initialize, initialize_history
  * - MooneyRivlinVisco::gradient (to compute reaction forces)
  * - MooneyRivlinVisco::get_gamma, get_num_active_terms
@@ -199,7 +198,6 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     op->set_prony_terms(0, nullptr, nullptr);
     
     // Test both flexible and non-flexible paths
-    op->set_use_flexible(use_flexible);
     
     op->initialize();
     op->initialize_history();
@@ -399,7 +397,6 @@ int main(int argc, char *argv[]) {
     printf("Operators being tested:\n");
     printf("  - MooneyRivlinVisco::set_C10, set_C01, set_K\n");
     printf("  - MooneyRivlinVisco::set_prony_terms(0, ...)\n");
-    printf("  - MooneyRivlinVisco::set_use_flexible()\n");
     printf("  - MooneyRivlinVisco::initialize(), initialize_history()\n");
     printf("  - MooneyRivlinVisco::gradient()\n");
     printf("  - MooneyRivlinVisco::get_gamma(), get_num_active_terms()\n");
