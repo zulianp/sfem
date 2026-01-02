@@ -13,37 +13,38 @@
 #include "sfem_macros.h"
 #include "utils.h"
 
-int array_read(MPI_Comm     comm,    //
-               const char  *path,    //
-               MPI_Datatype type,    //
-               void        *data,    //
-               ptrdiff_t    nlocal,  //
-               ptrdiff_t    nglobal) {  //
+// int array_read(MPI_Comm     comm,    //
+//                const char  *path,    //
+//                MPI_Datatype type,    //
+//                void        *data,    //
+//                ptrdiff_t    nlocal,  //
+//                ptrdiff_t    nglobal) {  //
 
-    if (nglobal >= (ptrdiff_t)INT_MAX) {
-        // Comunication free fallback by exploiting global information
-        return array_read_segmented(comm, path, type, data, INT_MAX, nlocal, nglobal);
-    }
+//     if (nglobal >= (ptrdiff_t)INT_MAX) {
+//         // Comunication free fallback by exploiting global information
+//         return array_read_segmented(comm, path, type, data, INT_MAX, nlocal, nglobal);
+//     }
 
-    int mpi_rank, mpi_size;
-    MPI_Comm_rank(comm, &mpi_rank);
-    MPI_Comm_size(comm, &mpi_size);
+//     int mpi_rank, mpi_size;
+//     MPI_Comm_rank(comm, &mpi_rank);
+//     MPI_Comm_size(comm, &mpi_size);
 
-    assert(nlocal <= nglobal);
+//     assert(nlocal <= nglobal);
 
-    MPI_Status status;
-    MPI_Offset nbytes;
-    MPI_File   file;
-    int        type_size;
-}
+//     MPI_Status status;
+//     MPI_Offset nbytes;
+//     MPI_File   file;
+//     int        type_size;
+// }
 
-int read_mapped_field(MPI_Comm           comm,        //
-                      const char        *input_path,  //
-                      const ptrdiff_t    n_local,     //
-                      const ptrdiff_t    n_global,    //
-                      const idx_t *const mapping,     //
-                      MPI_Datatype       data_type,   //
-                      void *const        data_out) {         //
+int                                               //
+read_mapped_field(MPI_Comm           comm,        //
+                  const char        *input_path,  //
+                  const ptrdiff_t    n_local,     //
+                  const ptrdiff_t    n_global,    //
+                  const idx_t *const mapping,     //
+                  MPI_Datatype       data_type,   //
+                  void *const        data_out) {         //
     int rank, size;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -62,8 +63,11 @@ int read_mapped_field(MPI_Comm           comm,        //
     }
 
     // Read this rank's contiguous chunk of the global field
-    uint8_t *local_chunk = (uint8_t *)malloc((size_t)local_size * (size_t)type_size);
-    if (!local_chunk) return SFEM_FAILURE;
+    uint8_t *local_chunk = NULL;
+    if (local_size > 0) {
+        local_chunk = (uint8_t *)malloc((size_t)local_size * (size_t)type_size);
+        if (!local_chunk) return SFEM_FAILURE;
+    }
 
     int err = array_read(comm, input_path, data_type, (void *)local_chunk, local_size, n_global);
     if (err) {
@@ -122,10 +126,15 @@ int read_mapped_field(MPI_Comm           comm,        //
     const ptrdiff_t total_recv_req = (ptrdiff_t)recv_displs[size - 1] + (ptrdiff_t)recv_req_count[size - 1];
 
     // Pack requests: global indices + local positions (for unpack)
-    idx_t     *req_list     = (idx_t *)malloc((size_t)n_local * sizeof(idx_t));
-    ptrdiff_t *local_pos    = (ptrdiff_t *)malloc((size_t)n_local * sizeof(ptrdiff_t));
-    count_t   *book_keeping = (count_t *)calloc((size_t)size, sizeof(count_t));
-    if (!req_list || !local_pos || !book_keeping) {
+    idx_t     *req_list  = NULL;
+    ptrdiff_t *local_pos = NULL;
+    if (n_local > 0) {
+        req_list  = (idx_t *)malloc((size_t)n_local * sizeof(idx_t));
+        local_pos = (ptrdiff_t *)malloc((size_t)n_local * sizeof(ptrdiff_t));
+    }
+
+    count_t *book_keeping = (count_t *)calloc((size_t)size, sizeof(count_t));
+    if ((n_local > 0 && (!req_list || !local_pos)) || !book_keeping) {
         free(book_keeping);
         free(local_pos);
         free(req_list);
@@ -153,17 +162,20 @@ int read_mapped_field(MPI_Comm           comm,        //
         book_keeping[src_rank]++;
     }
 
-    idx_t *recv_req_list = (idx_t *)malloc((size_t)total_recv_req * sizeof(idx_t));
-    if (!recv_req_list) {
-        free(book_keeping);
-        free(local_pos);
-        free(req_list);
-        free(recv_displs);
-        free(req_displs);
-        free(recv_req_count);
-        free(req_count);
-        free(local_chunk);
-        return SFEM_FAILURE;
+    idx_t *recv_req_list = NULL;
+    if (total_recv_req > 0) {
+        recv_req_list = (idx_t *)malloc((size_t)total_recv_req * sizeof(idx_t));
+        if (!recv_req_list) {
+            free(book_keeping);
+            free(local_pos);
+            free(req_list);
+            free(recv_displs);
+            free(req_displs);
+            free(recv_req_count);
+            free(req_count);
+            free(local_chunk);
+            return SFEM_FAILURE;
+        }
     }
 
     // Exchange requested indices
@@ -171,18 +183,21 @@ int read_mapped_field(MPI_Comm           comm,        //
             req_list, req_count, req_displs, SFEM_MPI_IDX_T, recv_req_list, recv_req_count, recv_displs, SFEM_MPI_IDX_T, comm));
 
     // Build response buffer for received requests (same ordering as recv_req_list)
-    uint8_t *send_resp = (uint8_t *)malloc((size_t)total_recv_req * (size_t)type_size);
-    if (!send_resp) {
-        free(recv_req_list);
-        free(book_keeping);
-        free(local_pos);
-        free(req_list);
-        free(recv_displs);
-        free(req_displs);
-        free(recv_req_count);
-        free(req_count);
-        free(local_chunk);
-        return SFEM_FAILURE;
+    uint8_t *send_resp = NULL;
+    if (total_recv_req > 0) {
+        send_resp = (uint8_t *)malloc((size_t)total_recv_req * (size_t)type_size);
+        if (!send_resp) {
+            free(recv_req_list);
+            free(book_keeping);
+            free(local_pos);
+            free(req_list);
+            free(recv_displs);
+            free(req_displs);
+            free(recv_req_count);
+            free(req_count);
+            free(local_chunk);
+            return SFEM_FAILURE;
+        }
     }
 
     for (ptrdiff_t i = 0; i < total_recv_req; ++i) {
@@ -194,19 +209,22 @@ int read_mapped_field(MPI_Comm           comm,        //
     }
 
     // Exchange response data back to requesters
-    uint8_t *recv_resp = (uint8_t *)malloc((size_t)n_local * (size_t)type_size);
-    if (!recv_resp) {
-        free(send_resp);
-        free(recv_req_list);
-        free(book_keeping);
-        free(local_pos);
-        free(req_list);
-        free(recv_displs);
-        free(req_displs);
-        free(recv_req_count);
-        free(req_count);
-        free(local_chunk);
-        return SFEM_FAILURE;
+    uint8_t *recv_resp = NULL;
+    if (n_local > 0) {
+        recv_resp = (uint8_t *)malloc((size_t)n_local * (size_t)type_size);
+        if (!recv_resp) {
+            free(send_resp);
+            free(recv_req_list);
+            free(book_keeping);
+            free(local_pos);
+            free(req_list);
+            free(recv_displs);
+            free(req_displs);
+            free(recv_req_count);
+            free(req_count);
+            free(local_chunk);
+            return SFEM_FAILURE;
+        }
     }
 
     MPI_CATCH_ERROR(
@@ -230,4 +248,30 @@ int read_mapped_field(MPI_Comm           comm,        //
     free(req_count);
     free(local_chunk);
     return SFEM_SUCCESS;
+}
+
+int mesh_read_nodal_field(const mesh_t *const mesh, const char *path, MPI_Datatype data_type, void *const data) {
+    // get MPI rank
+    int mpi_rank;
+    MPI_Comm_rank(mesh->comm, &mpi_rank);
+
+    count_t n_global_nodes = mesh->n_owned_nodes;
+    MPI_CATCH_ERROR(MPI_Allreduce(MPI_IN_PLACE, &n_global_nodes, 1, SFEM_MPI_COUNT_T, MPI_SUM, mesh->comm));
+
+    if (!mesh->node_mapping) {
+#ifndef NDEBUG
+        int size;
+        MPI_Comm_size(mesh->comm, &size);
+        assert(size == 1);
+#endif
+
+        if (mpi_rank == 0) printf("%s:%d: Reading using array_read\n", __FILE__, __LINE__);
+
+        return array_read(mesh->comm, path, data_type, data, mesh->n_owned_nodes, n_global_nodes);
+
+    } else {
+        if (mpi_rank == 0) printf("%s:%d: Reading using read_mapped_field\n", __FILE__, __LINE__);
+
+        return read_mapped_field(mesh->comm, path, mesh->n_owned_nodes, n_global_nodes, mesh->node_mapping, data_type, data);
+    }
 }

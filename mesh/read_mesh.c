@@ -878,7 +878,7 @@ int mesh_read_generic(MPI_Comm comm,
         }
 
         return 0;
-    } else {
+    } else { // else: if (size > 1)
         // Serial fallback
         ///////////////////////////////////////////////////////////////
 
