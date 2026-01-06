@@ -33,6 +33,7 @@
 #include <fstream>
 #include <cstring>
 #include <cassert>
+#include <iomanip>
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -118,6 +119,12 @@ enum TestMode {
 
 static const char* mode_names[] = {"Uniaxial", "PlaneStrain", "Equibiaxial"};
 
+struct ValidationStats {
+    double max_abs_err = 0.0;
+    double max_rel_err = 0.0;
+    double avg_rel_err = 0.0;
+};
+
 // Apply volume-preserving displacement based on mode
 static void apply_displacement(TestMode mode, double lambda, ptrdiff_t n_nodes, 
                                geom_t **pts, real_t *u) {
@@ -166,7 +173,7 @@ static double get_analytical_stress(TestMode mode, double lam, double C10, doubl
 // Main validation test
 // ============================================================================
 
-int run_validation(TestMode mode, double C10, double C01, double K, bool use_flexible) {
+int run_validation(TestMode mode, double C10, double C01, double K, bool use_flexible, ValidationStats &stats) {
     printf("\n========================================\n");
     printf("Testing: %s (C10=%.3f, C01=%.3f, K=%.1f, flexible=%s)\n", 
            mode_names[mode], C10, C01, K, use_flexible ? "true" : "false");
@@ -253,6 +260,7 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     
     // Test range of lambda values
     double max_error = 0.0;
+    double max_abs_error = 0.0;
     double avg_error = 0.0;
     int count = 0;
     
@@ -281,6 +289,7 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
         double sigma_analyt = get_analytical_stress(mode, lam, C10, C01);
         
         // Compute relative error
+        double abs_err = fabs(sigma_sim - sigma_analyt);
         double rel_err = 0.0;
         if (fabs(sigma_analyt) > 1e-10) {
             rel_err = fabs(sigma_sim - sigma_analyt) / fabs(sigma_analyt) * 100.0;
@@ -289,6 +298,7 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
         // Track statistics
         if (lam > 1.01) {  // Skip very small strains
             if (rel_err > max_error) max_error = rel_err;
+            if (abs_err > max_abs_error) max_abs_error = abs_err;
             avg_error += rel_err;
             count++;
         }
@@ -308,6 +318,7 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     
     printf("\n  Summary:\n");
     printf("    Max relative error: %.2f%%\n", max_error);
+    printf("    Max absolute error: %.6e\n", max_abs_error);
     printf("    Avg relative error: %.2f%%\n", avg_error);
     printf("    Results written to: %s\n", filename);
     
@@ -315,6 +326,9 @@ int run_validation(TestMode mode, double C10, double C01, double K, bool use_fle
     bool passed = (max_error < 5.0);  // 5% tolerance for numerical error
     printf("\n  TEST %s (tolerance: 5%%)\n", passed ? "PASSED" : "FAILED");
     
+    stats.max_abs_err = max_abs_error;
+    stats.max_rel_err = max_error;
+    stats.avg_rel_err = avg_error;
     return passed ? 0 : 1;
 }
 
@@ -409,27 +423,88 @@ int main(int argc, char *argv[]) {
     // Generate analytical curves for plotting
     generate_plot_data();
     
+    struct SummaryRow {
+        double C10 = 0.0;
+        double C01 = 0.0;
+        ValidationStats uni;
+        ValidationStats ps;
+        ValidationStats eq;
+    };
+    std::vector<SummaryRow> summary_rows;
+
     // ========== Test Case 1: C10=1, C01=0 (matches website top plot) ==========
     printf("\n\n=== Test Set 1: C10=1, C01=0 (website plot #1) ===\n");
-    
-    total_failures += run_validation(MODE_UNIAXIAL, 1.0, 0.0, K, true);
-    total_failures += run_validation(MODE_PLANE_STRAIN, 1.0, 0.0, K, true);
-    total_failures += run_validation(MODE_EQUIBIAXIAL, 1.0, 0.0, K, true);
+    {
+        SummaryRow row;
+        row.C10 = 1.0;
+        row.C01 = 0.0;
+        total_failures += run_validation(MODE_UNIAXIAL, 1.0, 0.0, K, true, row.uni);
+        total_failures += run_validation(MODE_PLANE_STRAIN, 1.0, 0.0, K, true, row.ps);
+        total_failures += run_validation(MODE_EQUIBIAXIAL, 1.0, 0.0, K, true, row.eq);
+        summary_rows.push_back(row);
+    }
     
     // ========== Test Case 2: C10=0, C01=1 (matches website bottom plot) ==========
     printf("\n\n=== Test Set 2: C10=0, C01=1 (website plot #2) ===\n");
-    
-    total_failures += run_validation(MODE_UNIAXIAL, 0.0, 1.0, K, true);
-    total_failures += run_validation(MODE_PLANE_STRAIN, 0.0, 1.0, K, true);
-    total_failures += run_validation(MODE_EQUIBIAXIAL, 0.0, 1.0, K, true);
+    {
+        SummaryRow row;
+        row.C10 = 0.0;
+        row.C01 = 1.0;
+        total_failures += run_validation(MODE_UNIAXIAL, 0.0, 1.0, K, true, row.uni);
+        total_failures += run_validation(MODE_PLANE_STRAIN, 0.0, 1.0, K, true, row.ps);
+        total_failures += run_validation(MODE_EQUIBIAXIAL, 0.0, 1.0, K, true, row.eq);
+        summary_rows.push_back(row);
+    }
     
     // ========== Test Case 3: User-specified parameters ==========
     if (fabs(C10 - 1.0) > 0.01 || fabs(C01) > 0.01) {
         printf("\n\n=== Test Set 3: User parameters C10=%.3f, C01=%.3f ===\n", C10, C01);
-        
-        total_failures += run_validation(MODE_UNIAXIAL, C10, C01, K, true);
-        total_failures += run_validation(MODE_PLANE_STRAIN, C10, C01, K, true);
-        total_failures += run_validation(MODE_EQUIBIAXIAL, C10, C01, K, true);
+
+        SummaryRow row;
+        row.C10 = C10;
+        row.C01 = C01;
+        total_failures += run_validation(MODE_UNIAXIAL, C10, C01, K, true, row.uni);
+        total_failures += run_validation(MODE_PLANE_STRAIN, C10, C01, K, true, row.ps);
+        total_failures += run_validation(MODE_EQUIBIAXIAL, C10, C01, K, true, row.eq);
+        summary_rows.push_back(row);
+    }
+
+    // Write summary table with scientific notation
+    {
+        std::ofstream csv("mr_pure_elastic_error_summary.csv");
+        csv.setf(std::ios::scientific);
+        csv << std::setprecision(6);
+        csv << "C10,C01,"
+            << "uniaxial_max_abs,uniaxial_max_rel_percent,"
+            << "planershear_max_abs,planershear_max_rel_percent,"
+            << "equibiaxial_max_abs,equibiaxial_max_rel_percent\n";
+        for (const auto &row : summary_rows) {
+            csv << row.C10 << "," << row.C01 << ","
+                << row.uni.max_abs_err << "," << row.uni.max_rel_err << ","
+                << row.ps.max_abs_err << "," << row.ps.max_rel_err << ","
+                << row.eq.max_abs_err << "," << row.eq.max_rel_err << "\n";
+        }
+        csv.close();
+
+        std::ofstream tex("mr_pure_elastic_error_summary.tex");
+        tex.setf(std::ios::scientific);
+        tex << std::setprecision(3);
+        tex << "\\begin{tabular}{lcccccc}\n";
+        tex << "\\hline\n";
+        tex << "Parameters & Uniaxial $|e|$ & Uniaxial $e_{\\%}$ & "
+               "PlanerShear $|e|$ & PlanerShear $e_{\\%}$ & "
+               "Equibiaxial $|e|$ & Equibiaxial $e_{\\%}$ \\\\\n";
+        tex << "\\hline\n";
+        for (const auto &row : summary_rows) {
+            tex << "$C_{10}=" << row.C10 << ",\\ C_{01}=" << row.C01 << "$ & "
+                << row.uni.max_abs_err << " & " << row.uni.max_rel_err << " & "
+                << row.ps.max_abs_err << " & " << row.ps.max_rel_err << " & "
+                << row.eq.max_abs_err << " & " << row.eq.max_rel_err << " \\\\\n";
+        }
+        tex << "\\hline\n";
+        tex << "\\end{tabular}\n";
+        tex.close();
+        printf("\nSummary tables written to: mr_pure_elastic_error_summary.csv, mr_pure_elastic_error_summary.tex\n");
     }
     
     // ========== Summary ==========
@@ -443,4 +518,3 @@ int main(int argc, char *argv[]) {
     MPI_Finalize();
     return total_failures;
 }
-
