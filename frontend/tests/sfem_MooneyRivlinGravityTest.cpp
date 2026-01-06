@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -16,6 +17,7 @@
 static void compute_contact_lower_bound(
     real_t* lower_bound,
     const real_t* displacement,
+    geom_t * const * ref_coords,  // Reference coordinates: ref_coords[dim][node]
     const ptrdiff_t* contact_nodes,
     const ptrdiff_t n_contact_nodes,
     const real_t contact_plane,
@@ -31,7 +33,9 @@ static void compute_contact_lower_bound(
         const ptrdiff_t node_idx = contact_nodes[i];
         const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
         const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx] = contact_plane - current_disp;
+        const real_t ref_coord = ref_coords[contact_dir][node_idx];
+        // Bound on delta_x: u + delta >= contact_plane - ref_coord
+        lower_bound[dof_idx] = contact_plane - ref_coord - current_disp;
     }
 }
 
@@ -110,8 +114,7 @@ static void compute_contact_lower_bound_triangular(
 }
 
 // Hemisphere obstacle: contact with a hemispherical surface
-// Object falls from above (in -y direction) onto the hemisphere
-// Hemisphere equation: (x-cx)² + (y-cy)² + (z-cz)² = R², y ≤ cy (upper hemisphere pointing up)
+// Hemisphere equation: (x-cx)² + (y-cy)² + (z-cz)² = R²
 static void compute_contact_lower_bound_hemisphere(
     real_t* lower_bound,
     const real_t* displacement,
@@ -195,7 +198,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     return output;
 }
 
-// Export obstacle geometry as a simple quad mesh
+// Export sloped obstacle geometry as a simple quad mesh (triangular/plane with slope)
 void export_obstacle_mesh(const std::string &output_dir,
                           real_t base_plane,
                           real_t slope,
@@ -204,27 +207,27 @@ void export_obstacle_mesh(const std::string &output_dir,
                           real_t z_min, real_t z_max) {
     std::string obstacle_dir = output_dir + "/obstacle";
     sfem::create_directory(obstacle_dir.c_str());
-    
+
     // Create 4 corner points of the obstacle plane
     // The plane equation: x = base_plane + slope * y (if slope_dir=1)
     std::vector<float> x_coords(4), y_coords(4), z_coords(4);
-    
+
     if (slope_dir == 1) {  // slope in y direction
         // Point 0: (y_min, z_min)
         x_coords[0] = base_plane + slope * y_min;
         y_coords[0] = y_min;
         z_coords[0] = z_min;
-        
+
         // Point 1: (y_max, z_min)
         x_coords[1] = base_plane + slope * y_max;
         y_coords[1] = y_max;
         z_coords[1] = z_min;
-        
+
         // Point 2: (y_max, z_max)
         x_coords[2] = base_plane + slope * y_max;
         y_coords[2] = y_max;
         z_coords[2] = z_max;
-        
+
         // Point 3: (y_min, z_max)
         x_coords[3] = base_plane + slope * y_min;
         y_coords[3] = y_min;
@@ -234,21 +237,104 @@ void export_obstacle_mesh(const std::string &output_dir,
         x_coords[0] = base_plane + slope * z_min;
         y_coords[0] = y_min;
         z_coords[0] = z_min;
-        
+
         // Point 1: (y_max, z_min)
         x_coords[1] = base_plane + slope * z_min;
         y_coords[1] = y_max;
         z_coords[1] = z_min;
-        
+
         // Point 2: (y_max, z_max)
         x_coords[2] = base_plane + slope * z_max;
         y_coords[2] = y_max;
         z_coords[2] = z_max;
-        
+
         // Point 3: (y_min, z_max)
         x_coords[3] = base_plane + slope * z_max;
         y_coords[3] = y_min;
         z_coords[3] = z_max;
+    }
+
+    // Write coordinates
+    FILE* fx = fopen((obstacle_dir + "/x.raw").c_str(), "wb");
+    FILE* fy = fopen((obstacle_dir + "/y.raw").c_str(), "wb");
+    FILE* fz = fopen((obstacle_dir + "/z.raw").c_str(), "wb");
+    fwrite(x_coords.data(), sizeof(float), 4, fx);
+    fwrite(y_coords.data(), sizeof(float), 4, fy);
+    fwrite(z_coords.data(), sizeof(float), 4, fz);
+    fclose(fx);
+    fclose(fy);
+    fclose(fz);
+
+    // Write quad element (as two triangles: 0-1-2 and 0-2-3)
+    std::vector<int32_t> i0 = {0, 0};
+    std::vector<int32_t> i1 = {1, 2};
+    std::vector<int32_t> i2 = {2, 3};
+
+    FILE* fi0 = fopen((obstacle_dir + "/i0.raw").c_str(), "wb");
+    FILE* fi1 = fopen((obstacle_dir + "/i1.raw").c_str(), "wb");
+    FILE* fi2 = fopen((obstacle_dir + "/i2.raw").c_str(), "wb");
+    fwrite(i0.data(), sizeof(int32_t), 2, fi0);
+    fwrite(i1.data(), sizeof(int32_t), 2, fi1);
+    fwrite(i2.data(), sizeof(int32_t), 2, fi2);
+    fclose(fi0);
+    fclose(fi1);
+    fclose(fi2);
+
+    printf("Obstacle mesh exported to: %s\n", obstacle_dir.c_str());
+    printf("  Corners: (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f) - (%.3f,%.3f,%.3f)\n",
+           x_coords[0], y_coords[0], z_coords[0],
+           x_coords[1], y_coords[1], z_coords[1],
+           x_coords[2], y_coords[2], z_coords[2],
+           x_coords[3], y_coords[3], z_coords[3]);
+}
+
+// Export flat obstacle geometry as a simple quad mesh for a given contact direction
+void export_flat_obstacle_mesh(const std::string &output_dir,
+                               real_t contact_plane,
+                               int contact_dir,
+                               real_t a_min, real_t a_max,
+                               real_t b_min, real_t b_max) {
+    std::string obstacle_dir = output_dir + "/obstacle";
+    sfem::create_directory(obstacle_dir.c_str());
+    
+    int h1, h2;
+    if (contact_dir == 0) { h1 = 1; h2 = 2; }       // x = const, span y,z
+    else if (contact_dir == 1) { h1 = 0; h2 = 2; }  // y = const, span x,z
+    else { h1 = 0; h2 = 1; }                         // z = const, span x,y
+
+    // Create 4 corner points of the obstacle plane
+    std::vector<float> x_coords(4), y_coords(4), z_coords(4);
+
+    float coords[4][3] = {
+        {0.f, 0.f, 0.f},
+        {0.f, 0.f, 0.f},
+        {0.f, 0.f, 0.f},
+        {0.f, 0.f, 0.f},
+    };
+
+    const float a_vals[2] = {static_cast<float>(a_min), static_cast<float>(a_max)};
+    const float b_vals[2] = {static_cast<float>(b_min), static_cast<float>(b_max)};
+
+    coords[0][contact_dir] = static_cast<float>(contact_plane);
+    coords[0][h1] = a_vals[0];
+    coords[0][h2] = b_vals[0];
+
+    coords[1][contact_dir] = static_cast<float>(contact_plane);
+    coords[1][h1] = a_vals[1];
+    coords[1][h2] = b_vals[0];
+
+    coords[2][contact_dir] = static_cast<float>(contact_plane);
+    coords[2][h1] = a_vals[1];
+    coords[2][h2] = b_vals[1];
+
+    coords[3][contact_dir] = static_cast<float>(contact_plane);
+    coords[3][h1] = a_vals[0];
+    coords[3][h2] = b_vals[1];
+
+    for (int i = 0; i < 4; ++i) {
+        x_coords[i] = coords[i][0];
+        y_coords[i] = coords[i][1];
+        z_coords[i] = coords[i][2];
     }
     
     // Write coordinates
@@ -370,35 +456,53 @@ void export_stepped_obstacle_mesh(const std::string &output_dir,
 void export_hemisphere_obstacle_mesh(const std::string &output_dir,
                                      real_t center_x, real_t center_y, real_t center_z,
                                      real_t radius,
+                                     int contact_dir,
                                      int n_segments = 16) {
     std::string obstacle_dir = output_dir + "/obstacle";
     sfem::create_directory(obstacle_dir.c_str());
     
+    int h1, h2;
+    if (contact_dir == 0) { h1 = 1; h2 = 2; }
+    else if (contact_dir == 1) { h1 = 0; h2 = 2; }
+    else { h1 = 0; h2 = 1; }
+
+    real_t center[3] = {center_x, center_y, center_z};
+
     // Generate hemisphere mesh using spherical coordinates
-    // Hemisphere faces +x direction: x = cx + sqrt(R² - (y-cy)² - (z-cz)²)
-    // This matches the contact constraint direction
     int n_rings = n_segments / 2;  // Number of latitude rings
     int n_points = 1 + n_rings * n_segments;  // Tip point + ring points
     int n_triangles = n_segments + (n_rings - 1) * n_segments * 2;  // Tip cap + body
     
     std::vector<float> x_coords(n_points), y_coords(n_points), z_coords(n_points);
     
-    // Tip point of hemisphere (rightmost point, facing +x)
-    x_coords[0] = center_x + radius;
-    y_coords[0] = center_y;
-    z_coords[0] = center_z;
+    // Tip point of hemisphere (facing +contact_dir)
+    {
+        float coords[3] = {static_cast<float>(center_x),
+                           static_cast<float>(center_y),
+                           static_cast<float>(center_z)};
+        coords[contact_dir] = static_cast<float>(center[contact_dir] + radius);
+        x_coords[0] = coords[0];
+        y_coords[0] = coords[1];
+        z_coords[0] = coords[2];
+    }
     
     int pt_idx = 1;
     for (int ring = 1; ring <= n_rings; ring++) {
         real_t phi = M_PI / 2.0 * ring / n_rings;  // 0 to pi/2 (tip to equator)
-        real_t r_ring = radius * sin(phi);         // radius in y-z plane
-        real_t x_ring = center_x + radius * cos(phi);  // x position along hemisphere
+        real_t r_ring = radius * sin(phi);
+        real_t c_ring = center[contact_dir] + radius * cos(phi);
         
         for (int seg = 0; seg < n_segments; seg++) {
             real_t theta = 2.0 * M_PI * seg / n_segments;
-            x_coords[pt_idx] = x_ring;
-            y_coords[pt_idx] = center_y + r_ring * cos(theta);
-            z_coords[pt_idx] = center_z + r_ring * sin(theta);
+            float coords[3] = {static_cast<float>(center_x),
+                               static_cast<float>(center_y),
+                               static_cast<float>(center_z)};
+            coords[contact_dir] = static_cast<float>(c_ring);
+            coords[h1] = static_cast<float>(center[h1] + r_ring * cos(theta));
+            coords[h2] = static_cast<float>(center[h2] + r_ring * sin(theta));
+            x_coords[pt_idx] = coords[0];
+            y_coords[pt_idx] = coords[1];
+            z_coords[pt_idx] = coords[2];
             pt_idx++;
         }
     }
@@ -459,7 +563,8 @@ void export_hemisphere_obstacle_mesh(const std::string &output_dir,
     fclose(fi2);
     
     printf("Hemisphere obstacle mesh exported to: %s\n", obstacle_dir.c_str());
-    printf("  Center: (%.3f, %.3f, %.3f), Radius: %.3f\n", center_x, center_y, center_z, radius);
+    printf("  Center: (%.3f, %.3f, %.3f), Radius: %.3f, contact_dir=%d\n",
+           center_x, center_y, center_z, radius, contact_dir);
 }
 
 int test_mooney_rivlin_gravity() {
@@ -469,7 +574,13 @@ int test_mooney_rivlin_gravity() {
     int SFEM_BASE_RESOLUTION = 10;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    std::shared_ptr<sfem::Mesh> mesh;
+    const char *mesh_path = getenv("SFEM_MESH");
+    if (mesh_path && mesh_path[0] != '\0') {
+        printf("Loading mesh from: %s\n", mesh_path);
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), mesh_path);
+    } else {
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,  // Grid
@@ -479,7 +590,8 @@ int test_mooney_rivlin_gravity() {
                                              2,
                                              1,
                                              1  // Dimensions (cube)
-    );
+        );
+    }
 
     auto fs = sfem::FunctionSpace::create(mesh, 3);  // 3D displacement
     auto f  = sfem::Function::create(fs);
@@ -582,35 +694,89 @@ int test_mooney_rivlin_gravity() {
     f->add_operator(op);
 
     // Read contact direction early (needed for BC selection)
-    int SFEM_CONTACT_DIR = 0;          // Contact direction: 0=x, 1=y, 2=z
+    int SFEM_CONTACT_DIR = 2;          // Contact direction: 0=x, 1=y, 2=z
     SFEM_READ_ENV(SFEM_CONTACT_DIR, atoi);
 
-    // BC - Sidesets
-    auto left_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < 1e-5; });
+    // BC - Sidesets (use mesh bounds so custom meshes work)
+    auto coords = mesh->points();
+    geom_t* const* coords_ptr = coords->data();
+    real_t min_c[3] = {std::numeric_limits<real_t>::max(),
+                       std::numeric_limits<real_t>::max(),
+                       std::numeric_limits<real_t>::max()};
+    real_t max_c[3] = {std::numeric_limits<real_t>::lowest(),
+                       std::numeric_limits<real_t>::lowest(),
+                       std::numeric_limits<real_t>::lowest()};
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        for (int d = 0; d < 3; ++d) {
+            const real_t v = coords_ptr[d][i];
+            if (v < min_c[d]) min_c[d] = v;
+            if (v > max_c[d]) max_c[d] = v;
+        }
+    }
+    real_t eps_c[3];
+    for (int d = 0; d < 3; ++d) {
+        const real_t range = max_c[d] - min_c[d];
+        eps_c[d] = (range > 0) ? range * 1e-6 : 1e-6;
+    }
 
-    auto right_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 2.0 - 1e-5; });
-    
-    auto top_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t, const geom_t y, const geom_t) -> bool { return y > 1.0 - 1e-5; });
+    auto make_sideset = [&](int dir, bool is_min) {
+        const real_t target = is_min ? min_c[dir] : max_c[dir];
+        const real_t eps = eps_c[dir];
+        if (dir == 0) {
+            return sfem::Sideset::create_from_selector(
+                mesh, [=](const geom_t x, const geom_t, const geom_t) -> bool {
+                    return fabs(x - target) <= eps;
+                });
+        } else if (dir == 1) {
+            return sfem::Sideset::create_from_selector(
+                mesh, [=](const geom_t, const geom_t y, const geom_t) -> bool {
+                    return fabs(y - target) <= eps;
+                });
+        } else {
+            return sfem::Sideset::create_from_selector(
+                mesh, [=](const geom_t, const geom_t, const geom_t z) -> bool {
+                    return fabs(z - target) <= eps;
+                });
+        }
+    };
+
+    auto min_sideset_x = make_sideset(0, true);
+    auto max_sideset_x = make_sideset(0, false);
+    auto min_sideset_y = make_sideset(1, true);
+    auto max_sideset_y = make_sideset(1, false);
+    auto min_sideset_z = make_sideset(2, true);
+    auto max_sideset_z = make_sideset(2, false);
+
+    auto contact_sideset = (SFEM_CONTACT_DIR == 0) ? min_sideset_x
+                           : (SFEM_CONTACT_DIR == 1) ? min_sideset_y
+                                                     : min_sideset_z;
+    auto opposite_sideset = (SFEM_CONTACT_DIR == 0) ? max_sideset_x
+                           : (SFEM_CONTACT_DIR == 1) ? max_sideset_y
+                                                     : max_sideset_z;
 
     // **Boundary conditions based on contact direction**
     if (!SFEM_ENABLE_CONTACT) {
-        // No contact: fix right end completely
-        sfem::DirichletConditions::Condition right_bc_x{.sidesets = right_sideset, .value = 0, .component = 0};
-        sfem::DirichletConditions::Condition right_bc_y{.sidesets = right_sideset, .value = 0, .component = 1};
-        sfem::DirichletConditions::Condition right_bc_z{.sidesets = right_sideset, .value = 0, .component = 2};
+        // No contact: fix opposite side completely
+        sfem::DirichletConditions::Condition right_bc_x{.sidesets = opposite_sideset, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition right_bc_y{.sidesets = opposite_sideset, .value = 0, .component = 1};
+        sfem::DirichletConditions::Condition right_bc_z{.sidesets = opposite_sideset, .value = 0, .component = 2};
         auto                                 conds = sfem::create_dirichlet_conditions(fs, {right_bc_x, right_bc_y, right_bc_z}, es);
         f->add_constraint(conds);
     } else if (SFEM_CONTACT_DIR == 1) {
-        // Y-direction contact (vertical drop): fix top surface in x and z only (allow vertical motion)
+        // Y-direction contact (vertical drop): fix max-y surface in x and z only (allow vertical motion)
         // This prevents lateral drift while allowing the object to fall
-        sfem::DirichletConditions::Condition top_bc_x{.sidesets = top_sideset, .value = 0, .component = 0};
-        sfem::DirichletConditions::Condition top_bc_z{.sidesets = top_sideset, .value = 0, .component = 2};
+        sfem::DirichletConditions::Condition top_bc_x{.sidesets = max_sideset_y, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition top_bc_z{.sidesets = max_sideset_y, .value = 0, .component = 2};
         auto                                 conds = sfem::create_dirichlet_conditions(fs, {top_bc_x, top_bc_z}, es);
         f->add_constraint(conds);
         printf("Y-direction contact: fixed top surface in x,z directions\n");
+    } else if (SFEM_CONTACT_DIR == 2) {
+        // Z-direction contact: fix max-z surface in x and y only (allow vertical motion)
+        sfem::DirichletConditions::Condition top_bc_x{.sidesets = max_sideset_z, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition top_bc_y{.sidesets = max_sideset_z, .value = 0, .component = 1};
+        auto                                 conds = sfem::create_dirichlet_conditions(fs, {top_bc_x, top_bc_y}, es);
+        f->add_constraint(conds);
+        printf("Z-direction contact: fixed max-z surface in x,y directions\n");
     }
     // For x-direction contact (CONTACT_DIR=0), no BC is needed - object is free to move in -x
 
@@ -735,7 +901,7 @@ int test_mooney_rivlin_gravity() {
     SFEM_READ_ENV(SFEM_HEMISPHERE_RADIUS, atof);
 
     // Get reference coordinates for obstacle
-    auto coords = mesh->points();
+    // coords already retrieved above for bounds
     
     // Store contact node indices
     std::vector<ptrdiff_t> contact_node_indices;
@@ -755,9 +921,9 @@ int test_mooney_rivlin_gravity() {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
-        // For stepped/triangular obstacles, use ALL nodes for contact detection
-        // For hemisphere, use left boundary nodes (same as flat plane)
-        if (SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) {
+        // For stepped/triangular/flat plane obstacles, use ALL nodes for contact detection
+        // For hemisphere, use contact boundary nodes
+        if (SFEM_OBSTACLE_TYPE == 0 || SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) {
             contact_node_indices.resize(n_nodes);
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 contact_node_indices[i] = i;
@@ -766,7 +932,7 @@ int test_mooney_rivlin_gravity() {
                    SFEM_OBSTACLE_TYPE, (long)n_nodes);
         } else {
             // For flat plane and hemisphere, only use left boundary nodes
-            auto lnodes = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
+            auto lnodes = sfem::create_nodeset_from_sideset(fs, contact_sideset[0]);
             const ptrdiff_t nbnodes = lnodes->size();
             contact_node_indices.resize(nbnodes);
             for (ptrdiff_t i = 0; i < nbnodes; i++) {
@@ -829,6 +995,7 @@ int test_mooney_rivlin_gravity() {
             compute_contact_lower_bound(
                 lower_bound->data(),
                 x->data(),
+                coords_ptr,
                 contact_node_indices.data(),
                 (ptrdiff_t)contact_node_indices.size(),
                 SFEM_CONTACT_PLANE,
@@ -878,13 +1045,29 @@ int test_mooney_rivlin_gravity() {
 
     // Export obstacle mesh for visualization
     if (SFEM_ENABLE_OUTPUT && SFEM_ENABLE_CONTACT) {
-        // Get mesh bounds (y and z ranges)
-        real_t y_min = 0.0, y_max = 1.0;  // Default for unit cube
-        real_t z_min = 0.0, z_max = 1.0;
+        // Get mesh bounds for all axes
+        real_t min_c[3] = {std::numeric_limits<real_t>::max(),
+                           std::numeric_limits<real_t>::max(),
+                           std::numeric_limits<real_t>::max()};
+        real_t max_c[3] = {std::numeric_limits<real_t>::lowest(),
+                           std::numeric_limits<real_t>::lowest(),
+                           std::numeric_limits<real_t>::lowest()};
+        geom_t* const* coords_ptr = coords->data();
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            for (int d = 0; d < 3; ++d) {
+                const real_t v = coords_ptr[d][i];
+                if (v < min_c[d]) min_c[d] = v;
+                if (v > max_c[d]) max_c[d] = v;
+            }
+        }
         
         // Export obstacle geometry based on type
         if (SFEM_OBSTACLE_TYPE == 2) {
             // Stepped obstacle
+            const real_t y_min = min_c[1];
+            const real_t y_max = max_c[1];
+            const real_t z_min = min_c[2];
+            const real_t z_max = max_c[2];
             int n_steps = (int)(y_max / SFEM_STEP_HEIGHT) + 1;
             export_stepped_obstacle_mesh("test_mooney_rivlin_gravity",
                                          SFEM_CONTACT_PLANE,
@@ -898,9 +1081,14 @@ int test_mooney_rivlin_gravity() {
                                             SFEM_HEMISPHERE_CENTER_X,
                                             SFEM_HEMISPHERE_CENTER_Y,
                                             SFEM_HEMISPHERE_CENTER_Z,
-                                            SFEM_HEMISPHERE_RADIUS);
+                                            SFEM_HEMISPHERE_RADIUS,
+                                            SFEM_CONTACT_DIR);
         } else if (SFEM_OBSTACLE_TYPE == 1) {
             // Triangular obstacle
+            const real_t y_min = min_c[1];
+            const real_t y_max = max_c[1];
+            const real_t z_min = min_c[2];
+            const real_t z_max = max_c[2];
             export_obstacle_mesh("test_mooney_rivlin_gravity",
                                 SFEM_CONTACT_PLANE,
                                 SFEM_OBSTACLE_SLOPE,
@@ -909,12 +1097,15 @@ int test_mooney_rivlin_gravity() {
                                 z_min, z_max);
         } else {
             // Flat obstacle (type 0)
-            export_obstacle_mesh("test_mooney_rivlin_gravity",
-                                SFEM_CONTACT_PLANE,
-                                0.0,
-                                SFEM_SLOPE_DIR,
-                                y_min, y_max,
-                                z_min, z_max);
+            int h1, h2;
+            if (SFEM_CONTACT_DIR == 0) { h1 = 1; h2 = 2; }
+            else if (SFEM_CONTACT_DIR == 1) { h1 = 0; h2 = 2; }
+            else { h1 = 0; h2 = 1; }
+            export_flat_obstacle_mesh("test_mooney_rivlin_gravity",
+                                      SFEM_CONTACT_PLANE,
+                                      SFEM_CONTACT_DIR,
+                                      min_c[h1], max_c[h1],
+                                      min_c[h2], max_c[h2]);
         }
     }
 
@@ -997,6 +1188,7 @@ int test_mooney_rivlin_gravity() {
                 compute_contact_lower_bound(
                     lower_bound->data(),
                     x->data(),
+                    coords_ptr,
                     contact_node_indices.data(),
                     (ptrdiff_t)contact_node_indices.size(),
                     SFEM_CONTACT_PLANE,

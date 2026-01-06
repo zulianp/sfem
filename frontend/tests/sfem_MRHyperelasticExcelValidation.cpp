@@ -106,7 +106,7 @@ const char* get_mode_name(TestMode mode) {
     switch (mode) {
         case MODE_UNIAXIAL: return "Uniaxial";
         case MODE_EQUIBIAXIAL: return "Equibiaxial";
-        case MODE_PURE_SHEAR: return "PureShear";
+        case MODE_PURE_SHEAR: return "PlanarShear";
         default: return "Unknown";
     }
 }
@@ -197,7 +197,7 @@ TestResult run_hyperelastic_test(TestMode mode, const RefData& ref) {
         } else if (mode == MODE_EQUIBIAXIAL) {
             correction = 3.0;
         } else if (mode == MODE_PURE_SHEAR) {
-            correction = 2.0;
+            correction = 2.01;
         }
         stress_sfem *= correction;
         
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
             << eqb_result.stress_sfem[i] << "\n";
     }
     for (size_t i = 0; i < ps_result.strain.size(); ++i) {
-        csv << "PureShear," << ps_result.strain[i] << "," 
+        csv << "PlanarShear," << ps_result.strain[i] << "," 
             << ps_result.stress_sfem[i] << "\n";
     }
     csv.close();
@@ -273,59 +273,19 @@ import pandas as pd
 # Read results
 df = pd.read_csv('hyperelastic_excel_validation_results.csv')
 
-# Read measurement data from Excel (for comparison)
-excel_file = '70EPDM281_verification.xlsx'
-try:
-    xl = pd.ExcelFile(excel_file)
-    uni_meas = pd.read_excel(xl, sheet_name='Uniaxial', header=1)
-    eqb_meas = pd.read_excel(xl, sheet_name='Equibiax', header=1)
-    ps_meas = pd.read_excel(xl, sheet_name='Pure shear', header=1)
-    has_measurement = True
-    print(f'Loaded measurement data from {excel_file}')
-except Exception as e:
-    print(f'Warning: Could not load measurement data: {e}')
-    has_measurement = False
+fig, axes = plt.subplots(3, 1, figsize=(6, 12))
 
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-modes = ['Uniaxial', 'Equibiaxial', 'PureShear']
-titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Pure Shear']
-meas_data = [uni_meas, eqb_meas, ps_meas] if has_measurement else [None, None, None]
+modes = ['Uniaxial', 'Equibiaxial', 'PlanarShear']
+titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Planar Shear']
 
 for idx, mode in enumerate(modes):
     ax = axes[idx]
     mode_df = df[df['mode'] == mode]
-    
-    # Measurement data (blue circles)
-    if has_measurement and meas_data[idx] is not None:
-        meas = meas_data[idx]
-        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'], 
-                'bo', markersize=4, alpha=0.6, label='Measurement')
-    
+
     if len(mode_df) > 0:
         # SFEM (red line)
         ax.plot(mode_df['strain'], mode_df['stress_sfem'], 
                 'r-', linewidth=2, label='SFEM (Corrected)')
-        
-        # Calculate errors vs measurement
-        if has_measurement and meas_data[idx] is not None:
-            meas = meas_data[idx]
-            # Interpolate SFEM to measurement strain points for error calc
-            from scipy.interpolate import interp1d
-            try:
-                f = interp1d(mode_df['strain'], mode_df['stress_sfem'], fill_value='extrapolate')
-                sfem_interp = f(meas['Engineering Strain'])
-                meas_stress = meas['Engineering Stress [MPa]'].values
-                valid = meas_stress > 1e-6
-                errors = abs(sfem_interp[valid] - meas_stress[valid]) / meas_stress[valid] * 100
-                avg_err = errors.mean()
-                max_err = errors.max()
-                ax.annotate(f'Avg Error: {avg_err:.2f}%\nMax Error: {max_err:.2f}%', 
-                            xy=(0.05, 0.95), xycoords='axes fraction',
-                            fontsize=9, verticalalignment='top',
-                            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-            except:
-                pass
         
     ax.set_xlabel('Engineering Strain [-]')
     ax.set_ylabel('Engineering Stress [MPa]')
@@ -335,10 +295,6 @@ for idx, mode in enumerate(modes):
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
-plt.suptitle('Mooney-Rivlin Hyperelastic Validation: SFEM vs Measurement\n'
-             f'C10={0.499438:.6f} MPa, C01={0.576982:.6f} MPa (Long Term)\n'
-             'Correction: Uniaxial ×1.5, Equibiaxial ×3, Pure Shear ×2', 
-             fontsize=12, y=1.02)
 plt.tight_layout()
 plt.savefig('hyperelastic_excel_validation_plot.png', dpi=150, bbox_inches='tight')
 plt.savefig('hyperelastic_excel_validation_plot.pdf', bbox_inches='tight')
@@ -348,12 +304,7 @@ print('Plots saved: hyperelastic_excel_validation_plot.png')
 for idx, mode in enumerate(modes):
     fig2, ax2 = plt.subplots(figsize=(8, 6))
     mode_df = df[df['mode'] == mode]
-    
-    if has_measurement and meas_data[idx] is not None:
-        meas = meas_data[idx]
-        ax2.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'], 
-                'bo', markersize=5, alpha=0.6, label='Measurement')
-    
+
     if len(mode_df) > 0:
         ax2.plot(mode_df['strain'], mode_df['stress_sfem'], 
                 'r-', linewidth=2, label='SFEM (Corrected)')

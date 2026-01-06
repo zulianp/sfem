@@ -119,28 +119,24 @@ namespace sfem {
             real_t g_inf = 1.0 - sum_g;
             
 
-            const real_t relax_threshold = 100.0;
-            
+            const real_t relax_threshold = 30.0;
+
             // First pass: count active terms and compute gamma
             // For Short Term params: gamma = g_inf + Σβ_i
-            prony_gamma = g_inf;  
+            prony_gamma = g_inf;
             num_active_terms = 0;
-            
+
             for (int i = 0; i < num_prony_terms; ++i) {
                 real_t tau_eff = prony_tau[i] / aT;
                 real_t x = dt / tau_eff;
-                
+
                 if (x > relax_threshold) {
-                    // Fully relaxed: term has equilibrated within one time step
-                    // At equilibrium, Prony term contribution → 0 (NOT g_i!)
-                    // Prony series represents deviation from equilibrium
-                    // Do NOT add g_i to gamma!
+                    // Fully relaxed within one time step -> skip history term
                 } else {
-                    // Active term: will contribute alpha, beta
                     num_active_terms++;
                 }
             }
-            
+
             printf("[compute_prony_coefficients] aT=%g dt=%g relax_threshold=%g num_prony_terms=%d\\n",
                    (double)aT, (double)dt, (double)relax_threshold, num_prony_terms);
             for (int i = 0; i < num_prony_terms; ++i) {
@@ -150,26 +146,25 @@ namespace sfem {
                 printf("  term %2d: tau=%g tau_eff=%g dt/tau_eff=%g g=%g active=%s\n",
                        i+1, (double)prony_tau[i], (double)tau_eff, (double)x, (double)prony_g[i], active ? "YES" : "NO");
             }
-            
+
             // Second pass: compute alpha, beta for active terms only
             prony_alpha.resize(num_active_terms);
             prony_beta.resize(num_active_terms);
-            
+
             int active_idx = 0;
             for (int i = 0; i < num_prony_terms; ++i) {
                 real_t tau_eff = prony_tau[i] / aT;
                 real_t x = dt / tau_eff;
-                
+
                 if (x <= relax_threshold) {
-                    // Active term
                     prony_alpha[active_idx] = exp(-x);
                     prony_beta[active_idx] = prony_g[i] * (1.0 - prony_alpha[active_idx]) / x;
-                    // Add beta to gamma for correct S_total = gamma_eff * S_curr + S_hist
                     prony_gamma += prony_beta[active_idx];
                     active_idx++;
                 }
             }
-            printf("[compute_prony_coefficients] num_active_terms=%d prony_gamma=%g\\n", num_active_terms, (double)prony_gamma);
+            printf("[compute_prony_coefficients] num_active_terms=%d prony_gamma=%g\\n",
+                   num_active_terms, (double)prony_gamma);
         }
         
         ptrdiff_t history_per_qp() const {
@@ -533,4 +528,3 @@ namespace sfem {
     MooneyRivlinVisco::Impl::~Impl() {}
 
 }  // namespace sfem
-

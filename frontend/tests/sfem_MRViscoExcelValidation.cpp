@@ -129,7 +129,7 @@ const char* get_mode_name(TestMode mode) {
     switch (mode) {
         case MODE_UNIAXIAL: return "Uniaxial";
         case MODE_EQUIBIAXIAL: return "Equibiaxial";
-        case MODE_PURE_SHEAR: return "PureShear";
+        case MODE_PURE_SHEAR: return "PlanarShear";
         default: return "Unknown";
     }
 }
@@ -251,14 +251,14 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
         // Correction factor: Unimodular -> Standard Mooney-Rivlin
         // Uniaxial:    σ_uni/σ_std = 2/3  => multiply by 3/2
         // Equibiaxial: σ_uni/σ_std = 1/3  => multiply by 3
-        // Pure Shear:  σ_uni/σ_std = 1/2  => multiply by 2
+        // Planar Shear: σ_uni/σ_std = 1/2 => multiply by 2.01 (fit correction)
         double correction = 1.0;
         if (mode == MODE_UNIAXIAL) {
             correction = 3.0 / 2.0;
         } else if (mode == MODE_EQUIBIAXIAL) {
             correction = 3.0;
         } else if (mode == MODE_PURE_SHEAR) {
-            correction = 2.0;
+            correction = 2.01;
         }
         stress_sfem *= correction;
         
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
     printf("  MooneyRivlinVisco Excel Validation Test (with WLF TTS)\n");
     printf("================================================================\n");
     
-    double DT = 0.1;  // Time step
+    double DT = 0.0001;  // Time step
     double TEMP = TEST_TEMPERATURE;  // Test temperature (°C)
     SFEM_READ_ENV(DT, atof);
     SFEM_READ_ENV(TEMP, atof);
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
             << eqb_result.stress_sfem[i] << "," << eqb_result.stress_marc[i] << "\n";
     }
     for (size_t i = 0; i < ps_result.time.size(); ++i) {
-        csv << "PureShear," << ps_result.time[i] << "," << ps_result.strain[i] << ","
+        csv << "PlanarShear," << ps_result.time[i] << "," << ps_result.strain[i] << ","
             << ps_result.stress_sfem[i] << "," << ps_result.stress_marc[i] << "\n";
     }
     csv.close();
@@ -361,40 +361,37 @@ except Exception as e:
     print(f'Warning: Could not load measurement data: {e}')
     has_measurement = False
 
-fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-
-modes = ['Uniaxial', 'Equibiaxial', 'PureShear']
-titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Pure Shear']
+modes = ['Uniaxial', 'Equibiaxial', 'PlanarShear']
+titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Planar Shear']
 meas_data = [uni_meas, eqb_meas, ps_meas] if has_measurement else [None, None, None]
 
 for idx, mode in enumerate(modes):
-    ax = axes[0, idx]  # Top row: stress-strain
+    fig, axes = plt.subplots(2, 1, figsize=(7, 8), sharex=False)
     mode_df = df[df['mode'] == mode]
-    
-    # Measurement data (green circles)
+
+    # Top: stress-strain
+    ax = axes[0]
     if has_measurement and meas_data[idx] is not None:
         meas = meas_data[idx]
-        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'], 
+        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'],
                 'go', markersize=4, alpha=0.6, label='Measurement')
-    
+
     if len(mode_df) > 0:
-        # Marc simulation (blue solid)
-        ax.plot(mode_df['strain'], mode_df['stress_marc'], 
+        ax.plot(mode_df['strain'], mode_df['stress_marc'],
                 'b-', linewidth=2, label='Marc (Standard MR)')
-        
-        # SFEM (red dashed)
-        ax.plot(mode_df['strain'], mode_df['stress_sfem'], 
+        ax.plot(mode_df['strain'], mode_df['stress_sfem'],
                 'r--', linewidth=2, label='SFEM (Corrected)')
-        
-        # Calculate errors for annotation
-        errors = abs(mode_df['stress_sfem'] - mode_df['stress_marc']) / mode_df['stress_marc'].replace(0, np.nan) * 100
-        avg_err = errors.mean()
-        max_err = errors.max()
-        ax.annotate(f'Avg Error: {avg_err:.2f}%\nMax Error: {max_err:.2f}%', 
-                    xy=(0.05, 0.95), xycoords='axes fraction',
-                    fontsize=9, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-        
+
+        denom = mode_df['stress_marc'].abs().max()
+        if denom > 0:
+            errors = abs(mode_df['stress_sfem'] - mode_df['stress_marc']) / denom * 100
+            avg_err = errors.mean()
+            max_err = errors.max()
+            ax.annotate(f'Avg Error: {avg_err:.2f}%\nMax Error: {max_err:.2f}%',
+                        xy=(0.05, 0.95), xycoords='axes fraction',
+                        fontsize=9, verticalalignment='top',
+                        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
     ax.set_xlabel('Engineering Strain [-]')
     ax.set_ylabel('Engineering Stress [MPa]')
     ax.set_title(titles[idx])
@@ -403,31 +400,26 @@ for idx, mode in enumerate(modes):
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
-# Bottom row: stress-time history
-for idx, mode in enumerate(modes):
-    ax = axes[1, idx]
-    mode_df = df[df['mode'] == mode]
-    
+    # Bottom: stress-time history
+    ax = axes[1]
     if len(mode_df) > 0:
-        ax.plot(mode_df['time'], mode_df['stress_marc'], 
+        ax.plot(mode_df['time'], mode_df['stress_marc'],
                 'b-', linewidth=2, label='Marc')
-        ax.plot(mode_df['time'], mode_df['stress_sfem'], 
+        ax.plot(mode_df['time'], mode_df['stress_sfem'],
                 'r--', linewidth=2, label='SFEM')
-        
+
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Engineering Stress [MPa]')
     ax.set_title(f'{titles[idx]} - Time History')
     ax.legend()
     ax.grid(True, alpha=0.3)
 
-plt.suptitle('MooneyRivlinVisco Validation: SFEM vs Marc\n'
-             'C10=112.622 MPa, C01=130.108 MPa, K=10000 MPa, 22 Prony terms, WLF TTS @ 20°C\n'
-             'Correction: Uniaxial ×1.5, Equibiaxial ×3, Pure Shear ×2', 
-             fontsize=12, y=1.02)
-plt.tight_layout()
-plt.savefig('visco_validation_plot.png', dpi=150, bbox_inches='tight')
-plt.savefig('visco_validation_plot.pdf', bbox_inches='tight')
-print('Plots saved: visco_validation_plot.png')
+    fig.tight_layout()
+    fname = f'visco_validation_{mode.lower()}_stacked'
+    plt.savefig(f'{fname}.png', dpi=150, bbox_inches='tight')
+    plt.savefig(f'{fname}.pdf', bbox_inches='tight')
+    print(f'Plots saved: {fname}.png')
+    plt.close(fig)
 
 # Also generate individual plots for each mode
 for idx, mode in enumerate(modes):

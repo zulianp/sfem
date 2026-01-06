@@ -59,7 +59,13 @@ int test_mooney_rivlin_visco_relaxation() {
     int SFEM_BASE_RESOLUTION = 10;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    std::shared_ptr<sfem::Mesh> mesh;
+    const char *mesh_path = getenv("SFEM_MESH");
+    if (mesh_path && mesh_path[0] != '\0') {
+        printf("Loading mesh from: %s\n", mesh_path);
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), mesh_path);
+    } else {
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,  // Grid
@@ -69,7 +75,8 @@ int test_mooney_rivlin_visco_relaxation() {
                                              2,
                                              1,
                                              1  // Dimensions (cube)
-    );
+        );
+    }
 
     auto fs = sfem::FunctionSpace::create(mesh, 3);  // 3D displacement
     auto f  = sfem::Function::create(fs);
@@ -171,12 +178,24 @@ int test_mooney_rivlin_visco_relaxation() {
     op->initialize_history();
     f->add_operator(op);
 
-    // BC
+    // BC: use mesh bounds in x-direction
+    geom_t x_min = 1e30;
+    geom_t x_max = -1e30;
+    const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    const geom_t *x_coords = fs->mesh_ptr()->points(0);
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+        const geom_t x = x_coords[i];
+        if (x < x_min) x_min = x;
+        if (x > x_max) x_max = x;
+    }
+    const geom_t span = x_max - x_min;
+    const geom_t tol = (span > 0 ? span : 1.0) * 1e-6;
+
     auto left_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x < 1e-5; });
+            mesh, [=](const geom_t x, const geom_t, const geom_t) -> bool { return x < x_min + tol; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
-            mesh, [](const geom_t x, const geom_t, const geom_t) -> bool { return x > 2.0 - 1e-5; });
+            mesh, [=](const geom_t x, const geom_t, const geom_t) -> bool { return x > x_max - tol; });
 
     if (!SFEM_ENABLE_CONTACT) {
         sfem::DirichletConditions::Condition left_bc_x{.sidesets = left_sideset, .value = 0, .component = 0};
@@ -232,7 +251,6 @@ int test_mooney_rivlin_visco_relaxation() {
     // Matrix assembly buffers (BSR format: 3x3 blocks)
     auto            graph      = fs->node_to_node_graph();
     const int       block_size = 3;
-    const ptrdiff_t n_nodes    = fs->mesh_ptr()->n_nodes();
     auto            values     = sfem::create_buffer<real_t>(graph->nnz() * block_size * block_size, es);
 
     // Linear Solver Wrapper (BSR SpMV)
