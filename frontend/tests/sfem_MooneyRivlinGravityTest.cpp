@@ -20,7 +20,7 @@ static void compute_contact_lower_bound(
     geom_t * const * ref_coords,  // Reference coordinates: ref_coords[dim][node]
     const ptrdiff_t* contact_nodes,
     const ptrdiff_t n_contact_nodes,
-    const real_t contact_plane,
+    const real_t contact_plane,   // ABSOLUTE coordinate of contact plane (e.g., z=0)
     const int contact_dir,
     const int block_size,
     const ptrdiff_t ndofs,
@@ -34,7 +34,8 @@ static void compute_contact_lower_bound(
         const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
         const real_t current_disp = displacement[dof_idx];
         const real_t ref_coord = ref_coords[contact_dir][node_idx];
-        // Bound on delta_x: u + delta >= contact_plane - ref_coord
+        // Constraint: ref_coord + disp + delta >= contact_plane
+        // => delta >= contact_plane - ref_coord - disp
         lower_bound[dof_idx] = contact_plane - ref_coord - current_disp;
     }
 }
@@ -716,8 +717,13 @@ int test_mooney_rivlin_gravity() {
     real_t eps_c[3];
     for (int d = 0; d < 3; ++d) {
         const real_t range = max_c[d] - min_c[d];
-        eps_c[d] = (range > 0) ? range * 1e-6 : 1e-6;
+        // Use a larger epsilon for complex meshes (like lion) that may have non-planar boundaries
+        // 5% of the range should capture most of the "bottom" region
+        eps_c[d] = (range > 0) ? range * 0.05 : 1e-3;
     }
+    printf("Mesh bounds: x=[%.4f, %.4f], y=[%.4f, %.4f], z=[%.4f, %.4f]\n",
+           min_c[0], max_c[0], min_c[1], max_c[1], min_c[2], max_c[2]);
+    printf("Sideset epsilon: eps_x=%.6f, eps_y=%.6f, eps_z=%.6f\n", eps_c[0], eps_c[1], eps_c[2]);
 
     auto make_sideset = [&](int dir, bool is_min) {
         const real_t target = is_min ? min_c[dir] : max_c[dir];
@@ -921,27 +927,26 @@ int test_mooney_rivlin_gravity() {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
-        // For stepped/triangular/flat plane obstacles, use ALL nodes for contact detection
-        // For hemisphere, use contact boundary nodes
+        // For flat plane (0), stepped (2), triangular (1): use ALL nodes for contact detection
+        // Each node has its own constraint based on its reference coordinate
+        // For hemisphere (4): use only contact boundary nodes
         if (SFEM_OBSTACLE_TYPE == 0 || SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) {
             contact_node_indices.resize(n_nodes);
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 contact_node_indices[i] = i;
             }
-            printf("Non-flat obstacle (type=%d): using ALL %ld nodes for contact detection\n", 
+            printf("Obstacle (type=%d): using ALL %ld nodes for contact detection\n", 
                    SFEM_OBSTACLE_TYPE, (long)n_nodes);
         } else {
-            // For flat plane and hemisphere, only use left boundary nodes
+            // Hemisphere (4): only use contact boundary nodes
             auto lnodes = sfem::create_nodeset_from_sideset(fs, contact_sideset[0]);
             const ptrdiff_t nbnodes = lnodes->size();
             contact_node_indices.resize(nbnodes);
             for (ptrdiff_t i = 0; i < nbnodes; i++) {
                 contact_node_indices[i] = lnodes->data()[i];
             }
-            if (SFEM_OBSTACLE_TYPE == 4) {
-                printf("Hemisphere obstacle (type=%d): using %ld left boundary nodes\n", 
-                       SFEM_OBSTACLE_TYPE, (long)nbnodes);
-            }
+            printf("Hemisphere obstacle (type=%d): using %ld boundary nodes for contact detection\n", 
+                   SFEM_OBSTACLE_TYPE, (long)nbnodes);
         }
 
         // Initial lower bound computation (displacement = 0 at start)
@@ -991,14 +996,14 @@ int test_mooney_rivlin_gravity() {
                 block_size,
                 ndofs);
         } else {
-            // Flat plane
+            // Flat plane - use absolute coordinate (0)
             compute_contact_lower_bound(
                 lower_bound->data(),
                 x->data(),
                 coords_ptr,
                 contact_node_indices.data(),
                 (ptrdiff_t)contact_node_indices.size(),
-                SFEM_CONTACT_PLANE,
+                0.0,  // Contact plane at z=0 (absolute coordinate)
                 SFEM_CONTACT_DIR,
                 block_size,
                 ndofs);
@@ -1097,12 +1102,15 @@ int test_mooney_rivlin_gravity() {
                                 z_min, z_max);
         } else {
             // Flat obstacle (type 0)
+            // SFEM_CONTACT_PLANE is a displacement constraint, actual plane position is:
+            // min_c[contact_dir] + SFEM_CONTACT_PLANE
+            const real_t actual_plane_pos = min_c[SFEM_CONTACT_DIR] + SFEM_CONTACT_PLANE;
             int h1, h2;
             if (SFEM_CONTACT_DIR == 0) { h1 = 1; h2 = 2; }
             else if (SFEM_CONTACT_DIR == 1) { h1 = 0; h2 = 2; }
             else { h1 = 0; h2 = 1; }
             export_flat_obstacle_mesh("test_mooney_rivlin_gravity",
-                                      SFEM_CONTACT_PLANE,
+                                      actual_plane_pos,
                                       SFEM_CONTACT_DIR,
                                       min_c[h1], max_c[h1],
                                       min_c[h2], max_c[h2]);
@@ -1184,14 +1192,14 @@ int test_mooney_rivlin_gravity() {
                     block_size,
                     ndofs);
             } else {
-                // Flat obstacle (type 0)
+                // Flat obstacle (type 0) - use absolute coordinate (0)
                 compute_contact_lower_bound(
                     lower_bound->data(),
                     x->data(),
                     coords_ptr,
                     contact_node_indices.data(),
                     (ptrdiff_t)contact_node_indices.size(),
-                    SFEM_CONTACT_PLANE,
+                    0.0,  // Contact plane at z=0 (absolute coordinate)
                     SFEM_CONTACT_DIR,
                     block_size,
                     ndofs);
