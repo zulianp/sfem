@@ -1435,7 +1435,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-#define TEST_GPU_HYTEG_REFINEMENT
+            // #define TEST_GPU_HYTEG_REFINEMENT
             // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
@@ -1462,8 +1462,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             clock_gettime(CLOCK_MONOTONIC, &t_start);
 #endif
 
-            //    ret = tet4_resample_field_adjoint_hex_quad_norm  //
-            ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+            ret = tet4_resample_field_adjoint_hex_quad_norm  //
+                                                             // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
                                                              // ret = tet4_resample_field_adjoint_hex_quad_norm  //
                                                              // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                                      //
@@ -2155,6 +2155,8 @@ normalize_field_and_find_min_max(real_t*         field,          // Input/Output
                                  int*            out_min_index,  //
                                  int*            out_max_index) {           // Output: Maximum value found in the field
 
+    PRINT_CURRENT_FUNCTION;
+
     int max_field_index = -1;
     int min_field_index = -1;
 
@@ -2242,4 +2244,6 @@ normalize_field_and_find_min_max(real_t*         field,          // Input/Output
     *out_max       = max_val;
     *out_min_index = min_field_index;
     *out_max_index = max_field_index;
+
+    RETURN_FROM_FUNCTION();
 }

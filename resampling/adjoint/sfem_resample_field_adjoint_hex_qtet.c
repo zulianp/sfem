@@ -578,29 +578,6 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
 
     real_t hex_element_field[8] = {0.0};
 
-    // const int size_x            = max_grid_x - min_grid_x + 1;
-    // const int size_y            = max_grid_y - min_grid_y + 1;
-    // const int size_z            = max_grid_z - min_grid_z + 1;
-    // const int total_grid_points = size_x * size_y * size_z;
-
-    // for (int idx = 0; idx < total_grid_points; idx += 1) {
-    //     const int ix_local = idx % size_x;
-    //     const int iy_local = (idx / size_x) % size_y;
-    //     const int iz_local = idx / (size_x * size_y);
-
-    //     // Convert to absolute grid coordinates
-    //     const int i_grid_x = min_grid_x + ix_local;
-    //     const int j_grid_y = min_grid_y + iy_local;
-    //     const int k_grid_z = min_grid_z + iz_local;
-
-    //     const real_t x_hex_min = (real_t)i_grid_x;
-    //     const real_t y_hex_min = (real_t)j_grid_y;
-    //     const real_t z_hex_min = (real_t)k_grid_z;
-
-    //     const real_t x_hex_max = x_hex_min + 1.0;
-    //     const real_t y_hex_max = y_hex_min + 1.0;
-    //     const real_t z_hex_max = z_hex_min + 1.0;
-
     for (int k_grid_z = min_grid_z; k_grid_z < max_grid_z; k_grid_z++) {
         const real_t z_hex_min = ((real_t)k_grid_z);
         const real_t z_hex_max = z_hex_min + 1.0;
@@ -705,14 +682,17 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                              j_grid_y * stride1 +  //
                                              k_grid_z * stride2;   //
 
-                data[base_index + off0] += hex_element_field[0];  //
-                data[base_index + off1] += hex_element_field[1];  //
-                data[base_index + off2] += hex_element_field[2];  //
-                data[base_index + off3] += hex_element_field[3];  //
-                data[base_index + off4] += hex_element_field[4];  //
-                data[base_index + off5] += hex_element_field[5];  //
-                data[base_index + off6] += hex_element_field[6];  //
-                data[base_index + off7] += hex_element_field[7];  //
+#pragma omp critical
+                {
+                    data[base_index + off0] += hex_element_field[0];  //
+                    data[base_index + off1] += hex_element_field[1];  //
+                    data[base_index + off2] += hex_element_field[2];  //
+                    data[base_index + off3] += hex_element_field[3];  //
+                    data[base_index + off4] += hex_element_field[4];  //
+                    data[base_index + off5] += hex_element_field[5];  //
+                    data[base_index + off6] += hex_element_field[6];  //
+                    data[base_index + off7] += hex_element_field[7];  //
+                }  // END omp critical
 
                 // }  // END: for i_grid_x
 
@@ -917,9 +897,9 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                          x0_n,                               //
                          y0_n,                               //
                          z0_n,                               //
-                         hex_vertices_x,                     //
-                         hex_vertices_y,                     //
-                         hex_vertices_z,                     //
+                         (const real_t*)hex_vertices_x,      //
+                         (const real_t*)hex_vertices_y,      //
+                         (const real_t*)hex_vertices_z,      //
                          &in_out_array[local_idx]);          //
             }
         }
@@ -1062,6 +1042,7 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
 
     init_quad_points_hex_qtet(2);  //
 
+#pragma omp parallel for schedule(dynamic)
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // Read the element vertex indices
         idx_t ev[4];
