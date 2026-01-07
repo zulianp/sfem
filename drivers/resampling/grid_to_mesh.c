@@ -313,7 +313,10 @@ print_rank_info(int              mpi_rank,         //
                 const geom_t*    origin,           //
                 const geom_t*    delta,            //
                 const ptrdiff_t* nglobal) {        //
-                                                   //
+    //
+
+    PRINT_CURRENT_FUNCTION;
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     int z_size_local = nlocal[2];
@@ -367,6 +370,8 @@ print_rank_info(int              mpi_rank,         //
         // Barrier ensures that only one rank prints at a time in order
         MPI_Barrier(MPI_COMM_WORLD);
     }
+
+    RETURN_FROM_FUNCTION();
 }
 
 /// Test functions for mesh field
@@ -848,19 +853,19 @@ int main(int argc, char* argv[]) {
                               mesh_fun_XYZ,                 //
                               g);                           //
 
-            // {
-            //     double* g_dbl = calloc(mesh.n_owned_nodes, sizeof(double));
+            {
+                double* g_dbl = calloc(mesh.n_owned_nodes, sizeof(double));
 
-            //     mesh_read_nodal_field(&mesh,                                                                               //
-            //                           "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
-            //                           MPI_DOUBLE,                                                                          //
-            //                           g_dbl);                                                                              //
+                mesh_read_nodal_field(&mesh,                                                                               //
+                                      "/home/simone/git/sfem_d/sfem/workflows/resample/bone_raw/point_data/bone_edf.raw",  //
+                                      MPI_DOUBLE,                                                                          //
+                                      g_dbl);                                                                              //
 
-            //     for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
-            //         g[i] = (real_t)(g_dbl[i]);
-            //     }
-            //     free(g_dbl);
-            // }
+                for (ptrdiff_t i = 0; i < mesh.n_owned_nodes; i++) {
+                    g[i] = (real_t)(g_dbl[i]);
+                }
+                free(g_dbl);
+            }
             const real_t alpha_th_tet10 = 2.5;
 
             switch (info.element_type) {
@@ -1107,10 +1112,10 @@ int main(int argc, char* argv[]) {
                     // real_t* bit_array_in_out_real = to_real_array(bit_array_in_out);
 
                     // TEST: write the in out field and the field_cnt
-                    real_t* field_cnt_real = (real_t*)malloc(n_zyx * sizeof(real_t));
-                    for (ptrdiff_t i = 0; i < n_zyx; i++) {
-                        field_cnt_real[i] = (real_t)(field_cnt[i]);
-                    }
+                    // real_t* field_cnt_real = (real_t*)malloc(n_zyx * sizeof(real_t));
+                    // for (ptrdiff_t i = 0; i < n_zyx; i++) {
+                    //     field_cnt_real[i] = (real_t)(field_cnt[i]);
+                    // }
 
                     char out_filename_raw[1000];
 
@@ -1190,8 +1195,8 @@ int main(int argc, char* argv[]) {
                     // free(bit_array_in_out_real);
                     // bit_array_in_out_real = NULL;
 
-                    free(field_cnt_real);
-                    field_cnt_real = NULL;
+                    // free(field_cnt_real);
+                    // field_cnt_real = NULL;
 
                     break;
 
