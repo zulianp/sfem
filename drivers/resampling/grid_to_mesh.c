@@ -501,6 +501,18 @@ int main(int argc, char* argv[]) {
 
     const function_XYZ_t mesh_fun_XYZ = mesh_fun_ones;
 
+    char out_base_directory[2048];
+
+    if (getenv("SFEM_OUT_BASE_DIRECTORY") != NULL) {
+        snprintf(out_base_directory, 2048, "%s", getenv("SFEM_OUT_BASE_DIRECTORY"));
+    } else {
+        snprintf(out_base_directory, 2048, "/tmp/");
+    }
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Using SFEM_OUT_BASE_DIRECTORY: %s\n", out_base_directory);
+#endif  // SFEM_LOG_LEVEL
+
 #if SFEM_LOG_LEVEL >= 5
 
     if (mpi_rank == 0) {
@@ -990,7 +1002,7 @@ int main(int argc, char* argv[]) {
                         delta[1] = side / (real_t)(nlocal[1] - 1);
                         delta[2] = side / (real_t)(nlocal[2] - 1);
 
-                        make_metadata(nglobal, delta, origin, "/home/simone/git/sfem_d/sfem/workflows/resample/");
+                        make_metadata(nglobal, delta, origin, out_base_directory);
 
 #if SFEM_LOG_LEVEL >= 5
                         printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",

@@ -18,6 +18,8 @@ PATH=$SCRIPTPATH/../../python/sfem/algebra:$PATH
 PATH=$SCRIPTPATH/../../python/sfem/sdf:$PATH
 PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
+export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 NCORES=8
 
 export CUDA_LAUNCH_BLOCKING=1

@@ -28,6 +28,9 @@ export OMP_NUM_THREADS=$NCORES
 field=field.raw
 mesh=bone
 
+export SFEM_OUT_BASE_DIRECTORY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
 # refine torus torus2
 # refine torus2 torus3
 # refine torus3 torus4
