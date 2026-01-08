@@ -685,7 +685,7 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                              j_grid_y * stride1 +  //
                                              k_grid_z * stride2;   //
 
-#pragma omp critical
+                // #pragma omp critical
                 {
                     data[base_index + off0] += hex_element_field[0];  //
                     data[base_index + off1] += hex_element_field[1];  //
@@ -695,6 +695,30 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                     data[base_index + off5] += hex_element_field[5];  //
                     data[base_index + off6] += hex_element_field[6];  //
                     data[base_index + off7] += hex_element_field[7];  //
+
+                    // // Check if any data values exceed 1.0
+                    // if (data[base_index + off0] > 1.0 || data[base_index + off1] > 1.0 || data[base_index + off2] > 1.0 ||
+                    //     data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
+                    //     data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0) {
+                    //     fprintf(stdout,
+                    //             "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d) ",
+                    //             base_index,
+                    //             i_grid_x,
+                    //             j_grid_y,
+                    //             k_grid_z);
+
+                    //     fprintf(stdout,
+                    //             " data values: %f, %f, %f, %f, %f, %f, %f, %f \n",
+                    //             data[base_index + off0],
+                    //             data[base_index + off1],
+                    //             data[base_index + off2],
+                    //             data[base_index + off3],
+                    //             data[base_index + off4],
+                    //             data[base_index + off5],
+                    //             data[base_index + off6],
+                    //             data[base_index + off7]);
+                    // }  // END if (data > 1.0)
+
                 }  // END omp critical
 
                 // }  // END: for i_grid_x
@@ -1014,6 +1038,29 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                 data[base_index + off6] += hex_element_field[6];  //
                 data[base_index + off7] += hex_element_field[7];  //
 
+                // Check if any data values exceed 1.0
+                if (data[base_index + off0] > 1.0 || data[base_index + off1] > 1.0 || data[base_index + off2] > 1.0 ||
+                    data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
+                    data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0) {
+                    fprintf(stdout,
+                            "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d) ",
+                            base_index,
+                            i_grid_x,
+                            j_grid_y,
+                            k_grid_z);
+
+                    fprintf(stdout,
+                            " data values: %f, %f, %f, %f, %f, %f, %f, %f \n",
+                            data[base_index + off0],
+                            data[base_index + off1],
+                            data[base_index + off2],
+                            data[base_index + off3],
+                            data[base_index + off4],
+                            data[base_index + off5],
+                            data[base_index + off6],
+                            data[base_index + off7]);
+                }  // END if (data > 1.0)
+
             }  // END: for k_grid_z
         }  // END: for i_grid_y
     }  // END: for j_grid_y
@@ -1044,7 +1091,7 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
 
     init_quad_points_hex_qtet(2);  //
 
-#pragma omp parallel for schedule(dynamic)
+    // #pragma omp parallel for schedule(dynamic)
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         // Read the element vertex indices
         idx_t ev[4];
@@ -1080,6 +1127,12 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
         const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
         const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
         const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+
+        //         if (wf0 > 1.0 || wf1 > 1.0 || wf2 > 1.0 || wf3 > 1.0) {
+        // #if SFEM_LOG_LEVEL >= 1
+        //             printf("Warning: Weighted field value greater than 1.0 at element %td \n", element_i);
+        // #endif
+        //         }
 
         tet4_resample_field_adjoint_tet_norm(x0_n,       //
                                              x1_n,       //
