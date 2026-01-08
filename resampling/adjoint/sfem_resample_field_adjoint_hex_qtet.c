@@ -318,6 +318,7 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
 
 }  // END Function: is_hex_out_of_tet
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 // #if defined(__AVX512F__)
 #include <immintrin.h>
 
@@ -473,8 +474,7 @@ void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],      
     in_out[0] = (all_negative_x_0 || all_negative_y_0 || all_negative_z_0 || all_outside_sum_0);
     in_out[1] = (all_negative_x_1 || all_negative_y_1 || all_negative_z_1 || all_outside_sum_1);
 }
-// #endif
-
+#endif  // END: x86 architecture specific code
 // #endif
 
 //////////////////////////////////////////////////////////
@@ -618,15 +618,18 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
                 const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
-                                                                                 // is_hex_out_of_tet  //
-                        (inv_J_tet,                                              //
-                         x0_n,                                                   //
-                         y0_n,                                                   //
-                         z0_n,                                                   //
-                         hex_vertices_x,                                         //
-                         hex_vertices_y,                                         //
-                         hex_vertices_z);                                        //
+#else
+                const bool is_out_of_tet = is_hex_out_of_tet  //
+#endif
+                        (inv_J_tet,        //
+                         x0_n,             //
+                         y0_n,             //
+                         z0_n,             //
+                         hex_vertices_x,   //
+                         hex_vertices_y,   //
+                         hex_vertices_z);  //
 
                 // printf("Is out of tet: %d \n", is_out_of_tet);
 
@@ -891,16 +894,15 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                                                    z_hex_max,
                                                    z_hex_max};
 
-                is_hex_out_of_tet_norm_v_avx512_fp32_step2h  //
-                                                             // is_hex_out_of_tet_step2h//
-                        (inv_J_tet,                          //
-                         x0_n,                               //
-                         y0_n,                               //
-                         z0_n,                               //
-                         (const real_t*)hex_vertices_x,      //
-                         (const real_t*)hex_vertices_y,      //
-                         (const real_t*)hex_vertices_z,      //
-                         &in_out_array[local_idx]);          //
+                // is_hex_out_of_tet_norm_v_avx512_fp32_step2h  //
+                is_hex_out_of_tet_step2h(inv_J_tet,                      //
+                                         x0_n,                           //
+                                         y0_n,                           //
+                                         z0_n,                           //
+                                         (const real_t*)hex_vertices_x,  //
+                                         (const real_t*)hex_vertices_y,  //
+                                         (const real_t*)hex_vertices_z,  //
+                                         &in_out_array[local_idx]);      //
             }
         }
     }
