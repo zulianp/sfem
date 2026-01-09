@@ -154,11 +154,11 @@ function process_raw_file() {
 }
 
 process_raw_file test_field
-process_raw_file field_cnt
-process_raw_file bit_array
-process_raw_file test_field_fun_XYZ
-process_raw_file test_field_alpha
-process_raw_file test_field_volume
+# process_raw_file field_cnt
+# process_raw_file bit_array
+# process_raw_file test_field_fun_XYZ
+# process_raw_file test_field_alpha
+# process_raw_file test_field_volume
 
 if [[ -f "test_field.xdmf" && $PRECISION == "float64" ]]; then
     sed -i 's/Precision="4"/Precision="8"/' test_field.xdmf

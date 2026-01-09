@@ -701,11 +701,8 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                     //     data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
                     //     data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0) {
                     //     fprintf(stdout,
-                    //             "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d) ",
-                    //             base_index,
-                    //             i_grid_x,
-                    //             j_grid_y,
-                    //             k_grid_z);
+                    //             "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d)
+                    //             ", base_index, i_grid_x, j_grid_y, k_grid_z);
 
                     //     fprintf(stdout,
                     //             " data values: %f, %f, %f, %f, %f, %f, %f, %f \n",
@@ -1089,6 +1086,8 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
                                           const mini_tet_parameters_t          mini_tet_parameters,  //
                                           real_t* const SFEM_RESTRICT          data) {                        //
 
+    PRINT_CURRENT_FUNCTION;
+
     init_quad_points_hex_qtet(2);  //
 
     // #pragma omp parallel for schedule(dynamic)
@@ -1134,25 +1133,27 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
         // #endif
         //         }
 
-        tet4_resample_field_adjoint_tet_norm(x0_n,       //
-                                             x1_n,       //
-                                             x2_n,       //
-                                             x3_n,       //
-                                             y0_n,       //
-                                             y1_n,       //
-                                             y2_n,       //
-                                             y3_n,       //
-                                             z0_n,       //
-                                             z1_n,       //
-                                             z2_n,       //
-                                             z3_n,       //
-                                             wf0,        //
-                                             wf1,        //
-                                             wf2,        //
-                                             wf3,        //
-                                             stride[1],  //
-                                             stride[2],  //
-                                             data);      //
+        const int ret_code =                                     //
+                tet4_resample_field_adjoint_tet_norm(x0_n,       //
+                                                     x1_n,       //
+                                                     x2_n,       //
+                                                     x3_n,       //
+                                                     y0_n,       //
+                                                     y1_n,       //
+                                                     y2_n,       //
+                                                     y3_n,       //
+                                                     z0_n,       //
+                                                     z1_n,       //
+                                                     z2_n,       //
+                                                     z3_n,       //
+                                                     wf0,        //
+                                                     wf1,        //
+                                                     wf2,        //
+                                                     wf3,        //
+                                                     stride[1],  //
+                                                     stride[2],  //
+                                                     data);      //
     }
 
+    RETURN_FROM_FUNCTION(0);
 }  // END: Function: tet4_resample_field_adjoint_hex_quad_norm
