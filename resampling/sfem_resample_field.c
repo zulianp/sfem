@@ -1435,7 +1435,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-// #define TEST_GPU_HYTEG_REFINEMENT
+            // #define TEST_GPU_HYTEG_REFINEMENT
             // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
@@ -1463,7 +1463,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 #endif
 
             ret = tet4_resample_field_adjoint_hex_quad_norm  //
-                                                             // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+            // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
                                                              // ret = tet4_resample_field_adjoint_hex_quad_norm  //
                                                              // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                                      //

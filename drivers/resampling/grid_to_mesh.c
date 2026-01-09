@@ -982,6 +982,8 @@ int main(int argc, char* argv[]) {
                     }
 #endif
 
+// #define REDEFINE_BOUNDING_BOX_FOR_REFINE
+#ifdef REDEFINE_BOUNDING_BOX_FOR_REFINE
                     {
                         real_t side;
                         real_t origin_bb[3];
@@ -1002,8 +1004,6 @@ int main(int argc, char* argv[]) {
                         delta[1] = side / (real_t)(nlocal[1] - 1);
                         delta[2] = side / (real_t)(nlocal[2] - 1);
 
-                        make_metadata(nglobal, delta, origin, out_base_directory);
-
 #if SFEM_LOG_LEVEL >= 5
                         printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
                                origin_bb[0],
@@ -1018,7 +1018,10 @@ int main(int argc, char* argv[]) {
                         printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
 #endif
                     }
+#endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
 
+#define ENABLE_NORMALIZE_MESH
+#ifdef ENABLE_NORMALIZE_MESH
                     normalize_mesh(mesh.nnodes,            //
                                    (geom_t**)mesh.points,  //
                                    delta[0],               //
@@ -1035,6 +1038,45 @@ int main(int argc, char* argv[]) {
                     origin[0] = 0.0;
                     origin[1] = 0.0;
                     origin[2] = 0.0;
+#endif
+
+// #define REDEFINE_BOUNDING_BOX
+#ifdef REDEFINE_BOUNDING_BOX
+                    {
+                        real_t side;
+                        real_t origin_bb[3];
+
+                        mesh_cube_bounding_box(mesh.nnodes,            //
+                                               (geom_t**)mesh.points,  //
+                                               0.05,                   //
+                                               &side,                  //
+                                               &origin_bb[0],          //
+                                               &origin_bb[1],          //
+                                               &origin_bb[2]);         //
+
+                        origin[0] = origin_bb[0];
+                        origin[1] = origin_bb[1];
+                        origin[2] = origin_bb[2];
+
+                        delta[0] = side / (real_t)(nlocal[0] - 1);
+                        delta[1] = side / (real_t)(nlocal[1] - 1);
+                        delta[2] = side / (real_t)(nlocal[2] - 1);
+
+#if SFEM_LOG_LEVEL >= 5
+                        printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
+                               origin_bb[0],
+                               origin_bb[1],
+                               origin_bb[2],
+                               side,
+                               __FILE__,
+                               __LINE__);
+
+                        printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
+                        printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
+                        printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
+#endif
+                    }
+#endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
 
                     printf("Stride: (%ld %ld %ld) \n", stride[0], stride[1], stride[2]);
 
@@ -1097,12 +1139,13 @@ int main(int argc, char* argv[]) {
                                        delta,
                                        max_field_coords);
 
-                    printf("Max field coords: %d %d %d :: coord %d\n",
+                    printf("Max field coords: %d %d %d :: coord %d, max value: %1.14e\n",
                            max_field_coords[0],
                            max_field_coords[1],
                            max_field_coords[2],
                            (int)(stride[0] * max_field_coords[0] + stride[1] * max_field_coords[1] +
-                                 stride[2] * max_field_coords[2]));
+                                 stride[2] * max_field_coords[2]),
+                           max_field_tet4);
 
                     print_rank_info(mpi_rank,              //
                                     mpi_size,              //
@@ -1135,13 +1178,13 @@ int main(int argc, char* argv[]) {
                     if (env_out_filename && strlen(env_out_filename) > 0) {
                         snprintf(out_filename_raw, 1000, "%s", env_out_filename);
                     } else {
-                        snprintf(out_filename_raw, 1000, "/home/simone/git/sfem_d/sfem/workflows/resample/test_field.raw");
+                        snprintf(out_filename_raw, 1000, "%s/test_field.raw", out_base_directory);
                     }
 
 #if SFEM_LOG_LEVEL >= 5
                     printf("Writing output field to: %s, %s:%d\n", out_filename_raw, __FILE__, __LINE__);
 #endif
-
+                    make_metadata(nglobal, delta, origin, out_base_directory);
                     ndarray_write(MPI_COMM_WORLD,
                                   out_filename_raw,
                                   ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
@@ -1150,6 +1193,7 @@ int main(int argc, char* argv[]) {
                                   nlocal,
                                   nglobal);
 
+#ifdef WRITE_FIELD_FUN_XYZ
                     if (field_fun_XYZ != NULL) {
                         char        out_filename_fun_xyz[1000];
                         const char* env_out_filename_fun_xyz = getenv("OUT_FILENAME_FUN_XYZ_RAW");
@@ -1168,6 +1212,7 @@ int main(int argc, char* argv[]) {
                                       nlocal,
                                       nglobal);
                     }
+#endif  // WRITE_FIELD_FUN_XYZ
 
                     // // TEST: write the in out field and the field_cnt
                     // ndarray_write(MPI_COMM_WORLD,
