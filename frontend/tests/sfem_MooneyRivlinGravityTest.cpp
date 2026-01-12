@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -149,7 +150,7 @@ static void compute_contact_lower_bound_hemisphere(
         const ptrdiff_t node_idx = contact_nodes[i];
         const ptrdiff_t dof_idx = node_idx * block_size + contact_dir;
         
-        // Current position in perpendicular directions (reference + displacement)
+        // Current position in perpendicular directions
         real_t cur_h1 = ref_coords[h1][node_idx] + displacement[node_idx * block_size + h1];
         real_t cur_h2 = ref_coords[h2][node_idx] + displacement[node_idx * block_size + h2];
         
@@ -168,14 +169,17 @@ static void compute_contact_lower_bound_hemisphere(
             surface_coord = center[contact_dir];
         }
         
-        // Same pattern as triangular/stepped: lower_bound = surface - current_disp
+        // Constraint: current_pos >= surface_coord
+        // current_pos = ref_coord + disp, so: disp >= surface_coord - ref_coord
+        // lower_bound = surface_coord - ref_coord - current_disp
+        const real_t ref_coord = ref_coords[contact_dir][node_idx];
         const real_t current_disp = displacement[dof_idx];
-        lower_bound[dof_idx] = surface_coord - current_disp;
+        lower_bound[dof_idx] = surface_coord - ref_coord - current_disp;
         
         // Debug output for first call
         if (first_call && i < 5) {
-            printf("  DEBUG hemisphere node %ld: ref_y=%.3f ref_z=%.3f dh1=%.3f dh2=%.3f dist=%.3f surface=%.3f disp=%.3f lb=%.3f\n",
-                   (long)node_idx, ref_coords[h1][node_idx], ref_coords[h2][node_idx], 
+            printf("  DEBUG hemisphere node %ld: ref_xy=(%.3f,%.3f) ref_z=%.3f dh=(%.3f,%.3f) dist=%.3f surface=%.3f disp=%.3f lb=%.3f\n",
+                   (long)node_idx, ref_coords[h1][node_idx], ref_coords[h2][node_idx], ref_coord,
                    dh1, dh2, sqrt(dist_h_sq), surface_coord, current_disp, lower_bound[dof_idx]);
         }
     }
@@ -581,13 +585,18 @@ int test_mooney_rivlin_gravity() {
         printf("Loading mesh from: %s\n", mesh_path);
         mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), mesh_path);
     } else {
+        // Default cube mesh with configurable initial gap
+        real_t SFEM_INIT_GAP = 0.05;  // Default gap above contact plane
+        SFEM_READ_ENV(SFEM_INIT_GAP, atof);
+        
+        printf("Creating default cube mesh with SFEM_INIT_GAP=%.4f\n", SFEM_INIT_GAP);
         mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,
                                              SFEM_BASE_RESOLUTION,  // Grid
                                              0,
                                              0,
-                                             0,  // Origin
+                                             SFEM_INIT_GAP,  // Origin z with gap
                                              2,
                                              1,
                                              1  // Dimensions (cube)
@@ -761,12 +770,20 @@ int test_mooney_rivlin_gravity() {
                                                      : max_sideset_z;
 
     // **Boundary conditions based on contact direction**
+    // SFEM_FIX_SIDE: 0=fix min side, 1=fix max side (default for backward compatibility)
+    int SFEM_FIX_SIDE = 1;
+    SFEM_READ_ENV(SFEM_FIX_SIDE, atoi);
+    
     if (!SFEM_ENABLE_CONTACT) {
-        // No contact: fix opposite side completely
-        sfem::DirichletConditions::Condition right_bc_x{.sidesets = opposite_sideset, .value = 0, .component = 0};
-        sfem::DirichletConditions::Condition right_bc_y{.sidesets = opposite_sideset, .value = 0, .component = 1};
-        sfem::DirichletConditions::Condition right_bc_z{.sidesets = opposite_sideset, .value = 0, .component = 2};
-        auto                                 conds = sfem::create_dirichlet_conditions(fs, {right_bc_x, right_bc_y, right_bc_z}, es);
+        // No contact: fix one side completely based on SFEM_FIX_SIDE
+        auto fixed_sideset = (SFEM_FIX_SIDE == 0) ? contact_sideset : opposite_sideset;
+        printf("Fixing %s side in %s direction (all DOFs)\n", 
+               SFEM_FIX_SIDE == 0 ? "min" : "max",
+               SFEM_CONTACT_DIR == 0 ? "x" : (SFEM_CONTACT_DIR == 1 ? "y" : "z"));
+        sfem::DirichletConditions::Condition bc_x{.sidesets = fixed_sideset, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition bc_y{.sidesets = fixed_sideset, .value = 0, .component = 1};
+        sfem::DirichletConditions::Condition bc_z{.sidesets = fixed_sideset, .value = 0, .component = 2};
+        auto                                 conds = sfem::create_dirichlet_conditions(fs, {bc_x, bc_y, bc_z}, es);
         f->add_constraint(conds);
     } else if (SFEM_CONTACT_DIR == 1) {
         // Y-direction contact (vertical drop): fix max-y surface in x and z only (allow vertical motion)
@@ -789,6 +806,12 @@ int test_mooney_rivlin_gravity() {
     // **GRAVITY as body force instead of Neumann surface force**
     real_t SFEM_GRAVITY = 9.81;  // Positive value, direction handled below
     SFEM_READ_ENV(SFEM_GRAVITY, atof);
+    
+    // Gravity direction: independent of contact direction
+    // Default: same as CONTACT_DIR (for backward compatibility)
+    // Set SFEM_GRAVITY_DIR to override (0=x, 1=y, 2=z)
+    int SFEM_GRAVITY_DIR = SFEM_CONTACT_DIR;
+    SFEM_READ_ENV(SFEM_GRAVITY_DIR, atoi);
 
     const ptrdiff_t ndofs   = fs->n_dofs();
     auto            x       = sfem::create_buffer<real_t>(ndofs, es);
@@ -807,25 +830,17 @@ int test_mooney_rivlin_gravity() {
     blas->scal(ndofs, density, mass_diag->data());
     f->set_value_to_constrained_dofs(1.0, mass_diag->data());  // Set 1 for BC nodes
 
-    // **Gravity force vector** (negative direction of SFEM_CONTACT_DIR)
-    // This replaces the Neumann surface force
+    // **Gravity force vector**
     auto f_gravity_neg = sfem::create_buffer<real_t>(ndofs, es);
     blas->zeros(ndofs, f_gravity_neg->data());
     
-    // Gravity direction: -SFEM_CONTACT_DIR (e.g., -x if CONTACT_DIR=0, -y if CONTACT_DIR=1)
-    // F_gravity = m * g in -CONTACT_DIR direction = -m*g in +CONTACT_DIR direction
-    // For gradient convention (we add -gradient to RHS), we need to store -F_gravity
-    // So we store -(-m*g) = +m*g when gravity is in +CONTACT_DIR direction
-    // But for hemisphere test, gravity should be in -CONTACT_DIR (downward)
-    // So the sign needs to be NEGATIVE for the gravity to pull DOWN
+    // Gravity in -GRAVITY_DIR direction (positive SFEM_GRAVITY causes motion in -GRAVITY_DIR)
     const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
+    printf("Gravity: %.4f in -%s direction\n", SFEM_GRAVITY, 
+           SFEM_GRAVITY_DIR == 0 ? "x" : (SFEM_GRAVITY_DIR == 1 ? "y" : "z"));
     for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-        // For gravity in -CONTACT_DIR direction: F_gravity[CONTACT_DIR] = -m*g
-        // Stored as -F_gravity = +m*g (POSITIVE value causes motion in -CONTACT_DIR)
-        // Wait, let me check the original code logic for x-direction:
-        // Original: pushed in -x, contact on left (x=0 plane), worked correctly
-        // So positive f_gravity_neg causes motion in -CONTACT_DIR
-        f_gravity_neg->data()[node * 3 + SFEM_CONTACT_DIR] = mass_diag->data()[node * 3 + SFEM_CONTACT_DIR] * SFEM_GRAVITY;
+        f_gravity_neg->data()[node * 3 + SFEM_GRAVITY_DIR] = 
+            mass_diag->data()[node * 3 + SFEM_GRAVITY_DIR] * SFEM_GRAVITY;
     }
     // Apply BC to gravity force (zero at constrained DOFs)
     f->set_value_to_constrained_dofs(0.0, f_gravity_neg->data());
@@ -927,26 +942,27 @@ int test_mooney_rivlin_gravity() {
         auto mprgp = sfem::create_mprgp(linear_op_apply, es);
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
-        // For flat plane (0), stepped (2), triangular (1): use ALL nodes for contact detection
-        // Each node has its own constraint based on its reference coordinate
-        // For hemisphere (4): use only contact boundary nodes
-        if (SFEM_OBSTACLE_TYPE == 0 || SFEM_OBSTACLE_TYPE == 1 || SFEM_OBSTACLE_TYPE == 2) {
+        // For hemisphere (type=4): only use bottom boundary nodes for stability
+        // For other types: use ALL nodes
+        if (SFEM_OBSTACLE_TYPE == 4) {
+            // Hemisphere: only constrain bottom boundary nodes
+            auto nodeset = sfem::create_nodeset_from_sidesets(fs, contact_sideset);
+            auto nodeset_data = nodeset->data();
+            ptrdiff_t n_boundary_nodes = nodeset->size();
+            contact_node_indices.resize(n_boundary_nodes);
+            for (ptrdiff_t i = 0; i < n_boundary_nodes; i++) {
+                contact_node_indices[i] = nodeset_data[i];
+            }
+            printf("Hemisphere obstacle (type=4): using %ld BOUNDARY nodes for contact\n", 
+                   (long)contact_node_indices.size());
+        } else {
+            // Other obstacle types: use all nodes
             contact_node_indices.resize(n_nodes);
             for (ptrdiff_t i = 0; i < n_nodes; i++) {
                 contact_node_indices[i] = i;
             }
             printf("Obstacle (type=%d): using ALL %ld nodes for contact detection\n", 
                    SFEM_OBSTACLE_TYPE, (long)n_nodes);
-        } else {
-            // Hemisphere (4): only use contact boundary nodes
-            auto lnodes = sfem::create_nodeset_from_sideset(fs, contact_sideset[0]);
-            const ptrdiff_t nbnodes = lnodes->size();
-            contact_node_indices.resize(nbnodes);
-            for (ptrdiff_t i = 0; i < nbnodes; i++) {
-                contact_node_indices[i] = lnodes->data()[i];
-            }
-            printf("Hemisphere obstacle (type=%d): using %ld boundary nodes for contact detection\n", 
-                   SFEM_OBSTACLE_TYPE, (long)nbnodes);
         }
 
         // Initial lower bound computation (displacement = 0 at start)
@@ -996,14 +1012,14 @@ int test_mooney_rivlin_gravity() {
                 block_size,
                 ndofs);
         } else {
-            // Flat plane - use absolute coordinate (0)
+            // Flat plane
             compute_contact_lower_bound(
                 lower_bound->data(),
                 x->data(),
                 coords_ptr,
                 contact_node_indices.data(),
                 (ptrdiff_t)contact_node_indices.size(),
-                0.0,  // Contact plane at z=0 (absolute coordinate)
+                SFEM_CONTACT_PLANE,
                 SFEM_CONTACT_DIR,
                 block_size,
                 ndofs);
@@ -1023,7 +1039,14 @@ int test_mooney_rivlin_gravity() {
     SFEM_READ_ENV(SFEM_T, atof);
     real_t t           = 0;
     size_t steps       = 0;
-    size_t export_freq = 1;
+    
+    // Output frequency: export every N steps (default 1 = every step)
+    int SFEM_EXPORT_FREQ = 1;
+    SFEM_READ_ENV(SFEM_EXPORT_FREQ, atoi);
+    size_t export_freq = SFEM_EXPORT_FREQ;
+    if (export_freq > 1) {
+        printf("Output frequency: every %zu steps\n", export_freq);
+    }
 
     auto f_int        = sfem::create_buffer<real_t>(ndofs, es);
     auto inertia_term = sfem::create_buffer<real_t>(ndofs, es);
@@ -1101,16 +1124,13 @@ int test_mooney_rivlin_gravity() {
                                 y_min, y_max,
                                 z_min, z_max);
         } else {
-            // Flat obstacle (type 0)
-            // SFEM_CONTACT_PLANE is a displacement constraint, actual plane position is:
-            // min_c[contact_dir] + SFEM_CONTACT_PLANE
-            const real_t actual_plane_pos = min_c[SFEM_CONTACT_DIR] + SFEM_CONTACT_PLANE;
+            // Flat obstacle (type 0) - plane at z=0 (absolute coordinate)
             int h1, h2;
             if (SFEM_CONTACT_DIR == 0) { h1 = 1; h2 = 2; }
             else if (SFEM_CONTACT_DIR == 1) { h1 = 0; h2 = 2; }
             else { h1 = 0; h2 = 1; }
             export_flat_obstacle_mesh("test_mooney_rivlin_gravity",
-                                      actual_plane_pos,
+                                      0.0,  // Contact plane at absolute coordinate 0
                                       SFEM_CONTACT_DIR,
                                       min_c[h1], max_c[h1],
                                       min_c[h2], max_c[h2]);
@@ -1192,14 +1212,14 @@ int test_mooney_rivlin_gravity() {
                     block_size,
                     ndofs);
             } else {
-                // Flat obstacle (type 0) - use absolute coordinate (0)
+                // Flat obstacle (type 0)
                 compute_contact_lower_bound(
                     lower_bound->data(),
                     x->data(),
                     coords_ptr,
                     contact_node_indices.data(),
                     (ptrdiff_t)contact_node_indices.size(),
-                    0.0,  // Contact plane at z=0 (absolute coordinate)
+                    SFEM_CONTACT_PLANE,
                     SFEM_CONTACT_DIR,
                     block_size,
                     ndofs);
@@ -1283,11 +1303,22 @@ int test_mooney_rivlin_gravity() {
             blas->zeros(ndofs, delta_x->data());
             solver->apply(rhs->data(), delta_x->data());
 
-            // u = u + dx
-            blas->axpy(ndofs, 1.0, delta_x->data(), x->data());
+            // u = u + dx (with optional damping for stability)
+            // For fine meshes, damping < 1 may be needed
+            static real_t SFEM_NEWTON_DAMPING = 1.0;
+            static bool damping_read = false;
+            if (!damping_read) {
+                SFEM_READ_ENV(SFEM_NEWTON_DAMPING, atof);
+                damping_read = true;
+                if (SFEM_NEWTON_DAMPING < 1.0) {
+                    printf("Using Newton damping = %.3f\n", SFEM_NEWTON_DAMPING);
+                }
+            }
+            real_t damping = SFEM_NEWTON_DAMPING;
+            blas->axpy(ndofs, damping, delta_x->data(), x->data());
 
             if (SFEM_ENABLE_CONTACT) {
-                blas->axpy(ndofs, -1, delta_x->data(), lower_bound->data());
+                blas->axpy(ndofs, -damping, delta_x->data(), lower_bound->data());
             }
         }
 
