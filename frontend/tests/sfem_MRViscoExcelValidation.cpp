@@ -378,9 +378,9 @@ for idx, mode in enumerate(modes):
 
     if len(mode_df) > 0:
         ax.plot(mode_df['strain'], mode_df['stress_marc'],
-                'b-', linewidth=2, label='Marc (Standard MR)')
+                'b-', linewidth=2, label='Marc')
         ax.plot(mode_df['strain'], mode_df['stress_sfem'],
-                'r--', linewidth=2, label='SFEM (Corrected)')
+                'r--', linewidth=2, label='SFEM')
 
         denom = mode_df['stress_marc'].abs().max()
         if denom > 0:
@@ -434,9 +434,9 @@ for idx, mode in enumerate(modes):
     
     if len(mode_df) > 0:
         ax2.plot(mode_df['strain'], mode_df['stress_marc'], 
-                'b-', linewidth=2, label='Marc (Standard MR)')
+                'b-', linewidth=2, label='Marc')
         ax2.plot(mode_df['strain'], mode_df['stress_sfem'], 
-                'r--', linewidth=2, label='SFEM (Corrected)')
+                'r--', linewidth=2, label='SFEM')
     
     ax2.set_xlabel('Engineering Strain [-]', fontsize=12)
     ax2.set_ylabel('Engineering Stress [MPa]', fontsize=12)

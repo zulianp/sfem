@@ -270,22 +270,76 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Read results
+# Read SFEM results
 df = pd.read_csv('hyperelastic_excel_validation_results.csv')
 
-fig, axes = plt.subplots(3, 1, figsize=(6, 12))
+# Read measurement data from Excel
+excel_file = '70EPDM281_verification.xlsx'
+try:
+    xl = pd.ExcelFile(excel_file)
+    # Read with header on row 1 (0-indexed)
+    uni_meas = pd.read_excel(xl, sheet_name='Uniaxial', header=1).iloc[:52]  # First 52 rows
+    eqb_meas = pd.read_excel(xl, sheet_name='Equibiax', header=1).iloc[:51]  # First 51 rows
+    ps_meas = pd.read_excel(xl, sheet_name='Pure shear', header=1).iloc[:53]  # First 53 rows
+    has_measurement = True
+    print(f'Loaded measurement data from {excel_file}')
+    print(f'  Uniaxial: {len(uni_meas)} points')
+    print(f'  Equibiaxial: {len(eqb_meas)} points')
+    print(f'  Pure shear: {len(ps_meas)} points')
+except Exception as e:
+    print(f'Warning: Could not load measurement data: {e}')
+    has_measurement = False
 
 modes = ['Uniaxial', 'Equibiaxial', 'PlanarShear']
 titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Planar Shear']
+meas_data = [uni_meas, eqb_meas, ps_meas] if has_measurement else [None, None, None]
+
+# Generate individual plots for each mode
+for idx, mode in enumerate(modes):
+    fig, ax = plt.subplots(figsize=(8, 6))
+    mode_df = df[df['mode'] == mode]
+
+    # Measurement data (green circles)
+    if has_measurement and meas_data[idx] is not None:
+        meas = meas_data[idx]
+        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'], 
+                'go', markersize=5, alpha=0.6, label='Measurement')
+
+    # SFEM (red dashed line)
+    if len(mode_df) > 0:
+        ax.plot(mode_df['strain'], mode_df['stress_sfem'], 
+                'r--', linewidth=2, label='SFEM')
+    
+    ax.set_xlabel('Engineering Strain [-]', fontsize=12)
+    ax.set_ylabel('Engineering Stress [MPa]', fontsize=12)
+    ax.set_title(f'{titles[idx]}', fontsize=14)
+    ax.legend(fontsize=11, loc='lower right')
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    
+    fname = f'hyperelastic_excel_{mode.lower()}'
+    plt.savefig(f'{fname}.png', dpi=150, bbox_inches='tight')
+    plt.savefig(f'{fname}.pdf', bbox_inches='tight')
+    print(f'Saved: {fname}.png')
+    plt.close(fig)
+
+# Combined stacked plot
+fig, axes = plt.subplots(3, 1, figsize=(7, 12))
 
 for idx, mode in enumerate(modes):
     ax = axes[idx]
     mode_df = df[df['mode'] == mode]
 
+    # Measurement data (green circles)
+    if has_measurement and meas_data[idx] is not None:
+        meas = meas_data[idx]
+        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'], 
+                'go', markersize=4, alpha=0.6, label='Measurement')
+
     if len(mode_df) > 0:
-        # SFEM (red line)
         ax.plot(mode_df['strain'], mode_df['stress_sfem'], 
-                'r-', linewidth=2, label='SFEM (Corrected)')
+                'r--', linewidth=2, label='SFEM')
         
     ax.set_xlabel('Engineering Strain [-]')
     ax.set_ylabel('Engineering Stress [MPa]')
@@ -296,31 +350,10 @@ for idx, mode in enumerate(modes):
     ax.set_ylim(bottom=0)
 
 plt.tight_layout()
-plt.savefig('hyperelastic_excel_validation_plot.png', dpi=150, bbox_inches='tight')
-plt.savefig('hyperelastic_excel_validation_plot.pdf', bbox_inches='tight')
-print('Plots saved: hyperelastic_excel_validation_plot.png')
-
-# Also generate individual plots
-for idx, mode in enumerate(modes):
-    fig2, ax2 = plt.subplots(figsize=(8, 6))
-    mode_df = df[df['mode'] == mode]
-
-    if len(mode_df) > 0:
-        ax2.plot(mode_df['strain'], mode_df['stress_sfem'], 
-                'r-', linewidth=2, label='SFEM (Corrected)')
-    
-    ax2.set_xlabel('Engineering Strain [-]', fontsize=12)
-    ax2.set_ylabel('Engineering Stress [MPa]', fontsize=12)
-    ax2.set_title(f'{titles[idx]} - Hyperelastic Validation', fontsize=14)
-    ax2.legend(fontsize=11)
-    ax2.grid(True, alpha=0.3)
-    ax2.set_xlim(left=0)
-    ax2.set_ylim(bottom=0)
-    
-    fname = f'hyperelastic_excel_{mode.lower()}.png'
-    plt.savefig(fname, dpi=150, bbox_inches='tight')
-    print(f'Saved: {fname}')
-    plt.close(fig2)
+plt.savefig('hyperelastic_excel_validation_stacked.png', dpi=150, bbox_inches='tight')
+plt.savefig('hyperelastic_excel_validation_stacked.pdf', bbox_inches='tight')
+print('Saved: hyperelastic_excel_validation_stacked.png')
+plt.close(fig)
 )";
     py.close();
     
