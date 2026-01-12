@@ -139,6 +139,164 @@ normalize_mesh(const ptrdiff_t nnodes,   // Mesh
 }
 // END: Function: normalize_mesh
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// normalize_mesh_BB //////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+int                                                            //
+normalize_mesh_BB(const ptrdiff_t              nnodes,         // Mesh
+                  geom_t** const SFEM_RESTRICT xyz,            //
+                  const real_t                 norm_nr_nodes,  //
+                  const real_t                 norm_delta,     //
+                  const real_t                 margin,         //
+                  real_t*                      new_origin0,    //
+                  real_t*                      new_origin1,    //
+                  real_t*                      new_origin2,    //
+                  real_t*                      new_side0,      //
+                  real_t*                      new_side1,      //
+                  real_t*                      new_side2) {                         //
+
+    PRINT_CURRENT_FUNCTION;
+
+    real_t min_mesh_x = DBL_MAX;
+    real_t max_mesh_x = -DBL_MAX;
+
+    real_t min_mesh_y = DBL_MAX;
+    real_t max_mesh_y = -DBL_MAX;
+
+    real_t min_mesh_z = DBL_MAX;
+    real_t max_mesh_z = -DBL_MAX;
+
+    for (ptrdiff_t node = 0; node < nnodes; node++) {
+        real_t x0_n = xyz[0][node];
+        real_t x1_n = xyz[0][node];
+        real_t x2_n = xyz[0][node];
+        real_t x3_n = xyz[0][node];
+
+        real_t y0_n = xyz[1][node];
+        real_t y1_n = xyz[1][node];
+        real_t y2_n = xyz[1][node];
+        real_t y3_n = xyz[1][node];
+
+        real_t z0_n = xyz[2][node];
+        real_t z1_n = xyz[2][node];
+        real_t z2_n = xyz[2][node];
+        real_t z3_n = xyz[2][node];
+
+        if (x0_n < min_mesh_x) min_mesh_x = x0_n;
+        if (x1_n < min_mesh_x) min_mesh_x = x1_n;
+        if (x2_n < min_mesh_x) min_mesh_x = x2_n;
+        if (x3_n < min_mesh_x) min_mesh_x = x3_n;
+
+        if (x0_n > max_mesh_x) max_mesh_x = x0_n;
+        if (x1_n > max_mesh_x) max_mesh_x = x1_n;
+        if (x2_n > max_mesh_x) max_mesh_x = x2_n;
+        if (x3_n > max_mesh_x) max_mesh_x = x3_n;
+
+        if (y0_n < min_mesh_y) min_mesh_y = y0_n;
+        if (y1_n < min_mesh_y) min_mesh_y = y1_n;
+        if (y2_n < min_mesh_y) min_mesh_y = y2_n;
+        if (y3_n < min_mesh_y) min_mesh_y = y3_n;
+
+        if (y0_n > max_mesh_y) max_mesh_y = y0_n;
+        if (y1_n > max_mesh_y) max_mesh_y = y1_n;
+        if (y2_n > max_mesh_y) max_mesh_y = y2_n;
+        if (y3_n > max_mesh_y) max_mesh_y = y3_n;
+
+        if (z0_n < min_mesh_z) min_mesh_z = z0_n;
+        if (z1_n < min_mesh_z) min_mesh_z = z1_n;
+        if (z2_n < min_mesh_z) min_mesh_z = z2_n;
+        if (z3_n < min_mesh_z) min_mesh_z = z3_n;
+
+        if (z0_n > max_mesh_z) max_mesh_z = z0_n;
+        if (z1_n > max_mesh_z) max_mesh_z = z1_n;
+        if (z2_n > max_mesh_z) max_mesh_z = z2_n;
+        if (z3_n > max_mesh_z) max_mesh_z = z3_n;
+    }
+
+    const real_t side_0 = max_mesh_x - min_mesh_x;
+    const real_t side_1 = max_mesh_y - min_mesh_y;
+    const real_t side_2 = max_mesh_z - min_mesh_z;
+
+    const real_t max_side = MAX(side_0, MAX(side_1, side_2));
+    const real_t new_side = max_side + 2.0 * margin * max_side;
+
+    const real_t origin_x = min_mesh_x - margin * max_side;
+    const real_t origin_y = min_mesh_y - margin * max_side;
+    const real_t origin_z = min_mesh_z - margin * max_side;
+
+    *new_origin0 = origin_x;
+    *new_origin1 = origin_y;
+    *new_origin2 = origin_z;
+
+    *new_side0 = new_side;
+    *new_side1 = new_side;
+    *new_side2 = new_side;
+
+    const real_t normalization_factor = (norm_delta * ((real_t)norm_nr_nodes - 1.0)) / new_side;
+
+#if SFEM_LOG_LEVEL >= 5
+    printf("Mesh bounding box before normalization:\n");
+    printf("  X: [%f, %f]\n", min_mesh_x, max_mesh_x);
+    printf("  Y: [%f, %f]\n", min_mesh_y, max_mesh_y);
+    printf("  Z: [%f, %f]\n", min_mesh_z, max_mesh_z);
+    printf("Computed cube bounding box:\n");
+    printf("  Origin: (%f, %f, %f)\n", origin_x, origin_y, origin_z);
+    printf("  Side:   %f\n", new_side);
+    printf("Normalization factor: %f\n", normalization_factor);
+#endif
+
+    for (ptrdiff_t node = 0; node < nnodes; node++) {
+        real_t x0_n = xyz[0][node];
+        real_t x1_n = xyz[0][node];
+        real_t x2_n = xyz[0][node];
+        real_t x3_n = xyz[0][node];
+
+        real_t y0_n = xyz[1][node];
+        real_t y1_n = xyz[1][node];
+        real_t y2_n = xyz[1][node];
+        real_t y3_n = xyz[1][node];
+
+        real_t z0_n = xyz[2][node];
+        real_t z1_n = xyz[2][node];
+        real_t z2_n = xyz[2][node];
+        real_t z3_n = xyz[2][node];
+
+        x0_n = (x0_n - origin_x) * normalization_factor;
+        x1_n = (x1_n - origin_x) * normalization_factor;
+        x2_n = (x2_n - origin_x) * normalization_factor;
+        x3_n = (x3_n - origin_x) * normalization_factor;
+
+        y0_n = (y0_n - origin_y) * normalization_factor;
+        y1_n = (y1_n - origin_y) * normalization_factor;
+        y2_n = (y2_n - origin_y) * normalization_factor;
+        y3_n = (y3_n - origin_y) * normalization_factor;
+
+        z0_n = (z0_n - origin_z) * normalization_factor;
+        z1_n = (z1_n - origin_z) * normalization_factor;
+        z2_n = (z2_n - origin_z) * normalization_factor;
+        z3_n = (z3_n - origin_z) * normalization_factor;
+
+        xyz[0][node] = x0_n;
+        xyz[0][node] = x1_n;
+        xyz[0][node] = x2_n;
+        xyz[0][node] = x3_n;
+
+        xyz[1][node] = y0_n;
+        xyz[1][node] = y1_n;
+        xyz[1][node] = y2_n;
+        xyz[1][node] = y3_n;
+
+        xyz[2][node] = z0_n;
+        xyz[2][node] = z1_n;
+        xyz[2][node] = z2_n;
+        xyz[2][node] = z3_n;
+    }
+
+    RETURN_FROM_FUNCTION(0);
+}
+
 int                                                               //
 mesh_cube_bounding_box(const ptrdiff_t              nnodes,       // Mesh
                        geom_t** const SFEM_RESTRICT xyz,          //
@@ -1462,8 +1620,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             clock_gettime(CLOCK_MONOTONIC, &t_start);
 #endif
 
-            ret = tet4_resample_field_adjoint_hex_quad_norm  //
-            // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+            // ret = tet4_resample_field_adjoint_hex_quad_norm  //
+            ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
                                                              // ret = tet4_resample_field_adjoint_hex_quad_norm  //
                                                              // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
                     (0,                                      //

@@ -420,6 +420,47 @@ real_t mesh_fun_chainsaw_xyz(real_t x, real_t y, real_t z) {
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+// print_mesh_function_name
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void print_mesh_function_name(const function_XYZ_t mesh_fun_XYZ, const int mpi_rank) {
+    if (mpi_rank != 0) {
+        RETURN_FROM_FUNCTION();
+    }  // END if (mpi_rank != 0)
+
+    if (mesh_fun_XYZ == mesh_fun_par) {
+        printf("Using: mesh_fun_par\n");
+    } else if (mesh_fun_XYZ == mesh_fun_lin_x) {
+        printf("Using: mesh_fun_lin_x\n");
+    } else if (mesh_fun_XYZ == mesh_fun_lin_hs_x) {
+        printf("Using: mesh_fun_lin_hs_x\n");
+    } else if (mesh_fun_XYZ == mesh_fun_lin_hs_y) {
+        printf("Using: mesh_fun_lin_hs_y\n");
+    } else if (mesh_fun_XYZ == mesh_fun_lin_hs_z) {
+        printf("Using: mesh_fun_lin_hs_z\n");
+    } else if (mesh_fun_XYZ == mesh_fun_trig) {
+        printf("Using: mesh_fun_trig\n");
+    } else if (mesh_fun_XYZ == mesh_fun_trig_pos) {
+        printf("Using: mesh_fun_trig_pos\n");
+    } else if (mesh_fun_XYZ == mesh_fun_ones) {
+        printf("Using: mesh_fun_ones\n");
+    } else if (mesh_fun_XYZ == mesh_fun_zeros) {
+        printf("Using: mesh_fun_zeros\n");
+    } else if (mesh_fun_XYZ == mesh_fun_linear_step) {
+        printf("Using: mesh_fun_linear_step\n");
+    } else if (mesh_fun_XYZ == mesh_fun_chainsaw_x) {
+        printf("Using: mesh_fun_chainsaw_x\n");
+    } else if (mesh_fun_XYZ == mesh_fun_chainsaw_xyz) {
+        printf("Using: mesh_fun_chainsaw_xyz\n");
+    } else {
+        printf("Using: UNKNOWN function\n");
+    }  // END if-else chain
+
+    RETURN_FROM_FUNCTION();
+}  // END Function: print_mesh_function_name
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 // make_metadata
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -514,37 +555,7 @@ int main(int argc, char* argv[]) {
 #endif  // SFEM_LOG_LEVEL
 
 #if SFEM_LOG_LEVEL >= 5
-
-    if (mpi_rank == 0) {
-        if (mesh_fun_XYZ == mesh_fun_par) {
-            printf("Using: mesh_fun_par\n");
-        } else if (mesh_fun_XYZ == mesh_fun_lin_x) {
-            printf("Using: mesh_fun_lin_x\n");
-        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_x) {
-            printf("Using: mesh_fun_lin_hs_x\n");
-        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_y) {
-            printf("Using: mesh_fun_lin_hs_y\n");
-        } else if (mesh_fun_XYZ == mesh_fun_lin_hs_z) {
-            printf("Using: mesh_fun_lin_hs_z\n");
-        } else if (mesh_fun_XYZ == mesh_fun_trig) {
-            printf("Using: mesh_fun_trig\n");
-        } else if (mesh_fun_XYZ == mesh_fun_trig_pos) {
-            printf("Using: mesh_fun_trig_pos\n");
-        } else if (mesh_fun_XYZ == mesh_fun_ones) {
-            printf("Using: mesh_fun_ones\n");
-        } else if (mesh_fun_XYZ == mesh_fun_zeros) {
-            printf("Using: mesh_fun_zeros\n");
-        } else if (mesh_fun_XYZ == mesh_fun_linear_step) {
-            printf("Using: mesh_fun_linear_step\n");
-        } else if (mesh_fun_XYZ == mesh_fun_chainsaw_x) {
-            printf("Using: mesh_fun_chainsaw_x\n");
-        } else if (mesh_fun_XYZ == mesh_fun_chainsaw_xyz) {
-            printf("Using: mesh_fun_chainsaw_xyz\n");
-        } else {
-            printf("Using: UNKNOWN function\n");
-        }
-    }
-
+    print_mesh_function_name(mesh_fun_XYZ, mpi_rank);
 #endif  // SFEM_LOG_LEVEL
 
     // print argv
@@ -1022,14 +1033,24 @@ int main(int argc, char* argv[]) {
 
 #define ENABLE_NORMALIZE_MESH
 #ifdef ENABLE_NORMALIZE_MESH
-                    normalize_mesh(mesh.nnodes,            //
-                                   (geom_t**)mesh.points,  //
-                                   delta[0],               //
-                                   delta[1],               //
-                                   delta[2],               //
-                                   origin[0],              //
-                                   origin[1],              //
-                                   origin[2]);             //
+
+                    real_t new_origin[3];
+                    real_t new_side[3];
+                    real_t new_delta[3];
+
+                    // const real_t norm_side = 100.0;
+
+                    normalize_mesh_BB(mesh.nnodes,            //
+                                      (geom_t**)mesh.points,  //
+                                      nlocal[0],              //
+                                      1.0,                    //
+                                      0.02,                   //
+                                      &new_origin[0],         //
+                                      &new_origin[1],         //
+                                      &new_origin[2],         //
+                                      &new_side[0],           //
+                                      &new_side[1],           //
+                                      &new_side[2]);          //
 
                     delta[0] = 1.0;
                     delta[1] = 1.0;
@@ -1038,6 +1059,26 @@ int main(int argc, char* argv[]) {
                     origin[0] = 0.0;
                     origin[1] = 0.0;
                     origin[2] = 0.0;
+
+                    new_delta[0] = new_side[0] / (real_t)(nlocal[0] - 1);
+                    new_delta[1] = new_side[1] / (real_t)(nlocal[1] - 1);
+                    new_delta[2] = new_side[2] / (real_t)(nlocal[2] - 1);
+
+#if SFEM_LOG_LEVEL >= 5
+                    printf("Normalized bounding box for refinement:\n new_origin = (%.5f %.5f %.5f),\n new_side = (%.5f %.5f "
+                           "%.5f), \n%s:%d\n",
+                           new_origin[0],
+                           new_origin[1],
+                           new_origin[2],
+                           new_side[0],
+                           new_side[1],
+                           new_side[2],
+                           __FILE__,
+                           __LINE__);
+                    printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
+                    printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
+                    printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
+#endif
 #endif
 
 // #define REDEFINE_BOUNDING_BOX
@@ -1184,7 +1225,7 @@ int main(int argc, char* argv[]) {
 #if SFEM_LOG_LEVEL >= 5
                     printf("Writing output field to: %s, %s:%d\n", out_filename_raw, __FILE__, __LINE__);
 #endif
-                    make_metadata(nglobal, delta, origin, out_base_directory);
+                    make_metadata(nlocal, new_delta, new_origin, out_base_directory);
                     ndarray_write(MPI_COMM_WORLD,
                                   out_filename_raw,
                                   ((SFEM_REAL_T_IS_FLOAT32) ? MPI_FLOAT : MPI_DOUBLE),
