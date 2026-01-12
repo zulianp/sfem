@@ -967,6 +967,19 @@ normalize_mesh(const ptrdiff_t              nnodes,   // Mesh
                const real_t                 origin1,  //
                const real_t                 origin2);                 //
 
+int                                                            //
+normalize_mesh_BB(const ptrdiff_t              nnodes,         // Mesh
+                  geom_t** const SFEM_RESTRICT xyz,            //
+                  const real_t                 norm_nr_nodes,  //
+                  const real_t                 norm_delta,     //
+                  const real_t                 margin,         //
+                  real_t*                      new_origin0,    //
+                  real_t*                      new_origin1,    //
+                  real_t*                      new_origin2,    //
+                  real_t*                      new_side0,      //
+                  real_t*                      new_side1,      //
+                  real_t*                      new_side2);                          //
+
 int                                                               //
 mesh_cube_bounding_box(const ptrdiff_t              nnodes,       // Mesh
                        geom_t** const SFEM_RESTRICT xyz,          //

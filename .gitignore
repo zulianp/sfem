@@ -254,3 +254,4 @@ workflows/resample/bench_adj/pdf_plots/elements_by_level.pdf
 workflows/resample/bench_adj/*
 
 workflows/resample/alpha_data.dat
+.python-version
