@@ -17,6 +17,7 @@
 #include "mesh_utils.h"
 #include "quadratures_rule.h"
 #include "read_mesh.h"
+#include "resample_adjoint_main.h"
 #include "resampling_utils.h"
 #include "sfem_mesh_read.h"
 #include "sfem_mesh_write.h"
@@ -36,6 +37,13 @@ int main(int argc, char* argv[]) {
     // printf("Starting grid_to_mesh\n");
     // printf("========================================\n\n");
     PRINT_CURRENT_FUNCTION;
+
+    int SFEM_ADJOINT = 0;
+    SFEM_READ_ENV(SFEM_ADJOINT, atoi);
+
+    if (SFEM_ADJOINT == 1) {
+        return main_adjoint(argc, argv);
+    }
 
     printf("========================================\n");
     printf("Starting sfem_resample_field_adjoint_hex_quad test\n");
@@ -100,9 +108,6 @@ int main(int argc, char* argv[]) {
 
     int SFEM_INTERPOLATE = 1;
     SFEM_READ_ENV(SFEM_INTERPOLATE, atoi);
-
-    int SFEM_ADJOINT = 0;
-    SFEM_READ_ENV(SFEM_ADJOINT, atoi);
 
     double tick = MPI_Wtime();
 
@@ -282,15 +287,15 @@ int main(int argc, char* argv[]) {
     // for TET10 elements
     // 0: do not assemble the dual mass vector in the kernel if the memory model is host and mpi_size > 1
     // 1: assemble the dual mass vector in the kernel
-    int assemble_dual_mass_vector_cuda = 0;
+    // int assemble_dual_mass_vector_cuda = 0;
 
-    if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
-        if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY && mpi_size > 1) {
-            assemble_dual_mass_vector_cuda = 0;
-        } else {
-            assemble_dual_mass_vector_cuda = 1;
-        }
-    }
+    // if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+    //     if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY && mpi_size > 1) {
+    //         assemble_dual_mass_vector_cuda = 0;
+    //     } else {
+    //         assemble_dual_mass_vector_cuda = 1;
+    //     }
+    // }
 
     // real_t* test_field = calloc(nlocal[0] * nlocal[1] * nlocal[2], sizeof(real_t));  /// DEBUG
 
@@ -316,7 +321,7 @@ int main(int argc, char* argv[]) {
         field = pfield;
     }
 
-    const int multi_field = 3;
+    // const int multi_field = 3;
 
     real_t* g = calloc(mesh.nnodes, sizeof(real_t));
     // real_t* multi_g = calloc(mesh.nnodes * multi_field, sizeof(real_t));
@@ -828,7 +833,7 @@ int main(int argc, char* argv[]) {
                 fprintf(stderr, "Error: resample_field_mesh_adjoint failed %s:%d\n", __FILE__, __LINE__);
                 return EXIT_FAILURE;
             }
-        }
+        }  // END adjoint case
 
         // end if SFEM_INTERPOLATE
         /////////////////////////////////
@@ -982,4 +987,4 @@ int main(int argc, char* argv[]) {
 
     const int return_value = MPI_Finalize();
     RETURN_FROM_FUNCTION(return_value);
-}
+}  // END: main
