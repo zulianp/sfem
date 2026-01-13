@@ -1593,7 +1593,7 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-            // #define TEST_GPU_HYTEG_REFINEMENT
+#define TEST_GPU_HYTEG_REFINEMENT
             // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
