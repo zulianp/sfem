@@ -62,7 +62,75 @@ void get_output_base_directory(char* out_base_directory, size_t buffer_size) {
     } else {
         snprintf(out_base_directory, buffer_size, "/tmp/");
     }
-} // END Function: get_output_base_directory
+}  // END Function: get_output_base_directory
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// setup_grid_normalization
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void setup_grid_normalization(ptrdiff_t nnodes, geom_t** mesh_points, ptrdiff_t* nlocal, geom_t* origin, geom_t* delta,
+                              real_t* new_origin, real_t* new_side, real_t* new_delta, int enable_normalize, int mpi_rank) {
+    if (enable_normalize) {
+        // Normalize mesh bounding box
+        normalize_mesh_BB(nnodes,          //
+                          mesh_points,     //
+                          nlocal[0],       //
+                          1.0,             //
+                          0.02,            //
+                          &new_origin[0],  //
+                          &new_origin[1],  //
+                          &new_origin[2],  //
+                          &new_side[0],    //
+                          &new_side[1],    //
+                          &new_side[2]);   //
+
+        delta[0] = 1.0;
+        delta[1] = 1.0;
+        delta[2] = 1.0;
+
+        origin[0] = 0.0;
+        origin[1] = 0.0;
+        origin[2] = 0.0;
+
+        new_delta[0] = new_side[0] / (real_t)(nlocal[0] - 1);
+        new_delta[1] = new_side[1] / (real_t)(nlocal[1] - 1);
+        new_delta[2] = new_side[2] / (real_t)(nlocal[2] - 1);
+
+#if SFEM_LOG_LEVEL >= 5
+        if (mpi_rank == 0) {
+            printf("Normalized bounding box for refinement:\n new_origin = (%.5f %.5f %.5f),\n new_side = (%.5f %.5f "
+                   "%.5f), \n%s:%d\n",
+                   new_origin[0],
+                   new_origin[1],
+                   new_origin[2],
+                   new_side[0],
+                   new_side[1],
+                   new_side[2],
+                   __FILE__,
+                   __LINE__);
+            printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
+            printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
+            printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
+        }
+#endif  // SFEM_LOG_LEVEL >= 5
+
+    } else {  // END if (enable_normalize)
+        // Use original grid parameters without normalization
+        new_origin[0] = origin[0];
+        new_origin[1] = origin[1];
+        new_origin[2] = origin[2];
+
+        new_side[0] = delta[0] * (real_t)(nlocal[0] - 1);
+        new_side[1] = delta[1] * (real_t)(nlocal[1] - 1);
+        new_side[2] = delta[2] * (real_t)(nlocal[2] - 1);
+
+        new_delta[0] = delta[0];
+        new_delta[1] = delta[1];
+        new_delta[2] = delta[2];
+
+    }  // END else
+}  // END Function: setup_grid_normalization
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -401,55 +469,23 @@ int main_adjoint(int argc, char* argv[]) {
                 }
 #endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
 
-#define ENABLE_NORMALIZE_MESH
-#ifdef ENABLE_NORMALIZE_MESH
+                int ENABLE_NORMALIZE_MESH_FLAG = 0;
+                SFEM_READ_ENV(ENABLE_NORMALIZE_MESH_FLAG, atoi);
 
                 real_t new_origin[3];
                 real_t new_side[3];
                 real_t new_delta[3];
 
-                // const real_t norm_side = 100.0;
-
-                normalize_mesh_BB(mesh.nnodes,            //
-                                  (geom_t**)mesh.points,  //
-                                  nlocal[0],              //
-                                  1.0,                    //
-                                  0.02,                   //
-                                  &new_origin[0],         //
-                                  &new_origin[1],         //
-                                  &new_origin[2],         //
-                                  &new_side[0],           //
-                                  &new_side[1],           //
-                                  &new_side[2]);          //
-
-                delta[0] = 1.0;
-                delta[1] = 1.0;
-                delta[2] = 1.0;
-
-                origin[0] = 0.0;
-                origin[1] = 0.0;
-                origin[2] = 0.0;
-
-                new_delta[0] = new_side[0] / (real_t)(nlocal[0] - 1);
-                new_delta[1] = new_side[1] / (real_t)(nlocal[1] - 1);
-                new_delta[2] = new_side[2] / (real_t)(nlocal[2] - 1);
-
-#if SFEM_LOG_LEVEL >= 5
-                printf("Normalized bounding box for refinement:\n new_origin = (%.5f %.5f %.5f),\n new_side = (%.5f %.5f "
-                       "%.5f), \n%s:%d\n",
-                       new_origin[0],
-                       new_origin[1],
-                       new_origin[2],
-                       new_side[0],
-                       new_side[1],
-                       new_side[2],
-                       __FILE__,
-                       __LINE__);
-                printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
-                printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
-                printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
-#endif
-#endif
+                setup_grid_normalization(mesh.nnodes,                 //
+                                         (geom_t**)mesh.points,       //
+                                         nlocal,                      //
+                                         origin,                      //
+                                         delta,                       //
+                                         new_origin,                  //
+                                         new_side,                    //
+                                         new_delta,                   //
+                                         ENABLE_NORMALIZE_MESH_FLAG,  //
+                                         mpi_rank);                   //
 
 // #define REDEFINE_BOUNDING_BOX
 #ifdef REDEFINE_BOUNDING_BOX
