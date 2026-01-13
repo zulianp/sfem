@@ -34,7 +34,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=${SFEM_TORUS_MESH:-torus4}
+mesh=${SFEM_TORUS_MESH:-torus2}
 # mesh=impeller_tet4
 
 out=resampled
