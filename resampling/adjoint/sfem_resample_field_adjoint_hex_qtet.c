@@ -321,7 +321,7 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
 
 }  // END Function: is_hex_out_of_tet
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_SIZE == 4
 // #if defined(__AVX512F__)
 #include <immintrin.h>
 
@@ -621,7 +621,7 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
-#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && 1
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_SIZE == 4
                 const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
 #else
                 const bool is_out_of_tet = is_hex_out_of_tet  //

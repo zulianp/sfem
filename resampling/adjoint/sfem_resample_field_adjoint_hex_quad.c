@@ -1551,8 +1551,8 @@ tet4_resample_field_adjoint_tet_quad_d(const real_t                x0_n,       /
                                                          Q_nodes_y,                               //
                                                          Q_nodes_z,                               //
                                                          Q_weights,                               //
-                                                         (real_t[3]){origin0, origin1, origin2},  //
-                                                         (real_t[3]){delta0, delta1, delta2},     //
+                                                         (geom_t[3]){origin0, origin1, origin2},  //
+                                                         (geom_t[3]){delta0, delta1, delta2},     //
                                                          i_grid_x,                                //
                                                          j_grid_y,                                //
                                                          k_grid_z);                               //

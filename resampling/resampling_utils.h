@@ -264,7 +264,7 @@ void print_mesh_function_name(const function_XYZ_t mesh_fun_XYZ, const int mpi_r
  * @param folder Folder path for metadata file
  * @return EXIT_SUCCESS on success, EXIT_FAILURE on failure
  */
-int make_metadata(ptrdiff_t nglobal[3], float_t delta[3], float_t origin[3], const char* folder);
+int make_metadata(ptrdiff_t nglobal[3], real_t delta[3], real_t origin[3], const char* folder);
 
 #ifdef __cplusplus
 }
