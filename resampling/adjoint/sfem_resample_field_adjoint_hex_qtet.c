@@ -47,6 +47,9 @@ get_dim_qad() {              //
     return dim_quad_cube_p;  //
 }  // END: get_dim_qad
 
+#define MY_MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MY_MAX(a, b) (((a) > (b)) ? (a) : (b))
+
 int                                                                         //
 compute_tet_bounding_box_norm(const real_t                   x0,            //
                               const real_t                   x1,            //
@@ -69,14 +72,14 @@ compute_tet_bounding_box_norm(const real_t                   x0,            //
                               ptrdiff_t* const SFEM_RESTRICT min_grid_z,    //
                               ptrdiff_t* const SFEM_RESTRICT max_grid_z) {  //
 
-    const real_t x_min = fmin(fmin(x0, x1), fmin(x2, x3));
-    const real_t x_max = fmax(fmax(x0, x1), fmax(x2, x3));
+    const real_t x_min = MY_MIN(MY_MIN(x0, x1), MY_MIN(x2, x3));
+    const real_t x_max = MY_MAX(MY_MAX(x0, x1), MY_MAX(x2, x3));
 
-    const real_t y_min = fmin(fmin(y0, y1), fmin(y2, y3));
-    const real_t y_max = fmax(fmax(y0, y1), fmax(y2, y3));
+    const real_t y_min = MY_MIN(MY_MIN(y0, y1), MY_MIN(y2, y3));
+    const real_t y_max = MY_MAX(MY_MAX(y0, y1), MY_MAX(y2, y3));
 
-    const real_t z_min = fmin(fmin(z0, z1), fmin(z2, z3));
-    const real_t z_max = fmax(fmax(z0, z1), fmax(z2, z3));
+    const real_t z_min = MY_MIN(MY_MIN(z0, z1), MY_MIN(z2, z3));
+    const real_t z_max = MY_MAX(MY_MAX(z0, z1), MY_MAX(z2, z3));
 
     // const real_t dx = delta0;
     // const real_t dy = delta1;
@@ -89,14 +92,14 @@ compute_tet_bounding_box_norm(const real_t                   x0,            //
     // Step 2: Convert to grid indices accounting for the origin
     // Formula: grid_index = (physical_coord - origin) / delta
     // Using floor for minimum indices (with safety margin of -1)
-    *min_grid_x = floor(x_min) - 1;
-    *min_grid_y = floor(y_min) - 1;
-    *min_grid_z = floor(z_min) - 1;
+    *min_grid_x = (ptrdiff_t)(floor(x_min) - 1.0);
+    *min_grid_y = (ptrdiff_t)(floor(y_min) - 1.0);
+    *min_grid_z = (ptrdiff_t)(floor(z_min) - 1.0);
 
     // Using ceil for maximum indices (with safety margin of +1)
-    *max_grid_x = ceil(x_max) + 1;
-    *max_grid_y = ceil(y_max) + 1;
-    *max_grid_z = ceil(z_max) + 1;
+    *max_grid_x = (ptrdiff_t)(ceil(x_max) + 1.0);
+    *max_grid_y = (ptrdiff_t)(ceil(y_max) + 1.0);
+    *max_grid_z = (ptrdiff_t)(ceil(z_max) + 1.0);
 
     return 0;  // Success
 }
@@ -618,7 +621,7 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && 1
                 const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
 #else
                 const bool is_out_of_tet = is_hex_out_of_tet  //

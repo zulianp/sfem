@@ -33,7 +33,7 @@ typedef struct {
     bool      inside_tet;
 } ijk_index_t;
 
-typedef enum { TET_QUAD_MIDPOINT_NQP } tet_quad_midpoint_nqp_t;
+typedef enum { TET_QUAD_MIDPOINT_NQP, TET_QUAD_GAUSS_LEGENDRE_NQP } tet_quad_midpoint_nqp_t;
 
 quadrature_point_result_t                                                  //
 transform_quadrature_point_n(const int                         q_ijk,      //

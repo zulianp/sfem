@@ -69,15 +69,36 @@ void get_output_base_directory(char* out_base_directory, size_t buffer_size) {
 // setup_grid_normalization
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-void setup_grid_normalization(ptrdiff_t nnodes, geom_t** mesh_points, ptrdiff_t* nlocal, geom_t* origin, geom_t* delta,
-                              real_t* new_origin, real_t* new_side, real_t* new_delta, int enable_normalize, int mpi_rank) {
+void                                                //
+setup_grid_normalization(ptrdiff_t    nnodes,       //
+                         geom_t**     mesh_points,  //
+                         ptrdiff_t*   nlocal,       //
+                         geom_t*      origin,       //
+                         geom_t*      delta,        //
+                         real_t*      new_origin,   //
+                         real_t*      new_side,     //
+                         real_t*      new_delta,    //
+                         const real_t margin,
+                         int          enable_normalize,  //
+                         int          mpi_rank) {                 //
+
+    PRINT_CURRENT_FUNCTION;
+
+    // const real_t margin = 0.04;
+
+#if SFEM_LOG_LEVEL >= 5
+    if (mpi_rank == 0) {
+        printf("Setting up grid normalization, enable_normalize = %d, %s:%d\n", enable_normalize, __FILE__, __LINE__);
+    }
+#endif  // SFEM_LOG_LEVEL >= 5
+
     if (enable_normalize) {
         // Normalize mesh bounding box
         normalize_mesh_BB(nnodes,          //
                           mesh_points,     //
                           nlocal[0],       //
                           1.0,             //
-                          0.02,            //
+                          margin,          //
                           &new_origin[0],  //
                           &new_origin[1],  //
                           &new_origin[2],  //
@@ -130,6 +151,8 @@ void setup_grid_normalization(ptrdiff_t nnodes, geom_t** mesh_points, ptrdiff_t*
         new_delta[2] = delta[2];
 
     }  // END else
+
+    RETURN_FROM_FUNCTION();
 }  // END Function: setup_grid_normalization
 
 //////////////////////////////////////////////////////////
@@ -431,50 +454,14 @@ int main_adjoint(int argc, char* argv[]) {
                 }
 #endif
 
-// #define REDEFINE_BOUNDING_BOX_FOR_REFINE
-#ifdef REDEFINE_BOUNDING_BOX_FOR_REFINE
-                {
-                    real_t side;
-                    real_t origin_bb[3];
-
-                    mesh_cube_bounding_box(mesh.nnodes,            //
-                                           (geom_t**)mesh.points,  //
-                                           0.05,                   //
-                                           &side,                  //
-                                           &origin_bb[0],          //
-                                           &origin_bb[1],          //
-                                           &origin_bb[2]);         //
-
-                    origin[0] = origin_bb[0];
-                    origin[1] = origin_bb[1];
-                    origin[2] = origin_bb[2];
-
-                    delta[0] = side / (real_t)(nlocal[0] - 1);
-                    delta[1] = side / (real_t)(nlocal[1] - 1);
-                    delta[2] = side / (real_t)(nlocal[2] - 1);
-
-#if SFEM_LOG_LEVEL >= 5
-                    printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
-                           origin_bb[0],
-                           origin_bb[1],
-                           origin_bb[2],
-                           side,
-                           __FILE__,
-                           __LINE__);
-
-                    printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
-                    printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
-                    printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
-#endif
-                }
-#endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
-
-                int ENABLE_NORMALIZE_MESH_FLAG = 0;
+                int ENABLE_NORMALIZE_MESH_FLAG = 1;
                 SFEM_READ_ENV(ENABLE_NORMALIZE_MESH_FLAG, atoi);
 
                 real_t new_origin[3];
                 real_t new_side[3];
                 real_t new_delta[3];
+
+                const real_t margin = 0.02;
 
                 setup_grid_normalization(mesh.nnodes,                 //
                                          (geom_t**)mesh.points,       //
@@ -484,46 +471,9 @@ int main_adjoint(int argc, char* argv[]) {
                                          new_origin,                  //
                                          new_side,                    //
                                          new_delta,                   //
+                                         margin,                      //
                                          ENABLE_NORMALIZE_MESH_FLAG,  //
                                          mpi_rank);                   //
-
-// #define REDEFINE_BOUNDING_BOX
-#ifdef REDEFINE_BOUNDING_BOX
-                {
-                    real_t side;
-                    real_t origin_bb[3];
-
-                    mesh_cube_bounding_box(mesh.nnodes,            //
-                                           (geom_t**)mesh.points,  //
-                                           0.05,                   //
-                                           &side,                  //
-                                           &origin_bb[0],          //
-                                           &origin_bb[1],          //
-                                           &origin_bb[2]);         //
-
-                    origin[0] = origin_bb[0];
-                    origin[1] = origin_bb[1];
-                    origin[2] = origin_bb[2];
-
-                    delta[0] = side / (real_t)(nlocal[0] - 1);
-                    delta[1] = side / (real_t)(nlocal[1] - 1);
-                    delta[2] = side / (real_t)(nlocal[2] - 1);
-
-#if SFEM_LOG_LEVEL >= 5
-                    printf("Bounding box for refinement:\n origin = (%.5f %.5f %.5f),\n side = %.5f, \n%s:%d\n",
-                           origin_bb[0],
-                           origin_bb[1],
-                           origin_bb[2],
-                           side,
-                           __FILE__,
-                           __LINE__);
-
-                    printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
-                    printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
-                    printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
-#endif
-                }
-#endif  // REDEFINE_BOUNDING_BOX_FOR_REFINE
 
                 printf("Stride: (%ld %ld %ld) \n", stride[0], stride[1], stride[2]);
 
