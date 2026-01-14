@@ -356,7 +356,7 @@ print_rank_info(int              mpi_rank,         //
                    max_index_0,
                    max_index_1,
                    max_index_2);
-                   
+
             printf("Rank %d: min_field = %1.14e, min index = %d\n", mpi_rank, min_field, min_field_index);
             printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
             if (mpi_rank == 0) {
@@ -476,7 +476,7 @@ void print_mesh_function_name(const function_XYZ_t mesh_fun_XYZ, const int mpi_r
 // make_metadata
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int make_metadata(ptrdiff_t nglobal[3], float_t delta[3], float_t origin[3], const char* folder) {
+int make_metadata(ptrdiff_t nglobal[3], real_t delta[3], real_t origin[3], const char* folder) {
     char metadata_path[1000];
     snprintf(metadata_path, sizeof(metadata_path), "%s/metadata_sdf.float32.yml", folder);
 
