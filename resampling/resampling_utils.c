@@ -324,11 +324,11 @@ print_rank_info(int              mpi_rank,         //
     int z_size       = 0;
     MPI_Reduce(&z_size_local, &z_size, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    field_mpi_domain_t field_mpi_domain;
-    field_mpi_domain.mpi_rank = mpi_rank;
-    field_mpi_domain.n_zyx    = n_zyx;
-    memcpy(field_mpi_domain.nlocal, nlocal, 3 * sizeof(ptrdiff_t));
-    memcpy(field_mpi_domain.origin, origin, 3 * sizeof(geom_t));
+    // field_mpi_domain_t field_mpi_domain;
+    // field_mpi_domain.mpi_rank = mpi_rank;
+    // field_mpi_domain.n_zyx    = n_zyx;
+    // memcpy(field_mpi_domain.nlocal, nlocal, 3 * sizeof(ptrdiff_t));
+    // memcpy(field_mpi_domain.origin, origin, 3 * sizeof(geom_t));
 
     for (int print_rank = 0; print_rank < mpi_size; ++print_rank) {
         if (mpi_rank == print_rank) {
@@ -341,11 +341,22 @@ print_rank_info(int              mpi_rank,         //
             const int delta_indices_z = end_index_z - start_index_z;
             const int size_z          = end_index_z - start_index_z + 1;
 
-            field_mpi_domain.start_indices[0] = 0;
-            field_mpi_domain.start_indices[1] = 0;
-            field_mpi_domain.start_indices[2] = start_index_z;
+            // field_mpi_domain.start_indices[0] = 0;
+            // field_mpi_domain.start_indices[1] = 0;
+            // field_mpi_domain.start_indices[2] = start_index_z;
 
-            printf("Rank %d: max_field = %1.14e, max index = %d\n", mpi_rank, max_field, max_field_index);
+            const int max_index_0 = max_field_index % nlocal[0];
+            const int max_index_1 = (max_field_index / nlocal[0]) % nlocal[1];
+            const int max_index_2 = max_field_index / (nlocal[0] * nlocal[1]);
+
+            printf("Rank %d: max_field = %1.14e, max index = %d, (%d, %d, %d)\n",
+                   mpi_rank,
+                   max_field,
+                   max_field_index,
+                   max_index_0,
+                   max_index_1,
+                   max_index_2);
+                   
             printf("Rank %d: min_field = %1.14e, min index = %d\n", mpi_rank, min_field, min_field_index);
             printf("Rank %d: n_zyx = %ld\n", mpi_rank, n_zyx);
             if (mpi_rank == 0) {
