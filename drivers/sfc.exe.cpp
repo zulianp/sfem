@@ -40,6 +40,8 @@ int sfc_reorder(const std::shared_ptr<sfem::Communicator> &comm, int argc, char 
     auto sfc = sfem::SFC::create_from_env();
     sfc->reorder(*mesh);
 
+    mesh->write(output_folder);
+
     double tock = MPI_Wtime();
 
     if (!comm->rank()) {
