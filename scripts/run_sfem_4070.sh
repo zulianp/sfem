@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+
+DELETE_LOG="${DELETE_LOG:-0}"
+IS_DEBUG="${IS_DEBUG:-1}"
+BUILD_DIR="${BUILD_DIR:-${REPO_DIR}/build_daint_dbg}"
+BIN_NAME="${BIN_NAME:-sfem_NewmarkKVTest}"
+BIN_ARGS="${BIN_ARGS:-}"
+IS_CMAKE_COMPILE_FLAG="${IS_CMAKE_COMPILE_FLAG:-0}"
+EXEC_SPACE="${EXEC_SPACE:-device}"
+CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES:-89}"
+NPROC="${NPROC:-$(nproc)}"
+
+
+if [ "$DELETE_LOG" -eq 1 ]; then
+    rm -f "${REPO_DIR}"/sfem_*.{out,err} || true
+fi
+
+mkdir -p "${BUILD_DIR}"
+cd "${BUILD_DIR}"
+
+
+if [ "$IS_CMAKE_COMPILE_FLAG" -eq 0 ]; then
+    # 解析 OpenMPI 的 -I 路径（兼容 showme / show）
+    MPI_SHOW_LINE="$(mpicc -show 2>/dev/null || mpicxx -show 2>/dev/null || echo)"
+    MPI_INC_FLAGS="$(echo "$MPI_SHOW_LINE" | sed -n 's/.*\(-I[^ ]*\)/\1/p' | tr '\n' ' ')"
+    if [ "$IS_DEBUG" -eq 1 ]; then
+        COMPILE_FLAGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_CUDA_HOST_COMPILER=$(which mpicxx) -DSFEM_ENABLE_MPI=ON -DSFEM_ENABLE_CUDA=ON -DSFEM_ENABLE_PYTHON=OFF -DSFEM_ENABLE_OPENMP=ON -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES} -DSFEM_CUDA_ARCH=${CUDA_ARCHITECTURES} -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CUDA_FLAGS=${MPI_INC_FLAGS}"
+    else
+        COMPILE_FLAGS="-DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_CUDA_HOST_COMPILER=$(which mpicxx) -DSFEM_ENABLE_MPI=ON -DSFEM_ENABLE_CUDA=ON -DSFEM_ENABLE_PYTHON=OFF -DSFEM_ENABLE_OPENMP=ON -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES} -DSFEM_CUDA_ARCH=${CUDA_ARCHITECTURES} -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_FLAGS=${MPI_INC_FLAGS}"
+    fi
+    cmake .. ${COMPILE_FLAGS}
+fi
+
+make -j"${NPROC}"
+
+SFEM_EXECUTION_SPACE="${EXEC_SPACE}" "./${BIN_NAME}" ${BIN_ARGS}
+
+
+
+
+
