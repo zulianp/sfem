@@ -620,12 +620,12 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
                   real_t*                       qw) {                        //
 
     // Gauss-Legendre n=1
-    double nodes_1[1]   = {5.000000000000000000e-01};
-    double weights_1[1] = {1.000000000000000000e+00};
+    double nodes_1[1]   = {5.000000000000000000e-01};  //
+    double weights_1[1] = {1.000000000000000000e+00};  //
 
     // Gauss-Legendre n=2
-    double nodes_2[2] = {2.113248654051871345e-01,  //
-                         7.886751345948128655e-01};
+    double nodes_2[2] = {2.113248654051871345e-01,   //
+                         7.886751345948128655e-01};  //
 
     double weights_2[2] = {5.000000000000000000e-01,   //
                            5.000000000000000000e-01};  //
