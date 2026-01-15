@@ -21,7 +21,7 @@
 
 #define out_real_t real_t
 
-#define N_QUADRATURE_POINTS_MAX 256
+#define N_QUADRATURE_POINTS_MAX 2048
 
 static int    dim_quad_cube_p                      = 1;  // Midpoint quadrature in 3D
 static real_t Q_nodes_x_p[N_QUADRATURE_POINTS_MAX] = {0.5};
@@ -29,12 +29,12 @@ static real_t Q_nodes_y_p[N_QUADRATURE_POINTS_MAX] = {0.5};
 static real_t Q_nodes_z_p[N_QUADRATURE_POINTS_MAX] = {0.5};
 static real_t Q_weights_p[N_QUADRATURE_POINTS_MAX] = {1.0};
 
-int init_quad_points_hex_qtet(const int dim_quad) {
+int init_quad_points_hex_qtet(const int dim_quad, tet_quad_midpoint_nqp_t quad_rule) {
     const int dim_quad_cube = dim_quad * dim_quad * dim_quad;
 
     if (dim_quad_cube < N_QUADRATURE_POINTS_MAX) {
         dim_quad_cube_p = dim_quad_cube;
-        sfem_quad_rule_3D(TET_QUAD_MIDPOINT_NQP, dim_quad, Q_nodes_x_p, Q_nodes_y_p, Q_nodes_z_p, Q_weights_p);
+        sfem_quad_rule_3D(quad_rule, dim_quad, Q_nodes_x_p, Q_nodes_y_p, Q_nodes_z_p, Q_weights_p);
     } else {
         return -1;  // Unsupported quadrature
     }
@@ -321,7 +321,7 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
 
 }  // END Function: is_hex_out_of_tet
 
-#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_SIZE == 4
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_IS_FLOAT32
 // #if defined(__AVX512F__)
 #include <immintrin.h>
 
@@ -621,7 +621,7 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max,
                                                   z_hex_max};
 
-#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_SIZE == 4
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_IS_FLOAT32
                 const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
 #else
                 const bool is_out_of_tet = is_hex_out_of_tet  //
@@ -1091,7 +1091,7 @@ tet4_resample_field_adjoint_hex_quad_norm(const ptrdiff_t                      s
 
     PRINT_CURRENT_FUNCTION;
 
-    init_quad_points_hex_qtet(2);  //
+    init_quad_points_hex_qtet(2, TET_QUAD_MIDPOINT_NQP);  //
 
     // #pragma omp parallel for schedule(dynamic)
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {

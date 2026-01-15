@@ -624,12 +624,20 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
     double weights_1[1] = {1.000000000000000000e+00};
 
     // Gauss-Legendre n=2
-    double nodes_2[2]   = {2.113248654051871345e-01, 7.886751345948128655e-01};
-    double weights_2[2] = {5.000000000000000000e-01, 5.000000000000000000e-01};
+    double nodes_2[2] = {2.113248654051871345e-01,  //
+                         7.886751345948128655e-01};
+
+    double weights_2[2] = {5.000000000000000000e-01,   //
+                           5.000000000000000000e-01};  //
 
     // Gauss-Legendre n=3
-    double nodes_3[3]   = {1.127016653792582979e-01, 5.000000000000000000e-01, 8.872983346207417021e-01};
-    double weights_3[3] = {2.777777777777778456e-01, 4.444444444444444198e-01, 2.777777777777778456e-01};
+    double nodes_3[3] = {1.127016653792582979e-01,   //
+                         5.000000000000000000e-01,   //
+                         8.872983346207417021e-01};  //
+
+    double weights_3[3] = {2.777777777777778456e-01,   //
+                           4.444444444444444198e-01,   //
+                           2.777777777777778456e-01};  //
 
     // Gauss-Legendre n=4
     double nodes_4[4] = {6.943184420297371373e-02,   //
@@ -643,22 +651,22 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
                            1.739274225687267861e-01};  //
 
     // Gauss-Legendre n=5
-    double nodes_5[5] = {4.691007703066801815e-02,
-                         2.307653449471584461e-01,
-                         5.000000000000000000e-01,
-                         7.692346550528414983e-01,
-                         9.530899229693319263e-01};
+    double nodes_5[5] = {4.691007703066801815e-02,   //
+                         2.307653449471584461e-01,   //
+                         5.000000000000000000e-01,   //
+                         7.692346550528414983e-01,   //
+                         9.530899229693319263e-01};  //
 
-    double weights_5[5] = {1.184634425280946396e-01,
-                           2.393143352496831522e-01,
-                           2.844444444444443332e-01,
-                           2.393143352496831522e-01,
-                           1.184634425280946396e-01};
+    double weights_5[5] = {1.184634425280946396e-01,   //
+                           2.393143352496831522e-01,   //
+                           2.844444444444443332e-01,   //
+                           2.393143352496831522e-01,   //
+                           1.184634425280946396e-01};  //
 
     switch (rule) {
         case TET_QUAD_MIDPOINT_NQP: {
-            real_t *nodes    = (real_t*)malloc(N * sizeof(real_t)),  //
-                    *weights = (real_t*)malloc(N * sizeof(real_t));
+            real_t* nodes   = (real_t*)malloc(N * sizeof(real_t));  //
+            real_t* weights = (real_t*)malloc(N * sizeof(real_t));  //
 
             // Compute 1D midpoint quadrature points and weights
             midpoint_quadrature(N, nodes, weights);
@@ -682,6 +690,46 @@ sfem_quad_rule_3D(const tet_quad_midpoint_nqp_t rule,  //
 
             return N * N * N;  // Total number of quadrature points
         }  // END case TET_QUAD_MIDPOINT_NQP
+
+        case TET_QUAD_GAUSS_LEGENDRE_NQP: {
+            int idx = 0;
+
+            double* weights_N = NULL;
+            double* nodes_N   = NULL;
+
+            if (N == 1) {
+                weights_N = weights_1;
+                nodes_N   = nodes_1;
+            } else if (N == 2) {
+                weights_N = weights_2;
+                nodes_N   = nodes_2;
+            } else if (N == 3) {
+                weights_N = weights_3;
+                nodes_N   = nodes_3;
+            } else if (N == 4) {
+                weights_N = weights_4;
+                nodes_N   = nodes_4;
+            } else if (N == 5) {
+                weights_N = weights_5;
+                nodes_N   = nodes_5;
+            } else {
+                // Unsupported N
+                return -1;
+            }
+
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    for (int k = 0; k < N; k++) {
+                        qw[idx] = weights_N[i] * weights_N[j] * weights_N[k];
+                        qx[idx] = nodes_N[i];
+                        qy[idx] = nodes_N[j];
+                        qz[idx] = nodes_N[k];
+                        idx++;
+                    }
+                }
+            }
+            return 1;
+        }  // END case TET_QUAD_GAUSS_LEGENDRE_NQP
 
         default:
             return -1;  // Unknown rule
