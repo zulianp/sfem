@@ -155,3 +155,4 @@ void bsr_constraint_nodes_to_identity_vec(const ptrdiff_t n_dirichlet_nodes,
 }
 #endif
 #endif //SFEM_DIRICHLET_H
+

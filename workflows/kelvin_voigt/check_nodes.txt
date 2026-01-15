@@ -1,0 +1,14 @@
+frame 0
+print dirichlet_nodes[0]
+print dirichlet_nodes[1]
+print dirichlet_nodes[2]
+print dirichlet_nodes[3]
+print dirichlet_nodes[4]
+print dirichlet_nodes[5]
+print dirichlet_nodes[6]
+print dirichlet_nodes[7]
+print dirichlet_nodes[8]
+print dirichlet_nodes[9]
+print dirichlet_nodes[10]
+print dirichlet_nodes[11]
+quit
