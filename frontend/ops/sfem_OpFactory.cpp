@@ -23,7 +23,7 @@
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-
+#include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
 #include <map>
 
 // Forward declarations for other operators that will be moved
@@ -48,6 +48,7 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", create_kelvin_voigt_newmark);
+            instance_.private_register_op("ss:KelvinVoigtNewmark", SemiStructuredKelvinVoigtNewmark::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", SemiStructuredLinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
