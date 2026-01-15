@@ -726,6 +726,10 @@ def compressible_mooney_rivlin(fe):
     gen.emit_header(f"{output_dir}/{elem_type_lc}_partial_assembly_{name}_inline.h",
                     guard=f"SFEM_{elem_type_uc}_PARTIAL_ASSEMBLY_{name.upper()}_INLINE_H",)
 
+    op.emit_objective()
+    op.emit_gradient()
+    op.emit_hessian()
+    op.emit_hessian_diag()
 
 
 if __name__ == "__main__":

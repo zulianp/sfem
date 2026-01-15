@@ -292,8 +292,8 @@ int write_mapped_field(MPI_Comm           comm,
         local_output_size = n_global - begin;
     }
 
-    int *send_count = (int *)malloc((size) * sizeof(int));
-    memset(send_count, 0, (size) * sizeof(int));
+    idx_t *send_count = (idx_t *)malloc((size) * sizeof(idx_t));
+    memset(send_count, 0, (size) * sizeof(idx_t));
 
     for (ptrdiff_t i = 0; i < n_local; ++i) {
         const idx_t idx       = mapping[i];
@@ -301,11 +301,11 @@ int write_mapped_field(MPI_Comm           comm,
         send_count[dest_rank]++;
     }
 
-    int *recv_count = (int *)malloc((size) * sizeof(int));
+    idx_t *recv_count = (idx_t *)malloc((size) * sizeof(idx_t));
     MPI_CATCH_ERROR(MPI_Alltoall(send_count, 1, SFEM_MPI_IDX_T, recv_count, 1, SFEM_MPI_IDX_T, comm));
 
-    int     *send_displs  = (int *)malloc(size * sizeof(int));
-    int     *recv_displs  = (int *)malloc(size * sizeof(int));
+    idx_t     *send_displs  = (idx_t *)malloc(size * sizeof(idx_t));
+    idx_t     *recv_displs  = (idx_t *)malloc(size * sizeof(idx_t));
     count_t *book_keeping = (count_t *)calloc(size, sizeof(count_t));
 
     send_displs[0] = 0;
@@ -366,71 +366,7 @@ int write_mapped_field(MPI_Comm           comm,
                                   data_type,
                                   comm));
 
-    if (0) {
-        for (int r = 0; r < size; r++) {
-            MPI_Barrier(comm);
-
-            if (r == rank) {
-                printf("[%d]\n", rank);
-                printf("\nsend_count\n");
-                for (int i = 0; i < size; i++) {
-                    printf("%d ", send_count[i]);
-                }
-
-                printf("\nsend_displs\n");
-                for (int i = 0; i < size; i++) {
-                    printf("%d ", send_displs[i]);
-                }
-
-                printf("\nrecv_count\n");
-                for (int i = 0; i < size; i++) {
-                    printf("%d ", recv_count[i]);
-                }
-
-                printf("\nrecv_displs\n");
-                for (int i = 0; i < size; i++) {
-                    printf("%d ", recv_displs[i]);
-                }
-
-                printf("\n");
-
-                idx_t min_idx = mapping[0];
-                idx_t max_idx = mapping[0];
-                for (ptrdiff_t i = 0; i < n_local; ++i) {
-                    const idx_t idx = mapping[i];
-                    min_idx         = MIN(min_idx, idx);
-                    max_idx         = MAX(max_idx, idx);
-                }
-
-                printf("[%d, %d]\n", min_idx, max_idx);
-                printf("%ld == %ld\n", total_recv, local_output_size);
-
-                for (ptrdiff_t recv_rank = 0; recv_rank < size; ++recv_rank) {
-                    if (recv_rank != rank) {
-                        for (int i = 0; i < send_count[recv_rank]; i++) {
-                            printf("%d ", (int)send_list[send_displs[recv_rank] + i]);
-                        }
-                    }
-                }
-
-                printf("\n");
-
-                for (ptrdiff_t i = 0; i < local_output_size; ++i) {
-                    ptrdiff_t dest = recv_list[i] - begin;
-
-                    if (dest < 0 || dest >= local_output_size) {
-                        printf("%d not in [%ld, %ld)\n", recv_list[i], begin, begin + local_output_size);
-                    }
-                }
-
-                fflush(stdout);
-            }
-
-            MPI_Barrier(comm);
-        }
-    }
-
-    ///////////////////////////////////
+     ///////////////////////////////////
     // Unpack indexed data
     ///////////////////////////////////
 
