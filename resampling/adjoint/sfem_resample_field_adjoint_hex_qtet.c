@@ -699,25 +699,60 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                     data[base_index + off6] += hex_element_field[6];  //
                     data[base_index + off7] += hex_element_field[7];  //
 
-                    // // Check if any data values exceed 1.0
-                    // if (data[base_index + off0] > 1.0 || data[base_index + off1] > 1.0 || data[base_index + off2] > 1.0 ||
-                    //     data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
-                    //     data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0) {
-                    //     fprintf(stdout,
-                    //             "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d)
-                    //             ", base_index, i_grid_x, j_grid_y, k_grid_z);
+                    // Check if any data values exceed 1.3
+                    if (data[base_index + off0] > 1.3 || data[base_index + off1] > 1.3 || data[base_index + off2] > 1.3 ||
+                        data[base_index + off3] > 1.3 || data[base_index + off4] > 1.3 || data[base_index + off5] > 1.3 ||
+                        data[base_index + off6] > 1.3 || data[base_index + off7] > 1.3) {
+                        fprintf(stdout,
+                                "WARNING: xxxxxxxx data value exceeds 1.3 at element indices (base_index=%td, i=%d, j=%d, k=%d)",
+                                base_index,
+                                i_grid_x,
+                                j_grid_y,
+                                k_grid_z);
 
-                    //     fprintf(stdout,
-                    //             " data values: %f, %f, %f, %f, %f, %f, %f, %f \n",
-                    //             data[base_index + off0],
-                    //             data[base_index + off1],
-                    //             data[base_index + off2],
-                    //             data[base_index + off3],
-                    //             data[base_index + off4],
-                    //             data[base_index + off5],
-                    //             data[base_index + off6],
-                    //             data[base_index + off7]);
-                    // }  // END if (data > 1.0)
+                        fprintf(stdout,
+                                " data values: %f, %f, %f, %f, %f, %f, %f, %f \n",
+                                data[base_index + off0],
+                                data[base_index + off1],
+                                data[base_index + off2],
+                                data[base_index + off3],
+                                data[base_index + off4],
+                                data[base_index + off5],
+                                data[base_index + off6],
+                                data[base_index + off7]);
+
+                        printf("Tet vertices: \n");
+                        printf("(%f, %f, %f) \n", x0_n, y0_n, z0_n);
+                        printf("(%f, %f, %f) \n", x1_n, y1_n, z1_n);
+                        printf("(%f, %f, %f) \n", x2_n, y2_n, z2_n);
+                        printf("(%f, %f, %f) \n", x3_n, y3_n, z3_n);
+
+                        printf("Hex vertices: \n");
+                        for (int v = 0; v < 8; v++) {
+                            printf("(%f, %f, %f) \n", hex_vertices_x[v], hex_vertices_y[v], hex_vertices_z[v]);
+                        }
+
+                        printf("Quadrature point phys: \n");
+                        for (int q_ijk = 0; q_ijk < dim_quad; q_ijk++) {
+                            quadrature_point_result_t Qpoint_phys =             //
+                                    transform_quadrature_point_norm(q_ijk,      //
+                                                                    Q_nodes_x,  //
+                                                                    Q_nodes_y,  //
+                                                                    Q_nodes_z,  //
+                                                                    Q_weights,  //
+                                                                    i_grid_x,   //
+                                                                    j_grid_y,   //
+                                                                    k_grid_z);  //
+                            printf("(%f, %f, %f) weight: %f \n",                //
+                                   Qpoint_phys.x,
+                                   Qpoint_phys.y,
+                                   Qpoint_phys.z,
+                                   Qpoint_phys.weight);
+                        }
+
+                        exit(EXIT_FAILURE);
+
+                    }  // END if (data > 1.3)
 
                 }  // END omp critical
 
