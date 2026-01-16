@@ -2,6 +2,8 @@
 
 set -e
 
+# Load CUDA on daint
+module load cudatoolkit 2>/dev/null || module load cuda 2>/dev/null || true
 
 export SFEM_PATH=/users/hyang/ws/sfem_github/sfem/build_release
 if [[ -z "$SFEM_PATH" ]]
@@ -12,11 +14,9 @@ fi
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-# Activate venv to ensure meshio is available
-source /users/hyang/ws/sfem_github/sfem/venv/bin/activate
-
-# Add venv's site-packages to PYTHONPATH as fallback
-export PYTHONPATH=/users/hyang/ws/sfem_github/sfem/venv/lib/python3.12/site-packages:$PYTHONPATH
+# Python/venv not needed - mesh is pre-prepared
+# source /users/hyang/ws/sfem_github/sfem/venv/bin/activate
+# export PYTHONPATH=/users/hyang/ws/sfem_github/sfem/venv/lib/python3.12/site-packages:$PYTHONPATH
 
 export PATH=$SFEM_PATH:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
@@ -37,28 +37,13 @@ export SFEM_T_END=15
 
 HERE=$PWD
 
-rm -rf torus_geometry
-if [[ ! -d torus_geometry ]]
+# Skip mesh generation - use pre-prepared mesh from hyperelasticity folder
+# Copy with: cp -r ../hyperelasticity/torus_geometry .
+if [[ ! -d torus_geometry/torus ]]
 then
-	mkdir -p torus_geometry
-	cd torus_geometry
-
-	python3 $SCRIPTPATH/../../python/sfem/mesh/db_to_raw.py ../../hyperelasticity/torus_cut_hex.vtk torus
-	surf_type=quad4
-	
-	skin torus skin_torus
-	python3 $SCRIPTPATH/../../python/sfem/mesh/raw_to_db.py skin_torus skin_torus.vtk
-
-	set -x
-
-	SFEM_DEBUG=1 create_sideset torus   4.96663 0.0306772 1.18258  0.998 	inlet
-	SFEM_DEBUG=1 create_sideset torus   4.98568 9.98184   1.10985  0.998 	outlet
-
-	raw_to_db.py inlet/surf 			inlet/surf.vtk 				--coords=torus --cell_type=$surf_type
-	raw_to_db.py outlet/surf 			outlet/surf.vtk 			--coords=torus --cell_type=$surf_type
-	raw_to_db.py torus 					torus.vtk 
-
-	cd $HERE
+	echo "ERROR: torus_geometry/torus not found!"
+	echo "Please copy from hyperelasticity: cp -r ../hyperelasticity/torus_geometry ."
+	exit 1
 fi
 
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
@@ -74,5 +59,7 @@ export SFEM_NEUMANN_VALUE=-5
 
 
 $LAUNCH kelvin_voigt_newmark torus_geometry/torus dirichlet_torus_kv.yaml torus_kv_output neumann_torus_kv.yaml
-raw_to_db.py torus_kv_output/mesh torus_kv_output.vtk -p 'torus_kv_output/out/*.raw' $EXTRA_OPTIONS
+
+# Convert output to VTK (requires Python - run on login node if needed)
+# raw_to_db.py torus_kv_output/mesh torus_kv_output.vtk -p 'torus_kv_output/out/*.raw' $EXTRA_OPTIONS
 
