@@ -318,6 +318,23 @@ class LinearKVOp:
                 expr.append(ast.Assignment(var, lhs[i, j]))
 
         return expr
+
+    def lhs_block_diag_sym(self):
+        lhs = self.eval_lhs_matrix
+        nnodes = self.fe.n_nodes()
+        dims = self.fe.spatial_dim()
+
+        expr = []
+        
+        for i in range(0, nnodes):
+            idx = 0
+            for d1 in range(0, dims):
+                for d2 in range(d1, dims):
+                    var = sp.symbols(f"out{idx}[{i}]")
+                    expr.append(ast.AddAugmentedAssignment(var, lhs[d1 * nnodes + i, d2 * nnodes + i]))
+                    idx += 1
+
+        return expr
     
     def lhs_sym(self):
         lhs = self.eval_lhs_matrix
@@ -447,8 +464,7 @@ class LinearKVOp:
 def main():
     start = perf_counter()
 
-    # fe = Hex8(False, False)
-    fe = SymbolicFE3D()
+    fe = Hex8(False, False)
     # fe = Tri3()
 
     op = LinearKVOp(fe)
@@ -563,9 +579,9 @@ def main():
 
 
     c_log("//--------------------------")
-    c_log("// hessian_sym")
+    c_log("// lhs_block_diag_sym")
     c_log("//--------------------------")
-    c_code(op.hessian_sym())
+    c_code(op.lhs_block_diag_sym())
 
     stop = perf_counter()
     console.print(f"// Overall: {stop - start} seconds")

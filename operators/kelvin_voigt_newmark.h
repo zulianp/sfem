@@ -128,12 +128,12 @@ int kelvin_voigt_newmark_block_diag_sym(const enum ElemType          element_typ
                                         const real_t                 eta,
                                         const real_t                 rho,
                                         const ptrdiff_t              out_stride,
-                                        real_t *const                out0,
-                                        real_t *const                out1,
-                                        real_t *const                out2,
-                                        real_t *const                out3,
-                                        real_t *const                out4,
-                                        real_t *const                out5);
+                                        real_t *const SFEM_RESTRICT  out0,
+                                        real_t *const SFEM_RESTRICT  out1,
+                                        real_t *const SFEM_RESTRICT  out2,
+                                        real_t *const SFEM_RESTRICT  out3,
+                                        real_t *const SFEM_RESTRICT  out4,
+                                        real_t *const SFEM_RESTRICT  out5);
 
 #ifdef __cplusplus
 }

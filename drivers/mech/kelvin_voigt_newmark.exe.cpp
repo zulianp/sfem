@@ -175,9 +175,8 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     kv_op->set_field("velocity", temp_vel, 0);
     kv_op->set_field("acceleration", increment, 0);
 
-    // Create solver (SSGMG)
+    // Create solver (SSGMG|CG)
     std::shared_ptr<sfem::Operator<real_t>> solver = nullptr;
-
     if (!sfem::Env::read("SFEM_USE_SSGMG", true) || SFEM_ELEMENT_REFINE_LEVEL <= 1) {
         // This could be put out of the loop since the operator is linear.
         // We will do nonlinear materials next, so we keep it here.
@@ -189,6 +188,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             auto diag       = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
             auto mask       = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
             f->constaints_mask(mask->data());
+            f->hessian_block_diag_sym(nullptr, diag->data());
             auto jacobi = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
             cg->set_preconditioner_op(jacobi);
         } else {
@@ -276,7 +276,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         printf("Final time: %g\n", t);
     }
 
-    return 0;
+    return SFEM_SUCCESS;
 }
 
 int main(int argc, char *argv[]) {
