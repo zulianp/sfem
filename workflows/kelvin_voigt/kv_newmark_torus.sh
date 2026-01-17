@@ -27,8 +27,9 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 
 
-export SFEM_EXECUTION_SPACE=device
-# export SFEM_ELEMENT_REFINE_LEVEL=2
+# export SFEM_EXECUTION_SPACE=device
+export SFEM_ELEMENT_REFINE_LEVEL=2
+export SFEM_USE_SSGMG=0
 export SFEM_DT=1
 export SFEM_T_END=2
 export SFEM_VERBOSE=1
