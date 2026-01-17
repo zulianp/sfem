@@ -364,7 +364,7 @@ namespace sfem {
 
         for (auto &op : impl_->ops) {
             if (op->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
-                std::cerr << "Failed hessian_diag in op: " << op->name() << "\n";
+                std::cerr << "Failed hessian_block_diag_sym in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }

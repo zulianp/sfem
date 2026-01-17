@@ -46,11 +46,14 @@ namespace sfem {
         cg->verbose = false;
         auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
         auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        f->hessian_block_diag_sym(nullptr, diag->data());
+        
         f->constaints_mask(mask->data());
 
-        auto sj = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
-        cg->set_preconditioner_op(sj);
+        
+        if(f->hessian_block_diag_sym(nullptr, diag->data()) == SFEM_SUCCESS) {
+            auto sj = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
+            cg->set_preconditioner_op(sj);
+        }
 
         cg->set_atol(1e-12);
         cg->set_rtol(1e-4);
@@ -310,7 +313,7 @@ namespace sfem {
             int SFEM_ENABLE_NL_OBSTACLE       = sfem::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
             int coarse_linear_smoothing_steps = sfem::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
             int linear_smoothing_steps        = sfem::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
-        
+
             int    max_inner_it         = sfem::Env::read("SFEM_MAX_INNER_IT", 40);
             int    max_it               = sfem::Env::read("SFEM_MAX_IT", 15);
             int    nlsmooth_steps       = sfem::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
@@ -327,7 +330,7 @@ namespace sfem {
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
-            std::string coarse_op_type = es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE;
+            std::string coarse_op_type = sfem::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
             std::string debug_folder   = "debug_ssmgc";
             std::string fine_op_type   = MATRIX_FREE;
 

@@ -228,4 +228,98 @@ int kelvin_voigt_newmark_assemble_diag_aos(const enum ElemType          element_
             SFEM_ERROR("kelvin_voigt_newmark_assemble_diag_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
+
+    return SFEM_FAILURE;
+}
+
+int kelvin_voigt_newmark_crs_sym(const enum ElemType                element_type,
+                                 const ptrdiff_t                    nelements,
+                                 const ptrdiff_t                    nnodes,
+                                 idx_t **const SFEM_RESTRICT        elements,
+                                 geom_t **const SFEM_RESTRICT       points,
+                                 const real_t                       beta,
+                                 const real_t                       gamma,
+                                 const real_t                       dt,
+                                 const real_t                       k,
+                                 const real_t                       K,
+                                 const real_t                       eta,
+                                 const real_t                       rho,
+                                 const count_t *const SFEM_RESTRICT rowptr,
+                                 const idx_t *const SFEM_RESTRICT   colidx,
+                                 const ptrdiff_t block_stride,  // stride of the block matrix to interchange SoA and AoS.
+                                 real_t **const SFEM_RESTRICT block_diag,
+                                 real_t **const SFEM_RESTRICT block_offdiag) {
+    switch (element_type) {
+        case HEX8: {
+            return affine_hex8_kelvin_voigt_newmark_crs_sym(nelements,
+                                                            nnodes,
+                                                            elements,
+                                                            points,
+                                                            beta,
+                                                            gamma,
+                                                            dt,
+                                                            k,
+                                                            K,
+                                                            eta,
+                                                            rho,
+                                                            rowptr,
+                                                            colidx,
+                                                            block_stride,
+                                                            block_diag,
+                                                            block_offdiag);
+        }
+        default: {
+            SFEM_ERROR("kelvin_voigt_newmark_crs_sym not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
+}
+
+int kelvin_voigt_newmark_block_diag_sym(const enum ElemType          element_type,
+                                        const ptrdiff_t              nelements,
+                                        const ptrdiff_t              nnodes,
+                                        idx_t **const SFEM_RESTRICT  elements,
+                                        geom_t **const SFEM_RESTRICT points,
+                                        const real_t                 beta,
+                                        const real_t                 gamma,
+                                        const real_t                 dt,
+                                        const real_t                 k,
+                                        const real_t                 K,
+                                        const real_t                 eta,
+                                        const real_t                 rho,
+                                        const ptrdiff_t              out_stride,
+                                        real_t *const                out0,
+                                        real_t *const                out1,
+                                        real_t *const                out2,
+                                        real_t *const                out3,
+                                        real_t *const                out4,
+                                        real_t *const                out5) {
+    switch (element_type) {
+        case HEX8: {
+            return affine_hex8_kelvin_voigt_newmark_block_diag_sym(nelements,
+                                                                   nnodes,
+                                                                   elements,
+                                                                   points,
+                                                                   beta,
+                                                                   gamma,
+                                                                   dt,
+                                                                   k,
+                                                                   K,
+                                                                   eta,
+                                                                   rho,
+                                                                   out_stride,
+                                                                   out0,
+                                                                   out1,
+                                                                   out2,
+                                                                   out3,
+                                                                   out4,
+                                                                   out5);
+        }
+        default: {
+            SFEM_ERROR("kelvin_voigt_newmark_block_diag_sym not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+
+    return SFEM_FAILURE;
 }

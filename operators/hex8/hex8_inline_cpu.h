@@ -322,6 +322,64 @@ static SFEM_INLINE void hex8_local_to_global_bsr3(const idx_t *const SFEM_RESTRI
     }
 }
 
+static SFEM_INLINE scalar_t hex8_ref_shape(const int i, const scalar_t qx, const scalar_t qy, const scalar_t qz) {
+    switch (i) {
+        case 0: {
+            // mundane ops: 6 divs: 0 sqrts: 0
+            // total ops: 6
+            const scalar_t f0 = -(qx - 1) * (qy - 1) * (qz - 1);
+            return f0;
+        }
+        case 1: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f1 = qx * (qy - 1) * (qz - 1);
+            return f1;
+        }
+        case 2: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f2 = -qx * qy * (qz - 1);
+            return f2;
+        }
+        case 3: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f3 = qy * (qx - 1) * (qz - 1);
+            return f3;
+        }
+        case 4: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f4 = qz * (qx - 1) * (qy - 1);
+            return f4;
+        }
+        case 5: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f5 = -qx * qz * (qy - 1);
+            return f5;
+        }
+        case 6: {
+            // mundane ops: 2 divs: 0 sqrts: 0
+            // total ops: 2
+            const scalar_t f6 = qx * qy * qz;
+            return f6;
+        }
+        case 7: {
+            // mundane ops: 4 divs: 0 sqrts: 0
+            // total ops: 4
+            const scalar_t f7 = -qy * qz * (qx - 1);
+            return f7;
+        }
+
+        default: {
+            assert(0);
+            return 0;
+        }
+    }
+}
+
 static SFEM_INLINE void hex8_ref_shape_grad(const int                     i,
                                             const scalar_t                qx,
                                             const scalar_t                qy,

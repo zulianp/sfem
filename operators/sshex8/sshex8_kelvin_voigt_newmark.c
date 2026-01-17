@@ -33,25 +33,25 @@ static void print_matrix(int r, int c, const scalar_t *const m) {
 }
 
 int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
-                           const ptrdiff_t              nelements,
-                           const ptrdiff_t              nnodes,
-                           idx_t **const SFEM_RESTRICT  elements,
-                           geom_t **const SFEM_RESTRICT points,
-                           const real_t                 k,
-                           const real_t                 K,
-                           const real_t                 eta,
-                           const real_t                 rho,
-                           const real_t                 dt,
-                           const real_t                 gamma,
-                           const real_t                 beta,
-                           const ptrdiff_t              u_stride,
-                           const real_t *const          ux,
-                           const real_t *const          uy,
-                           const real_t *const          uz,
-                           const ptrdiff_t              out_stride,
-                           real_t *const                outx,
-                           real_t *const                outy,
-                           real_t *const                outz) {
+                                             const ptrdiff_t              nelements,
+                                             const ptrdiff_t              nnodes,
+                                             idx_t **const SFEM_RESTRICT  elements,
+                                             geom_t **const SFEM_RESTRICT points,
+                                             const real_t                 k,
+                                             const real_t                 K,
+                                             const real_t                 eta,
+                                             const real_t                 rho,
+                                             const real_t                 dt,
+                                             const real_t                 gamma,
+                                             const real_t                 beta,
+                                             const ptrdiff_t              u_stride,
+                                             const real_t *const          ux,
+                                             const real_t *const          uy,
+                                             const real_t *const          uz,
+                                             const ptrdiff_t              out_stride,
+                                             real_t *const                outx,
+                                             real_t *const                outy,
+                                             real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -216,28 +216,28 @@ int affine_sshex8_kelvin_voigt_newmark_apply(const int                    level,
 }
 
 int affine_sshex8_kelvin_voigt_newmark_gradient(const int                    level,
-                              const ptrdiff_t              nelements,
-                              const ptrdiff_t              nnodes,
-                              idx_t **const SFEM_RESTRICT  elements,
-                              geom_t **const SFEM_RESTRICT points,
-                              const real_t                 k,
-                              const real_t                 K,
-                              const real_t                 eta,
-                              const real_t                 rho,
-                              const ptrdiff_t              u_stride,
-                              const real_t *const          ux,
-                              const real_t *const          uy,
-                              const real_t *const          uz,
-                              const real_t *const          vx,
-                              const real_t *const          vy,
-                              const real_t *const          vz,
-                              const real_t *const          ax,
-                              const real_t *const          ay,
-                              const real_t *const          az,
-                              const ptrdiff_t              out_stride,
-                              real_t *const                outx,
-                              real_t *const                outy,
-                              real_t *const                outz) {
+                                                const ptrdiff_t              nelements,
+                                                const ptrdiff_t              nnodes,
+                                                idx_t **const SFEM_RESTRICT  elements,
+                                                geom_t **const SFEM_RESTRICT points,
+                                                const real_t                 k,
+                                                const real_t                 K,
+                                                const real_t                 eta,
+                                                const real_t                 rho,
+                                                const ptrdiff_t              u_stride,
+                                                const real_t *const          ux,
+                                                const real_t *const          uy,
+                                                const real_t *const          uz,
+                                                const real_t *const          vx,
+                                                const real_t *const          vy,
+                                                const real_t *const          vz,
+                                                const real_t *const          ax,
+                                                const real_t *const          ay,
+                                                const real_t *const          az,
+                                                const ptrdiff_t              out_stride,
+                                                real_t *const                outx,
+                                                real_t *const                outy,
+                                                real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
@@ -571,6 +571,176 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
         for (int d = 0; d < 3; d++) {
             free(v[d]);
         }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                    level,
+                                                      const ptrdiff_t              nelements,
+                                                      const ptrdiff_t              nnodes,
+                                                      idx_t **const SFEM_RESTRICT  elements,
+                                                      geom_t **const SFEM_RESTRICT points,
+                                                      const real_t                 beta,
+                                                      const real_t                 gamma,
+                                                      const real_t                 dt,
+                                                      const real_t                 k,
+                                                      const real_t                 K,
+                                                      const real_t                 eta,
+                                                      const real_t                 rho,
+                                                      const ptrdiff_t              out_stride,
+                                                      real_t *const                out0,
+                                                      real_t *const                out1,
+                                                      real_t *const                out2,
+                                                      real_t *const                out3,
+                                                      real_t *const                out4,
+                                                      real_t *const                out5) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+    int SFEM_HEX8_QUADRATURE_ORDER = 2;
+    SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
+    // printf("SFEM_HEX8_QUADRATURE_ORDER = %d\n", SFEM_HEX8_QUADRATURE_ORDER);
+
+    int             n_qp = line_q3_n;
+    const scalar_t *qx   = line_q3_x;
+    const scalar_t *qw   = line_q3_w;
+
+    if (SFEM_HEX8_QUADRATURE_ORDER == 1) {
+        n_qp = line_q2_n;
+        qx   = line_q2_x;
+        qw   = line_q2_w;
+    } else if (SFEM_HEX8_QUADRATURE_ORDER == 5) {
+        n_qp = line_q6_n;
+        qx   = line_q6_x;
+        qw   = line_q6_w;
+    }
+
+    const int proteus_to_std_hex8_corners[8] = {// Bottom
+                                                sshex8_lidx(level, 0, 0, 0),
+                                                sshex8_lidx(level, level, 0, 0),
+                                                sshex8_lidx(level, level, level, 0),
+                                                sshex8_lidx(level, 0, level, 0),
+
+                                                // Top
+                                                sshex8_lidx(level, 0, 0, level),
+                                                sshex8_lidx(level, level, 0, level),
+                                                sshex8_lidx(level, level, level, level),
+                                                sshex8_lidx(level, 0, level, level)};
+    int       Lm1                            = level - 1;
+    int       Lm13                           = Lm1 * Lm1 * Lm1;
+
+#pragma omp parallel
+    {
+        idx_t *ev = malloc(nxe * sizeof(idx_t));
+
+        scalar_t x[8];
+        scalar_t y[8];
+        scalar_t z[8];
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            {
+                // Gather elemental data
+                for (int d = 0; d < nxe; d++) {
+                    ev[d] = elements[d][e];
+                }
+
+                for (int d = 0; d < 8; d++) {
+                    x[d] = points[0][ev[proteus_to_std_hex8_corners[d]]];
+                    y[d] = points[1][ev[proteus_to_std_hex8_corners[d]]];
+                    z[d] = points[2][ev[proteus_to_std_hex8_corners[d]]];
+                }
+            }
+
+            const scalar_t h = 1. / level;
+
+            scalar_t sub_adjugate[9];
+            scalar_t sub_determinant;
+            {
+                // 2) Evaluate Adjugate
+                scalar_t adjugate[9];
+                scalar_t jacobian_determinant;
+                hex8_adjugate_and_det(x, y, z, 0.5, 0.5, 0.5, adjugate, &jacobian_determinant);
+
+                // 3) Transform to sub-FFF
+                hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
+            }
+
+            accumulator_t blocks[8][6];
+
+            // Assemble the diagonal part of the matrix
+            for (int edof_i = 0; edof_i < 8; edof_i++) {
+                for (int k = 0; k < 6; k++) {
+                    blocks[edof_i][k] = 0;
+                }
+
+                for (int zi = 0; zi < n_qp; zi++) {
+                    for (int yi = 0; yi < n_qp; yi++) {
+                        for (int xi = 0; xi < n_qp; xi++) {
+                            scalar_t test_grad[3];
+                            hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], test_grad);
+                            const scalar_t test_fun = hex8_ref_shape(edof_i, qx[xi], qx[yi], qx[zi]);
+
+                            kelvin_voight_newmark_matrix_sym(beta,
+                                                             gamma,
+                                                             dt,
+                                                             k,
+                                                             K,
+                                                             eta,
+                                                             rho,
+                                                             sub_adjugate,
+                                                             sub_determinant,
+                                                             test_fun,
+                                                             test_grad,
+                                                             test_fun,
+                                                             test_grad,
+                                                             qw[xi] * qw[yi] * qw[zi],
+                                                             blocks[edof_i]);
+                        }
+                    }
+                }
+            }
+
+            // Iterate over sub-elements
+            for (int zi = 0; zi < level; zi++) {
+                for (int yi = 0; yi < level; yi++) {
+                    for (int xi = 0; xi < level; xi++) {
+                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
+                        int lev[8] = {// Bottom
+                                      sshex8_lidx(level, xi, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi, zi),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi),
+                                      sshex8_lidx(level, xi, yi + 1, zi),
+                                      // Top
+                                      sshex8_lidx(level, xi, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi, zi + 1),
+                                      sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
+                                      sshex8_lidx(level, xi, yi + 1, zi + 1)};
+
+                        for (int edof_i = 0; edof_i < 8; edof_i++) {
+                            const ptrdiff_t v = ev[lev[edof_i]];
+                            // local to global
+#pragma omp atomic update
+                            out0[v * out_stride] += blocks[edof_i][0];
+#pragma omp atomic update
+                            out1[v * out_stride] += blocks[edof_i][1];
+#pragma omp atomic update
+                            out2[v * out_stride] += blocks[edof_i][2];
+#pragma omp atomic update
+                            out3[v * out_stride] += blocks[edof_i][3];
+#pragma omp atomic update
+                            out4[v * out_stride] += blocks[edof_i][4];
+#pragma omp atomic update
+                            out5[v * out_stride] += blocks[edof_i][5];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean-up
+        free(ev);
     }
 
     return SFEM_SUCCESS;
