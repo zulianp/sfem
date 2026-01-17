@@ -74,6 +74,26 @@ int affine_sshex8_kelvin_voigt_newmark_diag(const int                    level,
                                             real_t *const                outz);
 
 
+int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                    level,
+                                                      const ptrdiff_t              nelements,
+                                                      const ptrdiff_t              nnodes,
+                                                      idx_t **const SFEM_RESTRICT  elements,
+                                                      geom_t **const SFEM_RESTRICT points,
+                                                      const real_t                 beta,
+                                                      const real_t                 gamma,
+                                                      const real_t                 dt,
+                                                      const real_t                 k,
+                                                      const real_t                 K,
+                                                      const real_t                 eta,
+                                                      const real_t                 rho,
+                                                      const ptrdiff_t              out_stride,
+                                                      real_t *const                out0,
+                                                      real_t *const                out1,
+                                                      real_t *const                out2,
+                                                      real_t *const                out3,
+                                                      real_t *const                out4,
+                                                      real_t *const                out5);
+
 
 #ifdef __cplusplus
 }

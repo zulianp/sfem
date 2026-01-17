@@ -3,7 +3,7 @@
 set -e
 
 
-export SFEM_PATH=/users/hyang/ws/sfem_github/sfem/build_release
+# export SFEM_PATH=/users/hyang/ws/sfem_github/sfem/build_release
 if [[ -z "$SFEM_PATH" ]]
 then
 	echo "SFEM_PATH=</path/to/sfem/installation> must be defined"
@@ -13,10 +13,10 @@ fi
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 # Activate venv to ensure meshio is available
-source /users/hyang/ws/sfem_github/sfem/venv/bin/activate
+# source /users/hyang/ws/sfem_github/sfem/venv/bin/activate
 
 # Add venv's site-packages to PYTHONPATH as fallback
-export PYTHONPATH=/users/hyang/ws/sfem_github/sfem/venv/lib/python3.12/site-packages:$PYTHONPATH
+# export PYTHONPATH=/users/hyang/ws/sfem_github/sfem/venv/lib/python3.12/site-packages:$PYTHONPATH
 
 export PATH=$SFEM_PATH:$PATH
 export PATH=$SCRIPTPATH/../../python/sfem/mesh:$PATH
@@ -29,8 +29,8 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 export SFEM_EXECUTION_SPACE=device
 export SFEM_ELEMENT_REFINE_LEVEL=2
-export SFEM_DT=0.15
-export SFEM_T_END=15
+export SFEM_DT=1
+export SFEM_T_END=40
 
 
 
@@ -76,3 +76,6 @@ export SFEM_NEUMANN_VALUE=-5
 $LAUNCH kelvin_voigt_newmark torus_geometry/torus dirichlet_torus_kv.yaml torus_kv_output neumann_torus_kv.yaml
 raw_to_db.py torus_kv_output/mesh torus_kv_output.vtk -p 'torus_kv_output/out/*.raw' $EXTRA_OPTIONS
 
+
+
+raw_to_db.py torus_kv_output/mesh torus_kv_output.xdmf -p "torus_kv_output/out/disp.0.*.raw,torus_kv_output/out/disp.1.*.raw,torus_kv_output/out/disp.2.*.raw" --transient  --time_whole_txt=torus_kv_output/out/time.txt

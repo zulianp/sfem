@@ -99,7 +99,7 @@ int affine_hex8_kelvin_voigt_newmark_diag(const ptrdiff_t              nelements
                                           const real_t                 beta,
                                           const real_t                 gamma,
                                           const real_t                 dt,
-                                          const real_t                 k,   
+                                          const real_t                 k,
                                           const real_t                 K,
                                           const real_t                 eta,
                                           const real_t                 rho,
@@ -107,6 +107,43 @@ int affine_hex8_kelvin_voigt_newmark_diag(const ptrdiff_t              nelements
                                           real_t *const                outx,
                                           real_t *const                outy,
                                           real_t *const                outz);
+
+int affine_hex8_kelvin_voigt_newmark_crs_sym(
+        const ptrdiff_t                    nelements,
+        const ptrdiff_t                    nnodes,
+        idx_t **const SFEM_RESTRICT        elements,
+        geom_t **const SFEM_RESTRICT       points,
+        const real_t                       beta,
+        const real_t                       gamma,
+        const real_t                       dt,
+        const real_t                       k,
+        const real_t                       K,
+        const real_t                       eta,
+        const real_t                       rho,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT   colidx,
+        const ptrdiff_t                    block_stride,  // stride of the block matrix to interchange SoA and AoS.
+        real_t **const SFEM_RESTRICT       block_diag,
+        real_t **const SFEM_RESTRICT       block_offdiag);
+
+int affine_hex8_kelvin_voigt_newmark_block_diag_sym(const ptrdiff_t              nelements,
+                                                    const ptrdiff_t              nnodes,
+                                                    idx_t **const SFEM_RESTRICT  elements,
+                                                    geom_t **const SFEM_RESTRICT points,
+                                                    const real_t                 beta,
+                                                    const real_t                 gamma,
+                                                    const real_t                 dt,
+                                                    const real_t                 k,
+                                                    const real_t                 K,
+                                                    const real_t                 eta,
+                                                    const real_t                 rho,
+                                                    const ptrdiff_t              out_stride,
+                                                    real_t *const                out0,
+                                                    real_t *const                out1,
+                                                    real_t *const                out2,
+                                                    real_t *const                out3,
+                                                    real_t *const                out4,
+                                                    real_t *const                out5);
 
 #ifdef __cplusplus
 }

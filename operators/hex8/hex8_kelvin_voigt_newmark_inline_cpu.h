@@ -6176,4 +6176,22 @@ static SFEM_INLINE void sshex8_kelvin_voigt_newmark_diag(const scalar_t         
     element_diag[23]    = x101 * (x171 + x250 + x278 + x296 + x297);
 }
 
+static SFEM_INLINE void kelvin_voight_newmark_matrix_sym(const scalar_t                beta,
+                                                         const scalar_t                gamma,
+                                                         const scalar_t                dt,
+                                                         const scalar_t                k,
+                                                         const scalar_t                K,
+                                                         const scalar_t                eta,
+                                                         const scalar_t                rho,
+                                                         const scalar_t *SFEM_RESTRICT adjugate,
+                                                         const scalar_t                jacobian_determinant,
+                                                         const scalar_t trial_fun,
+                                                         const scalar_t *SFEM_RESTRICT trial_grad,
+                                                         const scalar_t test_fun,
+                                                         const scalar_t *SFEM_RESTRICT test_grad,
+                                                         const scalar_t                qw,
+                                                         scalar_t *const SFEM_RESTRICT element_matrix) {
+SFEM_ERROR("Not implemented");
+}
+
 #endif  // HEX8_KELVIN_VOIGT_NEWMARK_INLINE_CPU_H

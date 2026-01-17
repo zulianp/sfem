@@ -62,7 +62,7 @@ class SymbolicFE2D(FE):
         return 2
 
     def integrate(self, q, expr):
-        ref_vol = sp.symbols("ref_vol")
+        ref_vol = sp.symbols("qw")
         return expr * ref_vol
 
     def jacobian(self, q):
@@ -142,7 +142,7 @@ class SymbolicFE3D(FE):
         return 3
 
     def integrate(self, q, expr):
-        ref_vol = sp.symbols("ref_vol")
+        ref_vol = sp.symbols("qw")
         return expr * ref_vol
 
     def jacobian(self, q):
