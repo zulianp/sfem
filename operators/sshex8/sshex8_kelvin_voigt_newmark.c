@@ -589,14 +589,16 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                                                       const real_t                 eta,
                                                       const real_t                 rho,
                                                       const ptrdiff_t              out_stride,
-                                                      real_t *const                out0,
-                                                      real_t *const                out1,
-                                                      real_t *const                out2,
-                                                      real_t *const                out3,
-                                                      real_t *const                out4,
-                                                      real_t *const                out5) {
+                                                      real_t *const SFEM_RESTRICT  out0,
+                                                      real_t *const SFEM_RESTRICT  out1,
+                                                      real_t *const SFEM_RESTRICT  out2,
+                                                      real_t *const SFEM_RESTRICT  out3,
+                                                      real_t *const SFEM_RESTRICT  out4,
+                                                      real_t *const SFEM_RESTRICT  out5) {
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
+
+    real_t *outs[6] = {out0, out1, out2, out3, out4, out5};
 
     int SFEM_HEX8_QUADRATURE_ORDER = 2;
     SFEM_READ_ENV(SFEM_HEX8_QUADRATURE_ORDER, atoi);
@@ -667,22 +669,17 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                 hex8_sub_adj_0(adjugate, jacobian_determinant, h, sub_adjugate, &sub_determinant);
             }
 
-            accumulator_t blocks[8][6];
-
-            // Assemble the diagonal part of the matrix
-            for (int edof_i = 0; edof_i < 8; edof_i++) {
-                for (int k = 0; k < 6; k++) {
-                    blocks[edof_i][k] = 0;
+            scalar_t blocks[6][8];
+            for (int d = 0; d < 6; d++) {
+                for (int v = 0; v < 8; v++) {
+                    blocks[d][v] = 0;
                 }
+            }
 
-                for (int zi = 0; zi < n_qp; zi++) {
-                    for (int yi = 0; yi < n_qp; yi++) {
-                        for (int xi = 0; xi < n_qp; xi++) {
-                            scalar_t test_grad[3];
-                            hex8_ref_shape_grad(edof_i, qx[xi], qx[yi], qx[zi], test_grad);
-                            const scalar_t test_fun = hex8_ref_shape(edof_i, qx[xi], qx[yi], qx[zi]);
-
-                            kelvin_voight_newmark_matrix_sym(beta,
+            for (int zi = 0; zi < n_qp; zi++) {
+                for (int yi = 0; yi < n_qp; yi++) {
+                    for (int xi = 0; xi < n_qp; xi++) {
+                        kelvin_voight_newmark_block_diag_sym(beta,
                                                              gamma,
                                                              dt,
                                                              k,
@@ -691,22 +688,23 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                                                              rho,
                                                              sub_adjugate,
                                                              sub_determinant,
-                                                             test_fun,
-                                                             test_grad,
-                                                             test_fun,
-                                                             test_grad,
+                                                             qx[xi],
+                                                             qx[yi],
+                                                             qx[zi],
                                                              qw[xi] * qw[yi] * qw[zi],
-                                                             blocks[edof_i]);
-                        }
+                                                             blocks[0],
+                                                             blocks[1],
+                                                             blocks[2],
+                                                             blocks[3],
+                                                             blocks[4],
+                                                             blocks[5]);
                     }
                 }
             }
 
-            // Iterate over sub-elements
             for (int zi = 0; zi < level; zi++) {
                 for (int yi = 0; yi < level; yi++) {
                     for (int xi = 0; xi < level; xi++) {
-                        // Convert to standard HEX8 local ordering (see 3-4 and 6-7)
                         int lev[8] = {// Bottom
                                       sshex8_lidx(level, xi, yi, zi),
                                       sshex8_lidx(level, xi + 1, yi, zi),
@@ -717,29 +715,19 @@ int affine_sshex8_kelvin_voigt_newmark_block_diag_sym(const int                 
                                       sshex8_lidx(level, xi + 1, yi, zi + 1),
                                       sshex8_lidx(level, xi + 1, yi + 1, zi + 1),
                                       sshex8_lidx(level, xi, yi + 1, zi + 1)};
-
-                        for (int edof_i = 0; edof_i < 8; edof_i++) {
-                            const ptrdiff_t v = ev[lev[edof_i]];
-                            // local to global
+                        for (int d = 0; d < 6; d++) {
+                            for (int v = 0; v < 8; v++) {
+                                const ptrdiff_t idx = ev[lev[v]] * out_stride;
+                                // local to global
 #pragma omp atomic update
-                            out0[v * out_stride] += blocks[edof_i][0];
-#pragma omp atomic update
-                            out1[v * out_stride] += blocks[edof_i][1];
-#pragma omp atomic update
-                            out2[v * out_stride] += blocks[edof_i][2];
-#pragma omp atomic update
-                            out3[v * out_stride] += blocks[edof_i][3];
-#pragma omp atomic update
-                            out4[v * out_stride] += blocks[edof_i][4];
-#pragma omp atomic update
-                            out5[v * out_stride] += blocks[edof_i][5];
+                                outs[d][idx] += blocks[d][v];
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Clean-up
         free(ev);
     }
 

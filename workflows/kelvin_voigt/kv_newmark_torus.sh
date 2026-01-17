@@ -28,16 +28,17 @@ export PATH=$SCRIPTPATH/../../data/benchmarks/meshes:$PATH
 
 
 export SFEM_EXECUTION_SPACE=device
-export SFEM_ELEMENT_REFINE_LEVEL=2
+# export SFEM_ELEMENT_REFINE_LEVEL=2
 export SFEM_DT=1
-export SFEM_T_END=40
+export SFEM_T_END=2
+export SFEM_VERBOSE=1
 
 
 
 
 HERE=$PWD
 
-rm -rf torus_geometry
+# rm -rf torus_geometry
 if [[ ! -d torus_geometry ]]
 then
 	mkdir -p torus_geometry
@@ -74,8 +75,4 @@ export SFEM_NEUMANN_VALUE=-5
 
 
 $LAUNCH kelvin_voigt_newmark torus_geometry/torus dirichlet_torus_kv.yaml torus_kv_output neumann_torus_kv.yaml
-raw_to_db.py torus_kv_output/mesh torus_kv_output.vtk -p 'torus_kv_output/out/*.raw' $EXTRA_OPTIONS
-
-
-
 raw_to_db.py torus_kv_output/mesh torus_kv_output.xdmf -p "torus_kv_output/out/disp.0.*.raw,torus_kv_output/out/disp.1.*.raw,torus_kv_output/out/disp.2.*.raw" --transient  --time_whole_txt=torus_kv_output/out/time.txt
