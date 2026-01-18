@@ -166,7 +166,7 @@ namespace sfem {
             }
         }
 
-        void update_contact(const T *const disp) {
+        int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
             auto                      f  = levels[0]->function;
             const enum ExecutionSpace es = f->execution_space();
@@ -189,6 +189,8 @@ namespace sfem {
                 contact_conds->update(disp);
                 contact_conds->update_signed_distance(disp, upper_bound->data());
             }
+
+            return SFEM_SUCCESS;
         }
 
         void init_contact() {
@@ -613,6 +615,11 @@ namespace sfem {
     template <typename T>
     int SSMGC<T>::apply(const T *const rhs, T *const x) {
         return impl_->mg->apply(rhs, x);
+    }
+
+    template <typename T>
+    int SSMGC<T>::update(const T *const disp) {
+        return impl_->update_contact(disp);
     }
 
     template <typename T>
