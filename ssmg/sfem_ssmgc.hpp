@@ -27,6 +27,7 @@ namespace sfem {
                                              const std::shared_ptr<Input>            &in);
 
         int            apply(const T *const rhs, T *const x) override;
+        int            update(const T *const disp);
         std::ptrdiff_t rows() const override;
         std::ptrdiff_t cols() const override;
         ExecutionSpace execution_space() const override;
