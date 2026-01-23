@@ -365,8 +365,56 @@ modes = ['Uniaxial', 'Equibiaxial', 'PlanarShear']
 titles = ['Uniaxial Tension', 'Equibiaxial Tension', 'Planar Shear']
 meas_data = [uni_meas, eqb_meas, ps_meas] if has_measurement else [None, None, None]
 
+# Combined side-by-side plot (2 rows x 3 columns)
+fig_all, axes_all = plt.subplots(2, 3, figsize=(15, 7), sharex='col')
 for idx, mode in enumerate(modes):
-    fig, axes = plt.subplots(2, 1, figsize=(7, 8), sharex=False)
+    mode_df = df[df['mode'] == mode]
+
+    # Top row: stress-strain
+    ax = axes_all[0, idx]
+    if has_measurement and meas_data[idx] is not None:
+        meas = meas_data[idx]
+        ax.plot(meas['Engineering Strain'], meas['Engineering Stress [MPa]'],
+                'go', markersize=4, alpha=0.6, label='Measurement')
+
+    if len(mode_df) > 0:
+        ax.plot(mode_df['strain'], mode_df['stress_marc'],
+                'b-', linewidth=2, label='Marc')
+        ax.plot(mode_df['strain'], mode_df['stress_sfem'],
+                'r--', linewidth=2, label='SFEM')
+
+    ax.set_title(titles[idx])
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    if idx == 0:
+        ax.set_ylabel('Engineering Stress [MPa]')
+    ax.set_xlabel('Engineering Strain [-]')
+    ax.legend(loc='lower right')
+
+    # Bottom row: stress-time history
+    ax = axes_all[1, idx]
+    if len(mode_df) > 0:
+        ax.plot(mode_df['time'], mode_df['stress_marc'],
+                'b-', linewidth=2, label='Marc')
+        ax.plot(mode_df['time'], mode_df['stress_sfem'],
+                'r--', linewidth=2, label='SFEM')
+
+    ax.set_title(f'{titles[idx]} - Time History')
+    ax.grid(True, alpha=0.3)
+    if idx == 0:
+        ax.set_ylabel('Engineering Stress [MPa]')
+    ax.set_xlabel('Time [s]')
+    ax.legend()
+
+fig_all.tight_layout()
+plt.savefig('visco_validation_side_by_side.png', dpi=150, bbox_inches='tight')
+plt.savefig('visco_validation_side_by_side.pdf', bbox_inches='tight')
+print('Plots saved: visco_validation_side_by_side.png')
+plt.close(fig_all)
+
+for idx, mode in enumerate(modes):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=False)
     mode_df = df[df['mode'] == mode]
 
     # Top: stress-strain
@@ -400,7 +448,7 @@ for idx, mode in enumerate(modes):
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
-    # Bottom: stress-time history
+    # Right: stress-time history
     ax = axes[1]
     if len(mode_df) > 0:
         ax.plot(mode_df['time'], mode_df['stress_marc'],
