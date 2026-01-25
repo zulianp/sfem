@@ -28,6 +28,7 @@ int mooney_rivlin_visco_update_history_flexible(
     const real_t *const SFEM_RESTRICT alpha,
     const real_t *const SFEM_RESTRICT beta,
     const ptrdiff_t history_stride,
+    const int history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     real_t *const SFEM_RESTRICT new_history,
     const ptrdiff_t u_stride,
@@ -52,6 +53,7 @@ int mooney_rivlin_visco_gradient_flexible(
     const real_t *const SFEM_RESTRICT beta,
     const real_t gamma,
     const ptrdiff_t history_stride,
+    const int history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -76,6 +78,7 @@ int mooney_rivlin_visco_bsr_flexible(
     const real_t *const SFEM_RESTRICT beta,
     const real_t gamma,
     const ptrdiff_t history_stride,
+    const int history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -102,6 +105,7 @@ int mooney_rivlin_visco_hessian_diag_flexible(
     const real_t *const SFEM_RESTRICT beta,
     const real_t gamma,
     const ptrdiff_t history_stride,
+    const int history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -117,4 +121,3 @@ int mooney_rivlin_visco_hessian_diag_flexible(
 #endif
 
 #endif  // MOONEY_RIVLIN_VISCO_H
-

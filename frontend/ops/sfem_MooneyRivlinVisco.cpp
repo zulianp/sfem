@@ -75,6 +75,7 @@ namespace sfem {
         // History buffer
         std::shared_ptr<Buffer<real_t>> history_buffer;
         std::shared_ptr<Buffer<real_t>> new_history_buffer;
+        int history_n_qp{8};
         
         // Previous displacement
         std::shared_ptr<Buffer<real_t>> prev_u_buffer;
@@ -179,8 +180,7 @@ namespace sfem {
                 return SFEM_SUCCESS;
             });
 
-            const int n_qp = 8; 
-            const ptrdiff_t total_size = total_elements * n_qp * history_per_qp();
+            const ptrdiff_t total_size = total_elements * history_n_qp * history_per_qp();
             
             history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
             new_history_buffer = create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
@@ -223,11 +223,20 @@ namespace sfem {
         ret->impl_->wlf_T_ref = sfem::Env::read("SFEM_WLF_T_REF", ret->impl_->wlf_T_ref);
         ret->impl_->current_T = sfem::Env::read("SFEM_TEMPERATURE", ret->impl_->current_T);
         ret->impl_->use_wlf   = sfem::Env::read("SFEM_USE_WLF", 0) != 0;
+
+        const std::string history_mode = sfem::Env::read("SFEM_HISTORY_MODE", std::string("per_qp"));
+        if (history_mode == "per_elem" || history_mode == "per_element" || history_mode == "1") {
+            ret->impl_->history_n_qp = 1;
+        } else {
+            ret->impl_->history_n_qp = 8;
+        }
         
         printf("[MooneyRivlinVisco::create] WLF params: C1=%g, C2=%g, T_ref=%g, T=%g, use_wlf=%d\n",
                (double)ret->impl_->wlf_C1, (double)ret->impl_->wlf_C2, 
                (double)ret->impl_->wlf_T_ref, (double)ret->impl_->current_T,
                ret->impl_->use_wlf ? 1 : 0);
+        printf("[MooneyRivlinVisco::create] history_mode=%s history_n_qp=%d\n",
+               history_mode.c_str(), ret->impl_->history_n_qp);
         
         // Prony series parameters (comma-separated values)
         // Example: SFEM_PRONY_G="0.15,0.15,0.10,0.05" SFEM_PRONY_TAU="0.1,1.0,10.0,100.0"
@@ -292,8 +301,7 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
-        const int n_qp = 8; 
-        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -311,6 +319,7 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                impl_->history_n_qp,
                 impl_->history_buffer->data() + history_offset,
                 3, 
                 &impl_->prev_u_buffer->data()[0],
@@ -334,8 +343,7 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
-        const int n_qp = 8; 
-        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -353,6 +361,7 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                impl_->history_n_qp,
                 impl_->history_buffer->data() + history_offset,
                 3,
                 &impl_->prev_u_buffer->data()[0],
@@ -376,8 +385,7 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
-        const int n_qp = 8; 
-        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -395,6 +403,7 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                impl_->history_n_qp,
                 impl_->history_buffer->data() + history_offset,
                 3,
                 &impl_->prev_u_buffer->data()[0],
@@ -418,8 +427,7 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
-        const int n_qp = 8; 
-        const ptrdiff_t history_stride = n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
 
         int ret = impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -436,6 +444,7 @@ namespace sfem {
                 impl_->prony_alpha.data(),
                 impl_->prony_beta.data(),
                 history_stride,
+                impl_->history_n_qp,
                 impl_->history_buffer->data() + history_offset,
                 impl_->new_history_buffer->data() + history_offset,
                 3,
