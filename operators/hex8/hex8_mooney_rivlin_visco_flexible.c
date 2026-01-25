@@ -39,6 +39,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT beta,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     real_t *const SFEM_RESTRICT       new_history,
     // 5. Displacement input
@@ -79,38 +80,92 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
             edispx[v] = ux[idx]; edispy[v] = uy[idx]; edispz[v] = uz[idx];
         }
 
-        for (int kz = 0; kz < n_qp; kz++) {
-            for (int ky = 0; ky < n_qp; ky++) {
-                for (int kx = 0; kx < n_qp; kx++) {
-                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], 
-                                          jacobian_adjugate, &jacobian_determinant);
-                    assert(jacobian_determinant > 0);
+        if (history_n_qp == 1) {
+            scalar_t S_dev_prev_avg[6] = {0};
+            scalar_t S_dev_curr_avg[6] = {0};
+            scalar_t weight_sum = 0;
 
-                    const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
-                    const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+            for (int kz = 0; kz < n_qp; kz++) {
+                for (int ky = 0; ky < n_qp; ky++) {
+                    for (int kx = 0; kx < n_qp; kx++) {
+                        hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz],
+                                              jacobian_adjugate, &jacobian_determinant);
+                        assert(jacobian_determinant > 0);
 
-                    scalar_t S_dev_prev[6];
-                    hex8_mooney_rivlin_S_dev_from_disp(
-                        jacobian_adjugate, jacobian_determinant,
-                        qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
-                        C10, C01, K,
-                        prev_edispx, prev_edispy, prev_edispz,
-                        S_dev_prev);
+                        scalar_t S_dev_prev[6];
+                        hex8_mooney_rivlin_S_dev_from_disp(
+                            jacobian_adjugate, jacobian_determinant,
+                            qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
+                            C10, C01, K,
+                            prev_edispx, prev_edispy, prev_edispz,
+                            S_dev_prev);
 
-                    scalar_t S_dev_curr[6];
-                    hex8_mooney_rivlin_S_dev_from_disp(
-                        jacobian_adjugate, jacobian_determinant,
-                        qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
-                        C10, C01, K,
-                        edispx, edispy, edispz,
-                        S_dev_curr);
+                        scalar_t S_dev_curr[6];
+                        hex8_mooney_rivlin_S_dev_from_disp(
+                            jacobian_adjugate, jacobian_determinant,
+                            qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
+                            C10, C01, K,
+                            edispx, edispy, edispz,
+                            S_dev_curr);
 
-                    for (int p = 0; p < num_prony_terms; ++p) {
-                        const real_t *H_old = history + hist_offset + p * 6;
-                        real_t *H_new = new_history + hist_offset + p * 6;
-                        
+                        const scalar_t w = (scalar_t)(qw[kx] * qw[ky] * qw[kz]) * jacobian_determinant;
+                        weight_sum += w;
                         for (int c = 0; c < 6; ++c) {
-                            H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
+                            S_dev_prev_avg[c] += w * S_dev_prev[c];
+                            S_dev_curr_avg[c] += w * S_dev_curr[c];
+                        }
+                    }
+                }
+            }
+
+            const scalar_t inv_w = (weight_sum != 0) ? (1.0 / weight_sum) : 0.0;
+            for (int c = 0; c < 6; ++c) {
+                S_dev_prev_avg[c] *= inv_w;
+                S_dev_curr_avg[c] *= inv_w;
+            }
+
+            const ptrdiff_t hist_offset = i * history_stride;
+            for (int p = 0; p < num_prony_terms; ++p) {
+                const real_t *H_old = history + hist_offset + p * 6;
+                real_t *H_new = new_history + hist_offset + p * 6;
+                for (int c = 0; c < 6; ++c) {
+                    H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr_avg[c] - S_dev_prev_avg[c]);
+                }
+            }
+        } else {
+            for (int kz = 0; kz < n_qp; kz++) {
+                for (int ky = 0; ky < n_qp; ky++) {
+                    for (int kx = 0; kx < n_qp; kx++) {
+                        hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz],
+                                              jacobian_adjugate, &jacobian_determinant);
+                        assert(jacobian_determinant > 0);
+
+                        const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
+                        const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+
+                        scalar_t S_dev_prev[6];
+                        hex8_mooney_rivlin_S_dev_from_disp(
+                            jacobian_adjugate, jacobian_determinant,
+                            qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
+                            C10, C01, K,
+                            prev_edispx, prev_edispy, prev_edispz,
+                            S_dev_prev);
+
+                        scalar_t S_dev_curr[6];
+                        hex8_mooney_rivlin_S_dev_from_disp(
+                            jacobian_adjugate, jacobian_determinant,
+                            qx[kx], qx[ky], qx[kz], qw[kx] * qw[ky] * qw[kz],
+                            C10, C01, K,
+                            edispx, edispy, edispz,
+                            S_dev_curr);
+
+                        for (int p = 0; p < num_prony_terms; ++p) {
+                            const real_t *H_old = history + hist_offset + p * 6;
+                            real_t *H_new = new_history + hist_offset + p * 6;
+
+                            for (int c = 0; c < 6; ++c) {
+                                H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
+                            }
                         }
                     }
                 }
@@ -143,6 +198,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -179,7 +235,6 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
         accumulator_t eoutx[8] = {0}, eouty[8] = {0}, eoutz[8] = {0};
         scalar_t jacobian_adjugate[9];
         scalar_t jacobian_determinant = 0;
-
         for (int v = 0; v < 8; ++v) ev[v] = elements[v][i * stride];
         for (int d = 0; d < 8; d++) { lx[d] = x[ev[d]]; ly[d] = y[ev[d]]; lz[d] = z[ev[d]]; }
         for (int v = 0; v < 8; ++v) {
@@ -205,7 +260,8 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
 
                     // History contribution (OPTIMIZED: pre-accumulate S_hist, call once)
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
-                    const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+                    const ptrdiff_t hist_offset = (i * history_stride) +
+                                                 ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -273,6 +329,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -310,7 +367,6 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
         scalar_t element_matrix[24 * 24] = {0};
         scalar_t jacobian_adjugate[9];
         scalar_t jacobian_determinant = 0;
-
         for (int v = 0; v < 8; ++v) ev[v] = elements[v][i * stride];
         for (int d = 0; d < 8; d++) { lx[d] = x[ev[d]]; ly[d] = y[ev[d]]; lz[d] = z[ev[d]]; }
         for (int v = 0; v < 8; ++v) {
@@ -336,7 +392,8 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
 
                     // History geometric stiffness (OPTIMIZED: pre-accumulate S_hist, call once)
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
-                    const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+                    const ptrdiff_t hist_offset = (i * history_stride) +
+                                                 ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -395,6 +452,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -432,7 +490,6 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
         scalar_t eoutx[8] = {0}, eouty[8] = {0}, eoutz[8] = {0};
         scalar_t jacobian_adjugate[9];
         scalar_t jacobian_determinant = 0;
-
         for (int v = 0; v < 8; ++v) ev[v] = elements[v][i * stride];
         for (int d = 0; d < 8; d++) { lx[d] = x[ev[d]]; ly[d] = y[ev[d]]; lz[d] = z[ev[d]]; }
         for (int v = 0; v < 8; ++v) {
@@ -457,7 +514,8 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
 
                     // History geometric stiffness (OPTIMIZED)
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
-                    const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
+                    const ptrdiff_t hist_offset = (i * history_stride) +
+                                                 ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -508,4 +566,3 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
 
     return SFEM_SUCCESS;
 }
-
