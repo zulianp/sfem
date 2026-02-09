@@ -41,8 +41,15 @@ int main(int argc, char* argv[]) {
     int SFEM_ADJOINT = 0;
     SFEM_READ_ENV(SFEM_ADJOINT, atoi);
 
+    int SFEM_TEST_CCELL = 0;
+    SFEM_READ_ENV(SFEM_TEST_CCELL, atoi);
+
     if (SFEM_ADJOINT == 1) {
         return main_adjoint(argc, argv);
+    }
+
+    if (SFEM_TEST_CCELL == 1) {
+        return main_test_ccell(argc, argv);
     }
 
     printf("========================================\n");

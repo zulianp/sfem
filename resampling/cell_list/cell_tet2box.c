@@ -52,27 +52,23 @@ make_mesh_tets_boxes(const ptrdiff_t                    start_element,  // Mesh
         const real_t z2_n = xyz[2][ev[2]];
         const real_t z3_n = xyz[2][ev[3]];
 
-        ptrdiff_t min_grid_x, max_grid_x;
-        ptrdiff_t min_grid_y, max_grid_y;
-        ptrdiff_t min_grid_z, max_grid_z;
+        const real_t min_x = MY_MIN(MY_MIN(x0_n, x1_n), MY_MIN(x2_n, x3_n));
+        const real_t max_x = MY_MAX(MY_MAX(x0_n, x1_n), MY_MAX(x2_n, x3_n));
 
-        min_grid_x = MY_MIN(MY_MIN(x0_n, x1_n), MY_MIN(x2_n, x3_n));
-        max_grid_x = MY_MAX(MY_MAX(x0_n, x1_n), MY_MAX(x2_n, x3_n));
+        const real_t min_y = MY_MIN(MY_MIN(y0_n, y1_n), MY_MIN(y2_n, y3_n));
+        const real_t max_y = MY_MAX(MY_MAX(y0_n, y1_n), MY_MAX(y2_n, y3_n));
 
-        min_grid_y = MY_MIN(MY_MIN(y0_n, y1_n), MY_MIN(y2_n, y3_n));
-        max_grid_y = MY_MAX(MY_MAX(y0_n, y1_n), MY_MAX(y2_n, y3_n));
-
-        min_grid_z = MY_MIN(MY_MIN(z0_n, z1_n), MY_MIN(z2_n, z3_n));
-        max_grid_z = MY_MAX(MY_MAX(z0_n, z1_n), MY_MAX(z2_n, z3_n));
+        const real_t min_z = MY_MIN(MY_MIN(z0_n, z1_n), MY_MIN(z2_n, z3_n));
+        const real_t max_z = MY_MAX(MY_MAX(z0_n, z1_n), MY_MAX(z2_n, z3_n));
 
         const ptrdiff_t box_index = element_i - start_element;
 
-        boxes_loc_ptr->min_x[box_index] = min_grid_x;
-        boxes_loc_ptr->max_x[box_index] = max_grid_x;
-        boxes_loc_ptr->min_y[box_index] = min_grid_y;
-        boxes_loc_ptr->max_y[box_index] = max_grid_y;
-        boxes_loc_ptr->min_z[box_index] = min_grid_z;
-        boxes_loc_ptr->max_z[box_index] = max_grid_z;
+        boxes_loc_ptr->min_x[box_index] = min_x;
+        boxes_loc_ptr->max_x[box_index] = max_x;
+        boxes_loc_ptr->min_y[box_index] = min_y;
+        boxes_loc_ptr->max_y[box_index] = max_y;
+        boxes_loc_ptr->min_z[box_index] = min_z;
+        boxes_loc_ptr->max_z[box_index] = max_z;
 
     }  // END: for element_i
 

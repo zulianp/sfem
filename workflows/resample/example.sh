@@ -134,7 +134,9 @@ GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
-export SFEM_ADJOINT=1
+
+export SFEM_ADJOINT=0
+export SFEM_TEST_CCELL=1
 
 # export SFEM_CLUSTER_SIZE=${SFEM_CLUSTER_SIZE:-32}
 
