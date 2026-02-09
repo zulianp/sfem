@@ -70,6 +70,7 @@ if(SFEM_ENABLE_RESAMPLING)
         resampling/hyteg
         resampling/adjoint
         resampling/data_structures
+        resampling/cell_list
     )
 endif()
 

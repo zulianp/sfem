@@ -157,6 +157,37 @@ double calculate_flops(const ptrdiff_t nelements, const ptrdiff_t quad_nodes, do
 int check_string_in_args(const int argc, const char* argv[], const char* target, int print_message);
 
 /**
+ * @brief Print command-line arguments (rank 0 only)
+ */
+void print_command_line_arguments(int argc, char* argv[], int mpi_rank);
+
+/**
+ * @brief Parse element type from command-line arguments
+ * @return 0 on success, non-zero on failure
+ */
+int parse_element_type_from_args(int argc, char* argv[], sfem_resample_field_info* info, int mpi_rank);
+
+/**
+ * @brief Get output base directory from environment or default
+ */
+void get_output_base_directory(char* out_base_directory, size_t buffer_size);
+
+/**
+ * @brief Setup grid normalization parameters
+ */
+void setup_grid_normalization(ptrdiff_t    nnodes,       //
+                              geom_t**     mesh_points,  //
+                              ptrdiff_t*   nlocal,       //
+                              geom_t*      origin,       //
+                              geom_t*      delta,        //
+                              real_t*      new_origin,   //
+                              real_t*      new_side,     //
+                              real_t*      new_delta,    //
+                              const real_t margin,       //
+                              int          enable_normalize,
+                              int          mpi_rank);
+
+/**
  * @brief Print rank information for debugging
  *
  * @param mpi_rank MPI rank
