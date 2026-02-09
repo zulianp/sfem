@@ -18,6 +18,7 @@
 #include "quadratures_rule.h"
 #include "read_mesh.h"
 #include "resampling_utils.h"
+#include "sfem_base.h"
 #include "sfem_mesh_read.h"
 #include "sfem_mesh_write.h"
 #include "sfem_queue.h"
@@ -71,6 +72,147 @@ get_option_argument(int         argc,    //
     *arg_size = 0;
     return -2;  // Option not found
 }
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// print_command_line_arguments
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void print_command_line_arguments(int argc, char* argv[], int mpi_rank) {
+    if (mpi_rank == 0) {
+        printf("argc: %d\n", argc);
+        printf("argv: \n");
+        for (int i = 0; i < argc; i++) {
+            printf(" %s", argv[i]);
+        }
+        printf("\n");
+    }  // END if (mpi_rank == 0)
+    RETURN_FROM_FUNCTION();
+}  // END Function: print_command_line_arguments
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// parse_element_type_from_args
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int parse_element_type_from_args(int argc, char* argv[], sfem_resample_field_info* info, int mpi_rank) {
+    if (check_string_in_args(argc, (const char**)argv, "TET4", mpi_rank == 0)) {
+        info->element_type = TET4;
+    } else if (check_string_in_args(argc, (const char**)argv, "TET10", mpi_rank == 0)) {
+        info->element_type = TET10;
+    } else {
+        fprintf(stderr, "Error: Invalid element type\n\n");
+        fprintf(stderr,
+                "usage: %s <nx> <ny> <nz> <ox> <oy> <oz> <dx> <dy> <dz> "
+                "<data.float32.raw> <folder> <output_path> <element_type>\n",
+                argv[0]);
+        RETURN_FROM_FUNCTION(EXIT_FAILURE);
+    }  // END if (element type)
+    RETURN_FROM_FUNCTION(0);
+}  // END Function: parse_element_type_from_args
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// get_output_base_directory
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void get_output_base_directory(char* out_base_directory, size_t buffer_size) {
+    if (getenv("SFEM_OUT_BASE_DIRECTORY") != NULL) {
+        snprintf(out_base_directory, buffer_size, "%s", getenv("SFEM_OUT_BASE_DIRECTORY"));
+    } else {
+        snprintf(out_base_directory, buffer_size, "/tmp/");
+    }  // END if (getenv("SFEM_OUT_BASE_DIRECTORY"))
+    RETURN_FROM_FUNCTION();
+}  // END Function: get_output_base_directory
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// setup_grid_normalization
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void                                                //
+setup_grid_normalization(ptrdiff_t    nnodes,       //
+                         geom_t**     mesh_points,  //
+                         ptrdiff_t*   nlocal,       //
+                         geom_t*      origin,       //
+                         geom_t*      delta,        //
+                         real_t*      new_origin,   //
+                         real_t*      new_side,     //
+                         real_t*      new_delta,    //
+                         const real_t margin,       //
+                         int          enable_normalize,
+                         int          mpi_rank) {                 //
+
+    PRINT_CURRENT_FUNCTION;
+
+#if SFEM_LOG_LEVEL >= 5
+    if (mpi_rank == 0) {
+        printf("Setting up grid normalization, enable_normalize = %d, %s:%d\n", enable_normalize, __FILE__, __LINE__);
+    }  // END if (mpi_rank == 0)
+#endif  // SFEM_LOG_LEVEL >= 5
+
+    if (enable_normalize) {
+        // Normalize mesh bounding box
+        normalize_mesh_BB(nnodes,          //
+                          mesh_points,     //
+                          nlocal[0],       //
+                          1.0,             //
+                          margin,          //
+                          &new_origin[0],  //
+                          &new_origin[1],  //
+                          &new_origin[2],  //
+                          &new_side[0],    //
+                          &new_side[1],    //
+                          &new_side[2]);   //
+
+        delta[0] = 1.0;
+        delta[1] = 1.0;
+        delta[2] = 1.0;
+
+        origin[0] = 0.0;
+        origin[1] = 0.0;
+        origin[2] = 0.0;
+
+        new_delta[0] = new_side[0] / (real_t)(nlocal[0] - 1);
+        new_delta[1] = new_side[1] / (real_t)(nlocal[1] - 1);
+        new_delta[2] = new_side[2] / (real_t)(nlocal[2] - 1);
+
+#if SFEM_LOG_LEVEL >= 5
+        if (mpi_rank == 0) {
+            printf("Normalized bounding box for refinement:\n new_origin = (%.5f %.5f %.5f),\n new_side = (%.5f %.5f "
+                   "%.5f), \n%s:%d\n",
+                   new_origin[0],
+                   new_origin[1],
+                   new_origin[2],
+                   new_side[0],
+                   new_side[1],
+                   new_side[2],
+                   __FILE__,
+                   __LINE__);
+            printf("  delta  = (%.5f %.5f %.5f)\n", delta[0], delta[1], delta[2]);
+            printf("  origin = (%.5f %.5f %.5f)\n", origin[0], origin[1], origin[2]);
+            printf("  nlocal = (%ld %ld %ld)\n", nlocal[0], nlocal[1], nlocal[2]);
+        }  // END if (mpi_rank == 0)
+#endif  // SFEM_LOG_LEVEL >= 5
+
+    } else {
+        // Use original grid parameters without normalization
+        new_origin[0] = origin[0];
+        new_origin[1] = origin[1];
+        new_origin[2] = origin[2];
+
+        new_side[0] = delta[0] * (real_t)(nlocal[0] - 1);
+        new_side[1] = delta[1] * (real_t)(nlocal[1] - 1);
+        new_side[2] = delta[2] * (real_t)(nlocal[2] - 1);
+
+        new_delta[0] = delta[0];
+        new_delta[1] = delta[1];
+        new_delta[2] = delta[2];
+
+    }  // END if (enable_normalize)
+
+    RETURN_FROM_FUNCTION();
+}  // END Function: setup_grid_normalization
 
 void get_3d_coordinates(int              index,   //
                         const ptrdiff_t* nlocal,  //
