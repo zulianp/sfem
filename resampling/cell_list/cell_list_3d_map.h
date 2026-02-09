@@ -148,10 +148,20 @@ int free_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map);
  * @param z_max Maximum Z coordinate of the domain
  * @return int 0 on success, non-zero on failure
  */
-int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map, const real_t *box_min_x, const real_t *box_min_y,
-                              const real_t *box_min_z, const real_t *box_max_x, const real_t *box_max_y, const real_t *box_max_z,
-                              const int num_boxes, const real_t x_min, const real_t x_max, const real_t y_min, const real_t y_max,
-                              const real_t z_min, const real_t z_max);
+int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
+                              const real_t          *box_min_x,  //
+                              const real_t          *box_min_y,  //
+                              const real_t          *box_min_z,  //
+                              const real_t          *box_max_x,  //
+                              const real_t          *box_max_y,  //
+                              const real_t          *box_max_z,  //
+                              const int              num_boxes,  //
+                              const real_t           x_min,      //
+                              const real_t           x_max,      //
+                              const real_t           y_min,      //
+                              const real_t           y_max,      //
+                              const real_t           z_min,      //
+                              const real_t           z_max);               //
 
 /**
  * @brief Query the cell list to find boxes containing a given point
@@ -163,8 +173,12 @@ int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map, const real_t *box_min_
  * @param box_indices Pointer to array of box indices that contain the point
  * @param num_boxes Pointer to number of boxes found
  */
-int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y,
-                              const real_t z, int **box_indices, int *num_boxes);
+int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map,      //
+                              const boxes_t *boxes, const real_t x,  //
+                              const real_t y,                        //
+                              const real_t z,                        //
+                              int        **box_indices,              //
+                              int         *num_boxes);
 
 /**
  * @brief Query the cell list to find boxes containing points with given X, Y and array of Z coordinates
@@ -177,11 +191,14 @@ int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *b
  * @param box_indices Pointer to array of arrays of box indices that contain the points
  * @param num_boxes Pointer to array of number of boxes found for each Z coordinate
  */
-int query_cell_list_3d_2d_map_given_xy(
-        const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y, const real_t *z_array,
-        const int size_z,
-        int    ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int     **num_boxes);
+int query_cell_list_3d_2d_map_given_xy(const cell_list_3d_2d_map_t *map,          //
+                                       const boxes_t               *boxes,        //
+                                       const real_t                 x,            //
+                                       const real_t                 y,            //
+                                       const real_t                *z_array,      //
+                                       const int                    size_z,       //
+                                       int                       ***box_indices,  // it produces a pointer of a vector
+                                       int                        **num_boxes);                          // (size_z) of vector(size_boxes_local)
 
 /**
  * @brief Linear search for boxes containing a given point
