@@ -12,6 +12,8 @@
 
 int main_test_ccell(int argc, char* argv[]) {  //
 
+    // return main_ccel_test(argc, argv);
+
     PRINT_CURRENT_FUNCTION;
 
     printf("========================================\n");
@@ -134,6 +136,9 @@ int main_test_ccell(int argc, char* argv[]) {  //
                                  (const idx_t**)mesh.elements,  //
                                  (const geom_t**)mesh.points,   //
                                  &bounding_boxes_ptr);          //
+
+    print_bounding_box_statistics(bounding_boxes_ptr);
+
     if (fb_error) {
         fprintf(stderr, "Error: make_mesh_tets_boxes failed %s:%d\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
@@ -150,6 +155,15 @@ int main_test_ccell(int argc, char* argv[]) {  //
     cell_list_3d_2d_map_t* cell_list_map = make_empty_cell_list_3d_2d_map();
 
     double cell_list_tick = MPI_Wtime();
+
+    printf("Building cell list\n");
+    printf("Grid bounding box: [%g, %g] x [%g, %g] x [%g, %g]\n",
+           min_grid_x,
+           max_grid_x,
+           min_grid_y,
+           max_grid_y,
+           min_grid_z,
+           max_grid_z);
 
     int cell_flag =                                                   //
             build_cell_list_3d_2d_map(cell_list_map,                  //
@@ -184,8 +198,9 @@ int main_test_ccell(int argc, char* argv[]) {  //
     }  // END if (mpi_rank == 0)
 
     // query_cell_list_test(cell_list_map, bounding_boxes_ptr, 1000);
+    // query_cell_list_given_xy_test(cell_list_map, bounding_boxes_ptr, 500, 5000);
 
-    query_cell_list_given_xy_test(cell_list_map, bounding_boxes_ptr, 200, 1000);
+    query_cell_list_given_xy_bench(cell_list_map, bounding_boxes_ptr, 500, 100000);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
     // Finalize mesh and other data structures or arrays.

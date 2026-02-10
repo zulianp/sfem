@@ -3,6 +3,14 @@
 
 #include "sfem_config.h"
 
+#if SFEM_REAL_T_IS_FLOAT32 == 1
+#define USE_SINGLE_PRECISION
+#elif SFEM_REAL_T_IS_FLOAT64 == 1
+#define USE_DOUBLE_PRECISION
+#else
+#error "Please define either USE_SINGLE_PRECISION or USE_DOUBLE_PRECISION"
+#endif
+
 #ifdef USE_SINGLE_PRECISION
 // typedef float real_t;
 #define REAL_T_LENGTH 4

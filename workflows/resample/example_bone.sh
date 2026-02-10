@@ -45,7 +45,7 @@ sdf=sdf.float32.raw
 
 # Use HEX_SIZE environment variable if defined, otherwise use default
 echo "Testing SDF quality ..."
-SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-125}
+SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-500}
 # sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(echo "$SFEM_HEX_SIZE $SFEM_HEX_SIZE $SFEM_HEX_SIZE")
@@ -106,7 +106,12 @@ GRID_TO_MESH="perf record -o /tmp/out.perf grid_to_mesh"
 
 export SFEM_INTERPOLATE=0
 export SFEM_READ_FP32=1
-export SFEM_ADJOINT=1
+# export SFEM_ADJOINT=1
+
+
+export SFEM_ADJOINT=0
+export SFEM_TEST_CCELL=1
+export ENABLE_NORMALIZE_MESH_FLAG=1
 
 export SFEM_CLUSTER_SIZE=${SFEM_CLUSTER_SIZE:-32}
 
