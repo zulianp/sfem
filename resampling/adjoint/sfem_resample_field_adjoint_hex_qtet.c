@@ -700,9 +700,10 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                     data[base_index + off7] += hex_element_field[7];  //
 
                     // Check if any data values exceed 1.3
-                    if (data[base_index + off0] > 1.3 || data[base_index + off1] > 1.3 || data[base_index + off2] > 1.3 ||  //
-                        data[base_index + off3] > 1.3 || data[base_index + off4] > 1.3 || data[base_index + off5] > 1.3 ||  //
-                        data[base_index + off6] > 1.3 || data[base_index + off7] > 1.3) {                                   //
+                    if (false &&
+                        (data[base_index + off0] > 1.3 || data[base_index + off1] > 1.3 || data[base_index + off2] > 1.3 ||  //
+                         data[base_index + off3] > 1.3 || data[base_index + off4] > 1.3 || data[base_index + off5] > 1.3 ||  //
+                         data[base_index + off6] > 1.3 || data[base_index + off7] > 1.3)) {                                  //
 
                         fprintf(stdout,
                                 "WARNING: xxxxxxxx data value exceeds 1.3 at element indices (base_index=%td, i=%d, j=%d, k=%d)",
@@ -1075,9 +1076,9 @@ tet4_resample_field_adjoint_tet_norm_step2h(const real_t                    x0_n
                 data[base_index + off7] += hex_element_field[7];  //
 
                 // Check if any data values exceed 1.0
-                if (data[base_index + off0] > 1.0 || data[base_index + off1] > 1.0 || data[base_index + off2] > 1.0 ||
-                    data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
-                    data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0) {
+                if (false && (data[base_index + off0] > 1.0 || data[base_index + off1] > 1.0 || data[base_index + off2] > 1.0 ||
+                              data[base_index + off3] > 1.0 || data[base_index + off4] > 1.0 || data[base_index + off5] > 1.0 ||
+                              data[base_index + off6] > 1.0 || data[base_index + off7] > 1.0)) {
                     fprintf(stdout,
                             "WARNING: xxxxxxxx data value exceeds 1.0 at element indices (base_index=%td, i=%d, j=%d, k=%d) ",
                             base_index,
