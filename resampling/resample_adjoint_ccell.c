@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "cell_list_bench.h"
 #include "cell_tet2box.h"
 #include "resampling_utils.h"
 #include "sfem_base.h"
@@ -181,6 +182,10 @@ int main_test_ccell(int argc, char* argv[]) {  //
     if (mpi_rank == 0) {
         printf("Cell list memory usage: %g Mbytes\n", (double)(cell_map_bytes) / (1024 * 1024));
     }  // END if (mpi_rank == 0)
+
+    // query_cell_list_test(cell_list_map, bounding_boxes_ptr, 1000);
+
+    query_cell_list_given_xy_test(cell_list_map, bounding_boxes_ptr, 200, 1000);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
     // Finalize mesh and other data structures or arrays.

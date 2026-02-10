@@ -34,7 +34,7 @@ mesh=mesh
 refine torus torus2
 refine torus2 torus3
 refine torus3 torus4
-mesh=${SFEM_TORUS_MESH:-torus2}
+mesh=${SFEM_TORUS_MESH:-torus4}
 # mesh=impeller_tet4
 
 out=resampled
@@ -73,7 +73,7 @@ fi
 # sdf_test.py $sdf 500
 
 # Use HEX_SIZE environment variable if defined, otherwise use default
-SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-125}
+SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-800}
 sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(head -3 metadata_sdf.float32.yml 			  | awk '{print $2}' | tr '\n' ' ')
