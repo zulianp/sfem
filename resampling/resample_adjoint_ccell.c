@@ -137,7 +137,12 @@ int main_test_ccell(int argc, char* argv[]) {  //
                                  (const geom_t**)mesh.points,   //
                                  &bounding_boxes_ptr);          //
 
-    print_bounding_box_statistics(bounding_boxes_ptr);
+    bounding_box_statistics_t stats = calculate_bounding_box_statistics(bounding_boxes_ptr);
+    print_bounding_box_statistics(&stats);
+
+    side_length_histograms_t histograms = calculate_side_length_histograms(bounding_boxes_ptr, &stats, 33);
+    print_side_length_histograms(&histograms);
+    free_side_length_histograms(&histograms);
 
     if (fb_error) {
         fprintf(stderr, "Error: make_mesh_tets_boxes failed %s:%d\n", __FILE__, __LINE__);
