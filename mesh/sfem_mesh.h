@@ -5,6 +5,7 @@
 #include "sfem_defs.h"
 
 #include <mpi.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -45,6 +46,40 @@ typedef struct {
     idx_t *node_offsets;
     idx_t *ghosts;
 } mesh_t;
+
+typedef struct {
+    // This a reference to the main mesh
+    // This "calss/struct" contains only the supplementary informations.
+    mesh_t *ref_mesh;
+
+    // An array of size (ref_mesh->nelements x 9) in row-major ordering storing the inverse of the Jacobians.
+    real_t *inv_Jacobian;
+    real_t *vetices_zero;
+} mesh_tet_geom_t;
+
+/**
+ * @brief Initialize mesh_tet_geom_t structure for a given mesh
+ */
+mesh_tet_geom_t mesh_tet_geometry_init(const mesh_t *mesh);
+
+mesh_tet_geom_t *mesh_tet_geometry_alloc(const mesh_t *mesh);
+
+void mesh_tet_geometry_free(mesh_tet_geom_t *geom);
+
+void mesh_tet_geometry_compute_inv_Jacobian(mesh_tet_geom_t *geom);
+
+real_t *get_inv_Jacobian_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i);
+
+real_t *get_vertices_zero_geom(const mesh_tet_geom_t *geom, ptrdiff_t element_i);
+
+bool                                            //
+is_point_out_of_tet(const real_t inv_J_tet[9],  //
+                    const real_t tet_origin_x,  //
+                    const real_t tet_origin_y,  //
+                    const real_t tet_origin_z,  //
+                    const real_t vertex_x,      //
+                    const real_t vertex_y,      //
+                    const real_t vertex_z);     //
 
 /**
  * @brief Initialize mesh data structure to empty
