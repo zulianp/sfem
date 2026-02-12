@@ -1,44 +1,51 @@
 #ifndef SFEM_ShiftedPenalty_IMPL_HPP
 #define SFEM_ShiftedPenalty_IMPL_HPP
 
-#include "sfem_Tracer.hpp" 
+#include "sfem_Tracer.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <functional>
 #include <cstddef>
+#include <functional>
 
 namespace sfem {
 
     template <typename T>
     struct ShiftedPenalty_Tpl {
-        std::function<T(const ptrdiff_t, const T* const, T* const)> sq_norm_ramp_p;
-        std::function<T(const ptrdiff_t, const T* const, T* const)> sq_norm_ramp_m;
-        std::function<void(const ptrdiff_t n, const T, const T* const, const T* const,
-                           const T* const, T* const)>
-                ramp_p;
+        std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_p;
+        std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_m;
+        std::function<void(const ptrdiff_t n, const T, const T* const, const T* const, const T* const, T* const)> ramp_p;
 
-        std::function<void(const ptrdiff_t n, const T, const T* const, const T* const,
-                           const T* const, T* const)>
-                ramp_m;
+        std::function<void(const ptrdiff_t n, const T, const T* const, const T* const, const T* const, T* const)> ramp_m;
 
-        std::function<void(const ptrdiff_t, const T, const T* const, const T* const, T* const)>
-                update_lagr_p;
+        std::function<void(const ptrdiff_t, const T, const T* const, const T* const, T* const)> update_lagr_p;
 
-        std::function<void(const ptrdiff_t, const T, const T* const, const T* const, T* const)>
-                update_lagr_m;
+        std::function<void(const ptrdiff_t, const T, const T* const, const T* const, T* const)> update_lagr_m;
 
-        std::function<void(const ptrdiff_t, T* const, const T, const T* const, const T* const,
-                       const T* const, const T* const, T* result)>
+        std::function<void(const ptrdiff_t,
+                           T* const,
+                           const T,
+                           const T* const,
+                           const T* const,
+                           const T* const,
+                           const T* const,
+                           T* result)>
                 calc_r_pen;
 
-        std::function<void(const ptrdiff_t, const T* const, const T, const T* const, const T* const,
-                           const T* const, const T* const, T* const)>
+        std::function<void(const ptrdiff_t,
+                           const T* const,
+                           const T,
+                           const T* const,
+                           const T* const,
+                           const T* const,
+                           const T* const,
+                           T* const)>
                 calc_J_pen;
 
         bool good() const {
-            return sq_norm_ramp_p && sq_norm_ramp_m && ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
+            return sq_norm_ramp_p && sq_norm_ramp_m && ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen &&
+                   calc_J_pen;
         }
     };
 
@@ -47,7 +54,7 @@ namespace sfem {
         static void build(struct ShiftedPenalty_Tpl<T>& tpl) {
             tpl.sq_norm_ramp_p = [](const ptrdiff_t n, const T* const x, T* const ub) -> T {
                 T ret = 0;
-#pragma omp parallel for reduction(+: ret)
+#pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
                     const T diff = std::max(T(0), x[i] - ub[i]);
                     ret += diff * diff;
@@ -57,7 +64,7 @@ namespace sfem {
 
             tpl.sq_norm_ramp_m = [](const ptrdiff_t n, const T* const x, T* const lb) -> T {
                 T ret = 0;
-#pragma omp parallel for reduction(+: ret)
+#pragma omp parallel for reduction(+ : ret)
                 for (ptrdiff_t i = 0; i < n; i++) {
                     const T diff = std::min(T(0), x[i] - lb[i]);
                     ret += diff * diff;
@@ -67,63 +74,55 @@ namespace sfem {
 
             // Adds to negative gradient (i.e., residual)
             tpl.ramp_p = [](const ptrdiff_t n,
-                            const T penalty_param,
-                            const T* const x,
-                            const T* const ub,
-                            const T* const lagr_ub,
-                            T* const out) {
+                            const T         penalty_param,
+                            const T* const  x,
+                            const T* const  ub,
+                            const T* const  lagr_ub,
+                            T* const        out) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
-                    out[i] -= penalty_param *
-                              std::max(T(0), x[i] - ub[i] + lagr_ub[i] / penalty_param);
+                    out[i] -= std::max(T(0), penalty_param * (x[i] - ub[i]) + lagr_ub[i]);
                 }
             };
 
             tpl.ramp_m = [](const ptrdiff_t n,
-                            const T penalty_param,
-                            const T* const x,
-                            const T* const lb,
-                            const T* const lagr_lb,
-                            T* const out) {
+                            const T         penalty_param,
+                            const T* const  x,
+                            const T* const  lb,
+                            const T* const  lagr_lb,
+                            T* const        out) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {
-                    out[i] -= penalty_param *
-                              std::min(T(0), x[i] - lb[i] + lagr_lb[i] / penalty_param);
+                    out[i] -= std::min(T(0), penalty_param * (x[i] - lb[i]) + lagr_lb[i]);
                 }
             };
 
-            tpl.update_lagr_p = [](const ptrdiff_t n,
-                                   const T penalty_param,
-                                   const T* const x,
-                                   const T* const ub,
-                                   T* const lagr_ub) {
+            tpl.update_lagr_p =
+                    [](const ptrdiff_t n, const T penalty_param, const T* const x, const T* const ub, T* const lagr_ub) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    lagr_ub[i] = std::max(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
-                }
-            };
+                        for (ptrdiff_t i = 0; i < n; i++) {
+                            lagr_ub[i] = std::max(T(0), lagr_ub[i] + penalty_param * (x[i] - ub[i]));
+                        }
+                    };
 
-            tpl.update_lagr_m = [](const ptrdiff_t n,
-                                   const T penalty_param,
-                                   const T* const x,
-                                   const T* const lb,
-                                   T* const lagr_lb) {
+            tpl.update_lagr_m =
+                    [](const ptrdiff_t n, const T penalty_param, const T* const x, const T* const lb, T* const lagr_lb) {
 #pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    lagr_lb[i] = std::min(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
-                }
-            };
+                        for (ptrdiff_t i = 0; i < n; i++) {
+                            lagr_lb[i] = std::min(T(0), lagr_lb[i] + penalty_param * (x[i] - lb[i]));
+                        }
+                    };
 
-            auto ramp_m = tpl.ramp_m;
-            auto ramp_p = tpl.ramp_p;
+            auto ramp_m    = tpl.ramp_m;
+            auto ramp_p    = tpl.ramp_p;
             tpl.calc_r_pen = [ramp_m, ramp_p](const ptrdiff_t n,
-                                              T* const x,
-                                              const T penalty_param,
-                                              const T* const lb,
-                                              const T* const ub,
-                                              const T* const lagr_lb,
-                                              const T* const lagr_ub,
-                                              T* result) {
+                                              T* const        x,
+                                              const T         penalty_param,
+                                              const T* const  lb,
+                                              const T* const  ub,
+                                              const T* const  lagr_lb,
+                                              const T* const  lagr_ub,
+                                              T*              result) {
                 SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_r_pen");
 
                 // Ramp negative and positive parts
@@ -132,28 +131,26 @@ namespace sfem {
             };
 
             tpl.calc_J_pen = [](const ptrdiff_t n,
-                                const T* const x,
-                                const T penalty_param,
-                                const T* const lb,
-                                const T* const ub,
-                                const T* const lagr_lb,
-                                const T* const lagr_ub,
-                                T* const result) {
+                                const T* const  x,
+                                const T         penalty_param,
+                                const T* const  lb,
+                                const T* const  ub,
+                                const T* const  lagr_lb,
+                                const T* const  lagr_ub,
+                                T* const        result) {
                 SFEM_TRACE_SCOPE("OpenMP_ShiftedPenalty::calc_J_pen");
 
                 if (lb) {
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] +=
-                                ((x[i] - lb[i] + lagr_lb[i] / penalty_param) <= 0) * penalty_param;
+                        result[i] += ((penalty_param * (x[i] - lb[i]) + lagr_lb[i]) <= 0) * penalty_param;
                     }
                 }
 
                 if (ub) {
 #pragma omp parallel for
                     for (ptrdiff_t i = 0; i < n; i++) {
-                        result[i] +=
-                                ((x[i] - ub[i] + lagr_ub[i] / penalty_param) >= 0) * penalty_param;
+                        result[i] += ((penalty_param * (x[i] - ub[i]) + lagr_ub[i]) >= 0) * penalty_param;
                     }
                 }
             };
