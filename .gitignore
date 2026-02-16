@@ -255,3 +255,6 @@ workflows/resample/bench_adj/*
 
 workflows/resample/alpha_data.dat
 .python-version
+workflows/resample/side_length_histograms/x_histogram.csv
+*.csv
+workflows/resample/side_length_histograms/*.csv

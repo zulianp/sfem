@@ -22,6 +22,12 @@ typedef struct {
     real_t avg_box_side_x;
     real_t avg_box_side_y;
     real_t avg_box_side_z;
+    real_t min_x;
+    real_t min_y;
+    real_t min_z;
+    real_t max_x;
+    real_t max_y;
+    real_t max_z;
     real_t max_volume;
     real_t min_volume;
     real_t avg_volume;
