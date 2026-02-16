@@ -15,7 +15,7 @@
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 bounding_box_statistics_t  //
-calculate_bounding_box_statistics(const boxes_t* boxes) {
+calculate_bounding_box_statistics(const boxes_t *boxes) {
     bounding_box_statistics_t stats = {0};
 
     if (boxes == NULL || boxes->num_boxes <= 0) {
@@ -29,6 +29,14 @@ calculate_bounding_box_statistics(const boxes_t* boxes) {
     stats.min_box_side_x = INFINITY;
     stats.min_box_side_y = INFINITY;
     stats.min_box_side_z = INFINITY;
+
+    stats.min_x = INFINITY;
+    stats.min_y = INFINITY;
+    stats.min_z = INFINITY;
+
+    stats.max_x = -INFINITY;
+    stats.max_y = -INFINITY;
+    stats.max_z = -INFINITY;
 
     real_t sum_box_side_x = 0.0;
     real_t sum_box_side_y = 0.0;
@@ -54,6 +62,14 @@ calculate_bounding_box_statistics(const boxes_t* boxes) {
         stats.min_box_side_x = MY_MIN(stats.min_box_side_x, side_x);
         stats.min_box_side_y = MY_MIN(stats.min_box_side_y, side_y);
         stats.min_box_side_z = MY_MIN(stats.min_box_side_z, side_z);
+
+        stats.min_x = MY_MIN(stats.min_x, boxes->min_x[i]);
+        stats.min_y = MY_MIN(stats.min_y, boxes->min_y[i]);
+        stats.min_z = MY_MIN(stats.min_z, boxes->min_z[i]);
+
+        stats.max_x = MY_MAX(stats.max_x, boxes->max_x[i]);
+        stats.max_y = MY_MAX(stats.max_y, boxes->max_y[i]);
+        stats.max_z = MY_MAX(stats.max_z, boxes->max_z[i]);
 
         sum_box_side_x += side_x;
         sum_box_side_y += side_y;
@@ -92,7 +108,7 @@ calculate_bounding_box_statistics(const boxes_t* boxes) {
 // print_bounding_box_statistics
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-void print_bounding_box_statistics(const bounding_box_statistics_t* stats) {
+void print_bounding_box_statistics(const bounding_box_statistics_t *stats) {
     if (stats == NULL) {
         return;
     }  // END if (stats == NULL)
@@ -113,6 +129,21 @@ void print_bounding_box_statistics(const bounding_box_statistics_t* stats) {
            (double)stats->avg_box_side_x,
            (double)stats->avg_box_side_y,
            (double)stats->avg_box_side_z);
+
+    printf("Minimum coordinates: X=%g, Y=%g, Z=%g\n",
+           (double)stats->min_x,
+           (double)stats->min_y,
+           (double)stats->min_z);
+
+    printf("Maximum coordinates: X=%g, Y=%g, Z=%g\n",
+           (double)stats->max_x,
+           (double)stats->max_y,
+           (double)stats->max_z);
+
+    printf("Domain side lengths: dX=%g, dY=%g, dZ=%g\n",
+           (double)(stats->max_x - stats->min_x),
+           (double)(stats->max_y - stats->min_y),
+           (double)(stats->max_z - stats->min_z));
 
     printf("Largest bounding box volume: %g\n", (double)stats->max_volume);
     printf("*  Box index: %d, Sides: dX=%g, dY=%g, dZ=%g\n",
@@ -139,9 +170,7 @@ void print_bounding_box_statistics(const bounding_box_statistics_t* stats) {
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 side_length_histograms_t  //
-calculate_side_length_histograms(const boxes_t *boxes,
-                                  const bounding_box_statistics_t *stats,
-                                  const int num_classes) {
+calculate_side_length_histograms(const boxes_t *boxes, const bounding_box_statistics_t *stats, const int num_classes) {
     side_length_histograms_t histograms = {0};
 
     if (boxes == NULL || stats == NULL || num_classes <= 0) {
@@ -150,27 +179,24 @@ calculate_side_length_histograms(const boxes_t *boxes,
 
     // Initialize histograms for x, y, z dimensions
     histograms.x_histogram.num_classes = num_classes;
-    histograms.x_histogram.min_value = stats->min_box_side_x;
-    histograms.x_histogram.max_value = stats->max_box_side_x;
-    histograms.x_histogram.bin_width =
-        (stats->max_box_side_x - stats->min_box_side_x) / num_classes;
-    histograms.x_histogram.counts = (int *)malloc(num_classes * sizeof(int));
+    histograms.x_histogram.min_value   = stats->min_box_side_x;
+    histograms.x_histogram.max_value   = stats->max_box_side_x;
+    histograms.x_histogram.bin_width   = (stats->max_box_side_x - stats->min_box_side_x) / num_classes;
+    histograms.x_histogram.counts      = (int *)malloc(num_classes * sizeof(int));
     memset(histograms.x_histogram.counts, 0, num_classes * sizeof(int));
 
     histograms.y_histogram.num_classes = num_classes;
-    histograms.y_histogram.min_value = stats->min_box_side_y;
-    histograms.y_histogram.max_value = stats->max_box_side_y;
-    histograms.y_histogram.bin_width =
-        (stats->max_box_side_y - stats->min_box_side_y) / num_classes;
-    histograms.y_histogram.counts = (int *)malloc(num_classes * sizeof(int));
+    histograms.y_histogram.min_value   = stats->min_box_side_y;
+    histograms.y_histogram.max_value   = stats->max_box_side_y;
+    histograms.y_histogram.bin_width   = (stats->max_box_side_y - stats->min_box_side_y) / num_classes;
+    histograms.y_histogram.counts      = (int *)malloc(num_classes * sizeof(int));
     memset(histograms.y_histogram.counts, 0, num_classes * sizeof(int));
 
     histograms.z_histogram.num_classes = num_classes;
-    histograms.z_histogram.min_value = stats->min_box_side_z;
-    histograms.z_histogram.max_value = stats->max_box_side_z;
-    histograms.z_histogram.bin_width =
-        (stats->max_box_side_z - stats->min_box_side_z) / num_classes;
-    histograms.z_histogram.counts = (int *)malloc(num_classes * sizeof(int));
+    histograms.z_histogram.min_value   = stats->min_box_side_z;
+    histograms.z_histogram.max_value   = stats->max_box_side_z;
+    histograms.z_histogram.bin_width   = (stats->max_box_side_z - stats->min_box_side_z) / num_classes;
+    histograms.z_histogram.counts      = (int *)malloc(num_classes * sizeof(int));
     memset(histograms.z_histogram.counts, 0, num_classes * sizeof(int));
 
     // Populate histograms
@@ -180,15 +206,9 @@ calculate_side_length_histograms(const boxes_t *boxes,
         const real_t side_z = boxes->max_z[i] - boxes->min_z[i];
 
         // Calculate bin indices for x, y, z
-        int bin_x =
-            (int)((side_x - histograms.x_histogram.min_value) /
-                  histograms.x_histogram.bin_width);
-        int bin_y =
-            (int)((side_y - histograms.y_histogram.min_value) /
-                  histograms.y_histogram.bin_width);
-        int bin_z =
-            (int)((side_z - histograms.z_histogram.min_value) /
-                  histograms.z_histogram.bin_width);
+        int bin_x = (int)((side_x - histograms.x_histogram.min_value) / histograms.x_histogram.bin_width);
+        int bin_y = (int)((side_y - histograms.y_histogram.min_value) / histograms.y_histogram.bin_width);
+        int bin_z = (int)((side_z - histograms.z_histogram.min_value) / histograms.z_histogram.bin_width);
 
         // Clamp bins to valid range (handle edge case of max value)
         bin_x = (bin_x >= num_classes) ? num_classes - 1 : bin_x;
@@ -232,8 +252,7 @@ void print_side_length_histograms(const side_length_histograms_t *histograms) {
     }  // END: for i
 
     // Print X-dimension histogram
-    printf("X-dimension side lengths histogram (%d classes):\n",
-           histograms->x_histogram.num_classes);
+    printf("X-dimension side lengths histogram (%d classes):\n", histograms->x_histogram.num_classes);
     printf("Range: [%12.5e, %12.5e], Bin width: %12.5e\n",
            (double)histograms->x_histogram.min_value,
            (double)histograms->x_histogram.max_value,
@@ -242,20 +261,23 @@ void print_side_length_histograms(const side_length_histograms_t *histograms) {
     printf("-----+-----------------+-----------------+-----------+---------+-------------+--------\n");
     int cumul_x = 0;
     for (int i = 0; i < histograms->x_histogram.num_classes; i++) {
-        real_t bin_start =
-            histograms->x_histogram.min_value + i * histograms->x_histogram.bin_width;
-        real_t bin_end = bin_start + histograms->x_histogram.bin_width;
+        real_t bin_start  = histograms->x_histogram.min_value + i * histograms->x_histogram.bin_width;
+        real_t bin_end    = bin_start + histograms->x_histogram.bin_width;
         real_t percentage = (total_x > 0) ? (100.0 * histograms->x_histogram.counts[i] / total_x) : 0.0;
         cumul_x += histograms->x_histogram.counts[i];
         real_t cumul_percentage = (total_x > 0) ? (100.0 * cumul_x / total_x) : 0.0;
-        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n", i,
-               (double)bin_start, (double)bin_end, histograms->x_histogram.counts[i],
-               (double)percentage, cumul_x, (double)cumul_percentage);
+        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n",
+               i,
+               (double)bin_start,
+               (double)bin_end,
+               histograms->x_histogram.counts[i],
+               (double)percentage,
+               cumul_x,
+               (double)cumul_percentage);
     }  // END: for i
 
     // Print Y-dimension histogram
-    printf("\nY-dimension side lengths histogram (%d classes):\n",
-           histograms->y_histogram.num_classes);
+    printf("\nY-dimension side lengths histogram (%d classes):\n", histograms->y_histogram.num_classes);
     printf("Range: [%12.5e, %12.5e], Bin width: %12.5e\n",
            (double)histograms->y_histogram.min_value,
            (double)histograms->y_histogram.max_value,
@@ -264,20 +286,23 @@ void print_side_length_histograms(const side_length_histograms_t *histograms) {
     printf("-----+-----------------+-----------------+-----------+---------+-------------+--------\n");
     int cumul_y = 0;
     for (int i = 0; i < histograms->y_histogram.num_classes; i++) {
-        real_t bin_start =
-            histograms->y_histogram.min_value + i * histograms->y_histogram.bin_width;
-        real_t bin_end = bin_start + histograms->y_histogram.bin_width;
+        real_t bin_start  = histograms->y_histogram.min_value + i * histograms->y_histogram.bin_width;
+        real_t bin_end    = bin_start + histograms->y_histogram.bin_width;
         real_t percentage = (total_y > 0) ? (100.0 * histograms->y_histogram.counts[i] / total_y) : 0.0;
         cumul_y += histograms->y_histogram.counts[i];
         real_t cumul_percentage = (total_y > 0) ? (100.0 * cumul_y / total_y) : 0.0;
-        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n", i,
-               (double)bin_start, (double)bin_end, histograms->y_histogram.counts[i],
-               (double)percentage, cumul_y, (double)cumul_percentage);
+        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n",
+               i,
+               (double)bin_start,
+               (double)bin_end,
+               histograms->y_histogram.counts[i],
+               (double)percentage,
+               cumul_y,
+               (double)cumul_percentage);
     }  // END: for i
 
     // Print Z-dimension histogram
-    printf("\nZ-dimension side lengths histogram (%d classes):\n",
-           histograms->z_histogram.num_classes);
+    printf("\nZ-dimension side lengths histogram (%d classes):\n", histograms->z_histogram.num_classes);
     printf("Range: [%12.5e, %12.5e], Bin width: %12.5e\n",
            (double)histograms->z_histogram.min_value,
            (double)histograms->z_histogram.max_value,
@@ -286,15 +311,19 @@ void print_side_length_histograms(const side_length_histograms_t *histograms) {
     printf("-----+-----------------+-----------------+-----------+---------+-------------+--------\n");
     int cumul_z = 0;
     for (int i = 0; i < histograms->z_histogram.num_classes; i++) {
-        real_t bin_start =
-            histograms->z_histogram.min_value + i * histograms->z_histogram.bin_width;
-        real_t bin_end = bin_start + histograms->z_histogram.bin_width;
+        real_t bin_start  = histograms->z_histogram.min_value + i * histograms->z_histogram.bin_width;
+        real_t bin_end    = bin_start + histograms->z_histogram.bin_width;
         real_t percentage = (total_z > 0) ? (100.0 * histograms->z_histogram.counts[i] / total_z) : 0.0;
         cumul_z += histograms->z_histogram.counts[i];
         real_t cumul_percentage = (total_z > 0) ? (100.0 * cumul_z / total_z) : 0.0;
-        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n", i,
-               (double)bin_start, (double)bin_end, histograms->z_histogram.counts[i],
-               (double)percentage, cumul_z, (double)cumul_percentage);
+        printf(" %3d | %15.5e | %15.5e | %9d | %7.2f | %10d | %7.2f\n",
+               i,
+               (double)bin_start,
+               (double)bin_end,
+               histograms->z_histogram.counts[i],
+               (double)percentage,
+               cumul_z,
+               (double)cumul_percentage);
     }  // END: for i
 
     printf("\n== End of Side Length Histograms ==\n\n");
@@ -333,8 +362,7 @@ void free_side_length_histograms(side_length_histograms_t *histograms) {
 // write_side_length_histograms
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
-int write_side_length_histograms(const side_length_histograms_t *histograms,
-                                 const char *output_dir) {
+int write_side_length_histograms(const side_length_histograms_t *histograms, const char *output_dir) {
     if (histograms == NULL || output_dir == NULL) {
         return EXIT_FAILURE;
     }  // END if (histograms == NULL || output_dir == NULL)
@@ -361,11 +389,12 @@ int write_side_length_histograms(const side_length_histograms_t *histograms,
         int cumul_x = 0;
         for (int i = 0; i < histograms->x_histogram.num_classes; i++) {
             real_t bin_start = histograms->x_histogram.min_value + i * histograms->x_histogram.bin_width;
-            real_t bin_end = bin_start + histograms->x_histogram.bin_width;
-            real_t pdf = (total_x > 0) ? ((real_t)histograms->x_histogram.counts[i] / total_x) : 0.0;
+            real_t bin_end   = bin_start + histograms->x_histogram.bin_width;
+            real_t pdf       = (total_x > 0) ? ((real_t)histograms->x_histogram.counts[i] / total_x) : 0.0;
             cumul_x += histograms->x_histogram.counts[i];
             real_t cdf = (total_x > 0) ? ((real_t)cumul_x / total_x) : 0.0;
-            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+            fprintf(fp,
+                    "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
                     (double)bin_start,
                     (double)bin_end,
                     (double)pdf,
@@ -390,11 +419,12 @@ int write_side_length_histograms(const side_length_histograms_t *histograms,
         int cumul_y = 0;
         for (int i = 0; i < histograms->y_histogram.num_classes; i++) {
             real_t bin_start = histograms->y_histogram.min_value + i * histograms->y_histogram.bin_width;
-            real_t bin_end = bin_start + histograms->y_histogram.bin_width;
-            real_t pdf = (total_y > 0) ? ((real_t)histograms->y_histogram.counts[i] / total_y) : 0.0;
+            real_t bin_end   = bin_start + histograms->y_histogram.bin_width;
+            real_t pdf       = (total_y > 0) ? ((real_t)histograms->y_histogram.counts[i] / total_y) : 0.0;
             cumul_y += histograms->y_histogram.counts[i];
             real_t cdf = (total_y > 0) ? ((real_t)cumul_y / total_y) : 0.0;
-            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+            fprintf(fp,
+                    "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
                     (double)bin_start,
                     (double)bin_end,
                     (double)pdf,
@@ -419,11 +449,12 @@ int write_side_length_histograms(const side_length_histograms_t *histograms,
         int cumul_z = 0;
         for (int i = 0; i < histograms->z_histogram.num_classes; i++) {
             real_t bin_start = histograms->z_histogram.min_value + i * histograms->z_histogram.bin_width;
-            real_t bin_end = bin_start + histograms->z_histogram.bin_width;
-            real_t pdf = (total_z > 0) ? ((real_t)histograms->z_histogram.counts[i] / total_z) : 0.0;
+            real_t bin_end   = bin_start + histograms->z_histogram.bin_width;
+            real_t pdf       = (total_z > 0) ? ((real_t)histograms->z_histogram.counts[i] / total_z) : 0.0;
             cumul_z += histograms->z_histogram.counts[i];
             real_t cdf = (total_z > 0) ? ((real_t)cumul_z / total_z) : 0.0;
-            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+            fprintf(fp,
+                    "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
                     (double)bin_start,
                     (double)bin_end,
                     (double)pdf,
@@ -451,16 +482,16 @@ int                                                                     //
 make_mesh_tets_boxes(const ptrdiff_t                    start_element,  //
                      const ptrdiff_t                    end_element,    //
                      const ptrdiff_t                    nnodes,         //
-                     const idx_t** const SFEM_RESTRICT  elems,          //
-                     const geom_t** const SFEM_RESTRICT xyz,            //
-                     boxes_t**                          boxes) {                                 //
+                     const idx_t **const SFEM_RESTRICT  elems,          //
+                     const geom_t **const SFEM_RESTRICT xyz,            //
+                     boxes_t                          **boxes) {                                 //
 
     PRINT_CURRENT_FUNCTION;
 
     const ptrdiff_t num_elements = end_element - start_element;
 
     // Allocate memory for boxes
-    boxes_t* const SFEM_RESTRICT boxes_loc_ptr = allocate_boxes_t((int)num_elements);
+    boxes_t *const SFEM_RESTRICT boxes_loc_ptr = allocate_boxes_t((int)num_elements);
 
     for (ptrdiff_t element_i = start_element; element_i < end_element; element_i++) {
         idx_t ev[4];
@@ -469,7 +500,7 @@ make_mesh_tets_boxes(const ptrdiff_t                    start_element,  //
             ev[v] = elems[v][element_i];
         }  // END: for vq
 
-#if SFEM_LOG_LEVEL >= 5
+#if SFEM_LOG_LEVEL > 5
         if (element_i % 1000000 == 0) {
             printf("*** Processing element %td / %td \n", element_i, end_element);
         }
@@ -512,10 +543,10 @@ make_mesh_tets_boxes(const ptrdiff_t                    start_element,  //
 
     }  // END: for element_i
 
-    *boxes = (boxes_t*)boxes_loc_ptr;
+    *boxes = (boxes_t *)boxes_loc_ptr;
 
     bounding_box_statistics_t stats = calculate_bounding_box_statistics(boxes_loc_ptr);
-    print_bounding_box_statistics(&stats);
+    // print_bounding_box_statistics(&stats);
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
 }  // END: Function: make_mesh_tets_boxes
