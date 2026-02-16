@@ -34,8 +34,12 @@ query_cell_list_3d_2d_map_mesh_given_xy(         //
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);
     // int iy = coord_to_grid_index(y, map->min_y, map->delta_y);
 
-    int ixiy[2];
-    coord_to_grid_indices((real_t[2]){x, y}, (real_t[2]){map->min_x, map->min_y}, (real_t[2]){map->delta_x, map->delta_y}, ixiy);
+    int ixiy[2];                                                    //
+    coord_to_grid_indices((real_t[2]){x, y},                        //
+                          (real_t[2]){map->min_x, map->min_y},      //
+                          (real_t[2]){map->delta_x, map->delta_y},  //
+                          ixiy);                                    //
+
     int ix = ixiy[0];
     int iy = ixiy[1];
 

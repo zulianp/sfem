@@ -1,11 +1,11 @@
 #ifndef __CELL_LIST_BENCH_H__
 #define __CELL_LIST_BENCH_H__
 
-#include "cell_list_3d_map.h"
 #include "cell_list_3d_1d_map.h"
+#include "cell_list_3d_map.h"
+#include "sfem_mesh.h"
 
-typedef struct
-{
+typedef struct {
     int num_boxes;
 
     real_t box_size_min;
@@ -40,9 +40,7 @@ int my_cmp_int(const void *a, const void *b);
  * @param num_queries Number of random queries to run
  * @return int 0 on success
  */
-int query_cell_list_bench(const cell_list_3d_2d_map_t *map,
-                          const boxes_t *boxes,
-                          const int num_queries);
+int query_cell_list_bench(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const int num_queries);
 
 /**
  * @brief Test the cell list query correctness against linear search
@@ -52,9 +50,7 @@ int query_cell_list_bench(const cell_list_3d_2d_map_t *map,
  * @param num_queries Number of random queries to run
  * @return int Total number of boxes found
  */
-int query_cell_list_test(const cell_list_3d_2d_map_t *map,
-                         const boxes_t *boxes,
-                         const int num_queries);
+int query_cell_list_test(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const int num_queries);
 
 /**
  * @brief Multithreaded benchmark of the cell list query performance
@@ -63,9 +59,7 @@ int query_cell_list_test(const cell_list_3d_2d_map_t *map,
  * @param num_queries Number of random queries to run
  * @return int 0 on success
  */
-int query_cell_list_bench_mt(const cell_list_3d_2d_map_t *map,
-                             const boxes_t *boxes,
-                             const int num_queries);
+int query_cell_list_bench_mt(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const int num_queries);
 
 /**
  * @brief Test the cell list query correctness for given x,y and multiple z values
@@ -75,10 +69,7 @@ int query_cell_list_bench_mt(const cell_list_3d_2d_map_t *map,
  * @param num_queries Total number of (x,y) queries to run
  * @return int 0 on success, EXIT_FAILURE on failure
  */
-int query_cell_list_given_xy_test(const cell_list_3d_2d_map_t *map,
-                                  const boxes_t *boxes,
-                                  const int num_z,
-                                  const int num_queries);
+int query_cell_list_given_xy_test(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const int num_z, const int num_queries);
 
 /**
  * @brief Test the cell list query correctness for given x,y and multiple z values
@@ -88,9 +79,7 @@ int query_cell_list_given_xy_test(const cell_list_3d_2d_map_t *map,
  * @param num_queries Total number of (x,y) queries to run
  * @return int 0 on success, EXIT_FAILURE on failure
  */
-int query_cell_list_given_xy_bench(const cell_list_3d_2d_map_t *map,
-                                   const boxes_t *boxes,
-                                   const int num_z,
+int query_cell_list_given_xy_bench(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const int num_z,
                                    const int num_queries);
 
 /**
@@ -105,11 +94,8 @@ int query_cell_list_given_xy_bench(const cell_list_3d_2d_map_t *map,
  * @param z_max Maximum Z coordinate of the domain
  * @param cpu_build_time_used Time taken to build the cell list
  */
-void test_single_query(cell_list_3d_2d_map_t *cell_list_map,
-                       boxes_t *boxes,
-                       real_t x_min, real_t x_max,
-                       real_t y_min, real_t y_max,
-                       real_t z_min, real_t z_max,
+void test_single_query(cell_list_3d_2d_map_t *cell_list_map,  //
+                       boxes_t *boxes, real_t x_min, real_t x_max, real_t y_min, real_t y_max, real_t z_min, real_t z_max,
                        double cpu_build_time_used);
 
 /**
@@ -128,10 +114,10 @@ int main_1D_3D(int argc, char **argv, box_config_t config);
  * @param num_queries Total number of (x,y) queries to run
  * @return int 0 on success, EXIT_FAILURE on failure
  */
-int query_cell_list_1d_3d_given_xy_test(const cell_list_3d_1d_map_t *map, //
-                                        const boxes_t *boxes,             //
-                                        const int num_z,                  //
-                                        const int num_queries);           //
+int query_cell_list_1d_3d_given_xy_test(const cell_list_3d_1d_map_t *map,    //
+                                        const boxes_t               *boxes,  //
+                                        const int                    num_z,  //
+                                        const int                    num_queries);              //
 
 /**
  * @brief Benchmark the 1D-3D cell list query performance for given x,y and multiple z values
@@ -141,10 +127,54 @@ int query_cell_list_1d_3d_given_xy_test(const cell_list_3d_1d_map_t *map, //
  * @param num_queries Total number of (x,y) queries to run
  * @return int 0 on success, EXIT_FAILURE on failure
  */
-int query_cell_list_1d_3d_given_xy_bench(const cell_list_3d_1d_map_t *map,
-                                         const boxes_t *boxes,
-                                         const int num_z,
+int query_cell_list_1d_3d_given_xy_bench(const cell_list_3d_1d_map_t *map, const boxes_t *boxes, const int num_z,
                                          const int num_queries);
 
-#endif // __CELL_LIST_BENCH_H__
+/**
+ * @brief Test the 1D-3D cell list query correctness for given x,y and multiple z values
+ * @param map The cell list data structure
+ * @param boxes The boxes data structure
+ * @param num_z Number of z values to test per (x,y) pair
+ * @param num_queries Total number of (x,y) queries to run
+ * @return int 0 on success, EXIT_FAILURE on failure
+ */
+int query_tet_cell_list_1d_3d_given_xy_test(const cell_list_3d_1d_map_t *map,        //
+                                            const boxes_t               *boxes,      //
+                                            const mesh_tet_geom_t       *mesh_geom,  //
+                                            const int                    num_z,      //
+                                            const int                    num_queries);                  //
+
+/**
+ * @brief Test the 2D-3D tet cell list query correctness for given x,y and multiple z values
+ * @param map The cell list data structure
+ * @param boxes The boxes data structure
+ * @param mesh_geom The tetrahedral mesh geometry
+ * @param num_z Number of z values to test per (x,y) pair
+ * @param num_queries Total number of (x,y) queries to run
+ * @return int Total number of boxes found
+ */
+int                                                                              //
+query_tet_cell_list_2d_3d_given_xy_test(const cell_list_3d_2d_map_t *map,        //
+                                        const boxes_t               *boxes,      //
+                                        const mesh_tet_geom_t       *mesh_geom,  //
+                                        const int                    num_z,      //
+                                        const int                    num_queries);                  //
+
+/**
+ * @brief Benchmark the 2D-3D tet cell list query performance for given x,y and multiple z values
+ * @param map The cell list data structure
+ * @param boxes The boxes data structure
+ * @param mesh_geom The tetrahedral mesh geometry
+ * @param num_z Number of z values to test per (x,y) pair
+ * @param num_queries Total number of (x,y) queries to run
+ * @return int Total number of boxes found
+ */
+int                                                                               //
+query_tet_cell_list_2d_3d_given_xy_bench(const cell_list_3d_2d_map_t *map,        //
+                                         const boxes_t               *boxes,      //
+                                         const mesh_tet_geom_t       *mesh_geom,  //
+                                         const int                    num_z,      //
+                                         const int                    num_queries);                  //
+
+#endif  // __CELL_LIST_BENCH_H__
 /////////////////////////////////////////////////

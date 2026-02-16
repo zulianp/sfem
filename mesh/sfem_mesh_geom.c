@@ -196,7 +196,9 @@ tet_inv_transform_J_mesh_geom(const real_t               *J_inv,    //
 }  // END: sfem_resample_field_adjoint_hex_quad
 
 /////////////////////////////////////////////////////////
-// is_hex_out_of_tet ////////////////////////////
+/////////////////////////////////////////////////////////
+// is_point_out_of_tet
+/////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
 bool                                            //
 is_point_out_of_tet(const real_t inv_J_tet[9],  //
@@ -218,13 +220,7 @@ is_point_out_of_tet(const real_t inv_J_tet[9],  //
     const real_t inv_J21 = inv_J_tet[7];
     const real_t inv_J22 = inv_J_tet[8];
 
-    // Track if all vertices violate each constraint
-    bool negative_x      = true;  // All ref_x < 0
-    bool negative_y      = true;  // All ref_y < 0
-    bool negative_z      = true;  // All ref_z < 0
-    bool all_outside_sum = true;  // All ref_x + ref_y + ref_z > 1
-
-    // Transform hex vertex to tet reference space
+    // Transform point to tet reference space
     const real_t dx = vertex_x - tet_origin_x;
     const real_t dy = vertex_y - tet_origin_y;
     const real_t dz = vertex_z - tet_origin_z;
@@ -233,25 +229,20 @@ is_point_out_of_tet(const real_t inv_J_tet[9],  //
     const real_t ref_y = inv_J10 * dx + inv_J11 * dy + inv_J12 * dz;
     const real_t ref_z = inv_J20 * dx + inv_J21 * dy + inv_J22 * dz;
 
-    // Update flags - a vertex that satisfies a constraint breaks that flag
-    negative_x = negative_x && (ref_x < 0.0);
-    negative_y = negative_y && (ref_y < 0.0);
-    negative_z = negative_z && (ref_z < 0.0);
+    // Check if point is inside reference tetrahedron
+    // A point is inside if: ref_x >= 0, ref_y >= 0, ref_z >= 0, and ref_x + ref_y + ref_z <= 1
+    const bool inside = (ref_x >= 0.0) &&                  //
+                        (ref_y >= 0.0) &&                  //
+                        (ref_z >= 0.0) &&                  //
+                        ((ref_x + ref_y + ref_z) <= 1.0);  //
 
-    const real_t sum_ref = ref_x + ref_y + ref_z;
-    all_outside_sum      = all_outside_sum && (sum_ref > 1.0);
-
-    // If this vertex is inside, we can early exit and say the hex is not completely outside
-    if (!negative_x && !negative_y && !negative_z && !all_outside_sum) {
-        return false;
-    } else {
-        return true;
-    }
+    // Return true if point is outside
+    return !(inside);
 
 }  // END Function: is_point_out_of_tet
 
 /////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
 // mesh_tet_geometry_compute_inv_Jacobian
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
