@@ -2,6 +2,7 @@
 #include "cell_tet2box.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -326,6 +327,120 @@ void free_side_length_histograms(side_length_histograms_t *histograms) {
     }  // END if (histograms->z_histogram.counts != NULL)
 
 }  // END Function: free_side_length_histograms
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// write_side_length_histograms
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int write_side_length_histograms(const side_length_histograms_t *histograms,
+                                 const char *output_dir) {
+    if (histograms == NULL || output_dir == NULL) {
+        return EXIT_FAILURE;
+    }  // END if (histograms == NULL || output_dir == NULL)
+
+    // Calculate totals for each dimension
+    int total_x = 0, total_y = 0, total_z = 0;
+    for (int i = 0; i < histograms->x_histogram.num_classes; i++) {
+        total_x += histograms->x_histogram.counts[i];
+        total_y += histograms->y_histogram.counts[i];
+        total_z += histograms->z_histogram.counts[i];
+    }  // END: for i
+
+    // Write X-dimension histogram
+    {
+        char filepath[4096];
+        snprintf(filepath, sizeof(filepath), "%s/x_histogram.csv", output_dir);
+        FILE *fp = fopen(filepath, "w");
+        if (fp == NULL) {
+            fprintf(stderr, "ERROR: Could not open file %s for writing\n", filepath);
+            return EXIT_FAILURE;
+        }  // END if (fp == NULL)
+
+        fprintf(fp, "Min,Max,PDF,CDF,Count,Cumul_Count\n");
+        int cumul_x = 0;
+        for (int i = 0; i < histograms->x_histogram.num_classes; i++) {
+            real_t bin_start = histograms->x_histogram.min_value + i * histograms->x_histogram.bin_width;
+            real_t bin_end = bin_start + histograms->x_histogram.bin_width;
+            real_t pdf = (total_x > 0) ? ((real_t)histograms->x_histogram.counts[i] / total_x) : 0.0;
+            cumul_x += histograms->x_histogram.counts[i];
+            real_t cdf = (total_x > 0) ? ((real_t)cumul_x / total_x) : 0.0;
+            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+                    (double)bin_start,
+                    (double)bin_end,
+                    (double)pdf,
+                    (double)cdf,
+                    histograms->x_histogram.counts[i],
+                    cumul_x);
+        }  // END: for i
+        fclose(fp);
+    }  // END write X-dimension histogram
+
+    // Write Y-dimension histogram
+    {
+        char filepath[4096];
+        snprintf(filepath, sizeof(filepath), "%s/y_histogram.csv", output_dir);
+        FILE *fp = fopen(filepath, "w");
+        if (fp == NULL) {
+            fprintf(stderr, "ERROR: Could not open file %s for writing\n", filepath);
+            return EXIT_FAILURE;
+        }  // END if (fp == NULL)
+
+        fprintf(fp, "Min,Max,PDF,CDF,Count,Cumul_Count\n");
+        int cumul_y = 0;
+        for (int i = 0; i < histograms->y_histogram.num_classes; i++) {
+            real_t bin_start = histograms->y_histogram.min_value + i * histograms->y_histogram.bin_width;
+            real_t bin_end = bin_start + histograms->y_histogram.bin_width;
+            real_t pdf = (total_y > 0) ? ((real_t)histograms->y_histogram.counts[i] / total_y) : 0.0;
+            cumul_y += histograms->y_histogram.counts[i];
+            real_t cdf = (total_y > 0) ? ((real_t)cumul_y / total_y) : 0.0;
+            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+                    (double)bin_start,
+                    (double)bin_end,
+                    (double)pdf,
+                    (double)cdf,
+                    histograms->y_histogram.counts[i],
+                    cumul_y);
+        }  // END: for i
+        fclose(fp);
+    }  // END write Y-dimension histogram
+
+    // Write Z-dimension histogram
+    {
+        char filepath[4096];
+        snprintf(filepath, sizeof(filepath), "%s/z_histogram.csv", output_dir);
+        FILE *fp = fopen(filepath, "w");
+        if (fp == NULL) {
+            fprintf(stderr, "ERROR: Could not open file %s for writing\n", filepath);
+            return EXIT_FAILURE;
+        }  // END if (fp == NULL)
+
+        fprintf(fp, "Min,Max,PDF,CDF,Count,Cumul_Count\n");
+        int cumul_z = 0;
+        for (int i = 0; i < histograms->z_histogram.num_classes; i++) {
+            real_t bin_start = histograms->z_histogram.min_value + i * histograms->z_histogram.bin_width;
+            real_t bin_end = bin_start + histograms->z_histogram.bin_width;
+            real_t pdf = (total_z > 0) ? ((real_t)histograms->z_histogram.counts[i] / total_z) : 0.0;
+            cumul_z += histograms->z_histogram.counts[i];
+            real_t cdf = (total_z > 0) ? ((real_t)cumul_z / total_z) : 0.0;
+            fprintf(fp, "%.15e,%.15e,%.15e,%.15e,%d,%d\n",
+                    (double)bin_start,
+                    (double)bin_end,
+                    (double)pdf,
+                    (double)cdf,
+                    histograms->z_histogram.counts[i],
+                    cumul_z);
+        }  // END: for i
+        fclose(fp);
+    }  // END write Z-dimension histogram
+
+    printf("Histograms written to:\n");
+    printf("  - %s/x_histogram.csv\n", output_dir);
+    printf("  - %s/y_histogram.csv\n", output_dir);
+    printf("  - %s/z_histogram.csv\n", output_dir);
+
+    RETURN_FROM_FUNCTION(EXIT_SUCCESS);
+}  // END Function: write_side_length_histograms
 
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////

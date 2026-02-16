@@ -17,8 +17,6 @@ int query_cell_list_3d_2d_map_mesh_given_xy(
         const real_t                 x,            //
         const real_t                 y,            //
         const real_t                *z_array,      //
-        const int                    size_z,       //
-        int                       ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int                        **num_boxes);                          //
+        const int                    size_z);      //
 
 #endif  // __CELL_LIST_3D_MAP_MESH_H__

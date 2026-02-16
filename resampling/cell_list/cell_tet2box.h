@@ -90,6 +90,12 @@ void print_side_length_histograms(const side_length_histograms_t *histograms);
 //////////////////////////////////////////////////////////
 void free_side_length_histograms(side_length_histograms_t *histograms);
 
+//////////////////////////////////////////////////////////
+// write_side_length_histograms
+//////////////////////////////////////////////////////////
+int write_side_length_histograms(const side_length_histograms_t *histograms,
+                                 const char *output_dir);
+
 int                                                                     //
 make_mesh_tets_boxes(const ptrdiff_t                    start_element,  // Mesh
                      const ptrdiff_t                    end_element,    //

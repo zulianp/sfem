@@ -140,9 +140,22 @@ int main_test_ccell(int argc, char* argv[]) {  //
     bounding_box_statistics_t stats = calculate_bounding_box_statistics(bounding_boxes_ptr);
     print_bounding_box_statistics(&stats);
 
-    side_length_histograms_t histograms = calculate_side_length_histograms(bounding_boxes_ptr, &stats, 33);
+    side_length_histograms_t histograms =                         //
+            calculate_side_length_histograms(bounding_boxes_ptr,  //
+                                             &stats,              //
+                                             50);                 //
     print_side_length_histograms(&histograms);
+
+    char histogram_output_dir[2048];
+    snprintf(histogram_output_dir, 2048, "%s/side_length_histograms", out_base_directory);
+    printf("Writing side length histograms to output directory: %s\n", histogram_output_dir);
+    write_side_length_histograms(&histograms, histogram_output_dir);
+
     free_side_length_histograms(&histograms);
+
+    mesh_tet_geom_t* geom = mesh_tet_geometry_alloc(&mesh);
+
+    mesh_tet_geometry_compute_inv_Jacobian(geom);
 
     if (fb_error) {
         fprintf(stderr, "Error: make_mesh_tets_boxes failed %s:%d\n", __FILE__, __LINE__);
@@ -207,9 +220,18 @@ int main_test_ccell(int argc, char* argv[]) {  //
 
     query_cell_list_given_xy_bench(cell_list_map, bounding_boxes_ptr, 500, 100000);
 
+    query_tet_cell_list_2d_3d_given_xy_bench(cell_list_map,
+                                             bounding_boxes_ptr,
+                                             geom,  //
+                                             500,
+                                             100000);
+
     //////////////////////////////////////////////////////////////////////////////////////////////////
     // Finalize mesh and other data structures or arrays.
     // Free of destroy mesh should be done after resampling since we use mesh points in resampling
+
+    mesh_tet_geometry_free(geom);
+    geom = NULL;
 
     if (bounding_boxes_ptr) {
         free_boxes_t(bounding_boxes_ptr);
