@@ -147,7 +147,7 @@ int main_test_ccell(int argc, char* argv[]) {  //
     print_side_length_histograms(&histograms);
 
     side_length_cdf_thresholds_t thresholds =                         //
-            calculate_cdf_thresholds(&histograms, 0.95, 0.95, 0.95);  //
+            calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);  //
 
     print_cdf_thresholds(&thresholds);
 
@@ -258,7 +258,13 @@ int main_test_ccell(int argc, char* argv[]) {  //
                                              500,
                                              100000);
 
-    query_cell_list_given_xy_split_test(split_map, bounding_boxes_ptr, 500, 5000);
+    // query_tet_split_cell_list_2d_3d_given_xy_test(  //
+    query_tet_cell_list_split_3d_2d_given_xy_bench(  //
+            split_map,                               //
+            bounding_boxes_ptr,                      //
+            geom,                                    //
+            500,
+            100000);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
     // Finalize mesh and other data structures or arrays.

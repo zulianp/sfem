@@ -21,6 +21,9 @@ static inline void coord_to_grid_indices(const real_t coord[2], const real_t ori
 ////////////////////////////////////////////////
 static inline int grid_to_cell_index(int ix, int iy, int num_cells_x) { return ix + iy * num_cells_x; }
 
+////////////////////////////////////////////////
+// query_cell_list_3d_2d_map_mesh_given_xy
+////////////////////////////////////////////////
 int                                              //
 query_cell_list_3d_2d_map_mesh_given_xy(         //
         const cell_list_3d_2d_map_t *map,        //
@@ -122,4 +125,40 @@ query_cell_list_3d_2d_map_mesh_given_xy(         //
     }  // END: if (num_boxes_local > 0)
 
     return -1;  // If not tet found containing the point, return -1 or a negative value to indicate not found.
+}
+
+//////////////////////////////////////////////////
+// query_cell_list_3d_2d_split_map_mesh_given_xy
+//////////////////////////////////////////////////
+int query_cell_list_3d_2d_split_map_mesh_given_xy(const cell_list_split_3d_2d_map_t *map,        //
+                                                  const boxes_t                     *boxes,      //
+                                                  const mesh_tet_geom_t             *mesh_geom,  //
+                                                  const real_t                       x,          //
+                                                  const real_t                       y,          //
+                                                  const real_t                      *z_array,    //
+                                                  const int                          size_z) {                            //
+
+    if (map == NULL || boxes == NULL || mesh_geom == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    const int tet_index =                                            //
+            query_cell_list_3d_2d_map_mesh_given_xy(map->map_lower,  //
+                                                    boxes,           //
+                                                    mesh_geom,       //
+                                                    x,               //
+                                                    y,               //
+                                                    z_array,         //
+                                                    size_z);         //
+
+    if (tet_index >= 0) return tet_index;
+
+    return                                                           //
+            query_cell_list_3d_2d_map_mesh_given_xy(map->map_upper,  //
+                                                    boxes,           //
+                                                    mesh_geom,       //
+                                                    x,               //
+                                                    y,               //
+                                                    z_array,         //
+                                                    size_z);         //
 }
