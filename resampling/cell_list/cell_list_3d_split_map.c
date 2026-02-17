@@ -272,25 +272,26 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
     map_upper->max_z = z_max;
 
     for (int i = 0; i < num_boxes; i++) {
-        if (box_min_x[i] < split_x && box_min_y[i] < split_y) {
-            real_t dx = fabs(box_max_x[i] - box_min_x[i]);
-            real_t dy = fabs(box_max_y[i] - box_min_y[i]);
-            real_t dz = fabs(box_max_z[i] - box_min_z[i]);
+        real_t dx = fabs(box_max_x[i] - box_min_x[i]);
+        real_t dy = fabs(box_max_y[i] - box_min_y[i]);
+        real_t dz = fabs(box_max_z[i] - box_min_z[i]);
 
+        if (dx < split_x && dy < split_y) {
             if (dx > max_delta_lower_x) max_delta_lower_x = dx;
             if (dy > max_delta_lower_y) max_delta_lower_y = dy;
             if (dz > max_delta_lower_z) max_delta_lower_z = dz;
 
         } else {
-            real_t dx = fabs(box_max_x[i] - box_min_x[i]);
-            real_t dy = fabs(box_max_y[i] - box_min_y[i]);
-            real_t dz = fabs(box_max_z[i] - box_min_z[i]);
-
             if (dx > map_upper->delta_x) map_upper->delta_x = dx;
             if (dy > map_upper->delta_y) map_upper->delta_y = dy;
             if (dz > map_upper->delta_z) map_upper->delta_z = dz;
         }
     }
+
+    // Assign computed max deltas to map_lower
+    map_lower->delta_x = max_delta_lower_x;
+    map_lower->delta_y = max_delta_lower_y;
+    map_lower->delta_z = max_delta_lower_z;
 
     map_lower->num_cells_x = (int)ceil((x_max - x_min) / map_lower->delta_x);
     map_lower->num_cells_y = (int)ceil((y_max - y_min) / map_lower->delta_y);
@@ -323,7 +324,11 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
 #endif
 
     for (int i = 0; i < num_boxes; i++) {
-        if (box_min_x[i] < split_x && box_min_y[i] < split_y) {
+        real_t dx = fabs(box_max_x[i] - box_min_x[i]);
+        real_t dy = fabs(box_max_y[i] - box_min_y[i]);
+        real_t dz = fabs(box_max_z[i] - box_min_z[i]);
+
+        if (dx < split_x && dy < split_y) {
             increment_cell_counts_for_box(map_lower, box_min_x[i], box_min_y[i], box_max_x[i], box_max_y[i]);
 
         } else {
@@ -350,7 +355,11 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
 
     // Fill the cell dictionary array
     for (int i = 0; i < num_boxes; i++) {
-        if (box_min_x[i] < split_x && box_min_y[i] < split_y) {
+        real_t dx = fabs(box_max_x[i] - box_min_x[i]);
+        real_t dy = fabs(box_max_y[i] - box_min_y[i]);
+        real_t dz = fabs(box_max_z[i] - box_min_z[i]);
+
+        if (dx < split_x && dy < split_y) {
             fill_cell_dict_for_box(map_lower,
                                    current_count_lower,
                                    i,
