@@ -130,15 +130,9 @@ void print_bounding_box_statistics(const bounding_box_statistics_t *stats) {
            (double)stats->avg_box_side_y,
            (double)stats->avg_box_side_z);
 
-    printf("Minimum coordinates: X=%g, Y=%g, Z=%g\n",
-           (double)stats->min_x,
-           (double)stats->min_y,
-           (double)stats->min_z);
+    printf("Minimum coordinates: X=%g, Y=%g, Z=%g\n", (double)stats->min_x, (double)stats->min_y, (double)stats->min_z);
 
-    printf("Maximum coordinates: X=%g, Y=%g, Z=%g\n",
-           (double)stats->max_x,
-           (double)stats->max_y,
-           (double)stats->max_z);
+    printf("Maximum coordinates: X=%g, Y=%g, Z=%g\n", (double)stats->max_x, (double)stats->max_y, (double)stats->max_z);
 
     printf("Domain side lengths: dX=%g, dY=%g, dZ=%g\n",
            (double)(stats->max_x - stats->min_x),
@@ -472,6 +466,90 @@ int write_side_length_histograms(const side_length_histograms_t *histograms, con
 
     RETURN_FROM_FUNCTION(EXIT_SUCCESS);
 }  // END Function: write_side_length_histograms
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// calculate_threshold_for_histogram (static helper)
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+static real_t  //
+calculate_threshold_for_histogram(const side_length_histogram_t *histogram, real_t cdf_ratio) {
+    if (histogram == NULL || histogram->counts == NULL) {
+        return 0.0;
+    }  // END if (histogram == NULL || histogram->counts == NULL)
+
+    // Calculate total count
+    int total = 0;
+    for (int i = 0; i < histogram->num_classes; i++) {
+        total += histogram->counts[i];
+    }  // END: for i
+
+    // Find threshold where CDF exceeds cdf_ratio
+    int    cumul     = 0;
+    real_t threshold = histogram->max_value;  // Default to max
+    for (int i = 0; i < histogram->num_classes; i++) {
+        cumul += histogram->counts[i];
+        real_t cdf = (total > 0) ? ((real_t)cumul / total) : 0.0;
+
+        if (cdf >= cdf_ratio) {
+            real_t bin_start = histogram->min_value + i * histogram->bin_width;
+            // Linear interpolation within the bin
+            real_t local_ratio =
+                    (cdf_ratio - (cdf - (real_t)histogram->counts[i] / total)) / ((real_t)histogram->counts[i] / total);
+            local_ratio = (local_ratio < 0.0) ? 0.0 : (local_ratio > 1.0) ? 1.0 : local_ratio;
+            threshold   = bin_start + local_ratio * histogram->bin_width;
+            break;
+        }  // END if (cdf >= cdf_ratio)
+    }  // END: for i
+
+    RETURN_FROM_FUNCTION(threshold);
+}  // END Function: calculate_threshold_for_histogram
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// calculate_cdf_thresholds
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+side_length_cdf_thresholds_t  //
+calculate_cdf_thresholds(const side_length_histograms_t *histograms, real_t cdf_ratio_x, real_t cdf_ratio_y, real_t cdf_ratio_z) {
+    side_length_cdf_thresholds_t thresholds = {0};
+
+    if (histograms == NULL) {
+        return thresholds;
+    }  // END if (histograms == NULL)
+
+    // Clamp ratios to [0, 1] range
+    cdf_ratio_x = (cdf_ratio_x < 0.0) ? 0.0 : (cdf_ratio_x > 1.0) ? 1.0 : cdf_ratio_x;
+    cdf_ratio_y = (cdf_ratio_y < 0.0) ? 0.0 : (cdf_ratio_y > 1.0) ? 1.0 : cdf_ratio_y;
+    cdf_ratio_z = (cdf_ratio_z < 0.0) ? 0.0 : (cdf_ratio_z > 1.0) ? 1.0 : cdf_ratio_z;
+
+    thresholds.cdf_ratio = cdf_ratio_x;  // Store the ratio (assuming same for all dimensions)
+
+    // Calculate thresholds for each dimension
+    thresholds.threshold_x = calculate_threshold_for_histogram(&histograms->x_histogram, cdf_ratio_x);
+    thresholds.threshold_y = calculate_threshold_for_histogram(&histograms->y_histogram, cdf_ratio_y);
+    thresholds.threshold_z = calculate_threshold_for_histogram(&histograms->z_histogram, cdf_ratio_z);
+
+    RETURN_FROM_FUNCTION(thresholds);
+}  // END Function: calculate_cdf_thresholds
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// print_cdf_thresholds
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+void print_cdf_thresholds(const side_length_cdf_thresholds_t *thresholds) {
+    if (thresholds == NULL) {
+        return;
+    }  // END if (thresholds == NULL)
+
+    printf("\n== CDF-based Thresholds (CDF ratio: %.4f) ==\n", (double)thresholds->cdf_ratio);
+    printf("Threshold X: %g\n", (double)thresholds->threshold_x);
+    printf("Threshold Y: %g\n", (double)thresholds->threshold_y);
+    printf("Threshold Z: %g\n", (double)thresholds->threshold_z);
+    printf("== End of CDF-based Thresholds ==\n\n");
+
+}  // END Function: print_cdf_thresholds
 
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////

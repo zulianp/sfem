@@ -287,6 +287,45 @@ int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
                                     const real_t                  z_max);                      //
 
 /**
+ * @brief Query the split cell list to find boxes containing a given point
+ * @param split_map Pointer to cell_list_split_3d_2d_map_t structure
+ * @param boxes Pointer to boxes_t structure containing the boxes
+ * @param x X coordinate of the query point
+ * @param y Y coordinate of the query point
+ * @param z Z coordinate of the query point
+ * @param box_indices Pointer to array of box indices that contain the point
+ * @param num_boxes Pointer to number of boxes found
+ */
+int query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map,    //
+                                    const boxes_t                     *boxes,        //
+                                    const real_t                       x,            //
+                                    const real_t                       y,            //
+                                    const real_t                       z,            //
+                                    int                              **box_indices,  //
+                                    int                               *num_boxes);                                 //
+
+/**
+ * @brief Query the split cell list to find boxes containing points with given X, Y and array of Z coordinates
+ * @param split_map Pointer to cell_list_split_3d_2d_map_t structure
+ * @param boxes Pointer to boxes_t structure containing the boxes
+ * @param x X coordinate of the query points
+ * @param y Y coordinate of the query points
+ * @param z_array Array of Z coordinates of the query points
+ * @param size_z Size of the Z coordinates array
+ * @param box_indices Pointer to array of arrays of box indices that contain the points
+ * @param num_boxes Pointer to array of number of boxes found for each Z coordinate
+ */
+int query_cell_list_3d_2d_split_map_given_xy(
+        const cell_list_split_3d_2d_map_t *split_map,    //
+        const boxes_t                     *boxes,        //
+        const real_t                       x,            //
+        const real_t                       y,            //
+        const real_t                      *z_array,      //
+        const int                          size_z,       //
+        int                             ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
+        int                              **num_boxes);
+
+/**
  * @brief Calculate the memory usage of the cell list
  * @param map Pointer to cell_list_3d_2d_map_t structure
  * @return int64_t Memory usage in bytes
