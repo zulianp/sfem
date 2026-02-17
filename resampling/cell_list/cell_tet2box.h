@@ -102,6 +102,42 @@ void free_side_length_histograms(side_length_histograms_t *histograms);
 int write_side_length_histograms(const side_length_histograms_t *histograms,
                                  const char *output_dir);
 
+//////////////////////////////////////////////////////////
+// side_length_cdf_thresholds_t
+//////////////////////////////////////////////////////////
+/**
+ * @brief Structure to hold CDF-based thresholds for side lengths
+ * Stores the side length values where CDF reaches given ratio thresholds
+ */
+typedef struct {
+    real_t threshold_x;
+    real_t threshold_y;
+    real_t threshold_z;
+    real_t cdf_ratio;  // The CDF ratio used for threshold calculation
+} side_length_cdf_thresholds_t;
+
+//////////////////////////////////////////////////////////
+// calculate_cdf_thresholds
+//////////////////////////////////////////////////////////
+/**
+ * @brief Calculate side length thresholds where CDF exceeds given ratios
+ * @param histograms Histogram data for x, y, z dimensions
+ * @param cdf_ratio_x CDF ratio for x dimension (0.0 to 1.0)
+ * @param cdf_ratio_y CDF ratio for y dimension (0.0 to 1.0)
+ * @param cdf_ratio_z CDF ratio for z dimension (0.0 to 1.0)
+ * @return Structure containing threshold values where CDF exceeds the given ratios
+ */
+side_length_cdf_thresholds_t calculate_cdf_thresholds(
+    const side_length_histograms_t *histograms,
+    real_t cdf_ratio_x,
+    real_t cdf_ratio_y,
+    real_t cdf_ratio_z);
+
+//////////////////////////////////////////////////////////
+// print_cdf_thresholds
+//////////////////////////////////////////////////////////
+void print_cdf_thresholds(const side_length_cdf_thresholds_t *thresholds);
+
 int                                                                     //
 make_mesh_tets_boxes(const ptrdiff_t                    start_element,  // Mesh
                      const ptrdiff_t                    end_element,    //

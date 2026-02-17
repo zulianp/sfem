@@ -146,6 +146,11 @@ int main_test_ccell(int argc, char* argv[]) {  //
                                              50);                 //
     print_side_length_histograms(&histograms);
 
+    side_length_cdf_thresholds_t thresholds =                         //
+            calculate_cdf_thresholds(&histograms, 0.95, 0.95, 0.95);  //
+
+    print_cdf_thresholds(&thresholds);
+
     char histogram_output_dir[2048];
     snprintf(histogram_output_dir, 2048, "%s/side_length_histograms", out_base_directory);
     printf("Writing side length histograms to output directory: %s\n", histogram_output_dir);
@@ -215,6 +220,33 @@ int main_test_ccell(int argc, char* argv[]) {  //
         printf("Cell list memory usage: %g Mbytes\n", (double)(cell_map_bytes) / (1024 * 1024));
     }  // END if (mpi_rank == 0)
 
+    printf("Building cell list Split Map\n");
+    cell_list_split_3d_2d_map_t* split_map = NULL;
+
+    build_cell_list_3d_2d_split_map(&split_map,                     //
+                                    thresholds.threshold_x,         //
+                                    thresholds.threshold_y,         //
+                                    bounding_boxes_ptr->min_x,      //
+                                    bounding_boxes_ptr->min_y,      //
+                                    bounding_boxes_ptr->min_z,      //
+                                    bounding_boxes_ptr->max_x,      //
+                                    bounding_boxes_ptr->max_y,      //
+                                    bounding_boxes_ptr->max_z,      //
+                                    bounding_boxes_ptr->num_boxes,  //
+                                    min_grid_x,                     //
+                                    max_grid_x,                     //
+                                    min_grid_y,                     //
+                                    max_grid_y,                     //
+                                    min_grid_z,                     //
+                                    max_grid_z);                    //
+
+    if (split_map == NULL) {
+        fprintf(stderr, "Error: build_cell_list_3d_2d_split_map failed %s:%d\n", __FILE__, __LINE__);
+        return EXIT_FAILURE;
+    }
+
+    printf("Cell list split map built successfully with split_x = %g and split_y = %g\n", split_map->split_x, split_map->split_y);
+
     // query_cell_list_test(cell_list_map, bounding_boxes_ptr, 1000);
     // query_cell_list_given_xy_test(cell_list_map, bounding_boxes_ptr, 500, 5000);
 
@@ -225,6 +257,8 @@ int main_test_ccell(int argc, char* argv[]) {  //
                                              geom,  //
                                              500,
                                              100000);
+
+    query_cell_list_given_xy_split_test(split_map, bounding_boxes_ptr, 500, 5000);
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
     // Finalize mesh and other data structures or arrays.
@@ -243,6 +277,8 @@ int main_test_ccell(int argc, char* argv[]) {  //
 
     free(field);
     mesh_destroy(&mesh);
+
+    free_cell_list_split_3d_2d_map(split_map);
 
     RETURN_FROM_FUNCTION(1);
 }

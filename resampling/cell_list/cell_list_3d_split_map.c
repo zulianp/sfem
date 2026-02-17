@@ -220,13 +220,11 @@ int free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map) {
 
     if (split_map->map_lower != NULL) {
         free_cell_list_3d_2d_map(split_map->map_lower);
-        free(split_map->map_lower);
         split_map->map_lower = NULL;
     }
 
     if (split_map->map_upper != NULL) {
         free_cell_list_3d_2d_map(split_map->map_upper);
-        free(split_map->map_upper);
         split_map->map_upper = NULL;
     }
 
@@ -442,4 +440,160 @@ int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
                                             y_max,                    //
                                             z_min,                    //
                                             z_max);                   //
+}
+
+////////////////////////////////////////////////
+// query_cell_list_3d_2d_split_map
+////////////////////////////////////////////////
+int query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map,    //
+                                    const boxes_t                     *boxes,        //
+                                    const real_t                       x,            //
+                                    const real_t                       y,            //
+                                    const real_t                       z,            //
+                                    int                              **box_indices,  //
+                                    int                               *num_boxes) {                                //
+    if (split_map == NULL || boxes == NULL || box_indices == NULL || num_boxes == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    int *box_indices_lower = NULL;
+    int *box_indices_upper = NULL;
+
+    int num_boxes_lower = -1;
+    int num_boxes_upper = -1;
+
+    int result_lower = query_cell_list_3d_2d_map(split_map->map_lower,  //
+                                                 boxes,
+                                                 x,
+                                                 y,
+                                                 z,
+                                                 &box_indices_lower,
+                                                 &num_boxes_lower);
+
+    int result_upper = query_cell_list_3d_2d_map(split_map->map_upper,  //
+                                                 boxes,
+                                                 x,
+                                                 y,
+                                                 z,
+                                                 &box_indices_upper,
+                                                 &num_boxes_upper);
+
+    if (result_lower != 0 || result_upper != 0) {
+        if (box_indices_lower != NULL) {
+            free(box_indices_lower);
+        }
+        if (box_indices_upper != NULL) {
+            free(box_indices_upper);
+        }
+        return -1;
+    }
+
+    *num_boxes   = num_boxes_lower + num_boxes_upper;
+    *box_indices = malloc((*num_boxes) * sizeof(int));
+
+    // Merge the results from the lower and upper maps
+    if (box_indices_lower != NULL) {
+        for (int i = 0; i < num_boxes_lower; i++) {
+            (*box_indices)[i] = box_indices_lower[i];
+        }
+        free(box_indices_lower);
+    }
+
+    if (box_indices_upper != NULL) {
+        for (int i = 0; i < num_boxes_upper; i++) {
+            (*box_indices)[num_boxes_lower + i] = box_indices_upper[i];
+        }
+        free(box_indices_upper);
+    }
+
+    return 0;
+}
+
+/////////////////////////////////////////////////
+// query_cell_list_3d_2d_split_map_given_xy
+////////////////////////////////////////////////
+int query_cell_list_3d_2d_split_map_given_xy(
+        const cell_list_split_3d_2d_map_t *split_map,    //
+        const boxes_t                     *boxes,        //
+        const real_t                       x,            //
+        const real_t                       y,            //
+        const real_t                      *z_array,      //
+        const int                          size_z,       //
+        int                             ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
+        int                              **num_boxes) {                               //
+                                                         //
+    if (split_map == NULL || boxes == NULL || box_indices == NULL || num_boxes == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    int **box_indices_lower = NULL;
+    int **box_indices_upper = NULL;
+
+    int *num_boxes_lower = NULL;
+    int *num_boxes_upper = NULL;
+
+    int result_lower =                                                //
+            query_cell_list_3d_2d_map_given_xy(split_map->map_lower,  //
+                                               boxes,                 //
+                                               x,                     //
+                                               y,                     //
+                                               z_array,               //
+                                               size_z,                //
+                                               &box_indices_lower,    //
+                                               &num_boxes_lower);     //
+
+    int result_upper =                                                //
+            query_cell_list_3d_2d_map_given_xy(split_map->map_upper,  //
+                                               boxes,                 //
+                                               x,                     //
+                                               y,                     //
+                                               z_array,               //
+                                               size_z,                //
+                                               &box_indices_upper,    //
+                                               &num_boxes_upper);     //
+
+    *num_boxes   = calloc(size_z, sizeof(int));
+    *box_indices = malloc(size_z * sizeof(int *));
+
+    for (int iz = 0; iz < size_z; iz++) {
+        int count_lower = (box_indices_lower != NULL) ? num_boxes_lower[iz] : 0;
+        int count_upper = (box_indices_upper != NULL) ? num_boxes_upper[iz] : 0;
+
+        (*num_boxes)[iz]   = count_lower + count_upper;
+        (*box_indices)[iz] = malloc((*num_boxes)[iz] * sizeof(int));
+
+        // Merge the results from the lower and upper maps for this z value
+        int idx = 0;
+        if (box_indices_lower != NULL) {
+            for (int i = 0; i < count_lower; i++) {
+                (*box_indices)[iz][idx++] = box_indices_lower[iz][i];
+            }
+            free(box_indices_lower[iz]);
+        }
+
+        if (box_indices_upper != NULL) {
+            for (int i = 0; i < count_upper; i++) {
+                (*box_indices)[iz][idx++] = box_indices_upper[iz][i];
+            }
+            free(box_indices_upper[iz]);
+        }
+    }
+
+    if (box_indices_lower != NULL) {
+        free(box_indices_lower);
+    }
+
+    if (box_indices_upper != NULL) {
+        free(box_indices_upper);
+    }
+
+    if (num_boxes_lower != NULL) {
+        free(num_boxes_lower);
+    }
+
+    if (num_boxes_upper != NULL) {
+        free(num_boxes_upper);
+    }
+
+    return 0;
 }
