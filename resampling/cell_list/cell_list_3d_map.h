@@ -216,7 +216,26 @@ cell_list_split_3d_2d_map_t *make_empty_cell_list_split_3d_2d_map(void);
  */
 int free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map);
 
-int build_cell_list_3d_2d_split_map(cell_list_3d_2d_map_t *map,        //
+/**
+ * @brief Build the 3D cell list with 2D mapping using a x and y sides length split
+ * @param split_map Pointer to cell_list_split_3d_2d_map_t structure to build
+ * @param split_x X coordinate of the split line
+ * @param split_y Y coordinate of the split line
+ * @param box_min_x Array of minimum X coordinates of boxes
+ * @param box_min_y Array of minimum Y coordinates of boxes
+ * @param box_min_z Array of minimum Z coordinates of boxes
+ * @param box_max_x Array of maximum X coordinates of boxes
+ * @param box_max_y Array of maximum Y coordinates of boxes
+ * @param box_max_z Array of maximum Z coordinates of boxes
+ * @param num_boxes Number of boxes
+ * @param x_min Minimum X coordinate of the domain
+ * @param x_max Maximum X coordinate of the domain
+ * @param y_min Minimum Y coordinate of the domain
+ */
+int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
+                                    cell_list_3d_2d_map_t *map_upper,  //
+                                    const real_t           split_x,    //
+                                    const real_t           split_y,    //
                                     const real_t          *box_min_x,  //
                                     const real_t          *box_min_y,  //
                                     const real_t          *box_min_z,  //
@@ -230,6 +249,43 @@ int build_cell_list_3d_2d_split_map(cell_list_3d_2d_map_t *map,        //
                                     const real_t           y_max,      //
                                     const real_t           z_min,      //
                                     const real_t           z_max);               //
+
+/**
+ * @brief Build the 3D cell list with 2D mapping using a x and y sides length split
+ * @param split_map Pointer to cell_list_split_3d_2d_map_t structure to build
+ * @param split_x X coordinate of the split line
+ * @param split_y Y coordinate of the split line
+ * @param box_min_x Array of minimum X coordinates of boxes
+ * @param box_min_y Array of minimum Y coordinates of boxes
+ * @param box_min_z Array of minimum Z coordinates of boxes
+ * @param box_max_x Array of maximum X coordinates of boxes
+ * @param box_max_y Array of maximum Y coordinates of boxes
+ * @param box_max_z Array of maximum Z coordinates of boxes
+ * @param num_boxes Number of boxes
+ * @param x_min Minimum X coordinate of the domain
+ * @param x_max Maximum X coordinate of the domain
+ * @param y_min Minimum Y coordinate of the domain
+ * @param y_max Maximum Y coordinate of the domain
+ * @param z_min Minimum Z coordinate of the domain
+ * @param z_max Maximum Z coordinate of the domain
+ */
+int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
+                                    const real_t                  split_x,    //
+                                    const real_t                  split_y,    //
+                                    const real_t                 *box_min_x,  //
+                                    const real_t                 *box_min_y,  //
+                                    const real_t                 *box_min_z,  //
+                                    const real_t                 *box_max_x,  //
+                                    const real_t                 *box_max_y,  //
+                                    const real_t                 *box_max_z,  //
+                                    const int                     num_boxes,  //
+                                    const real_t                  x_min,      //
+                                    const real_t                  x_max,      //
+                                    const real_t                  y_min,      //
+                                    const real_t                  y_max,      //
+                                    const real_t                  z_min,      //
+                                    const real_t                  z_max);                      //
+
 /**
  * @brief Calculate the memory usage of the cell list
  * @param map Pointer to cell_list_3d_2d_map_t structure
