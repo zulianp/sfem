@@ -160,6 +160,44 @@ void print_bounding_box_statistics(const bounding_box_statistics_t *stats) {
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
+// write_domain_side_lengths
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+int write_domain_side_lengths(const bounding_box_statistics_t *stats, const char *output_dir) {
+    if (stats == NULL || output_dir == NULL) {
+        fprintf(stderr, "ERROR: Invalid arguments to write_domain_side_lengths\n");
+        RETURN_FROM_FUNCTION(EXIT_FAILURE);
+    }  // END if (stats == NULL || output_dir == NULL)
+
+    // Construct file path with default filename
+    char filepath[4096];
+    snprintf(filepath, sizeof(filepath), "%s/domain_side_lengths.csv", output_dir);
+
+    FILE *fp = fopen(filepath, "w");
+    if (fp == NULL) {
+        fprintf(stderr, "ERROR: Could not open file %s for writing\n", filepath);
+        RETURN_FROM_FUNCTION(EXIT_FAILURE);
+    }  // END if (fp == NULL)
+
+    // Write header
+    fprintf(fp, "x,y,z\n");
+
+    // Calculate and write domain side lengths
+    const real_t domain_x = stats->max_x - stats->min_x;
+    const real_t domain_y = stats->max_y - stats->min_y;
+    const real_t domain_z = stats->max_z - stats->min_z;
+
+    fprintf(fp, "%.15e,%.15e,%.15e\n", (double)domain_x, (double)domain_y, (double)domain_z);
+
+    fclose(fp);
+
+    printf("Domain side lengths written to: %s\n", filepath);
+
+    RETURN_FROM_FUNCTION(EXIT_SUCCESS);
+}  // END Function: write_domain_side_lengths
+
+//////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
 // calculate_side_length_histograms
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
