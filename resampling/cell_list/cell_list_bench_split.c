@@ -454,6 +454,14 @@ query_tet_cell_list_split_3d_2d_given_xy_bench(const cell_list_split_3d_2d_map_t
     printf("Cumulative query time: %.6e seconds\n", total_time_s);
     printf("Average time per query: %.6f us\n", avg_time_per_query_us);
     printf("Queries per second: %.2f K queries/s\n", (double)effective_num_queries / total_elapsed_s / 1000.0);
+    printf("<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us "
+           "</split_results_headers>\n");
+    printf("<split_results> %.6e, %d, %d, %d, %.6e </split_results>\n",
+           total_elapsed_s,
+           effective_num_queries,
+           num_z,
+           total_boxes_found,
+           avg_time_per_query_us);
     printf("========================================\n\n");
 
     return total_boxes_found;

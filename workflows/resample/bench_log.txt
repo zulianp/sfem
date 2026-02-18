@@ -1,0 +1,2402 @@
+refine torus torus2
+n_files (4):
+torus/i0.raw
+torus/i1.raw
+torus/i2.raw
+torus/i3.raw
+n_files (1):
+torus/x.raw
+n_files (1):
+torus/y.raw
+n_files (1):
+torus/z.raw
+build_n2e: allocating 3.7412e-05 GB
+build_n2e: allocating 0.000779456 GB
+crs_graph.c: build_n2e		0.000660452 seconds
+crs_graph.c: build nz (mem conservative) structure	0.00680318 seconds
+Writing mesh in torus2
+----------------------------------------
+refine.c: elements #coarse 48716, #fine 389728, nodes #coarse 9352, #fine 69681
+----------------------------------------
+TTS:			0.0188572 seconds
+refine torus2 torus3
+n_files (4):
+torus2/i0.raw
+torus2/i1.raw
+torus2/i2.raw
+torus2/i3.raw
+n_files (1):
+torus2/x.raw
+n_files (1):
+torus2/y.raw
+n_files (1):
+torus2/z.raw
+build_n2e: allocating 0.000278728 GB
+build_n2e: allocating 0.00623565 GB
+crs_graph.c: build_n2e		0.00609055 seconds
+crs_graph.c: build nz (mem conservative) structure	0.0511861 seconds
+Writing mesh in torus3
+----------------------------------------
+refine.c: elements #coarse 389728, #fine 3117824, nodes #coarse 69681, #fine 538134
+----------------------------------------
+TTS:			0.126771 seconds
+refine torus3 torus4
+n_files (4):
+torus3/i0.raw
+torus3/i1.raw
+torus3/i2.raw
+torus3/i3.raw
+n_files (1):
+torus3/x.raw
+n_files (1):
+torus3/y.raw
+n_files (1):
+torus3/z.raw
+build_n2e: allocating 0.00215254 GB
+build_n2e: allocating 0.0498852 GB
+crs_graph.c: build_n2e		0.0550139 seconds
+crs_graph.c: build nz (mem conservative) structure	0.424046 seconds
+Writing mesh in torus4
+----------------------------------------
+refine.c: elements #coarse 3117824, #fine 24942592, nodes #coarse 538134, #fine 4230268
+----------------------------------------
+TTS:			0.956932 seconds
+Reusing existing mesh skinned and SDF!
+sdf_test.py: ==========================================
+sdf_test.py: Writing field to sdf.float32.raw
+sdf_test.py: Using grid size D = 800 from command line argument
+sdf_test.py: Generating field of size 800 x 800 x 800
+sdf_test.py: Size of field in memory: 1.9073486328125 GB
+sdf_test.py: Zero field
+sdf_test.py: Time taken to generate field: 1.7972745895385742 seconds
+sdf_test.py: nx: 800
+sdf_test.py: ny: 800
+sdf_test.py: nz: 800
+sdf_test.py: block_size: 1
+sdf_test.py: type: float
+sdf_test.py: ox: -0.88
+sdf_test.py: oy: -0.88
+sdf_test.py: oz: -0.88
+sdf_test.py: dx: 0.0022027534418022528
+sdf_test.py: dy: 0.0022027534418022528
+sdf_test.py: dz: 0.0022027534418022528
+sdf_test.py: path: /home/simone/git/sfem_d/sfem/workflows/resample/sdf.float32.raw
+sdf_test.py: ==========================================
+sdf_test.py: Writing metadata file to .//metadata_sdf.float32.yml
+800 800 800
+-0.88 -0.88 -0.88
+0.0022027534418022528 0.0022027534418022528 0.0022027534418022528
+Running in forward mode
+Running resampling from grid to mesh...
+  Sizes:       800 800 800 
+  Origins:     -0.88 -0.88 -0.88 
+  Scaling:     0.0022027534418022528 0.0022027534418022528 0.0022027534418022528 
+  SDF:         sdf.float32.raw
+  Target mesh: sorted
+  Field:       field.raw
+[32m
+Enter Function[0m: [33mmain[0m, file: /home/simone/git/sfem_d/sfem/drivers/resampling/grid_to_mesh.c:39
+[32m
+Enter Function[0m: [33mmain_test_ccell[0m, file: /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:162
+========================================
+Starting sfem_resample_field_ccell test
+========================================
+
+<sizeof_real_t> 8
+[31m
+Return from function[0m: [33mget_output_base_directory[0m, file: /home/simone/git/sfem_d/sfem/resampling/resampling_utils.c:125
+Using SFEM_OUT_BASE_DIRECTORY: /home/simone/git/sfem_d/sfem/workflows/resample
+Using: mesh_fun_ones
+[31m
+Return from function[0m: [33mprint_mesh_function_name[0m, file: /home/simone/git/sfem_d/sfem/resampling/resampling_utils.c:613
+argc: 15
+argv: 
+ grid_to_mesh 800 800 800 -0.88 -0.88 -0.88 0.0022027534418022528 0.0022027534418022528 0.0022027534418022528 sdf.float32.raw sorted field.raw TET4 CUDA
+[31m
+Return from function[0m: [33mprint_command_line_arguments[0m, file: /home/simone/git/sfem_d/sfem/resampling/resampling_utils.c:90
+Found TET4 in argv[13]
+[31m
+Return from function[0m: [33mparse_element_type_from_args[0m, file: /home/simone/git/sfem_d/sfem/resampling/resampling_utils.c:111
+info.element_type = TET4,    /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:244
+Reading mesh from folder: sorted
+n_files (4):
+sorted/i0.raw
+sorted/i1.raw
+sorted/i2.raw
+sorted/i3.raw
+n_files (1):
+sorted/x.raw
+n_files (1):
+sorted/y.raw
+n_files (1):
+sorted/z.raw
+nlocal: 800 800 800, /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:271
+[32m
+Enter Function[0m: [33mmake_mesh_tets_boxes[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:605
+[31m
+Return from function[0m: [33mcalculate_bounding_box_statistics[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:103
+[31m
+Return from function[0m: [33mmake_mesh_tets_boxes[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:667
+[31m
+Return from function[0m: [33mcalculate_bounding_box_statistics[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:103
+
+== Bounding box statistics: ==
+Largest bounding box sides: dX=0.053638, dY=0.050266, dZ=0.0570944
+Smallest bounding box sides: dX=0.000738651, dY=0.000426233, dZ=0.000681132
+Average bounding box sides: dX=0.00458421, dY=0.00451159, dZ=0.0045558
+Minimum coordinates: X=-0.7, Y=-0.692794, Z=-0.2
+Maximum coordinates: X=0.699441, Y=0.699562, Z=0.2
+Domain side lengths: dX=1.39944, dY=1.39236, dZ=0.4
+Largest bounding box volume: 2.90687e-05
+*  Box index: 11835808, Sides: dX=0.0294583, dY=0.029465, dZ=0.0334896
+Smallest bounding box volume: 3.34679e-09
+*  Box index: 21800103, Sides: dX=0.00199685, dY=0.000426233, dZ=0.00393222
+Average bounding box volume: 1.57997e-07
+Volume ratio (max/min): 8685.54
+
+== End of Bounding box statistics: ==
+
+[31m
+Return from function[0m: [33mcalculate_side_length_histograms[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:263
+
+== Side Length Histograms ==
+
+X-dimension side lengths histogram (50 classes):
+Range: [ 7.38651e-04,  5.36380e-02], Bin width:  1.05799e-03
+ Bin |      Min        |      Max        |    Count  |    %   | Cumul Count | Cumul %
+-----+-----------------+-----------------+-----------+---------+-------------+--------
+   0 |     7.38651e-04 |     1.79664e-03 |    138282 |    0.55 |     138282 |    0.55
+   1 |     1.79664e-03 |     2.85462e-03 |   2843634 |   11.40 |    2981916 |   11.96
+   2 |     2.85462e-03 |     3.91261e-03 |   8374917 |   33.58 |   11356833 |   45.53
+   3 |     3.91261e-03 |     4.97060e-03 |   6455213 |   25.88 |   17812046 |   71.41
+   4 |     4.97060e-03 |     6.02858e-03 |   3349254 |   13.43 |   21161300 |   84.84
+   5 |     6.02858e-03 |     7.08657e-03 |   1938688 |    7.77 |   23099988 |   92.61
+   6 |     7.08657e-03 |     8.14455e-03 |    856384 |    3.43 |   23956372 |   96.05
+   7 |     8.14455e-03 |     9.20254e-03 |    282024 |    1.13 |   24238396 |   97.18
+   8 |     9.20254e-03 |     1.02605e-02 |    120236 |    0.48 |   24358632 |   97.66
+   9 |     1.02605e-02 |     1.13185e-02 |     89988 |    0.36 |   24448620 |   98.02
+  10 |     1.13185e-02 |     1.23765e-02 |     81390 |    0.33 |   24530010 |   98.35
+  11 |     1.23765e-02 |     1.34345e-02 |     65602 |    0.26 |   24595612 |   98.61
+  12 |     1.34345e-02 |     1.44925e-02 |     61590 |    0.25 |   24657202 |   98.86
+  13 |     1.44925e-02 |     1.55505e-02 |     54632 |    0.22 |   24711834 |   99.07
+  14 |     1.55505e-02 |     1.66084e-02 |     41850 |    0.17 |   24753684 |   99.24
+  15 |     1.66084e-02 |     1.76664e-02 |     38796 |    0.16 |   24792480 |   99.40
+  16 |     1.76664e-02 |     1.87244e-02 |     28448 |    0.11 |   24820928 |   99.51
+  17 |     1.87244e-02 |     1.97824e-02 |     24640 |    0.10 |   24845568 |   99.61
+  18 |     1.97824e-02 |     2.08404e-02 |     19952 |    0.08 |   24865520 |   99.69
+  19 |     2.08404e-02 |     2.18984e-02 |     13734 |    0.06 |   24879254 |   99.75
+  20 |     2.18984e-02 |     2.29564e-02 |     10958 |    0.04 |   24890212 |   99.79
+  21 |     2.29564e-02 |     2.40143e-02 |     11728 |    0.05 |   24901940 |   99.84
+  22 |     2.40143e-02 |     2.50723e-02 |      8884 |    0.04 |   24910824 |   99.87
+  23 |     2.50723e-02 |     2.61303e-02 |      8476 |    0.03 |   24919300 |   99.91
+  24 |     2.61303e-02 |     2.71883e-02 |      6506 |    0.03 |   24925806 |   99.93
+  25 |     2.71883e-02 |     2.82463e-02 |      3996 |    0.02 |   24929802 |   99.95
+  26 |     2.82463e-02 |     2.93043e-02 |      2984 |    0.01 |   24932786 |   99.96
+  27 |     2.93043e-02 |     3.03623e-02 |      3468 |    0.01 |   24936254 |   99.97
+  28 |     3.03623e-02 |     3.14203e-02 |      1884 |    0.01 |   24938138 |   99.98
+  29 |     3.14203e-02 |     3.24782e-02 |      1060 |    0.00 |   24939198 |   99.99
+  30 |     3.24782e-02 |     3.35362e-02 |      1644 |    0.01 |   24940842 |   99.99
+  31 |     3.35362e-02 |     3.45942e-02 |       932 |    0.00 |   24941774 |  100.00
+  32 |     3.45942e-02 |     3.56522e-02 |       282 |    0.00 |   24942056 |  100.00
+  33 |     3.56522e-02 |     3.67102e-02 |       180 |    0.00 |   24942236 |  100.00
+  34 |     3.67102e-02 |     3.77682e-02 |        76 |    0.00 |   24942312 |  100.00
+  35 |     3.77682e-02 |     3.88262e-02 |        24 |    0.00 |   24942336 |  100.00
+  36 |     3.88262e-02 |     3.98841e-02 |        82 |    0.00 |   24942418 |  100.00
+  37 |     3.98841e-02 |     4.09421e-02 |        32 |    0.00 |   24942450 |  100.00
+  38 |     4.09421e-02 |     4.20001e-02 |        82 |    0.00 |   24942532 |  100.00
+  39 |     4.20001e-02 |     4.30581e-02 |        28 |    0.00 |   24942560 |  100.00
+  40 |     4.30581e-02 |     4.41161e-02 |        12 |    0.00 |   24942572 |  100.00
+  41 |     4.41161e-02 |     4.51741e-02 |         8 |    0.00 |   24942580 |  100.00
+  42 |     4.51741e-02 |     4.62321e-02 |         0 |    0.00 |   24942580 |  100.00
+  43 |     4.62321e-02 |     4.72900e-02 |         4 |    0.00 |   24942584 |  100.00
+  44 |     4.72900e-02 |     4.83480e-02 |         0 |    0.00 |   24942584 |  100.00
+  45 |     4.83480e-02 |     4.94060e-02 |         0 |    0.00 |   24942584 |  100.00
+  46 |     4.94060e-02 |     5.04640e-02 |         0 |    0.00 |   24942584 |  100.00
+  47 |     5.04640e-02 |     5.15220e-02 |         0 |    0.00 |   24942584 |  100.00
+  48 |     5.15220e-02 |     5.25800e-02 |         0 |    0.00 |   24942584 |  100.00
+  49 |     5.25800e-02 |     5.36380e-02 |         8 |    0.00 |   24942592 |  100.00
+
+Y-dimension side lengths histogram (50 classes):
+Range: [ 4.26233e-04,  5.02660e-02], Bin width:  9.96796e-04
+ Bin |      Min        |      Max        |    Count  |    %   | Cumul Count | Cumul %
+-----+-----------------+-----------------+-----------+---------+-------------+--------
+   0 |     4.26233e-04 |     1.42303e-03 |     20866 |    0.08 |      20866 |    0.08
+   1 |     1.42303e-03 |     2.41982e-03 |   1094355 |    4.39 |    1115221 |    4.47
+   2 |     2.41982e-03 |     3.41662e-03 |   6330983 |   25.38 |    7446204 |   29.85
+   3 |     3.41662e-03 |     4.41342e-03 |   8272118 |   33.16 |   15718322 |   63.02
+   4 |     4.41342e-03 |     5.41021e-03 |   4004226 |   16.05 |   19722548 |   79.07
+   5 |     5.41021e-03 |     6.40701e-03 |   2523958 |   10.12 |   22246506 |   89.19
+   6 |     6.40701e-03 |     7.40380e-03 |   1313722 |    5.27 |   23560228 |   94.46
+   7 |     7.40380e-03 |     8.40060e-03 |    486600 |    1.95 |   24046828 |   96.41
+   8 |     8.40060e-03 |     9.39739e-03 |    211670 |    0.85 |   24258498 |   97.26
+   9 |     9.39739e-03 |     1.03942e-02 |     97406 |    0.39 |   24355904 |   97.65
+  10 |     1.03942e-02 |     1.13910e-02 |     74452 |    0.30 |   24430356 |   97.95
+  11 |     1.13910e-02 |     1.23878e-02 |     75350 |    0.30 |   24505706 |   98.25
+  12 |     1.23878e-02 |     1.33846e-02 |     76144 |    0.31 |   24581850 |   98.55
+  13 |     1.33846e-02 |     1.43814e-02 |     60718 |    0.24 |   24642568 |   98.80
+  14 |     1.43814e-02 |     1.53782e-02 |     57658 |    0.23 |   24700226 |   99.03
+  15 |     1.53782e-02 |     1.63750e-02 |     42344 |    0.17 |   24742570 |   99.20
+  16 |     1.63750e-02 |     1.73718e-02 |     39360 |    0.16 |   24781930 |   99.36
+  17 |     1.73718e-02 |     1.83686e-02 |     28516 |    0.11 |   24810446 |   99.47
+  18 |     1.83686e-02 |     1.93653e-02 |     23428 |    0.09 |   24833874 |   99.56
+  19 |     1.93653e-02 |     2.03621e-02 |     17854 |    0.07 |   24851728 |   99.64
+  20 |     2.03621e-02 |     2.13589e-02 |     14352 |    0.06 |   24866080 |   99.69
+  21 |     2.13589e-02 |     2.23557e-02 |     16376 |    0.07 |   24882456 |   99.76
+  22 |     2.23557e-02 |     2.33525e-02 |     11390 |    0.05 |   24893846 |   99.80
+  23 |     2.33525e-02 |     2.43493e-02 |      9548 |    0.04 |   24903394 |   99.84
+  24 |     2.43493e-02 |     2.53461e-02 |      7432 |    0.03 |   24910826 |   99.87
+  25 |     2.53461e-02 |     2.63429e-02 |      6964 |    0.03 |   24917790 |   99.90
+  26 |     2.63429e-02 |     2.73397e-02 |      6226 |    0.02 |   24924016 |   99.93
+  27 |     2.73397e-02 |     2.83365e-02 |      4674 |    0.02 |   24928690 |   99.94
+  28 |     2.83365e-02 |     2.93333e-02 |      3952 |    0.02 |   24932642 |   99.96
+  29 |     2.93333e-02 |     3.03301e-02 |      2390 |    0.01 |   24935032 |   99.97
+  30 |     3.03301e-02 |     3.13269e-02 |      2378 |    0.01 |   24937410 |   99.98
+  31 |     3.13269e-02 |     3.23237e-02 |      1338 |    0.01 |   24938748 |   99.98
+  32 |     3.23237e-02 |     3.33205e-02 |       856 |    0.00 |   24939604 |   99.99
+  33 |     3.33205e-02 |     3.43173e-02 |      1106 |    0.00 |   24940710 |   99.99
+  34 |     3.43173e-02 |     3.53141e-02 |       948 |    0.00 |   24941658 |  100.00
+  35 |     3.53141e-02 |     3.63109e-02 |       468 |    0.00 |   24942126 |  100.00
+  36 |     3.63109e-02 |     3.73077e-02 |       164 |    0.00 |   24942290 |  100.00
+  37 |     3.73077e-02 |     3.83045e-02 |        94 |    0.00 |   24942384 |  100.00
+  38 |     3.83045e-02 |     3.93013e-02 |        56 |    0.00 |   24942440 |  100.00
+  39 |     3.93013e-02 |     4.02981e-02 |        44 |    0.00 |   24942484 |  100.00
+  40 |     4.02981e-02 |     4.12949e-02 |        28 |    0.00 |   24942512 |  100.00
+  41 |     4.12949e-02 |     4.22916e-02 |        12 |    0.00 |   24942524 |  100.00
+  42 |     4.22916e-02 |     4.32884e-02 |        16 |    0.00 |   24942540 |  100.00
+  43 |     4.32884e-02 |     4.42852e-02 |        16 |    0.00 |   24942556 |  100.00
+  44 |     4.42852e-02 |     4.52820e-02 |         4 |    0.00 |   24942560 |  100.00
+  45 |     4.52820e-02 |     4.62788e-02 |         4 |    0.00 |   24942564 |  100.00
+  46 |     4.62788e-02 |     4.72756e-02 |        12 |    0.00 |   24942576 |  100.00
+  47 |     4.72756e-02 |     4.82724e-02 |         8 |    0.00 |   24942584 |  100.00
+  48 |     4.82724e-02 |     4.92692e-02 |         0 |    0.00 |   24942584 |  100.00
+  49 |     4.92692e-02 |     5.02660e-02 |         8 |    0.00 |   24942592 |  100.00
+
+Z-dimension side lengths histogram (50 classes):
+Range: [ 6.81132e-04,  5.70944e-02], Bin width:  1.12826e-03
+ Bin |      Min        |      Max        |    Count  |    %   | Cumul Count | Cumul %
+-----+-----------------+-----------------+-----------+---------+-------------+--------
+   0 |     6.81132e-04 |     1.80940e-03 |    149884 |    0.60 |     149884 |    0.60
+   1 |     1.80940e-03 |     2.93766e-03 |   3367262 |   13.50 |    3517146 |   14.10
+   2 |     2.93766e-03 |     4.06593e-03 |   9319124 |   37.36 |   12836270 |   51.46
+   3 |     4.06593e-03 |     5.19419e-03 |   6173622 |   24.75 |   19009892 |   76.21
+   4 |     5.19419e-03 |     6.32246e-03 |   2930474 |   11.75 |   21940366 |   87.96
+   5 |     6.32246e-03 |     7.45072e-03 |   1588970 |    6.37 |   23529336 |   94.33
+   6 |     7.45072e-03 |     8.57899e-03 |    591978 |    2.37 |   24121314 |   96.71
+   7 |     8.57899e-03 |     9.70725e-03 |    204530 |    0.82 |   24325844 |   97.53
+   8 |     9.70725e-03 |     1.08355e-02 |     95442 |    0.38 |   24421286 |   97.91
+   9 |     1.08355e-02 |     1.19638e-02 |     61530 |    0.25 |   24482816 |   98.16
+  10 |     1.19638e-02 |     1.30920e-02 |     57232 |    0.23 |   24540048 |   98.39
+  11 |     1.30920e-02 |     1.42203e-02 |     73378 |    0.29 |   24613426 |   98.68
+  12 |     1.42203e-02 |     1.53486e-02 |     65640 |    0.26 |   24679066 |   98.94
+  13 |     1.53486e-02 |     1.64768e-02 |     49280 |    0.20 |   24728346 |   99.14
+  14 |     1.64768e-02 |     1.76051e-02 |     41970 |    0.17 |   24770316 |   99.31
+  15 |     1.76051e-02 |     1.87334e-02 |     33794 |    0.14 |   24804110 |   99.44
+  16 |     1.87334e-02 |     1.98616e-02 |     22610 |    0.09 |   24826720 |   99.54
+  17 |     1.98616e-02 |     2.09899e-02 |     20250 |    0.08 |   24846970 |   99.62
+  18 |     2.09899e-02 |     2.21182e-02 |     17134 |    0.07 |   24864104 |   99.69
+  19 |     2.21182e-02 |     2.32464e-02 |     13566 |    0.05 |   24877670 |   99.74
+  20 |     2.32464e-02 |     2.43747e-02 |     13894 |    0.06 |   24891564 |   99.80
+  21 |     2.43747e-02 |     2.55030e-02 |      9346 |    0.04 |   24900910 |   99.83
+  22 |     2.55030e-02 |     2.66312e-02 |      8224 |    0.03 |   24909134 |   99.87
+  23 |     2.66312e-02 |     2.77595e-02 |      7232 |    0.03 |   24916366 |   99.89
+  24 |     2.77595e-02 |     2.88878e-02 |      6578 |    0.03 |   24922944 |   99.92
+  25 |     2.88878e-02 |     3.00160e-02 |      5774 |    0.02 |   24928718 |   99.94
+  26 |     3.00160e-02 |     3.11443e-02 |      3278 |    0.01 |   24931996 |   99.96
+  27 |     3.11443e-02 |     3.22726e-02 |      2824 |    0.01 |   24934820 |   99.97
+  28 |     3.22726e-02 |     3.34008e-02 |      1768 |    0.01 |   24936588 |   99.98
+  29 |     3.34008e-02 |     3.45291e-02 |      2492 |    0.01 |   24939080 |   99.99
+  30 |     3.45291e-02 |     3.56573e-02 |       864 |    0.00 |   24939944 |   99.99
+  31 |     3.56573e-02 |     3.67856e-02 |      1044 |    0.00 |   24940988 |   99.99
+  32 |     3.67856e-02 |     3.79139e-02 |       756 |    0.00 |   24941744 |  100.00
+  33 |     3.79139e-02 |     3.90421e-02 |       336 |    0.00 |   24942080 |  100.00
+  34 |     3.90421e-02 |     4.01704e-02 |       296 |    0.00 |   24942376 |  100.00
+  35 |     4.01704e-02 |     4.12987e-02 |        40 |    0.00 |   24942416 |  100.00
+  36 |     4.12987e-02 |     4.24269e-02 |        36 |    0.00 |   24942452 |  100.00
+  37 |     4.24269e-02 |     4.35552e-02 |        28 |    0.00 |   24942480 |  100.00
+  38 |     4.35552e-02 |     4.46835e-02 |        20 |    0.00 |   24942500 |  100.00
+  39 |     4.46835e-02 |     4.58117e-02 |        20 |    0.00 |   24942520 |  100.00
+  40 |     4.58117e-02 |     4.69400e-02 |        20 |    0.00 |   24942540 |  100.00
+  41 |     4.69400e-02 |     4.80683e-02 |         4 |    0.00 |   24942544 |  100.00
+  42 |     4.80683e-02 |     4.91965e-02 |        12 |    0.00 |   24942556 |  100.00
+  43 |     4.91965e-02 |     5.03248e-02 |        16 |    0.00 |   24942572 |  100.00
+  44 |     5.03248e-02 |     5.14531e-02 |        12 |    0.00 |   24942584 |  100.00
+  45 |     5.14531e-02 |     5.25813e-02 |         4 |    0.00 |   24942588 |  100.00
+  46 |     5.25813e-02 |     5.37096e-02 |         0 |    0.00 |   24942588 |  100.00
+  47 |     5.37096e-02 |     5.48379e-02 |         0 |    0.00 |   24942588 |  100.00
+  48 |     5.48379e-02 |     5.59661e-02 |         0 |    0.00 |   24942588 |  100.00
+  49 |     5.59661e-02 |     5.70944e-02 |         4 |    0.00 |   24942592 |  100.00
+
+== End of Side Length Histograms ==
+
+[31m
+Return from function[0m: [33mcalculate_threshold_for_histogram[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:543
+[31m
+Return from function[0m: [33mcalculate_threshold_for_histogram[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:543
+[31m
+Return from function[0m: [33mcalculate_threshold_for_histogram[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:543
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+
+== CDF-based Thresholds (CDF ratio: 0.9600) ==
+Threshold X: 0.00813037
+Threshold Y: 0.00819178
+Threshold Z: 0.00824273
+== End of CDF-based Thresholds ==
+
+Writing side length histograms to output directory: /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms
+Histograms written to:
+  - /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/x_histogram.csv
+  - /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/y_histogram.csv
+  - /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/z_histogram.csv
+[31m
+Return from function[0m: [33mwrite_side_length_histograms[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:505
+Domain side lengths written to: /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/domain_side_lengths.csv
+[31m
+Return from function[0m: [33mwrite_domain_side_lengths[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:196
+Building cell list
+Grid bounding box: [-0.88, 0.882203] x [-0.88, 0.882203] x [-0.88, 0.882203]
+Max box sizes: dx = 0.053638, dy = 0.050266, dz = 0.057094
+Number of cells: nx = 33, ny = 36, nz = 31
+Total number of 2D cells: 1188
+
+Cell list built successfully.
+Cell list build time: 2.74487 seconds
+Cell list memory usage: 562.905 Mbytes
+Building cell list Split Map
+Cell list split map built successfully with split_x = 0.00813037 and split_y = 0.00819178
+query_cell_list_given_xy_bench: Running 100000 random queries to test cell list...
+Each of the 100000 different (x,y) points will be queried for 500 different z values.
+Total elapsed time for 50000000 XY queries: 4.517750e+01 seconds
+Total boxes found in 50000000 queries: 35881019
+Average time per query: 0.903550 us
+query_tet_cell_list_2d_3d_given_xy_bench: Running 100000 random queries to benchmark cell list...
+Each of the 100000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_tet_bench.c:283
+query_tet_cell_list_2d_3d_given_xy_bench with 50000000 queries (each with 500 z values)
+Total queries: 50000000
+Total boxes found: 3513322
+Total elapsed time: 3.944789e+01 seconds
+Cumulative query time: 3.864999e+01 seconds
+Average time per query: 0.773000 us
+Queries per second: 1267.50 K queries/s
+========================================
+
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 100000 random queries to benchmark cell list...
+Each of the 100000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 50000000 queries (each with 500 z values)
+Total queries: 50000000
+Total boxes found: 3521191
+Total elapsed time: 9.679396e+00 seconds
+Cumulative query time: 8.902042e+00 seconds
+Average time per query: 0.178041 us
+Queries per second: 5165.61 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 9.679396e+00, 50000000, 500, 3521191, 1.780408e-01 </split_results>
+========================================
+
+
+========================================
+Running CDF Ratio Scan Benchmark
+========================================
+
+[32m
+Enter Function[0m: [33mbenchmark_cdf_ratio_scan[0m, file: /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:23
+
+========================================
+Starting CDF Ratio Scan Benchmark
+========================================
+Ratio range: [0.2, 0.99], step: 0.01
+Benchmark parameters: num_z=500, num_queries=10000
+========================================
+
+Results will be written to: /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/cdf_ratio_benchmark.csv
+
+========================================
+Iteration 1: CDF ratio = 0.2
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.82959 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355933
+Total elapsed time: 4.023218e+00 seconds
+Cumulative query time: 3.943323e+00 seconds
+Average time per query: 0.788665 us
+Queries per second: 1242.79 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.023218e+00, 5000000, 500, 355933, 7.886645e-01 </split_results>
+========================================
+
+Benchmark completed in 4.02323 seconds
+
+========================================
+Iteration 2: CDF ratio = 0.21
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.91092 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349823
+Total elapsed time: 4.022713e+00 seconds
+Cumulative query time: 3.940329e+00 seconds
+Average time per query: 0.788066 us
+Queries per second: 1242.94 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.022713e+00, 5000000, 500, 349823, 7.880658e-01 </split_results>
+========================================
+
+Benchmark completed in 4.02273 seconds
+
+========================================
+Iteration 3: CDF ratio = 0.22
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.79224 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 343521
+Total elapsed time: 3.844400e+00 seconds
+Cumulative query time: 3.761986e+00 seconds
+Average time per query: 0.752397 us
+Queries per second: 1300.59 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.844400e+00, 5000000, 500, 343521, 7.523973e-01 </split_results>
+========================================
+
+Benchmark completed in 3.84445 seconds
+
+========================================
+Iteration 4: CDF ratio = 0.23
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.89755 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347258
+Total elapsed time: 3.857429e+00 seconds
+Cumulative query time: 3.778202e+00 seconds
+Average time per query: 0.755640 us
+Queries per second: 1296.20 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.857429e+00, 5000000, 500, 347258, 7.556404e-01 </split_results>
+========================================
+
+Benchmark completed in 3.85745 seconds
+
+========================================
+Iteration 5: CDF ratio = 0.24
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85304 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 357951
+Total elapsed time: 4.097040e+00 seconds
+Cumulative query time: 4.016654e+00 seconds
+Average time per query: 0.803331 us
+Queries per second: 1220.39 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.097040e+00, 5000000, 500, 357951, 8.033309e-01 </split_results>
+========================================
+
+Benchmark completed in 4.09706 seconds
+
+========================================
+Iteration 6: CDF ratio = 0.25
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.84147 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 348047
+Total elapsed time: 3.888546e+00 seconds
+Cumulative query time: 3.809048e+00 seconds
+Average time per query: 0.761810 us
+Queries per second: 1285.83 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.888546e+00, 5000000, 500, 348047, 7.618097e-01 </split_results>
+========================================
+
+Benchmark completed in 3.88859 seconds
+
+========================================
+Iteration 7: CDF ratio = 0.26
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.86233 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352081
+Total elapsed time: 3.842960e+00 seconds
+Cumulative query time: 3.766905e+00 seconds
+Average time per query: 0.753381 us
+Queries per second: 1301.08 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.842960e+00, 5000000, 500, 352081, 7.533809e-01 </split_results>
+========================================
+
+Benchmark completed in 3.84298 seconds
+
+========================================
+Iteration 8: CDF ratio = 0.27
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.81337 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 348840
+Total elapsed time: 3.915023e+00 seconds
+Cumulative query time: 3.837117e+00 seconds
+Average time per query: 0.767423 us
+Queries per second: 1277.13 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.915023e+00, 5000000, 500, 348840, 7.674233e-01 </split_results>
+========================================
+
+Benchmark completed in 3.91504 seconds
+
+========================================
+Iteration 9: CDF ratio = 0.28
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85848 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349585
+Total elapsed time: 3.983115e+00 seconds
+Cumulative query time: 3.902111e+00 seconds
+Average time per query: 0.780422 us
+Queries per second: 1255.30 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.983115e+00, 5000000, 500, 349585, 7.804222e-01 </split_results>
+========================================
+
+Benchmark completed in 3.98313 seconds
+
+========================================
+Iteration 10: CDF ratio = 0.29
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.8543 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 354968
+Total elapsed time: 3.970121e+00 seconds
+Cumulative query time: 3.890097e+00 seconds
+Average time per query: 0.778019 us
+Queries per second: 1259.41 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.970121e+00, 5000000, 500, 354968, 7.780195e-01 </split_results>
+========================================
+
+Benchmark completed in 3.97014 seconds
+
+========================================
+Iteration 11: CDF ratio = 0.3
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.94915 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351988
+Total elapsed time: 4.032737e+00 seconds
+Cumulative query time: 3.952781e+00 seconds
+Average time per query: 0.790556 us
+Queries per second: 1239.85 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.032737e+00, 5000000, 500, 351988, 7.905562e-01 </split_results>
+========================================
+
+Benchmark completed in 4.03275 seconds
+
+========================================
+Iteration 12: CDF ratio = 0.31
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.9391 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352350
+Total elapsed time: 4.110322e+00 seconds
+Cumulative query time: 4.029752e+00 seconds
+Average time per query: 0.805950 us
+Queries per second: 1216.45 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.110322e+00, 5000000, 500, 352350, 8.059504e-01 </split_results>
+========================================
+
+Benchmark completed in 4.11034 seconds
+
+========================================
+Iteration 13: CDF ratio = 0.32
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.89732 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346077
+Total elapsed time: 3.930281e+00 seconds
+Cumulative query time: 3.850639e+00 seconds
+Average time per query: 0.770128 us
+Queries per second: 1272.17 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.930281e+00, 5000000, 500, 346077, 7.701278e-01 </split_results>
+========================================
+
+Benchmark completed in 3.93032 seconds
+
+========================================
+Iteration 14: CDF ratio = 0.33
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.86529 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351692
+Total elapsed time: 3.957944e+00 seconds
+Cumulative query time: 3.878065e+00 seconds
+Average time per query: 0.775613 us
+Queries per second: 1263.28 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.957944e+00, 5000000, 500, 351692, 7.756130e-01 </split_results>
+========================================
+
+Benchmark completed in 3.95796 seconds
+
+========================================
+Iteration 15: CDF ratio = 0.34
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.90494 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 353977
+Total elapsed time: 3.974367e+00 seconds
+Cumulative query time: 3.895215e+00 seconds
+Average time per query: 0.779043 us
+Queries per second: 1258.06 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.974367e+00, 5000000, 500, 353977, 7.790431e-01 </split_results>
+========================================
+
+Benchmark completed in 3.97438 seconds
+
+========================================
+Iteration 16: CDF ratio = 0.35
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.93038 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 344392
+Total elapsed time: 4.003840e+00 seconds
+Cumulative query time: 3.921849e+00 seconds
+Average time per query: 0.784370 us
+Queries per second: 1248.80 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.003840e+00, 5000000, 500, 344392, 7.843697e-01 </split_results>
+========================================
+
+Benchmark completed in 4.00389 seconds
+
+========================================
+Iteration 17: CDF ratio = 0.36
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.97822 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 348278
+Total elapsed time: 4.043567e+00 seconds
+Cumulative query time: 3.961948e+00 seconds
+Average time per query: 0.792390 us
+Queries per second: 1236.53 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.043567e+00, 5000000, 500, 348278, 7.923896e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04358 seconds
+
+========================================
+Iteration 18: CDF ratio = 0.37
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.95939 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352851
+Total elapsed time: 4.130757e+00 seconds
+Cumulative query time: 4.049612e+00 seconds
+Average time per query: 0.809922 us
+Queries per second: 1210.43 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.130757e+00, 5000000, 500, 352851, 8.099224e-01 </split_results>
+========================================
+
+Benchmark completed in 4.13077 seconds
+
+========================================
+Iteration 19: CDF ratio = 0.38
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.93073 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 354622
+Total elapsed time: 4.104431e+00 seconds
+Cumulative query time: 4.023733e+00 seconds
+Average time per query: 0.804747 us
+Queries per second: 1218.20 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.104431e+00, 5000000, 500, 354622, 8.047466e-01 </split_results>
+========================================
+
+Benchmark completed in 4.10448 seconds
+
+========================================
+Iteration 20: CDF ratio = 0.39
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.89377 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351216
+Total elapsed time: 3.996076e+00 seconds
+Cumulative query time: 3.916051e+00 seconds
+Average time per query: 0.783210 us
+Queries per second: 1251.23 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.996076e+00, 5000000, 500, 351216, 7.832102e-01 </split_results>
+========================================
+
+Benchmark completed in 3.99609 seconds
+
+========================================
+Iteration 21: CDF ratio = 0.4
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.89127 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 345090
+Total elapsed time: 3.843777e+00 seconds
+Cumulative query time: 3.764854e+00 seconds
+Average time per query: 0.752971 us
+Queries per second: 1300.80 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.843777e+00, 5000000, 500, 345090, 7.529708e-01 </split_results>
+========================================
+
+Benchmark completed in 3.84379 seconds
+
+========================================
+Iteration 22: CDF ratio = 0.41
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.94478 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 341340
+Total elapsed time: 3.953859e+00 seconds
+Cumulative query time: 3.875224e+00 seconds
+Average time per query: 0.775045 us
+Queries per second: 1264.59 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.953859e+00, 5000000, 500, 341340, 7.750447e-01 </split_results>
+========================================
+
+Benchmark completed in 3.95387 seconds
+
+========================================
+Iteration 23: CDF ratio = 0.42
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.86715 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351626
+Total elapsed time: 4.011704e+00 seconds
+Cumulative query time: 3.933412e+00 seconds
+Average time per query: 0.786682 us
+Queries per second: 1246.35 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.011704e+00, 5000000, 500, 351626, 7.866824e-01 </split_results>
+========================================
+
+Benchmark completed in 4.01172 seconds
+
+========================================
+Iteration 24: CDF ratio = 0.43
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.82949 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349599
+Total elapsed time: 3.938009e+00 seconds
+Cumulative query time: 3.860871e+00 seconds
+Average time per query: 0.772174 us
+Queries per second: 1269.68 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.938009e+00, 5000000, 500, 349599, 7.721742e-01 </split_results>
+========================================
+
+Benchmark completed in 3.93802 seconds
+
+========================================
+Iteration 25: CDF ratio = 0.44
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.73896 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349433
+Total elapsed time: 3.925931e+00 seconds
+Cumulative query time: 3.849801e+00 seconds
+Average time per query: 0.769960 us
+Queries per second: 1273.58 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.925931e+00, 5000000, 500, 349433, 7.699601e-01 </split_results>
+========================================
+
+Benchmark completed in 3.92595 seconds
+
+========================================
+Iteration 26: CDF ratio = 0.45
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.67257 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346637
+Total elapsed time: 3.796438e+00 seconds
+Cumulative query time: 3.720807e+00 seconds
+Average time per query: 0.744161 us
+Queries per second: 1317.02 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.796438e+00, 5000000, 500, 346637, 7.441615e-01 </split_results>
+========================================
+
+Benchmark completed in 3.79649 seconds
+
+========================================
+Iteration 27: CDF ratio = 0.46
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.8658 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352447
+Total elapsed time: 3.977893e+00 seconds
+Cumulative query time: 3.897380e+00 seconds
+Average time per query: 0.779476 us
+Queries per second: 1256.95 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.977893e+00, 5000000, 500, 352447, 7.794759e-01 </split_results>
+========================================
+
+Benchmark completed in 3.97792 seconds
+
+========================================
+Iteration 28: CDF ratio = 0.47
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.69858 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 353021
+Total elapsed time: 3.830551e+00 seconds
+Cumulative query time: 3.758335e+00 seconds
+Average time per query: 0.751667 us
+Queries per second: 1305.30 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.830551e+00, 5000000, 500, 353021, 7.516670e-01 </split_results>
+========================================
+
+Benchmark completed in 3.83057 seconds
+
+========================================
+Iteration 29: CDF ratio = 0.48
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.65262 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350728
+Total elapsed time: 3.851560e+00 seconds
+Cumulative query time: 3.777395e+00 seconds
+Average time per query: 0.755479 us
+Queries per second: 1298.18 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.851560e+00, 5000000, 500, 350728, 7.554789e-01 </split_results>
+========================================
+
+Benchmark completed in 3.85161 seconds
+
+========================================
+Iteration 30: CDF ratio = 0.49
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.64761 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 348238
+Total elapsed time: 3.809414e+00 seconds
+Cumulative query time: 3.736115e+00 seconds
+Average time per query: 0.747223 us
+Queries per second: 1312.54 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.809414e+00, 5000000, 500, 348238, 7.472231e-01 </split_results>
+========================================
+
+Benchmark completed in 3.80943 seconds
+
+========================================
+Iteration 31: CDF ratio = 0.5
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.63912 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346556
+Total elapsed time: 3.870699e+00 seconds
+Cumulative query time: 3.792622e+00 seconds
+Average time per query: 0.758524 us
+Queries per second: 1291.76 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.870699e+00, 5000000, 500, 346556, 7.585244e-01 </split_results>
+========================================
+
+Benchmark completed in 3.87072 seconds
+
+========================================
+Iteration 32: CDF ratio = 0.51
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.77555 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346815
+Total elapsed time: 3.872353e+00 seconds
+Cumulative query time: 3.796490e+00 seconds
+Average time per query: 0.759298 us
+Queries per second: 1291.20 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.872353e+00, 5000000, 500, 346815, 7.592980e-01 </split_results>
+========================================
+
+Benchmark completed in 3.87241 seconds
+
+========================================
+Iteration 33: CDF ratio = 0.52
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.83009 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355632
+Total elapsed time: 3.921326e+00 seconds
+Cumulative query time: 3.843908e+00 seconds
+Average time per query: 0.768782 us
+Queries per second: 1275.08 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.921326e+00, 5000000, 500, 355632, 7.687816e-01 </split_results>
+========================================
+
+Benchmark completed in 3.92134 seconds
+
+========================================
+Iteration 34: CDF ratio = 0.53
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.77531 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 353855
+Total elapsed time: 4.036676e+00 seconds
+Cumulative query time: 3.957489e+00 seconds
+Average time per query: 0.791498 us
+Queries per second: 1238.64 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.036676e+00, 5000000, 500, 353855, 7.914977e-01 </split_results>
+========================================
+
+Benchmark completed in 4.03669 seconds
+
+========================================
+Iteration 35: CDF ratio = 0.54
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.84178 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351742
+Total elapsed time: 3.915902e+00 seconds
+Cumulative query time: 3.839406e+00 seconds
+Average time per query: 0.767881 us
+Queries per second: 1276.84 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.915902e+00, 5000000, 500, 351742, 7.678811e-01 </split_results>
+========================================
+
+Benchmark completed in 3.91592 seconds
+
+========================================
+Iteration 36: CDF ratio = 0.55
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.73427 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350135
+Total elapsed time: 3.947379e+00 seconds
+Cumulative query time: 3.871466e+00 seconds
+Average time per query: 0.774293 us
+Queries per second: 1266.66 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.947379e+00, 5000000, 500, 350135, 7.742932e-01 </split_results>
+========================================
+
+Benchmark completed in 3.9474 seconds
+
+========================================
+Iteration 37: CDF ratio = 0.56
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.81473 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 340349
+Total elapsed time: 3.723057e+00 seconds
+Cumulative query time: 3.648060e+00 seconds
+Average time per query: 0.729612 us
+Queries per second: 1342.98 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.723057e+00, 5000000, 500, 340349, 7.296121e-01 </split_results>
+========================================
+
+Benchmark completed in 3.72307 seconds
+
+========================================
+Iteration 38: CDF ratio = 0.57
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.64572 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351105
+Total elapsed time: 3.720264e+00 seconds
+Cumulative query time: 3.648191e+00 seconds
+Average time per query: 0.729638 us
+Queries per second: 1343.99 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.720264e+00, 5000000, 500, 351105, 7.296383e-01 </split_results>
+========================================
+
+Benchmark completed in 3.72028 seconds
+
+========================================
+Iteration 39: CDF ratio = 0.58
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.68937 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 359907
+Total elapsed time: 3.801163e+00 seconds
+Cumulative query time: 3.724797e+00 seconds
+Average time per query: 0.744959 us
+Queries per second: 1315.39 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.801163e+00, 5000000, 500, 359907, 7.449594e-01 </split_results>
+========================================
+
+Benchmark completed in 3.80121 seconds
+
+========================================
+Iteration 40: CDF ratio = 0.59
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.66366 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 348096
+Total elapsed time: 3.721860e+00 seconds
+Cumulative query time: 3.649814e+00 seconds
+Average time per query: 0.729963 us
+Queries per second: 1343.41 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.721860e+00, 5000000, 500, 348096, 7.299628e-01 </split_results>
+========================================
+
+Benchmark completed in 3.72187 seconds
+
+========================================
+Iteration 41: CDF ratio = 0.6
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.61471 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355804
+Total elapsed time: 3.830951e+00 seconds
+Cumulative query time: 3.758542e+00 seconds
+Average time per query: 0.751708 us
+Queries per second: 1305.16 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.830951e+00, 5000000, 500, 355804, 7.517084e-01 </split_results>
+========================================
+
+Benchmark completed in 3.83097 seconds
+
+========================================
+Iteration 42: CDF ratio = 0.61
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.63049 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351551
+Total elapsed time: 3.785868e+00 seconds
+Cumulative query time: 3.713060e+00 seconds
+Average time per query: 0.742612 us
+Queries per second: 1320.70 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.785868e+00, 5000000, 500, 351551, 7.426120e-01 </split_results>
+========================================
+
+Benchmark completed in 3.78592 seconds
+
+========================================
+Iteration 43: CDF ratio = 0.62
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.6692 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349411
+Total elapsed time: 3.798165e+00 seconds
+Cumulative query time: 3.725016e+00 seconds
+Average time per query: 0.745003 us
+Queries per second: 1316.43 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.798165e+00, 5000000, 500, 349411, 7.450031e-01 </split_results>
+========================================
+
+Benchmark completed in 3.79818 seconds
+
+========================================
+Iteration 44: CDF ratio = 0.63
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.64128 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350928
+Total elapsed time: 3.824756e+00 seconds
+Cumulative query time: 3.752290e+00 seconds
+Average time per query: 0.750458 us
+Queries per second: 1307.27 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.824756e+00, 5000000, 500, 350928, 7.504580e-01 </split_results>
+========================================
+
+Benchmark completed in 3.82477 seconds
+
+========================================
+Iteration 45: CDF ratio = 0.64
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.62151 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352400
+Total elapsed time: 3.775408e+00 seconds
+Cumulative query time: 3.703120e+00 seconds
+Average time per query: 0.740624 us
+Queries per second: 1324.36 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.775408e+00, 5000000, 500, 352400, 7.406240e-01 </split_results>
+========================================
+
+Benchmark completed in 3.77546 seconds
+
+========================================
+Iteration 46: CDF ratio = 0.65
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.6532 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347567
+Total elapsed time: 3.781588e+00 seconds
+Cumulative query time: 3.708683e+00 seconds
+Average time per query: 0.741737 us
+Queries per second: 1322.20 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.781588e+00, 5000000, 500, 347567, 7.417365e-01 </split_results>
+========================================
+
+Benchmark completed in 3.7816 seconds
+
+========================================
+Iteration 47: CDF ratio = 0.66
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.68917 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 342882
+Total elapsed time: 3.827979e+00 seconds
+Cumulative query time: 3.751989e+00 seconds
+Average time per query: 0.750398 us
+Queries per second: 1306.17 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.827979e+00, 5000000, 500, 342882, 7.503979e-01 </split_results>
+========================================
+
+Benchmark completed in 3.82799 seconds
+
+========================================
+Iteration 48: CDF ratio = 0.67
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.87399 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352163
+Total elapsed time: 4.046894e+00 seconds
+Cumulative query time: 3.964239e+00 seconds
+Average time per query: 0.792848 us
+Queries per second: 1235.52 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.046894e+00, 5000000, 500, 352163, 7.928479e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04691 seconds
+
+========================================
+Iteration 49: CDF ratio = 0.68
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.93059 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349530
+Total elapsed time: 4.051415e+00 seconds
+Cumulative query time: 3.969201e+00 seconds
+Average time per query: 0.793840 us
+Queries per second: 1234.14 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.051415e+00, 5000000, 500, 349530, 7.938401e-01 </split_results>
+========================================
+
+Benchmark completed in 4.05143 seconds
+
+========================================
+Iteration 50: CDF ratio = 0.69
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 3.00746 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350737
+Total elapsed time: 4.091571e+00 seconds
+Cumulative query time: 4.008911e+00 seconds
+Average time per query: 0.801782 us
+Queries per second: 1222.02 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.091571e+00, 5000000, 500, 350737, 8.017821e-01 </split_results>
+========================================
+
+Benchmark completed in 4.09159 seconds
+
+========================================
+Iteration 51: CDF ratio = 0.7
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.97697 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355611
+Total elapsed time: 4.046004e+00 seconds
+Cumulative query time: 3.968611e+00 seconds
+Average time per query: 0.793722 us
+Queries per second: 1235.79 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.046004e+00, 5000000, 500, 355611, 7.937221e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04602 seconds
+
+========================================
+Iteration 52: CDF ratio = 0.71
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85732 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352571
+Total elapsed time: 3.960862e+00 seconds
+Cumulative query time: 3.882142e+00 seconds
+Average time per query: 0.776428 us
+Queries per second: 1262.35 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.960862e+00, 5000000, 500, 352571, 7.764285e-01 </split_results>
+========================================
+
+Benchmark completed in 3.96091 seconds
+
+========================================
+Iteration 53: CDF ratio = 0.72
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.83871 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 349114
+Total elapsed time: 3.944529e+00 seconds
+Cumulative query time: 3.866288e+00 seconds
+Average time per query: 0.773258 us
+Queries per second: 1267.58 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.944529e+00, 5000000, 500, 349114, 7.732577e-01 </split_results>
+========================================
+
+Benchmark completed in 3.94454 seconds
+
+========================================
+Iteration 54: CDF ratio = 0.73
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.84679 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 353229
+Total elapsed time: 4.033768e+00 seconds
+Cumulative query time: 3.953543e+00 seconds
+Average time per query: 0.790709 us
+Queries per second: 1239.54 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.033768e+00, 5000000, 500, 353229, 7.907086e-01 </split_results>
+========================================
+
+Benchmark completed in 4.03378 seconds
+
+========================================
+Iteration 55: CDF ratio = 0.74
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.88355 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350395
+Total elapsed time: 4.062996e+00 seconds
+Cumulative query time: 3.980921e+00 seconds
+Average time per query: 0.796184 us
+Queries per second: 1230.62 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.062996e+00, 5000000, 500, 350395, 7.961842e-01 </split_results>
+========================================
+
+Benchmark completed in 4.06304 seconds
+
+========================================
+Iteration 56: CDF ratio = 0.75
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.8592 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352784
+Total elapsed time: 3.980401e+00 seconds
+Cumulative query time: 3.901955e+00 seconds
+Average time per query: 0.780391 us
+Queries per second: 1256.15 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.980401e+00, 5000000, 500, 352784, 7.803910e-01 </split_results>
+========================================
+
+Benchmark completed in 3.98042 seconds
+
+========================================
+Iteration 57: CDF ratio = 0.76
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.86562 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351360
+Total elapsed time: 3.941302e+00 seconds
+Cumulative query time: 3.861902e+00 seconds
+Average time per query: 0.772380 us
+Queries per second: 1268.62 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.941302e+00, 5000000, 500, 351360, 7.723805e-01 </split_results>
+========================================
+
+Benchmark completed in 3.94132 seconds
+
+========================================
+Iteration 58: CDF ratio = 0.77
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.87624 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 359173
+Total elapsed time: 3.996767e+00 seconds
+Cumulative query time: 3.917055e+00 seconds
+Average time per query: 0.783411 us
+Queries per second: 1251.01 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.996767e+00, 5000000, 500, 359173, 7.834109e-01 </split_results>
+========================================
+
+Benchmark completed in 3.99678 seconds
+
+========================================
+Iteration 59: CDF ratio = 0.78
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.88528 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 344688
+Total elapsed time: 3.856725e+00 seconds
+Cumulative query time: 3.777797e+00 seconds
+Average time per query: 0.755559 us
+Queries per second: 1296.44 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.856725e+00, 5000000, 500, 344688, 7.555594e-01 </split_results>
+========================================
+
+Benchmark completed in 3.85674 seconds
+
+========================================
+Iteration 60: CDF ratio = 0.79
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85998 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 345904
+Total elapsed time: 3.935016e+00 seconds
+Cumulative query time: 3.854978e+00 seconds
+Average time per query: 0.770996 us
+Queries per second: 1270.64 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.935016e+00, 5000000, 500, 345904, 7.709955e-01 </split_results>
+========================================
+
+Benchmark completed in 3.93503 seconds
+
+========================================
+Iteration 61: CDF ratio = 0.8
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.91518 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 352078
+Total elapsed time: 4.067509e+00 seconds
+Cumulative query time: 3.986273e+00 seconds
+Average time per query: 0.797255 us
+Queries per second: 1229.25 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.067509e+00, 5000000, 500, 352078, 7.972546e-01 </split_results>
+========================================
+
+Benchmark completed in 4.06752 seconds
+
+========================================
+Iteration 62: CDF ratio = 0.81
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.90841 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 354273
+Total elapsed time: 4.020288e+00 seconds
+Cumulative query time: 3.940281e+00 seconds
+Average time per query: 0.788056 us
+Queries per second: 1243.69 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.020288e+00, 5000000, 500, 354273, 7.880563e-01 </split_results>
+========================================
+
+Benchmark completed in 4.0203 seconds
+
+========================================
+Iteration 63: CDF ratio = 0.82
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.88765 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347033
+Total elapsed time: 4.010043e+00 seconds
+Cumulative query time: 3.928825e+00 seconds
+Average time per query: 0.785765 us
+Queries per second: 1246.87 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.010043e+00, 5000000, 500, 347033, 7.857650e-01 </split_results>
+========================================
+
+Benchmark completed in 4.01006 seconds
+
+========================================
+Iteration 64: CDF ratio = 0.83
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.90331 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355508
+Total elapsed time: 3.978529e+00 seconds
+Cumulative query time: 3.898168e+00 seconds
+Average time per query: 0.779634 us
+Queries per second: 1256.75 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.978529e+00, 5000000, 500, 355508, 7.796336e-01 </split_results>
+========================================
+
+Benchmark completed in 3.97854 seconds
+
+========================================
+Iteration 65: CDF ratio = 0.84
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.95494 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351417
+Total elapsed time: 4.074653e+00 seconds
+Cumulative query time: 3.994468e+00 seconds
+Average time per query: 0.798894 us
+Queries per second: 1227.10 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.074653e+00, 5000000, 500, 351417, 7.988936e-01 </split_results>
+========================================
+
+Benchmark completed in 4.07471 seconds
+
+========================================
+Iteration 66: CDF ratio = 0.85
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.92888 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 343672
+Total elapsed time: 3.954531e+00 seconds
+Cumulative query time: 3.873966e+00 seconds
+Average time per query: 0.774793 us
+Queries per second: 1264.37 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.954531e+00, 5000000, 500, 343672, 7.747933e-01 </split_results>
+========================================
+
+Benchmark completed in 3.95455 seconds
+
+========================================
+Iteration 67: CDF ratio = 0.86
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.77941 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 355186
+Total elapsed time: 4.046755e+00 seconds
+Cumulative query time: 3.967110e+00 seconds
+Average time per query: 0.793422 us
+Queries per second: 1235.56 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.046755e+00, 5000000, 500, 355186, 7.934221e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04677 seconds
+
+========================================
+Iteration 68: CDF ratio = 0.87
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.88139 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347545
+Total elapsed time: 4.040444e+00 seconds
+Cumulative query time: 3.960031e+00 seconds
+Average time per query: 0.792006 us
+Queries per second: 1237.49 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.040444e+00, 5000000, 500, 347545, 7.920062e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04049 seconds
+
+========================================
+Iteration 69: CDF ratio = 0.88
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.83331 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 357836
+Total elapsed time: 3.991767e+00 seconds
+Cumulative query time: 3.911399e+00 seconds
+Average time per query: 0.782280 us
+Queries per second: 1252.58 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.991767e+00, 5000000, 500, 357836, 7.822798e-01 </split_results>
+========================================
+
+Benchmark completed in 3.99178 seconds
+
+========================================
+Iteration 70: CDF ratio = 0.89
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.86126 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347392
+Total elapsed time: 3.917970e+00 seconds
+Cumulative query time: 3.838313e+00 seconds
+Average time per query: 0.767663 us
+Queries per second: 1276.17 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.917970e+00, 5000000, 500, 347392, 7.676626e-01 </split_results>
+========================================
+
+Benchmark completed in 3.91799 seconds
+
+========================================
+Iteration 71: CDF ratio = 0.9
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.90186 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 357625
+Total elapsed time: 4.070615e+00 seconds
+Cumulative query time: 3.990949e+00 seconds
+Average time per query: 0.798190 us
+Queries per second: 1228.32 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.070615e+00, 5000000, 500, 357625, 7.981899e-01 </split_results>
+========================================
+
+Benchmark completed in 4.07063 seconds
+
+========================================
+Iteration 72: CDF ratio = 0.91
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.90976 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 358405
+Total elapsed time: 4.129657e+00 seconds
+Cumulative query time: 4.048974e+00 seconds
+Average time per query: 0.809795 us
+Queries per second: 1210.75 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.129657e+00, 5000000, 500, 358405, 8.097947e-01 </split_results>
+========================================
+
+Benchmark completed in 4.12967 seconds
+
+========================================
+Iteration 73: CDF ratio = 0.92
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.93153 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346298
+Total elapsed time: 3.968130e+00 seconds
+Cumulative query time: 3.886369e+00 seconds
+Average time per query: 0.777274 us
+Queries per second: 1260.04 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.968130e+00, 5000000, 500, 346298, 7.772739e-01 </split_results>
+========================================
+
+Benchmark completed in 3.96815 seconds
+
+========================================
+Iteration 74: CDF ratio = 0.93
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.84442 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 346688
+Total elapsed time: 3.909902e+00 seconds
+Cumulative query time: 3.832001e+00 seconds
+Average time per query: 0.766400 us
+Queries per second: 1278.80 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.909902e+00, 5000000, 500, 346688, 7.664002e-01 </split_results>
+========================================
+
+Benchmark completed in 3.90992 seconds
+
+========================================
+Iteration 75: CDF ratio = 0.94
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85166 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 347414
+Total elapsed time: 3.922040e+00 seconds
+Cumulative query time: 3.843219e+00 seconds
+Average time per query: 0.768644 us
+Queries per second: 1274.85 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.922040e+00, 5000000, 500, 347414, 7.686439e-01 </split_results>
+========================================
+
+Benchmark completed in 3.92208 seconds
+
+========================================
+Iteration 76: CDF ratio = 0.95
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.95633 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350056
+Total elapsed time: 3.921973e+00 seconds
+Cumulative query time: 3.845668e+00 seconds
+Average time per query: 0.769134 us
+Queries per second: 1274.87 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.921973e+00, 5000000, 500, 350056, 7.691337e-01 </split_results>
+========================================
+
+Benchmark completed in 3.92199 seconds
+
+========================================
+Iteration 77: CDF ratio = 0.96
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.84957 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 351768
+Total elapsed time: 4.043336e+00 seconds
+Cumulative query time: 3.962335e+00 seconds
+Average time per query: 0.792467 us
+Queries per second: 1236.60 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.043336e+00, 5000000, 500, 351768, 7.924670e-01 </split_results>
+========================================
+
+Benchmark completed in 4.04335 seconds
+
+========================================
+Iteration 78: CDF ratio = 0.97
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.85321 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 350994
+Total elapsed time: 3.986299e+00 seconds
+Cumulative query time: 3.906792e+00 seconds
+Average time per query: 0.781358 us
+Queries per second: 1254.30 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 3.986299e+00, 5000000, 500, 350994, 7.813585e-01 </split_results>
+========================================
+
+Benchmark completed in 3.98636 seconds
+
+========================================
+Iteration 79: CDF ratio = 0.98
+========================================
+[31m
+Return from function[0m: [33mcalculate_cdf_thresholds[0m, file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_tet2box.c:571
+Thresholds: X=0, Y=0, Z=0
+Split map built in 2.89139 seconds (split_x=0, split_y=0)
+query_tet_cell_list_split_3d_2d_given_xy_bench: Running 10000 random queries to benchmark cell list...
+Each of the 10000 different (x,y) points will be queried for 500 different z values.
+
+========== BENCHMARK RESULTS ==========
+file: /home/simone/git/sfem_d/sfem/resampling/cell_list/cell_list_bench_split.c:447
+query_tet_cell_list_split_3d_2d_given_xy_bench with 5000000 queries (each with 500 z values)
+Total queries: 5000000
+Total boxes found: 354579
+Total elapsed time: 4.097078e+00 seconds
+Cumulative query time: 4.016302e+00 seconds
+Average time per query: 0.803260 us
+Queries per second: 1220.38 K queries/s
+<split_results_headers> total_elapsed_s, effective_num_queries, num_z, total_boxes_found, avg_time_per_query_us </split_results_headers>
+<split_results> 4.097078e+00, 5000000, 500, 354579, 8.032605e-01 </split_results>
+========================================
+
+Benchmark completed in 4.09709 seconds
+
+Benchmark results written to: /home/simone/git/sfem_d/sfem/workflows/resample/side_length_histograms/cdf_ratio_benchmark.csv
+========================================
+CDF Ratio Scan Benchmark Completed
+========================================
+
+[31m
+Return from function[0m: [33mbenchmark_cdf_ratio_scan[0m, file: /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:155
+[31m
+Return from function[0m: [33mmain_test_ccell[0m, file: /home/simone/git/sfem_d/sfem/resampling/resample_adjoint_ccell.c:456
