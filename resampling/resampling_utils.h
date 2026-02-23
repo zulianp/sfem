@@ -297,6 +297,42 @@ void print_mesh_function_name(const function_XYZ_t mesh_fun_XYZ, const int mpi_r
  */
 int make_metadata(ptrdiff_t nglobal[3], real_t delta[3], real_t origin[3], const char* folder);
 
+/**
+ * @brief Benchmark CDF ratio scan for cell list split map performance
+ *
+ * @param histograms Side length histograms
+ * @param bounding_boxes_ptr Bounding boxes for mesh elements
+ * @param geom Tetrahedral mesh geometry
+ * @param min_grid_x Minimum grid X coordinate
+ * @param max_grid_x Maximum grid X coordinate
+ * @param min_grid_y Minimum grid Y coordinate
+ * @param max_grid_y Maximum grid Y coordinate
+ * @param min_grid_z Minimum grid Z coordinate
+ * @param max_grid_z Maximum grid Z coordinate
+ * @param min_ratio Minimum CDF ratio to test
+ * @param max_ratio Maximum CDF ratio to test
+ * @param step CDF ratio step size
+ * @param num_z Number of Z samples
+ * @param num_queries Number of queries to perform
+ * @param output_dir Output directory for CSV results
+ * @return EXIT_SUCCESS on success, EXIT_FAILURE on failure
+ */
+int benchmark_cdf_ratio_scan(const side_length_histograms_t* histograms,          //
+                             const boxes_t*                  bounding_boxes_ptr,  //
+                             const mesh_tet_geom_t*          geom,                //
+                             const real_t                    min_grid_x,          //
+                             const real_t                    max_grid_x,          //
+                             const real_t                    min_grid_y,          //
+                             const real_t                    max_grid_y,          //
+                             const real_t                    min_grid_z,          //
+                             const real_t                    max_grid_z,          //
+                             const real_t                    min_ratio,           //
+                             const real_t                    max_ratio,           //
+                             const real_t                    step,                //
+                             const int                       num_z,               //
+                             const int                       num_queries,         //
+                             const char*                     output_dir);         //
+
 #ifdef __cplusplus
 }
 #endif

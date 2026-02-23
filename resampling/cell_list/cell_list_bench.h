@@ -198,18 +198,28 @@ int query_cell_list_given_xy_split_test(const cell_list_split_3d_2d_map_t *map, 
  * @param num_queries Total number of (x,y) queries to run
  * @return int 0 on success, EXIT_FAILURE on failure
  */
-int query_tet_split_cell_list_2d_3d_given_xy_test(const cell_list_split_3d_2d_map_t *map,        //
-                                                  const boxes_t                     *boxes,      //
-                                                  const mesh_tet_geom_t             *mesh_geom,  //
-                                                  const int                          num_z,      //
-                                                  const int                          num_queries);
+int                                                                                          //
+query_tet_split_cell_list_2d_3d_given_xy_test(const cell_list_split_3d_2d_map_t *map,        //
+                                              const boxes_t                     *boxes,      //
+                                              const mesh_tet_geom_t             *mesh_geom,  //
+                                              const int                          num_z,      //
+                                              const int                          num_queries);
 
+/**
+ * @brief Benchmark the cell list query correctness for given x,y and multiple z values using split map
+ * @param map The split cell list data structure
+ * @param boxes The boxes data structure
+ * @param mesh_geom The tetrahedral mesh geometry
+ * @param num_z Number of z values to test per (x,y) pair
+ * @param num_queries Total number of (x,y) queries to run
+ * @return int 0 on success, EXIT_FAILURE on failure
+ */
 int                                                                                           //
 query_tet_cell_list_split_3d_2d_given_xy_bench(const cell_list_split_3d_2d_map_t *map,        //
                                                const boxes_t                     *boxes,      //
                                                const mesh_tet_geom_t             *mesh_geom,  //
                                                const int                          num_z,      //
-                                               const int                          num_queries);
+                                               const int                          num_queries);                        //
 
 #endif  // __CELL_LIST_BENCH_H__
 /////////////////////////////////////////////////
