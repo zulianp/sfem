@@ -112,10 +112,21 @@ int free_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map) {
 // build_cell_list_3d_2d_map
 ////////////////////////////////////////////////
 #define DEBUG_OUTPUT
-int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map, const real_t *box_min_x, const real_t *box_min_y,
-                              const real_t *box_min_z, const real_t *box_max_x, const real_t *box_max_y, const real_t *box_max_z,
-                              const int num_boxes, const real_t x_min, const real_t x_max, const real_t y_min, const real_t y_max,
-                              const real_t z_min, const real_t z_max) {
+int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
+                              const real_t          *box_min_x,  //
+                              const real_t          *box_min_y,  //
+                              const real_t          *box_min_z,  //
+                              const real_t          *box_max_x,  //
+                              const real_t          *box_max_y,  //
+                              const real_t          *box_max_z,  //
+                              const int              num_boxes,  //
+                              const real_t           x_min,      //
+                              const real_t           x_max,      //
+                              const real_t           y_min,      //
+                              const real_t           y_max,      //
+                              const real_t           z_min,      //
+                              const real_t           z_max) {              //
+
     real_t max_delta_x = 0.0;
     real_t max_delta_y = 0.0;
     real_t max_delta_z = 0.0;

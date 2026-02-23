@@ -2,6 +2,7 @@
 #define __SFEM_RESAMPLE_FIELD_ADJOINT_HEX_QUAD_H__
 
 #include "sfem_resample_field.h"
+#include "sfem_resample_field_adjoint_hex_quad.h"
 #include "sfem_resample_field_adjoint_hyteg.h"
 #include "sfem_resample_field_tet4_math.h"
 #include "sfem_stack.h"
@@ -34,6 +35,13 @@ typedef struct {
 } ijk_index_t;
 
 typedef enum { TET_QUAD_MIDPOINT_NQP, TET_QUAD_GAUSS_LEGENDRE_NQP } tet_quad_midpoint_nqp_t;
+
+// Getter functions for quadrature point arrays
+real_t* get_Q_nodes_x_p(void);
+real_t* get_Q_nodes_y_p(void);
+real_t* get_Q_nodes_z_p(void);
+real_t* get_Q_weights_p(void);
+int     get_dim_qad();
 
 quadrature_point_result_t                                                  //
 transform_quadrature_point_n(const int                         q_ijk,      //
