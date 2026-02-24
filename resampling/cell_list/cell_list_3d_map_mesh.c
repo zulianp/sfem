@@ -129,15 +129,15 @@ query_cell_list_3d_2d_map_mesh_given_xy(         //
 //////////////////////////////////////////////////
 // query_cell_list_3d_2d_map_mesh_given_xy_tetsv
 //////////////////////////////////////////////////
-int                                                                                    //
-query_cell_list_3d_2d_map_mesh_given_xy_tetsv(const cell_list_3d_2d_map_t *map,        //
-                                              const boxes_t               *boxes,      //
-                                              const mesh_tet_geom_t       *mesh_geom,  //
-                                              const real_t                 x,          //
-                                              const real_t                 y,          //
-                                              const real_t                *z_array,    //
-                                              const int                    size_z,     //
-                                              int                         *tets_array) {                       //
+int                                                                                     //
+query_cell_list_3d_2d_map_mesh_given_xy_tets_v(const cell_list_3d_2d_map_t *map,        //
+                                               const boxes_t               *boxes,      //
+                                               const mesh_tet_geom_t       *mesh_geom,  //
+                                               const real_t                 x,          //
+                                               const real_t                 y,          //
+                                               const real_t                *z_array,    //
+                                               const int                    size_z,     //
+                                               int                         *tets_array) {                       //
 
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);
     // int iy = coord_to_grid_index(y, map->min_y, map->delta_y);
@@ -163,27 +163,13 @@ query_cell_list_3d_2d_map_mesh_given_xy_tetsv(const cell_list_3d_2d_map_t *map, 
 
     int boxes_found = 0;
 
-    for (int i = 0; i < size_z; i++) {
-        tets_array[i] = -1;  // Initialize output array to -1 (indicating not found)
-    }
+    // for (int i = 0; i < size_z; i++) {
+    //     tets_array[i] = -1;  // Initialize output array to -1 (indicating not found)
+    // }
 
     if (num_boxes_local > 0) {
         for (int iz = 0; iz < size_z; iz++) {
             const real_t z = z_array[iz];
-
-            // int lower_bound_index = lower_bound_generic(
-            //     &map->upper_bounds_z[start_index],
-            //     (size_t)num_boxes_local,
-            //     sizeof(real_t),
-            //     &z,
-            //     cmp_real_t);
-
-            // int upper_bound_index = upper_bound_generic(
-            //     &map->lower_bounds_z[start_index],
-            //     (size_t)num_boxes_local,
-            //     sizeof(real_t),
-            //     &z,
-            //     cmp_real_t);
 
             int lower_bound_index = lower_bound_float(&map->upper_bounds_z[start_index], num_boxes_local, z);
 
@@ -214,18 +200,19 @@ query_cell_list_3d_2d_map_mesh_given_xy_tetsv(const cell_list_3d_2d_map_t *map, 
                     real_t *inv_Jacobian  = get_inv_Jacobian_geom(mesh_geom, box_index);
                     real_t *vertices_zero = get_vertices_zero_geom(mesh_geom, box_index);
 
-                    const bool is_out = is_point_out_of_tet(inv_Jacobian,  //
-                                                            vertices_zero[0],
-                                                            vertices_zero[1],
-                                                            vertices_zero[2],
-                                                            x,
-                                                            y,
-                                                            z);
+                    const bool is_out = is_point_out_of_tet(inv_Jacobian,      //
+                                                            vertices_zero[0],  //
+                                                            vertices_zero[1],  //
+                                                            vertices_zero[2],  //
+                                                            x,                 //
+                                                            y,                 //
+                                                            z);                //
 
                     if (!is_out) {
-                        return box_index;  // Return the index of the first box found containing the point
-                        // If the mesh is well-behaved and the boxes are tight around the tets,
-                        // we can expect to find at most one box containing the point.
+                        // Store the index of the box (tet) found containing the point in the output array
+                        // Only one tet is expected to contain the point, so we can break after finding the first one.
+                        tets_array[iz] = box_index;
+                        break;
                     }
                 }
             }
@@ -269,4 +256,47 @@ int query_cell_list_3d_2d_split_map_mesh_given_xy(const cell_list_split_3d_2d_ma
                                                     y,               //
                                                     z_array,         //
                                                     size_z);         //
+}
+
+int                                                                                                 //
+query_cell_list_3d_2d_split_map_mesh_given_xy_tets_v(const cell_list_split_3d_2d_map_t *map,        //
+                                                     const boxes_t                     *boxes,      //
+                                                     const mesh_tet_geom_t             *mesh_geom,  //
+                                                     const real_t                       x,          //
+                                                     const real_t                       y,          //
+                                                     const real_t                      *z_array,    //
+                                                     const int                          size_z,     //
+                                                     int                               *tets_array) {                             //
+
+    if (map == NULL || boxes == NULL || mesh_geom == NULL || tets_array == NULL) {
+        return -1;  // Invalid pointer
+    }
+
+    // In this case it populates the tets_array with the results from both maps,
+    // since we want to get all the tets that contain the points (x, y, z_array), not just one.
+    // Considering the uniqueness of point -> tet: if the point is contained in a tet in the lower map,
+    // it should not be contained in any tet in the upper map, and vice versa.
+    // So there is no risk of overwriting results from one map with results from the other map in tets_array.
+
+    for (int i = 0; i < size_z; i++) {
+        tets_array[i] = -1;  // Initialize output array to -1 (indicating not found)
+    }
+
+    query_cell_list_3d_2d_map_mesh_given_xy_tets_v(map->map_lower,  //
+                                                   boxes,           //
+                                                   mesh_geom,       //
+                                                   x,               //
+                                                   y,               //
+                                                   z_array,         //
+                                                   size_z,          //
+                                                   tets_array);     //
+
+    query_cell_list_3d_2d_map_mesh_given_xy_tets_v(map->map_upper,  //
+                                                   boxes,           //
+                                                   mesh_geom,       //
+                                                   x,               //
+                                                   y,               //
+                                                   z_array,         //
+                                                   size_z,          //
+                                                   tets_array);     //
 }
