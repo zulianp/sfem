@@ -1,0 +1,1513 @@
+\documentclass[mscthesis]{usiinfthesis}
+\usepackage{lipsum}
+\usepackage{float}
+\usepackage{seqsplit}
+
+\usepackage{listings}
+\newtheorem{definition}{Definition}[chapter]
+\lstdefinelanguage{algebra}
+{morekeywords={import,sort,constructors,observers,transformers,axioms,if,
+else,end},
+sensitive=false,
+morecomment=[l]{//s},
+}
+
+
+
+\title{Solution to contact problem for non-linear thermo-viscoelastic materials in liquid diaphragm pumps} %compulsory
+\specialization{Computational Science}%optional
+\author{Haoyu Yang} %compulsory
+\begin{committee}
+\advisor{Prof.}{Krause}{Rolf} %compulsory
+\coadvisor{Dr.}{Zulian}{Patrick}{} %optional
+\end{committee}
+% \Day{September}{ %compulsory
+\Month{September} %compulsory
+\Year{2025} %compulsory, put only the year
+\place{Lugano} %compulsory
+
+\dedication{To my beloved} %optional
+\openepigraph{Someone said \dots}{Someone} %optional
+
+%\makeindex %optional, also comment out \theindex at the end
+
+\begin{document}
+
+\maketitle %generates the titlepage, this is FIXED
+
+\frontmatter %generates the frontmatter, this is FIXED
+
+\begin{abstract}
+This is a very abstract abstract. 
+
+\end{abstract}
+
+% \begin{abstract}[Zusammenfassung]
+% optional, use only if your external advisor requires it in his/er
+% language 
+% \\
+
+% \lipsum
+% \end{abstract}
+
+\begin{acknowledgements}
+
+\end{acknowledgements}
+
+\tableofcontents 
+\listoffigures %optional
+\listoftables %optional
+
+\mainmatter
+
+% ============================
+% Introduction (LaTeX)
+% Works with usiinfthesis + natbib (already loaded by the class)
+% ============================
+
+\chapter{Introduction}
+\label{ch:introduction}
+
+Elastomeric components such as rubber diaphragms and valves are key to the operation of
+reciprocating diaphragm pumps \cite{Swienty2024ICEC}. These parts undergo large, reversible
+deformations as the pump cycles, and they serve critical functions like sealing to prevent leakage.
+The ability of elastomers to sustain such extreme strains while repeatedly flexing makes them ideal
+for pump diaphragms, but it also poses significant challenges for simulation and design. A diaphragm
+experiences nonlinear elasticity at large strains and pronounced rate-dependent viscoelastic effects,
+meaning its stress response depends on the speed and history of deformation. In high-frequency pump
+applications, this leads to energy dissipation and stress relaxation that must be captured
+by the material model. At the same time, simulating an entire pump assembly with fine finite element
+meshes and many loading cycles is computationally intensive, straining both the memory and
+processing capabilities of standard solvers. The result is a strong industrial motivation to develop
+advanced constitutive models and numerical methods that can predict elastomer behavior in pumps
+with high fidelity and efficiency.\\
+
+\noindent Improving these simulations has direct societal and economic relevance: it enables virtual prototyping
+of pumps  and helps engineers
+optimize elastomer designs for durability and sealing performance without exhaustive physical testing
+\cite{Swienty2024ICEC}. In summary, the need to accurately represent complex polymer physics under real operating conditions, combined with the
+need for robust and fast computation, defines the central challenge addressed by this work.\\
+
+\noindent A number of physical phenomena govern the mechanics of elastomers in such applications.
+Hyperelasticity dominates the instantaneously recoverable response -- even soft rubber can support
+high stresses at finite strains by storing elastic energy. Viscoelasticity, on the other hand, introduces
+time-dependent behavior: under sustained deformation, stress relaxes, and under cyclic loads, energy
+is dissipated as heat. Together these lead to the characteristic hysteresis and stress relaxation observed
+in pump diaphragms made of materials like EPDM or polyurethane \cite{Somarathna2020}.
+Furthermore, elastomer behavior is highly rate-sensitive. At low strain rates they exhibit rubber-like
+compliance, whereas at higher rates they stiffen and can even appear leather-like. Somarathna et al.
+(2020) compiled several hyper-viscoelastic models for polyurethane and showed that capturing such
+rate-dependent transitions is essential for accurate predictions across different loading speeds
+\cite{Somarathna2020}.\\
+
+\noindent Another crucial aspect is the temperature dependence of viscoelastic response. Pump diaphragms may
+heat up from internal damping, or experience ambient temperature swings, which shifts their stiffness
+and damping characteristics. A common engineering approach to account for this is the
+time--temperature superposition principle (TTSP), wherein viscoelastic moduli at various temperatures
+are superposed by shifting along the time axis. This effectively defines a shift factor as a function of
+temperature, allowing a master relaxation curve to represent a family of curves. TTSP is widely used for
+polymers and is the basis for defining temperature-dependent material parameters in this thesis.
+However, it comes with limitations: assumptions of thermorheological simplicity often break down for
+filled elastomers or thermoplastics, leading to errors outside a limited temperature--frequency range.
+Indeed, recent studies have highlighted that while TTSP can extend viscoelastic data, its applicability
+must be carefully validated for the specific polymer and deformation mode in question
+\cite{Dorleans2021,Ionita2020}. In the present work, temperature effects are incorporated in a weakly
+coupled manner -- i.e.\ through temperature-dependent material properties
+rather than a fully coupled thermomechanical analysis. This provides a practical compromise: the
+material model can reflect the stiffening of the viscoelastic response at lower temperatures or its
+softening at higher temperatures \cite{Dorleans2021,Ionita2020}, without the considerable complexity
+of solving the heat equation alongside mechanics. The focus remains on capturing the key phenomena
+of finite-strain elasticity, rate-dependent viscoelastic dissipation, and temperature-modulated behavior,
+as all are vital to predicting how an elastomeric pump component will perform in service.\\
+
+\noindent Parallel to these physical considerations, there is a rich literature on constitutive modeling of finite-strain viscoelasticity that establishes the theoretical foundation for this work. Early pioneering
+frameworks by Simo (1987) and Reese \& Govindjee (1998) introduced thermodynamically consistent
+models for large-deformation viscoelastic behavior \cite{Simo1987,ReeseGovindjee1998}. These models
+are built within the continuum mechanics of irreversible processes: a free energy function is augmented with internal state variables that represent the viscous mechanisms, and a dissipation
+potential or evolution law is defined for those internal variables. This internal-variable approach, also
+adopted by Holzapfel (1996) for elastomeric structures, has crucial advantages \cite{Holzapfel1996}.
+First, it ensures compliance with the second law of thermodynamics -- the formulated models
+inherently produce non-negative dissipation, a property essential for realistic
+long-term behavior. Second, it provides a tractable way to represent hereditary effects  without storing the entire strain history. Instead, a finite set of internal variables characterizes the current viscoelastic state.\\
+
+\noindent As described in a modern overview by Hackett (2016), the internal variables are approximated by a
+recursive expression, and solving the hereditary integrals in incremental form becomes feasible
+\cite{Hackett2016}. In practical terms, this means that the convolution integral of past stresses is transformed into update formulas for internal stress-like variables -- a numerical
+scheme often known as the Prony series or generalized Maxwell recursion. Each internal variable
+typically decays exponentially, and the next increment's
+value can be updated from the previous step's value without integrating over the full past. This
+approach drastically reduces the computational cost of incorporating viscoelastic memory and has
+become standard in finite-strain viscoelastic FEM implementations
+\cite{Simo1987,ReeseGovindjee1998,Holzapfel1996,Hackett2016}.\\
+
+\noindent Reese and Govindjee's model in particular utilized a nonlinear evolution law for the internal variables,
+enabling it to capture far-from-equilibrium material behavior beyond the reach of linear viscoelastic
+approximations \cite{ReeseGovindjee1998}. Subsequent works built on this, for example by including
+damage in the viscoelastic network as Simo did, or by
+introducing flow rules analogous to plasticity for the viscous strains as in some quasi-linear models.
+More recently, Jinaga et al.\ (2025) proposed a comprehensive finite-strain thermomechanical
+viscoelastic--viscoplastic model for polymeric materials \cite{Jinaga2025}. Their framework, while very
+elaborate, underscores the state of the art in constitutive modeling: it incorporates temperature
+dependence and even a viscoplastic flow element on top of nonlinear
+viscoelasticity. This thesis is conceptually aligned with such frameworks -- especially in using internal
+variable evolution equations for viscoelasticity -- but stays within the viscoelastic regime
+and a moderate level of complexity.\\
+
+\noindent The chosen model can be seen as a generalized Maxwell chain at finite strain, calibrated to match the
+hyperelastic long-term response and a discrete relaxation spectrum of the material. The relaxation
+spectrum is represented by a Prony series whose parameters are obtained by fitting experimental data -- a process for which standard methods exist, including iterative algorithms
+to determine Prony coefficients from time-varying strain data \cite{Chen2000NASA}. Notably, an
+alternative approach is to infer a continuous relaxation spectrum and then discretize it optimally; this
+was demonstrated by Esposito et al.\ (2020) for polymeric foams \cite{Esposito2020}. In our case, we
+adopt a more straightforward identification of a finite Prony series, but the model could equivalently
+accommodate a spectrum derived from such continuous-to-discrete techniques. In summary, the
+literature provides a strong basis -- from thermodynamic consistency and internal-variable formulation
+to advanced coupling options -- and our constitutive implementation builds directly upon those
+well-established principles.\\
+
+\noindent Implementing a complex finite-strain viscoelastic model in a nonlinear finite element simulation raises
+several numerical challenges. One major challenge is the time integration of the internal variable
+evolution equations. Because the stiffness of the internal variables' ODEs can vary widely, an implicit integration scheme is usually preferred
+for stability. The exponential integrator or recursive update mentioned earlier is one such implicit
+scheme that is unconditionally stable for linear viscoelasticity and was extended to the nonlinear case
+by Simo and Reese \cite{Simo1987,ReeseGovindjee1998}. Ensuring stability and accuracy of the internal
+updates is critical for the overall Newton--Raphson iteration to converge, especially when many internal
+variables are active.\\
+
+\noindent Another challenge is computing the consistent tangent stiffness matrix for the Newton
+solver. Finite-strain viscoelastic models typically require analytical linearization of both the hyperelastic stress
+and the internal variable update to form a tangent moduli tensor consistent with the integration scheme.
+If the algorithmic tangent is not consistent, the global Newton iterations may stagnate or diverge,
+particularly under large deformation steps. Simo (1987) already emphasized such computational
+aspects by deriving the exact tangent for his model, and Reese \& Govindjee (1998) likewise provided
+detailed algorithmic consistency in their finite viscoelasticity theory \cite{Simo1987,ReeseGovindjee1998}.
+In the present implementation, a fully consistent Jacobian matrix is derived for the coupled hyper-
+viscoelastic material routine, which is critical for the quadratic convergence of Newton's method in our
+large-strain finite element context.\\
+
+\noindent Beyond correctness and stability, computational efficiency is paramount -- especially given the eventual
+goal of simulating full pump systems or large portions thereof. A straightforward finite element
+implementation of a hyper-viscoelastic material can be extremely demanding: every integration
+point not only stores the usual elastic strain measures but also a set of internal variables for the
+viscoelastic state. For a generalized Maxwell model with $N$ Prony terms, each integration point carries
+$N$ extra tensor variables. In a three-dimensional mesh with
+millions of elements, the memory required to store these history variables can become the bottleneck,
+exceeding CPU cache capacities and stressing memory bandwidth. This memory-intensive nature of
+history-dependent simulations often makes them bound by memory transfer speeds rather than raw CPU
+throughput.\\
+
+\noindent Modern research into high-performance computing (HPC) for finite elements offers strategies to alleviate
+this. One strategy is the use of matrix-free methods, wherein the global stiffness matrix is not assembled
+or stored explicitly. Instead, element residuals and stiffness actions are computed on-the-fly during the
+solver iterations. Martínez-Frutos \& Herrero-Pérez (2015) demonstrated an efficient matrix-free finite
+element scheme on GPUs for a fixed-grid elasticity problem, reducing memory use drastically by
+avoiding storage of large sparse matrices \cite{MartinezFrutos2015}. The matrix-free approach is
+attractive for our problem because it can similarly avoid storing a full material stiffness matrix that would
+anyway change every iteration due to viscoelasticity. By recomputing element contributions as needed, we trade extra computations for reduced memory usage --
+a good trade-off on modern architectures where FLOPs are abundant but memory bandwidth is limited.\\
+
+\noindent Another HPC strategy is to exploit GPUs for their parallel throughput,
+especially for the linear algebra and element calculations. However, achieving high performance on GPUs
+requires optimizing memory access patterns and minimizing data transfer between CPU and GPU. Taylor
+et al.\ (2008) demonstrated that even viscoelastic internal-variable updates can be integrated efficiently
+in GPU-based solvers \cite{taylor2008}.\\
+
+\noindent Our work follows these insights by offloading the linear viscoelastic operations to the GPU, treating them
+in a bulk, matrix-free fashion that maximizes the reuse of data on-device. By contrast, the nonlinear
+hyperelastic computations (which involve more complex tensor operations and conditional branches)
+are kept on the CPU in our current implementation, as they proved more difficult to vectorize and
+parallelize on the GPU. This split design leverages each processor's strengths: the GPU excels at the
+dense linear combinatorial updates for the internal variables across all integration points, while the CPU
+efficiently handles the sophisticated evaluation of the hyperelastic stress and tangent, benefitting from
+mature single-core libraries.\\
+
+\noindent Incorporate algebraic multigrid (AMG) preconditioner within the iterative solver for the
+linearized system at each Newton step also significantly accelerates convergence for the ill-conditioned
+stiffness matrices that can arise in nearly-incompressible elastomers. These HPC-oriented choices -- matrix-free element calculations, GPU-accelerated
+viscoelastic updates, and multigrid-precon-\\ditioned solves -- are aimed at overcoming the memory and
+processing challenges inherent in large-scale nonlinear viscoelastic simulations \cite{Schussnig2025}.\\
+
+\noindent Developing efficient GPU kernels typically requires careful low-level optimization -- for instance,
+coalescing memory accesses for internal-variable arrays and avoiding thread divergence when applying
+different Prony terms. Such low-level GPU optimization techniques have been surveyed extensively by
+Hijma et al.\ (2023) \cite{Hijma2023}.\\
+
+\noindent While contact mechanics is not the primary focus of this thesis, it is an important consideration for
+future work on pump simulations. Contact of viscoelastic bodies has a long history in mechanics; Lee \&
+Radok (1960) provided an early solution for a class of linear viscoelastic contact problems \cite{lee1960}.
+In diaphragm pumps, contact between elastomeric components and rigid seats is crucial for sealing; in
+future work, incorporating robust contact algorithms together with the present hyper-viscoelastic model
+will be a key extension \cite{Swienty2024ICEC}.\\
+
+% \noindent In light of the above context and challenges, there is a clear gap in the current practice: no open-source
+% solution presently combines a state-of-the-art finite-strain thermo-viscoelastic constitutive model with a
+% robust nonlinear solver and HPC optimizations geared towards industrial pump systems. Commercial
+% finite element packages do offer user subroutines for custom viscoelasticity, but these are often
+% proprietary, and their efficiency on modern parallel hardware is limited. Academic codes, on the other
+% hand, have explored high-order or GPU-based FEM but typically with simpler material models.\\
+
+% \noindent As a result, an engineer attempting to simulate a diaphragm pump under realistic cyclic loads might
+% face a dilemma: either simplify the material behavior (losing accuracy in predicting damping and stress
+% peaks) or simplify the simulation scope (model only a small segment, or a 2D slice, to keep computation
+% feasible). The work presented in this thesis aims to bridge that gap by delivering both: a sophisticated
+% material model capturing nonlinear viscoelasticity at finite strains with temperature-dependent
+% properties, and an implementation optimized for large-scale computation. The open-source nature of the
+% code (developed within the SFEM library \cite{SFEM}) further ensures that the outcomes can be freely used,
+% tested, and extended by both academia and industry.
+
+\noindent This thesis develops and validates a finite-strain thermo-viscoelastic material model and implements it
+in a modern finite element environment with HPC capabilities. The work encompasses:
+(i) formulating a nonlinear hyper-viscoelastic constitutive law (with internal variables for a Prony-series
+relaxation spectrum) and implementing it in the open-source SFEM code \cite{SFEM},
+(ii) deriving an efficient recursive update algorithm for the internal variables, which is used to integrate
+the viscoelastic overstress in each element without storing full strain history,
+(iii) incorporating temperature-dependent viscoelastic parameters via TTSP-based shift factors,
+(iv) offloading the computationally intensive linear viscoelastic updates to the GPU, using a custom
+matrix-free kernel that updates all internal variables in parallel,
+(v) ensuring that the overall non-linear hyper-viscoelastic solver runs stably on the CPU, and
+(vi) performing an extensive experimental validation in collaboration with an industrial partner: the
+model is calibrated against multi-rate test data for pump-grade elastomer and then used to simulate a
+diaphragm under realistic loading.\\
+
+\noindent The remainder of this thesis is organized as follows. Chapter 2 introduces the theoretical framework of
+finite-strain viscoelasticity, detailing the constitutive model's equations, the internal variable formalism,
+and the incorporation of time--temperature superposition for temperature-dependent behavior.
+Chapter 3 describes the numerical implementation in the SFEM finite element code: the time-integration
+of internal variables, the derivation of the consistent tangent, and the matrix-free GPU-accelerated
+solution strategy are presented, along with performance optimization details. In Chapter 4, we present
+several numerical examples xxxxxxxxx. Chapter 5 then focuses on the experimental validation: we discuss the material testing campaign,
+the parameter identification process for the Prony series, and the simulation of a diaphragm under cyclic
+pressure loading. Finally, Chapter 6 concludes the thesis by summarizing the findings, highlighting the
+contributions, and outlining future work.
+
+
+
+
+\chapter{Methodology}
+
+This chapter presents the theoretical foundations of the finite-strain hyper--viscoelastic solver developed in this thesis, with a clear path from continuum modeling to the discrete operators used in our Total Lagrangian implementation. We begin with a brief recap of linear elasticity (Sec.~2.1) to fix notation and establish stress and strain measures. We then review linear viscoelasticity and the Prony-series representation (Sec.~2.2), which motivates the internal-variable form adopted later for efficient large-scale finite element implementation.\\
+
+\noindent The main part of the chapter is devoted to finite-strain hyper--viscoelastodynamics (Sec.~2.3). We introduce the Total Lagrangian kinematics and stress measures (Sec.~2.3.1), define the equilibrium hyperelastic response using a decoupled Mooney--Rivlin model (Sec.~2.3.2), and extend it to rate-dependent behavior via a generalized Maxwell chain acting on the isochoric response using Prony internal variables (Sec.~2.3.3). To enable robust Newton iterations, we derive the algorithmic stress and its consistent linearization (Sec.~2.3.4). Finally, we formulate the weak form and the corresponding discrete operators needed for assembly (Sec.~2.3.5), and conclude with the time integration strategy based on Newmark-$\beta$ together with a Newton--Raphson solve at each time step (Sec.~2.3.6).
+
+
+\section{Linear elasticity under infinitesimal strains}
+\label{sec:linear_elasticity}
+
+This section briefly recalls small-strain linear elasticity to establish notation and a baseline
+mechanical model used later for comparison and for algorithmic components. Although the elastomeric components considered in this thesis
+ultimately require finite-strain hyper-viscoelasticity, the linear theory remains useful as a
+reference point and as a stepping stone toward more complex constitutive laws \cite{bower2012}.
+
+\subsection{Kinematics and assumptions}
+Let $\boldsymbol{u}:\Omega\rightarrow\mathbb{R}^d$ denote the displacement field in a domain $\Omega$.
+Under the assumption of infinitesimal strains, the strain tensor is defined by the symmetric part of
+the displacement gradient:
+\begin{equation}
+\boldsymbol{\varepsilon}(\boldsymbol{u})
+=
+\frac{1}{2}\left(\nabla \boldsymbol{u} + (\nabla \boldsymbol{u})^{T}\right).
+\label{eq:infinitesimal_strain}
+\end{equation}
+Small-strain linear elasticity is characterized by the following standard assumptions \cite{bower2012}:
+\begin{itemize}
+  \item \textbf{Reversibility.} After removal of external loads, the body returns to its undeformed configuration.
+  \item \textbf{Rate- and history-independence.} The stress depends only on the current strain state; it is independent of loading rate and prior history.
+  \item \textbf{Linearity (Hooke's law).} The stress--strain relation is linear within the small-deformation regime.
+  \item \textbf{Isotropy.} For materials without preferred directions, the constitutive response is invariant under rigid rotations.
+\end{itemize}
+
+\subsection{Constitutive law and elasticity tensor}
+The constitutive relation of a linear elastic solid reads
+\begin{equation}
+\boldsymbol{\sigma}
+=
+\mathbb{C}:\boldsymbol{\varepsilon},
+\qquad
+\sigma_{ij} = C_{ijkl}\,\varepsilon_{kl},
+\label{eq:linear_elastic_constitutive_tensor}
+\end{equation}
+where $\boldsymbol{\sigma}$ is the Cauchy stress tensor, $\boldsymbol{\varepsilon}$ is the infinitesimal
+strain tensor, and $\mathbb{C}$ is the fourth-order elasticity tensor. For an isotropic material,
+$\mathbb{C}$ reduces to the Lam\'e form
+\begin{equation}
+C_{ijkl}
+=
+\lambda\,\delta_{ij}\delta_{kl}
++
+\mu\,(\delta_{ik}\delta_{jl}+\delta_{il}\delta_{jk}),
+\label{eq:lame_form}
+\end{equation}
+where $\lambda$ and $\mu$ are the Lam\'e parameters, and $\delta_{ij}$ is the Kronecker delta.
+Equivalently, \eqref{eq:linear_elastic_constitutive_tensor} can be written compactly as
+\begin{equation}
+\boldsymbol{\sigma}
+=
+\lambda\,\mathrm{tr}(\boldsymbol{\varepsilon})\,\mathbf{I}
++
+2\mu\,\boldsymbol{\varepsilon}.
+\label{eq:linear_elastic_constitutive}
+\end{equation}
+
+\subsection{Material parameters}
+The Lam\'e parameters are related to Young's modulus $E$, Poisson's ratio $\nu$, the bulk modulus
+$K$, and the shear modulus $\mu$ by
+\begin{equation}
+\mu=\frac{E}{2(1+\nu)},
+\qquad
+\lambda=\frac{E\nu}{(1+\nu)(1-2\nu)},
+\qquad
+K=\lambda+\frac{2}{3}\mu.
+\label{eq:lame_relations}
+\end{equation}
+In nearly incompressible materials (a common situation for elastomers), $\nu\to 1/2$ and thus
+$K\gg \mu$. This separation of volumetric and deviatoric stiffness will later motivate the explicit
+volumetric--isochoric splitting used in the finite-strain hyperelastic formulation.
+
+\subsection{Strain energy density}
+For linear elasticity, the stored energy density is quadratic in strain:
+\begin{equation}
+W(\boldsymbol{\varepsilon})
+=
+\frac{\lambda}{2}\big(\mathrm{tr}\boldsymbol{\varepsilon}\big)^2
++
+\mu\,\boldsymbol{\varepsilon}:\boldsymbol{\varepsilon},
+\label{eq:linear_elastic_energy}
+\end{equation}
+and the constitutive law \eqref{eq:linear_elastic_constitutive} follows from
+$\boldsymbol{\sigma}=\partial W/\partial \boldsymbol{\varepsilon}$.
+This energy-based viewpoint provides a direct conceptual bridge to hyperelasticity, where the energy
+is defined in terms of finite-strain measures and stresses are obtained via appropriate derivatives.\\
+
+\noindent
+Linear elasticity provides a compact baseline operator $\mathbb{C}$ and a clear
+volumetric/deviatoric structure. In the next section, we revisit viscoelasticity and introduce internal
+variables and Prony-series recursion, which will be reused in the finite-strain hyper-viscoelastic
+model developed later.
+
+\section{Linear viscoelasticity}
+\label{sec:linear_viscoelasticity}
+
+Elastomers and many polymer-based materials exhibit a mechanical response that is neither purely
+elastic nor purely viscous. Under loading, part of the deformation is stored and recovered,
+while another part is associated with time-dependent molecular rearrangements (viscosity), leading to
+\emph{creep} and \emph{stress relaxation}. From an engineering viewpoint, these effects manifest as
+rate dependence, hysteresis, and strong temperature
+sensitivity—features that are central for predicting the dynamic behaviour of pump-grade elastomeric
+components under repeated excitation \cite{bower2012,Haupt2002}.
+
+\subsection{Key phenomena and temperature sensitivity}
+Two canonical experiments summarize linear viscoelastic behaviour:
+(i) \textbf{creep}: the strain increases in time under constant stress;
+(ii) \textbf{stress relaxation}: the stress decreases in time under constant strain.
+In dynamic settings, viscoelasticity also implies phase lag between stress and strain, and therefore
+cycle-to-cycle energy dissipation. Moreover, polymer stiffness varies markedly with temperature,
+especially near transitions such as the glass-transition region. Fig.~\ref{fig:shear_modulus_temp}
+illustrates the qualitative dependence of shear modulus on temperature for a typical polymer
+\cite{bower2012}. In this thesis, such temperature effects are later incorporated through
+\emph{temperature-dependent material parameters}, rather than by solving a coupled
+thermal PDE.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{Variation_of_shear_modulus_with_diff_T.png}
+  \caption{Qualitative variation of shear modulus of a typical polymer with temperature \cite{bower2012}.}
+  \label{fig:shear_modulus_temp}
+\end{figure}
+
+\subsection{Spring--dashpot representations (mechanical analogs)}
+A widely used entry point to linear viscoelasticity is the spring--dashpot analogy, where a linear
+spring represents elasticity and a dashpot represents viscosity. Classical two-parameter models include
+the Kelvin--Voigt model and the Maxwell mode. By combining multiple Maxwell branches in parallel, one obtains the \emph{generalized Maxwell}
+model, which naturally leads to a Prony-series representation of relaxation \cite{bower2012,Haupt2002}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{dff_spring_dashpot.png}
+  \caption{Spring--dashpot representations commonly used to model polymer viscoelasticity.}
+  \label{fig:spring_dashpot_models}
+\end{figure}
+
+\subsection{Kelvin--Voigt model}
+In the Kelvin--Voigt model, a spring of stiffness $E$ and a dashpot of viscosity $\eta$ are connected in
+parallel. The strain is shared by both elements, while stresses add up, yielding
+\begin{equation}
+  \boldsymbol{\sigma}(t) = E\,\boldsymbol{\varepsilon}(t) + \eta\,\dot{\boldsymbol{\varepsilon}}(t).
+  \label{eq:kelvin_voigt}
+\end{equation}
+This model captures \emph{creep} with a bounded long-time strain under a constant applied stress, but it
+does not reproduce an instantaneous stress jump under an imposed strain history and therefore
+cannot represent stress relaxation accurately \cite{bower2012}. In practice, Kelvin--Voigt is often used as
+a simple damping model, or as a building block when viscoelasticity is embedded into a broader
+framework.
+
+\subsection{Maxwell model}
+In the Maxwell model, the spring and dashpot are connected in series. The stress is common to both
+elements, while total strain is additive, which leads to
+\begin{equation}
+  \dot{\boldsymbol{\varepsilon}}(t) = \frac{\boldsymbol{\sigma}(t)}{\eta}
+  + \frac{1}{E}\dot{\boldsymbol{\sigma}}(t).
+  \label{eq:maxwell}
+\end{equation}
+The Maxwell model reproduces \emph{stress relaxation} naturally: under a suddenly imposed constant
+strain, the stress decays exponentially with a characteristic relaxation time $\tau=\eta/E$
+\cite{Haupt2002}. However, under constant stress it predicts unbounded creep. This motivates the use
+of multiple relaxation mechanisms in parallel.
+
+\subsection{Generalized Maxwell model and Prony-series representation}
+Real polymers exhibit a \emph{spectrum} of relaxation times rather than a single relaxation time. A common
+linear model is the generalized Maxwell model, consisting of $N$ Maxwell branches in parallel with an
+equilibrium spring. Fig.~\ref{fig:generalised_Maxwell_model} illustrates this construction.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{generallized_maxwell.png}
+  \caption{Generalized Maxwell model (Prony-series representation) \cite{Penghao2024}.}
+  \label{fig:generalised_Maxwell_model}
+\end{figure}
+
+\noindent
+In a compact form, the total stress is decomposed into an equilibrium contribution and viscous
+overstresses:
+\begin{equation}
+  \boldsymbol{\sigma} = E_\infty \boldsymbol{\varepsilon} + \sum_{i=1}^{N} \boldsymbol{q}_i,
+  \label{eq:total_stress}
+\end{equation}
+where $\boldsymbol{q}_i$ denotes the internal (branch) stress of the $i$-th Maxwell element, and
+$E_\infty$ is the long-time (equilibrium) modulus. Using the internal strain variable
+$\boldsymbol{\alpha}_i$ for the dashpot strain, one may write the branch relation as
+\begin{equation}
+  \boldsymbol{q}_i(t) = \eta_i\,\dot{\boldsymbol{\alpha}}_i(t) = E_i(\boldsymbol{\varepsilon}-\boldsymbol{\alpha}_i).
+  \label{eq:prony_internal}
+\end{equation}
+Differentiating \eqref{eq:prony_internal} and eliminating $\dot{\boldsymbol{\alpha}}_i$ yields the
+standard first-order evolution equation
+\begin{equation}
+  \dot{\boldsymbol{q}}_i(t) + \frac{\boldsymbol{q}_i}{\tau_i} = \frac{d}{dt}\left(E_i\boldsymbol{\varepsilon}\right),
+  \qquad \tau_i = \eta_i/E_i.
+  \label{eq:prony_evolution}
+\end{equation}
+Equation \eqref{eq:prony_evolution} is linear and admits a convolution representation. Using an
+integrating-factor argument (and assuming $\boldsymbol{q}_i(0)=\mathbf{0}$ for simplicity) one obtains
+\begin{align}
+  \boldsymbol{q}_i(t)
+  &= E_i \exp(-t/\tau_i)\int_0^t \exp(s/\tau_i)\,\dot{\boldsymbol{\varepsilon}}(s)\,ds
+  \label{eq:q_i_initial}
+\end{align}
+and equivalently the hereditary (Boltzmann-type) form
+\begin{equation}
+  \boldsymbol{q}_i(t) = E_i \int_0^t \exp\!\left(-\frac{t-s}{\tau_i}\right)\dot{\boldsymbol{\varepsilon}}(s)\,ds.
+  \label{eq:q_i_conv_non_{node}orm}
+\end{equation}
+
+\subsubsection{Normalized Prony coefficients}
+Define the instantaneous modulus
+\begin{equation}
+  E_0 = E_\infty + \sum_{i=1}^{N} E_i,
+\end{equation}
+and normalized Prony coefficients
+\begin{equation}
+  g_\infty=\frac{E_\infty}{E_0},
+  \qquad
+  g_i=\frac{E_i}{E_0},
+  \qquad
+  g_\infty+\sum_{i=1}^N g_i = 1.
+\end{equation}
+Then \eqref{eq:total_stress} can be rewritten as
+\begin{equation}
+  \boldsymbol{\sigma} = g_\infty E_0 \boldsymbol{\varepsilon} + \sum_{i=1}^{N} \boldsymbol{q}_i,
+\end{equation}
+where the branch stress takes the normalized convolution form
+\begin{equation}
+  \boldsymbol{q}_i(t) = g_i E_0 \int_0^t \exp\!\left(-\frac{t-s}{\tau_i}\right)\dot{\boldsymbol{\varepsilon}}(s)\,ds.
+  \label{eq:q_i}
+\end{equation}
+
+\subsubsection{Time interval partitioning and recursive update}
+We now have a closed formula between $\boldsymbol{q}_i$ and $\boldsymbol{\varepsilon}$, but since
+\eqref{eq:q_i} is a convolution integral, evaluating it from $0$ to $t$ at every time step is not practical.
+A standard remedy is to derive a \emph{recursive} update, which avoids storing the full strain history and
+only requires the previous internal state. Following the discretization strategy also discussed in
+\cite{Penghao2024}, consider a time interval $[t_n,t_{n+1}]$ with $\Delta t=t_{n+1}-t_n$ and split
+\eqref{eq:q_i} into a history part and a current-step part:
+\begin{align}
+\boldsymbol{q}_i(t_{n+1}) &= g_i E_0 \int_0^{t_n} \exp\left[-\frac{t_{n+1}-s}{\tau_i}\right] \frac{d\boldsymbol{\varepsilon}(s)}{ds} ds \notag \\
+&\quad + g_i E_0 \int_{t_n}^{t_{n+1}} \exp\left[-\frac{t_{n+1}-s}{\tau_i}\right] \frac{d\boldsymbol{\varepsilon}(s)}{ds} ds.
+\end{align}
+The first integral can be expressed using $\boldsymbol{q}_i(t_n)$:
+\begin{align}
+&g_i E_0 \int_0^{t_n} \exp\left[-\frac{t_{n+1}-s}{\tau_i}\right] \frac{d\boldsymbol{\varepsilon}(s)}{ds} ds \notag \\
+&= g_i E_0 \exp\left[-\frac{\Delta t}{\tau_i}\right] \int_0^{t_n} \exp\left[-\frac{t_n-s}{\tau_i}\right] \frac{d\boldsymbol{\varepsilon}(s)}{ds} ds \notag \\
+&= \exp\left[-\frac{\Delta t}{\tau_i}\right]\boldsymbol{q}_i(t_n).
+\end{align}
+For the second integral, assume a linear variation of strain over the time step:
+\begin{equation}
+\boldsymbol{\varepsilon}(s) \approx \boldsymbol{\varepsilon}(t_n) + \frac{s-t_n}{\Delta t}\big[\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)\big],
+\end{equation}
+so that the strain rate is approximately constant:
+\begin{equation}
+\frac{d\boldsymbol{\varepsilon}(s)}{ds} \approx \frac{\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)}{\Delta t}.
+\end{equation}
+Substituting into the integral yields
+\begin{align}
+&g_i E_0\int_{t_n}^{t_{n+1}} \exp\left[-\frac{t_{n+1}-s}{\tau_i}\right]
+\frac{\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)}{\Delta t}\,ds \notag\\
+&= g_i E_0\frac{\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)}{\Delta t}\,
+\tau_i\left[1-\exp\left(-\frac{\Delta t}{\tau_i}\right)\right].
+\end{align}
+Combining both parts leads to the recursion
+\begin{align}
+\boldsymbol{q}_i(t_{n+1})
+&= \exp\left(-\frac{\Delta t}{\tau_i}\right)\boldsymbol{q}_i(t_n)
++ g_i E_0\frac{\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)}{\Delta t}\,
+\tau_i\left[1-\exp\left(-\frac{\Delta t}{\tau_i}\right)\right].
+\end{align}
+Define the coefficients
+\begin{align}
+\alpha_i &= \exp\left(-\frac{\Delta t}{\tau_i}\right),\\
+\beta_i  &= g_i E_0\frac{1-\exp(-\Delta t/\tau_i)}{\Delta t/\tau_i},
+\end{align}
+and obtain the compact discrete update
+\begin{equation}
+\boxed{
+\begin{cases}
+\boldsymbol{q}_i(t_{n+1}) = \alpha_i\,\boldsymbol{q}_i(t_n)
++ \beta_i\,[\boldsymbol{\varepsilon}(t_{n+1})-\boldsymbol{\varepsilon}(t_n)],\\
+\alpha_i = \exp(-\Delta t/\tau_i),\\
+\beta_i = g_i E_0 \dfrac{1-\exp(-\Delta t/\tau_i)}{\Delta t/\tau_i}.
+\end{cases}}
+\label{eq:prony_recursion}
+\end{equation}
+
+\noindent
+The recursion \eqref{eq:prony_recursion} is essential for efficient simulation: it replaces full-history
+convolution by a local update per time step, requiring only the previous internal state
+$\boldsymbol{q}_i(t_n)$. This formulation will later be reused when constructing a time-discrete,
+dynamics-oriented solver where viscoelastic internal variables must be updated consistently at each step.\\
+
+\noindent
+The remainder of this chapter moves from constitutive modelling to discretization. We next introduce
+the finite element setting and the time-integration strategy used for dynamics (Newmark-$\beta$),
+which provides the backbone for transient simulations with viscoelastic constitutive updates.
+
+
+% ==========================================================
+% 2.3 Finite-strain hyper-viscoelastodynamics (mainline)
+% 2.3.1 Finite-strain kinematics & stress measures (TL)
+% ==========================================================
+
+\section{Finite-strain hyper-viscoelastodynamics}
+\label{sec:finite_strain_mainline}
+
+\subsection{Finite-strain kinematics and stress measures (Total Lagrangian)}
+\label{sec:finite_strain_kinematics}
+
+\paragraph{Notation and conventions.}
+Scalars are denoted by italic letters (e.g.\ $t$), vectors by bold lowercase (e.g.\ $\mathbf{u}$),
+and second-order tensors by bold uppercase (e.g.\ $\mathbf{F}$).
+The identity tensor is $\mathbf{I}$, the transpose is $(\cdot)^T$,
+the trace is $\mathrm{tr}(\cdot)$, and the determinant is $\det(\cdot)$.
+For two second-order tensors $\mathbf{A},\mathbf{B}$, the double contraction is
+$\mathbf{A}:\mathbf{B} := \sum_{i,j} A_{ij}B_{ij}$.
+All gradients and divergences in this section are taken with respect to the \emph{reference}
+(material) coordinates $\mathbf{X}$; we denote
+\[
+\nabla_{\!X}(\cdot) := \frac{\partial(\cdot)}{\partial\mathbf{X}},
+\qquad
+\mathrm{Div}(\cdot) := \nabla_{\!X}\!\cdot(\cdot).
+\]
+
+\paragraph{Reference configuration and motion.}
+Let $\Omega_0 \subset \mathbb{R}^3$ be the reference configuration of the body,
+with boundary $\partial\Omega_0 = \Gamma_0^{u} \cup \Gamma_0^{t}$, where
+$\Gamma_0^{u}$ is the displacement (Dirichlet) boundary and $\Gamma_0^{t}$ is the traction (Neumann) boundary.
+Material points are labeled by $\mathbf{X}\in\Omega_0$ and time by $t\in[0,T]$, where $T>0$ is the final time.
+The motion map is
+\begin{equation}
+  \boldsymbol{\varphi}(\mathbf{X},t) : \Omega_0 \times [0,T] \to \mathbb{R}^3,
+  \qquad
+  \mathbf{x} = \boldsymbol{\varphi}(\mathbf{X},t),
+\end{equation}
+and the displacement field is defined by
+\begin{equation}
+  \mathbf{u}(\mathbf{X},t) := \boldsymbol{\varphi}(\mathbf{X},t) - \mathbf{X}.
+\end{equation}
+In a \emph{Total Lagrangian} formulation, unknowns and test functions are defined on $\Omega_0$,
+and all volume integrals are evaluated over $\Omega_0$.
+
+\paragraph{Deformation gradient and Jacobian.}
+The deformation gradient is the reference gradient of the motion:
+\begin{equation}
+  \mathbf{F}(\mathbf{X},t) := \nabla_{\!X}\boldsymbol{\varphi}(\mathbf{X},t)
+  = \mathbf{I} + \nabla_{\!X}\mathbf{u}(\mathbf{X},t).
+  \label{eq:def_F}
+\end{equation}
+The local volume change is measured by the Jacobian determinant
+\begin{equation}
+  J(\mathbf{X},t) := \det\mathbf{F}(\mathbf{X},t),
+  \qquad J>0,
+  \label{eq:def_J}
+\end{equation}
+and the reference and current volume elements satisfy $dv = J\,dV$,
+where $dV$ denotes an infinitesimal volume in $\Omega_0$ and $dv$ its image in the current configuration.
+
+\paragraph{Strain measure and invariants.}
+We introduce the right Cauchy--Green tensor
+\begin{equation}
+  \mathbf{C}(\mathbf{X},t) := \mathbf{F}^T\mathbf{F}.
+  \label{eq:def_C}
+\end{equation}
+For isotropic materials, it is convenient to use the principal invariants of $\mathbf{C}$:
+\begin{equation}
+  I_1(\mathbf{C}) := \mathrm{tr}(\mathbf{C}),\qquad
+  I_2(\mathbf{C}) := \tfrac{1}{2}\Big[(\mathrm{tr}\,\mathbf{C})^2 - \mathrm{tr}(\mathbf{C}^2)\Big],\qquad
+  I_3(\mathbf{C}) := \det(\mathbf{C}) = J^2.
+  \label{eq:C_invariants}
+\end{equation}
+
+\paragraph{Isochoric--volumetric split (nearly-incompressible elastomers).}
+To separate distortional (volume-preserving) deformation from volumetric deformation,
+we define the \emph{isochoric} deformation gradient and right Cauchy--Green tensor by
+\begin{equation}
+  \bar{\mathbf{F}} := J^{-1/3}\mathbf{F},
+  \qquad
+  \bar{\mathbf{C}} := \bar{\mathbf{F}}^T\bar{\mathbf{F}} = J^{-2/3}\mathbf{C},
+  \label{eq:isochoric_split}
+\end{equation}
+so that $\det\bar{\mathbf{F}}=1$ and $\det\bar{\mathbf{C}}=1$.
+The corresponding isochoric invariants are defined as
+\begin{equation}
+  \bar{I}_1 := \mathrm{tr}(\bar{\mathbf{C}}) = J^{-2/3} I_1,
+  \qquad
+  \bar{I}_2 := \tfrac{1}{2}\Big[(\mathrm{tr}\,\bar{\mathbf{C}})^2 - \mathrm{tr}(\bar{\mathbf{C}}^2)\Big]
+             = J^{-4/3} I_2.
+  \label{eq:isochoric_invariants}
+\end{equation}
+This split will be used in Section~\ref{sec:mooney_rivlin_flexible} to define the equilibrium
+hyperelastic energy $W_\infty(\bar{\mathbf{C}},J)$, and in Section~\ref{sec:finite_strain_prony}
+to formulate a deviatoric (isochoric) Prony-series overstress.
+
+\paragraph{Stress measures.}
+We use the first Piola--Kirchhoff stress $\mathbf{P}(\mathbf{X},t)$, which maps reference area normals to current tractions.
+It is related to the second Piola--Kirchhoff stress $\mathbf{S}(\mathbf{X},t)$ by
+\begin{equation}
+  \mathbf{P} = \mathbf{F}\mathbf{S}.
+  \label{eq:P_S_relation}
+\end{equation}
+For completeness, the Kirchhoff stress $\boldsymbol{\tau}$ and the Cauchy stress $\boldsymbol{\sigma}$ are
+\begin{equation}
+  \boldsymbol{\tau} := \mathbf{P}\mathbf{F}^T,
+  \qquad
+  \boldsymbol{\sigma} := \frac{1}{J}\boldsymbol{\tau}.
+  \label{eq:tau_sigma}
+\end{equation}
+
+\paragraph{Work conjugacy and internal virtual work (Total Lagrangian).}
+Let $\delta\mathbf{u}$ be an admissible virtual displacement (test variation) on $\Omega_0$.
+The corresponding virtual deformation-gradient increment is
+$\delta\mathbf{F} := \nabla_{\!X}\delta\mathbf{u}$.
+In the Total Lagrangian setting, the internal virtual work is
+\begin{equation}
+  \delta W_{\mathrm{int}}
+  = \int_{\Omega_0} \mathbf{P} : \delta\mathbf{F}\, dV
+  = \int_{\Omega_0} \mathbf{P} : \nabla_{\!X}\delta\mathbf{u}\, dV.
+  \label{eq:virtual_work_P}
+\end{equation}
+This relation fixes the stress measure used in the finite element residual:
+$\mathbf{P}$ is \emph{work-conjugate} to $\mathbf{F}$ in $\Omega_0$.
+
+\paragraph{Hyperelastic equilibrium stress from a stored energy.}
+If an equilibrium (rate-independent) stored energy density per unit reference volume,
+$W(\mathbf{F})$ (or equivalently $W(\mathbf{C})$), is specified, then the associated stresses are
+\begin{equation}
+  \mathbf{P} := \frac{\partial W}{\partial \mathbf{F}},
+  \qquad
+  \mathbf{S} := 2\,\frac{\partial W}{\partial \mathbf{C}},
+  \label{eq:def_P_S_from_energy}
+\end{equation}
+with $\mathbf{P}=\mathbf{F}\mathbf{S}$ consistent with \eqref{eq:P_S_relation}.
+The specific form of $W$ used in this thesis (Mooney--Rivlin, flexible variant) is introduced next.
+
+
+\subsection{Hyperelasticity: Mooney--Rivlin}
+\label{sec:mr_flexible}
+
+To construct a finite-strain hyper--viscoelastic model, we first define the
+\emph{equilibrium} (long-term) response that remains after all viscoelastic overstresses
+have decayed. Throughout this thesis, the subscript ``$\infty$'' refers to this
+\emph{relaxed equilibrium branch}. Importantly, only the \emph{isochoric} response is allowed
+to relax in the present model (Sec.~\ref{sec:fs_visco_prony}), whereas the volumetric response
+is kept purely elastic.
+
+\paragraph{Isochoric--volumetric split.}
+We adopt the standard decoupled form
+\begin{equation}
+  W(\mathbf{C})
+  = W_{\mathrm{iso}}(\bar{\mathbf{C}}) + W_{\mathrm{vol}}(J),
+  \label{eq:W_split}
+\end{equation}
+with $J=\det\mathbf{F}>0$ and the isochoric right Cauchy--Green tensor
+\begin{equation}
+  \bar{\mathbf{C}} := J^{-2/3}\mathbf{C}, \qquad \det\bar{\mathbf{C}}=1,
+  \label{eq:Cbar_def}
+\end{equation}
+where $\mathbf{C}=\mathbf{F}^\mathsf{T}\mathbf{F}$. The split isolates the deviatoric response
+from the volumetric response.
+
+\paragraph{Mooney--Rivlin isochoric energy.}
+For the deviatoric part we use the Mooney--Rivlin model written in terms of the
+\emph{isochoric invariants} of $\bar{\mathbf{C}}$:
+\begin{equation}
+  \bar I_1 := \mathrm{tr}(\bar{\mathbf{C}}),\qquad
+  \bar I_2 := \tfrac12\left[(\mathrm{tr}\,\bar{\mathbf{C}})^2-\mathrm{tr}(\bar{\mathbf{C}}^2)\right].
+  \label{eq:Ibar_def}
+\end{equation}
+The isochoric stored energy is
+\begin{equation}
+  W_{\mathrm{iso}}(\bar{\mathbf{C}})
+  = C_{10}\,(\bar I_1-3) + C_{01}\,(\bar I_2-3),
+  \label{eq:W_iso_mr}
+\end{equation}
+where $C_{10}$ and $C_{01}$ are material parameters.
+
+\paragraph{Volumetric penalty (purely elastic).}
+To control compressibility we employ the quadratic penalty
+\begin{equation}
+  W_{\mathrm{vol}}(J) = \frac{1}{D_1}(J-1)^2,
+  \label{eq:W_vol_penalty}
+\end{equation}
+with parameter $D_1>0$. In the small-strain limit this corresponds to an effective bulk modulus
+$K \approx 2/D_1$, hence small $D_1$ enforces near-incompressibility.
+
+% \paragraph{Stress measures and notation used in the sequel.}
+% Since the energy is defined per unit reference volume, we work with the second and first
+% Piola--Kirchhoff stresses
+% \begin{equation}
+%   \mathbf{S} := 2\,\frac{\partial W}{\partial \mathbf{C}},
+%   \qquad
+%   \mathbf{P} := \frac{\partial W}{\partial \mathbf{F}}
+%   \quad\text{with}\quad
+%   \mathbf{P} = \mathbf{F}\,\mathbf{S}.
+%   \label{eq:S_P_from_W_general}
+% \end{equation}
+% In a Total Lagrangian setting, these are the natural measures entering the weak form.
+
+\paragraph{Instantaneous-reference split.}
+We define the \emph{instantaneous-reference} stresses associated with the split \eqref{eq:W_split} as
+\begin{equation}
+  \mathbf{S}_{\mathrm{iso},0} := 2\,\frac{\partial W_{\mathrm{iso}}(\bar{\mathbf{C}})}{\partial \mathbf{C}},
+  \qquad
+  \mathbf{S}_{\mathrm{vol}} := 2\,\frac{\partial W_{\mathrm{vol}}(J)}{\partial \mathbf{C}},
+  \label{eq:S_iso0_S_vol_def}
+\end{equation}
+and the corresponding first Piola stresses
+\begin{equation}
+  \mathbf{P}_{\mathrm{iso},0} := \mathbf{F}\mathbf{S}_{\mathrm{iso},0},
+  \qquad
+  \mathbf{P}_{\mathrm{vol}} := \mathbf{F}\mathbf{S}_{\mathrm{vol}}.
+  \label{eq:P_iso0_P_vol_def}
+\end{equation}
+Here $\mathbf{S}_{\mathrm{iso},0}$ will serve as the driving stress for the Maxwell branches in
+Sec.~\ref{sec:fs_visco_prony}. Note that $\mathbf{S}_{\mathrm{vol}}$ is \emph{purely elastic} in the present thesis;
+hence we do \emph{not} attach subscripts ``$0$'' or ``$\infty$'' to volumetric quantities.
+
+\paragraph{Closed-form expressions.}
+For the Mooney--Rivlin form \eqref{eq:W_iso_mr}, it is convenient to express $\mathbf{S}_{\mathrm{iso},0}$ via
+the derivatives of the isochoric invariants with respect to $\mathbf{C}$. Using
+$\bar I_1 = J^{-2/3} I_1$ and $\bar I_2 = J^{-4/3} I_2$ with
+$I_1=\mathrm{tr}\,\mathbf{C}$ and $I_2=\tfrac12[(\mathrm{tr}\,\mathbf{C})^2-\mathrm{tr}(\mathbf{C}^2)]$,
+one obtains the standard relations
+\begin{align}
+  \frac{\partial \bar I_1}{\partial \mathbf{C}}
+  &= J^{-2/3}\left(\mathbf{I} - \frac{1}{3} I_1\,\mathbf{C}^{-1}\right), \label{eq:dIbar1_dC}\\
+  \frac{\partial \bar I_2}{\partial \mathbf{C}}
+  &= J^{-4/3}\left( I_1\,\mathbf{I} - \mathbf{C} - \frac{2}{3} I_2\,\mathbf{C}^{-1}\right), \label{eq:dIbar2_dC}
+\end{align}
+and therefore
+\begin{equation}
+  \mathbf{S}_{\mathrm{iso},0}
+  = 2\left(
+  C_{10}\,\frac{\partial \bar I_1}{\partial \mathbf{C}}
+  + C_{01}\,\frac{\partial \bar I_2}{\partial \mathbf{C}}
+  \right).
+  \label{eq:S_iso_mr}
+\end{equation}
+For the volumetric energy \eqref{eq:W_vol_penalty}, using
+$\dfrac{\partial J}{\partial \mathbf{C}}=\tfrac12 J\,\mathbf{C}^{-1}$ yields
+\begin{equation}
+  \mathbf{S}_{\mathrm{vol}}
+  = 2\,\frac{\partial W_{\mathrm{vol}}}{\partial \mathbf{C}}
+  = 2\left(\frac{2}{D_1}(J-1)\right)\frac{\partial J}{\partial \mathbf{C}}
+  = \frac{2J(J-1)}{D_1}\,\mathbf{C}^{-1}.
+  \label{eq:S_vol}
+\end{equation}
+
+\paragraph{Equilibrium branch used by the hyper--viscoelastic model.}
+In the generalized Maxwell model introduced next (Sec.~\ref{sec:fs_visco_prony}), only the isochoric response
+relaxes. Accordingly, the long-term (equilibrium) stresses are defined as
+\begin{equation}
+  \mathbf{S}_{\infty} := \mathbf{S}_{\mathrm{vol}} + g_{\infty}\,\mathbf{S}_{\mathrm{iso},0},
+  \qquad
+  \mathbf{P}_{\infty} := \mathbf{F}\mathbf{S}_{\infty}.
+  \label{eq:Sinf_Pinf_def}
+\end{equation}
+These stresses will be augmented by viscoelastic overstress contributions $\{\mathbf Q_m\}$ in
+Sec.~\ref{sec:fs_visco_prony}, yielding the total stress used in dynamics.
+
+
+\subsection{Finite-strain viscoelasticity: generalized Maxwell model with Prony internal variables}
+\label{sec:fs_visco_prony}
+
+Building on the hyperelastic ingredients introduced in Sec.~\ref{sec:mr_flexible}, we model rate-dependence
+through a generalized Maxwell chain acting on the \emph{isochoric} response only, while the volumetric response
+remains purely elastic. This choice is standard for rubber-like polymers: time-dependence is mainly associated
+with shear mechanisms and it avoids unphysical long-term volumetric relaxation.
+
+\paragraph{Reduced time and Prony series.}
+Consistent with Sec.~2.2, we introduce the reduced time increment
+\begin{equation}
+  \Delta t_r := \frac{\Delta t}{a_T(T)},
+  \label{eq:reduced_time}
+\end{equation}
+where $a_T(T)$ is a temperature shift factor (e.g.\ WLF/Arrhenius). The normalized relaxation function is
+approximated by a Prony series
+\begin{equation}
+  g(t_r) = g_{\infty} + \sum_{m=1}^{N_p} g_m \exp\!\left(-\frac{t_r}{\tau_m}\right),
+  \qquad
+  g_{\infty} + \sum_{m=1}^{N_p} g_m = 1,
+  \label{eq:prony_relax}
+\end{equation}
+with Prony weights $g_m$ and relaxation times $\tau_m$ (defined at a reference temperature).
+
+\paragraph{Driving stresses in the reference configuration.}
+All constitutive quantities are expressed in $\Omega_0$ (Total Lagrangian). We define
+\begin{equation}
+  \mathbf S_{\mathrm{vol}} := 2\,\frac{\partial W_{\mathrm{vol}}(J)}{\partial \mathbf C},
+  \qquad
+  \mathbf S_{\mathrm{iso},0} := 2\,\frac{\partial W_{\mathrm{iso}}(\bar{\mathbf C})}{\partial \mathbf C}.
+  \label{eq:S_vol_S_iso0}
+\end{equation}
+Here $\mathbf S_{\mathrm{iso},0}$ is the \emph{instantaneous-reference} isochoric (deviatoric) second
+Piola--Kirchhoff stress computed from the same isochoric energy $W_{\mathrm{iso}}$ as in Sec.~\ref{sec:mr_flexible}.
+Importantly, the volumetric stress $\mathbf S_{\mathrm{vol}}$ is \emph{purely elastic} in this thesis; therefore we do
+not attach subscripts ``$0$'' or ``$\infty$'' to volumetric quantities.
+
+\paragraph{Total stress with overstress internal variables.}
+We introduce stress-like internal variables $\{\mathbf Q_m\}_{m=1}^{N_p}$, stored at each quadrature
+point in $\Omega_0$. The \emph{total} second Piola--Kirchhoff stress at $t_{n+1}$ is defined as
+\begin{equation}
+  \mathbf S^{n+1}
+  = \mathbf S_{\mathrm{vol}}^{n+1}
+  + g_{\infty}\,\mathbf S_{\mathrm{iso},0}^{n+1}
+  + \sum_{m=1}^{N_p} \mathbf Q_m^{n+1}.
+  \label{eq:S_total_prony}
+\end{equation}
+The corresponding \emph{total} first Piola--Kirchhoff stress follows from $\mathbf P=\mathbf F\mathbf S$:
+\begin{equation}
+  \mathbf P^{n+1} = \mathbf F^{n+1}\mathbf S^{n+1}.
+  \label{eq:P_total_prony_compact}
+\end{equation}
+When all overstresses decay ($\mathbf Q_m\!\to\!\mathbf 0$), the long-term response is
+$\mathbf S_{\infty}=\mathbf S_{\mathrm{vol}}+g_{\infty}\mathbf S_{\mathrm{iso},0}$ and
+$\mathbf P_{\infty}=\mathbf F\mathbf S_{\infty}$.
+
+\paragraph{Evolution equation and exact time-discrete recursion.}
+Each Maxwell branch is driven by the rate of the instantaneous-reference isochoric stress:
+\begin{equation}
+  \dot{\mathbf Q}_m + \frac{1}{\tau_m}\mathbf Q_m = g_m\,\dot{\mathbf S}_{\mathrm{iso},0}.
+  \label{eq:Q_ode}
+\end{equation}
+Assuming $\dot{\mathbf S}_{\mathrm{iso},0}$ is constant within one step $[t_n,t_{n+1}]$, the exact update of
+\eqref{eq:Q_ode} yields
+\begin{equation}
+  \mathbf Q_m^{n+1}
+  = \alpha_m\,\mathbf Q_m^{n}
+  + \beta_m\left(\mathbf S_{\mathrm{iso},0}^{n+1} - \mathbf S_{\mathrm{iso},0}^{n}\right),
+  \label{eq:Q_update}
+\end{equation}
+with
+\begin{equation}
+  \alpha_m := \exp\!\left(-\frac{\Delta t_r}{\tau_m}\right),
+  \qquad
+  \beta_m := g_m\,\frac{\tau_m}{\Delta t_r}\left(1-\alpha_m\right).
+  \label{eq:alpha_beta}
+\end{equation}
+This internal-variable form is equivalent to the convolution representation, while being more suitable
+for large-scale implementations because it requires only $N_p$ tensor-valued state variables per quadrature point.
+
+
+
+\subsection{Algorithmic stress and consistent linearization}
+\label{sec:alg_stress_consistent_lin}
+
+For the Newton solve at time $t_{n+1}$, we require a constitutive update that returns the \emph{algorithmic stress}
+$\mathbf P^{n+1}$ and its \emph{consistent} linearization with respect to the current deformation gradient
+$\mathbf F^{n+1}$, while treating all history quantities at $t_n$ as constants within the Newton iteration.
+
+\paragraph{Algorithmic form of the stress update (clear separation of current vs.\ history).}
+Insert the recursion \eqref{eq:Q_update} into the total stress \eqref{eq:S_total_prony}:
+\begin{align}
+  \mathbf S^{n+1}
+  &= \mathbf S_{\mathrm{vol}}^{n+1}
+   + g_{\infty}\,\mathbf S_{\mathrm{iso},0}^{n+1}
+   + \sum_{m=1}^{N_p}\Big[
+        \alpha_m\mathbf Q_m^{n} + \beta_m(\mathbf S_{\mathrm{iso},0}^{n+1}-\mathbf S_{\mathrm{iso},0}^{n})
+     \Big] \nonumber\\
+  &= \mathbf S_{\mathrm{vol}}^{n+1}
+   + \gamma\,\mathbf S_{\mathrm{iso},0}^{n+1}
+   + \mathbf S_{\mathrm{hist}},
+  \label{eq:S_alg_split}
+\end{align}
+where we define the scalar
+\begin{equation}
+  \gamma := g_{\infty} + \sum_{m=1}^{N_p}\beta_m,
+  \label{eq:gamma_def}
+\end{equation}
+and the \emph{history stress} (constant during the Newton iteration at $t_{n+1}$)
+\begin{equation}
+  \mathbf S_{\mathrm{hist}}
+  := \sum_{m=1}^{N_p}\alpha_m\mathbf Q_m^{n}
+   - \left(\sum_{m=1}^{N_p}\beta_m\right)\mathbf S_{\mathrm{iso},0}^{n}.
+  \label{eq:S_hist_def}
+\end{equation}
+With \eqref{eq:P_total_prony_compact}, the total first Piola stress becomes
+\begin{equation}
+  \mathbf P^{n+1}
+  = \mathbf F^{n+1}\Big(\mathbf S_{\mathrm{vol}}^{n+1} + \gamma\,\mathbf S_{\mathrm{iso},0}^{n+1}\Big)
+  + \mathbf F^{n+1}\mathbf S_{\mathrm{hist}}
+  =: \mathbf P_{\mathrm{alg}}^{n+1} + \mathbf F^{n+1}\mathbf S_{\mathrm{hist}} .
+  \label{eq:P_alg_plus_hist}
+\end{equation}
+The term $\mathbf P_{\mathrm{alg}}^{n+1}$ collects all contributions that depend on the current iterate
+$\mathbf F^{n+1}$ through $\mathbf S_{\mathrm{vol}}^{n+1}$ and $\mathbf S_{\mathrm{iso},0}^{n+1}$, whereas the
+history term $\mathbf F^{n+1}\mathbf S_{\mathrm{hist}}$ contains only known tensors from $t_n$.
+
+\paragraph{Interpretation via an algorithmic energy.}
+Since $\gamma$ is a scalar constant for a given step $(\Delta t_r, T)$, the algorithmic stress
+$\mathbf P_{\mathrm{alg}}^{n+1}$ can be obtained from the \emph{algorithmic stored energy}
+\begin{equation}
+  W_{\mathrm{alg}}(\mathbf F)
+  := W_{\mathrm{vol}}(J) + \gamma\,W_{\mathrm{iso}}(\bar{\mathbf C}),
+  \qquad
+  \mathbf P_{\mathrm{alg}} = \frac{\partial W_{\mathrm{alg}}}{\partial \mathbf F}.
+  \label{eq:W_alg_def}
+\end{equation}
+This observation is convenient for implementation: one can reuse the hyperelastic derivatives of
+$W_{\mathrm{vol}}$ and $W_{\mathrm{iso}}$, with the isochoric part scaled by $\gamma$.
+
+\paragraph{Consistent linearization.}
+During the Newton iteration at $t_{n+1}$, all history quantities are fixed:
+$\delta \mathbf S_{\mathrm{hist}} = \mathbf 0$.
+Taking the variation of \eqref{eq:P_alg_plus_hist} therefore gives
+\begin{equation}
+  \delta \mathbf P^{n+1}
+  = \delta \mathbf P_{\mathrm{alg}}^{n+1}
+  + \delta\mathbf F^{n+1}\,\mathbf S_{\mathrm{hist}}.
+  \label{eq:dP_simple}
+\end{equation}
+Introduce the fourth-order algorithmic tangent, which is material Jacobian
+\begin{equation}
+  \mathbb A_{\mathrm{alg}}^{n+1} := \frac{\partial \mathbf P_{\mathrm{alg}}^{n+1}}{\partial \mathbf F^{n+1}},
+  \label{eq:Aalg_def}
+\end{equation}
+which is the standard hyperelastic tangent associated with $W_{\mathrm{alg}}$ in \eqref{eq:W_alg_def}.
+Then \eqref{eq:dP_simple} can be written as
+\begin{equation}
+  \delta \mathbf P^{n+1}
+  = \Big(\mathbb A_{\mathrm{alg}}^{n+1} + \mathbb I \otimes \mathbf S_{\mathrm{hist}}\Big) : \delta \mathbf F^{n+1},
+  \label{eq:A_total_compact}
+\end{equation}
+where $(\mathbb I \otimes \mathbf S_{\mathrm{hist}}):\delta\mathbf F = \delta\mathbf F\,\mathbf S_{\mathrm{hist}}$.
+% In components,
+% \begin{equation}
+%   (\mathbb I \otimes \mathbf S_{\mathrm{hist}})_{iI kL} = \delta_{ik}\,(\mathbf S_{\mathrm{hist}})_{LI}.
+%   \label{eq:I_otimes_Sh}
+% \end{equation}
+% Equation \eqref{eq:A_total_compact} is the consistent constitutive Jacobian needed by the global Newton solve
+% in Sec.~2.3.6 (Newmark-$\beta$ dynamics).
+
+
+\subsection{Weak form and discrete operators (Total Lagrangian)}
+\label{sec:weak_form_discrete_ops}
+
+We work in the reference configuration $\Omega_0\subset\mathbb{R}^3$ with boundary
+$\partial\Omega_0=\Gamma_{u,0}\cup\Gamma_{t,0}$.
+Let $\mathbf u(\mathbf X,t)$ denote the displacement and $\mathbf F(\mathbf X,t)=\mathbf I+\nabla_{\!X}\mathbf u$
+the deformation gradient. The balance of linear momentum in $\Omega_0$ reads
+\begin{equation}
+  \rho_0\,\ddot{\mathbf u} = \mathrm{Div}_{X}\,\mathbf P + \rho_0\,\mathbf b_0
+  \qquad \text{in } \Omega_0,
+  \label{eq:strong_momentum_TL}
+\end{equation}
+with reference density $\rho_0$ and prescribed body force $\mathbf b_0$.
+The boundary conditions are
+\begin{equation}
+  \mathbf u=\bar{\mathbf u}\ \text{on }\Gamma_{u,0},
+  \qquad
+  \mathbf P\,\mathbf N = \bar{\mathbf t}_0\ \text{on }\Gamma_{t,0},
+  \label{eq:bc_TL}
+\end{equation}
+where $\mathbf N$ is the outward unit normal on $\partial\Omega_0$.
+Here $\mathbf P$ denotes the \emph{total} first Piola--Kirchhoff stress.
+In a time-discrete setting, $\mathbf P^{n+1}$ is the stress returned by the constitutive update
+(Secs.~2.3.2--2.3.4), i.e.\ a (numerical) approximation of the total stress at $t_{n+1}$.
+
+\paragraph{Weak form.}
+Let $\mathbf w$ be an admissible virtual displacement with $\mathbf w=\mathbf 0$ on $\Gamma_{u,0}$.
+Multiplying \eqref{eq:strong_momentum_TL} by $\mathbf w$ and integrating by parts yields the Total Lagrangian weak form:
+find $\mathbf u(\cdot,t)$ such that for all $\mathbf w$,
+\begin{equation}
+  \int_{\Omega_0} \rho_0\,\mathbf w\cdot \ddot{\mathbf u}\, \mathrm dV
+  + \int_{\Omega_0} (\nabla_{\!X}\mathbf w):\mathbf P \, \mathrm dV
+  =
+  \int_{\Omega_0} \rho_0\,\mathbf w\cdot\mathbf b_0\, \mathrm dV
+  + \int_{\Gamma_{t,0}} \mathbf w\cdot \bar{\mathbf t}_0\, \mathrm dA .
+  \label{eq:weak_form_TL}
+\end{equation}
+The second term defines the internal virtual work and will generate the discrete internal force and tangent.
+
+\paragraph{Finite element discretization.}
+Let $\{N_a(\mathbf X)\}_{a=1}^{n_{node}}$ be nodal basis functions. We approximate
+\begin{equation}
+  \mathbf u_h(\mathbf X,t) = \sum_{a=1}^{n_{node}} N_a(\mathbf X)\,\mathbf d_a(t),
+  \qquad
+  \mathbf w_h(\mathbf X) = \sum_{a=1}^{n_{node}} N_a(\mathbf X)\,\delta\mathbf d_a,
+  \label{eq:FE_ansatz}
+\end{equation}
+where $\mathbf d_a(t)\in\mathbb{R}^3$ are nodal unknowns.
+Substituting \eqref{eq:FE_ansatz} into \eqref{eq:weak_form_TL} yields the semi-discrete system
+\begin{equation}
+  \mathbf M\,\ddot{\mathbf d}(t) + \mathbf f_{\mathrm{int}}(\mathbf d(t),\mathrm{history})
+  =
+  \mathbf f_{\mathrm{ext}}(t),
+  \label{eq:semi_discrete}
+\end{equation}
+with global vector $\mathbf d=[\mathbf d_1;\dots;\mathbf d_{n_{node}}]\in\mathbb{R}^{3n_{node}}$.
+The consistent mass matrix and external force are
+\begin{align}
+  \mathbf M_{ab} &= \int_{\Omega_0} \rho_0\,N_a N_b\,\mathbf I\,\mathrm dV,
+  \label{eq:mass_matrix}\\
+  (\mathbf f_{\mathrm{ext}})_a &= \int_{\Omega_0} \rho_0\,N_a\,\mathbf b_0\,\mathrm dV
+  + \int_{\Gamma_{t,0}} N_a\,\bar{\mathbf t}_0\,\mathrm dA .
+  \label{eq:fext}
+\end{align}
+
+\paragraph{Internal force in index form.}
+Let $\mathbf P=\mathbf P(\mathbf F;\mathrm{history})$ be evaluated pointwise in $\Omega_0$ by the constitutive update.
+From \eqref{eq:weak_form_TL}, the internal nodal force is
+\begin{equation}
+  (\mathbf f_{\mathrm{int}})_a
+  = \int_{\Omega_0} (\nabla_{\!X} N_a)\cdot \mathbf P \, \mathrm dV,
+  \qquad
+  \text{i.e.}\quad
+  (f_{\mathrm{int}})_a^{\,i} = \int_{\Omega_0} \frac{\partial N_a}{\partial X_I}\,P_{iI}\,\mathrm dV,
+  \label{eq:fint_index}
+\end{equation}
+where $i$ is a spatial component index and $I$ a reference-coordinate index.
+
+% ============================================================
+% REPLACE ONLY THE SCREENSHOT-COVERED PART OF SEC. 2.3.5 WITH THIS
+% ============================================================
+
+
+\paragraph{Internal force (Total Lagrangian).}
+With the Total Lagrangian weak form, the internal nodal force associated with node $a$ is
+\begin{equation}
+  (\mathbf f_{\mathrm{int}})_a(\mathbf d,\mathrm{history})
+  = \int_{\Omega_0} \mathbf P(\mathbf F(\mathbf d),\mathrm{history})\,\nabla_{\!X}N_a \, \mathrm dV,
+  \label{eq:fint_def}
+\end{equation}
+where $\nabla_{\!X}$ denotes the gradient with respect to the reference coordinate $\mathbf X$.
+In components,
+\begin{equation}
+  (f_{\mathrm{int}})_a^{\,m}
+  = \int_{\Omega_0} P_{mI}\,\frac{\partial N_a}{\partial X_I}\,\mathrm dV,
+  \qquad m=1,2,3.
+  \label{eq:fint_comp}
+\end{equation}
+
+\paragraph{Consistent tangent and element stiffness.}
+The material contribution to the element stiffness follows from linearizing \eqref{eq:fint_comp}
+with respect to the nodal degrees of freedom. Define the element block
+\begin{equation}
+  K_{ab}^{\,mk} := \frac{\partial (f_{\mathrm{int}})_a^{\,m}}{\partial d_b^{\,k}}.
+  \label{eq:K_def}
+\end{equation}
+Differentiating \eqref{eq:fint_comp} gives
+\begin{equation}
+  K_{ab}^{\,mk}
+  = \int_{\Omega_0}
+  \frac{\partial P_{mI}}{\partial d_b^{\,k}}
+  \frac{\partial N_a}{\partial X_I}\,\mathrm dV.
+  \label{eq:K_step1}
+\end{equation}
+Using the chain rule through the deformation gradient,
+\begin{equation}
+  \frac{\partial P_{mI}}{\partial d_b^{\,k}}
+  = \sum_{p,Q}\frac{\partial P_{mI}}{\partial F_{pQ}}
+  \frac{\partial F_{pQ}}{\partial d_b^{\,k}}
+  = \sum_{p,Q} A_{mI pQ}\,\frac{\partial F_{pQ}}{\partial d_b^{\,k}},
+  \qquad
+  A_{mI pQ} := \frac{\partial P_{mI}}{\partial F_{pQ}},
+  \label{eq:chain_dP_dd}
+\end{equation}
+where $\mathbb A=\partial\mathbf P/\partial\mathbf F$ is the (algorithmic) Total Lagrangian tangent
+used by Newton's method.
+
+\noindent Next, express $\mathbf F$ in terms of nodal unknowns. Since
+$\mathbf x(\mathbf X)=\mathbf X+\mathbf u_h(\mathbf X)$, one has
+\begin{equation}
+  F_{pQ} = \frac{\partial x_p}{\partial X_Q}
+  = \delta_{pQ} + \sum_{c=1}^{n_{\mathrm{node}}} d_c^{\,p}\,\frac{\partial N_c}{\partial X_Q},
+  \qquad
+  \frac{\partial F_{pQ}}{\partial d_b^{\,k}}
+  = \delta_{pk}\,\frac{\partial N_b}{\partial X_Q}.
+  \label{eq:dF_dd}
+\end{equation}
+Substitution of \eqref{eq:dF_dd} into \eqref{eq:chain_dP_dd} yields
+\begin{equation}
+  \frac{\partial P_{mI}}{\partial d_b^{\,k}}
+  = \sum_{Q} A_{mI kQ}\,\frac{\partial N_b}{\partial X_Q}.
+  \label{eq:dP_dd_final}
+\end{equation}
+Finally, inserting \eqref{eq:dP_dd_final} into \eqref{eq:K_step1} gives the standard Total Lagrangian
+stiffness contraction
+\begin{equation}
+  K_{ab}^{\,mk}
+  = \int_{\Omega_0}
+  \sum_{I,Q}
+  \frac{\partial N_a}{\partial X_I}\,
+  A_{mI kQ}\,
+  \frac{\partial N_b}{\partial X_Q}\,
+  \mathrm dV.
+  \label{eq:K_TL_final}
+\end{equation}
+
+\paragraph{Split of the 4th-order tangent $\mathbb A$.}
+Within the Newton iterations of a fixed time step $t_n\to t_{n+1}$, all state variables stored at $t_n$
+are constants. Using the Prony recursion in Sec.~2.3.3, the second Piola stress at $t_{n+1}$ can be written as
+\begin{equation}
+  \mathbf S^{n+1} = \mathbf S_{\mathrm{alg}}^{n+1} + \mathbf S_{\mathrm{hist}},
+  \label{eq:S_alg_hist_split}
+\end{equation}
+where $\mathbf S_{\mathrm{hist}}$ collects the history-only terms that are constant during the Newton iterations.
+For the update
+$\mathbf Q_m^{n+1}=\alpha_m \mathbf Q_m^n+\beta_m(\mathbf S_{\mathrm{iso},0}^{n+1}-\mathbf S_{\mathrm{iso},0}^{n})$,
+the decomposition \eqref{eq:S_alg_hist_split} is obtained by defining
+\begin{equation}
+  \mathbf S_{\mathrm{alg}}^{n+1}
+  := \mathbf S_{\mathrm{vol}}^{n+1} + \gamma\,\mathbf S_{\mathrm{iso},0}^{n+1},
+  \qquad
+  \mathbf S_{\mathrm{hist}}
+  := \sum_{m=1}^{N_p}\alpha_m \mathbf Q_m^n - \Big(\sum_{m=1}^{N_p}\beta_m\Big)\mathbf S_{\mathrm{iso},0}^{n},
+  \qquad
+  \gamma := g_\infty + \sum_{m=1}^{N_p}\beta_m,
+  \label{eq:S_alg_S_hist_def}
+\end{equation}
+so that $\mathbf S^{n+1}=\mathbf S_{\mathrm{vol}}^{n+1}+g_\infty\mathbf S_{\mathrm{iso},0}^{n+1}+\sum_m \mathbf Q_m^{n+1}$ holds identically.
+
+\noindent Since $\mathbf P^{n+1}=\mathbf F^{n+1}\mathbf S^{n+1}$,
+\begin{equation}
+  \mathbf P^{n+1} = \mathbf F^{n+1}\mathbf S_{\mathrm{alg}}^{n+1} + \mathbf F^{n+1}\mathbf S_{\mathrm{hist}}
+  =: \mathbf P_{\mathrm{alg}}^{n+1} + \mathbf F^{n+1}\mathbf S_{\mathrm{hist}}.
+  \label{eq:P_alg_hist_split}
+\end{equation}
+Taking variations yields
+$\delta\mathbf P^{n+1}=\delta\mathbf P_{\mathrm{alg}}^{n+1}+\delta\mathbf F^{n+1}\mathbf S_{\mathrm{hist}}$,
+hence the tangent decomposes as
+\begin{equation}
+  \mathbb A
+  := \frac{\partial\mathbf P^{n+1}}{\partial\mathbf F^{n+1}}
+  = \mathbb A_{\mathrm{alg}} + \mathbb I\otimes \mathbf S_{\mathrm{hist}},
+  \qquad
+  (\mathbb I\otimes \mathbf S_{\mathrm{hist}})_{mI kQ}=\delta_{mk}(\mathbf S_{\mathrm{hist}})_{QI}.
+  \label{eq:A_split}
+\end{equation}
+
+\paragraph{Explicit form of $\mathbb A_{\mathrm{alg}}$.}
+From $\mathbf P_{\mathrm{alg}}=\mathbf F\,\mathbf S_{\mathrm{alg}}$,
+\begin{equation}
+  \delta\mathbf P_{\mathrm{alg}}
+  = \delta\mathbf F\,\mathbf S_{\mathrm{alg}} + \mathbf F\,\delta\mathbf S_{\mathrm{alg}}.
+  \label{eq:dPalg}
+\end{equation}
+If the constitutive routine provides the second-Piola tangent
+$\delta\mathbf S_{\mathrm{alg}}=\mathbb C_{\mathrm{alg}}:\delta\mathbf E$ with
+$\mathbf E=\tfrac12(\mathbf C-\mathbf I)$ and $\delta\mathbf E=\tfrac12(\mathbf F^T\delta\mathbf F+(\delta\mathbf F)^T\mathbf F)$,
+then $\delta\mathbf P_{\mathrm{alg}}=\mathbb A_{\mathrm{alg}}:\delta\mathbf F$ holds with
+\begin{equation}
+  (\mathbb A_{\mathrm{alg}})_{mI kQ}
+  = \delta_{mk}(\mathbf S_{\mathrm{alg}})_{QI}
+  + \frac12\,F_{mJ}\,(\mathbb C_{\mathrm{alg}})_{JI MN}\,
+  \big(\delta_{Q N}F_{kM} + \delta_{QM}F_{kN}\big),
+  \label{eq:Aalg_comp}
+\end{equation}
+evaluated at the current Newton iterate. Combining \eqref{eq:A_split} and \eqref{eq:Aalg_comp} gives the full
+$\mathbb A$ used in \eqref{eq:K_TL_final}.
+
+\paragraph{Reference-element mapping and precomputed transformed tangent.}
+On a reference element with coordinates $\boldsymbol\xi$, let
+$\mathbf J:=\partial\mathbf X/\partial\boldsymbol\xi$ be the geometric mapping Jacobian. Then
+\begin{equation}
+  \frac{\partial N_a}{\partial X_I}
+  = \sum_{r}\frac{\partial N_a}{\partial \xi_r}\,(\mathbf J^{-1})_{rI},
+  \qquad
+  \mathrm dV=\det(\mathbf J)\,\mathrm dV_{\xi}.
+  \label{eq:ref_map}
+\end{equation}
+Substituting \eqref{eq:ref_map} into \eqref{eq:K_TL_final} motivates the transformed tensor
+\begin{equation}
+  \widetilde A_{m k r q}
+  := \sum_{I,Q} A_{mI kQ}\,(\mathbf J^{-1})_{rI}\,(\mathbf J^{-1})_{qQ}\,\det(\mathbf J),
+  \label{eq:A_tilde}
+\end{equation}
+so that the element stiffness can be written as
+\begin{equation}
+  K_{ab}^{\,mk}
+  = \int_{\Omega_{\xi}}
+  \sum_{r,q}\widetilde A_{m k r q}\,
+  \frac{\partial N_a}{\partial \xi_r}\,
+  \frac{\partial N_b}{\partial \xi_q}\,
+  \mathrm dV_{\xi}.
+  \label{eq:K_ref}
+\end{equation}
+
+
+\subsection{Time integration: Newmark scheme and Newton--Raphson iteration}
+\label{sec:newmark_newton}
+
+We advance the semi-discrete hyper--viscoelastodynamic system from Sec.~2.3.5,
+\begin{equation}
+  \mathbf M\,\ddot{\mathbf d}(t) + \mathbf f_{\mathrm{int}}\big(\mathbf d(t),\mathrm{history}(t)\big)
+  = \mathbf f_{\mathrm{ext}}(t),
+  \label{eq:semi_discrete_dyn}
+\end{equation}
+where $\mathbf d(t)\in\mathbb R^{n_{\mathrm{dof}}}$ collects the nodal unknowns.
+The internal force $\mathbf f_{\mathrm{int}}$ is assembled from the \emph{total} first
+Piola--Kirchhoff stress $\mathbf P$ delivered by the constitutive update (Secs.~2.3.2--2.3.4),
+together with the consistent Total Lagrangian tangent $\mathbb A:=\partial\mathbf P/\partial\mathbf F$
+used for stiffness assembly in Sec.~2.3.5.
+
+\paragraph{Time grid and Newmark kinematics.}
+Let $t_{n+1}=t_n+\Delta t$ and denote the converged state at $t_n$ by
+$\{\mathbf d^n,\mathbf v^n,\mathbf a^n\}$ (displacement, velocity, acceleration).
+We employ the Newmark updating framework with parameters $(\beta_N,\gamma_N)$:
+\begin{align}
+  \mathbf d^{n+1} &=
+  \mathbf d^n + \Delta t\,\mathbf v^n
+  + \Delta t^2\Big(\tfrac{1}{2}-\beta_N\Big)\mathbf a^n
+  + \Delta t^2\,\beta_N\,\mathbf a^{n+1},
+  \label{eq:newmark_d}\\
+  \mathbf v^{n+1} &=
+  \mathbf v^n + \Delta t\Big((1-\gamma_N)\mathbf a^n + \gamma_N\,\mathbf a^{n+1}\Big).
+  \label{eq:newmark_v}
+\end{align}
+In the implicit setting, $\mathbf d^{n+1}$ is taken as the primary unknown and
+$\mathbf a^{n+1}$, $\mathbf v^{n+1}$ are expressed as functions of $\mathbf d^{n+1}$:
+\begin{align}
+  \mathbf a^{n+1}(\mathbf d^{n+1})
+  &= \frac{1}{\beta_N\,\Delta t^2}\Big(\mathbf d^{n+1}-\mathbf d^n-\Delta t\,\mathbf v^n\Big)
+   - \frac{1-2\beta_N}{2\beta_N}\,\mathbf a^n,
+  \label{eq:newmark_a_of_d}\\
+  \mathbf v^{n+1}(\mathbf d^{n+1})
+  &= \frac{\gamma_N}{\beta_N\,\Delta t}\Big(\mathbf d^{n+1}-\mathbf d^n\Big)
+   + \Big(1-\frac{\gamma_N}{\beta_N}\Big)\mathbf v^n
+   + \Delta t\Big(1-\frac{\gamma_N}{2\beta_N}\Big)\mathbf a^n.
+  \label{eq:newmark_v_of_d}
+\end{align}
+A common choice is $(\beta_N,\gamma_N)=(1/4,1/2)$, which is the average acceleration.
+
+\paragraph{Nonlinear residual at $t_{n+1}$.}
+Evaluating \eqref{eq:semi_discrete_dyn} at $t_{n+1}$ and substituting
+\eqref{eq:newmark_a_of_d} gives the nonlinear system for $\mathbf d^{n+1}$:
+\begin{equation}
+  \mathbf R^{n+1}(\mathbf d^{n+1})
+  := \mathbf M\,\mathbf a^{n+1}(\mathbf d^{n+1})
+   + \mathbf f_{\mathrm{int}}\!\big(\mathbf d^{n+1},\mathrm{history}_n\big)
+   - \mathbf f_{\mathrm{ext}}^{n+1}
+  = \mathbf 0.
+  \label{eq:residual_newmark}
+\end{equation}
+Here $\mathrm{history}_n$ denotes the stored internal variables at $t_n$ (e.g.\ Prony overstresses
+$\{\mathbf Q_m^n\}$). Within the Newton iterations of the step $t_n\to t_{n+1}$,
+$\mathrm{history}_n$ is fixed, while the constitutive update provides
+$\mathbf P^{n+1}$ and $\mathbb A^{n+1}$ consistently with the time-discrete internal-variable recursion.
+
+\paragraph{Newton--Raphson linearization.}
+Given an iterate $\mathbf d^{n+1,(k)}$, we solve for the correction $\Delta\mathbf d^{(k)}$ via
+\begin{equation}
+  \mathbf J^{(k)}\,\Delta\mathbf d^{(k)} = -\mathbf R^{(k)},
+  \qquad
+  \mathbf d^{n+1,(k+1)} = \mathbf d^{n+1,(k)} + \Delta\mathbf d^{(k)},
+  \label{eq:newton_update}
+\end{equation}
+where $\mathbf R^{(k)}:=\mathbf R^{n+1}(\mathbf d^{n+1,(k)})$ and
+$\mathbf J^{(k)}:=\partial\mathbf R^{n+1}/\partial\mathbf d^{n+1}$.
+
+\noindent Using \eqref{eq:newmark_a_of_d}, the variation of the acceleration is
+\begin{equation}
+  \delta\mathbf a^{n+1} = \frac{1}{\beta_N\,\Delta t^2}\,\delta\mathbf d^{n+1}.
+  \label{eq:da_dd}
+\end{equation}
+Moreover, the consistent internal-force linearization defines
+\begin{equation}
+  \delta \mathbf f_{\mathrm{int}}
+  = \mathbf K_{\mathrm{int}}\,\delta\mathbf d^{n+1},
+  \qquad
+  \mathbf K_{\mathrm{int}} := \frac{\partial \mathbf f_{\mathrm{int}}}{\partial \mathbf d^{n+1}},
+  \label{eq:Kint_def}
+\end{equation}
+with $\mathbf K_{\mathrm{int}}$ assembled element-wise from $\mathbb A=\partial\mathbf P/\partial\mathbf F$
+as detailed in Sec.~2.3.5.
+Combining \eqref{eq:da_dd}--\eqref{eq:Kint_def} yields the Newmark--Newton Jacobian
+\begin{equation}
+  \mathbf J^{(k)}
+  = \frac{1}{\beta_N\,\Delta t^2}\,\mathbf M + \mathbf K_{\mathrm{int}}^{(k)}.
+  \label{eq:newmark_jacobian}
+\end{equation}
+This is the effective tangent used in \eqref{eq:newton_update}.
+
+
+
+
+\paragraph{Algorithm for Newton-Raphson Iteration.}
+Given $(\mathbf d^n,\mathbf v^n,\mathbf a^n,\mathrm{history}_n)$:
+\begin{enumerate}
+  \item \textbf{Predictor (optional).} Set an initial guess, e.g.\ $\mathbf d^{n+1,(0)}=\mathbf d^n+\Delta t\,\mathbf v^n$.
+  \item \textbf{Newton loop} for $k=0,1,\dots$:
+  \begin{enumerate}
+    \item Compute $\mathbf a^{n+1,(k)}$ and $\mathbf v^{n+1,(k)}$ from \eqref{eq:newmark_a_of_d}--\eqref{eq:newmark_v_of_d}.
+    \item At each quadrature point, build $\mathbf F^{n+1,(k)}$ from $\mathbf d^{n+1,(k)}$ (Sec.~2.3.1),
+          call the constitutive update (Secs.~2.3.3--2.3.4) to obtain
+          $\mathbf P^{n+1,(k)}$ and $\mathbb A^{n+1,(k)}$.
+    \item Assemble $\mathbf f_{\mathrm{int}}^{(k)}$ and $\mathbf K_{\mathrm{int}}^{(k)}$ (Sec.~2.3.5),
+          then residual $\mathbf R^{(k)}$ from \eqref{eq:residual_newmark}.
+    \item Assemble Jacobian $\mathbf J^{(k)}$ from \eqref{eq:newmark_jacobian} and solve
+          $\mathbf J^{(k)}\Delta\mathbf d^{(k)}=-\mathbf R^{(k)}$.
+    \item Update $\mathbf d^{n+1,(k+1)}=\mathbf d^{n+1,(k)}+\Delta\mathbf d^{(k)}$.
+  \end{enumerate}
+  \item \textbf{Accept step.} Upon convergence, set
+  $\mathbf d^{n+1}=\mathbf d^{n+1,(k_\star)}$ and compute
+  $\mathbf a^{n+1},\mathbf v^{n+1}$ from \eqref{eq:newmark_a_of_d}--\eqref{eq:newmark_v_of_d}.
+  Store the internal variables at $t_{n+1}$ as $\mathrm{history}_{n+1}$.
+\end{enumerate}
+
+
+
+
+
+
+\chapter{Implementation and Code Organization}
+\label{ch:implementation}
+
+\section{Implementation overview and execution flow}
+\label{sec:implementation_overview}
+
+This chapter describes how the continuum model and time-discrete algorithms introduced in Chapter~2 are mapped to a practical, high-performance implementation in the SFEM code base.  The presentation emphasizes responsibilities and I/O at each software layer, the timing of history accesses during Newton--Newmark solves, and the minimal set of primitives that a constitutive routine must provide to integrate smoothly with element kernels and global assembly.
+
+\noindent This implementation is built on top of the SFEM codebase. The SFEM library provides the project infrastructure (mesh, element loops, I/O and solver interfaces) that this work reuses and extends; in particular, core finite‑element data structures and element dispatching are taken from SFEM and augmented here with the finite‑strain hyper‑viscoelastic constitutive updates and the GPU/offload kernels described below. For reproducibility the experiments in this thesis are based on the SFEM repository (see \cite{sfemgit}) and the specific modifications are documented in the implementation notes and accompanying repository. A formal citation for the SFEM codebase is included in the bibliography.
+
+\noindent The implementation follows a layered execution flow. A single implicit time step from $t_n\to t_{n+1}$ can be viewed as the sequence:
+
+\begin{center}
+  time step $\to$ Newmark predictor $\to$ Newton loop $\to$ element kernels $\to$ global assemble/solve $\to$ state commit
+\end{center}
+
+\noindent Key points about data movement and timing:
+
+\begin{itemize}
+  \item \textbf{History read/write semantics.} All history  variables are stored at quadrature points on the reference configuration (see Sec.~\ref{sec:fs_visco_prony}).  Within a Newton iteration for the step $t_n\to t_{n+1}$ the history values corresponding to $t_n$ (e.g. $\{\mathbf Q_m^n\}$) are to be treated as constants: they may be read by the constitutive update but must not be overwritten. Only after the Newton step is accepted are the updated history values at $t_{n+1}$ written back. This preserves the Total Lagrangian consistency of the algorithm and avoids accidental interleaving of partially updated state across iterations.
+
+  \item \textbf{Implementation mode: FLEXIBLE (unique\_Hi).} The SFEM implementation used in this thesis employs the FLEXIBLE history-storage strategy: only the active Prony branch histories $H_i^n$ are stored at each quadrature point and the contribution of fully relaxed branches is absorbed into a scalar parameter $\gamma$. Kernels produced by the code generator are therefore written in a compact, parameterized form (algorithmic part depends on $\gamma$) while history-related contributions and updates are performed by small runtime loops over active terms. This design reduces per‑qp memory, simplifies support for variable numbers of Prony terms, and keeps generated C kernels concise.
+
+  \item \textbf{History layout and buffers.} The frontend (\texttt{\detokenize{MooneyRivlinVisco}} operator) allocates host-side history buffers sized by the number of elements, quadrature points, and the per‑qp history stride required by the FLEXIBLE layout. A \texttt{new\_history} buffer is written during the step and swapped into place atomically via \texttt{swap\_history\_buffers()} on step acceptance. An auxiliary \texttt{prev\_u} buffer stores the previous displacement field when needed by history updates.
+
+  \item \textbf{Total Lagrangian convention.} All constitutive computations and history variables live in the reference configuration $\Omega_0$ (Sec.~\ref{sec:finite_strain_kinematics}). The constitutive update therefore accepts the current deformation gradient $\mathbf F^{n+1,(k)}$, returns the pointwise first Piola stress $\mathbf P^{n+1,(k)}$ and (optionally) the algorithmic tangent $\mathbb A^{n+1,(k)}$, and keeps any temporary work memory local to the kernel.
+
+  \item \textbf{Separation of algorithmic and history contributions.} As derived in Sec.~2.3.3--2.3.4, the constitutive model produces an \emph{algorithmic} stress contribution (that depends on the current iterate) and a history-only contribution that is constant during Newton iterations. Implementations should exploit this split to avoid recomputing history-dependent scalars inside tight loops and to form the material tangent as
+  \[ \mathbb A = \mathbb A_{\mathrm{alg}} + \mathbb I \otimes \mathbf S_{\mathrm{hist}}, \]
+  consistent with Eq.~\eqref{eq:A_split}.
+
+  \item \textbf{Code-generation and kernel decomposition.} The project uses a symbolic code-generation pipeline (\texttt{sr\_visco\_hyper\_unique\_Hi.py}) that emits per‑qp C kernels for the algorithmic parts and small helper kernels for history handling. Typical generated kernels (for \texttt{hex8} elements and the flexible architecture) include:
+  \begin{itemize}
+    \item \texttt{\detokenize{hex8_mooney_rivlin_S_dev_from_disp}}: compute elastic deviatoric stress $\mathbf S_{\mathrm{dev}}$ from the displacement (no history access);
+    \item \texttt{\detokenize{hex8_mooney_rivlin_grad_flexible}}: algorithmic gradient with symbolic $\gamma$ (no history writes);
+    \item \texttt{\detokenize{hex8_mooney_rivlin_grad_hist_single}}: single‑Prony‑term history contribution to gradient (called in a loop over active terms at runtime);
+    \item \texttt{\detokenize{hex8_mooney_rivlin_hessian_algo_micro}} / \texttt{\detokenize{hex8_mooney_rivlin_S_lin_flexible}}: algorithmic Hessian / metric tensor generation (history geometric stiffness added at runtime).
+  \end{itemize}
+  This decomposition keeps generated code compact and lets the C driver loop over Prony terms to add history contributions and to update history entries.
+
+  \item \textbf{Prony precomputation and parameter passing.} The frontend computes WLF-shifted effective relaxation times and classifies Prony terms into ``active'' and ``fully relaxed'' when the operator is configured. In typical use, which is fixed temperature and unchanged Prony data, this computation happens once at setup; it is recomputed only if the time step, Prony series, WLF parameters or temperature are modified. Active terms yield arrays of $\alpha$ and $\beta$ passed to the kernels; fully relaxed weights are absorbed into \texttt{\detokenize{gamma}}. Generated kernels therefore accept \texttt{\detokenize{alpha}},\texttt{\detokenize{beta}} arrays and \texttt{\detokenize{gamma}}.
+
+
+  \item \textbf{Minimal constitutive routine contract.} A well-defined constitutive routine (used by element kernels) should have the following interface semantics:
+  \begin{enumerate}
+    \item Inputs: quadrature point geometry, current deformation gradient $\mathbf F^{n+1,(k)}$, time step parameters $(\Delta t, a_T)$, and the history bundle $\mathrm{history}_n$.
+    \item Outputs: pointwise first Piola stress $\mathbf P^{n+1,(k)}$, the algorithmic material tangent (optionally) $\mathbb A_{\mathrm{alg}}^{n+1,(k)}$, and any per-qp diagnostics for testing (energies, $J$, $\mathbf S$, etc.).
+    \item Side-effects: none during Newton iterations. A separate ``commit'' call must be provided that atomically replaces $\mathrm{history}_n$ by $\mathrm{history}_{n+1}$ once the step is accepted.
+  \end{enumerate}
+
+  \item \textbf{High-level driver responsibilities.} The top-level driver (time loop) orchestrates Newmark prediction, Newton iterations and the accept/commit logic. The driver:
+  \begin{itemize}
+    \item forms the Newmark predictor for $\mathbf d^{n+1,(0)}$ and computes the associated $\mathbf a^{n+1,(0)}$, $\mathbf v^{n+1,(0)}$ (Eqs.~\eqref{eq:newmark_d}--\eqref{eq:newmark_v});
+    \item enters the Newton loop and for each iterate calls element kernels to evaluate $\mathbf f_{\mathrm{int}}$ and $\mathbf K_{\mathrm{int}}$;
+    \item assembles the global residual $\mathbf R^{(k)}$ and Jacobian $\mathbf J^{(k)}$ (Eq.~\eqref{eq:newmark_jacobian}) and invokes the linear solver; and
+    \item upon convergence invokes the commit operation to persist updated history variables.
+  \end{itemize}
+
+  \item \textbf{Element kernel responsibilities.} An element kernel performs operations at the element level and across quadrature points: it
+  \begin{enumerate}
+    \item evaluates shape function gradients and builds $\mathbf F^{n+1,(k)}$ at each qp (using nodal dofs);
+    \item calls the constitutive update to obtain $\mathbf P^{n+1,(k)}$ and $\mathbb A^{n+1,(k)}$ (or the parts required to form the transformed tangent $\widetilde A$ in Eq.~\eqref{eq:A_tilde});
+    \item forms element contributions to the internal force and stiffness (Eqs.~\eqref{eq:fint_def},~\eqref{eq:K_ref}); and
+    \item exposes qp-level diagnostics for unit tests and debugging (energies, $\mathbf S$, $\mathbf P$, $J$, etc.).
+  \end{enumerate}
+
+  \item \textbf{I/O and debugging hooks.} For verification and regression testing the implementation should provide optional per-qp or per-element dumps of: the deformation measures $(\mathbf F, J, \bar{\mathbf C})$, the returned stresses $(\mathbf S,\mathbf P)$, the material tangent components, and energy increments. These hooks are invaluable when comparing analytic tangents against finite-difference checks (see Sec.~\ref{sec:alg_stress_consistent_lin}).
+\end{itemize}
+
+\paragraph{Why this structure matters.} The layered separation (driver $\to$ element kernels $\to$ constitutive routine) keeps responsibilities narrow, simplifies unit testing, and enables multiple backend strategies: the same constitutive routine can be used in a CPU element kernel, a vectorized batch kernel, or a GPU kernel provided the history-access semantics are respected. Moreover, keeping the algorithmic stress derivation in the constitutive update and exposing a small, stable interface reduces duplication and the risk of inconsistencies between energy and tangent.
+
+\bigskip
+
+\noindent The remainder of this chapter gives a "top-down" description of the code structure: Section~3.2 presents the call chain and module responsibilities; Section~3.3 describes the code-generation pipeline used for pointwise kernels; Section~3.4 discusses data layouts and history storage; Section~3.5 describes kernel design and CPU/GPU split; Section~3.6 maps index notation to concrete code arrays; Section~3.7 details the Newton--Newmark driver in code; and Sections~3.8--3.9 cover testing hooks and performance notes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\appendix %optional, use only if you have an appendix
+
+\chapter{Some retarded material}
+
+\backmatter
+
+\chapter{Glossary} %optional
+
+%\bibliographystyle{alpha}
+%\bibliographystyle{dcu}
+\bibliographystyle{plainnat}
+\bibliography{biblio}
+
+%\cleardoublepage
+%\theindex %optional, use only if you have an index, must use
+	  %\makeindex in the preamble
+
+\end{document}

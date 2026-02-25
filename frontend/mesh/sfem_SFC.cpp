@@ -7,7 +7,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Env.hpp"
 
-#ifdef DSFEM_ENABLE_MPI_SORT
+#ifdef SFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
 #endif
 
@@ -208,7 +208,7 @@ namespace sfem {
             }
         }
     
-    #ifdef DSFEM_ENABLE_MPI_SORT
+    #ifdef SFEM_ENABLE_MPI_SORT
     
         if (size > 1) {
             // TODO

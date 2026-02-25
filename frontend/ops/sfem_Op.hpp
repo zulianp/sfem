@@ -295,6 +295,8 @@ namespace sfem {
         int apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
         int value(const real_t * /*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override { return std::make_shared<NoOp>(); }
+        bool is_no_op() const override { return true; }
     };
 
     /**

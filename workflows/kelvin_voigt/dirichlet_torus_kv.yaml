@@ -1,0 +1,8 @@
+# dirichlet.yaml
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: torus_geometry/inlet
+    value: [0, 0, 0]
+    component: [0, 1, 2]
+

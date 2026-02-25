@@ -67,8 +67,8 @@ mem_sshex8_mesh: 0.0679173 	[GB]
 mem_connectivity_reduction: 7.5x
 mem_corner_points: 2.7e-06 	[GB]
 
-CG (float64): 0.0679173 + 2.7e-06+ 5 * 0.13 = 0.718	[GB]
+CG (float64): 0.0679173 + 2.7e-06 + 5 * 0.13 = 0.718	[GB]
 mem reduction: 1.88x (vs. 2x of fully-structured)
 
-CG (float32): 0.0679173 + 0.19441 + 5 * 0.065 = 0.58 [GB]
+CG (float32): 0.0679173 + 2.7e-06 + 5 * 0.065 = 0.39 [GB]
 mem reduction: 2.32x (vs. 3x of fully-structured)

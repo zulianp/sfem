@@ -94,6 +94,8 @@ void extrude(const ptrdiff_t              nsides,
         }
     }
 
+    free(pseudo_normals);
+
     double tock = MPI_Wtime();
     printf("extrude.c: extrude\t%g seconds\n", tock - tick);
 }

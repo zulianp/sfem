@@ -176,7 +176,7 @@ def add_fields(field_data, field_data_type, storage, check_len):
             for f in files:
                 data = np.fromfile(f, dtype=t)
 
-                if t == np.int32:
+                if t == np.int32 or t == np.uint8:
                     print(f"Warning converting field from {t} to float32 to work with Paraview")
                     data = data.astype(np.float32)
                     t = np.float32
