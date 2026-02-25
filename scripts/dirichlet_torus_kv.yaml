@@ -1,0 +1,47 @@
+dirichlet_conditions:
+  # Fix inlet end - fully constrained
+  - type: sideset
+    format: file
+    path: torus_geometry/inlet
+    value: [0, 0, 0]
+    component: [0, 1, 2]
+  
+  # Outlet end - fixed for now (can be adjusted to free boundary with Neumann conditions)
+  - type: sideset
+    format: file
+    path: torus_geometry/outlet
+    value: [0, 0, 0]
+    component: [0, 1, 2]
+
+# Newmark time integration parameters
+time_integration:
+  dt: 0.01        # time step size
+  t_end: 1.0      # simulation end time
+  gamma: 0.5      # Newmark gamma (0.5 for midpoint rule)
+  beta: 0.25      # Newmark beta (0.25 for average acceleration method, unconditionally stable)
+
+# Material parameters (Kelvin-Voigt model)
+material:
+  k: 4.0          # shear modulus (mu)
+  K: 3.0          # bulk modulus
+  eta: 0.1        # viscosity coefficient
+  rho: 1.0        # density
+
+# Optional: Neumann boundary conditions (applied loads)
+# neumann_conditions:
+#   - type: sideset
+#     format: file
+#     path: torus_geometry/outlet
+#     value: [0, -10.0, 0]  # apply force of -10 in y direction
+#     component: [0, 1, 2]
+
+# Output settings
+output:
+  enable: true
+  frequency: 10    # export every 10 time steps
+  path: torus_kv_output
+  fields:
+    - displacement
+    - velocity
+    - acceleration
+
