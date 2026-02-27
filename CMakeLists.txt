@@ -229,7 +229,7 @@ target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include> $<INSTALL_INTERFACE:include/kernels>)
+    $<INSTALL_INTERFACE:include>)
 
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
