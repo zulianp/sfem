@@ -420,6 +420,7 @@ update_hex_field(const int                            mpi_size,        // MPI si
                  const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
                  real_t *const SFEM_RESTRICT          hex_field) {              // Output field for the hex cell containing (x,y,z)
 
+    // get the physical coordinates of the grid point (i_grid, j_grid) in the hex mesh.
     const real_t grid_x = origin[0] + i_grid * delta[0];
     const real_t grid_y = origin[1] + j_grid * delta[1];
     const int    z_size = n[2];
@@ -494,6 +495,48 @@ update_hex_field(const int                            mpi_size,        // MPI si
 
     free(tet_indices);
     tet_indices = NULL;
+
+    return 0;
+}
+
+//////////////////////////////////////////////
+// transfer_to_hex_field
+//////////////////////////////////////////////
+int                                                                                   //
+transfer_to_hex_field_cell_tet4(const int                            mpi_size,        // MPI size
+                                const int                            mpi_rank,        // MPI rank
+                                cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
+                                boxes_t                             *boxes,           // Boxes data structure
+                                mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                                const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
+                                const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
+                                const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
+                                const geom_t *const SFEM_RESTRICT    origin,          // SDF: origin[3]
+                                const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
+                                const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
+                                real_t *const SFEM_RESTRICT          hex_field) {              //
+
+    const ptrdiff_t x_size = n[0];
+    const ptrdiff_t y_size = n[1];
+
+    for (ptrdiff_t i_grid = 0; i_grid < x_size; i_grid++) {
+        for (ptrdiff_t j_grid = 0; j_grid < y_size; j_grid++) {
+            update_hex_field(mpi_size,        //
+                             mpi_rank,        //
+                             split_map,       //
+                             boxes,           //
+                             mesh_geom,       //
+                             i_grid,          //
+                             j_grid,          //
+                             mesh,            //
+                             n,               //
+                             stride,          //
+                             origin,          //
+                             delta,           //
+                             weighted_field,  //
+                             hex_field);      //
+        }
+    }
 
     return 0;
 }

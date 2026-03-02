@@ -148,8 +148,38 @@ update_hex_quad_node_vz(const int                            mpi_size,   // MPI 
                         real_t *const SFEM_RESTRICT          hex_element_field);       //
 
 /**
- * @brief Compress and reorder key-value pairs by removing entries with key -1 and shifting valid entries to the front of the
- * arrays
+ * @brief Transfer field values from tet mesh to hex mesh by iterating over hex grid points and resampling from the tet mesh
+ * @param mpi_size MPI size
+ * @param mpi_rank MPI rank
+ * @param split_map Cell list split map data structure
+ * @param boxes Boxes data structure
+ * @param mesh_geom Mesh geometry data structure
+ * @param mesh Mesh structure
+ * @param n SDF dimensions n[3]
+ * @param stride SDF stride[3]
+ * @param origin SDF origin[3]
+ * @param delta SDF delta[3]
+ * @param weighted_field Weighted field values at mesh nodes
+ * @param hex_field Output field for the hex mesh after resampling
+ * @return int 0 on success
+ */
+int                                                                                   //
+transfer_to_hex_field_cell_tet4(const int                            mpi_size,        // MPI size
+                                const int                            mpi_rank,        // MPI rank
+                                cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
+                                boxes_t                             *boxes,           // Boxes data structure
+                                mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                                const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
+                                const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
+                                const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
+                                const geom_t *const SFEM_RESTRICT    origin,          // SDF: origin[3]
+                                const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
+                                const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
+                                real_t *const SFEM_RESTRICT          hex_field);               //
+
+/**
+ * @brief Compress and reorder key-value pairs by removing entries with key -1 and shifting valid entries to the front of
+ * the arrays
  * @param keyArray Array of keys to be compressed and reordered
  * @param valArray Array of values corresponding to the keys, to be reordered in the same way as keyArray
  * @param n Size of the input arrays keyArray and valArray
