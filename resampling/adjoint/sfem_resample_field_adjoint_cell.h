@@ -40,8 +40,6 @@ build_bounding_box_statistics(const boxes_t              *boxes,       //
 
 /**
  * @brief Update hex field values at a single quadrature node based on tet field values
- * @param mpi_size MPI size
- * @param mpi_rank MPI rank
  * @param x Physical x coordinate of the quadrature point
  * @param y Physical y coordinate of the quadrature point
  * @param z Physical z coordinate of the quadrature point
@@ -49,7 +47,6 @@ build_bounding_box_statistics(const boxes_t              *boxes,       //
  * @param index_tet The index of the tet containing the quadrature point
  * @param mesh Mesh structure
  * @param mesh_geom Mesh geometry data structure
- * @param n SDF dimensions n[3]
  * @param stride SDF stride[3]
  * @param origin SDF origin[3]
  * @param delta SDF delta[3]
@@ -58,16 +55,13 @@ build_bounding_box_statistics(const boxes_t              *boxes,       //
  * @return int 0 on success
  */
 int                                                                        //
-update_hex_quad_node(const int                            mpi_size,        //
-                     const int                            mpi_rank,        //
-                     const real_t                         x,               //
+update_hex_quad_node(const real_t                         x,               //
                      const real_t                         y,               //
                      const real_t                         z,               //
                      const real_t                         phys_w,          //
                      const ptrdiff_t                      index_tet,       //
                      const mesh_t *const SFEM_RESTRICT    mesh,            //
                      mesh_tet_geom_t                     *mesh_geom,       //
-                     const ptrdiff_t *const SFEM_RESTRICT n,               //
                      const ptrdiff_t *const SFEM_RESTRICT stride,          //
                      const geom_t *const SFEM_RESTRICT    origin,          //
                      const geom_t *const SFEM_RESTRICT    delta,           //
@@ -76,8 +70,6 @@ update_hex_quad_node(const int                            mpi_size,        //
 
 /**
  * @brief Update hex field by resampling from tet mesh at a given grid location
- * @param mpi_size MPI size
- * @param mpi_rank MPI rank
  * @param split_map Cell list split map data structure
  * @param boxes Boxes data structure
  * @param mesh_geom Mesh geometry data structure
@@ -93,9 +85,7 @@ update_hex_quad_node(const int                            mpi_size,        //
  * @return int 0 on success
  */
 int                                                                    //
-update_hex_field(const int                            mpi_size,        //
-                 const int                            mpi_rank,        //
-                 cell_list_split_3d_2d_map_t         *split_map,       //
+update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       //
                  boxes_t                             *boxes,           //
                  mesh_tet_geom_t                     *mesh_geom,       //
                  const ptrdiff_t                      i_grid,          //
@@ -111,8 +101,6 @@ update_hex_field(const int                            mpi_size,        //
 /**
  * @brief Update hex field values at multiple quadrature nodes based on tet field values, optimized for multiple z values in the
  * same tet
- * @param mpi_size MPI size
- * @param mpi_rank MPI rank
  * @param x Physical x coordinate of the quadrature point
  * @param y Physical y coordinate of the quadrature point
  * @param z Array of physical z coordinates of the quadrature points (multiple z values to process)
@@ -121,7 +109,6 @@ update_hex_field(const int                            mpi_size,        //
  * @param index_tet The index of the tet containing the quadrature points (same for all z values)
  * @param mesh Mesh structure
  * @param mesh_geom Mesh geometry data structure
- * @param n SDF dimensions n[3]
  * @param stride SDF stride[3]
  * @param origin SDF origin[3]
  * @param delta SDF delta[3]
@@ -130,9 +117,7 @@ update_hex_field(const int                            mpi_size,        //
  * @return int 0 on success
  */
 int                                                                      //
-update_hex_quad_node_vz(const int                            mpi_size,   // MPI size
-                        const int                            mpi_rank,   // MPI rank
-                        const real_t                         x,          // Physical x coordinate of the quadrature point
+update_hex_quad_node_vz(const real_t                         x,          // Physical x coordinate of the quadrature point
                         const real_t                         y,          // Physical y coordinate of the quadrature point
                         const real_t                        *z,          // Physical z coordinate of the quadrature point
                         const ptrdiff_t                      z_size,     // Size of the z array (number of z values to process)
@@ -140,7 +125,6 @@ update_hex_quad_node_vz(const int                            mpi_size,   // MPI 
                         const ptrdiff_t                      index_tet,  // The index of the tet containing the quadrature point
                         const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
                         mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
-                        const ptrdiff_t *const SFEM_RESTRICT n,          // SDF: n[3]
                         const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
                         const geom_t *const SFEM_RESTRICT    origin,     // SDF: origin[3]
                         const geom_t *const SFEM_RESTRICT    delta,      // SDF: delta[3]
@@ -149,8 +133,6 @@ update_hex_quad_node_vz(const int                            mpi_size,   // MPI 
 
 /**
  * @brief Transfer field values from tet mesh to hex mesh by iterating over hex grid points and resampling from the tet mesh
- * @param mpi_size MPI size
- * @param mpi_rank MPI rank
  * @param split_map Cell list split map data structure
  * @param boxes Boxes data structure
  * @param mesh_geom Mesh geometry data structure
@@ -164,9 +146,7 @@ update_hex_quad_node_vz(const int                            mpi_size,   // MPI 
  * @return int 0 on success
  */
 int                                                                                   //
-transfer_to_hex_field_cell_tet4(const int                            mpi_size,        // MPI size
-                                const int                            mpi_rank,        // MPI rank
-                                cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
+transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                                 boxes_t                             *boxes,           // Boxes data structure
                                 mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
                                 const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
@@ -176,6 +156,32 @@ transfer_to_hex_field_cell_tet4(const int                            mpi_size,  
                                 const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
                                 const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
                                 real_t *const SFEM_RESTRICT          hex_field);               //
+
+/**
+ * @brief Resample field values from tet mesh to hex mesh for a range of elements using quadrature points and adjoint method
+ * @param start_element The starting index of the elements to process
+ * @param end_element The ending index of the elements to process
+ * @param mesh Mesh structure
+ * @param n SDF dimensions n[3]
+ * @param stride SDF stride[3]
+ * @param origin SDF origin[3]
+ * @param delta SDF delta[3]
+ * @param weighted_field Weighted field values at mesh nodes
+ * @param mini_tet_parameters Parameters for handling small tetrahedra
+ * @param data Output array to store the resampled field values for the hex mesh
+ * @return int 0 on success
+ */
+int                                                                                              //
+tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start_element,        // Mesh
+                                      const ptrdiff_t                      end_element,          //
+                                      const mesh_t                        *mesh,                 //
+                                      const ptrdiff_t *const SFEM_RESTRICT n,                    // SDF
+                                      const ptrdiff_t *const SFEM_RESTRICT stride,               //
+                                      const geom_t *const SFEM_RESTRICT    origin,               //
+                                      const geom_t *const SFEM_RESTRICT    delta,                //
+                                      const real_t *const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                      const mini_tet_parameters_t          mini_tet_parameters,  //
+                                      real_t *const SFEM_RESTRICT          data);                         //
 
 /**
  * @brief Compress and reorder key-value pairs by removing entries with key -1 and shifting valid entries to the front of

@@ -80,16 +80,13 @@ build_bounding_box_statistics(const boxes_t              *boxes,        //
 // update_hex_field
 //////////////////////////////////////////////
 int                                                                        //
-update_hex_quad_node(const int                            mpi_size,        // MPI size
-                     const int                            mpi_rank,        // MPI rank
-                     const real_t                         x,               // Physical x coordinate of the quadrature point
+update_hex_quad_node(const real_t                         x,               // Physical x coordinate of the quadrature point
                      const real_t                         y,               // Physical y coordinate of the quadrature point
                      const real_t                         z,               // Physical z coordinate of the quadrature point
                      const real_t                         phys_w,          // Quadrature weight for the quadrature point
                      const ptrdiff_t                      index_tet,       // The index of the tet containing the quadrature point
                      const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
                      mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
-                     const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
                      const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
                      const geom_t *const SFEM_RESTRICT    origin,          // SDF: origin[3]
                      const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
@@ -173,23 +170,30 @@ update_hex_quad_node(const int                            mpi_size,        // MP
 
     const real_t wf_quad_QW = wf_quad * phys_w;
 
-    hex_element_field[off0] += wf_quad_QW * hex8_f0;
-    hex_element_field[off1] += wf_quad_QW * hex8_f1;
-    hex_element_field[off2] += wf_quad_QW * hex8_f2;
-    hex_element_field[off3] += wf_quad_QW * hex8_f3;
-    hex_element_field[off4] += wf_quad_QW * hex8_f4;
-    hex_element_field[off5] += wf_quad_QW * hex8_f5;
-    hex_element_field[off6] += wf_quad_QW * hex8_f6;
-    hex_element_field[off7] += wf_quad_QW * hex8_f7;
+    // hex_element_field[base_index + off0] += wf_quad_QW * hex8_f0;
+    // hex_element_field[base_index + off1] += wf_quad_QW * hex8_f1;
+    // hex_element_field[base_index + off2] += wf_quad_QW * hex8_f2;
+    // hex_element_field[base_index + off3] += wf_quad_QW * hex8_f3;
+    // hex_element_field[base_index + off4] += wf_quad_QW * hex8_f4;
+    // hex_element_field[base_index + off5] += wf_quad_QW * hex8_f5;
+    // hex_element_field[base_index + off6] += wf_quad_QW * hex8_f6;
+    // hex_element_field[base_index + off7] += wf_quad_QW * hex8_f7;
+
+    hex_element_field[base_index + off0] = 1.0;
+    hex_element_field[base_index + off1] = 1.0;
+    hex_element_field[base_index + off2] = 1.0;
+    hex_element_field[base_index + off3] = 1.0;
+    hex_element_field[base_index + off4] = 1.0;
+    hex_element_field[base_index + off5] = 1.0;
+    hex_element_field[base_index + off6] = 1.0;
+    hex_element_field[base_index + off7] = 1.0;
 }
 
 //////////////////////////////////////////////
 // update_hex_field
 //////////////////////////////////////////////
 int                                                                      //
-update_hex_quad_node_vz(const int                            mpi_size,   // MPI size
-                        const int                            mpi_rank,   // MPI rank
-                        const real_t                         x,          // Physical x coordinate of the quadrature point
+update_hex_quad_node_vz(const real_t                         x,          // Physical x coordinate of the quadrature point
                         const real_t                         y,          // Physical y coordinate of the quadrature point
                         const real_t                        *z,          // Physical z coordinate of the quadrature point
                         const ptrdiff_t                      z_size,     // Size of the z array (number of z values to process)
@@ -197,7 +201,6 @@ update_hex_quad_node_vz(const int                            mpi_size,   // MPI 
                         const ptrdiff_t                      index_tet,  // The index of the tet containing the quadrature point
                         const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
                         mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
-                        const ptrdiff_t *const SFEM_RESTRICT n,          // SDF: n[3]
                         const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
                         const geom_t *const SFEM_RESTRICT    origin,     // SDF: origin[3]
                         const geom_t *const SFEM_RESTRICT    delta,      // SDF: delta[3]
@@ -405,9 +408,7 @@ compress_and_reorder(int    *keyArray,  //
 // update_hex_field
 //////////////////////////////////////////////
 int                                                                    //
-update_hex_field(const int                            mpi_size,        // MPI size
-                 const int                            mpi_rank,        // MPI rank
-                 cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
+update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                  boxes_t                             *boxes,           // Boxes data structure
                  mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
                  const ptrdiff_t                      i_grid,          // The i index of the grid point in the hex mesh
@@ -468,16 +469,13 @@ update_hex_field(const int                            mpi_size,        // MPI si
                 continue;  // No tet found for this z level, skip to the next
             }
 
-            update_hex_quad_node(mpi_size,        //
-                                 mpi_rank,        //
-                                 phys_x,          //
+            update_hex_quad_node(phys_x,          //
                                  phys_y,          //
                                  z_array[k],      //
                                  phys_w,          //
                                  tet_indices[k],  //
                                  mesh,            //
                                  mesh_geom,       //
-                                 n,               //
                                  stride,          //
                                  origin,          //
                                  delta,           //
@@ -503,9 +501,7 @@ update_hex_field(const int                            mpi_size,        // MPI si
 // transfer_to_hex_field
 //////////////////////////////////////////////
 int                                                                                   //
-transfer_to_hex_field_cell_tet4(const int                            mpi_size,        // MPI size
-                                const int                            mpi_rank,        // MPI rank
-                                cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
+transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                                 boxes_t                             *boxes,           // Boxes data structure
                                 mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
                                 const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
@@ -516,14 +512,14 @@ transfer_to_hex_field_cell_tet4(const int                            mpi_size,  
                                 const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
                                 real_t *const SFEM_RESTRICT          hex_field) {              //
 
+    PRINT_CURRENT_FUNCTION;
+
     const ptrdiff_t x_size = n[0];
     const ptrdiff_t y_size = n[1];
 
     for (ptrdiff_t i_grid = 0; i_grid < x_size; i_grid++) {
         for (ptrdiff_t j_grid = 0; j_grid < y_size; j_grid++) {
-            update_hex_field(mpi_size,        //
-                             mpi_rank,        //
-                             split_map,       //
+            update_hex_field(split_map,       //
                              boxes,           //
                              mesh_geom,       //
                              i_grid,          //
@@ -538,5 +534,100 @@ transfer_to_hex_field_cell_tet4(const int                            mpi_size,  
         }
     }
 
-    return 0;
+    RETURN_FROM_FUNCTION(0);
+}
+
+/////////////////////////////////////////////////
+// tet4_resample_field_adjoint_hex_quad_norm
+/////////////////////////////////////////////////
+int                                                                                              //
+tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start_element,        // Mesh
+                                      const ptrdiff_t                      end_element,          //
+                                      const mesh_t                        *mesh,                 //
+                                      const ptrdiff_t *const SFEM_RESTRICT n,                    // SDF
+                                      const ptrdiff_t *const SFEM_RESTRICT stride,               //
+                                      const geom_t *const SFEM_RESTRICT    origin,               //
+                                      const geom_t *const SFEM_RESTRICT    delta,                //
+                                      const real_t *const SFEM_RESTRICT    weighted_field,       // Input weighted field
+                                      const mini_tet_parameters_t          mini_tet_parameters,  //
+                                      real_t *const SFEM_RESTRICT          data) {                        // SDF: data (output)
+
+    PRINT_CURRENT_FUNCTION;
+
+    boxes_t  *bounding_boxes_ptr = NULL;                          //
+    const int fb_error           =                                //
+            make_mesh_tets_boxes(0,                               //
+                                 end_element,                     //
+                                 mesh->nnodes,                    //
+                                 (const idx_t **)mesh->elements,  //
+                                 (const geom_t **)mesh->points,   //
+                                 &bounding_boxes_ptr);            //
+
+    bounding_box_statistics_t stats = calculate_bounding_box_statistics(bounding_boxes_ptr);
+    print_bounding_box_statistics(&stats);
+
+    side_length_histograms_t histograms =                         //
+            calculate_side_length_histograms(bounding_boxes_ptr,  //
+                                             &stats,              //
+                                             50);                 //
+    print_side_length_histograms(&histograms);
+
+    side_length_cdf_thresholds_t thresholds =                         //
+            calculate_cdf_thresholds(&histograms, 0.96, 0.96, 0.96);  //
+
+    mesh_tet_geom_t *geom = mesh_tet_geometry_alloc(mesh);
+
+    mesh_tet_geometry_compute_inv_Jacobian(geom);
+
+    const real_t min_grid_x = origin[0];
+    const real_t min_grid_y = origin[1];
+    const real_t min_grid_z = origin[2];
+
+    const real_t max_grid_x = origin[0] + delta[0] * n[0];
+    const real_t max_grid_y = origin[1] + delta[1] * n[1];
+    const real_t max_grid_z = origin[2] + delta[2] * n[2];
+
+    cell_list_split_3d_2d_map_t *split_map = NULL;
+
+    build_cell_list_3d_2d_split_map(&split_map,                     //
+                                    thresholds.threshold_x,         //
+                                    thresholds.threshold_y,         //
+                                    bounding_boxes_ptr->min_x,      //
+                                    bounding_boxes_ptr->min_y,      //
+                                    bounding_boxes_ptr->min_z,      //
+                                    bounding_boxes_ptr->max_x,      //
+                                    bounding_boxes_ptr->max_y,      //
+                                    bounding_boxes_ptr->max_z,      //
+                                    bounding_boxes_ptr->num_boxes,  //
+                                    min_grid_x,                     //
+                                    max_grid_x,                     //
+                                    min_grid_y,                     //
+                                    max_grid_y,                     //
+                                    min_grid_z,                     //
+                                    max_grid_z);                    //
+
+    transfer_to_hex_field_cell_tet4(split_map,           //
+                                    bounding_boxes_ptr,  //
+                                    geom,                //
+                                    mesh,                //
+                                    n,                   //
+                                    stride,              //
+                                    origin,              //
+                                    delta,               //
+                                    weighted_field,      //
+                                    data);               //
+
+    ///////// FREE RESOURCES /////////
+    free_cell_list_split_3d_2d_map(split_map);
+    split_map = NULL;
+
+    mesh_tet_geometry_free(geom);
+    geom = NULL;
+
+    free_boxes_t(bounding_boxes_ptr);
+    bounding_boxes_ptr = NULL;
+
+    free_side_length_histograms(&histograms);
+
+    RETURN_FROM_FUNCTION(0);
 }
