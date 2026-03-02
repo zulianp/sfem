@@ -7,6 +7,7 @@
 #include <time.h>
 #include "sfem_base.h"
 #include "sfem_config.h"  // Include the generated config header
+#include "sfem_resample_field_adjoint_cell.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_adjoint_mini_tet_gpu_wrapper.h"
@@ -1593,8 +1594,8 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
 
         case ADJOINT_REFINE_HYTEG_REFINEMENT:
 
-// #define TEST_GPU_HYTEG_REFINEMENT
-// #define COMPUTE_FUN_XYZ_HEX
+            // #define TEST_GPU_HYTEG_REFINEMENT
+            // #define COMPUTE_FUN_XYZ_HEX
 
 #if defined(TEST_GPU_HYTEG_REFINEMENT) && defined(SFEM_ENABLE_CUDA)
 
@@ -1620,22 +1621,34 @@ resample_field_adjoint_tet4(const int                            mpi_size,      
             clock_gettime(CLOCK_MONOTONIC, &t_start);
 #endif
 
-            ret = tet4_resample_field_adjoint_hex_quad_norm  //
-                                                             // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
-                                                             // ret = tet4_resample_field_adjoint_hex_quad_norm  //
-                                                             // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
-                    (0,                                      //
-                     mesh->nelements,                        //
-                     mesh->nnodes,                           //
-                     (const idx_t**)mesh->elements,          //
-                     (const geom_t**)mesh->points,           //
-                     n,                                      //
-                     stride,                                 //
-                     origin,                                 //
-                     delta,                                  //
-                     mass_vector,                            //
-                     mini_tet_parameters,                    //
-                     data);                                  //
+            //
+            ret = tet4_resample_field_adjoint_cell_quad(0,
+                                                        mesh->nelements,      //
+                                                        mesh,                 //
+                                                        n,                    // SDF
+                                                        stride,               //
+                                                        origin,               //
+                                                        delta,                //
+                                                        mass_vector,          // Input weighted field
+                                                        mini_tet_parameters,  //
+                                                        data);                //
+
+            // ret = tet4_resample_field_adjoint_hex_quad_norm  //
+            //                                                  // ret = tet4_resample_field_adjoint_hex_quad_d_v2  //
+            //                                                  // ret = tet4_resample_field_adjoint_hex_quad_norm  //
+            //                                                  // ret = tet4_resample_field_local_refine_adjoint_hyteg_d  //
+            //         (0,                                      //
+            //          mesh->nelements,                        //
+            //          mesh->nnodes,                           //
+            //          (const idx_t**)mesh->elements,          //
+            //          (const geom_t**)mesh->points,           //
+            //          n,                                      //
+            //          stride,                                 //
+            //          origin,                                 //
+            //          delta,                                  //
+            //          mass_vector,                            //
+            //          mini_tet_parameters,                    //
+            //          data);                                  //
 
 #if SFEM_LOG_LEVEL >= 5
             struct timespec t_end;
@@ -1860,7 +1873,7 @@ resample_field_mesh_adjoint_tet10(const int                            mpi_size,
                               mesh->elements,   //
                               mesh->points,     //
                               weighted_field,   //
-                              g);               //
+                              (real_t*)g);      //
 
     }  // end if (INVALID == st)
 
@@ -2042,7 +2055,7 @@ resample_field_mesh_tet10(const int                            mpi_size,  // MPI
         // exchange ghost nodes and add contribution
         if (mpi_size > 1) {                                                     //
             printf("perform_exchange_operations %s:%d\n", __FILE__, __LINE__);  //
-            perform_exchange_operations(mesh,                                   //
+            perform_exchange_operations((mesh_t*)mesh,                          //
                                         mass_vector,                            //
                                         weighted_field);                        //
         }
@@ -2177,7 +2190,7 @@ interpolate_field(const ptrdiff_t                      nnodes,  // Mesh: nnodes
 // minmax //////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-SFEM_INLINE static void                         //
+SFEM_INLINE void                                //
 minmax(const ptrdiff_t                   n,     //
        const geom_t* const SFEM_RESTRICT x,     //
        geom_t*                           xmin,  //
