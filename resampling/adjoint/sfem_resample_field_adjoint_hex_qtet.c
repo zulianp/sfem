@@ -362,15 +362,94 @@ is_hex_out_of_tet_norm_v(const real_t inv_J_tet[9],         //
 }  // END Function: is_hex_out_of_tet
 
 #if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_IS_FLOAT32
-// #if defined(__AVX512F__)
 #include <immintrin.h>
 
-// Macro for 3x1 matrix-vector multiplication using FP32 and YMM registers
-#define MATVEC_MUL_3x1_PS(result, j0, j1, j2, d0, d1, d2)                    \
-    do {                                                                     \
-        __m256 _tmp0_##result = _mm256_mul_ps((j2), (d2));                   \
-        __m256 _tmp1_##result = _mm256_fmadd_ps((j1), (d1), _tmp0_##result); \
-        (result)              = _mm256_fmadd_ps((j0), (d0), _tmp1_##result); \
+#if defined(__AVX2__)
+#define SFEM_MATVEC_MUL_3x1_PS_256(result, j0, j1, j2, d0, d1, d2)             \
+    do {                                                                       \
+        __m256 _tmp0_##result = _mm256_mul_ps((j2), (d2));                     \
+        __m256 _tmp1_##result = _mm256_add_ps(_mm256_mul_ps((j1), (d1)), _tmp0_##result); \
+        (result)              = _mm256_add_ps(_mm256_mul_ps((j0), (d0)), _tmp1_##result); \
+    } while (0)
+
+bool                                                                  //
+is_hex_out_of_tet_norm_v_avx2_fp32(const real_t inv_J_tet[9],         //
+                                   const real_t tet_origin_x,         //
+                                   const real_t tet_origin_y,         //
+                                   const real_t tet_origin_z,         //
+                                   const real_t hex_vertices_x[8],    //
+                                   const real_t hex_vertices_y[8],    //
+                                   const real_t hex_vertices_z[8]) {  //
+
+    __m256 hex_x = _mm256_loadu_ps(hex_vertices_x);
+    __m256 hex_y = _mm256_loadu_ps(hex_vertices_y);
+    __m256 hex_z = _mm256_loadu_ps(hex_vertices_z);
+
+    __m256 origin_x = _mm256_set1_ps(tet_origin_x);
+    __m256 origin_y = _mm256_set1_ps(tet_origin_y);
+    __m256 origin_z = _mm256_set1_ps(tet_origin_z);
+
+    __m256 dx = _mm256_sub_ps(hex_x, origin_x);
+    __m256 dy = _mm256_sub_ps(hex_y, origin_y);
+    __m256 dz = _mm256_sub_ps(hex_z, origin_z);
+
+    __m256 J00 = _mm256_set1_ps(inv_J_tet[0]);
+    __m256 J01 = _mm256_set1_ps(inv_J_tet[1]);
+    __m256 J02 = _mm256_set1_ps(inv_J_tet[2]);
+    __m256 J10 = _mm256_set1_ps(inv_J_tet[3]);
+    __m256 J11 = _mm256_set1_ps(inv_J_tet[4]);
+    __m256 J12 = _mm256_set1_ps(inv_J_tet[5]);
+    __m256 J20 = _mm256_set1_ps(inv_J_tet[6]);
+    __m256 J21 = _mm256_set1_ps(inv_J_tet[7]);
+    __m256 J22 = _mm256_set1_ps(inv_J_tet[8]);
+
+    __m256 ref_x, ref_y, ref_z;
+    {
+        __m256 t0 = _mm256_mul_ps(J02, dz);
+        __m256 t1 = _mm256_add_ps(_mm256_mul_ps(J01, dy), t0);
+        ref_x     = _mm256_add_ps(_mm256_mul_ps(J00, dx), t1);
+    }
+    {
+        __m256 t0 = _mm256_mul_ps(J12, dz);
+        __m256 t1 = _mm256_add_ps(_mm256_mul_ps(J11, dy), t0);
+        ref_y     = _mm256_add_ps(_mm256_mul_ps(J10, dx), t1);
+    }
+    {
+        __m256 t0 = _mm256_mul_ps(J22, dz);
+        __m256 t1 = _mm256_add_ps(_mm256_mul_ps(J21, dy), t0);
+        ref_z     = _mm256_add_ps(_mm256_mul_ps(J20, dx), t1);
+    }
+
+    __m256 sum_ref = _mm256_add_ps(_mm256_add_ps(ref_x, ref_y), ref_z);
+
+    __m256 zero = _mm256_setzero_ps();
+    __m256 one  = _mm256_set1_ps(1.0f);
+
+    __m256 cmp_x   = _mm256_cmp_ps(ref_x, zero, _CMP_LT_OQ);
+    __m256 cmp_y   = _mm256_cmp_ps(ref_y, zero, _CMP_LT_OQ);
+    __m256 cmp_z   = _mm256_cmp_ps(ref_z, zero, _CMP_LT_OQ);
+    __m256 cmp_sum = _mm256_cmp_ps(sum_ref, one, _CMP_GT_OQ);
+
+    const int m1 = _mm256_movemask_ps(cmp_x);
+    const int m2 = _mm256_movemask_ps(cmp_y);
+    const int m3 = _mm256_movemask_ps(cmp_z);
+    const int m4 = _mm256_movemask_ps(cmp_sum);
+
+    const bool all_negative_x  = (m1 == 0xFF);
+    const bool all_negative_y  = (m2 == 0xFF);
+    const bool all_negative_z  = (m3 == 0xFF);
+    const bool all_outside_sum = (m4 == 0xFF);
+
+    return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
+}
+#endif  // END if (__AVX2__)
+
+#if defined(__AVX512F__)
+#define SFEM_MATVEC_MUL_3x1_PS_512(result, j0, j1, j2, d0, d1, d2)            \
+    do {                                                                       \
+        __m512 _tmp0_##result = _mm512_mul_ps((j2), (d2));                     \
+        __m512 _tmp1_##result = _mm512_add_ps(_mm512_mul_ps((j1), (d1)), _tmp0_##result); \
+        (result)              = _mm512_add_ps(_mm512_mul_ps((j0), (d0)), _tmp1_##result); \
     } while (0)
 
 bool                                                                    //
@@ -382,22 +461,18 @@ is_hex_out_of_tet_norm_v_avx512_fp32(const real_t inv_J_tet[9],         //
                                      const real_t hex_vertices_y[8],    //
                                      const real_t hex_vertices_z[8]) {  //
 
-    // Load all 8 vertices (8 floats = 256 bits)
     __m256 hex_x = _mm256_loadu_ps(hex_vertices_x);
     __m256 hex_y = _mm256_loadu_ps(hex_vertices_y);
     __m256 hex_z = _mm256_loadu_ps(hex_vertices_z);
 
-    // Broadcast tet origin (single float to all 8 lanes)
     __m256 origin_x = _mm256_set1_ps(tet_origin_x);
     __m256 origin_y = _mm256_set1_ps(tet_origin_y);
     __m256 origin_z = _mm256_set1_ps(tet_origin_z);
 
-    // Compute dx, dy, dz
     __m256 dx = _mm256_sub_ps(hex_x, origin_x);
     __m256 dy = _mm256_sub_ps(hex_y, origin_y);
     __m256 dz = _mm256_sub_ps(hex_z, origin_z);
 
-    // Broadcast inverse Jacobian elements (single float to all 8 lanes)
     __m256 J00 = _mm256_set1_ps(inv_J_tet[0]);
     __m256 J01 = _mm256_set1_ps(inv_J_tet[1]);
     __m256 J02 = _mm256_set1_ps(inv_J_tet[2]);
@@ -408,70 +483,50 @@ is_hex_out_of_tet_norm_v_avx512_fp32(const real_t inv_J_tet[9],         //
     __m256 J21 = _mm256_set1_ps(inv_J_tet[7]);
     __m256 J22 = _mm256_set1_ps(inv_J_tet[8]);
 
-    // Transform to reference space using FMA (FP32)
     __m256 ref_x, ref_y, ref_z;
-    MATVEC_MUL_3x1_PS(ref_x, J00, J01, J02, dx, dy, dz);
-    MATVEC_MUL_3x1_PS(ref_y, J10, J11, J12, dx, dy, dz);
-    MATVEC_MUL_3x1_PS(ref_z, J20, J21, J22, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_256(ref_x, J00, J01, J02, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_256(ref_y, J10, J11, J12, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_256(ref_z, J20, J21, J22, dx, dy, dz);
 
-    // Compute sum
     __m256 sum_ref = _mm256_add_ps(_mm256_add_ps(ref_x, ref_y), ref_z);
 
-    // Constants
     __m256 zero = _mm256_setzero_ps();
     __m256 one  = _mm256_set1_ps(1.0f);
 
-    // Perform comparisons and get masks (using k registers)
-    // Note: AVX-512 mask registers work with 256-bit ops via _mm256_cmp_ps_mask
-    __mmask8 k1 = _mm256_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);   // ref_x < 0
-    __mmask8 k2 = _mm256_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);   // ref_y < 0
-    __mmask8 k3 = _mm256_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);   // ref_z < 0
-    __mmask8 k4 = _mm256_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);  // sum > 1
+    __mmask8 k1 = _mm256_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);
+    __mmask8 k2 = _mm256_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);
+    __mmask8 k3 = _mm256_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);
+    __mmask8 k4 = _mm256_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);
 
-    // Reduce masks: check if ALL vertices satisfy each constraint
-    // For 8 elements (8 floats), all bits set = 0xFF
-    bool all_negative_x  = (k1 == 0xFF);
-    bool all_negative_y  = (k2 == 0xFF);
-    bool all_negative_z  = (k3 == 0xFF);
-    bool all_outside_sum = (k4 == 0xFF);
+    const bool all_negative_x  = (k1 == 0xFF);
+    const bool all_negative_y  = (k2 == 0xFF);
+    const bool all_negative_z  = (k3 == 0xFF);
+    const bool all_outside_sum = (k4 == 0xFF);
 
-    // Return true if at least one constraint is satisfied by all vertices
     return (all_negative_x || all_negative_y || all_negative_z || all_outside_sum);
 }
 
-// Macro for 3x1 matrix-vector multiplication using FP32 and YMM registers
-#define MATVEC_MUL_3x1_PS_512(result, j0, j1, j2, d0, d1, d2)                \
-    do {                                                                     \
-        __m512 _tmp0_##result = _mm512_mul_ps((j2), (d2));                   \
-        __m512 _tmp1_##result = _mm512_fmadd_ps((j1), (d1), _tmp0_##result); \
-        (result)              = _mm512_fmadd_ps((j0), (d0), _tmp1_##result); \
-    } while (0)
-
-void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],        //
+void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],       //
                                                  const float tet_origin_x,        //
                                                  const float tet_origin_y,        //
                                                  const float tet_origin_z,        //
                                                  const float hex_vertices_x[16],  //
                                                  const float hex_vertices_y[16],  //
                                                  const float hex_vertices_z[16],  //
-                                                 bool        in_out[2]) {                //
+                                                 bool        in_out[2]) {         //
 
-    // Load all 8 vertices (8 floats = 256 bits)
     __m512 hex_x = _mm512_loadu_ps(hex_vertices_x);
     __m512 hex_y = _mm512_loadu_ps(hex_vertices_y);
     __m512 hex_z = _mm512_loadu_ps(hex_vertices_z);
 
-    // Broadcast tet origin (single float to all 8 lanes)
     __m512 origin_x = _mm512_set1_ps(tet_origin_x);
     __m512 origin_y = _mm512_set1_ps(tet_origin_y);
     __m512 origin_z = _mm512_set1_ps(tet_origin_z);
 
-    // Compute dx, dy, dz
     __m512 dx = _mm512_sub_ps(hex_x, origin_x);
     __m512 dy = _mm512_sub_ps(hex_y, origin_y);
     __m512 dz = _mm512_sub_ps(hex_z, origin_z);
 
-    // Broadcast inverse Jacobian elements (single float to all 8 lanes)
     __m512 J00 = _mm512_set1_ps(inv_J_tet[0]);
     __m512 J01 = _mm512_set1_ps(inv_J_tet[1]);
     __m512 J02 = _mm512_set1_ps(inv_J_tet[2]);
@@ -482,27 +537,20 @@ void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],      
     __m512 J21 = _mm512_set1_ps(inv_J_tet[7]);
     __m512 J22 = _mm512_set1_ps(inv_J_tet[8]);
 
-    // Transform to reference space using FMA (FP32)
     __m512 ref_x, ref_y, ref_z;
-    MATVEC_MUL_3x1_PS_512(ref_x, J00, J01, J02, dx, dy, dz);
-    MATVEC_MUL_3x1_PS_512(ref_y, J10, J11, J12, dx, dy, dz);
-    MATVEC_MUL_3x1_PS_512(ref_z, J20, J21, J22, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_512(ref_x, J00, J01, J02, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_512(ref_y, J10, J11, J12, dx, dy, dz);
+    SFEM_MATVEC_MUL_3x1_PS_512(ref_z, J20, J21, J22, dx, dy, dz);
 
-    // Compute sum
     __m512 sum_ref = _mm512_add_ps(_mm512_add_ps(ref_x, ref_y), ref_z);
 
-    // Constants
     __m512 zero = _mm512_setzero_ps();
     __m512 one  = _mm512_set1_ps(1.0f);
-    // Perform comparisons and get masks (using k registers)
-    // Note: AVX-512 mask registers work with 256-bit ops via _mm256_cmp_ps_mask
-    __mmask16 k1 = _mm512_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);   // ref_x < 0
-    __mmask16 k2 = _mm512_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);   // ref_y < 0
-    __mmask16 k3 = _mm512_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);   // ref_z < 0
-    __mmask16 k4 = _mm512_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);  // sum > 1
+    __mmask16 k1 = _mm512_cmp_ps_mask(ref_x, zero, _CMP_LT_OQ);
+    __mmask16 k2 = _mm512_cmp_ps_mask(ref_y, zero, _CMP_LT_OQ);
+    __mmask16 k3 = _mm512_cmp_ps_mask(ref_z, zero, _CMP_LT_OQ);
+    __mmask16 k4 = _mm512_cmp_ps_mask(sum_ref, one, _CMP_GT_OQ);
 
-    // Reduce masks: check if ALL vertices satisfy each constraint
-    // For 8 elements (8 floats), all bits set = 0xFF
     bool all_negative_x_0  = (k1 == 0xFF00);
     bool all_negative_y_0  = (k2 == 0xFF00);
     bool all_negative_z_0  = (k3 == 0xFF00);
@@ -513,12 +561,11 @@ void is_hex_out_of_tet_norm_v_avx512_fp32_step2h(const float inv_J_tet[9],      
     bool all_negative_z_1  = (k3 == 0x00FF);
     bool all_outside_sum_1 = (k4 == 0x00FF);
 
-    // Return true if at least one constraint is satisfied by all vertices
     in_out[0] = (all_negative_x_0 || all_negative_y_0 || all_negative_z_0 || all_outside_sum_0);
     in_out[1] = (all_negative_x_1 || all_negative_y_1 || all_negative_z_1 || all_outside_sum_1);
 }
+#endif  // END if (__AVX512F__)
 #endif  // END: x86 architecture specific code
-// #endif
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -662,7 +709,13 @@ tet4_resample_field_adjoint_tet_norm(const real_t                    x0_n,     /
                                                   z_hex_max};
 
 #if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && SFEM_REAL_T_IS_FLOAT32
+#if defined(__AVX512F__)
                 const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx512_fp32  //
+#elif defined(__AVX2__)
+                const bool is_out_of_tet = is_hex_out_of_tet_norm_v_avx2_fp32  //
+#else
+                const bool is_out_of_tet = is_hex_out_of_tet  //
+#endif
 #else
                 const bool is_out_of_tet = is_hex_out_of_tet  //
 #endif
