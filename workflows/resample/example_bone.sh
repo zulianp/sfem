@@ -45,7 +45,7 @@ sdf=sdf.float32.raw
 
 # Use HEX_SIZE environment variable if defined, otherwise use default
 echo "Testing SDF quality ..."
-SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-500}
+SFEM_HEX_SIZE=${SFEM_HEX_SIZE:-800}
 # sdf_test.py $sdf $SFEM_HEX_SIZE
 
 sizes=$(echo "$SFEM_HEX_SIZE $SFEM_HEX_SIZE $SFEM_HEX_SIZE")
