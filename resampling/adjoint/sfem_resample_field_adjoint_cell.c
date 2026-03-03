@@ -93,26 +93,30 @@ update_hex_quad_node(const real_t                         x,               // Ph
                      const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
                      real_t *const SFEM_RESTRICT          hex_element_field) {      // Output field values for the 8 hex nodes
 
-    const int off0 = 0;
-    const int off1 = stride[0];
-    const int off2 = stride[0] + stride[1];
-    const int off3 = stride[1];
-    const int off4 = stride[2];
-    const int off5 = stride[0] + stride[2];
-    const int off6 = stride[0] + stride[1] + stride[2];
-    const int off7 = stride[1] + stride[2];
+    const ptrdiff_t stride0 = stride[0];
+    const ptrdiff_t stride1 = stride[1];
+    const ptrdiff_t stride2 = stride[2];
+
+    const ptrdiff_t off0 = 0;
+    const ptrdiff_t off1 = stride0;
+    const ptrdiff_t off2 = stride0 + stride1;
+    const ptrdiff_t off3 = stride1;
+    const ptrdiff_t off4 = stride2;
+    const ptrdiff_t off5 = stride0 + stride2;
+    const ptrdiff_t off6 = stride0 + stride1 + stride2;
+    const ptrdiff_t off7 = stride1 + stride2;
 
     const real_t ox = origin[0];
     const real_t oy = origin[1];
     const real_t oz = origin[2];
 
-    const real_t dx = delta[0];
-    const real_t dy = delta[1];
-    const real_t dz = delta[2];
+    const real_t inv_dx = 1.0 / delta[0];
+    const real_t inv_dy = 1.0 / delta[1];
+    const real_t inv_dz = 1.0 / delta[2];
 
-    const real_t grid_x = (x - ox) / dx;
-    const real_t grid_y = (y - oy) / dy;
-    const real_t grid_z = (z - oz) / dz;
+    const real_t grid_x = (x - ox) * inv_dx;
+    const real_t grid_y = (y - oy) * inv_dy;
+    const real_t grid_z = (z - oz) * inv_dz;
 
     const ptrdiff_t i = floor(grid_x);
     const ptrdiff_t j = floor(grid_y);
@@ -122,20 +126,19 @@ update_hex_quad_node(const real_t                         x,               // Ph
     const real_t l_y = (grid_y - (real_t)j);
     const real_t l_z = (grid_z - (real_t)k);
 
-    const ptrdiff_t base_index = i * 1 +          //
-                                 j * stride[1] +  //
-                                 k * stride[2];   //
+    const ptrdiff_t base_index = i * stride0 +  //
+                                 j * stride1 +  //
+                                 k * stride2;   //
 
-    idx_t ev[4];
+    const idx_t ev0 = mesh->elements[0][index_tet];
+    const idx_t ev1 = mesh->elements[1][index_tet];
+    const idx_t ev2 = mesh->elements[2][index_tet];
+    const idx_t ev3 = mesh->elements[3][index_tet];
 
-    for (int v = 0; v < 4; ++v) {
-        ev[v] = mesh->elements[v][index_tet];
-    }  // END: for vq
-
-    const real_t wf0 = weighted_field[ev[0]];  // Weighted field at vertex 0
-    const real_t wf1 = weighted_field[ev[1]];  // Weighted field at vertex 1
-    const real_t wf2 = weighted_field[ev[2]];  // Weighted field at vertex 2
-    const real_t wf3 = weighted_field[ev[3]];  // Weighted field at vertex 3
+    const real_t wf0 = weighted_field[ev0];  // Weighted field at vertex 0
+    const real_t wf1 = weighted_field[ev1];  // Weighted field at vertex 1
+    const real_t wf2 = weighted_field[ev2];  // Weighted field at vertex 2
+    const real_t wf3 = weighted_field[ev3];  // Weighted field at vertex 3
 
     const real_t *inv_J_tet = &(mesh_geom->inv_Jacobian[index_tet * 9]);  // Inverse Jacobian for the current tet
 
@@ -148,9 +151,19 @@ update_hex_quad_node(const real_t                         x,               // Ph
     const real_t y_o = y - y0_n;
     const real_t z_o = z - z0_n;
 
-    const real_t x_ref = inv_J_tet[0] * x_o + inv_J_tet[1] * y_o + inv_J_tet[2] * z_o;
-    const real_t y_ref = inv_J_tet[3] * x_o + inv_J_tet[4] * y_o + inv_J_tet[5] * z_o;
-    const real_t z_ref = inv_J_tet[6] * x_o + inv_J_tet[7] * y_o + inv_J_tet[8] * z_o;
+    const real_t inv_J_00 = inv_J_tet[0];
+    const real_t inv_J_01 = inv_J_tet[1];
+    const real_t inv_J_02 = inv_J_tet[2];
+    const real_t inv_J_10 = inv_J_tet[3];
+    const real_t inv_J_11 = inv_J_tet[4];
+    const real_t inv_J_12 = inv_J_tet[5];
+    const real_t inv_J_20 = inv_J_tet[6];
+    const real_t inv_J_21 = inv_J_tet[7];
+    const real_t inv_J_22 = inv_J_tet[8];
+
+    const real_t x_ref = inv_J_00 * x_o + inv_J_01 * y_o + inv_J_02 * z_o;
+    const real_t y_ref = inv_J_10 * x_o + inv_J_11 * y_o + inv_J_12 * z_o;
+    const real_t z_ref = inv_J_20 * x_o + inv_J_21 * y_o + inv_J_22 * z_o;
 
     const real_t f0 = 1.0 - x_ref - y_ref - z_ref;
     const real_t f1 = x_ref;
@@ -168,25 +181,23 @@ update_hex_quad_node(const real_t                         x,               // Ph
     const real_t c2 = l_x * l_y;
     const real_t c3 = one_minus_lx * l_y;
 
-    const real_t hex8_f0 = c0 * one_minus_lz;
-    const real_t hex8_f1 = c1 * one_minus_lz;
-    const real_t hex8_f2 = c2 * one_minus_lz;
-    const real_t hex8_f3 = c3 * one_minus_lz;
-    const real_t hex8_f4 = c0 * l_z;
-    const real_t hex8_f5 = c1 * l_z;
-    const real_t hex8_f6 = c2 * l_z;
-    const real_t hex8_f7 = c3 * l_z;
-
     const real_t wf_quad_QW = wf_quad * phys_w;
 
-    hex_element_field[base_index + off0] += wf_quad_QW * hex8_f0;
-    hex_element_field[base_index + off1] += wf_quad_QW * hex8_f1;
-    hex_element_field[base_index + off2] += wf_quad_QW * hex8_f2;
-    hex_element_field[base_index + off3] += wf_quad_QW * hex8_f3;
-    hex_element_field[base_index + off4] += wf_quad_QW * hex8_f4;
-    hex_element_field[base_index + off5] += wf_quad_QW * hex8_f5;
-    hex_element_field[base_index + off6] += wf_quad_QW * hex8_f6;
-    hex_element_field[base_index + off7] += wf_quad_QW * hex8_f7;
+    const real_t w_c0 = wf_quad_QW * c0;
+    const real_t w_c1 = wf_quad_QW * c1;
+    const real_t w_c2 = wf_quad_QW * c2;
+    const real_t w_c3 = wf_quad_QW * c3;
+
+    real_t *const SFEM_RESTRICT out = &hex_element_field[base_index];
+
+    out[off0] += w_c0 * one_minus_lz;
+    out[off1] += w_c1 * one_minus_lz;
+    out[off2] += w_c2 * one_minus_lz;
+    out[off3] += w_c3 * one_minus_lz;
+    out[off4] += w_c0 * l_z;
+    out[off5] += w_c1 * l_z;
+    out[off6] += w_c2 * l_z;
+    out[off7] += w_c3 * l_z;
 
     return 0;
 }  // END Function: update_hex_quad_node
@@ -218,15 +229,13 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
         return EXIT_FAILURE;
     }
 
-    real_t z_buffer[MAX_Z_SIZE]          = {0};  // Buffer to hold z values for processing, adjust size as needed
-    real_t grid_z_buffer[MAX_Z_SIZE]     = {0};  // Buffer to hold grid z values for processing, adjust size as needed
-    real_t k_buffer[MAX_Z_SIZE]          = {0};  // Buffer to hold k indices for processing, adjust size as needed
-    real_t l_z_buffer[MAX_Z_SIZE]        = {0};  // Buffer to hold local z coordinates for processing, adjust size as needed
-    real_t base_index_buffer[MAX_Z_SIZE] = {0};  // Buffer to hold base indices for processing, adjust size as needed
-    real_t z_o_buffer[MAX_Z_SIZE]        = {0};  // Buffer to hold z_0 values for processing, adjust size as needed
-    real_t x_ref_buffer[MAX_Z_SIZE]      = {0};  // Buffer to hold x reference coordinates for processing
-    real_t y_ref_buffer[MAX_Z_SIZE]      = {0};  // Buffer to hold y reference coordinates for processing
-    real_t z_ref_buffer[MAX_Z_SIZE]      = {0};  // Buffer to hold z reference coordinates for processing
+    real_t    grid_z_buffer[MAX_Z_SIZE];      // Buffer to hold grid z values for processing
+    ptrdiff_t k_buffer[MAX_Z_SIZE];           // Buffer to hold k indices for processing
+    real_t    l_z_buffer[MAX_Z_SIZE];         // Buffer to hold local z coordinates for processing
+    ptrdiff_t base_index_buffer[MAX_Z_SIZE];  // Buffer to hold base indices for processing
+    real_t    x_ref_buffer[MAX_Z_SIZE];       // Buffer to hold x reference coordinates for processing
+    real_t    y_ref_buffer[MAX_Z_SIZE];       // Buffer to hold y reference coordinates for processing
+    real_t    z_ref_buffer[MAX_Z_SIZE];       // Buffer to hold z reference coordinates for processing
 
     const int off0 = 0;
     const int off1 = stride[0];
@@ -241,35 +250,30 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
     const real_t oy = origin[1];
     const real_t oz = origin[2];
 
-    const real_t dx = delta[0];
-    const real_t dy = delta[1];
-    const real_t dz = delta[2];
+    const real_t dx     = delta[0];
+    const real_t dy     = delta[1];
+    const real_t dz     = delta[2];
+    const real_t inv_dz = 1.0 / dz;  // Precompute inverse to avoid repeated division
 
     const real_t grid_x = (x - ox) / dx;
     const real_t grid_y = (y - oy) / dy;
 
-    for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        z_buffer[idx]      = z[idx];
-        grid_z_buffer[idx] = (z[idx] - oz) / dz;
-    }
-
     const ptrdiff_t i = floor(grid_x);
     const ptrdiff_t j = floor(grid_y);
 
-    for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        k_buffer[idx] = floor(grid_z_buffer[idx]);
-    }
-
     const real_t l_x = (grid_x - (real_t)i);
     const real_t l_y = (grid_y - (real_t)j);
-    for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        l_z_buffer[idx] = (grid_z_buffer[idx] - (real_t)k_buffer[idx]);
-    }
 
     for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        base_index_buffer[idx] = i * 1 +                     //
-                                 j * stride[1] +             //
-                                 k_buffer[idx] * stride[2];  //
+        grid_z_buffer[idx] = (z[idx] - oz) * inv_dz;  // Use multiplication instead of division
+
+        k_buffer[idx] = floor(grid_z_buffer[idx]);
+
+        l_z_buffer[idx] = (grid_z_buffer[idx] - (real_t)k_buffer[idx]);
+
+        base_index_buffer[idx] = i * stride[0] +                        //
+                                 j * stride[1] +                        //
+                                 (ptrdiff_t)k_buffer[idx] * stride[2];  //
     }
 
     idx_t ev[4];
@@ -285,16 +289,13 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
 
     const real_t *inv_J_tet = &(mesh_geom->inv_Jacobian[index_tet * 9]);  // Inverse Jacobian for the current tet
 
-    const real_t x0_n = mesh_geom->vetices_zero[ev[0] * 3 + 0];  // x coordinate of vertex 0
-    const real_t y0_n = mesh_geom->vetices_zero[ev[0] * 3 + 1];  // y coordinate of vertex 0
-    const real_t z0_n = mesh_geom->vetices_zero[ev[0] * 3 + 2];  // z coordinate of vertex 0
+    const real_t x0_n = mesh_geom->vetices_zero[index_tet * 3 + 0];  // x coordinate of vertex 0
+    const real_t y0_n = mesh_geom->vetices_zero[index_tet * 3 + 1];  // y coordinate of vertex 0
+    const real_t z0_n = mesh_geom->vetices_zero[index_tet * 3 + 2];  // z coordinate of vertex 0
 
     // Compute the coordinates of the quadrature point in the reference tetrahedron using the inverse Jacobian transformation.
     const real_t x_o = x - x0_n;
     const real_t y_o = y - y0_n;
-    for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        z_o_buffer[idx] = z_buffer[idx] - z0_n;
-    }
 
     // Compute reference coordinates efficiently in a single loop
     const real_t inv_J_00 = inv_J_tet[0];
@@ -308,14 +309,11 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
     const real_t inv_J_22 = inv_J_tet[8];
 
     for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
-        x_ref_buffer[idx] = inv_J_00 * x_o + inv_J_01 * y_o + inv_J_02 * z_o_buffer[idx];
-        y_ref_buffer[idx] = inv_J_10 * x_o + inv_J_11 * y_o + inv_J_12 * z_o_buffer[idx];
-        z_ref_buffer[idx] = inv_J_20 * x_o + inv_J_21 * y_o + inv_J_22 * z_o_buffer[idx];
+        const real_t z_o  = z[idx] - z0_n;  // Compute inline instead of using z_o_buffer
+        x_ref_buffer[idx] = inv_J_00 * x_o + inv_J_01 * y_o + inv_J_02 * z_o;
+        y_ref_buffer[idx] = inv_J_10 * x_o + inv_J_11 * y_o + inv_J_12 * z_o;
+        z_ref_buffer[idx] = inv_J_20 * x_o + inv_J_21 * y_o + inv_J_22 * z_o;
     }  // END for (idx)
-
-    // Process all buffered values with efficient vectorized loop
-
-    real_t hex_element_field_local[MAX_Z_SIZE][8] = {0};  // Local array to accumulate contributions for the hex element field
 
     // Precalculate factors that are independent from idx
     const real_t one_minus_lx = (1.0 - l_x);
@@ -327,6 +325,7 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
     const real_t c2 = l_x * l_y;                    // l_x * l_y
     const real_t c3 = one_minus_lx * l_y;           // (1-l_x) * l_y
 
+    // Direct accumulation loop - eliminates hex_element_field_local buffer and final accumulation loop
     for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
         const real_t x_ref = x_ref_buffer[idx];
         const real_t y_ref = y_ref_buffer[idx];
@@ -352,40 +351,18 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
         const real_t hex8_f6 = c2 * l_z;
         const real_t hex8_f7 = c3 * l_z;
 
-        const real_t wf_quad_QW = wf_quad * phys_w;
-
-        hex_element_field_local[idx][0] += wf_quad_QW * hex8_f0;
-        hex_element_field_local[idx][1] += wf_quad_QW * hex8_f1;
-        hex_element_field_local[idx][2] += wf_quad_QW * hex8_f2;
-        hex_element_field_local[idx][3] += wf_quad_QW * hex8_f3;
-        hex_element_field_local[idx][4] += wf_quad_QW * hex8_f4;
-        hex_element_field_local[idx][5] += wf_quad_QW * hex8_f5;
-        hex_element_field_local[idx][6] += wf_quad_QW * hex8_f6;
-        hex_element_field_local[idx][7] += wf_quad_QW * hex8_f7;
-    }  // END for (idx)
-
-    // After processing all z values, accumulate the local contributions into the global hex element field
-    for (ptrdiff_t idx = 0; idx < z_size; ++idx) {
+        const real_t    wf_quad_QW = wf_quad * phys_w;
         const ptrdiff_t base_index = base_index_buffer[idx];
 
-        hex_element_field[base_index + off0] += hex_element_field_local[idx][0];
-        hex_element_field[base_index + off1] += hex_element_field_local[idx][1];
-        hex_element_field[base_index + off2] += hex_element_field_local[idx][2];
-        hex_element_field[base_index + off3] += hex_element_field_local[idx][3];
-        hex_element_field[base_index + off4] += hex_element_field_local[idx][4];
-        hex_element_field[base_index + off5] += hex_element_field_local[idx][5];
-        hex_element_field[base_index + off6] += hex_element_field_local[idx][6];
-        hex_element_field[base_index + off7] += hex_element_field_local[idx][7];
-    }
-
-    // hex_element_field[off0] += hex_element_field_local[0];
-    // hex_element_field[off1] += hex_element_field_local[1];
-    // hex_element_field[off2] += hex_element_field_local[2];
-    // hex_element_field[off3] += hex_element_field_local[3];
-    // hex_element_field[off4] += hex_element_field_local[4];
-    // hex_element_field[off5] += hex_element_field_local[5];
-    // hex_element_field[off6] += hex_element_field_local[6];
-    // hex_element_field[off7] += hex_element_field_local[7];
+        hex_element_field[base_index + off0] += wf_quad_QW * hex8_f0;
+        hex_element_field[base_index + off1] += wf_quad_QW * hex8_f1;
+        hex_element_field[base_index + off2] += wf_quad_QW * hex8_f2;
+        hex_element_field[base_index + off3] += wf_quad_QW * hex8_f3;
+        hex_element_field[base_index + off4] += wf_quad_QW * hex8_f4;
+        hex_element_field[base_index + off5] += wf_quad_QW * hex8_f5;
+        hex_element_field[base_index + off6] += wf_quad_QW * hex8_f6;
+        hex_element_field[base_index + off7] += wf_quad_QW * hex8_f7;
+    }  // END for (idx)
 
     return 0;
 }  // END Function: update_hex_quad_node_vz
@@ -573,40 +550,57 @@ update_hex_field_vz(cell_list_split_3d_2d_map_t         *split_map,       // Cel
 
         compress_and_reorder(tet_indices, z_array, z_size);
 
-        real_t vz[MAX_Z_SIZE];  // Buffer to hold vz values for the current quadrature point
-                                // real_t phys_w[MAX_Z_SIZE];  // Buffer to hold physical weights for the current quadrature point
+        real_t vz[MAX_Z_SIZE] = {0};  // Buffer to hold vz values - INITIALIZED TO ZERO
 
         real_t phys_w = q_w * hex_volume;
-        // Assuming the weight is the same for all z values for this quadrature point, adjust if needed
 
         ptrdiff_t k = 0;
-        while (true) {
-            const ptrdiff_t tet_index    = tet_indices[k];
-            ptrdiff_t       vz_index_loc = 0;
+        while (k < z_size) {
+            const ptrdiff_t tet_index = tet_indices[k];
 
+            // Skip invalid tet indices (marked as -1 by compress_and_reorder)
+            if (tet_index < 0) {
+                k++;
+                continue;
+            }  // END if (tet_index < 0)
+
+            ptrdiff_t vz_index_loc = 0;
+
+            // Collect all consecutive z values with the same valid tet_index
             while (k < z_size && tet_index == tet_indices[k] && vz_index_loc < MAX_Z_SIZE) {
                 vz[vz_index_loc] = z_array[k];
                 vz_index_loc += 1;
                 k += 1;
-            }
+            }  // END while (k < z_size && tet_index == tet_indices[k])
 
-            update_hex_quad_node_vz(phys_x,          //
-                                    phys_y,          //
-                                    vz,              //
-                                    vz_index_loc,    //
-                                    phys_w,          //
-                                    tet_index,       //
-                                    mesh,            //
-                                    mesh_geom,       //
-                                    stride,          //
-                                    origin,          //
-                                    delta,           //
-                                    weighted_field,  //
-                                    hex_field);      //
-
-            if (k >= z_size) break;
-        }
+            // Only process if we have valid z values
+            if (vz_index_loc > 0) {
+                update_hex_quad_node_vz(phys_x,          //
+                                        phys_y,          //
+                                        vz,              //
+                                        vz_index_loc,    //
+                                        phys_w,          //
+                                        tet_index,       //
+                                        mesh,            //
+                                        mesh_geom,       //
+                                        stride,          //
+                                        origin,          //
+                                        delta,           //
+                                        weighted_field,  //
+                                        hex_field);      //
+            }  // END if (vz_index_loc > 0)
+        }  // END while (k < z_size)
     }
+    // END for (int q_ijk)
+
+    // Free allocated arrays
+    free(z_array);
+    z_array = NULL;
+
+    free(tet_indices);
+    tet_indices = NULL;
+
+    return 0;
 }
 
 //////////////////////////////////////////////
@@ -631,18 +625,18 @@ transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map, 
 
     for (ptrdiff_t i_grid = 0; i_grid < x_size; i_grid++) {
         for (ptrdiff_t j_grid = 0; j_grid < y_size; j_grid++) {
-            update_hex_field_vz(split_map,       //
-                                boxes,           //
-                                mesh_geom,       //
-                                i_grid,          //
-                                j_grid,          //
-                                mesh,            //
-                                n,               //
-                                stride,          //
-                                origin,          //
-                                delta,           //
-                                weighted_field,  //
-                                hex_field);      //
+            update_hex_field(split_map,       //
+                             boxes,           //
+                             mesh_geom,       //
+                             i_grid,          //
+                             j_grid,          //
+                             mesh,            //
+                             n,               //
+                             stride,          //
+                             origin,          //
+                             delta,           //
+                             weighted_field,  //
+                             hex_field);      //
         }
     }
 
