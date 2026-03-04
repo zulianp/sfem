@@ -847,6 +847,10 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
+    ptrdiff_t NeoHookeanOgdenPacked::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t NeoHookeanOgdenPacked::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     int NeoHookeanOgdenPacked::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
@@ -1243,3 +1247,4 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 }  // namespace sfem
+

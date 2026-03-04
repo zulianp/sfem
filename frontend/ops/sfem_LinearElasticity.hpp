@@ -39,6 +39,8 @@ namespace sfem {
     public:
         const char *name() const override { return "LinearElasticity"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
 
         // Accessors for compatibility with semi-structured wrappers
         real_t get_mu() const;

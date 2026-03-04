@@ -41,6 +41,8 @@ namespace sfem {
 
         const char *name() const override { return "PackedLaplacian"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
 
         /**
          * @brief Create a Laplacian operator

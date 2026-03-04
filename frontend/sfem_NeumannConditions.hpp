@@ -58,6 +58,8 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
 
         inline bool is_linear() const override { return true; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
 
         int                            n_conditions() const;
         std::shared_ptr<FunctionSpace> space();

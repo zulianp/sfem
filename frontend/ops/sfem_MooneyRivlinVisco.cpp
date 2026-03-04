@@ -207,6 +207,10 @@ namespace sfem {
         }
     };
 
+    ptrdiff_t MooneyRivlinVisco::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t MooneyRivlinVisco::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     std::unique_ptr<Op> MooneyRivlinVisco::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("MooneyRivlinVisco::create");
         auto ret = std::make_unique<MooneyRivlinVisco>(space);
@@ -528,3 +532,4 @@ namespace sfem {
     MooneyRivlinVisco::Impl::~Impl() {}
 
 }  // namespace sfem
+

@@ -24,6 +24,7 @@
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
+#include "sfem_Gradient.hpp"
 #include <map>
 
 // Forward declarations for other operators that will be moved
@@ -72,6 +73,7 @@ namespace sfem {
             instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
             instance_.private_register_op("ss:NeoHookeanOgden", SemiStructuredNeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
+            instance_.private_register_op("Gradient", Gradient::create);
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 

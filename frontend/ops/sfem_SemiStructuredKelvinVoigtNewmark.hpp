@@ -41,6 +41,8 @@ namespace sfem {
 
         const char *name() const override;
         inline bool is_linear() const override { return true; }
+        inline ptrdiff_t  n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t  n_dofs_image() const override { return space->n_dofs(); }
         int initialize(const std::vector<std::string> &block_names = {}) override;
         SemiStructuredKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace> &space);
 

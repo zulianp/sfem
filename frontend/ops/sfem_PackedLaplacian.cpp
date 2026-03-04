@@ -545,6 +545,10 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
+    ptrdiff_t PackedLaplacian::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t PackedLaplacian::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     int PackedLaplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("PackedLaplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
@@ -766,3 +770,4 @@ namespace sfem {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem
+

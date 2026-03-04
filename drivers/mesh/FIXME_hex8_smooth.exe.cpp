@@ -19,6 +19,8 @@ namespace sfem {
         const char *name() const override { return "HEX8Smooth"; }
 
         bool is_linear() const override { return true; }
+        inline ptrdiff_t n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t n_dofs_image() const override { return space->n_dofs(); }
         int  initialize(const std::vector<std::string> &block_names = {}) override { return SFEM_SUCCESS; }
 
         int gradient(const real_t *const x, real_t *const out) override {
@@ -78,6 +80,7 @@ std::shared_ptr<sfem::Buffer<real_t>> solve(const std::shared_ptr<sfem::Function
     cg->apply(rhs->data(), x->data());
     return x;
 }
+
 
 int smooth(const std::shared_ptr<sfem::Mesh> &m) {
     MPI_Comm comm = MPI_COMM_WORLD;

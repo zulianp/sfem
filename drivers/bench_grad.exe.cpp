@@ -1,0 +1,76 @@
+#include "sfem_API.hpp"
+
+#include "sfem_Buffer.hpp"
+#include "sfem_Env.hpp"
+#include "sfem_base.h"
+
+int main(int argc, char *argv[]) {
+    sfem::Context context(argc, argv);
+    auto          comm = context.communicator();
+
+    if (comm->size() > 1) {
+        SFEM_ERROR("Parallel execution not supported!\n");
+    }
+
+    const int base_resolution = sfem::Env::read("SFEM_BASE_RESOLUTION", 64);
+    const int warmup          = sfem::Env::read("SFEM_WARMUP", 3);
+    const int repeat          = sfem::Env::read("SFEM_REPEAT", 20);
+
+    auto mesh = sfem::Mesh::create_cube(comm, TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
+    auto fs   = sfem::FunctionSpace::create(mesh, 1);
+
+    auto op = sfem::create_op(fs, "Gradient", sfem::EXECUTION_SPACE_HOST);
+
+    const double setup_t0 = MPI_Wtime();
+    op->initialize();
+    const double setup_t1 = MPI_Wtime();
+
+    const ptrdiff_t n_in  = op->n_dofs_domain();
+    const ptrdiff_t n_out = op->n_dofs_image();
+
+    auto h_buf   = sfem::create_buffer<real_t>(n_in, sfem::EXECUTION_SPACE_HOST);
+    auto out_buf = sfem::create_buffer<real_t>(n_out, sfem::EXECUTION_SPACE_HOST);
+
+    real_t *const h   = h_buf->data();
+    real_t *const out = out_buf->data();
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n_in; i++) {
+        h[i] = (real_t)((i % 97) * (1.0 / 97.0));
+    }
+
+    for (int i = 0; i < warmup; i++) {
+        op->apply(nullptr, h, out);
+    }
+
+    sfem::device_synchronize();
+    const double t0 = MPI_Wtime();
+
+    for (int r = 0; r < repeat; r++) {
+        op->apply(nullptr, h, out);
+    }
+
+    sfem::device_synchronize();
+    const double t1 = MPI_Wtime();
+
+    const double elapsed = (t1 - t0) / repeat;
+
+    const double in_rate_m  = 1e-6 * (double)n_in / elapsed;
+    const double out_rate_m = 1e-6 * (double)n_out / elapsed;
+    const double bw_gbps    = ((double)(n_in + n_out) * (double)sizeof(real_t)) / elapsed / 1e9;
+
+    volatile real_t sink = out[0];
+
+    printf("op Gradient\n");
+    printf("element_type %s\n", type_to_string(mesh->element_type()));
+    printf("#elements %ld\n", (long)mesh->n_elements());
+    printf("#nodes %ld\n", (long)mesh->n_nodes());
+    printf("setup %g [s]\n", setup_t1 - setup_t0);
+    printf("time %g [s]\n", elapsed);
+    printf("rate_in %g [MDoF/s]\n", in_rate_m);
+    printf("rate_out %g [MDoF/s]\n", out_rate_m);
+    printf("bw %g [GB/s]\n", bw_gbps);
+    printf("sink %g\n", (double)sink);
+
+    return SFEM_SUCCESS;
+}

@@ -54,6 +54,10 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
+    ptrdiff_t MooneyRivlinActiveStrainPacked::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t MooneyRivlinActiveStrainPacked::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     std::unique_ptr<Op> MooneyRivlinActiveStrainPacked::create(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_unique<MooneyRivlinActiveStrainPacked>(space);
         return ret;

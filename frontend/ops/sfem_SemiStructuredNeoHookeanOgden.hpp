@@ -53,6 +53,8 @@
  
          const char *name() const override;
          inline bool is_linear() const override { return true; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
  
          /**
           * @brief Initialize the operator

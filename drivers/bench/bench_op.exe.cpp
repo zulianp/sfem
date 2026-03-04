@@ -233,9 +233,9 @@ int main(int argc, char *argv[]) {
             op->initialize();
             f->add_operator(op);
 
-            auto x      = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto input  = sfem::create_buffer<real_t>(fs->n_dofs(), es);
-            auto output = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+            auto x      = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);
+            auto input  = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);
+            auto output = sfem::create_buffer<real_t>(op->n_dofs_image(), es);
 
             double start = MPI_Wtime();
             f->update(x->data());

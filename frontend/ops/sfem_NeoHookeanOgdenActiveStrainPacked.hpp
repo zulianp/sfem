@@ -8,6 +8,8 @@ namespace sfem {
     public:
         const char *name() const override { return "NeoHookeanOgdenActiveStrainPacked"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
