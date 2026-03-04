@@ -708,6 +708,10 @@ namespace sfem {
         std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) { return kernels[domain.element_type]; }
     };
 
+    ptrdiff_t Hyperelasticity::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t Hyperelasticity::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     std::unique_ptr<Op> Hyperelasticity::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("Hyperelasticity::create");
 
@@ -976,3 +980,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

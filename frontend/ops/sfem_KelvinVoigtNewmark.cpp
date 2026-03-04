@@ -52,6 +52,10 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
+    ptrdiff_t KelvinVoigtNewmark::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t KelvinVoigtNewmark::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     // Factory
     std::unique_ptr<Op> KelvinVoigtNewmark::create(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("KelvinVoigtNewmark::create");
@@ -417,3 +421,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

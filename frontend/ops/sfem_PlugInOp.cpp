@@ -130,6 +130,10 @@ namespace sfem {
         }
     };
 
+    ptrdiff_t PlugInOp::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t PlugInOp::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     std::unique_ptr<Op> PlugInOp::create(const std::shared_ptr<FunctionSpace> &space, const std::string &opname) {
         return std::unique_ptr<Op>(new PlugInOp(space, opname));
     }
@@ -316,4 +320,5 @@ namespace sfem {
     }
 
 }  // namespace sfem
+
 

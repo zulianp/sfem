@@ -399,6 +399,8 @@ namespace sfem {
     int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) override { return SFEM_SUCCESS; }
 
     inline bool is_linear() const override { return true; }
+    inline ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+    inline ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
     int n_conditions() const;
 
@@ -426,6 +428,8 @@ namespace sfem {
 
         const char *name() const override { return "gpu:Laplacian"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULaplacian:initialize");
@@ -542,6 +546,8 @@ namespace sfem {
 
         const char *name() const override { return "ss:gpu::Laplacian"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULaplacian:initialize");
@@ -669,6 +675,8 @@ namespace sfem {
 
         const char *name() const override { return "gpu:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULinearElasticity:initialize");
@@ -844,6 +852,8 @@ namespace sfem {
 
         const char *name() const override { return "ss::gpu::LinearElasticity"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
@@ -1037,6 +1047,8 @@ namespace sfem {
 
         const char *name() const override { return "ss::gpu::LinearElasticity"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("SemiStructuredGPULinearElasticity:initialize");
@@ -1229,6 +1241,8 @@ namespace sfem {
     
             const char *name() const override { return "gpu:KelvinVoigtNewmark"; }
             inline bool is_linear() const override { return true; }
+            ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+            ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
     
             void set_field(const char* name, const std::shared_ptr<Buffer<real_t>>& vel, int component) override {
                 if (strcmp(name, "velocity") == 0) {
@@ -1436,6 +1450,8 @@ namespace sfem {
 
         const char *name() const override { return "ss:gpu:KelvinVoigtNewmark"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         int initialize(const std::vector<std::string>& = {}) override {
 
@@ -1653,6 +1669,8 @@ namespace sfem {
 
         const char *name() const override { return "ss::gpu::EMOp"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
     };
 
     class GPUEMWarpOp : public Op {
@@ -1761,6 +1779,8 @@ namespace sfem {
 
         const char *name() const override { return "ss::gpu::EMWarpOp"; }
         inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
     };
 
     void register_device_ops() {
@@ -1776,3 +1796,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

@@ -54,6 +54,10 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
     };
 
+    ptrdiff_t NeoHookeanOgdenActiveStrainPacked::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t NeoHookeanOgdenActiveStrainPacked::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     std::unique_ptr<Op> NeoHookeanOgdenActiveStrainPacked::create(const std::shared_ptr<FunctionSpace> &space) {
         auto ret = std::make_unique<NeoHookeanOgdenActiveStrainPacked>(space);
         return ret;

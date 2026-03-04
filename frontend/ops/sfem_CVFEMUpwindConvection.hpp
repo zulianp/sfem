@@ -9,6 +9,8 @@ namespace sfem {
         enum ElemType                   element_type { INVALID };
         const char                     *name() const override { return "CVFEMUpwindConvection"; }
         inline bool                     is_linear() const override { return true; }
+        inline ptrdiff_t                       n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t                       n_dofs_image() const override { return space->n_dofs(); }
         void set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &v, const int component) override;
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
         int                        initialize(const std::vector<std::string> &block_names = {}) override;

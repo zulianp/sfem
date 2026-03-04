@@ -1,51 +1,20 @@
-/**
- * @file sfem_Mass.hpp
- * @brief Mass matrix operator for finite element analysis
- * 
- * This file defines the Mass operator, which implements the discrete
- * mass matrix for finite element discretizations. The mass matrix is
- * commonly used in time-dependent problems and eigenvalue computations.
- */
-
-#pragma once
+#ifndef SFEM_GRADIENT_HPP
+#define SFEM_GRADIENT_HPP
 
 #include "sfem_Op.hpp"
 
 namespace sfem {
 
-    /**
-     * @brief Mass matrix operator for finite element discretizations
-     * 
-     * The Mass operator implements the discrete mass matrix:
-     * 
-     * M_ij = ∫_Ω φ_i φ_j dΩ
-     * 
-     * where:
-     * - φ_i, φ_j are finite element basis functions
-     * - Ω is the computational domain
-     * 
-     * This operator is used in various applications:
-     * - Time-dependent problems (heat equation, wave equation)
-     * - Eigenvalue problems
-     * - L² projections
-     * - Stabilization terms
-     * 
-     * The operator supports:
-     * - Various element types (HEX8, TET4, etc.)
-     * - CRS matrix format for assembly
-     * - Matrix-vector products for application
-     * - Scalar function spaces only (block_size == 1)
-     * - Multi-domain operations via MultiDomainOp
-     */
-    class Mass final : public Op {
+ 
+    class Gradient final : public Op {
     public:
-        const char *name() const override { return "Mass"; }
+        const char *name() const override { return "Gradient"; }
         inline bool is_linear() const override { return true; }
-        inline ptrdiff_t  n_dofs_domain() const override;
-        inline ptrdiff_t  n_dofs_image() const override;
+        ptrdiff_t  n_dofs_domain() const override;
+        ptrdiff_t  n_dofs_image() const override;
 
         /**
-         * @brief Create a Mass operator
+         * @brief Create a Gradient operator
          * @param space Function space (must have block_size == 1)
          * @return Unique pointer to the operator
          * 
@@ -54,11 +23,25 @@ namespace sfem {
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
         /**
+         * @brief Create a level-of-refinement (LOR) version
+         * @param space Function space for LOR operator
+         * @return Shared pointer to LOR operator
+         */
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override;
+
+        /**
+         * @brief Create a derefined version
+         * @param space Function space for derefined operator
+         * @return Shared pointer to derefined operator
+         */
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+
+        /**
          * @brief Initialize the operator
          * @param block_names Optional list of block names to initialize
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          * 
-         * Sets up the MultiDomainOp for multi-block operations.
+         * Currently a no-op, but may be extended for future optimizations.
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
@@ -66,18 +49,26 @@ namespace sfem {
          * @brief Constructor
          * @param space Function space
          */
-        Mass(const std::shared_ptr<FunctionSpace> &space);
+        Gradient(const std::shared_ptr<FunctionSpace> &space);
 
         /**
          * @brief Destructor
          */
-        ~Mass();
+        ~Gradient();
 
         // Matrix assembly methods
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override;
+
+        int hessian_crs_sym(const real_t *const  x,
+                            const count_t *const rowptr,
+                            const idx_t *const   colidx,
+                            real_t *const        diag_values,
+                            real_t *const        off_diag_values) override;
+
+        int hessian_diag(const real_t *const /*x*/, real_t *const values) override;
 
         // Vector operations
         int gradient(const real_t *const x, real_t *const out) override;
@@ -95,3 +86,6 @@ namespace sfem {
     };
 
 } // namespace sfem 
+
+
+#endif  // SFEM_GRADIENT_HPP

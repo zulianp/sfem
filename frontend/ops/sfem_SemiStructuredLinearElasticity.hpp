@@ -96,7 +96,9 @@ namespace sfem {
 
         const char *name() const override;
         inline bool is_linear() const override { return true; }
-
+        inline ptrdiff_t  n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t  n_dofs_image() const override { return space->n_dofs(); }
+        
         /**
          * @brief Initialize the operator
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error

@@ -49,6 +49,8 @@ namespace sfem {
 
         const char *name() const override { return "LumpedMass"; }
         inline bool is_linear() const override { return true; }
+        inline ptrdiff_t n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t n_dofs_image() const override { return space->n_dofs(); }
 
         /**
          * @brief Create a LumpedMass operator

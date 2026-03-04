@@ -262,6 +262,10 @@ namespace sfem {
         return nullptr;
     }
 
+    ptrdiff_t SemiStructuredNeoHookeanOgden::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t SemiStructuredNeoHookeanOgden::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     const char *SemiStructuredNeoHookeanOgden::name() const { return "ss:NeoHookeanOgden"; }
 
     void SemiStructuredNeoHookeanOgden::set_option(const std::string &name, bool val) {
@@ -315,3 +319,4 @@ namespace sfem {
 
     int SemiStructuredNeoHookeanOgden::report(const real_t *const) { return SFEM_SUCCESS; }
 }  // namespace sfem
+

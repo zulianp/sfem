@@ -50,6 +50,10 @@ namespace sfem {
 
     int NeumannConditions::n_conditions() const { return impl_->conditions.size(); }
 
+    ptrdiff_t NeumannConditions::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t NeumannConditions::n_dofs_image() const { return impl_->space->n_dofs(); }
+
     const char *NeumannConditions::name() const { return "NeumannConditions"; }
 
     NeumannConditions::NeumannConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
