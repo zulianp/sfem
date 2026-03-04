@@ -278,6 +278,8 @@ real_t mesh_fun_chainsaw_x(real_t x, real_t y, real_t z);
  */
 real_t mesh_fun_chainsaw_xyz(real_t x, real_t y, real_t z);
 
+real_t mesh_fun_chainsaw_xyz_pos(real_t x, real_t y, real_t z);
+
 /**
  * @brief Print the name of the active mesh function
  *

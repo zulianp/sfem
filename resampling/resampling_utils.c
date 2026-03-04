@@ -574,6 +574,14 @@ real_t mesh_fun_chainsaw_xyz(real_t x, real_t y, real_t z) {
     return amp * (xyz / period - floor(0.5 + xyz / period));
 }
 
+real_t mesh_fun_chainsaw_xyz_pos(real_t x, real_t y, real_t z) {
+    const real_t period = 0.15;
+    const real_t amp    = 1.0;
+    const real_t xyz    = (copysign(1, x) * copysign(1, y) * copysign(1, z)) * sqrt(x * x + y * y + z * z);
+
+    return 0.5 + amp * (xyz / period - floor(0.5 + xyz / period));
+}
+
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 // print_mesh_function_name
@@ -608,6 +616,8 @@ void print_mesh_function_name(const function_XYZ_t mesh_fun_XYZ, const int mpi_r
         printf("Using: mesh_fun_chainsaw_x\n");
     } else if (mesh_fun_XYZ == mesh_fun_chainsaw_xyz) {
         printf("Using: mesh_fun_chainsaw_xyz\n");
+    } else if (mesh_fun_XYZ == mesh_fun_chainsaw_xyz_pos) {
+        printf("Using: mesh_fun_chainsaw_xyz_pos\n");
     } else {
         printf("Using: UNKNOWN function\n");
     }  // END if-else chain

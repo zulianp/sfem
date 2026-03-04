@@ -1,5 +1,9 @@
-#include "sfem_resample_field_adjoint_cell.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "cell_list_3d_map_mesh.h"
+#include "sfem_resample_field_adjoint_cell.h"
 #include "sfem_resample_field_adjoint_hex_quad.h"
 
 #define MAX_Z_SIZE 64  // Define a maximum size for the z array to prevent overflow, adjust as needed
@@ -399,19 +403,21 @@ compress_and_reorder(int    *keyArray,  //
 //////////////////////////////////////////////
 // update_hex_field
 //////////////////////////////////////////////
-int                                                                    //
-update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
-                 boxes_t                             *boxes,           // Boxes data structure
-                 mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
-                 const ptrdiff_t                      i_grid,          // The i index of the grid point in the hex mesh
-                 const ptrdiff_t                      j_grid,          // The j index of the grid point in the hex mesh
-                 const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
-                 const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
-                 const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
-                 const geom_t *const SFEM_RESTRICT    origin,          // SDF: origin[3]
-                 const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
-                 const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
-                 real_t *const SFEM_RESTRICT          hex_field) {              // Output field for the hex cell containing (x,y,z)
+int                                                                        //
+update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Cell list split map data structure
+                 boxes_t                             *boxes,               // Boxes data structure
+                 mesh_tet_geom_t                     *mesh_geom,           // Mesh geometry data structure
+                 const ptrdiff_t                      i_grid,              // The i index of the grid point in the hex mesh
+                 const ptrdiff_t                      j_grid,              // The j index of the grid point in the hex mesh
+                 const mesh_t *const SFEM_RESTRICT    mesh,                // Mesh: mesh_t struct
+                 const ptrdiff_t *const SFEM_RESTRICT n,                   // SDF: n[3]
+                 const ptrdiff_t *const SFEM_RESTRICT stride,              // SDF: stride[3]
+                 const geom_t *const SFEM_RESTRICT    origin,              // SDF: origin[3]
+                 const geom_t *const SFEM_RESTRICT    delta,               // SDF: delta[3]
+                 const real_t *const SFEM_RESTRICT    weighted_field,      // Weighted field
+                 real_t                              *z_array_buffer,      // Buffer to hold z values for processing
+                 int                                 *tet_indices_buffer,  // Buffer to hold tet indices for processing
+                 real_t *const SFEM_RESTRICT          hex_field) {                  // Output field for the hex cell containing (x,y,z)
 
     // get the physical coordinates of the grid point (i_grid, j_grid) in the hex mesh.
     const real_t grid_x = origin[0] + i_grid * delta[0];
@@ -426,8 +432,10 @@ update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       // Cell l
 
     const real_t hex_volume = delta[0] * delta[1] * delta[2];
 
-    real_t *z_array     = malloc(z_size * sizeof(real_t));
-    int    *tet_indices = malloc(z_size * sizeof(int));
+    // real_t *z_array     = malloc(z_size * sizeof(real_t));
+    // int    *tet_indices = malloc(z_size * sizeof(int));
+    real_t *z_array     = z_array_buffer;
+    int    *tet_indices = tet_indices_buffer;
 
     for (int q_ijk = 0; q_ijk < dim_q; q_ijk++) {
         const real_t q_x = quad_x[q_ijk];
@@ -479,13 +487,6 @@ update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       // Cell l
             // We can use this tet index to get the corresponding value from tet_g and accumulate it.
         }
     }
-
-    // Free allocated arrays
-    free(z_array);
-    z_array = NULL;
-
-    free(tet_indices);
-    tet_indices = NULL;
 
     return 0;
 }  // END Function: update_hex_field
@@ -622,26 +623,118 @@ transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map, 
 
     const ptrdiff_t x_size = n[0];
     const ptrdiff_t y_size = n[1];
+    const ptrdiff_t z_size = n[2];
+
+    real_t *z_array_buffer     = malloc(z_size * sizeof(real_t));
+    int    *tet_indices_buffer = malloc(z_size * sizeof(int));
+
+    if (!z_array_buffer || !tet_indices_buffer) {
+        free(z_array_buffer);
+        free(tet_indices_buffer);
+        RETURN_FROM_FUNCTION(-1);
+    }  // END if (!z_array_buffer || !tet_indices_buffer)
 
     for (ptrdiff_t i_grid = 0; i_grid < x_size; i_grid++) {
         for (ptrdiff_t j_grid = 0; j_grid < y_size; j_grid++) {
-            update_hex_field(split_map,       //
-                             boxes,           //
-                             mesh_geom,       //
-                             i_grid,          //
-                             j_grid,          //
-                             mesh,            //
-                             n,               //
-                             stride,          //
-                             origin,          //
-                             delta,           //
-                             weighted_field,  //
-                             hex_field);      //
+            update_hex_field(split_map,           //
+                             boxes,               //
+                             mesh_geom,           //
+                             i_grid,              //
+                             j_grid,              //
+                             mesh,                //
+                             n,                   //
+                             stride,              //
+                             origin,              //
+                             delta,               //
+                             weighted_field,      //
+                             z_array_buffer,      //
+                             tet_indices_buffer,  //
+                             hex_field);          //
         }
     }
 
+    free(z_array_buffer);
+    z_array_buffer = NULL;
+
+    free(tet_indices_buffer);
+    tet_indices_buffer = NULL;
+
     RETURN_FROM_FUNCTION(0);
 }  // END Function: transfer_to_hex_field_cell_tet4
+
+//////////////////////////////////////////////
+// transfer_to_hex_field
+//////////////////////////////////////////////
+int                                                                                        //
+transfer_to_hex_field_cell_split_par_tet4(cell_list_split_3d_2d_map_t         *split_map,  // Cell list split map data structure
+                                          boxes_t                             *boxes,      // Boxes data structure
+                                          mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
+                                          const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
+                                          const ptrdiff_t *const SFEM_RESTRICT n,          // SDF: n[3]
+                                          const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
+                                          const geom_t *const SFEM_RESTRICT    origin,     // SDF: origin[3]
+                                          const geom_t *const SFEM_RESTRICT    delta,      // SDF: delta[3]
+                                          const real_t *const SFEM_RESTRICT    weighted_field,  // Weighted field
+                                          real_t *const SFEM_RESTRICT          hex_field) {              //
+    PRINT_CURRENT_FUNCTION;
+
+#ifdef _OPENMP
+    int num_procs = omp_get_num_procs();
+    omp_set_dynamic(0);
+    omp_set_num_threads(num_procs);
+#endif
+
+    const ptrdiff_t x_size = n[0];
+    const ptrdiff_t y_size = n[1];
+
+#pragma omp parallel
+    {
+        const ptrdiff_t z_size = n[2];
+
+        real_t *z_array_buffer     = malloc(z_size * sizeof(real_t));
+        int    *tet_indices_buffer = malloc(z_size * sizeof(int));
+
+        if (z_array_buffer && tet_indices_buffer) {
+            for (ptrdiff_t start_i = 0; start_i < 3; start_i++) {
+                for (ptrdiff_t start_j = 0; start_j < 3; start_j++) {
+                    ptrdiff_t loop_count_i = (x_size > start_i) ? ((x_size - start_i + 2) / 3) : 0;
+                    ptrdiff_t loop_count_j = (y_size > start_j) ? ((y_size - start_j + 2) / 3) : 0;
+
+#pragma omp for collapse(2) schedule(guided)
+                    for (ptrdiff_t k = 0; k < loop_count_i; k++) {
+                        for (ptrdiff_t m = 0; m < loop_count_j; m++) {
+                            ptrdiff_t i_grid = start_i + (k * 3);
+                            ptrdiff_t j_grid = start_j + (m * 3);
+
+                            update_hex_field(split_map,           //
+                                             boxes,               //
+                                             mesh_geom,           //
+                                             i_grid,              //
+                                             j_grid,              //
+                                             mesh,                //
+                                             n,                   //
+                                             stride,              //
+                                             origin,              //
+                                             delta,               //
+                                             weighted_field,      //
+                                             z_array_buffer,      //
+                                             tet_indices_buffer,  //
+                                             hex_field);          //
+                        }
+                    }
+                }
+            }
+        }  // END if (z_array_buffer && tet_indices_buffer)
+
+        free(z_array_buffer);
+        z_array_buffer = NULL;
+
+        free(tet_indices_buffer);
+        tet_indices_buffer = NULL;
+    }
+
+    RETURN_FROM_FUNCTION(0);
+}
 
 /////////////////////////////////////////////////
 // tet4_resample_field_adjoint_hex_quad_norm

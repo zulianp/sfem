@@ -84,19 +84,21 @@ update_hex_quad_node(const real_t                         x,               //
  * @param hex_field Output field for the hex cell containing (x,y,z)
  * @return int 0 on success
  */
-int                                                                    //
-update_hex_field(cell_list_split_3d_2d_map_t         *split_map,       //
-                 boxes_t                             *boxes,           //
-                 mesh_tet_geom_t                     *mesh_geom,       //
-                 const ptrdiff_t                      i_grid,          //
-                 const ptrdiff_t                      j_grid,          //
-                 const mesh_t *const SFEM_RESTRICT    mesh,            //
-                 const ptrdiff_t *const SFEM_RESTRICT n,               //
-                 const ptrdiff_t *const SFEM_RESTRICT stride,          //
-                 const geom_t *const SFEM_RESTRICT    origin,          //
-                 const geom_t *const SFEM_RESTRICT    delta,           //
-                 const real_t *const SFEM_RESTRICT    weighted_field,  //
-                 real_t *const SFEM_RESTRICT          hex_field);               //
+int                                                                        //
+update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Cell list split map data structure
+                 boxes_t                             *boxes,               // Boxes data structure
+                 mesh_tet_geom_t                     *mesh_geom,           // Mesh geometry data structure
+                 const ptrdiff_t                      i_grid,              // The i index of the grid point in the hex mesh
+                 const ptrdiff_t                      j_grid,              // The j index of the grid point in the hex mesh
+                 const mesh_t *const SFEM_RESTRICT    mesh,                // Mesh: mesh_t struct
+                 const ptrdiff_t *const SFEM_RESTRICT n,                   // SDF: n[3]
+                 const ptrdiff_t *const SFEM_RESTRICT stride,              // SDF: stride[3]
+                 const geom_t *const SFEM_RESTRICT    origin,              // SDF: origin[3]
+                 const geom_t *const SFEM_RESTRICT    delta,               // SDF: delta[3]
+                 const real_t *const SFEM_RESTRICT    weighted_field,      // Weighted field
+                 real_t                              *z_array_buffer,      // Buffer to hold z values for processing
+                 int                                 *tet_indices_buffer,  // Buffer to hold tet indices for processing
+                 real_t *const SFEM_RESTRICT          hex_field);                   //
 
 /**
  * @brief Update hex field values at multiple quadrature nodes based on tet field values, optimized for multiple z values in the
