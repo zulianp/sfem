@@ -8,7 +8,9 @@
 #include "cell_arg_sort.h"
 #include "precision_types.h"
 
-real_t random_interval(real_t min, real_t max);
+real_t                              //
+random_interval(const real_t min,   //
+                const real_t max);  //
 
 //////////////////////////////////////////////////////////
 // boxes_t
@@ -31,26 +33,30 @@ typedef struct {
  * @brief Create an empty boxes_t structure
  * @return
  */
-boxes_t make_boxes_t(void);
+boxes_t              //
+make_boxes_t(void);  //
 
 /**
  * @brief Initialize boxes_t structure
  * @param boxes Pointer to boxes_t structure to initialize
  */
-void init_boxes_t(boxes_t *boxes);
+void                           //
+init_boxes_t(boxes_t *boxes);  //
 
 /**
  * @brief Allocate memory for boxes_t structure
  * @param num_boxes Number of boxes to allocate
  * @return Pointer to allocated boxes_t structure
  */
-boxes_t *allocate_boxes_t(const int num_boxes);
+boxes_t *                               //
+allocate_boxes_t(const int num_boxes);  //
 
 /**
  * @brief Free memory allocated for boxes_t structure
  * @param boxes Pointer to boxes_t structure to free
  */
-void free_boxes_t(boxes_t *boxes);
+void                           //
+free_boxes_t(boxes_t *boxes);  //
 
 /**
  * @brief Check if a box contains a given point
@@ -61,9 +67,19 @@ void free_boxes_t(boxes_t *boxes);
  * @param z Z coordinate of the point
  * @return true if the box contains the point, false otherwise
  */
-bool check_box_contains_pt(const boxes_t *boxes, const int box_index, const real_t x, const real_t y, const real_t z);
+bool                                             //
+check_box_contains_pt(const boxes_t *boxes,      //
+                      const int      box_index,  //
+                      const real_t   x,          //
+                      const real_t   y,          //
+                      const real_t   z);           //
 
-bool check_box_contains_pt_fast(const boxes_t *boxes, const int box_index, const real_t x, const real_t y, const real_t z);
+bool                                                  //
+check_box_contains_pt_fast(const boxes_t *boxes,      //
+                           const int      box_index,  //
+                           const real_t   x,          //
+                           const real_t   y,          //
+                           const real_t   z);           //
 
 /**
  * @brief Generate random boxes within specified bounds
@@ -78,10 +94,20 @@ bool check_box_contains_pt_fast(const boxes_t *boxes, const int box_index, const
  * @param box_size_max Maximum size of the boxes in each dimension
  * @return int 0 on success, non-zero on failure
  */
-int make_random_boxes(boxes_t *boxes, const real_t x_min, const real_t x_max, const real_t y_min, const real_t y_max,
-                      const real_t z_min, const real_t z_max, const real_t box_size_min_x, const real_t box_size_max_x,
-                      const real_t box_size_min_y, const real_t box_size_max_y, const real_t box_size_min_z,
-                      const real_t box_size_max_z);
+int                                              //
+make_random_boxes(boxes_t     *boxes,            //
+                  const real_t x_min,            //
+                  const real_t x_max,            //
+                  const real_t y_min,            //
+                  const real_t y_max,            //
+                  const real_t z_min,            //
+                  const real_t z_max,            //
+                  const real_t box_size_min_x,   //
+                  const real_t box_size_max_x,   //
+                  const real_t box_size_min_y,   //
+                  const real_t box_size_max_y,   //
+                  const real_t box_size_min_z,   //
+                  const real_t box_size_max_z);  //
 
 /////////////////////////////////////////////////////////
 // cell_list_3d_2d_map_t
@@ -131,13 +157,15 @@ typedef struct {
  * @brief Create an empty cell_list_3d_2d_map_t structure
  * @return Pointer to allocated cell_list_3d_2d_map_t structure
  */
-cell_list_3d_2d_map_t *make_empty_cell_list_3d_2d_map(void);
+cell_list_3d_2d_map_t *                //
+make_empty_cell_list_3d_2d_map(void);  //
 
 /**
  * @brief Free memory allocated for cell_list_3d_2d_map_t structure
  * @param map Pointer to cell_list_3d_2d_map_t structure to free
  */
-int free_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map);
+int                                                    //
+free_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map);  //
 
 /**
  * @brief Build the 3D cell list with 2D mapping
@@ -157,10 +185,21 @@ int free_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map);
  * @param z_max Maximum Z coordinate of the domain
  * @return int 0 on success, non-zero on failure
  */
-int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map, const real_t *box_min_x, const real_t *box_min_y,
-                              const real_t *box_min_z, const real_t *box_max_x, const real_t *box_max_y, const real_t *box_max_z,
-                              const int num_boxes, const real_t x_min, const real_t x_max, const real_t y_min, const real_t y_max,
-                              const real_t z_min, const real_t z_max);
+int                                                          //
+build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
+                          const real_t          *box_min_x,  //
+                          const real_t          *box_min_y,  //
+                          const real_t          *box_min_z,  //
+                          const real_t          *box_max_x,  //
+                          const real_t          *box_max_y,  //
+                          const real_t          *box_max_z,  //
+                          const int              num_boxes,  //
+                          const real_t           x_min,      //
+                          const real_t           x_max,      //
+                          const real_t           y_min,      //
+                          const real_t           y_max,      //
+                          const real_t           z_min,      //
+                          const real_t           z_max);               //
 
 /**
  * @brief Query the cell list to find boxes containing a given point
@@ -172,8 +211,14 @@ int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map, const real_t *box_min_
  * @param box_indices Pointer to array of box indices that contain the point
  * @param num_boxes Pointer to number of boxes found
  */
-int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y,
-                              const real_t z, int **box_indices, int *num_boxes);
+int                                                                  //
+query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map,          //
+                          const boxes_t               *boxes,        //
+                          const real_t                 x,            //
+                          const real_t                 y,            //
+                          const real_t                 z,            //
+                          int                        **box_indices,  //
+                          int                         *num_boxes);                           //
 
 /**
  * @brief Query the cell list to find boxes containing points with given X, Y and array of Z coordinates
@@ -186,11 +231,15 @@ int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *b
  * @param box_indices Pointer to array of arrays of box indices that contain the points
  * @param num_boxes Pointer to array of number of boxes found for each Z coordinate
  */
-int query_cell_list_3d_2d_map_given_xy(
-        const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y, const real_t *z_array,
-        const int size_z,
-        int    ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int     **num_boxes);
+int                                                                       //
+query_cell_list_3d_2d_map_given_xy(const cell_list_3d_2d_map_t *map,      //
+                                   const boxes_t               *boxes,    //
+                                   const real_t                 x,        //
+                                   const real_t                 y,        //
+                                   const real_t                *z_array,  //
+                                   const int                    size_z,   //
+                                   int ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
+                                   int  **num_boxes);    //
 
 /**
  * @brief Linear search for boxes containing a given point
@@ -201,20 +250,27 @@ int query_cell_list_3d_2d_map_given_xy(
  * @param box_indices Pointer to array of box indices that contain the point
  * @param num_boxes Pointer to number of boxes found
  */
-int query_linear_search_boxes(const boxes_t *boxes, const real_t x, const real_t y, const real_t z, int **box_indices,
-                              int *num_boxes);
+int                                                    //
+query_linear_search_boxes(const boxes_t *boxes,        //
+                          const real_t   x,            //
+                          const real_t   y,            //
+                          const real_t   z,            //
+                          int          **box_indices,  //
+                          int           *num_boxes);             //
 
 /**
  * @brief Create an empty cell_list_split_3d_2d_map_t structure
  * @return Pointer to allocated cell_list_split_3d_2d_map_t structure
  */
-cell_list_split_3d_2d_map_t *make_empty_cell_list_split_3d_2d_map(void);
+cell_list_split_3d_2d_map_t *                //
+make_empty_cell_list_split_3d_2d_map(void);  //
 
 /**
  * @brief Free memory allocated for cell_list_split_3d_2d_map_t structure
  * @param split_map Pointer to cell_list_split_3d_2d_map_t structure to free
  */
-int free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map);
+int                                                                      //
+free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map);  //
 
 /**
  * @brief Build the 3D cell list with 2D mapping using a x and y sides length split
@@ -232,23 +288,24 @@ int free_cell_list_split_3d_2d_map(cell_list_split_3d_2d_map_t *split_map);
  * @param x_max Maximum X coordinate of the domain
  * @param y_min Minimum Y coordinate of the domain
  */
-int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
-                                    cell_list_3d_2d_map_t *map_upper,  //
-                                    const real_t           split_x,    //
-                                    const real_t           split_y,    //
-                                    const real_t          *box_min_x,  //
-                                    const real_t          *box_min_y,  //
-                                    const real_t          *box_min_z,  //
-                                    const real_t          *box_max_x,  //
-                                    const real_t          *box_max_y,  //
-                                    const real_t          *box_max_z,  //
-                                    const int              num_boxes,  //
-                                    const real_t           x_min,      //
-                                    const real_t           x_max,      //
-                                    const real_t           y_min,      //
-                                    const real_t           y_max,      //
-                                    const real_t           z_min,      //
-                                    const real_t           z_max);               //
+int                                                                //
+fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
+                                cell_list_3d_2d_map_t *map_upper,  //
+                                const real_t           split_x,    //
+                                const real_t           split_y,    //
+                                const real_t          *box_min_x,  //
+                                const real_t          *box_min_y,  //
+                                const real_t          *box_min_z,  //
+                                const real_t          *box_max_x,  //
+                                const real_t          *box_max_y,  //
+                                const real_t          *box_max_z,  //
+                                const int              num_boxes,  //
+                                const real_t           x_min,      //
+                                const real_t           x_max,      //
+                                const real_t           y_min,      //
+                                const real_t           y_max,      //
+                                const real_t           z_min,      //
+                                const real_t           z_max);               //
 
 /**
  * @brief Build the 3D cell list with 2D mapping using a x and y sides length split
@@ -269,22 +326,23 @@ int fill_cell_lists_3d_2d_split_map(cell_list_3d_2d_map_t *map_lower,  //
  * @param z_min Minimum Z coordinate of the domain
  * @param z_max Maximum Z coordinate of the domain
  */
-int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
-                                    const real_t                  split_x,    //
-                                    const real_t                  split_y,    //
-                                    const real_t                 *box_min_x,  //
-                                    const real_t                 *box_min_y,  //
-                                    const real_t                 *box_min_z,  //
-                                    const real_t                 *box_max_x,  //
-                                    const real_t                 *box_max_y,  //
-                                    const real_t                 *box_max_z,  //
-                                    const int                     num_boxes,  //
-                                    const real_t                  x_min,      //
-                                    const real_t                  x_max,      //
-                                    const real_t                  y_min,      //
-                                    const real_t                  y_max,      //
-                                    const real_t                  z_min,      //
-                                    const real_t                  z_max);                      //
+int                                                                       //
+build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
+                                const real_t                  split_x,    //
+                                const real_t                  split_y,    //
+                                const real_t                 *box_min_x,  //
+                                const real_t                 *box_min_y,  //
+                                const real_t                 *box_min_z,  //
+                                const real_t                 *box_max_x,  //
+                                const real_t                 *box_max_y,  //
+                                const real_t                 *box_max_z,  //
+                                const int                     num_boxes,  //
+                                const real_t                  x_min,      //
+                                const real_t                  x_max,      //
+                                const real_t                  y_min,      //
+                                const real_t                  y_max,      //
+                                const real_t                  z_min,      //
+                                const real_t                  z_max);                      //
 
 /**
  * @brief Query the split cell list to find boxes containing a given point
@@ -296,13 +354,14 @@ int build_cell_list_3d_2d_split_map(cell_list_split_3d_2d_map_t **split_map,  //
  * @param box_indices Pointer to array of box indices that contain the point
  * @param num_boxes Pointer to number of boxes found
  */
-int query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map,    //
-                                    const boxes_t                     *boxes,        //
-                                    const real_t                       x,            //
-                                    const real_t                       y,            //
-                                    const real_t                       z,            //
-                                    int                              **box_indices,  //
-                                    int                               *num_boxes);                                 //
+int                                                                              //
+query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map,    //
+                                const boxes_t                     *boxes,        //
+                                const real_t                       x,            //
+                                const real_t                       y,            //
+                                const real_t                       z,            //
+                                int                              **box_indices,  //
+                                int                               *num_boxes);                                 //
 
 /**
  * @brief Query the split cell list to find boxes containing points with given X, Y and array of Z coordinates
@@ -315,7 +374,8 @@ int query_cell_list_3d_2d_split_map(const cell_list_split_3d_2d_map_t *split_map
  * @param box_indices Pointer to array of arrays of box indices that contain the points
  * @param num_boxes Pointer to array of number of boxes found for each Z coordinate
  */
-int query_cell_list_3d_2d_split_map_given_xy(
+int  //
+query_cell_list_3d_2d_split_map_given_xy(
         const cell_list_split_3d_2d_map_t *split_map,    //
         const boxes_t                     *boxes,        //
         const real_t                       x,            //
@@ -323,14 +383,15 @@ int query_cell_list_3d_2d_split_map_given_xy(
         const real_t                      *z_array,      //
         const int                          size_z,       //
         int                             ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int                              **num_boxes);
+        int                              **num_boxes);                                //
 
 /**
  * @brief Calculate the memory usage of the cell list
  * @param map Pointer to cell_list_3d_2d_map_t structure
  * @return int64_t Memory usage in bytes
  */
-int64_t cell_list_3d_2d_map_bytes(const cell_list_3d_2d_map_t *map);
+int64_t                                                       //
+cell_list_3d_2d_map_bytes(const cell_list_3d_2d_map_t *map);  //
 
 #endif  // __CELL_LIST_3D_MAP_H__
 ////////////////////////////////////////////////

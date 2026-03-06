@@ -90,7 +90,7 @@ update_hex_quad_node(const real_t                         x,               // Ph
                      const real_t                         phys_w,          // Quadrature weight for the quadrature point
                      const ptrdiff_t                      index_tet,       // The index of the tet containing the quadrature point
                      const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
-                     mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                     const mesh_tet_geom_t               *mesh_geom,       // Mesh geometry data structure
                      const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
                      const geom_t *const SFEM_RESTRICT    origin,          // SDF: origin[3]
                      const geom_t *const SFEM_RESTRICT    delta,           // SDF: delta[3]
@@ -217,7 +217,7 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
                         const real_t                         phys_w,     // Quadrature weight for the quadrature point
                         const ptrdiff_t                      index_tet,  // The index of the tet containing the quadrature point
                         const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
-                        mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
+                        const mesh_tet_geom_t               *mesh_geom,  // Mesh geometry data structure
                         const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
                         const geom_t *const SFEM_RESTRICT    origin,     // SDF: origin[3]
                         const geom_t *const SFEM_RESTRICT    delta,      // SDF: delta[3]
@@ -406,7 +406,7 @@ compress_and_reorder(int    *keyArray,  //
 int                                                                        //
 update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Cell list split map data structure
                  boxes_t                             *boxes,               // Boxes data structure
-                 mesh_tet_geom_t                     *mesh_geom,           // Mesh geometry data structure
+                 const mesh_tet_geom_t               *mesh_geom,           // Mesh geometry data structure
                  const ptrdiff_t                      i_grid,              // The i index of the grid point in the hex mesh
                  const ptrdiff_t                      j_grid,              // The j index of the grid point in the hex mesh
                  const mesh_t *const SFEM_RESTRICT    mesh,                // Mesh: mesh_t struct
@@ -434,8 +434,8 @@ update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Ce
 
     // real_t *z_array     = malloc(z_size * sizeof(real_t));
     // int    *tet_indices = malloc(z_size * sizeof(int));
-    real_t *z_array     = z_array_buffer;
-    int    *tet_indices = tet_indices_buffer;
+    // real_t *z_array     = z_array_buffer;
+    // int    *tet_indices = tet_indices_buffer;
 
     for (int q_ijk = 0; q_ijk < dim_q; q_ijk++) {
         const real_t q_x = quad_x[q_ijk];
@@ -452,36 +452,36 @@ update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Ce
         // Populate z_array with the physical z coordinates for the current quadrature point
         const real_t delta_z = delta[2];
         for (ptrdiff_t k = 0; k < z_size; k++) {
-            z_array[k] = phys_z_base + (real_t)k * delta_z;
+            z_array_buffer[k] = phys_z_base + (real_t)k * delta_z;
         }
 
-        query_cell_list_3d_2d_split_map_mesh_given_xy_tets_v(split_map,     //
-                                                             boxes,         //
-                                                             mesh_geom,     //
-                                                             phys_x,        //
-                                                             phys_y,        //
-                                                             z_array,       //
-                                                             z_size,        //
-                                                             tet_indices);  //
+        query_cell_list_3d_2d_split_map_mesh_given_xy_tets_v(split_map,            //
+                                                             boxes,                //
+                                                             mesh_geom,            //
+                                                             phys_x,               //
+                                                             phys_y,               //
+                                                             z_array_buffer,       //
+                                                             z_size,               //
+                                                             tet_indices_buffer);  //
 
-        compress_and_reorder(tet_indices, z_array, z_size);
+        compress_and_reorder(tet_indices_buffer, z_array_buffer, z_size);
 
         for (ptrdiff_t k = 0; k < z_size; k++) {
             // If compress and reorder is called it is ensured that after the first -1 there is no others tets.
-            if (tet_indices[k] < 0) break;
+            if (tet_indices_buffer[k] < 0) break;
 
-            update_hex_quad_node(phys_x,          //
-                                 phys_y,          //
-                                 z_array[k],      //
-                                 phys_w,          //
-                                 tet_indices[k],  //
-                                 mesh,            //
-                                 mesh_geom,       //
-                                 stride,          //
-                                 origin,          //
-                                 delta,           //
-                                 weighted_field,  //
-                                 hex_field);      //
+            update_hex_quad_node(phys_x,                 //
+                                 phys_y,                 //
+                                 z_array_buffer[k],      //
+                                 phys_w,                 //
+                                 tet_indices_buffer[k],  //
+                                 mesh,                   //
+                                 mesh_geom,              //
+                                 stride,                 //
+                                 origin,                 //
+                                 delta,                  //
+                                 weighted_field,         //
+                                 hex_field);             //
 
             // Now we have the tet index for the current quadrature point (phys_x, phys_y, z_array[k])
             // We can use this tet index to get the corresponding value from tet_g and accumulate it.
@@ -497,7 +497,7 @@ update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Ce
 int                                                                       //
 update_hex_field_vz(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                     boxes_t                             *boxes,           // Boxes data structure
-                    mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                    const mesh_tet_geom_t               *mesh_geom,       // Mesh geometry data structure
                     const ptrdiff_t                      i_grid,          // The i index of the grid point in the hex mesh
                     const ptrdiff_t                      j_grid,          // The j index of the grid point in the hex mesh
                     const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
@@ -610,7 +610,7 @@ update_hex_field_vz(cell_list_split_3d_2d_map_t         *split_map,       // Cel
 int                                                                                   //
 transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                                 boxes_t                             *boxes,           // Boxes data structure
-                                mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                                const mesh_tet_geom_t               *mesh_geom,       // Mesh geometry data structure
                                 const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
                                 const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
                                 const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]
@@ -668,7 +668,7 @@ transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map, 
 int                                                                                        //
 transfer_to_hex_field_cell_split_par_tet4(cell_list_split_3d_2d_map_t         *split_map,  // Cell list split map data structure
                                           boxes_t                             *boxes,      // Boxes data structure
-                                          mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
+                                          const mesh_tet_geom_t               *mesh_geom,  // Mesh geometry data structure
                                           const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
                                           const ptrdiff_t *const SFEM_RESTRICT n,          // SDF: n[3]
                                           const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
