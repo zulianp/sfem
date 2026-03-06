@@ -312,8 +312,13 @@ int build_cell_list_3d_2d_map(cell_list_3d_2d_map_t *map,        //
 ////////////////////////////////////////////////
 // query_cell_list_3d_2d_map
 ////////////////////////////////////////////////
-int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y,
-                              const real_t z, int **box_indices, int *num_boxes) {
+int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map,          //
+                              const boxes_t               *boxes,        //
+                              const real_t                 x,            //
+                              const real_t                 y,            //
+                              const real_t                 z,            //
+                              int                        **box_indices,  //
+                              int                         *num_boxes) {                          //
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);
     // int iy = coord_to_grid_index(y, map->min_y, map->delta_y);
 
@@ -376,10 +381,15 @@ int query_cell_list_3d_2d_map(const cell_list_3d_2d_map_t *map, const boxes_t *b
 // query_cell_list_3d_2d_map_given_xy
 ////////////////////////////////////////////////
 int query_cell_list_3d_2d_map_given_xy(
-        const cell_list_3d_2d_map_t *map, const boxes_t *boxes, const real_t x, const real_t y, const real_t *z_array,
-        const int size_z,
-        int    ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
-        int     **num_boxes)        // it produces a pointer of a vector (size_z) storint the number of boxes for each z
+        const cell_list_3d_2d_map_t *map,          //
+        const boxes_t               *boxes,        //
+        const real_t                 x,            //
+        const real_t                 y,            //
+        const real_t                *z_array,      //
+        const int                    size_z,       //
+        int                       ***box_indices,  // it produces a pointer of a vector (size_z) of vector(size_boxes_local)
+        int                        **num_boxes)                           // it produces a pointer of a vector (size_z)
+                                                   // storing the number of boxes for each Z coordinate
 {
     // int ix = coord_to_grid_index(x, map->min_x, map->delta_x);
     // int iy = coord_to_grid_index(y, map->min_y, map->delta_y);

@@ -61,7 +61,7 @@ update_hex_quad_node(const real_t                         x,               //
                      const real_t                         phys_w,          //
                      const ptrdiff_t                      index_tet,       //
                      const mesh_t *const SFEM_RESTRICT    mesh,            //
-                     mesh_tet_geom_t                     *mesh_geom,       //
+                     const mesh_tet_geom_t              *mesh_geom,       //
                      const ptrdiff_t *const SFEM_RESTRICT stride,          //
                      const geom_t *const SFEM_RESTRICT    origin,          //
                      const geom_t *const SFEM_RESTRICT    delta,           //
@@ -87,7 +87,7 @@ update_hex_quad_node(const real_t                         x,               //
 int                                                                        //
 update_hex_field(cell_list_split_3d_2d_map_t         *split_map,           // Cell list split map data structure
                  boxes_t                             *boxes,               // Boxes data structure
-                 mesh_tet_geom_t                     *mesh_geom,           // Mesh geometry data structure
+                 const mesh_tet_geom_t              *mesh_geom,           // Mesh geometry data structure
                  const ptrdiff_t                      i_grid,              // The i index of the grid point in the hex mesh
                  const ptrdiff_t                      j_grid,              // The j index of the grid point in the hex mesh
                  const mesh_t *const SFEM_RESTRICT    mesh,                // Mesh: mesh_t struct
@@ -126,7 +126,7 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
                         const real_t                         phys_w,     // Quadrature weight for the quadrature point
                         const ptrdiff_t                      index_tet,  // The index of the tet containing the quadrature point
                         const mesh_t *const SFEM_RESTRICT    mesh,       // Mesh: mesh_t struct
-                        mesh_tet_geom_t                     *mesh_geom,  // Mesh geometry data structure
+                        const mesh_tet_geom_t              *mesh_geom,  // Mesh geometry data structure
                         const ptrdiff_t *const SFEM_RESTRICT stride,     // SDF: stride[3]
                         const geom_t *const SFEM_RESTRICT    origin,     // SDF: origin[3]
                         const geom_t *const SFEM_RESTRICT    delta,      // SDF: delta[3]
@@ -150,7 +150,7 @@ update_hex_quad_node_vz(const real_t                         x,          // Phys
 int                                                                                   //
 transfer_to_hex_field_cell_tet4(cell_list_split_3d_2d_map_t         *split_map,       // Cell list split map data structure
                                 boxes_t                             *boxes,           // Boxes data structure
-                                mesh_tet_geom_t                     *mesh_geom,       // Mesh geometry data structure
+                                const mesh_tet_geom_t              *mesh_geom,       // Mesh geometry data structure
                                 const mesh_t *const SFEM_RESTRICT    mesh,            // Mesh: mesh_t struct
                                 const ptrdiff_t *const SFEM_RESTRICT n,               // SDF: n[3]
                                 const ptrdiff_t *const SFEM_RESTRICT stride,          // SDF: stride[3]

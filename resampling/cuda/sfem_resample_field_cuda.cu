@@ -138,7 +138,7 @@ print_performance_metrics_tet4(FILE*         output_file,      //
             nodes_struc_second,                                                         //
             quadrature_points_per_second);                                              //
     fprintf(output_file, "============================================================================\n");
-}
+} // END: print_performance_metrics_tet4
 
 /**
  * @brief Print performance metrics for the kernel
