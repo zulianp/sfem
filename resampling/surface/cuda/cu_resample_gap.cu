@@ -1,12 +1,12 @@
 #include "cu_resample_gap.h"
 
 #include "cu_quadshell4_resample.h"
-#include "sfem_cuda_base.h"
-#include "sfem_macros.h"
+#include "sfem_cuda_base.hpp"
+#include "sfem_macros.hpp"
 
 extern "C" int cu_resample_gap_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -22,7 +22,7 @@ extern "C" int cu_resample_gap_local(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return 0;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
 
     switch (st) {
         // case TRISHELL3:
@@ -43,7 +43,7 @@ extern "C" int cu_resample_gap_local(
 
 extern "C" int cu_resample_weight_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -52,7 +52,7 @@ extern "C" int cu_resample_weight_local(
         real_t* const SFEM_RESTRICT w) {
     if (!nelements) return SFEM_SUCCESS;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
 
     switch (st) {
         // case TRISHELL3:
@@ -75,7 +75,7 @@ __global__ void cu_in_place_div(const ptrdiff_t n, real_t* const SFEM_RESTRICT i
     }
 }
 
-static int rescale_with_weight(const enum ElemType          element_type,
+static int rescale_with_weight(const smesh::ElemType          element_type,
                                const ptrdiff_t              nelements,
                                const ptrdiff_t              nnodes,
                                idx_t** const SFEM_RESTRICT  elems,
@@ -100,7 +100,7 @@ static int rescale_with_weight(const enum ElemType          element_type,
 
 extern "C" int cu_resample_gap(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -116,7 +116,7 @@ extern "C" int cu_resample_gap(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
     int err = 0;
@@ -129,7 +129,7 @@ extern "C" int cu_resample_gap(
 
 extern "C" int cu_resample_gap_value_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -144,7 +144,7 @@ extern "C" int cu_resample_gap_value_local(
         real_t* const SFEM_RESTRICT g) {
     if (!nelements) return SFEM_SUCCESS;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
 
     switch (st) {
         case QUADSHELL4: {
@@ -159,7 +159,7 @@ extern "C" int cu_resample_gap_value_local(
 
 extern "C" int cu_resample_gap_value(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -174,7 +174,7 @@ extern "C" int cu_resample_gap_value(
         real_t* const SFEM_RESTRICT g) {
     if (!nelements) return SFEM_SUCCESS;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
     cudaMemset(g, 0, nnodes * sizeof(real_t));
     int err = cu_resample_gap_value_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
     err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
@@ -183,7 +183,7 @@ extern "C" int cu_resample_gap_value(
 
 extern "C" int cu_resample_gap_normals_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -198,7 +198,7 @@ extern "C" int cu_resample_gap_normals_local(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    enum ElemType st = shell_type(element_type);
+    smesh::ElemType st = shell_type(element_type);
 
     switch (st) {
         case QUADSHELL4: {
@@ -243,7 +243,7 @@ extern "C" int cu_normalize(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT
 
 extern "C" int cu_resample_gap_normals(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,

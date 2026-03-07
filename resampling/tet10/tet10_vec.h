@@ -4,7 +4,7 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "tet10_weno.h"
 
 #if SFEM_VEC_SIZE == 8 && SIZEOF_REAL_T == 8

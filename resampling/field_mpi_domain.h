@@ -16,9 +16,9 @@
 
 #include "mesh_aura.h"
 #include "read_mesh.h"
-#include "sfem_mesh_write.h"
-#include "sfem_resample_field.h"
-#include "sfem_resample_field_tet4_math.h"
+#include "sfem_mesh_write.hpp"
+#include "sfem_resample_field.hpp"
+#include "sfem_resample_field_tet4_math.hpp"
 
 #include "mass.h"
 #include "mesh_utils.h"

@@ -1,0 +1,1 @@
+#include "dg_hex8_symmetric_interior_penalty_inline.h"

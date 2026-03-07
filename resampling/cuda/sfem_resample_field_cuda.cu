@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_cuda_math.cuh"
 
 // #define real_t double
@@ -14,7 +14,7 @@
 #define MY_RESTRICT __restrict__
 
 #include "mass.h"
-#include "sfem_mesh.h"
+#include "smesh_mesh.hpp"
 #include "sfem_resample_field_cuda_kernel.cuh"
 
 #define HANDLE_CUDA_ERROR(err)                                 \

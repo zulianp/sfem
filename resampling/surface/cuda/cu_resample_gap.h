@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,7 +13,7 @@ extern "C" {
 
 int cu_resample_gap_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -30,7 +30,7 @@ int cu_resample_gap_local(
 
 int cu_resample_gap(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -47,7 +47,7 @@ int cu_resample_gap(
 
 int cu_resample_gap_value_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -63,7 +63,7 @@ int cu_resample_gap_value_local(
 
 int cu_resample_gap_value(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -78,7 +78,7 @@ int cu_resample_gap_value(
         real_t* const SFEM_RESTRICT g);
 
 int cu_resample_gap_normals(  // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -94,7 +94,7 @@ int cu_resample_gap_normals(  // Mesh
 
 int cu_resample_weight_local(
         // Mesh
-        const enum ElemType          element_type,
+        const smesh::ElemType          element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,

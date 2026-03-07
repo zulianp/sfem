@@ -1,4 +1,4 @@
-#include <sfem_base.h>
+#include <sfem_base.hpp>
 #include <stdio.h>
 
 // #define real_type real_t

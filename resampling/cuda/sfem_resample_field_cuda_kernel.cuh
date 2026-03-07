@@ -8,7 +8,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // #define real_t double
 #define real_type real_t
