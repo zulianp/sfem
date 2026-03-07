@@ -4,3 +4,6 @@
 [submodule "external/HXTSort"]
 	path = external/HXTSort
 	url = https://git.immc.ucl.ac.be/hextreme/HXTSort
+[submodule "external/smesh"]
+	path = external/smesh
+	url = https://github.com/zulianp/smesh

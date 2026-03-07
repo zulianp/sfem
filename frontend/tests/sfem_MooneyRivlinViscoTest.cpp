@@ -264,7 +264,7 @@ int test_mooney_rivlin_visco_relaxation() {
                                                        graph->rowptr()->data(),
                                                        graph->colidx()->data(),
                                                        values->data(),
-                                                       0.0,
+                                                       real_t(0),
                                                        in,
                                                        out);
             },
