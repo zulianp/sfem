@@ -142,10 +142,12 @@ int         tet4_patch_gradient(const ptrdiff_t                                 
 
                     xx[f][k] = points[0][ff];
                     yy[f][k] = points[1][ff];
-                    xx[f][k] = points[2][ff];
+                    zz[f][k] = points[2][ff];
                     uu[f][k] = in[ff];
                 }
             }
+
+            // static const int VEC_SIZE = 8;
 
 #pragma omp simd
             for (count_t k = 0; k < extent; k++) {
