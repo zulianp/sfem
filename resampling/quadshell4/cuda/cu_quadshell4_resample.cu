@@ -1,9 +1,9 @@
 #include "cu_quadshell4_resample.h"
 
 #include "line_quadrature.h"
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 static const scalar_t infty = 10000;
 

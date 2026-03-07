@@ -4,8 +4,8 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "tet10_vec.h"
 

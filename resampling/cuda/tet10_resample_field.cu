@@ -1,14 +1,14 @@
 #include <cooperative_groups.h>
 #include <cuda_profiler_api.h>
-#include <sfem_base.h>
+#include <sfem_base.hpp>
 #include <stdio.h>
 #include <time.h>
 
 // #define real_type real_t
 
 #include "mesh_aura.h"
-#include "sfem_defs.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "smesh_mesh.hpp"
 
 #include "tet10_weno_cuda.cuh"
 
@@ -191,7 +191,7 @@ launch_kernels_hex8_to_tet10_resample_field_local_CUDA_unified(               //
     cudaDeviceSynchronize();
 
     if (bool_assemble_dual_mass_vector == 1) {
-        enum ElemType st = shell_type((ElemType)mesh->element_type);
+        smesh::ElemType st = shell_type((ElemType)mesh->element_type);
         if (st == INVALID) {
             // Launch isoparametric_tet10_assemble_dual_mass_vector_kernel
 

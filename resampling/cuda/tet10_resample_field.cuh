@@ -2,7 +2,7 @@
 #define __TET10_RESAMPLE_FIELD_CUH__
 
 #include <cuda_runtime.h>
-#include <sfem_base.h>
+#include <sfem_base.hpp>
 
 /////////////////////////////////////////////////////////////////
 // Struct for xyz

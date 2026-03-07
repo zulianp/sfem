@@ -8,8 +8,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 // Tetrahedral indices for L = 1
 extern int hyteg_L1_indices[];

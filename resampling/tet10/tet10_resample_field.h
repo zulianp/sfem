@@ -4,9 +4,9 @@
 #include <mpi.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mesh.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "smesh_mesh.hpp"
 
 #ifdef __cplusplus
 extern "C" {

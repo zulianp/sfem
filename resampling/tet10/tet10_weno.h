@@ -2,7 +2,7 @@
 #define __TET10_WENO_H__
 
 #include <math.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #define List2(ARRAY, AA, BB) \
     {                        \
