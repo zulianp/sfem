@@ -1,8 +1,8 @@
 #ifndef LAPLACIAN_INCORE_CUDA_H
 #define LAPLACIAN_INCORE_CUDA_H
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include <stddef.h>
 
@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-int cu_laplacian_apply(const enum ElemType             element_type,
+int cu_laplacian_apply(const smesh::ElemType             element_type,
                        const ptrdiff_t                 nelements,
                        idx_t **const SFEM_RESTRICT     elements,
                        const ptrdiff_t                 fff_stride,
@@ -20,7 +20,7 @@ int cu_laplacian_apply(const enum ElemType             element_type,
                        void *const SFEM_RESTRICT       y,
                        void                           *stream);
 
-int cu_laplacian_diag(const enum ElemType             element_type,
+int cu_laplacian_diag(const smesh::ElemType             element_type,
                       const ptrdiff_t                 nelements,
                       idx_t **const SFEM_RESTRICT     elements,
                       const ptrdiff_t                 fff_stride,
@@ -29,7 +29,7 @@ int cu_laplacian_diag(const enum ElemType             element_type,
                       void *const SFEM_RESTRICT       diag,
                       void                           *stream);
 
-int cu_laplacian_crs(const enum ElemType                element_type,
+int cu_laplacian_crs(const smesh::ElemType                element_type,
                      const ptrdiff_t                    nelements,
                      idx_t **const SFEM_RESTRICT        elements,
                      const ptrdiff_t                    fff_stride,
@@ -40,7 +40,7 @@ int cu_laplacian_crs(const enum ElemType                element_type,
                      void *const SFEM_RESTRICT          values,
                      void                              *stream);
 
-int cu_laplacian_crs_sym(const enum ElemType                element_type,
+int cu_laplacian_crs_sym(const smesh::ElemType                element_type,
                          const ptrdiff_t                    nelements,
                          idx_t **const SFEM_RESTRICT        elements,
                          const ptrdiff_t                    fff_stride,

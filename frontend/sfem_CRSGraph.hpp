@@ -1,33 +1,15 @@
 #ifndef SFEM_CRS_GRAPH_HPP
 #define SFEM_CRS_GRAPH_HPP
 
-// C++ includes
+#include "sfem_base.hpp"
 #include "sfem_Buffer.hpp"
-
-#include <memory>
+#include "smesh_crs_graph.hpp"
+#include "smesh_crs_graph.impl.hpp"
 
 namespace sfem {
-	class CRSGraph final {
-	public:
-	    CRSGraph();
-	    ~CRSGraph();
 
-	    CRSGraph(const SharedBuffer<count_t>& rowptr, const SharedBuffer<idx_t>& colidx);
+using CRSGraph = smesh::CRSGraph<count_t, idx_t>;
 
-	    friend class Mesh;
+}  // namespace sfem
 
-	    ptrdiff_t                        n_nodes() const;
-	    ptrdiff_t                        nnz() const;
-	    SharedBuffer<count_t>            rowptr() const;
-	    SharedBuffer<idx_t>              colidx() const;
-	    std::shared_ptr<CRSGraph>        block_to_scalar(const int block_size);
-
-	    void print(std::ostream &os) const;
-
-	private:
-	    class Impl;
-	    std::unique_ptr<Impl> impl_;
-	};
-}
-
-#endif //SFEM_CRS_GRAPH_HPP
+#endif  // SFEM_CRS_GRAPH_HPP

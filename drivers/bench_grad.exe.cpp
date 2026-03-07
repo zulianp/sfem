@@ -1,10 +1,10 @@
 #include "sfem_API.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 int main(int argc, char *argv[]) {
     using namespace sfem;
@@ -15,13 +15,14 @@ int main(int argc, char *argv[]) {
         SFEM_ERROR("Parallel execution not supported!\n");
     }
 
-    const int base_resolution = Env::read("SFEM_BASE_RESOLUTION", 64);
-    const int warmup          = Env::read("SFEM_WARMUP", 3);
-    const int repeat          = Env::read("SFEM_REPEAT", 20);
+    const int base_resolution = smesh::Env::read("SFEM_BASE_RESOLUTION", 64);
+    const int warmup          = smesh::Env::read("SFEM_WARMUP", 3);
+    const int repeat          = smesh::Env::read("SFEM_REPEAT", 20);
 
-    auto mesh = Mesh::create_cube(comm, TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
+    auto mesh = Mesh::create_cube(
+            comm, smesh::TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
 
-    if (Env::read("SFEM_USE_SFC", false)) {
+    if (smesh::Env::read("SFEM_USE_SFC", false)) {
         auto sfc = SFC::create_from_env();
         sfc->reorder(*mesh);
     }
@@ -73,7 +74,7 @@ int main(int argc, char *argv[]) {
     volatile real_t sink = out[0];
 
     printf("op Gradient\n");
-    printf("element_type %s\n", type_to_string(mesh->element_type()));
+    printf("element_type %s\n", type_to_string(mesh->element_type(0)));
     printf("#elements %ld\n", (long)mesh->n_elements());
     printf("#nodes %ld\n", (long)mesh->n_nodes());
     printf("setup %g [s]\n", setup_t1 - setup_t0);

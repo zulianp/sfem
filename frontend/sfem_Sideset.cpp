@@ -4,15 +4,18 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 // Mesh
 #include "adj_table.h"
 #include "hex8_fff.h"
 #include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "smesh_adjacency.hpp"
+#include "smesh_sidesets.hpp"
+#include "smesh_sshex8_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
 
@@ -118,14 +121,14 @@ namespace sfem {
 
         auto points = mesh->points()->data();
 
-        enum ElemType element_type = mesh->element_type();
+        smesh::ElemType element_type = mesh->element_type(0);
 
-        const enum ElemType st   = side_type(element_type);
+        const smesh::ElemType st   = side_type(element_type);
         const int           nnxs = elem_num_nodes(st);
         const int           ns   = elem_num_sides(element_type);
 
-        std::vector<int> local_side_table(ns * nnxs);
-        fill_local_side_table(mesh->element_type(), local_side_table.data());
+        smesh::LocalSideTable local_side_table;
+        local_side_table.fill(mesh->element_type(0));
 
         size_t                                n_blocks = mesh->n_blocks();
         std::vector<std::shared_ptr<Sideset>> sidesets;
@@ -148,7 +151,7 @@ namespace sfem {
                     double p[3] = {0, 0, 0};
 
                     for (int ln = 0; ln < nnxs; ln++) {
-                        const idx_t node = elements[local_side_table[s * nnxs + ln]][e];
+                        const idx_t node = elements[local_side_table.table[s * nnxs + ln]][e];
 
                         for (int d = 0; d < dim; d++) {
                             p[d] += points[d][node];
@@ -242,7 +245,7 @@ namespace sfem {
             SFEM_ERROR("IMPLEMENT ME\n");
         } else {
             block_idx_t                  n_sidesets = sidesets.size();
-            std::vector<enum ElemType>   element_type(n_sidesets);
+            std::vector<smesh::ElemType>   element_type(n_sidesets);
             std::vector<idx_t **>        elems(n_sidesets);
             std::vector<ptrdiff_t>       n_surf_elements(n_sidesets);
             std::vector<element_idx_t *> parent_element(n_sidesets);
@@ -262,14 +265,14 @@ namespace sfem {
             ptrdiff_t n_nodes_out{0};
             idx_t    *nodes_out{nullptr};
 
-            extract_nodeset_from_sidesets(n_sidesets,
-                                          element_type.data(),
-                                          elems.data(),
-                                          n_surf_elements.data(),
-                                          parent_element.data(),
-                                          side_idx.data(),
-                                          &n_nodes_out,
-                                          &nodes_out);
+            smesh::extract_nodeset_from_sidesets(n_sidesets,
+                                                 element_type.data(),
+                                                 elems.data(),
+                                                 n_surf_elements.data(),
+                                                 parent_element.data(),
+                                                 side_idx.data(),
+                                                 &n_nodes_out,
+                                                 &nodes_out);
 
             return sfem::manage_host_buffer(n_nodes_out, nodes_out);
         }
@@ -283,8 +286,18 @@ namespace sfem {
         if (space->has_semi_structured_mesh()) {
             auto &&ss = space->semi_structured_mesh();
             SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-            if (sshex8_extract_nodeset_from_sideset(ss.level(),
-                                                    ss.element_data(),
+            if (smesh::sshex8_extract_nodeset_from_sideset(ss.level(),
+                                                           ss.element_data(),
+                                                           sideset->parent()->size(),
+                                                           sideset->parent()->data(),
+                                                           sideset->lfi()->data(),
+                                                           &n_nodes,
+                                                           &nodes) != SFEM_SUCCESS) {
+                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
+            }
+        } else {
+            if (smesh::extract_nodeset_from_sideset(space->element_type(),
+                                                    space->mesh_ptr()->elements(0)->data(),
                                                     sideset->parent()->size(),
                                                     sideset->parent()->data(),
                                                     sideset->lfi()->data(),
@@ -292,22 +305,12 @@ namespace sfem {
                                                     &nodes) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to extract nodeset from sideset!\n");
             }
-        } else {
-            if (extract_nodeset_from_sideset(space->element_type(),
-                                             space->mesh_ptr()->elements()->data(),
-                                             sideset->parent()->size(),
-                                             sideset->parent()->data(),
-                                             sideset->lfi()->data(),
-                                             &n_nodes,
-                                             &nodes) != SFEM_SUCCESS) {
-                SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-            }
         }
 
         return sfem::manage_host_buffer(n_nodes, nodes);
     }
 
-    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+    std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset) {
         if (space->has_semi_structured_mesh()) {
@@ -315,51 +318,51 @@ namespace sfem {
             auto   ss_sides =
                     sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sideset->parent()->size());
 
-            if (sshex8_extract_surface_from_sideset(ssmesh.level(),
-                                                    ssmesh.element_data(),
-                                                    sideset->parent()->size(),
-                                                    sideset->parent()->data(),
-                                                    sideset->lfi()->data(),
-                                                    ss_sides->data()) != SFEM_SUCCESS) {
+            if (smesh::sshex8_extract_surface_from_sideset(ssmesh.level(),
+                                                           ssmesh.element_data(),
+                                                           sideset->parent()->size(),
+                                                           sideset->parent()->data(),
+                                                           sideset->lfi()->data(),
+                                                           ss_sides->data()) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
 
             idx_t           *idx          = nullptr;
             ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
-            std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+            std::vector<int> levels(smesh::sshex8_hierarchical_n_levels(ssmesh.level()));
 
             // FiXME harcoded for sshex8
-            sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+            smesh::sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
 
             const int nnxs    = 4;
             const int nexs    = ssmesh.level() * ssmesh.level();
             auto      surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size() * nexs);
 
             ssquad4_to_standard_quad4_mesh(ssmesh.level(), sideset->parent()->size(), ss_sides->data(), surface->data());
-            return {QUADSHELL4, surface};
+            return {smesh::QUADSHELL4, surface};
         } else {
             auto st   = shell_type(side_type(space->element_type()));
             int  nnxs = elem_num_nodes(st);
 
             auto surface = sfem::create_host_buffer<idx_t>(nnxs, sideset->parent()->size());
             auto mesh    = space->mesh_ptr();
-            if (extract_surface_from_sideset(space->element_type(),
-                                             mesh->elements()->data(),
-                                             sideset->parent()->size(),
-                                             sideset->parent()->data(),
-                                             sideset->lfi()->data(),
-                                             surface->data()) != SFEM_SUCCESS) {
+            if (smesh::extract_surface_from_sideset(space->element_type(),
+                                                    mesh->elements(0)->data(),
+                                                    sideset->parent()->size(),
+                                                    sideset->parent()->data(),
+                                                    sideset->lfi()->data(),
+                                                    surface->data()) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to create surface from sideset!");
             }
             return {st, surface};
         }
     }
 
-    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
+    std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
             const std::shared_ptr<FunctionSpace>        &space,
             const std::vector<std::shared_ptr<Sideset>> &sidesets) {
         if (sidesets.empty()) {
-            return {INVALID, nullptr};
+            return {smesh::INVALID, nullptr};
         }
 
         if (sidesets.size() == 1) {
@@ -367,6 +370,6 @@ namespace sfem {
         }
 
         SFEM_ERROR("IMPLEMENT ME\n");
-        return {INVALID, nullptr};
+        return {smesh::INVALID, nullptr};
     }
 }  // namespace sfem

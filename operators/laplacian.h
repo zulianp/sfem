@@ -2,12 +2,8 @@
 #define LAPLACIAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "tet4_fff.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 int laplacian_is_opt(int element_type);
 
@@ -68,9 +64,5 @@ int laplacian_crs_sym(int element_type,
                       const idx_t *const SFEM_RESTRICT colidx,
                       real_t *const SFEM_RESTRICT diag,
                       real_t *const SFEM_RESTRICT offdiag);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  // LAPLACIAN_H

@@ -1,10 +1,10 @@
 #include "sfem_Packed.hpp"
 
-#include "sfem_macros.h"
-#include "sfem_mask.h"
+#include "sfem_macros.hpp"
+#include "sfem_mask.hpp"
 
-#include "sfem_Env.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_env.hpp"
+#include "smesh_mesh.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -263,7 +263,7 @@ namespace sfem {
         void init(const std::shared_ptr<Mesh> &mesh, const std::vector<std::string> &block_names, const bool modify_mesh) {
             this->mesh = mesh;
 
-            const ptrdiff_t SFEM_ELEMENTS_PER_PACK = sfem::Env::read("SFEM_ELEMENTS_PER_PACK", 0);
+            const ptrdiff_t SFEM_ELEMENTS_PER_PACK = smesh::Env::read("SFEM_ELEMENTS_PER_PACK", 0);
 
             node_map = sfem::create_host_buffer<idx_t>(mesh->n_nodes());
 

@@ -2,8 +2,8 @@
 #define MACRO_TET4_LINEAR_ELASTICITY_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 #include "tet4_linear_elasticity.h"
 
 #ifdef __cplusplus

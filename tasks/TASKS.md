@@ -42,7 +42,7 @@ public:
     // Metadata
     MPI_Comm comm;
     int spatial_dim;
-    enum ElemType element_type;
+    smesh::ElemType element_type;
     ptrdiff_t nelements;
     ptrdiff_t nnodes;
     
@@ -178,7 +178,7 @@ public:
 #### Task 2.2: Implement Shared Pointer Patterns
 **Objective**: Implement automatic cleanup using smart pointers
 **Files to modify**:
-- `frontend/sfem_Mesh.hpp/cpp` - Extend existing Mesh class
+- `frontend/smesh_mesh.hpp/cpp` - Extend existing Mesh class
 - `frontend/sfem_Buffer.hpp` - Ensure proper shared_ptr support
 
 **Subtasks**:
@@ -227,7 +227,7 @@ public:
 #### Task 3.1: Implement Multi-Block Container
 **Objective**: Create multi-block mesh container in C++ frontend
 **Files to create/modify**:
-- `frontend/sfem_Mesh.hpp/cpp` - Extend with multi-block support
+- `frontend/smesh_mesh.hpp/cpp` - Extend with multi-block support
 - `mesh/block_connectivity.h/c` - Block connectivity (no memory management)
 
 **Subtasks**:

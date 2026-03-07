@@ -1,7 +1,7 @@
 #ifndef CU_TET4_LAPLACIAN_INLINE_HPP
 #define CU_TET4_LAPLACIAN_INLINE_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <typename fff_t, typename scalar_t>
 static inline __device__ __host__ void cu_tet4_laplacian_apply_fff(

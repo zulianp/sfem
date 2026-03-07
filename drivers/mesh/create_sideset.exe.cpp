@@ -13,10 +13,10 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
 
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
         // Read data
         ///////////////////////////////////////////////////////////////////////////////
 
-        auto mesh = sfem::Mesh::create_from_file(comm, path_mesh);
+        auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(path_mesh));
 
         ///////////////////////////////////////////////////////////////////////////////
         // Extract buffers and values
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
 
         const ptrdiff_t n_elements = mesh->n_elements();
         const ptrdiff_t n_nodes    = mesh->n_nodes();
-        auto            elements   = mesh->elements()->data();
+        auto            elements   = mesh->elements(0)->data();
         auto            points     = mesh->points()->data();
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -110,18 +110,18 @@ int main(int argc, char *argv[]) {
         ///////////////////////////////////////////////////////////////////////////////
 
         // Reduce cost of computation by exploiting low-order representation
-        enum ElemType element_type_hack = mesh->element_type();
+        smesh::ElemType element_type_hack = mesh->element_type(0);
         switch (element_type_hack) {
-            case TRI6: {
-                element_type_hack = TRI3;
+            case smesh::TRI6: {
+                element_type_hack = smesh::TRI3;
                 break;
             }
-            case TET10: {
-                element_type_hack = TET4;
+            case smesh::TET10: {
+                element_type_hack = smesh::TET4;
                 break;
             }
-            case EDGE3: {
-                element_type_hack = EDGE2;
+            case smesh::EDGE3: {
+                element_type_hack = smesh::EDGE2;
                 break;
             }
             default:
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
         const int nsxe = elem_num_sides(element_type_hack);
 
-        enum ElemType st   = side_type(element_type_hack);
+        smesh::ElemType st   = side_type(element_type_hack);
         const int     nnxs = elem_num_nodes(st);
         const int     dim  = mesh->spatial_dimension();
         const int     ns   = elem_num_sides(element_type_hack);
@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
         // Build node-to-element CSR once, to walk boundary by shared nodes/edges
         count_t       *n2e_ptr  = nullptr;
         element_idx_t *n2e_el   = nullptr;
-        const int      nxe_full = elem_num_nodes(mesh->element_type());
+        const int      nxe_full = elem_num_nodes(mesh->element_type(0));
         if (build_n2e(n_elements, n_nodes, nxe_full, elements, &n2e_ptr, &n2e_el) != SFEM_SUCCESS) {
             SFEM_ERROR("Failed to build node->element incidence\n");
         }
@@ -415,14 +415,14 @@ int main(int argc, char *argv[]) {
         }
 
         sfem::create_directory(output_folder.c_str());
-        sideset_parent->to_file((output_folder + "/parent.raw").c_str());
-        sideset_lfi->to_file((output_folder + "/lfi.int16.raw").c_str());
+        sideset_parent->to_file(smesh::Path(output_folder + "/parent." + std::string(smesh::TypeToString<element_idx_t>::value())));
+        sideset_lfi->to_file(smesh::Path(output_folder + "/lfi." + std::string(smesh::TypeToString<i16>::value())));
 
         if (SFEM_DEBUG) {
             printf("Extraced %ld/%ld surface elements\n", long(sideset_parent->size()), long(parent->size()));
-            auto debug_elements = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(mesh->element_type())), n_selected);
+            auto debug_elements = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(mesh->element_type(0))), n_selected);
 
-            if (extract_surface_from_sideset(mesh->element_type(),
+            if (extract_surface_from_sideset(mesh->element_type(0),
                                              elements,
                                              n_selected,
                                              sideset_parent->data(),
@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
             }
 
             sfem::create_directory((output_folder + "/surf").c_str());
-            debug_elements->to_files((output_folder + "/surf/i%d.raw").c_str());
+            debug_elements->to_files(smesh::Path(output_folder + "/surf/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
         }
 
         double tock = MPI_Wtime();

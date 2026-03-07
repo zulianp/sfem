@@ -5,9 +5,9 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "integrate_values.h"
 #include "neumann.h"
@@ -26,7 +26,7 @@
 #include "adj_table.h"
 #include "hex8_fff.h"
 #include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
 
@@ -284,7 +284,7 @@ namespace sfem {
 
         std::map<  //
                 std::shared_ptr<Sideset>,
-                std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>>>
+                std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>>>
                 sideset_to_surface;
 
         for (auto &c : nc->impl_->conditions) {

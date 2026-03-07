@@ -2,12 +2,12 @@
 #define SFEM_SEMISTRUCTUREDMESH_HPP
 
 // C Includes
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // C++ Includes
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include <memory>
 #include <vector>

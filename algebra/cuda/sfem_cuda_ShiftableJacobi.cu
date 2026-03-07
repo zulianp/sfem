@@ -1,9 +1,9 @@
 #include "sfem_cuda_ShiftableJacobi.hpp"
 
-#include "sfem_base.h"
-#include "sfem_cuda_base.h"
+#include "sfem_base.hpp"
+#include "sfem_cuda_base.hpp"
 
-#include "sfem_mask.h"
+#include "sfem_mask.hpp"
 
 #include "cu_mask.cuh"
 

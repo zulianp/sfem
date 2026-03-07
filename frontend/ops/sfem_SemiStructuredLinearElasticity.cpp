@@ -6,7 +6,7 @@
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearElasticity.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -26,7 +26,7 @@ namespace sfem {
             return nullptr;
         }
 
-        assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(space->element_type()));  // REMOVEME once generalized approach
         auto ret = std::make_unique<SemiStructuredLinearElasticity>(space);
 
         real_t SFEM_SHEAR_MODULUS        = 1;
@@ -37,7 +37,7 @@ namespace sfem {
 
         ret->mu           = SFEM_SHEAR_MODULUS;
         ret->lambda       = SFEM_FIRST_LAME_PARAMETER;
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
 
         int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
         SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
@@ -118,7 +118,7 @@ namespace sfem {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::apply", ssm.level());
 
-        assert(element_type == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
         calls++;
 

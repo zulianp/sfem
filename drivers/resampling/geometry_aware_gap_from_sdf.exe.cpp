@@ -9,8 +9,8 @@
 
 #include "mesh_aura.h"
 #include "read_mesh.h"
-#include "sfem_mesh_write.h"
-#include "sfem_resample_gap.h"
+#include "sfem_mesh_write.hpp"
+#include "sfem_resample_gap.hpp"
 #include "node_interpolate.h"
 
 #include "mass.h"
@@ -58,9 +58,38 @@ int main(int argc, char* argv[]) {
         mkdir(output_folder, 0700);
     }
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     if (!mesh) {
         return EXIT_FAILURE;
+    }
+    auto dist = mesh->distributed();
+    const ptrdiff_t n_owned_nodes = dist ? dist->n_nodes_owned() : mesh->n_nodes();
+    auto node_owner = dist ? dist->node_owner() : sfem::create_host_buffer<int>(mesh->n_nodes());
+    auto ghosts = dist ? dist->ghosts() : sfem::create_host_buffer<idx_t>(0);
+    auto node_offsets = sfem::create_host_buffer<idx_t>(size + 1);
+    if (dist) {
+        auto d_dist_node_offsets = dist->node_offsets()->data();
+        auto d_node_offsets = node_offsets->data();
+        for (int i = 0; i < size + 1; ++i) {
+            d_node_offsets[i] = static_cast<idx_t>(d_dist_node_offsets[i]);
+        }
+    } else {
+        auto d_node_offsets = node_offsets->data();
+        d_node_offsets[0] = 0;
+        d_node_offsets[1] = static_cast<idx_t>(mesh->n_nodes());
+    }
+
+    auto node_mapping = sfem::create_host_buffer<idx_t>(n_owned_nodes);
+    if (dist) {
+        auto d_dist_node_mapping = dist->node_mapping()->data();
+        auto d_node_mapping = node_mapping->data();
+        for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
+            d_node_mapping[i] = static_cast<idx_t>(d_dist_node_mapping[i]);
+        }
+    } else {
+        for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
+            node_mapping->data()[i] = static_cast<idx_t>(i);
+        }
     }
 
     ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
@@ -124,12 +153,12 @@ int main(int argc, char* argv[]) {
             count_t* rowptr = 0;
             idx_t* colidx = 0;
             build_crs_graph_for_elem_type(
-                mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), &rowptr, &colidx);
+                mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), &rowptr, &colidx);
 
-            extract_sharp_edges(mesh->element_type(),
+            extract_sharp_edges(mesh->element_type(0),
                                 mesh->n_elements(),
                                 mesh->n_nodes(),
-                                mesh->elements()->data(),
+                                mesh->elements(0)->data(),
                                 mesh->points()->data(),
                                 // CRS-graph (node to node)
                                 rowptr,
@@ -143,10 +172,10 @@ int main(int argc, char* argv[]) {
             free(colidx);
         }
 
-        extract_disconnected_faces(mesh->element_type(),
+        extract_disconnected_faces(mesh->element_type(0),
                                    mesh->n_elements(),
                                    mesh->n_nodes(),
-                                   mesh->elements()->data(),
+                                   mesh->elements(0)->data(),
                                    n_sharp_edges,
                                    e0,
                                    e1,
@@ -166,11 +195,11 @@ int main(int argc, char* argv[]) {
     {
         double resample_tick = MPI_Wtime();
 
-        if (n_sharp_edges) {  // BEAM2 integral
+        if (n_sharp_edges) {  // smesh::BEAM2 integral
             idx_t* edges[2] = {e0, e1};
             resample_gap_local(
                 // Mesh
-                BEAM2,
+                smesh::BEAM2,
                 n_sharp_edges,
                 mesh->n_nodes(),
                 edges,
@@ -188,16 +217,16 @@ int main(int argc, char* argv[]) {
                 znormal);
 
             assemble_lumped_mass(
-                BEAM2, n_sharp_edges, mesh->n_nodes(), edges, mesh->points()->data(), mass_vector);
+                smesh::BEAM2, n_sharp_edges, mesh->n_nodes(), edges, mesh->points()->data(), mass_vector);
         }
 
         if (SFEM_SUPERIMPOSE) {
             resample_gap_local(
                 // Mesh
-                shell_type(mesh->element_type()),
+                shell_type(mesh->element_type(0)),
                 mesh->n_elements(),
                 mesh->n_nodes(),
-                mesh->elements()->data(),
+                mesh->elements(0)->data(),
                 mesh->points()->data(),
                 // SDF
                 nlocal,
@@ -211,26 +240,26 @@ int main(int argc, char* argv[]) {
                 ynormal,
                 znormal);
 
-            assemble_lumped_mass(shell_type(mesh->element_type()),
+            assemble_lumped_mass(shell_type(mesh->element_type(0)),
                                  mesh->n_elements(),
                                  mesh->n_nodes(),
-                                 mesh->elements()->data(),
+                                 mesh->elements(0)->data(),
                                  mesh->points()->data(),
                                  mass_vector);
 
         } else {
             if (n_disconnected_elements) {  // Faces
-                int nxe = elem_num_nodes(mesh->element_type());
+                int nxe = elem_num_nodes(mesh->element_type(0));
                 idx_t** selected_elements = allocate_elements(nxe, n_disconnected_elements);
                 select_elements(nxe,
                                 n_disconnected_elements,
                                 disconnected_elements,
-                                mesh->elements()->data(),
+                                mesh->elements(0)->data(),
                                 selected_elements);
 
                 resample_gap_local(
                     // Mesh
-                    shell_type(mesh->element_type()),
+                    shell_type(mesh->element_type(0)),
                     n_disconnected_elements,
                     mesh->n_nodes(),
                     selected_elements,
@@ -247,7 +276,7 @@ int main(int argc, char* argv[]) {
                     ynormal,
                     znormal);
 
-                assemble_lumped_mass(shell_type(mesh->element_type()),
+                assemble_lumped_mass(shell_type(mesh->element_type(0)),
                                      n_disconnected_elements,
                                      mesh->n_nodes(),
                                      selected_elements,
@@ -304,10 +333,10 @@ int main(int argc, char* argv[]) {
             send_recv_t slave_to_master;
             mesh_create_nodal_send_recv(mesh->comm()->get(),
                                         mesh->n_nodes(),
-                                        mesh->n_owned_nodes(),
-                                        mesh->node_owner()->data(),
-                                        mesh->node_offsets()->data(),
-                                        mesh->ghosts()->data(),
+                                        n_owned_nodes,
+                                        node_owner->data(),
+                                        node_offsets->data(),
+                                        ghosts->data(),
                                         &slave_to_master);
 
             ptrdiff_t count = mesh_exchange_master_buffer_count(&slave_to_master);
@@ -316,7 +345,7 @@ int main(int argc, char* argv[]) {
             auto e_add = [&](real_t* const SFEM_RESTRICT inout) {
                 exchange_add(mesh->comm()->get(),
                              mesh->n_nodes(),
-                             mesh->n_owned_nodes(),
+                             n_owned_nodes,
                              &slave_to_master,
                              inout,
                              real_buffer);
@@ -332,12 +361,12 @@ int main(int argc, char* argv[]) {
         }
 
         // divide by the mass vector
-        for (ptrdiff_t i = 0; i < mesh->n_owned_nodes(); i++) {
+        for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
             if (mass_vector[i] == 0) {
                 fprintf(stderr,
                         "Found 0 mass at %ld, info (%ld, %ld)\n",
                         i,
-                        mesh->n_owned_nodes(),
+                        n_owned_nodes,
                         mesh->n_nodes());
             }
 
@@ -345,7 +374,7 @@ int main(int argc, char* argv[]) {
             g[i] /= mass_vector[i];
         }
 
-        for (ptrdiff_t i = 0; i < mesh->n_owned_nodes(); i++) {
+        for (ptrdiff_t i = 0; i < n_owned_nodes; i++) {
             const real_t xn = xnormal[i];
             const real_t yn = ynormal[i];
             const real_t zn = znormal[i];
@@ -371,16 +400,16 @@ int main(int argc, char* argv[]) {
 
         char path[1024 * 10];
         snprintf(path, sizeof(path), "%s/gap.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm()->get(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
+        mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, g);
 
         snprintf(path, sizeof(path), "%s/xnormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm()->get(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, xnormal);
+        mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, xnormal);
 
         snprintf(path, sizeof(path), "%s/ynormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm()->get(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, ynormal);
+        mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, ynormal);
 
         snprintf(path, sizeof(path), "%s/znormal.float64.raw", output_folder);
-        mesh_write_nodal_field(mesh->comm()->get(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, znormal);
+        mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, znormal);
 
         if (0) {
             for (ptrdiff_t i = 0; i < mesh->n_nodes(); i++) {
@@ -388,7 +417,7 @@ int main(int argc, char* argv[]) {
             }
 
             snprintf(path, sizeof(path), "%s/rank.float64.raw", output_folder);
-            mesh_write_nodal_field(mesh->comm()->get(), mesh->n_owned_nodes(), mesh->node_mapping()->data(), path, SFEM_MPI_REAL_T, g);
+            mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, g);
         }
 
         double io_tock = MPI_Wtime();

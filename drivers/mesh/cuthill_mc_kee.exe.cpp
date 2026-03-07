@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 #include "sortreduce.h"
 
 int main(int argc, char *argv[]) {
@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(argv[1]));
     std::string output_folder = argv[2];
 
     const ptrdiff_t n_elements = mesh->n_elements();
@@ -151,16 +151,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    int nxe = mesh->n_nodes_per_element();
-    auto elements_data = mesh->elements()->data();
+    int nxe = mesh->n_nodes_per_element(0);
+    auto elements_data = mesh->elements(0)->data();
     for(int d = 0; d < nxe; d++) {
         for(ptrdiff_t i = 0; i < n_elements; i++) {
                 elements_data[d][i] = reordering_data[elements_data[d][i]];
         }
     }
 
-    mesh->write(output_folder.c_str());
-    inverse_reordering->to_file((output_folder + "/map.raw").c_str());
+    mesh->write(smesh::Path(output_folder));
+    inverse_reordering->to_file(smesh::Path(output_folder + "/map." + std::string(smesh::TypeToString<idx_t>::value())));
 
     return MPI_Finalize();
 }

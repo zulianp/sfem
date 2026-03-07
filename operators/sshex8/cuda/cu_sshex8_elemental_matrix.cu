@@ -1,8 +1,8 @@
 #include "cu_sshex8_elemental_matrix.h"
 
 #include "cu_sshex8_inline.hpp"
-#include "sfem_cuda_base.h"
-#include "sfem_macros.h"
+#include "sfem_cuda_base.hpp"
+#include "sfem_macros.hpp"
 
 template <typename T>
 __global__ void cu_affine_hex8_elemental_matrix_apply_kernel(const ptrdiff_t              nelements,

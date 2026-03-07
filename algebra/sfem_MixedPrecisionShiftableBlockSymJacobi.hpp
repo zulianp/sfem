@@ -1,7 +1,7 @@
 #ifndef SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
 #define SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_Buffer.hpp"

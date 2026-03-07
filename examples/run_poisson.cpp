@@ -7,8 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
                               &dirichlet_conditions,
                               &n_dirichlet_conditions);
 
-    enum ElemType elem_type = (ElemType)mesh.element_type;
+    smesh::ElemType elem_type = (smesh::ElemType)mesh.element_type;
 
     if (SFEM_USE_MACRO) {
         elem_type = macro_type_variant(elem_type);
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
     destroy_conditions(n_dirichlet_conditions, dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    if (elem_type == MACRO_TET4) {
+    if (elem_type == smesh::MACRO_TET4) {
         tet4_fff_destroy(&fff);
     }
 

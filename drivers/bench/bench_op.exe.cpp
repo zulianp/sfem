@@ -3,19 +3,19 @@
 
 #include "matrixio_array.h"
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_P1toP2.hpp"
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -78,7 +78,7 @@ typedef struct OpDesc {
 
 } OpDesc_t;
 
-void add_matrix_free_scalar_ops(enum ElemType                   element_type,
+void add_matrix_free_scalar_ops(smesh::ElemType                   element_type,
                                 const bool                      semi_structured,
                                 const enum sfem::ExecutionSpace es,
                                 std::vector<OpDesc_t>          &ops) {
@@ -90,12 +90,12 @@ void add_matrix_free_scalar_ops(enum ElemType                   element_type,
         ops.push_back({.name = "PackedLaplacian", .type = MATRIX_FREE, .block_size = 1});
     }
 
-    if (element_type == HEX8 && !semi_structured) {
+    if (element_type == smesh::HEX8 && !semi_structured) {
         ops.push_back({.name = "Mass", .type = MATRIX_FREE, .block_size = 1});
     }
 }
 
-void add_matrix_based_scalar_ops(enum ElemType                   element_type,
+void add_matrix_based_scalar_ops(smesh::ElemType                   element_type,
                                  const bool                      semi_structured,
                                  const enum sfem::ExecutionSpace es,
                                  std::vector<OpDesc_t>          &ops) {
@@ -109,30 +109,30 @@ void add_matrix_based_scalar_ops(enum ElemType                   element_type,
 }
 
 void add_matrix_free_vector_ops(const int                       dim,
-                                enum ElemType                   element_type,
+                                smesh::ElemType                   element_type,
                                 const bool                      semi_structured,
                                 const enum sfem::ExecutionSpace es,
                                 std::vector<OpDesc_t>          &ops) {
     ops.push_back({.name = "LinearElasticity", .type = MATRIX_FREE, .block_size = dim});
 
-    // if ((element_type == TET4 && !semi_structured) || element_type == HEX8) {
+    // if ((element_type == smesh::TET4 && !semi_structured) || element_type == smesh::HEX8) {
     ops.push_back({.name = "NeoHookeanOgden", .type = MATRIX_FREE, .block_size = dim});
     // }
 
-    if (!semi_structured && (element_type == HEX8 || element_type == TET10)) {
+    if (!semi_structured && (element_type == smesh::HEX8 || element_type == smesh::TET10)) {
         ops.push_back({.name = "NeoHookeanOgdenPacked", .type = MATRIX_FREE, .block_size = dim});
     }
 }
 
 void add_matrix_based_vector_ops(const int                       dim,
-                                 enum ElemType                   element_type,
+                                 smesh::ElemType                   element_type,
                                  const bool                      semi_structured,
                                  const enum sfem::ExecutionSpace es,
                                  std::vector<OpDesc_t>          &ops) {
-    if (element_type == TET10 || semi_structured) return;
+    if (element_type == smesh::TET10 || semi_structured) return;
     ops.push_back({.name = "LinearElasticity", .type = BSR, .block_size = dim});
 
-    if (element_type == HEX8) {
+    if (element_type == smesh::HEX8) {
         ops.push_back({.name = "LinearElasticity", .type = BSR_SYM, .block_size = dim});  // FIXME
         ops.push_back({.name = "NeoHookeanOgden", .type = BSR, .block_size = dim});
     }
@@ -147,9 +147,9 @@ int main(int argc, char *argv[]) {
             SFEM_ERROR("Parallel execution not supported!\n");
         }
 
-        int SFEM_BASE_RESOLUTION      = sfem::Env::read("SFEM_BASE_RESOLUTION", 50);
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
-        int SFEM_REPEAT               = sfem::Env::read("SFEM_REPEAT", 5);
+        int SFEM_BASE_RESOLUTION      = smesh::Env::read("SFEM_BASE_RESOLUTION", 50);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
+        int SFEM_REPEAT               = smesh::Env::read("SFEM_REPEAT", 5);
 
         auto es = sfem::EXECUTION_SPACE_HOST;
 
@@ -159,28 +159,37 @@ int main(int argc, char *argv[]) {
             es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
 
-        std::string                 path = sfem::Env::read_string("SFEM_MESH", "");
+        std::string                 path = smesh::Env::read_string("SFEM_MESH", "");
         std::shared_ptr<sfem::Mesh> m;
 
         if (!path.empty()) {
-            m = sfem::Mesh::create_from_file(comm, path.c_str());
+            m = sfem::Mesh::create_from_file(comm, smesh::Path(path.c_str()));
         } else {
-            auto SFEM_ELEM_TYPE = type_from_string(sfem::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
+            auto SFEM_ELEM_TYPE = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
 
-            m = sfem::Mesh::create_cube(
-                    comm, SFEM_ELEM_TYPE, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
+            m = sfem::Mesh::create_cube(comm,
+                                        static_cast<smesh::ElemType>(SFEM_ELEM_TYPE),
+                                        SFEM_BASE_RESOLUTION,
+                                        SFEM_BASE_RESOLUTION,
+                                        SFEM_BASE_RESOLUTION,
+                                        0,
+                                        0,
+                                        0,
+                                        1,
+                                        1,
+                                        1);
         }
 
-        if (sfem::Env::read("SFEM_PROMOTE_TO_P2", false)) {
+        if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
             m = sfem::convert_p1_mesh_to_p2(m);
         }
 
-        if (sfem::Env::read("SFEM_USE_SFC", false)) {
+        if (smesh::Env::read("SFEM_USE_SFC", false)) {
             auto sfc = sfem::SFC::create_from_env();
             sfc->reorder(*m);
         }
 
-        printf("element_type %s\n", type_to_string(m->element_type()));
+        printf("element_type %s\n", type_to_string(m->element_type(0)));
 
         std::vector<OpDesc_t>                            ops;
         std::shared_ptr<sfem::SemiStructuredMesh>        ssmesh;
@@ -198,21 +207,21 @@ int main(int argc, char *argv[]) {
 
 
         int dim = m->spatial_dimension();
-        add_matrix_free_scalar_ops(m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
-        add_matrix_free_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+        add_matrix_free_scalar_ops(m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+        add_matrix_free_vector_ops(dim, m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
 
-        if (nnodes <= sfem::Env::read("SFEM_MAX_NODES_MATRIX", 27270901)) {
+        if (nnodes <= smesh::Env::read("SFEM_MAX_NODES_MATRIX", 27270901)) {
             double start = MPI_Wtime();
             m->node_to_node_graph();
             double stop = MPI_Wtime();
             printf("CRS Graph creation %g [s]\n", (stop - start));
-            add_matrix_based_scalar_ops(m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+            add_matrix_based_scalar_ops(m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
             fprintf(stderr, "[Warning]Skipping CRS ops for large meshes #nodes %ld #dim %d\n", (long)nnodes, dim);
         }
 
-        if (nnodes <= sfem::Env::read("SFEM_MAX_NODES_BLOCK_MATRIX", 1030301)) {
-            add_matrix_based_vector_ops(dim, m->element_type(), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
+        if (nnodes <= smesh::Env::read("SFEM_MAX_NODES_BLOCK_MATRIX", 1030301)) {
+            add_matrix_based_vector_ops(dim, m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
             fprintf(stderr, "[Warning] Skipping BSR ops for large meshes #nodes %ld #dim %d\n", (long)nnodes, dim);
         }

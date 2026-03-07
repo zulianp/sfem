@@ -1,7 +1,7 @@
 #ifndef SFEM_ARGSORT_H
 #define SFEM_ARGSORT_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <stddef.h>
 #include <stdint.h>

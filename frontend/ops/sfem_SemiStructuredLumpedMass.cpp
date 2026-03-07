@@ -5,7 +5,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_LumpedMass.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -23,9 +23,9 @@ namespace sfem {
                     "semi_structured_mesh!\n");
         }
 
-        assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(space->element_type()));  // REMOVEME once generalized approach
         auto ret          = std::make_unique<SemiStructuredLumpedMass>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
 
         return ret;
     }

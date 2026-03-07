@@ -11,14 +11,15 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "extract_surface_graph.h"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
+#include "sfem_API.hpp"
 #include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {
@@ -58,33 +59,20 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
     char        path[SFEM_MAX_PATH_LENGTH];
-    snprintf(path, sizeof(path), "%s/i*.raw", folder);
-    int nnxe = sfem::count_files(path);
-    // FIXME
-    enum ElemType element_type          = (enum ElemType)nnxe;
-    enum ElemType element_type_for_algo = element_type;
-    if (element_type == TET10) {
-        element_type_for_algo = TET4;
-    } else if (element_type == TRI6) {
-        element_type_for_algo = TRI3;
+    auto        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    smesh::ElemType element_type          = mesh->element_type(0);
+    smesh::ElemType element_type_for_algo = element_type;
+    if (element_type == smesh::TET10) {
+        element_type_for_algo = smesh::TET4;
+    } else if (element_type == smesh::TRI6) {
+        element_type_for_algo = smesh::TRI3;
     }
 
     // Read only the data we need
-    nnxe = elem_num_nodes(element_type_for_algo);
-
-    idx_t **elems = (idx_t **)malloc(nnxe * sizeof(idx_t *));
-
-    ptrdiff_t n_local_elements, n_elements;
-    mesh_read_elements(comm, nnxe, folder, elems, &n_local_elements, &n_elements);
-
-    ptrdiff_t n_nodes = 0;
-    for (int d = 0; d < nnxe; d++) {
-        for (ptrdiff_t i = 0; i < n_elements; i++) {
-            n_nodes = MAX(n_nodes, elems[d][i]);
-        }
-    }
-
-    n_nodes += 1;
+    const int nnxe = elem_num_nodes(element_type_for_algo);
+    idx_t **const elems = mesh->elements(0)->data();
+    const ptrdiff_t n_elements = mesh->n_elements();
+    const ptrdiff_t n_nodes = mesh->n_nodes();
 
     count_t       *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
@@ -99,10 +87,6 @@ int main(int argc, char *argv[]) {
 
     snprintf(path, sizeof(path), "%s/adj_idx.raw", output_folder);
     array_write(comm, path, SFEM_MPI_ELEMENT_IDX_T, adj_idx, adj_ptr[n_elements], adj_ptr[n_elements]);
-
-    for (int d = 0; d < nnxe; d++) {
-        free(elems[d]);
-    }
 
     free(adj_ptr);
     free(adj_idx);

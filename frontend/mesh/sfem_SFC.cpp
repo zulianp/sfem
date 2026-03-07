@@ -5,7 +5,7 @@
 #include "argsort.h"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 
 #ifdef SFEM_ENABLE_MPI_SORT
 #include "mpi-sort.h"
@@ -85,16 +85,17 @@ namespace sfem {
 
     std::shared_ptr<SFC> SFC::create_from_env() {
         auto ret = std::make_shared<SFC>();
-        ret->impl_->order_coordinate  = sfem::Env::read<int>("SFEM_ORDER_WITH_COORDINATE", ret->impl_->order_coordinate);
+        ret->impl_->order_coordinate  = smesh::Env::read<int>("SFEM_ORDER_WITH_COORDINATE", ret->impl_->order_coordinate);
         return ret;
     }
 
     int SFC::reorder(Mesh &mesh) {
-        auto elements = mesh.elements()->data();
+        auto elements = mesh.elements(0)->data();
         auto points = mesh.points()->data();
-        const ptrdiff_t n_owned_nodes = mesh.n_owned_nodes();
-        const ptrdiff_t n_owned_elements = mesh.n_owned_elements();
-        const int nxe = elem_num_nodes(mesh.element_type());
+        const bool distributed = mesh.comm()->size() > 1;
+        const ptrdiff_t n_owned_nodes = distributed ? mesh.distributed()->n_nodes_owned() : mesh.n_nodes();
+        const ptrdiff_t n_owned_elements = distributed ? mesh.distributed()->n_elements_owned() : mesh.n_elements();
+        const int nxe = elem_num_nodes(mesh.element_type(0));
     
         auto sfc_buff = sfem::create_host_buffer<sfc_t>(n_owned_elements);
         auto sfc = sfc_buff->data();

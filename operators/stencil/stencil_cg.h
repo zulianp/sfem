@@ -1,7 +1,7 @@
 #ifndef STENCIL_CG_H
 #define STENCIL_CG_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "stencil3.h"
 
 #include <math.h>

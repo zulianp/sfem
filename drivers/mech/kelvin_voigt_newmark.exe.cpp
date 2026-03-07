@@ -6,10 +6,10 @@
 
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
-#include "sfem_mesh_write.h"
+#include "sfem_mesh_write.hpp"
 #include "sfem_ssgmg.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -28,7 +28,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    const bool verbose = sfem::Env::read("SFEM_VERBOSE", false);
+    const bool verbose = smesh::Env::read("SFEM_VERBOSE", false);
 
     // Parse command line arguments
     if (argc != 5) {
@@ -43,7 +43,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     std::string output_path    = argv[3];
     const char *neumann_path   = argv[4];
 
-    auto m = sfem::Mesh::create_from_file(comm, mesh_path);
+    auto m = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
 
     // Create function space
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
@@ -120,10 +120,10 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     blas->zeros(ndofs, g->data());
 
     // Time integration parameters
-    real_t dt          = sfem::Env::read("SFEM_DT", 0.1);
-    real_t T           = sfem::Env::read("SFEM_T_END", 5.0);
-    size_t export_freq = sfem::Env::read("SFEM_EXPORT_FREQ", 1);
-    int    nliter      = sfem::Env::read("SFEM_NLITER", 1);
+    real_t dt          = smesh::Env::read("SFEM_DT", 0.1);
+    real_t T           = smesh::Env::read("SFEM_T_END", 5.0);
+    size_t export_freq = smesh::Env::read("SFEM_EXPORT_FREQ", 1);
+    int    nliter      = smesh::Env::read("SFEM_NLITER", 1);
 
     if (!comm->rank() && verbose) {
         printf("Time step: %g\n", dt);
@@ -142,9 +142,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     sfem::create_directory((output_path + "/out").c_str());
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
-        fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
+        fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     } else {
-        fs->mesh_ptr()->write((output_path + "/mesh").c_str());
+        fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));
     }
 
     // Time variables
@@ -177,13 +177,13 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     // Create solver (SSGMG|CG)
     std::shared_ptr<sfem::Operator<real_t>> solver = nullptr;
-    if (!sfem::Env::read("SFEM_USE_SSGMG", true) || SFEM_ELEMENT_REFINE_LEVEL <= 1) {
+    if (!smesh::Env::read("SFEM_USE_SSGMG", true) || SFEM_ELEMENT_REFINE_LEVEL <= 1) {
         // This could be put out of the loop since the operator is linear.
         // We will do nonlinear materials next, so we keep it here.
         auto material_op = sfem::create_linear_operator("MF", f, solution, es);
         auto cg          = sfem::create_cg<real_t>(material_op, es);
 
-        if (sfem::Env::read("SFEM_USE_BJACOBI", false)) {
+        if (smesh::Env::read("SFEM_USE_BJACOBI", false)) {
             int  block_size = fs->block_size();
             auto diag       = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
             auto mask       = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);

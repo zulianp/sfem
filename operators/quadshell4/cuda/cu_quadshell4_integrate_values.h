@@ -1,7 +1,7 @@
 #ifndef CU_QUADSHELL4_INTEGRATE_VALUES_H
 #define CU_QUADSHELL4_INTEGRATE_VALUES_H
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

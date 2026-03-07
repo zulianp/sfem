@@ -1,7 +1,7 @@
 #ifndef SFEM_EXTRACT_SURFACE_GRAPH
 #define SFEM_EXTRACT_SURFACE_GRAPH
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include <stddef.h>
 
 

@@ -1,4 +1,4 @@
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <algorithm>
 #include <cassert>

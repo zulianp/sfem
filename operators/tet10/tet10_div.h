@@ -2,7 +2,7 @@
 #define SFEM_TET10_DIV_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 void tet10_div_apply(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,

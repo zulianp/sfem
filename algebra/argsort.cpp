@@ -1,7 +1,7 @@
 
 #include <algorithm>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <cstddef>
 #include <cstdint>

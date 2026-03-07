@@ -2,7 +2,7 @@
 #define SFEM_OPERATOR_HPP
 
 // C includes
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // C++ includes
 #include "sfem_Buffer.hpp"

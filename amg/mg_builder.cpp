@@ -108,7 +108,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
             weights_buff->data()[k] = near_null->data()[k];
         }
 
-        auto pt = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+        auto pt = sfem::h_pwc_interp(weights_buff, partition_buff, coarser_dim);
         pt->transpose();
 
         // Convert matrix?
@@ -117,7 +117,7 @@ std::shared_ptr<sfem::Multigrid<real_t>> builder(
 
         stat_iter->set_max_it(smoothing_steps);
         amg->add_level(coarse_op, stat_iter, p, pt);
-        p = h_pwc_interp(weights_buff, partition_buff, coarser_dim);
+        p = sfem::h_pwc_interp(weights_buff, partition_buff, coarser_dim);
 
         amg_levels++;
 

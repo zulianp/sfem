@@ -10,16 +10,17 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "read_mesh.h"
 
 #include "laplacian.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_mesh.h"
+#include "smesh_sshex8_graph.hpp"
 #include "sfem_glob.hpp"
 
 #include "sfem_API.hpp"
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
     // Set-up (read and init)
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
 
     const int nxe = sshex8_nxe(level);
@@ -73,7 +74,7 @@ int main(int argc, char *argv[]) {
     }
 
     ptrdiff_t n_unique_nodes, interior_start;
-    sshex8_generate_elements(level, n_elements, mesh->n_nodes(), mesh->elements()->data(), d_sshex8_elements, &n_unique_nodes, &interior_start);
+    smesh::sshex8_generate_elements(level, n_elements, mesh->n_nodes(), mesh->elements(0)->data(), d_sshex8_elements, &n_unique_nodes, &interior_start);
 
     // ///////////////////////////////////////////////////////////////////////////////
     // Generate explicit hex8 micro-mesh
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
     float  TTS  = tock - tick;
 
-    printf("Generated HEX8 mesh in %g [s]\n", TTS);
+    printf("Generated smesh::HEX8 mesh in %g [s]\n", TTS);
     printf("nelements %ld\n", n_micro_elements);
     printf("nnodes    %ld\n", n_unique_nodes);
     printf("nxe       %d\n", nxe);

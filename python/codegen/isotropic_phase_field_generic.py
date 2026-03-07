@@ -336,7 +336,7 @@ args_H = (
 
 tpl = """
 // Basic includes
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include <math.h>
 
 // Energy

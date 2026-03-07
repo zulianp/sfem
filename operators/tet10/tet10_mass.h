@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 void tet10_assemble_mass(const ptrdiff_t nelements,
                          const ptrdiff_t nnodes,

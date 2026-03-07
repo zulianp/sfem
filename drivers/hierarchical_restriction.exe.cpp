@@ -5,8 +5,8 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_mesh.h"
-#include "sfem_prolongation_restriction.h"
+#include "smesh_mesh.hpp"
+#include "sfem_prolongation_restriction.hpp"
 
 #include "matrixio_array.h"
 
@@ -33,19 +33,19 @@ int main(int argc, char *argv[]) {
     }
 
     const char *folder = argv[1];
-    enum ElemType from_element = type_from_string(argv[2]);
-    enum ElemType to_element = type_from_string(argv[3]);
+    smesh::ElemType from_element = sfem::type_from_string(argv[2]);
+    smesh::ElemType to_element = sfem::type_from_string(argv[3]);
     const char *path_input = argv[4];
     const char *path_output = argv[5];
 
     int SFEM_USE_CRS_GRAPH_RESTRICT = 0;
     SFEM_READ_ENV(SFEM_USE_CRS_GRAPH_RESTRICT, atoi);
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    ptrdiff_t n_coarse_nodes = max_node_id(to_element, n_elements, mesh->elements()->data()) + 1;
+    ptrdiff_t n_coarse_nodes = max_node_id(to_element, n_elements, mesh->elements(0)->data()) + 1;
 
     real_t *from = (real_t*)malloc(n_nodes * sizeof(real_t));
     real_t *to = (real_t*)calloc(n_coarse_nodes, sizeof(real_t));
@@ -61,13 +61,13 @@ int main(int argc, char *argv[]) {
 
         double tack = MPI_Wtime();
 
-        int nxe = elem_num_nodes(mesh->element_type());
+        int nxe = elem_num_nodes(mesh->element_type(0));
         uint16_t *element_to_node_incidence_count = (uint16_t *)calloc(n_nodes, sizeof(int));
         for (int d = 0; d < nxe; d++) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_elements; ++i) {
 #pragma omp atomic update
-                element_to_node_incidence_count[mesh->elements()->data()[d][i]]++;
+                element_to_node_incidence_count[mesh->elements(0)->data()[d][i]]++;
             }
         }
 
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
         err = hierarchical_restriction_with_counting(from_element,
                                                      to_element,
                                                      n_elements,
-                                                     mesh->elements()->data(),
+                                                     mesh->elements(0)->data(),
                                                      element_to_node_incidence_count,
                                                      1,
                                                      from,
@@ -95,8 +95,8 @@ int main(int argc, char *argv[]) {
 
         double tack = MPI_Wtime();
 
-        err = build_crs_graph_for_elem_type(
-                to_element, n_elements, n_coarse_nodes, mesh->elements()->data(), &rowptr, &colidx);
+        err = smesh::create_crs_graph_for_elem_type(
+                to_element, n_elements, n_coarse_nodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
         setup_elapsed = MPI_Wtime() - tack;
 

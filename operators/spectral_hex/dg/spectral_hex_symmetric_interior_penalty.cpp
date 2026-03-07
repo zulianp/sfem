@@ -3,8 +3,8 @@
 #include "hex8_laplacian_inline_cpu.h"
 #include "lagrange.hpp"
 #include "line_quadrature.h"
-#include "sfem_base.h"
-#include "sfem_macros.h"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
 #include "sshex8.h"
 
 #include "lagrange_hex_interpolate_inline.hpp"

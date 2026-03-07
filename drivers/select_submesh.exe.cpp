@@ -11,8 +11,8 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "argsort.h"
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     if (max_nodes > mesh->n_nodes()) {
         SFEM_ERROR("max_nodes > mesh.nnodes");
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
     } else {
         count_t *d_adj_ptr;
         idx_t   *d_adj_idx;
-        build_crs_graph_3(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), &d_adj_ptr, &d_adj_idx);
+        smesh::create_crs_graph_3(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), &d_adj_ptr, &d_adj_idx);
 
         auto adj_ptr = sfem::manage_host_buffer<count_t>(mesh->n_nodes() + 1, d_adj_ptr);
         auto adj_idx = sfem::manage_host_buffer<idx_t>(d_adj_ptr[mesh->n_nodes()], d_adj_idx);
@@ -178,8 +178,8 @@ int main(int argc, char *argv[]) {
     auto selected_elements = sfem::create_host_buffer<idx_t>(mesh->n_elements() + 1);
     auto d_selected_elements = selected_elements->data();
 
-    auto      elements = mesh->elements()->data();
-    const int nxe      = elem_num_nodes(mesh->element_type());
+    auto      elements = mesh->elements(0)->data();
+    const int nxe      = elem_num_nodes(mesh->element_type(0));
     for (ptrdiff_t i = 0; i < mesh->n_elements(); ++i) {
         for (int d = 0; d < nxe; ++d) {
             idx_t node = elements[d][i];
@@ -248,10 +248,10 @@ int main(int argc, char *argv[]) {
     }
 
     auto selection = std::make_shared<sfem::Mesh>(
-            mesh->comm(), dim, mesh->element_type(), n_selected_elements, elems, n_selected_nodes, selected_points);
+            mesh->comm(), static_cast<smesh::ElemType>(mesh->element_type(0)), elems, selected_points);
 
     selection->set_node_mapping(mapping);
-    selection->write(output_folder);
+    selection->write(smesh::Path(output_folder));
 
     double tock = MPI_Wtime();
 

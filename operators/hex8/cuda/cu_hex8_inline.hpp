@@ -1,8 +1,8 @@
 #ifndef CU_HEX_INLINE_HPP
 #define CU_HEX_INLINE_HPP
 
-#include "sfem_defs.h"
-#include "sfem_macros.h"
+#include "sfem_defs.hpp"
+#include "sfem_macros.hpp"
 
 template <typename idx_t>
 static inline __device__ __host__ idx_t cu_hex8_linear_search(const idx_t target, const idx_t *const arr, const int size) {

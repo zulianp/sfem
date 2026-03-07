@@ -1,12 +1,12 @@
 #include "sfem_SemiStructuredNeoHookeanOgden.hpp"
 
 // C includes
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 #include "sshex8_neohookean_ogden.h"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
@@ -22,7 +22,7 @@ namespace sfem {
     class SemiStructuredNeoHookeanOgden::Impl {
     public:
         std::shared_ptr<FunctionSpace> space;                           ///< Function space for the operator
-        enum ElemType                  element_type { INVALID };        ///< Element type
+        smesh::ElemType                  element_type { smesh::INVALID };        ///< Element type
         real_t                         mu{1}, lambda{1};                ///< Lamé parameters
         bool                           use_affine_approximation{true};  ///< Use affine approximation for performance
         SharedBuffer<metric_tensor_t>  partial_assembly;
@@ -40,7 +40,7 @@ namespace sfem {
             return nullptr;
         }
 
-        assert(space->element_type() == SSHEX8);  // REMOVEME once generalized approach
+        assert(is_semistructured_type(space->element_type()));  // REMOVEME once generalized approach
         auto ret = std::make_unique<SemiStructuredNeoHookeanOgden>(space);
 
         real_t SFEM_SHEAR_MODULUS        = 1;
@@ -51,7 +51,7 @@ namespace sfem {
 
         ret->impl_->mu           = SFEM_SHEAR_MODULUS;
         ret->impl_->lambda       = SFEM_FIRST_LAME_PARAMETER;
-        ret->impl_->element_type = (enum ElemType)space->element_type();
+        ret->impl_->element_type = (smesh::ElemType)space->element_type();
 
         int SFEM_HEX8_ASSUME_AFFINE = ret->impl_->use_affine_approximation;
         SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);

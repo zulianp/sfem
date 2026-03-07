@@ -1,7 +1,7 @@
 #include "cu_contact_surface.h"
 
-#include "sfem_cuda_base.h"
-#include "sfem_macros.h"
+#include "sfem_cuda_base.hpp"
+#include "sfem_macros.hpp"
 
 __global__ void cu_displace_points_kernel(const int                         dim,
                                           const ptrdiff_t                   n_nodes,

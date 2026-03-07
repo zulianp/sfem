@@ -3,14 +3,14 @@
 
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void stokes_mini_assemble_hessian_soa(enum ElemType element_type,
+void stokes_mini_assemble_hessian_soa(smesh::ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
                                       idx_t **const elems,
@@ -20,7 +20,7 @@ void stokes_mini_assemble_hessian_soa(enum ElemType element_type,
                                       const idx_t *const colidx,
                                       real_t **const values);
 
-void stokes_mini_assemble_hessian_aos(enum ElemType element_type,
+void stokes_mini_assemble_hessian_aos(smesh::ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
                                       idx_t **const elems,
@@ -30,7 +30,7 @@ void stokes_mini_assemble_hessian_aos(enum ElemType element_type,
                                       const idx_t *const colidx,
                                       real_t *const values);
 
-void stokes_mini_assemble_rhs_soa(enum ElemType element_type,
+void stokes_mini_assemble_rhs_soa(smesh::ElemType element_type,
                                   const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t **const elems,
@@ -40,7 +40,7 @@ void stokes_mini_assemble_rhs_soa(enum ElemType element_type,
                                   real_t **SFEM_RESTRICT forcing,
                                   real_t **const SFEM_RESTRICT rhs);
 
-void stokes_mini_assemble_rhs_aos(enum ElemType element_type,
+void stokes_mini_assemble_rhs_aos(smesh::ElemType element_type,
                                   const ptrdiff_t nelements,
                                   const ptrdiff_t nnodes,
                                   idx_t **const elems,
@@ -50,7 +50,7 @@ void stokes_mini_assemble_rhs_aos(enum ElemType element_type,
                                   real_t **SFEM_RESTRICT forcing,
                                   real_t *const SFEM_RESTRICT rhs);
 
-void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
+void stokes_mini_assemble_gradient_aos(const smesh::ElemType element_type,
                                        const ptrdiff_t nelements,
                                        const ptrdiff_t nnodes,
                                        idx_t **const SFEM_RESTRICT elems,
@@ -59,7 +59,7 @@ void stokes_mini_assemble_gradient_aos(const enum ElemType element_type,
                                        const real_t *const SFEM_RESTRICT u,
                                        real_t *const SFEM_RESTRICT values);
 
-void stokes_mini_assemble_hessian_aos(const enum ElemType element_type,
+void stokes_mini_assemble_hessian_aos(const smesh::ElemType element_type,
                                       const ptrdiff_t nelements,
                                       const ptrdiff_t nnodes,
                                       idx_t **const SFEM_RESTRICT elems,
@@ -69,7 +69,7 @@ void stokes_mini_assemble_hessian_aos(const enum ElemType element_type,
                                       const idx_t *const SFEM_RESTRICT colidx,
                                       real_t *const SFEM_RESTRICT values);
 
-void stokes_mini_apply_aos(const enum ElemType element_type,
+void stokes_mini_apply_aos(const smesh::ElemType element_type,
                                  const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
                                  idx_t **const SFEM_RESTRICT elems,

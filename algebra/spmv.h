@@ -2,11 +2,7 @@
 #define SFEM_SPMV_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "sfem_base.hpp"
 
 int scal(const ptrdiff_t nnodes, const real_t scale_factor, real_t *x);
 
@@ -24,10 +20,6 @@ int crs_diag(
                  const real_t *const SFEM_RESTRICT values,
                  real_t *const SFEM_RESTRICT diag
     );
-
-#ifdef __cplusplus
-}
-#endif
 
 
 #endif  // SFEM_SPMV_H

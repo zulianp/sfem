@@ -2,8 +2,8 @@
 #define TET4_FFF_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,7 +17,7 @@ typedef struct {
     ptrdiff_t nelements;
     jacobian_t *data;
     idx_t **elements;
-    enum ElemType element_type;
+    smesh::ElemType element_type;
 } fff_t;
 
 int tet4_fff_fill(const ptrdiff_t nelements,

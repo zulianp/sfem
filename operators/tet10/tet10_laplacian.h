@@ -2,7 +2,7 @@
 #define TET10_LAPLACIAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // Code generated with laplace_op.py (mixed symbolic and numerical integration)
 

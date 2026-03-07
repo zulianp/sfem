@@ -12,9 +12,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 
 #include "mass.h"

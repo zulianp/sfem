@@ -1,5 +1,5 @@
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -23,16 +23,16 @@ extern "C" void extract_surface_connectivity(const int element_type,
     const int el_n_nodes = elem_num_nodes(element_type);
     const int el_n_sides = elem_num_sides(element_type);
 
-    ElemType st = side_type(element_type);
+    smesh::ElemType st = side_type(element_type);
     const int side_num_nodes = elem_num_nodes(st);
 
-    if (element_type == TET10) {
+    if (element_type == smesh::TET10) {
         // Use edge nodes?
         build_n2e(n_elements, n_nodes, 6, elems + 4, &n2eptr, &elindex);
 
         // Or use corners?
         // build_n2e(n_elements, n_nodes, 4, elems, &n2eptr, &elindex);
-    } else if (element_type == TRI6) {
+    } else if (element_type == smesh::TRI6) {
         // This will give us an element adjaciency graph directly
         build_n2e(n_elements, n_nodes, 3, elems + 3, &n2eptr, &elindex);
     } else {

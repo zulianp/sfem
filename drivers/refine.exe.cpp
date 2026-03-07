@@ -11,9 +11,9 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "sfem_glob.hpp"
 #include "sortreduce.h"
@@ -86,10 +86,10 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto            coarse_mesh         = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto            coarse_mesh         = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements          = coarse_mesh->n_elements();
     const ptrdiff_t n_nodes             = coarse_mesh->n_nodes();
-    const int       n_nodes_per_element = coarse_mesh->n_nodes_per_element();
+    const int       n_nodes_per_element = coarse_mesh->n_nodes_per_element(0);
     const int       spatial_dim         = coarse_mesh->spatial_dimension();
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -99,11 +99,11 @@ int main(int argc, char *argv[]) {
     count_t *rowptr = 0;
     idx_t   *colidx = 0;
 
-    // This only works for TET4 or TRI3
+    // This only works for smesh::TET4 or smesh::TRI3
     build_crs_graph_for_elem_type(
-            coarse_mesh->element_type(), n_elements, n_nodes, coarse_mesh->elements()->data(), &rowptr, &colidx);
+            coarse_mesh->element_type(0), n_elements, n_nodes, coarse_mesh->elements(0)->data(), &rowptr, &colidx);
 
-    if (coarse_mesh->element_type() == QUAD4) {
+    if (coarse_mesh->element_type(0) == smesh::QUAD4) {
         // TODO Clean up the extra connectivity
     }
 
@@ -134,21 +134,18 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////////////////////////////////////////////////
 
     auto refined_elements_buffer =
-            sfem::create_host_buffer<idx_t>(n_nodes_per_element, n_elements * (coarse_mesh->element_type() == TET4 ? 8 : 4));
+            sfem::create_host_buffer<idx_t>(n_nodes_per_element, n_elements * (coarse_mesh->element_type(0) == smesh::TET4 ? 8 : 4));
     auto refined_points_buffer = sfem::create_host_buffer<geom_t>(spatial_dim, coarse_mesh->n_nodes() + fine_nodes);
 
     auto refined_mesh = std::make_shared<sfem::Mesh>(sfem::Communicator::wrap(comm),
-                                                     spatial_dim,
-                                                     coarse_mesh->element_type(),
-                                                     refined_elements_buffer->extent(1),
+                                                     coarse_mesh->element_type(0),
                                                      refined_elements_buffer,
-                                                     refined_points_buffer->extent(1),
                                                      refined_points_buffer);
 
     auto refined_elements = refined_elements_buffer->data();
     auto refined_points   = refined_points_buffer->data();
 
-    auto coarse_elements = coarse_mesh->elements()->data();
+    auto coarse_elements = coarse_mesh->elements(0)->data();
     auto coarse_points   = coarse_mesh->points()->data();
 
     // Allocate space for refined nodes
@@ -164,7 +161,7 @@ int main(int argc, char *argv[]) {
 
   
 
-    if (coarse_mesh->element_type() == TET4) {
+    if (coarse_mesh->element_type(0) == smesh::TET4) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < n_elements; e++) {
             idx_t macro_element[10];
@@ -208,7 +205,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-    } else if (coarse_mesh->element_type() == TRI3) {
+    } else if (coarse_mesh->element_type(0) == smesh::TRI3) {
         // TODO fill p2 node indices in elements
         for (ptrdiff_t e = 0; e < n_elements; e++) {
             idx_t macro_element[6];
@@ -246,7 +243,7 @@ int main(int argc, char *argv[]) {
             }
         }
     } else {
-        fprintf(stderr, "Implement for element_type %d\n!", coarse_mesh->element_type());
+        fprintf(stderr, "Implement for element_type %d\n!", coarse_mesh->element_type(0));
         return EXIT_FAILURE;
     }
 
@@ -276,7 +273,7 @@ int main(int argc, char *argv[]) {
     // Write P2 mesh to disk
     ///////////////////////////////////////////////////////////////////////////////
 
-    refined_mesh->write(output_folder);
+    refined_mesh->write(smesh::Path(output_folder));
 
     // Make sure we do not delete the same array twice
     for (int d = 0; d < n_nodes_per_element; d++) {

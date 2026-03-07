@@ -12,10 +12,10 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
 
@@ -91,14 +91,14 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
 
-    const char* SFEM_ELEMENT_TYPE = type_to_string(mesh->element_type());
+    const char* SFEM_ELEMENT_TYPE = type_to_string(mesh->element_type(0));
     SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
-    mesh->set_element_type(type_from_string(SFEM_ELEMENT_TYPE));
+    mesh->set_element_type(0, sfem::type_from_string(SFEM_ELEMENT_TYPE));
 
-    int nxe = mesh->n_nodes_per_element();
+    int nxe = mesh->n_nodes_per_element(0);
 
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     idx_t closest_element = SFEM_IDX_INVALID;
     real_t closest_sq_dist = 1000000;
 
-    auto elements = mesh->elements()->data();
+    auto elements = mesh->elements(0)->data();
     auto points = mesh->points()->data();
     const int spatial_dim = mesh->spatial_dimension();
 
@@ -143,19 +143,19 @@ int main(int argc, char *argv[]) {
     // Create dual-graph for navigating neighboring elements
     ///////////////////////////////////////////////////////////////////////////////
 
-    int element_type_hack = mesh->element_type();
-    if (mesh->element_type() == TRI6) {
-        element_type_hack = TRI3;
+    int element_type_hack = mesh->element_type(0);
+    if (mesh->element_type(0) == smesh::TRI6) {
+        element_type_hack = smesh::TRI3;
     }
 
-    if (mesh->element_type() == EDGE3) {
-        element_type_hack = EDGE2;
+    if (mesh->element_type(0) == smesh::EDGE3) {
+        element_type_hack = smesh::EDGE2;
     }
 
     count_t *adj_ptr = 0;
     element_idx_t *adj_idx = 0;
-    create_dual_graph(
-        mesh->n_elements(), mesh->n_nodes(), element_type_hack, elements, &adj_ptr, &adj_idx);
+    smesh::create_dual_graph(
+        mesh->n_elements(), mesh->n_nodes(), static_cast<smesh::ElemType>(element_type_hack), elements, &adj_ptr, &adj_idx);
 
     uint8_t *selected = (uint8_t *)malloc(mesh->n_elements() * sizeof(uint8_t));
     memset(selected, 0, mesh->n_elements() * sizeof(uint8_t));
@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     // Create marker for different faces based on dihedral angles
     ///////////////////////////////////////////////////////////////////////////////
 
-    if (element_type_hack == EDGE2) {
+    if (element_type_hack == smesh::EDGE2) {
         for (ptrdiff_t q = 0; elem_queue[q] >= 0; q = (q + 1) % size_queue) {
             const ptrdiff_t e = elem_queue[q];
 

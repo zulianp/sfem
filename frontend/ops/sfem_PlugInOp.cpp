@@ -1,10 +1,10 @@
 #include "sfem_PlugInOp.hpp"
 
 #include "sfem_Tracer.hpp"
-#include "sfem_logger.h"
+#include "sfem_logger.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include <dlfcn.h>
 #include <cassert>
@@ -20,10 +20,10 @@ namespace sfem {
             return r;
         }
 
-        inline const char *elem_suffix(enum ElemType t) {
+        inline const char *elem_suffix(smesh::ElemType t) {
             switch (t) {
-                case HEX8: return "hex8";
-                case TET4: return "tet4";
+                case smesh::HEX8: return "hex8";
+                case smesh::TET4: return "tet4";
                 default: return nullptr;
             }
         }
@@ -70,9 +70,9 @@ namespace sfem {
         real_t mu{1};
         real_t lambda{1};
 
-        std::map<enum ElemType, grad_fn>  grad;
-        std::map<enum ElemType, apply_fn> apply;
-        std::map<enum ElemType, update_fn> update;
+        std::map<smesh::ElemType, grad_fn>  grad;
+        std::map<smesh::ElemType, apply_fn> apply;
+        std::map<smesh::ElemType, update_fn> update;
 
         Impl(const std::shared_ptr<FunctionSpace> &s, const std::string &n) : space(s), opname(n) {}
 
@@ -80,7 +80,7 @@ namespace sfem {
             if (handle) dlclose(handle);
         }
 
-        int ensure_loaded(enum ElemType t) {
+        int ensure_loaded(smesh::ElemType t) {
             if (!handle) {
                 handle = open_library(opname);
                 if (!handle) {
@@ -315,7 +315,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void PlugInOp::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void PlugInOp::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

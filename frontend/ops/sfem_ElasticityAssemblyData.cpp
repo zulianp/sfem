@@ -1,6 +1,6 @@
 #include "sfem_ElasticityAssemblyData.hpp"
 
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
 // FIXME
 #include "hex8_neohookean_ogden.h"

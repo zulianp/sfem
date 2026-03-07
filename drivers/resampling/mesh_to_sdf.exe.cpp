@@ -8,8 +8,8 @@
 #include "matrixio_ndarray.h"
 
 #include "read_mesh.h"
-#include "sfem_mesh_write.h"
-#include "sfem_resample_gap.h"
+#include "sfem_mesh_write.hpp"
+#include "sfem_resample_gap.hpp"
 
 #include "point_triangle_distance.h"
 
@@ -665,7 +665,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     if (!mesh) {
         return EXIT_FAILURE;
     }
@@ -675,18 +675,18 @@ int main(int argc, char* argv[]) {
     {  // AABB
         if (SFEM_BOXED_MESH) {
             // FIXME we do not actually need to read the mesh! only the points!
-            auto boxed_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), SFEM_BOXED_MESH);
+            auto boxed_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(SFEM_BOXED_MESH));
             if (!boxed_mesh) {
                 return EXIT_FAILURE;
             }
 
             for (int d = 0; d < mesh->spatial_dimension(); d++) {
-                minmax(boxed_mesh->n_nodes(), boxed_mesh->points(d), &origin[d], &box_max[d]);
+                minmax(boxed_mesh->n_nodes(), boxed_mesh->points()->data()[d], &origin[d], &box_max[d]);
             }
 
         } else {
             for (int d = 0; d < mesh->spatial_dimension(); d++) {
-                minmax(mesh->n_nodes(), mesh->points(d), &origin[d], &box_max[d]);
+                minmax(mesh->n_nodes(), mesh->points()->data()[d], &origin[d], &box_max[d]);
             }
         }
 
@@ -712,9 +712,9 @@ int main(int argc, char* argv[]) {
 
     // Remove elements we do not need!
     ptrdiff_t nelements = select_submesh(mesh->n_elements(),                     //
-                                    elem_num_nodes(mesh->element_type()),  //
+                                    elem_num_nodes(mesh->element_type(0)),  //
                                     mesh->n_nodes(),                        //
-                                    mesh->elements()->data(),                      //
+                                    mesh->elements(0)->data(),                      //
                                     mesh->points()->data(),                        //
                                     origin,                             //
                                     box_max);                           //
@@ -726,7 +726,7 @@ int main(int argc, char* argv[]) {
 
     compute_vertex_pseudo_normals_3(nelements,  //
                                     mesh->n_nodes(),     //
-                                    mesh->elements()->data(),   //
+                                    mesh->elements(0)->data(),   //
                                     mesh->points()->data(),     //
                                     normals);        //
 
@@ -748,7 +748,7 @@ int main(int argc, char* argv[]) {
 
     // compute_sdf
     compute_sdf_brute_force(nelements,  //
-                            mesh->elements()->data(),   //
+                            mesh->elements(0)->data(),   //
                             mesh->points()->data(),     //
                             normals,         //
                             nglobal,         //

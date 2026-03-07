@@ -2,8 +2,8 @@
 #define LINEAR_ELASTICITY_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,7 +13,7 @@ extern "C" {
 // Structure of arrays
 //////////////////////////
 
-int linear_elasticity_assemble_value_soa(const enum ElemType                element_type,
+int linear_elasticity_assemble_value_soa(const smesh::ElemType              element_type,
                                          const ptrdiff_t                    nelements,
                                          const ptrdiff_t                    nnodes,
                                          idx_t **const SFEM_RESTRICT        elems,
@@ -23,7 +23,7 @@ int linear_elasticity_assemble_value_soa(const enum ElemType                elem
                                          const real_t **const SFEM_RESTRICT u,
                                          real_t *const SFEM_RESTRICT        value);
 
-int linear_elasticity_assemble_gradient_soa(const enum ElemType                element_type,
+int linear_elasticity_assemble_gradient_soa(const smesh::ElemType              element_type,
                                             const ptrdiff_t                    nelements,
                                             const ptrdiff_t                    nnodes,
                                             idx_t **const SFEM_RESTRICT        elems,
@@ -33,7 +33,7 @@ int linear_elasticity_assemble_gradient_soa(const enum ElemType                e
                                             const real_t **const SFEM_RESTRICT u,
                                             real_t **const SFEM_RESTRICT       values);
 
-int linear_elasticity_crs_soa(const enum ElemType                element_type,
+int linear_elasticity_crs_soa(const smesh::ElemType              element_type,
                               const ptrdiff_t                    nelements,
                               const ptrdiff_t                    nnodes,
                               idx_t **const SFEM_RESTRICT        elems,
@@ -44,7 +44,7 @@ int linear_elasticity_crs_soa(const enum ElemType                element_type,
                               const idx_t *const SFEM_RESTRICT   colidx,
                               real_t **const SFEM_RESTRICT       values);
 
-int linear_elasticity_assemble_diag_aos(const enum ElemType          element_type,
+int linear_elasticity_assemble_diag_aos(const smesh::ElemType        element_type,
                                         const ptrdiff_t              nelements,
                                         const ptrdiff_t              nnodes,
                                         idx_t **const SFEM_RESTRICT  elems,
@@ -53,7 +53,7 @@ int linear_elasticity_assemble_diag_aos(const enum ElemType          element_typ
                                         const real_t                 lambda,
                                         real_t *const SFEM_RESTRICT  values);
 
-int linear_elasticity_apply_soa(const enum ElemType                element_type,
+int linear_elasticity_apply_soa(const smesh::ElemType              element_type,
                                 const ptrdiff_t                    nelements,
                                 const ptrdiff_t                    nnodes,
                                 idx_t **const SFEM_RESTRICT        elems,
@@ -67,7 +67,7 @@ int linear_elasticity_apply_soa(const enum ElemType                element_type,
 // Array of structures
 //////////////////////////
 
-int linear_elasticity_assemble_value_aos(const enum ElemType               element_type,
+int linear_elasticity_assemble_value_aos(const smesh::ElemType             element_type,
                                          const ptrdiff_t                   nelements,
                                          const ptrdiff_t                   nnodes,
                                          idx_t **const SFEM_RESTRICT       elems,
@@ -77,7 +77,7 @@ int linear_elasticity_assemble_value_aos(const enum ElemType               eleme
                                          const real_t *const SFEM_RESTRICT u,
                                          real_t *const SFEM_RESTRICT       value);
 
-int linear_elasticity_assemble_gradient_aos(const enum ElemType               element_type,
+int linear_elasticity_assemble_gradient_aos(const smesh::ElemType             element_type,
                                             const ptrdiff_t                   nelements,
                                             const ptrdiff_t                   nnodes,
                                             idx_t **const SFEM_RESTRICT       elems,
@@ -87,7 +87,7 @@ int linear_elasticity_assemble_gradient_aos(const enum ElemType               el
                                             const real_t *const SFEM_RESTRICT u,
                                             real_t *const SFEM_RESTRICT       values);
 
-int linear_elasticity_crs_aos(const enum ElemType                element_type,
+int linear_elasticity_crs_aos(const smesh::ElemType              element_type,
                               const ptrdiff_t                    nelements,
                               const ptrdiff_t                    nnodes,
                               idx_t **const SFEM_RESTRICT        elems,
@@ -98,7 +98,7 @@ int linear_elasticity_crs_aos(const enum ElemType                element_type,
                               const idx_t *const SFEM_RESTRICT   colidx,
                               real_t *const SFEM_RESTRICT        values);
 
-int linear_elasticity_apply_aos(const enum ElemType               element_type,
+int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                 const ptrdiff_t                   nelements,
                                 const ptrdiff_t                   nnodes,
                                 idx_t **const SFEM_RESTRICT       elements,
@@ -108,7 +108,7 @@ int linear_elasticity_apply_aos(const enum ElemType               element_type,
                                 const real_t *const SFEM_RESTRICT u,
                                 real_t *const SFEM_RESTRICT       values);
 
-int linear_elasticity_apply_adjugate_aos(const enum ElemType                   element_type,
+int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 element_type,
                                          const ptrdiff_t                       nelements,
                                          const ptrdiff_t                       nnodes,
                                          idx_t **const SFEM_RESTRICT           elements,
@@ -119,7 +119,7 @@ int linear_elasticity_apply_adjugate_aos(const enum ElemType                   e
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values);
 
-int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_type,
+int linear_elasticity_block_diag_sym_aos(const smesh::ElemType        element_type,
                                          const ptrdiff_t              nelements,
                                          const ptrdiff_t              nnodes,
                                          idx_t **const SFEM_RESTRICT  elements,
@@ -128,7 +128,7 @@ int linear_elasticity_block_diag_sym_aos(const enum ElemType          element_ty
                                          const real_t                 lambda,
                                          real_t *const                out);
 
-int linear_elasticity_block_diag_sym_soa(const enum ElemType          element_type,
+int linear_elasticity_block_diag_sym_soa(const smesh::ElemType        element_type,
                                          const ptrdiff_t              nelements,
                                          const ptrdiff_t              nnodes,
                                          idx_t **const SFEM_RESTRICT  elements,
@@ -138,7 +138,7 @@ int linear_elasticity_block_diag_sym_soa(const enum ElemType          element_ty
                                          real_t **const SFEM_RESTRICT out);
 
 // Block sparse row (BSR) https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-storage-formats
-int linear_elasticity_bsr(const enum ElemType                element_type,
+int linear_elasticity_bsr(const smesh::ElemType              element_type,
                           const ptrdiff_t                    nelements,
                           const ptrdiff_t                    nnodes,
                           idx_t **const SFEM_RESTRICT        elems,
@@ -149,7 +149,7 @@ int linear_elasticity_bsr(const enum ElemType                element_type,
                           const idx_t *const SFEM_RESTRICT   colidx,
                           real_t *const SFEM_RESTRICT        values);
 
-int linear_elasticity_bcrs_sym(const enum ElemType                element_type,
+int linear_elasticity_bcrs_sym(const smesh::ElemType              element_type,
                                const ptrdiff_t                    nelements,
                                const ptrdiff_t                    nnodes,
                                idx_t **const SFEM_RESTRICT        elems,

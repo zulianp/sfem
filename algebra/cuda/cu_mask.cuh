@@ -1,7 +1,7 @@
 #ifndef CU_MASK_CUH
 #define CU_MASK_CUH
 
-#include "sfem_mask.h"
+#include "sfem_mask.hpp"
 
 static inline __device__ int cu_mask_get(ptrdiff_t i, const mask_t* const mask) {
     const static size_t nbits = (sizeof(mask_t) * 8);

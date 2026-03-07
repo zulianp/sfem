@@ -2,7 +2,7 @@
 #define VTET4_LAPLACIAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 int vtet4_laplacian_apply(const ptrdiff_t nelements,
                           const ptrdiff_t nnodes,

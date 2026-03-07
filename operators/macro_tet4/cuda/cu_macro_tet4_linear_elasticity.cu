@@ -4,12 +4,12 @@
 #include <cstddef>
 
 #include "cu_macro_tet4_linear_elasticity.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include "cu_tet4_inline.hpp"
 

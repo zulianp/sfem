@@ -1,7 +1,7 @@
 #ifndef LUMPED_PTPD_H
 #define LUMPED_PTPD_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <stddef.h>
 #include <stdint.h>

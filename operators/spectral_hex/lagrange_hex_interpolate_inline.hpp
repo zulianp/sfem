@@ -1,6 +1,6 @@
 #ifndef LAGRANGE_HEX_INTERPOLATE_INLINE_HPP
 #define LAGRANGE_HEX_INTERPOLATE_INLINE_HPP
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <int N, int Q, typename T>
 void lagrange_hex_interpolate(

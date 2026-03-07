@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 
 void trishell3_p0_p1_l2_projection_apply(const ptrdiff_t nelements,

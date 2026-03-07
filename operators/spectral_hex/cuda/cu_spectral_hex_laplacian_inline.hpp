@@ -1,7 +1,7 @@
 #ifndef CU_SPECTRAL_HEX_LAPLACIAN_INLINE_H
 #define CU_SPECTRAL_HEX_LAPLACIAN_INLINE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 template <int N, typename T>
 inline __host__ __device__ void cu_spectral_hex_laplacian_apply(

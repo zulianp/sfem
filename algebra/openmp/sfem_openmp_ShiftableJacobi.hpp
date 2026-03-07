@@ -1,8 +1,8 @@
 #ifndef SFEM_OPENMP_SHIFTABLEJACOBI_HPP
 #define SFEM_OPENMP_SHIFTABLEJACOBI_HPP
 
-#include "sfem_base.h"
-#include "sfem_mask.h"
+#include "sfem_base.hpp"
+#include "sfem_mask.hpp"
 
 #include <cstdio>
 #include <cstdlib>

@@ -2,7 +2,7 @@
 
 #include "sfem_ShiftedPenalty.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     double tick = MPI_Wtime();
 
     const char *folder     = argv[1];
-    auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const int   block_size = 3;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);

@@ -134,8 +134,9 @@ namespace sfem {
         std::stringstream ss;
 
         std::string field_path;
+        const std::string field_ext = std::string(smesh::TypeToString<T>::value());
         ss << "path: "
-           << "sdf.raw\n";
+           << "sdf." << field_ext << "\n";
         ss << "spatial_dimension: " << impl_->spatial_dimension << "\n";
         ss << "nx: " << impl_->nglobal[0] << "\n";
         ss << "ox: " << impl_->origin[0] << "\n";
@@ -161,7 +162,7 @@ namespace sfem {
         os << ss.str();
         os.close();
 
-        return impl_->field->to_file((folder + "/sdf.raw").c_str());
+        return impl_->field->to_file(smesh::Path(folder + "/sdf." + field_ext));
     }
 
     template <class T>

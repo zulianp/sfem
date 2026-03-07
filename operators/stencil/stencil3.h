@@ -1,7 +1,7 @@
 #ifndef STENCIL_3_H
 #define STENCIL_3_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "stencil2.h"
 
 // #define SFEM_ENABLE_STENCIL_TILING

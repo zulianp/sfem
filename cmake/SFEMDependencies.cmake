@@ -1,5 +1,37 @@
 # SFEMDependencies.cmake
 
+set(SFEM_SMESH_PATH "")
+foreach(_candidate_path
+        "${CMAKE_CURRENT_LIST_DIR}/../external/smesh"
+        "${CMAKE_CURRENT_LIST_DIR}/../externals/smesh")
+    if(EXISTS "${_candidate_path}/CMakeLists.txt")
+        set(SFEM_SMESH_PATH "${_candidate_path}")
+        break()
+    endif()
+endforeach()
+
+if(SFEM_SMESH_PATH)
+    set(SMESH_ENABLE_AVX2 ${SFEM_ENABLE_AVX2} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_AVX512 ${SFEM_ENABLE_AVX512} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_AVX512_SORT ${SFEM_ENABLE_AVX512_SORT} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_BLAS ${SFEM_ENABLE_BLAS} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_RYAML ${SFEM_ENABLE_RYAML} CACHE BOOL "" FORCE)
+
+    add_subdirectory("${SFEM_SMESH_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/smesh")
+
+    if(TARGET smesh::smesh)
+        list(APPEND SFEM_SUBMODULES smesh::smesh)
+    endif()
+else()
+    message(FATAL_ERROR "Could not find SMESH in ../external/smesh or ../externals/smesh.")
+endif()
+
 if(SFEM_ENABLE_CUDA)
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
@@ -87,10 +119,14 @@ find_package(Doxygen QUIET)
 if(DOXYGEN_FOUND)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.txt ${CMAKE_BINARY_DIR}
                    @ONLY IMMEDIATE)
-    add_custom_target(
-        docs
-        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile.txt
-        SOURCES ${CMAKE_BINARY_DIR}/Doxyfile.txt)
+    if(TARGET docs)
+        message(STATUS "Skipping SFEM docs target: target 'docs' already exists")
+    else()
+        add_custom_target(
+            docs
+            COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile.txt
+            SOURCES ${CMAKE_BINARY_DIR}/Doxyfile.txt)
+    endif()
 
 endif()
 
@@ -208,4 +244,3 @@ endif()
 if(SFEM_ENABLE_AVX512_SORT)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
 endif()
-

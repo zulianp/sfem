@@ -1,7 +1,7 @@
 #ifndef SFEM_CUDA_CRS_H
 #define SFEM_CUDA_CRS_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 void crs_device_create(const ptrdiff_t nnodes,
                        const ptrdiff_t nnz,

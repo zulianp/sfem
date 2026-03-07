@@ -26,8 +26,8 @@ namespace sfem {
         std::shared_ptr<Operator<T>> actual_op;
 
         void init() {
-            auto from_element = (enum ElemType)from_space->element_type();
-            auto to_element   = (enum ElemType)to_space->element_type();
+            auto from_element = (smesh::ElemType)from_space->element_type();
+            auto to_element   = (smesh::ElemType)to_space->element_type();
 
             ptrdiff_t nnodes   = 0;
             idx_t**   elements = nullptr;
@@ -39,7 +39,7 @@ namespace sfem {
                 nnodes       = ssmesh.n_nodes();
             } else {
                 nxe      = elem_num_nodes(from_element);
-                elements = from_space->mesh().elements()->data();
+                elements = from_space->mesh().elements(0)->data();
                 nnodes   = from_space->mesh().n_nodes();
             }
 
@@ -209,7 +209,7 @@ namespace sfem {
                                 hierarchical_restriction_with_counting(from_element,
                                                                        to_element,
                                                                        from_space->mesh().n_elements(),
-                                                                       from_space->mesh().elements()->data(),
+                                                                       from_space->mesh().elements(0)->data(),
                                                                        element_to_node_incidence_count->data(),
                                                                        block_size,
                                                                        from,
@@ -285,13 +285,13 @@ namespace sfem {
     class SurfaceRestrict<T>::Impl {
     public:
         int                    from_level;
-        enum ElemType          from_elem_type;
+        smesh::ElemType          from_elem_type;
         ptrdiff_t              from_n_nodes;
         SharedBuffer<idx_t*>   from_sides;
         SharedBuffer<uint16_t> from_count;
 
         int                  to_level;
-        enum ElemType        to_elem_type;
+        smesh::ElemType        to_elem_type;
         ptrdiff_t            to_n_nodes;
         SharedBuffer<idx_t*> to_sides;
 
@@ -301,12 +301,12 @@ namespace sfem {
         std::shared_ptr<Operator<T>> actual_op;
 
         Impl(const int                     from_level,
-             const enum ElemType           from_elem_type,
+             const smesh::ElemType           from_elem_type,
              const ptrdiff_t               from_n_nodes,
              const SharedBuffer<idx_t*>&   from_sides,
              const SharedBuffer<uint16_t>& from_count,
              const int                     to_level,
-             const enum ElemType           to_elem_type,
+             const smesh::ElemType           to_elem_type,
              const ptrdiff_t               to_n_nodes,
              const SharedBuffer<idx_t*>&   to_sides,
              const ExecutionSpace          es,
@@ -363,12 +363,12 @@ namespace sfem {
 
     template <typename T>
     SurfaceRestrict<T>::SurfaceRestrict(const int                     from_level,
-                                        const enum ElemType           from_elem_type,
+                                        const smesh::ElemType           from_elem_type,
                                         const ptrdiff_t               from_n_nodes,
                                         const SharedBuffer<idx_t*>&   from_sides,
                                         const SharedBuffer<uint16_t>& from_count,
                                         const int                     to_level,
-                                        const enum ElemType           to_elem_type,
+                                        const smesh::ElemType           to_elem_type,
                                         const ptrdiff_t               to_n_nodes,
                                         const SharedBuffer<idx_t*>&   to_sides,
                                         const ExecutionSpace          es,
@@ -387,12 +387,12 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<SurfaceRestrict<T>> SurfaceRestrict<T>::create(const int                     from_level,
-                                                                   const enum ElemType           from_elem_type,
+                                                                   const smesh::ElemType           from_elem_type,
                                                                    const ptrdiff_t               from_n_nodes,
                                                                    const SharedBuffer<idx_t*>&   from_sides,
                                                                    const SharedBuffer<uint16_t>& from_count,
                                                                    const int                     to_level,
-                                                                   const enum ElemType           to_elem_type,
+                                                                   const smesh::ElemType           to_elem_type,
                                                                    const ptrdiff_t               to_n_nodes,
                                                                    const SharedBuffer<idx_t*>&   to_sides,
                                                                    const ExecutionSpace          es,

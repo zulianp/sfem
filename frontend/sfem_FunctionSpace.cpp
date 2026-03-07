@@ -4,11 +4,11 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_prolongation_restriction.h"
+#include "sfem_prolongation_restriction.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_CRSGraph.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Packed.hpp"
 
@@ -19,7 +19,7 @@ namespace sfem {
         std::shared_ptr<Mesh> mesh;
         int                   block_size{1};
         // Multi-block support: dedicated element type for each block
-        std::vector<enum ElemType> element_types;
+        std::vector<smesh::ElemType> element_types;
 
         // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
@@ -36,10 +36,10 @@ namespace sfem {
         ~Impl() {}
 
         // Helper method to get element type for a specific block
-        enum ElemType get_element_type_for_block(int block) const {
+        smesh::ElemType get_element_type_for_block(int block) const {
             if (block < 0 || block >= static_cast<int>(element_types.size()) || element_types.empty()) {
                 // Fallback to default element type
-                return INVALID;
+                return smesh::INVALID;
             }
             return element_types[block];
         }
@@ -59,13 +59,13 @@ namespace sfem {
                         element_types.push_back(block->element_type());
                     } else {
                         // Fallback to default element type
-                        element_types.push_back(INVALID);
+                        element_types.push_back(smesh::INVALID);
                     }
                 }
             }
         }
 
-        void override_element_types(const enum ElemType element_type) {
+        void override_element_types(const smesh::ElemType element_type) {
             size_t n_blocks = mesh->n_blocks();
             if (n_blocks > 0) {
                 element_types.clear();
@@ -91,7 +91,8 @@ namespace sfem {
             // This is for nodal discretizations (CG)
             if (!node_to_node_graph) {
                 // Use the default element type for graph creation
-                node_to_node_graph = mesh->create_node_to_node_graph(get_element_type_for_block(0));
+                node_to_node_graph = mesh->create_node_to_node_graph(
+                        static_cast<smesh::ElemType>(get_element_type_for_block(0)));
             }
 
             if (block_size == 1) {
@@ -123,7 +124,7 @@ namespace sfem {
         return impl_->node_to_node_graph;
     }
 
-    enum ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }
+    smesh::ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }
 
     std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
         if (to_level == 1) {
@@ -146,7 +147,8 @@ namespace sfem {
         ret->impl_->nlocal               = mesh->n_nodes() * block_size;
         ret->impl_->nglobal              = ret->impl_->nlocal;
 
-        ret->impl_->element_types.push_back(SSHEX8);
+        ret->impl_->element_types.push_back(
+                semistructured_type(mesh->macro_mesh()->element_type(0), mesh->level()));
 
         // TODO: Once multi-block support is available in the semistructured mesh,
         // Initialize element types for multi-block support
@@ -164,31 +166,31 @@ namespace sfem {
         ret->impl_->nlocal               = mesh->mesh()->n_nodes() * block_size;
         ret->impl_->nglobal              = ret->impl_->nlocal;
 
-        ret->impl_->element_types.push_back(mesh->mesh()->element_type());
+        ret->impl_->element_types.push_back(mesh->mesh()->element_type(0));
         return ret;
     }
 
-    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const enum ElemType element_type)
+    FunctionSpace::FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size, const smesh::ElemType element_type)
         : impl_(std::make_unique<Impl>()) {
         impl_->mesh       = mesh;
         impl_->block_size = block_size;
         assert(block_size > 0);
 
-        if (element_type == INVALID) {
+        if (element_type == smesh::INVALID) {
             impl_->initialize_element_types();
 
         } else {
             impl_->override_element_types(element_type);
         }
 
-        if (element_type == INVALID) {
+        if (element_type == smesh::INVALID) {
             impl_->nlocal  = mesh->n_nodes() * block_size;
             impl_->nglobal = mesh->n_nodes() * block_size;
         } else {
             assert(mesh->n_blocks() == 1);
             // FIXME in parallel it will not work
             impl_->nlocal =
-                    (max_node_id(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements()->data()) + 1) *
+                    (max_node_id(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements(0)->data()) + 1) *
                     block_size;
             impl_->nglobal = impl_->nlocal;
         }
@@ -200,10 +202,10 @@ namespace sfem {
         // Check if we have a multi-block mesh
         if (impl_->mesh->n_blocks() > 1) {
             // For multi-block meshes, we need to check if all blocks are compatible
-            // For now, we'll only promote if the default element type is HEX8
-            if (impl_->get_element_type_for_block(0) == HEX8) {
+            // For now, we'll only promote if the default element type is smesh::HEX8
+            if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
                 impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
-                impl_->override_element_types(SSHEX8);
+                impl_->override_element_types(semistructured_type(smesh::HEX8, level));
                 impl_->nlocal  = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
                 impl_->nglobal = impl_->nlocal;
 
@@ -212,9 +214,9 @@ namespace sfem {
             return SFEM_FAILURE;
         } else {
             // Single block mesh - original behavior
-            if (impl_->get_element_type_for_block(0) == HEX8) {
+            if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
                 impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
-                impl_->override_element_types(SSHEX8);
+                impl_->override_element_types(semistructured_type(smesh::HEX8, level));
                 impl_->nlocal  = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
                 impl_->nglobal = impl_->nlocal;
 
@@ -267,7 +269,7 @@ namespace sfem {
     // Helper method to check if this is a multi-block function space
     bool FunctionSpace::is_multi_block() const { return impl_->mesh && impl_->mesh->n_blocks() > 1; }
 
-    std::vector<enum ElemType> FunctionSpace::element_types() const { return impl_->element_types; }
+    std::vector<smesh::ElemType> FunctionSpace::element_types() const { return impl_->element_types; }
 
     int FunctionSpace::initialize_packed_mesh() {
         impl_->packed_mesh = Packed<PackedIdxType>::create(impl_->mesh, {}, true);

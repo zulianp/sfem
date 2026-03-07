@@ -44,8 +44,8 @@ def create_array(name, size):
 if __name__ == "__main__":
 
     code_all = "//Auto-generated\n"
-    code_all += '#include "sfem_base.h"\n'
-    code_all += '#include "sfem_vec.h"\n'
+    code_all += '#include "sfem_base.hpp"\n'
+    code_all += '#include "sfem_vec.hpp"\n'
     code_all += "#include <assert.h>\n"
     code_all += "#include <stddef.h>\n"
     code_all += "\n"

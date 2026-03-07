@@ -17,6 +17,9 @@ namespace sfem {
     static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const MemorySpace es);
 
     template <typename T>
+    static SharedBuffer<T> create_buffer(const std::ptrdiff_t n, const ExecutionSpace es);
+
+    template <typename T>
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};

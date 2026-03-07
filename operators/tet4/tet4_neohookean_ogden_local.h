@@ -2,7 +2,7 @@
 #define TET4_NEOHOOKEAN_OGDEN_LOCAL_H
 
 #include <math.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "tet4_partial_assembly_neohookean_inline.h"
 

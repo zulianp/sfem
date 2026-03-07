@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "cu_ssquad4_interpolate.h"
 #include "matrixio_array.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "ssquad4_interpolate.h"
 
 #include "sfem_API.hpp"
@@ -14,7 +14,7 @@
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #include "spmv.h"
 
@@ -65,7 +65,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
                                     return dd;
                                 });
 
-    sdf->to_file("test_contact/sdf");
+    sdf->to_file(smesh::Path("test_contact/sdf"));
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }

@@ -113,13 +113,13 @@ int main(int argc, char *argv[]) {
                 return (y > -1e-5 && y < 1e-5) || (y > (H - 1e-5) && y < (H + 1e-5));
             });
 
-    mesh->write((output_folder + "/mesh").c_str());
+    mesh->write(smesh::Path((output_folder + "/mesh")));
     auto fs = sfem::FunctionSpace::create(mesh, 1);
 
     element_idx_t *table_{nullptr};
-    create_element_adj_table(mesh->n_elements(), mesh->n_nodes(), mesh->element_type(), mesh->elements()->data(), &table_);
+    create_element_adj_table(mesh->n_elements(), mesh->n_nodes(), mesh->element_type(0), mesh->elements(0)->data(), &table_);
 
-    const int ns    = elem_num_sides(mesh->element_type());
+    const int ns    = elem_num_sides(mesh->element_type(0));
     auto      table = sfem::manage_host_buffer<element_idx_t>(mesh->n_elements() * ns, table_);
 
 

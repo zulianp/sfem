@@ -4,7 +4,7 @@
 #include "boundary_condition_io.h"
 #include "dirichlet.h"
 #include "neumann.h"
-#include "sfem_prolongation_restriction.h"
+#include "sfem_prolongation_restriction.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
@@ -12,15 +12,12 @@
 #include "sfem_Grid.hpp"
 #include "sfem_Input.hpp"
 
-#include "node_interpolate.h"
-#include "sfem_resample_gap.h"
-
 #include "sfem_API.hpp"
 
 #include "adj_table.h"
 #include "obstacle.h"
-#include "sfem_hex8_mesh_graph.h"
-#include "sfem_sshex8_skin.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "sfem_sshex8_skin.hpp"
 #include "sshex8_mesh.h"
 
 #include "sfem_Tracer.hpp"
@@ -71,10 +68,10 @@ namespace sfem {
     std::shared_ptr<Constraint> AxisAlignedContactConditions::derefine(const std::shared_ptr<FunctionSpace> &coarse_space,
                                                                        const bool                            as_zero) const {
         auto space = impl_->space;
-        auto et    = (enum ElemType)space->element_type();
+        auto et    = (smesh::ElemType)space->element_type();
 
         const ptrdiff_t max_coarse_idx =
-                max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements()->data());
+                max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -300,13 +297,9 @@ namespace sfem {
             contact_surface->reset_points();
 
             auto st           = contact_surface->element_type();
-            auto surface_mesh = std::make_shared<Mesh>(space->mesh_ptr()->comm(),
-                                                       space->mesh_ptr()->spatial_dimension(),
-                                                       st,
-                                                       contact_surface->elements()->extent(1),
-                                                       contact_surface->elements(),
-                                                       contact_surface->points()->extent(1),
-                                                       contact_surface->points());
+             auto surface_mesh = std::make_shared<Mesh>(
+                    space->mesh_ptr()->comm(), static_cast<smesh::ElemType>(st), contact_surface->elements(), contact_surface->points());
+
 
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");

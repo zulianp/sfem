@@ -2,8 +2,8 @@
 #define MOONEY_RIVLIN_VISCO_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +16,7 @@ extern "C" {
 // =============================================================================
 
 int mooney_rivlin_visco_update_history_flexible(
-    const enum ElemType element_type,
+    const smesh::ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const SFEM_RESTRICT elements,
@@ -39,7 +39,7 @@ int mooney_rivlin_visco_update_history_flexible(
     const real_t *const SFEM_RESTRICT uz);
 
 int mooney_rivlin_visco_gradient_flexible(
-    const enum ElemType element_type,
+    const smesh::ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const SFEM_RESTRICT elements,
@@ -63,7 +63,7 @@ int mooney_rivlin_visco_gradient_flexible(
     real_t *const SFEM_RESTRICT out);
 
 int mooney_rivlin_visco_bsr_flexible(
-    const enum ElemType element_type,
+    const smesh::ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const SFEM_RESTRICT elements,
@@ -89,7 +89,7 @@ int mooney_rivlin_visco_bsr_flexible(
     real_t *const SFEM_RESTRICT values);
 
 int mooney_rivlin_visco_hessian_diag_flexible(
-    const enum ElemType element_type,
+    const smesh::ElemType element_type,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const SFEM_RESTRICT elements,

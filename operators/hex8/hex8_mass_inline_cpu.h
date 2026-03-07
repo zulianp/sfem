@@ -1,8 +1,8 @@
 #ifndef HEX8_MASS_INLINE_CPU_H
 #define HEX8_MASS_INLINE_CPU_H
 
-#include "sfem_defs.h"
-#include "sfem_macros.h"
+#include "sfem_defs.hpp"
+#include "sfem_macros.hpp"
 
 static SFEM_INLINE void hex8_mass_sum_factorization(const scalar_t                      detJ,
                                                     const scalar_t *const SFEM_RESTRICT qw,

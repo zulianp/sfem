@@ -4,11 +4,11 @@
 #include "sfem_Function.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_mask.h"
+#include "sfem_mask.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 #include "sfem_Stationary.hpp"
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     // Create discretization
     // -------------------------------
 
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {

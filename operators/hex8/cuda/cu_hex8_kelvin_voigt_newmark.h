@@ -2,8 +2,8 @@
 #define CU_HEX8_KELVIN_VOIGT_NEWMARK_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

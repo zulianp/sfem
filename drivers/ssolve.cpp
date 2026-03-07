@@ -9,8 +9,8 @@ extern "C" {
 #include "matrixio_array.h"
 #include "neumann.h"
 #include "read_mesh.h"
-#include "sfem_mesh.h"
-#include "sfem_mesh_write.h"
+#include "smesh_mesh.hpp"
+#include "sfem_mesh_write.hpp"
 }
 
 #include <yaml-cpp/yaml.h>

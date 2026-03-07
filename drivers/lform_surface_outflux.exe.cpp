@@ -9,14 +9,14 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "read_mesh.h"
 
 #include "tet4_grad.h"
 
-#include "sfem_defs.h"
-#include "sfem_macros.h"
+#include "sfem_defs.hpp"
+#include "sfem_macros.hpp"
 
 #include "sfem_API.hpp"
 
@@ -379,7 +379,7 @@ void tri6_p2_p2_surface_outflux(const ptrdiff_t nelements,
     printf("surface_outflux.c: tri6_surface_outflux\t%g seconds\n", tock - tick);
 }
 
-void surface_outflux(const enum ElemType element_type,
+void surface_outflux(const smesh::ElemType element_type,
                      const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const SFEM_RESTRICT elems,
@@ -392,12 +392,12 @@ void surface_outflux(const enum ElemType element_type,
 
 {
     switch (element_type) {
-        case TRI3: {
+        case smesh::TRI3: {
             tri3_p1_p1_surface_outflux(
                 nelements, nnodes, elems, xyz, normals_xyz, vector_field_x, vector_field_y, vector_field_z, values);
             break;
         }
-        case TRI6: {
+        case smesh::TRI6: {
             tri6_p2_p2_surface_outflux(
                 nelements, nnodes, elems, xyz, normals_xyz, vector_field_x, vector_field_y, vector_field_z, values);
             break;
@@ -446,7 +446,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -467,15 +467,15 @@ int main(int argc, char *argv[]) {
         normals_xyz[d] = (geom_t *)malloc(n_elements * sizeof(geom_t));
     }
 
-    normals(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), normals_xyz);
+    normals(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), normals_xyz);
 
     real_t *outflux = (real_t *)malloc(n_nodes * sizeof(real_t));
     memset(outflux, 0, n_nodes * sizeof(real_t));
 
-    surface_outflux(mesh->element_type(),
+    surface_outflux(mesh->element_type(0),
                     n_elements,
                     n_nodes,
-                    mesh->elements()->data(),
+                    mesh->elements(0)->data(),
                     mesh->points()->data(),
                     normals_xyz,
                     vector_field[0],
@@ -511,4 +511,3 @@ int main(int argc, char *argv[]) {
 
     return MPI_Finalize();
 }
-

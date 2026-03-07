@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_mesh.h"
+#include "sfem_base.hpp"
+#include "smesh_mesh.hpp"
 #include "boundary_condition.h"
 
 #ifdef __cplusplus
@@ -20,19 +20,19 @@ void read_boundary_conditions(MPI_Comm comm,
                               boundary_condition_t **bcs,
                               int *nbc);
 
-void read_dirichlet_conditions(const mesh_t *const mesh,
-                               const char *sets,
-                               const char *values,
-                               const char *components,
-                               boundary_condition_t **bcs,
-                               int *nbc);
+// void read_dirichlet_conditions(const sfem::Mesh *const mesh,
+//                                const char *sets,
+//                                const char *values,
+//                                const char *components,
+//                                boundary_condition_t **bcs,
+//                                int *nbc);
 
-void read_neumann_conditions(const mesh_t *const mesh,
-                             const char *sets,
-                             const char *values,
-                             const char *components,
-                             boundary_condition_t **bcs,
-                             int *nbc);
+// void read_neumann_conditions(const sfem::Mesh *const mesh,
+//                              const char *sets,
+//                              const char *values,
+//                              const char *components,
+//                              boundary_condition_t **bcs,
+//                              int *nbc);
 
 #ifdef __cplusplus
 }

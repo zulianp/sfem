@@ -1,8 +1,8 @@
 #ifndef DG_HEX8_SYMMETRIC_INTERIOR_PENALTY_INLINE_H
 #define DG_HEX8_SYMMETRIC_INTERIOR_PENALTY_INLINE_H
 
-#include "sfem_base.h"
-#include "sfem_macros.h"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
 
 #include <math.h>
 

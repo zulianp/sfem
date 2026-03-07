@@ -31,7 +31,7 @@ namespace sfem {
      * - Poisson equations
      *
      * The operator supports:
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Multiple matrix formats (CRS, diagonal)
      * - Low-order-refinement (LOR) and derefinement
      * - Performance tracking
@@ -109,7 +109,7 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
-        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
     private:
         class Impl;

@@ -1,6 +1,6 @@
 #include "sfem_glob.hpp"
-#include "sfem_glob.h"
-#include "sfem_base.h"
+#include "sfem_glob.hpp"
+#include "sfem_base.hpp"
 #ifndef _WIN32
 #include <glob.h>
 #include <sys/stat.h>

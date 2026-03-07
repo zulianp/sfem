@@ -2,7 +2,7 @@
 #define SFEM_SSHEX8_KELVIN_VOIGT_NEWMARK_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

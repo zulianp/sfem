@@ -1,8 +1,8 @@
 
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_blas.hpp"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include <algorithm>
 #include <cassert>

@@ -1,11 +1,11 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -15,7 +15,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -93,7 +93,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
@@ -173,7 +173,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
@@ -254,7 +254,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
 
     int SFEM_ENABLE_OUTPUT = 1;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file("test_contact/sdf");
+    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
@@ -370,7 +370,7 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        mesh->write("test_contact/coarse_mesh");
+        mesh->write(smesh::Path("test_contact/coarse_mesh"));
         fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
 
         auto out = f->output();

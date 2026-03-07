@@ -1,47 +1,47 @@
-#ifndef SFEM_EXTRACT_SHARP_FEATURES_H
-#define SFEM_EXTRACT_SHARP_FEATURES_H
+// #ifndef SFEM_EXTRACT_SHARP_FEATURES_H
+// #define SFEM_EXTRACT_SHARP_FEATURES_H
 
-#include <stddef.h>
+// #include <stddef.h>
 
-#include "sfem_defs.h"
+// #include "sfem_defs.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
 
-int extract_sharp_edges(const enum ElemType element_type,
-                        const ptrdiff_t nelements,
-                        const ptrdiff_t nnodes,
-                        idx_t **const SFEM_RESTRICT elements,
-                        geom_t **const SFEM_RESTRICT points,
-                        // CRS-graph (node to node)
-                        const count_t *const SFEM_RESTRICT rowptr,
-                        const idx_t *const SFEM_RESTRICT colidx,
-                        const geom_t angle_threshold,
-                        ptrdiff_t *out_n_sharp_edges,
-                        idx_t **out_e0,
-                        idx_t **out_e1);
+// int extract_sharp_edges(const smesh::ElemType element_type,
+//                         const ptrdiff_t nelements,
+//                         const ptrdiff_t nnodes,
+//                         idx_t **const SFEM_RESTRICT elements,
+//                         geom_t **const SFEM_RESTRICT points,
+//                         // CRS-graph (node to node)
+//                         const count_t *const SFEM_RESTRICT rowptr,
+//                         const idx_t *const SFEM_RESTRICT colidx,
+//                         const geom_t angle_threshold,
+//                         ptrdiff_t *out_n_sharp_edges,
+//                         idx_t **out_e0,
+//                         idx_t **out_e1);
 
-int extract_sharp_corners(const ptrdiff_t nnodes,
-                          const ptrdiff_t n_sharp_edges,
-                          idx_t *const SFEM_RESTRICT e0,
-                          idx_t *const SFEM_RESTRICT e1,
-                          ptrdiff_t *out_ncorners,
-                          idx_t **out_corners,
-                          int edge_clean_up);
+// int extract_sharp_corners(const ptrdiff_t nnodes,
+//                           const ptrdiff_t n_sharp_edges,
+//                           idx_t *const SFEM_RESTRICT e0,
+//                           idx_t *const SFEM_RESTRICT e1,
+//                           ptrdiff_t *out_ncorners,
+//                           idx_t **out_corners,
+//                           int edge_clean_up);
 
-int extract_disconnected_faces(const enum ElemType element_type,
-                               const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t **const SFEM_RESTRICT elements,
-                               const ptrdiff_t n_sharp_edges,
-                               const idx_t *const SFEM_RESTRICT e0,
-                               const idx_t *const SFEM_RESTRICT e1,
-                               ptrdiff_t *out_n_disconnected_elements,
-                               element_idx_t **out_disconnected_elements);
+// int extract_disconnected_faces(const smesh::ElemType element_type,
+//                                const ptrdiff_t nelements,
+//                                const ptrdiff_t nnodes,
+//                                idx_t **const SFEM_RESTRICT elements,
+//                                const ptrdiff_t n_sharp_edges,
+//                                const idx_t *const SFEM_RESTRICT e0,
+//                                const idx_t *const SFEM_RESTRICT e1,
+//                                ptrdiff_t *out_n_disconnected_elements,
+//                                element_idx_t **out_disconnected_elements);
 
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// }
+// #endif
 
-#endif  // SFEM_EXTRACT_SHARP_FEATURES_H
+// #endif  // SFEM_EXTRACT_SHARP_FEATURES_H

@@ -11,7 +11,7 @@ typedef struct {
     MPI_Comm comm;
     int      mem_space;
     int      spatial_dim;
-    enum ElemType element_type;
+    smesh::ElemType element_type;
     ptrdiff_t nelements;
     ptrdiff_t nnodes;
     idx_t  **elements;        // Element connectivity
@@ -52,7 +52,7 @@ public:
     // Metadata
     MPI_Comm comm;
     int spatial_dim;
-    enum ElemType element_type;
+    smesh::ElemType element_type;
     ptrdiff_t nelements;
     ptrdiff_t nnodes;
     
@@ -145,7 +145,7 @@ int assemble_laplacian(const SharedBuffer<idx_t *> &elements,
                       const SharedBuffer<geom_t *> &points,
                       ptrdiff_t nelements,
                       ptrdiff_t nnodes,
-                      enum ElemType element_type,
+                      smesh::ElemType element_type,
                       ...);
 ```
 
@@ -168,14 +168,14 @@ This document provides a comprehensive inventory of all functions that **directl
 
 ## 1. mesh_t Struct Definition Analysis
 
-### Current Structure (from `mesh/sfem_mesh.h`)
+### Current Structure (from `mesh/smesh_mesh.hpp`)
 ```c
 typedef struct {
     MPI_Comm comm;                    // MPI communicator
     int      mem_space;               // Memory space (host/CUDA)
     
     int           spatial_dim;        // Spatial dimension (2D/3D)
-    enum ElemType element_type;       // Element type (HEX8, TET4, etc.)
+    smesh::ElemType element_type;       // Element type (HEX8, TET4, etc.)
     
     ptrdiff_t nelements;              // Number of elements
     ptrdiff_t nnodes;                 // Number of nodes
@@ -263,7 +263,7 @@ Based on analysis, algorithms typically need only:
 | `read_dirichlet_conditions(const mesh_t *mesh, ...)` | Read Dirichlet BCs | `nelements`, `nnodes`, `elements`, `points` | No | Medium |
 | `read_neumann_conditions(const mesh_t *mesh, ...)` | Read Neumann BCs | `nelements`, `nnodes`, `elements`, `points` | No | Medium |
 
-### 2.6 CUDA Mesh Operations (`mesh/sfem_cuda_mesh.h`)
+### 2.6 CUDA Mesh Operations (`mesh/sfem_cuda_mesh.hpp`)
 
 | Function | Purpose | Minimal Data Required | MPI Dependent | Refactor Priority |
 |----------|---------|----------------------|---------------|-------------------|
@@ -366,7 +366,7 @@ void mesh_create_quad4_square(const int nx, const int ny,
                              geom_t ***points);
 
 void mesh_create_serial(const int spatial_dim,
-                       const enum ElemType element_type,
+                       const smesh::ElemType element_type,
                        const ptrdiff_t nelements_in, const idx_t **elements_in,
                        const ptrdiff_t nnodes_in, const geom_t **points_in,
                        ptrdiff_t *nelements,
@@ -376,7 +376,7 @@ void mesh_create_serial(const int spatial_dim,
 
 // Utility functions for mesh data management
 void mesh_destroy(const int spatial_dim,
-                 const enum ElemType element_type,
+                 const smesh::ElemType element_type,
                  idx_t **elements,
                  geom_t **points);
 

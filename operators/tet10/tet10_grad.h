@@ -1,7 +1,7 @@
 #ifndef SFEM_TET10_GRAD_H
 #define SFEM_TET10_GRAD_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include <stddef.h>
 
 #ifdef __cplusplus

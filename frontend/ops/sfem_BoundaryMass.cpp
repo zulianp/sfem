@@ -1,7 +1,7 @@
 #include "sfem_BoundaryMass.hpp"
 #include <mpi.h>
 #include "mass.h"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -12,9 +12,9 @@ namespace sfem {
         SFEM_TRACE_SCOPE("BoundaryMass::create");
 
         auto ret          = std::make_unique<BoundaryMass>(space);
-        auto element_type = (enum ElemType)space->element_type();
+        auto element_type = (smesh::ElemType)space->element_type();
         ret->element_type = shell_type(side_type(element_type));
-        if (ret->element_type == INVALID) {
+        if (ret->element_type == smesh::INVALID) {
             std::cerr << "Invalid element type for BoundaryMass, Bulk element type: " << type_to_string(element_type) << "\n";
             return nullptr;
         }
@@ -94,7 +94,7 @@ namespace sfem {
     int BoundaryMass::value(const real_t *x, real_t *const out) {
         // auto mesh = (mesh_t *)space->mesh().impl_mesh();
 
-        // mass_assemble_value((enum ElemType)space->element_type(),
+        // mass_assemble_value((smesh::ElemType)space->element_type(),
         //                     mesh->nelements,
         //                     mesh->nnodes,
         //                     mesh->elements,

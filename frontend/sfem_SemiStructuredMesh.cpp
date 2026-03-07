@@ -2,17 +2,18 @@
 
 // C Includes
 #include "line_quadrature_gauss_lobatto.h"
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
 // Mesh
 #include "adj_table.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "smesh_sshex8_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
 
 // C++ Includes
 #include "sfem_CRSGraph.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -47,21 +48,21 @@ namespace sfem {
                 auto default_block = std::make_shared<Block>();
                 default_block->set_name(block->name());
 
-                // FIXME hardcoded for sshex8
-                default_block->set_element_type(SSHEX8);
+                default_block->set_element_type(
+                        semistructured_type(block->element_type(), level));
 
                 const int nxe            = sshex8_nxe(level);
                 auto      micro_elements = create_host_buffer<idx_t>(nxe, macro_mesh->n_elements());
                 default_block->set_elements(micro_elements);
 
                 auto elements = micro_elements->data();
-                sshex8_generate_elements(level,
-                                         macro_mesh->n_elements(),
-                                         macro_mesh->n_nodes(),
-                                         macro_mesh->elements()->data(),
-                                         elements,
-                                         &this->n_unique_nodes,
-                                         &this->interior_start);
+                smesh::sshex8_generate_elements(level,
+                                                macro_mesh->n_elements(),
+                                                macro_mesh->n_nodes(),
+                                                macro_mesh->elements(0)->data(),
+                                                elements,
+                                                &this->n_unique_nodes,
+                                                &this->interior_start);
 
                 blocks.push_back(default_block);
 
@@ -83,9 +84,9 @@ namespace sfem {
 
     std::vector<int> SemiStructuredMesh::derefinement_levels() {
         const int        L       = level();
-        const int        nlevels = sshex8_hierarchical_n_levels(L);
+        const int        nlevels = smesh::sshex8_hierarchical_n_levels(L);
         std::vector<int> levels(nlevels);
-        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
+        smesh::sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
         return levels;
     }
 
@@ -159,19 +160,19 @@ namespace sfem {
 
         const int L = level();
 
-        const int nlevels = sshex8_hierarchical_n_levels(L);
+        const int nlevels = smesh::sshex8_hierarchical_n_levels(L);
 
         std::vector<int> levels(nlevels);
 
         // FiXME harcoded for sshex8
-        sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
+        smesh::sshex8_hierarchical_mesh_levels(L, nlevels, levels.data());
 
-        return sshex8_hierarchical_renumbering(L,
-                                               nlevels,
-                                               levels.data(),
-                                               this->n_elements(),
-                                               this->impl_->n_unique_nodes,
-                                               this->impl_->default_elements()->data());
+        return smesh::sshex8_hierarchical_renumbering(L,
+                                                      nlevels,
+                                                      levels.data(),
+                                                      this->n_elements(),
+                                                      this->impl_->n_unique_nodes,
+                                                      this->impl_->default_elements()->data());
     }
 
     std::shared_ptr<Buffer<geom_t *>> SemiStructuredMesh::points() {
@@ -240,7 +241,8 @@ namespace sfem {
         count_t *rowptr{nullptr};
         idx_t   *colidx{nullptr};
 
-        sshex8_crs_graph(impl_->level, this->n_elements(), this->n_nodes(), this->element_data(), &rowptr, &colidx);
+        smesh::sshex8_crs_graph<element_idx_t, count_t, idx_t>(
+                impl_->level, this->n_elements(), this->n_nodes(), this->element_data(), &rowptr, &colidx);
 
         impl_->node_to_node_graph =
                 std::make_shared<CRSGraph>(Buffer<count_t>::own(this->n_nodes() + 1, rowptr, free, MEMORY_SPACE_HOST),
@@ -291,10 +293,10 @@ namespace sfem {
         // points->print(std::cout);
 
         std::string points_path = folder + "/x%d.raw";
-        points->to_files(points_path.c_str());
+        points->to_files(smesh::Path(points_path));
 
         std::string elements_path = folder + "/i%d.raw";
-        hex8_elements->to_files(elements_path.c_str());
+        hex8_elements->to_files(smesh::Path(elements_path));
 
         std::stringstream ss;
         ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::export_as_standard)\n";
@@ -302,7 +304,7 @@ namespace sfem {
         ss << "n_nodes: " << points->extent(1) << "\n";
         ss << "spatial_dimension: 3\n";
         ss << "elem_num_nodes: 8\n";
-        ss << "element_type: HEX8\n";
+        ss << "element_type: smesh::HEX8\n";
         ss << "points:\n";
         ss << "- x: x0.raw\n";
         ss << "- y: x1.raw\n";
@@ -350,10 +352,10 @@ namespace sfem {
         auto        points   = this->points();
 
         std::string points_path = folder + "/x%d.raw";
-        points->to_files(points_path.c_str());
+        points->to_files(smesh::Path(points_path));
 
         std::string elements_path = folder + "/i%d.raw";
-        elements->to_files(elements_path.c_str());
+        elements->to_files(smesh::Path(elements_path));
 
         std::stringstream ss;
         ss << "# SFEM mesh meta file (generated by SemiStructuredMesh::write)\n";
@@ -362,7 +364,7 @@ namespace sfem {
         ss << "n_nodes: " << points->extent(1) << "\n";
         ss << "spatial_dimension: 3\n";
         ss << "elem_num_nodes: " << ((level() - 1) * (level() - 1) * (level() - 1)) << "\n";
-        ss << "element_type: SSHEX8\n";
+        ss << "element_type: " << type_to_string(block(0)->element_type()) << "\n";
         ss << "points:\n";
         ss << "- x: x0.raw\n";
         ss << "- y: x1.raw\n";

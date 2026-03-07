@@ -2,8 +2,8 @@
 #define TET10_NAVIER_STOKES_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 #include "crs_graph.h"
 #include "sortreduce.h"
 

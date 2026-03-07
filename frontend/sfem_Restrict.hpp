@@ -2,8 +2,8 @@
 #define SFEM_RESTRICT_HPP
 
 // C includes
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 // C++ includes
 #include "sfem_ForwardDeclarations.hpp"
@@ -44,24 +44,24 @@ namespace sfem {
     class SurfaceRestrict final : public Operator<T> {
     public:
         SurfaceRestrict(const int                     from_level,
-                        const enum ElemType           from_elem_type,
+                        const smesh::ElemType           from_elem_type,
                         const ptrdiff_t               from_n_nodes,
                         const SharedBuffer<idx_t*>&   from_sides,
                         const SharedBuffer<uint16_t>& from_count,
                         const int                     to_level,
-                        const enum ElemType           to_elem_type,
+                        const smesh::ElemType           to_elem_type,
                         const ptrdiff_t               to_n_nodes,
                         const SharedBuffer<idx_t*>&   to_sides,
                         const ExecutionSpace          es,
                         const int                     block_size);
 
         static std::shared_ptr<SurfaceRestrict<T>> create(const int                     from_level,
-                                                          const enum ElemType           from_elem_type,
+                                                          const smesh::ElemType           from_elem_type,
                                                           const ptrdiff_t               from_n_nodes,
                                                           const SharedBuffer<idx_t*>&   from_sides,
                                                           const SharedBuffer<uint16_t>& from_count,
                                                           const int                     to_level,
-                                                          const enum ElemType           to_elem_type,
+                                                          const smesh::ElemType           to_elem_type,
                                                           const ptrdiff_t               to_n_nodes,
                                                           const SharedBuffer<idx_t*>&   to_sides,
                                                           const ExecutionSpace          es,

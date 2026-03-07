@@ -1,14 +1,14 @@
 #include "sfem_Hyperelasticity.hpp"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_CRSGraph.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -17,7 +17,7 @@
 
 #include "generic_hyperelasticity.hpp"
 
-// HEX8 dedicated micro-kernels and helpers
+// smesh::HEX8 dedicated micro-kernels and helpers
 #include "hex8_inline_cpu.h"
 #include "line_quadrature.h"
 #include "hex8_partial_assembly_neohookean_inline.h"
@@ -165,7 +165,7 @@ namespace sfem {
                                              const real_t *const,
                                              metric_tensor_t *const) = 0;
 
-        // Objective and path-evaluated objective (HEX8 specialized forms)
+        // Objective and path-evaluated objective (smesh::HEX8 specialized forms)
         virtual int objective(const ptrdiff_t,
                               const ptrdiff_t,
                               const ptrdiff_t,
@@ -200,7 +200,7 @@ namespace sfem {
     namespace hex8 {
         class NeoHookeanOgden final : public HyperelasticityKernels {
         public:
-            // Implement using generic_hyperelasticity.hpp and HEX8 micro-kernels
+            // Implement using generic_hyperelasticity.hpp and smesh::HEX8 micro-kernels
             int hessian_aos(const ptrdiff_t        nelements,
                             const ptrdiff_t        nnodes,
                             idx_t **const          elements,
@@ -209,10 +209,10 @@ namespace sfem {
                             const count_t *const   rowptr,
                             const idx_t *const     colidx,
                             real_t *const          values) override {
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
                 return neohookean_ogden_hessian_aos(
-                        HEX8, nelements, nnodes, elements, points, mu, lambda, u, rowptr, colidx, values);
+                        smesh::HEX8, nelements, nnodes, elements, points, mu, lambda, u, rowptr, colidx, values);
             }
 
             int hessian_diag_aos(const ptrdiff_t       nelements,
@@ -221,8 +221,8 @@ namespace sfem {
                                  geom_t **const        points,
                                  const real_t *const   u,
                                  real_t *const         out) override {
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 auto diag_micro = [mu, lambda](const scalar_t *lx,
                                                const scalar_t *ly,
@@ -289,8 +289,8 @@ namespace sfem {
                              const real_t *const u,
                              real_t *const       out) override {
 
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 auto micro_kernel = [mu, lambda](const scalar_t *lx,
                                                  const scalar_t *ly,
@@ -353,8 +353,8 @@ namespace sfem {
                           const real_t *const  u,
                           const real_t *const  h,
                           real_t *const        out) override {
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 auto s_kernel = [mu, lambda](const scalar_t *lx,
                                              const scalar_t *ly,
@@ -468,14 +468,14 @@ namespace sfem {
                                          const real_t *const     uz,
                                          metric_tensor_t *const  pa) override {
 
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 return neohookean_ogden_hessian_partial_assembly(
-                        HEX8, nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, pa);
+                        smesh::HEX8, nelements, stride, elements, points, mu, lambda, u_stride, ux, uy, uz, pa);
             }
 
-            // Objective and path-evaluated objective (HEX8 specialized forms)
+            // Objective and path-evaluated objective (smesh::HEX8 specialized forms)
             int objective(const ptrdiff_t    nelements,
                           const ptrdiff_t    /*stride*/,  // elements assumed SoA with stride 1
                           const ptrdiff_t    nnodes,
@@ -488,8 +488,8 @@ namespace sfem {
                           const int          is_elem_wise,
                           real_t *const      out) override {
 
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 auto micro_kernel = [mu, lambda](const scalar_t *lx,
                                                  const scalar_t *ly,
@@ -535,8 +535,8 @@ namespace sfem {
                                 const real_t *const steps,
                                 real_t *const      out) override {
 
-                const real_t mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
-                const real_t lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
+                const real_t mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", real_t(1));
+                const real_t lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", real_t(1));
 
                 auto micro_kernel = [mu, lambda](const scalar_t *lx,
                                                  const scalar_t *ly,
@@ -660,7 +660,7 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            // Objective and path-evaluated objective (HEX8 specialized forms)
+            // Objective and path-evaluated objective (smesh::HEX8 specialized forms)
             int objective(const ptrdiff_t,
                           const ptrdiff_t,
                           const ptrdiff_t,
@@ -704,7 +704,7 @@ namespace sfem {
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
 
-        std::unordered_map<enum ElemType, std::shared_ptr<HyperelasticityKernels>> kernels;
+        std::unordered_map<smesh::ElemType, std::shared_ptr<HyperelasticityKernels>> kernels;
         std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) { return kernels[domain.element_type]; }
     };
 
@@ -717,9 +717,9 @@ namespace sfem {
 
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<Hyperelasticity>(space);
-        // Register HEX8 kernels
-        ret->impl_->kernels[HEX8] = std::make_shared<hex8::NeoHookeanOgden>();
-        // auto plugin_folder = sfem::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./");
+        // Register smesh::HEX8 kernels
+        ret->impl_->kernels[smesh::HEX8] = std::make_shared<hex8::NeoHookeanOgden>();
+        // auto plugin_folder = smesh::Env::read_string("SFEM_HYPERELASTICITY_PLUGIN_FOLDER", "./");
         // if (!plugin_folder.empty()) {
         //     ret->impl_->hyperelasticity_load_plugins(plugin_folder);
         // }
@@ -829,13 +829,13 @@ namespace sfem {
     int Hyperelasticity::initialize(const std::vector<std::string> &block_names) {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
-        bool use_partial_assembly = sfem::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
-        bool use_compression      = sfem::Env::read("SFEM_USE_COMPRESSION", false);
-        bool use_AoS              = sfem::Env::read("SFEM_HYPERELAStICITY_USE_AOS", false);
+        bool use_partial_assembly = smesh::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
+        bool use_compression      = smesh::Env::read("SFEM_USE_COMPRESSION", false);
+        bool use_AoS              = smesh::Env::read("SFEM_HYPERELAStICITY_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
             auto ua                  = std::make_shared<struct HyperelasticityAssemblyData>();
-            ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == HEX8;
+            ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == smesh::HEX8;
             ua->use_compression      = use_compression;
             ua->use_AoS              = use_AoS;
             ua->elements             = domain.second.block->elements();
@@ -863,7 +863,7 @@ namespace sfem {
 
             auto element_type = domain.second.element_type;
 
-            if (element_type == TET4 || element_type == HEX8) {
+            if (element_type == smesh::TET4 || element_type == smesh::HEX8) {
                 // FIXME: Add support for other element types
                 if (!assembly_data->partial_assembly_buffer) {
                     assembly_data->partial_assembly_buffer =
@@ -918,7 +918,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             auto ua = std::static_pointer_cast<HyperelasticityAssemblyData>(domain.user_data);
-            if (domain.element_type == HEX8) {
+            if (domain.element_type == smesh::HEX8) {
                 auto kernels = impl_->find_kernels(domain);
                 return kernels->objective_steps(mesh->n_elements(),
                                                 ua->elements_stride,
@@ -975,7 +975,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void Hyperelasticity::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void Hyperelasticity::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

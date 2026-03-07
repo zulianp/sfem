@@ -2,11 +2,7 @@
 #define TET4_LINEAR_ELASTICITY_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "sfem_base.hpp"
 
 int tet4_linear_elasticity_value(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,
@@ -91,8 +87,4 @@ int tet4_linear_elasticity_bsr(const ptrdiff_t nelements,
                                const count_t *const SFEM_RESTRICT rowptr,
                                const idx_t *const SFEM_RESTRICT colidx,
                                real_t *const SFEM_RESTRICT values);
-
-#ifdef __cplusplus
-}
-#endif
 #endif  // TET4_LINEAR_ELASTICITY_H

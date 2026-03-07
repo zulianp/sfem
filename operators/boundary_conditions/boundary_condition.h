@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +31,7 @@ void boundary_condition_create(boundary_condition_t *const bc,
                                const real_t value,
                                real_t *const values);
 
-// void add_neumann_condition_to_gradient_vec(const enum ElemType element_type,
+// void add_neumann_condition_to_gradient_vec(const smesh::ElemType element_type,
 //                                            geom_t **const SFEM_RESTRICT points,
 //                                            const int n_conditions,
 //                                            const boundary_condition_t *const cond,

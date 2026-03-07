@@ -1,7 +1,7 @@
 #include "sfem_ssmgc.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "ssquad4_interpolate.h"
 
 #include "lumped_ptdp.h"
@@ -309,30 +309,30 @@ namespace sfem {
             bool coarse_solver_verbose          = false;
             bool debug                          = false;
             bool enable_shift                   = true;
-            bool enable_line_search             = sfem::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
+            bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
             bool project_coarse_correction      = false;
 
-            int SFEM_ENABLE_NL_OBSTACLE       = sfem::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
-            int coarse_linear_smoothing_steps = sfem::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
-            int linear_smoothing_steps        = sfem::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
+            int SFEM_ENABLE_NL_OBSTACLE       = smesh::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);
+            int coarse_linear_smoothing_steps = smesh::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
+            int linear_smoothing_steps        = smesh::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
 
-            int    max_inner_it         = sfem::Env::read("SFEM_MAX_INNER_IT", 40);
-            int    max_it               = sfem::Env::read("SFEM_MAX_IT", 15);
-            int    nlsmooth_steps       = sfem::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = sfem::Env::read("SFEM_MAX_COARSE_IT", 40000);
-            real_t omega_factor         = sfem::Env::read("SFEM_OMEGA_FACTOR", 100.);
-            real_t stagnation_threshold = sfem::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
+            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 40);
+            int    max_it               = smesh::Env::read("SFEM_MAX_IT", 15);
+            int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
+            real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
+            real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
             static constexpr bool is_double = std::is_same<real_t, double>::value;
 
-            real_t atol              = sfem::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
-            real_t max_penalty_param = sfem::Env::read(
+            real_t atol              = smesh::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
+            real_t max_penalty_param = smesh::Env::read(
                     "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
-            real_t penalty_param          = sfem::Env::read("SFEM_PENALTY_PARAM", 1e4);
+            real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 1e4);
             real_t penalty_param_increase = 10;
             real_t coarse_rtol            = 1e-6;
 
-            std::string coarse_op_type = sfem::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
+            std::string coarse_op_type = smesh::Env::read_string("SFEM_COARSE_OP_TYPE", es == EXECUTION_SPACE_HOST ? BSR : MATRIX_FREE);
             std::string debug_folder   = "debug_ssmgc";
             std::string fine_op_type   = MATRIX_FREE;
 

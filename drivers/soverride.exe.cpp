@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "utils.h"

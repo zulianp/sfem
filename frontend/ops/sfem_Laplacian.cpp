@@ -2,16 +2,16 @@
 #include "sfem_Tracer.hpp"
 
 #include "hex8_fff.h"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 #include "tet4_fff.h"
 
 #include "laplacian.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -55,7 +55,7 @@ namespace sfem {
             auto block        = domain.block;
             auto fff          = create_host_buffer<jacobian_t>(block->n_elements() * 6);
             
-            if (element_type == HEX8 || element_type == SSHEX8) {
+            if (element_type == smesh::HEX8 || is_semistructured_type(element_type)) {
                 hex8_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
             } else {
                 tet4_fff_fill(block->n_elements(), block->elements()->data(), mesh->points()->data(), fff->data());
@@ -222,7 +222,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void Laplacian::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void Laplacian::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem

@@ -1,7 +1,7 @@
 #ifndef CU_MASK_H
 #define CU_MASK_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

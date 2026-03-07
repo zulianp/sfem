@@ -2,8 +2,8 @@
 #define SFEM_SSHEX_8_H
 
 #include <assert.h>
-#include "sfem_base.h"
-#include "sfem_macros.h"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
 
 static SFEM_INLINE int sshex8_nxe(int level) {
     const int corners    = 8;

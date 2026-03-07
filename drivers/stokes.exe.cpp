@@ -16,9 +16,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 
 #include "mass.h"
@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     // Optional params
     real_t SFEM_MU = 1;
@@ -184,15 +184,15 @@ int main(int argc, char *argv[]) {
     ptrdiff_t nnz = 0;
     count_t *rowptr = 0;
     idx_t *colidx = 0;
-    build_crs_graph_for_elem_type(
-        mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), &rowptr, &colidx);
+    smesh::create_crs_graph_for_elem_type(
+        mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), &rowptr, &colidx);
     nnz = rowptr[mesh->n_nodes()];
 
     double tock = MPI_Wtime();
     printf("stokes.c: build crs graph\t\t%g seconds\n", tock - tack);
     tack = tock;
 
-    const int sdim = elem_manifold_dim(mesh->element_type());
+    const int sdim = elem_manifold_dim(mesh->element_type(0));
     const int n_vars = sdim + 1;
 
     real_t *rhs_values[4] = {0, 0, 0, 0};
@@ -245,20 +245,20 @@ int main(int argc, char *argv[]) {
         // Operator assembly
         ///////////////////////////////////////////////////////////////////////////////
 
-        stokes_mini_assemble_hessian_aos(mesh->element_type(),
+        stokes_mini_assemble_hessian_aos(mesh->element_type(0),
                                          mesh->n_elements(),
                                          mesh->n_nodes(),
-                                         mesh->elements()->data(),
+                                         mesh->elements(0)->data(),
                                          mesh->points()->data(),
                                          SFEM_MU,
                                          rowptr,
                                          colidx,
                                          values);
 
-        stokes_mini_assemble_rhs_aos(mesh->element_type(),
+        stokes_mini_assemble_rhs_aos(mesh->element_type(0),
                                      mesh->n_elements(),
                                      mesh->n_nodes(),
-                                     mesh->elements()->data(),
+                                     mesh->elements(0)->data(),
                                      mesh->points()->data(),
                                      SFEM_MU,
                                      SFEM_RHO,
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
 
         count_t *b_rowptr = (count_t *)malloc((mesh->n_nodes() + 1) * n_vars * sizeof(count_t));
         idx_t *b_colidx = (idx_t *)malloc((ptrdiff_t)rowptr[mesh->n_nodes()] * n_vars * n_vars * sizeof(idx_t));
-        crs_graph_block_to_scalar(mesh->n_nodes(), n_vars, rowptr, colidx, b_rowptr, b_colidx);
+        smesh::crs_graph_block_to_scalar(mesh->n_nodes(), n_vars, rowptr, colidx, b_rowptr, b_colidx);
 
         if (SFEM_DIRICHLET_NODES) {
             idx_t *dirichlet_nodes = 0;
@@ -350,10 +350,10 @@ int main(int argc, char *argv[]) {
         // Operator assembly
         ///////////////////////////////////////////////////////////////////////////////
 
-        stokes_mini_assemble_hessian_soa(mesh->element_type(),
+        stokes_mini_assemble_hessian_soa(mesh->element_type(0),
                                          mesh->n_elements(),
                                          mesh->n_nodes(),
-                                         mesh->elements()->data(),
+                                         mesh->elements(0)->data(),
                                          mesh->points()->data(),
                                          SFEM_MU,
                                          rowptr,
@@ -364,10 +364,10 @@ int main(int argc, char *argv[]) {
             // No static condensation contribution on RHS
             for (int i = 0; i < n_vars; i++) {
                 if (rhs_values[i]) {
-                    apply_mass(mesh->element_type(),
+                    apply_mass(mesh->element_type(0),
                                mesh->n_elements(),
                                mesh->n_nodes(),
-                               mesh->elements()->data(),
+                               mesh->elements(0)->data(),
                                mesh->points()->data(),
                                1,
                                rhs_values[i],
@@ -376,10 +376,10 @@ int main(int argc, char *argv[]) {
                 }
             }
         } else {
-            stokes_mini_assemble_rhs_soa(mesh->element_type(),
+            stokes_mini_assemble_rhs_soa(mesh->element_type(0),
                                          mesh->n_elements(),
                                          mesh->n_nodes(),
-                                         mesh->elements()->data(),
+                                         mesh->elements(0)->data(),
                                          mesh->points()->data(),
                                          SFEM_MU,
                                          SFEM_RHO,

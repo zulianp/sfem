@@ -2,8 +2,8 @@
 
 // C
 #include "adj_table.h"
-#include "sfem_hex8_mesh_graph.h"
-#include "sfem_sshex8_skin.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "sfem_sshex8_skin.hpp"
 #include "sshex8_mesh.h"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -14,22 +14,60 @@
 // C++
 #include "sfem_Function.hpp"
 #include "sfem_Input.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
+#include "smesh_sshex8_graph.hpp"
+#include "sshex8.h"
+
+#include <unordered_map>
 
 
 namespace sfem {
+    static void remap_surface_elements_to_contiguous_index(const ptrdiff_t n_elements,
+                                                           const int       nnxs,
+                                                           idx_t **const   elements,
+                                                           ptrdiff_t      *n_contiguous,
+                                                           idx_t         **idx) {
+        std::unordered_map<idx_t, idx_t> map;
+        map.reserve(n_elements * nnxs);
+
+        idx_t next = 0;
+        for (int v = 0; v < nnxs; v++) {
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                const idx_t global_idx = elements[v][e];
+                auto        it         = map.find(global_idx);
+                if (it == map.end()) {
+                    map[global_idx] = next++;
+                }
+            }
+        }
+
+        *n_contiguous = next;
+        *idx          = (idx_t *)malloc((*n_contiguous) * sizeof(idx_t));
+
+        for (const auto &kv : map) {
+            (*idx)[kv.second] = kv.first;
+        }
+
+        for (int v = 0; v < nnxs; v++) {
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                elements[v][e] = map[elements[v][e]];
+            }
+        }
+    }
+
     template <typename T>
     using ptr = std::shared_ptr<T>;
 
-    // std::tuple<enum ElemType, ptr<Buffer<idx_t *>>, ptr<Buffer<geom_t *>>, ptr<Buffer<idx_t>>> read_surface(
+    // std::tuple<smesh::ElemType, ptr<Buffer<idx_t *>>, ptr<Buffer<geom_t *>>, ptr<Buffer<idx_t>>> read_surface(
     //         const std::shared_ptr<FunctionSpace> &space,
     //         const std::string                    &path) {
     //     // Read mesh surface information
-    //     const enum ElemType element_type      = space->element_type();
-    //     const enum ElemType side_element_type = shell_type(side_type(element_type));
+    //     const smesh::ElemType element_type      = space->element_type();
+    //     const smesh::ElemType side_element_type = shell_type(side_type(element_type));
     //     const int           nxe               = elem_num_nodes(side_element_type);
 
     //     // space->has_semi_structured_mesh() ? elem_num_nodes(type_from_string(surface_elem_type.c_str()))
@@ -94,7 +132,7 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>>  sides;
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
-        enum ElemType                     element_type { INVALID };
+        smesh::ElemType                     element_type { smesh::INVALID };
         enum ExecutionSpace               execution_space { EXECUTION_SPACE_HOST };
         
 #ifdef SFEM_ENABLE_CUDA
@@ -113,7 +151,7 @@ namespace sfem {
             const int          dim  = mesh->spatial_dimension();
 
             for (int d = 0; d < dim; d++) {
-                const geom_t *const x   = mesh->points(d);
+                const geom_t *const x   = mesh->points()->data()[d];
                 geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
@@ -162,7 +200,7 @@ namespace sfem {
             const idx_t *const idx = node_mapping->data();
 
             for (int d = 0; d < dim; d++) {
-                const geom_t *const x   = mesh->points(d);
+                const geom_t *const x   = mesh->points()->data()[d];
                 geom_t *const       x_s = surface_points->data()[d];
 
 #pragma omp parallel for
@@ -186,7 +224,7 @@ namespace sfem {
     SharedBuffer<idx_t>    MeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
 #endif
 
-    enum ElemType MeshContactSurface::element_type() const { return impl_->element_type; }
+    smesh::ElemType MeshContactSurface::element_type() const { return impl_->element_type; }
 
     void MeshContactSurface::displace_points(const real_t *disp) { impl_->displace_points(disp); }
     void MeshContactSurface::reset_points() { impl_->reset_points(); }
@@ -195,14 +233,14 @@ namespace sfem {
                                                                    const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                    const enum ExecutionSpace                    es) {
         auto          mesh = space->mesh_ptr();
-        enum ElemType st   = side_type(space->element_type());
+        smesh::ElemType st   = side_type(space->element_type());
         const int     nnxs = elem_num_nodes(st);
 
         auto sides = sfem::create_surface_from_sidesets(space, sidesets).second;
 
         idx_t    *idx          = nullptr;
         ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
-        remap_elements_to_contiguous_index(sides->extent(1), sides->extent(0), sides->data(), &n_contiguous, &idx);
+        remap_surface_elements_to_contiguous_index(sides->extent(1), sides->extent(0), sides->data(), &n_contiguous, &idx);
         auto node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
 
         // Create object
@@ -242,7 +280,7 @@ namespace sfem {
         std::shared_ptr<Buffer<idx_t *>>  semi_structured_sides;
         std::shared_ptr<Buffer<idx_t>>    node_mapping;
         std::shared_ptr<Buffer<geom_t *>> surface_points;
-        enum ElemType                     element_type { INVALID };
+        smesh::ElemType                     element_type { smesh::INVALID };
         enum ExecutionSpace               execution_space { EXECUTION_SPACE_HOST };
 
 #ifdef SFEM_ENABLE_CUDA
@@ -341,7 +379,7 @@ namespace sfem {
     SharedBuffer<idx_t>    SSMeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
 #endif
 
-    enum ElemType SSMeshContactSurface::element_type() const { return impl_->element_type; }
+    smesh::ElemType SSMeshContactSurface::element_type() const { return impl_->element_type; }
 
     void SSMeshContactSurface::displace_points(const real_t *disp) { impl_->displace_points(disp); }
     void SSMeshContactSurface::reset_points() { impl_->reset_points(); }
@@ -358,31 +396,25 @@ namespace sfem {
         auto semi_structured_sides =
                 sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sidesets[0]->parent()->size());
 
-        if (sshex8_extract_surface_from_sideset(ssmesh.level(),
-                                                ssmesh.element_data(),
-                                                sidesets[0]->parent()->size(),
-                                                sidesets[0]->parent()->data(),
-                                                sidesets[0]->lfi()->data(),
-                                                semi_structured_sides->data()) != SFEM_SUCCESS) {
+        if (smesh::sshex8_extract_surface_from_sideset(ssmesh.level(),
+                                                       ssmesh.element_data(),
+                                                       sidesets[0]->parent()->size(),
+                                                       sidesets[0]->parent()->data(),
+                                                       sidesets[0]->lfi()->data(),
+                                                       semi_structured_sides->data()) != SFEM_SUCCESS) {
             SFEM_ERROR("Unable to extract surface from sideset!\n");
         }
 
         idx_t           *idx          = nullptr;
         ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
-        std::vector<int> levels(sshex8_hierarchical_n_levels(ssmesh.level()));
+        std::vector<int> levels(smesh::sshex8_hierarchical_n_levels(ssmesh.level()));
 
-        sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+        smesh::sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
 
         // auto semi_structured_sides = sfem::create_surface_from_sidesets(space, sidesets).second;
 
-        ssquad4_hierarchical_remapping(ssmesh.level(),
-                                       levels.size(),
-                                       levels.data(),
-                                       semi_structured_sides->extent(1),
-                                       ssmesh.n_nodes(),
-                                       semi_structured_sides->data(),
-                                       &idx,
-                                       &n_contiguous);
+        smesh::ssquad4_hierarchical_remapping(ssmesh.level(),
+                semi_structured_sides->extent(1), semi_structured_sides->extent(0), semi_structured_sides->data(), &n_contiguous, &idx);
 
         auto node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
 

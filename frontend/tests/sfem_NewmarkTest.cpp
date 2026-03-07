@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -115,7 +115,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     if (fs->has_semi_structured_mesh()) {
         fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
     } else {
-        fs->mesh_ptr()->write(output_dir.c_str());
+        fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
     return output;
 }

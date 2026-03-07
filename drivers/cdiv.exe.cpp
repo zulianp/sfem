@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "operators/div.h"
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -64,10 +64,10 @@ int main(int argc, char *argv[]) {
     memset(div_u, 0, mesh->n_elements() * sizeof(real_t));
 
     cdiv(
-        mesh->element_type(),
+        mesh->element_type(0),
         n_elements, 
         n_nodes, 
-        mesh->elements()->data(), mesh->points()->data(), 
+        mesh->elements(0)->data(), mesh->points()->data(), 
         u[0], u[1], u[2], div_u);
 
     real_t SFEM_SCALE = 1;

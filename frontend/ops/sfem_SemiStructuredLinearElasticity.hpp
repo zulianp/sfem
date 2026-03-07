@@ -38,13 +38,13 @@ namespace sfem {
      * - Affine approximation for performance optimization
      * - Level-of-refinement (LOR) and derefinement
      * - Performance tracking and statistics
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Both scalar and vector function spaces
      */
     class SemiStructuredLinearElasticity : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;                           ///< Function space for the operator
-        enum ElemType                  element_type { INVALID };        ///< Element type
+        smesh::ElemType                  element_type { smesh::INVALID };        ///< Element type
         real_t                         mu{1}, lambda{1};                ///< Lamé parameters
         bool                           use_affine_approximation{true};  ///< Use affine approximation for performance
         long                           calls{0};                        ///< Number of apply() calls for performance tracking

@@ -7,7 +7,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef NDEBUG
 #define INLINE inline

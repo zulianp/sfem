@@ -1,8 +1,8 @@
 #include "sfem_API.hpp"
 
 #include "matrixio_array.h"
-#include "sfem_defs.h"
-#include "sfem_mesh_write.h"
+#include "sfem_defs.hpp"
+#include "sfem_mesh_write.hpp"
 #include "tet4_inline_cpu.h"
 
 int main(int argc, char *argv[]) {
@@ -26,10 +26,10 @@ int main(int argc, char *argv[]) {
 
     const char *output_folder = argv[2];
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    int nxe = elem_num_nodes((enum ElemType)m->element_type());
-    const auto elements = m->elements()->data();
+    int nxe = elem_num_nodes((smesh::ElemType)m->element_type(0));
+    const auto elements = m->elements(0)->data();
     const auto points = m->points()->data();
     const ptrdiff_t nelements = m->n_elements();
 
@@ -145,6 +145,6 @@ int main(int argc, char *argv[]) {
     printf("n_reorders= %ld\n", n_reorders);
 
     if(n_reorders)
-        m->write(output_folder);
+        m->write(smesh::Path(output_folder));
     return MPI_Finalize();
 }

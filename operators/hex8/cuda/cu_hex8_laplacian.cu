@@ -1,7 +1,7 @@
 #include "cu_hex8_laplacian.h"
 
 #include "cu_hex8_laplacian_inline.hpp"
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #ifndef MAX
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))

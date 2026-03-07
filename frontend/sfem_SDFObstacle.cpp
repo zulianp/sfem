@@ -3,7 +3,7 @@
 #include "sfem_resample_gap.h"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_resample_gap.h"
+#include "cu_resample_gap.hpp"
 #endif
 
 namespace sfem {

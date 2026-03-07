@@ -1,6 +1,6 @@
 #include "cu_hex8_linear_elasticity.h"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include "cu_hex8_linear_elasticity_inline.hpp"
 #include "cu_hex8_linear_elasticity_matrix_inline.hpp"

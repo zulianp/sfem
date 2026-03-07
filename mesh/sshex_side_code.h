@@ -1,7 +1,7 @@
 #ifndef SSHEX_SIDE_CODE_H
 #define SSHEX_SIDE_CODE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

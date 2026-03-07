@@ -3,7 +3,10 @@
 #include "adj_table.h"
 
 #include "sfem_glob.hpp"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "smesh_sidesets.hpp"
+
+#include <unordered_map>
 
 #include "hex8_inline_cpu.h"
 #include "hex8_linear_elasticity.h"
@@ -11,6 +14,39 @@
 #include "line_quadrature.h"
 
 namespace sfem {
+    static void remap_surface_elements_to_contiguous_index(const ptrdiff_t n_elements,
+                                                           const int       nnxs,
+                                                           idx_t **const   elements,
+                                                           ptrdiff_t      *n_contiguous,
+                                                           idx_t         **idx) {
+        std::unordered_map<idx_t, idx_t> map;
+        map.reserve(n_elements * nnxs);
+
+        idx_t next = 0;
+        for (int v = 0; v < nnxs; v++) {
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                const idx_t global_idx = elements[v][e];
+                auto        it         = map.find(global_idx);
+                if (it == map.end()) {
+                    map[global_idx] = next++;
+                }
+            }
+        }
+
+        *n_contiguous = next;
+        *idx          = (idx_t *)malloc((*n_contiguous) * sizeof(idx_t));
+
+        for (const auto &kv : map) {
+            (*idx)[kv.second] = kv.first;
+        }
+
+        for (int v = 0; v < nnxs; v++) {
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                elements[v][e] = map[elements[v][e]];
+            }
+        }
+    }
+
     class HEX8Smooth final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
@@ -31,7 +67,7 @@ namespace sfem {
             // FIXME Find out a good mesh smoothing operator
             return affine_hex8_linear_elasticity_apply(space->mesh_ptr()->n_elements(),
                                                        space->mesh_ptr()->n_nodes(),
-                                                       space->mesh_ptr()->elements()->data(),
+                                                       space->mesh_ptr()->elements(0)->data(),
                                                        space->mesh_ptr()->points()->data(),
                                                        1.,
                                                        1.,
@@ -100,7 +136,7 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
     int16_t       *side_idx{nullptr};
 
     if (extract_skin_sideset(
-                m->n_elements(), m->n_nodes(), m->element_type(), m->elements()->data(), &n_surf_elements, &parent, &side_idx) !=
+                m->n_elements(), m->n_nodes(), m->element_type(0), m->elements(0)->data(), &n_surf_elements, &parent, &side_idx) !=
         SFEM_SUCCESS) {
         SFEM_ERROR("Failed extract_skin_sideset!\n");
     }
@@ -109,20 +145,20 @@ int smooth(const std::shared_ptr<sfem::Mesh> &m) {
                                                    sfem::manage_host_buffer<element_idx_t>(n_surf_elements, parent),
                                                    sfem::manage_host_buffer<int16_t>(n_surf_elements, side_idx));
 
-    auto sides = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(m->element_type())), sideset->parent()->size());
+    auto sides = sfem::create_host_buffer<idx_t>(elem_num_nodes(side_type(m->element_type(0))), sideset->parent()->size());
 
-    if (extract_surface_from_sideset(m->element_type(),
-                                     m->elements()->data(),
-                                     sideset->parent()->size(),
-                                     sideset->parent()->data(),
-                                     sideset->lfi()->data(),
-                                     sides->data()) != SFEM_SUCCESS) {
+    if (smesh::extract_surface_from_sideset(m->element_type(0),
+                                            m->elements(0)->data(),
+                                            sideset->parent()->size(),
+                                            sideset->parent()->data(),
+                                            sideset->lfi()->data(),
+                                            sides->data()) != SFEM_SUCCESS) {
         SFEM_ERROR("Failed extract_surface_from_sideset!\n");
     }
 
     idx_t    *idx          = nullptr;
     ptrdiff_t n_contiguous = -1;
-    remap_elements_to_contiguous_index(sides->extent(1), sides->extent(0), sides->data(), &n_contiguous, &idx);
+    sfem::remap_surface_elements_to_contiguous_index(sides->extent(1), sides->extent(0), sides->data(), &n_contiguous, &idx);
     auto nodeset = sfem::manage_host_buffer(n_contiguous, idx);
 
     auto sx = sfem::create_host_buffer<real_t>(nodeset->size());
@@ -176,14 +212,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto        mesh          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(argv[1]));
     const char *output_folder = argv[2];
 
     if (smooth(mesh) != SFEM_SUCCESS) {
         SFEM_ERROR("Unable to smooth!");
     }
 
-    mesh->write(output_folder);
+    mesh->write(smesh::Path(output_folder));
 
     return MPI_Finalize();
 }

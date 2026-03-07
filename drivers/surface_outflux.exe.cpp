@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "read_mesh.h"
 
@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *vector_field[3];
     ptrdiff_t vector_field_size_local, vector_field_size_global;
@@ -308,14 +308,14 @@ int main(int argc, char *argv[]) {
         normals_xyz[d] = (geom_t *)malloc(mesh->n_elements() * sizeof(geom_t));
     }
 
-    normals(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), normals_xyz);
+    normals(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), normals_xyz);
 
     real_t *outflux = (real_t *)malloc(mesh->n_elements() * sizeof(real_t));
     memset(outflux, 0, mesh->n_elements() * sizeof(real_t));
 
     surface_outflux(mesh->n_elements(),
                     mesh->n_nodes(),
-                    mesh->elements()->data(),
+                    mesh->elements(0)->data(),
                     mesh->points()->data(),
                     normals_xyz,
                     vector_field[0],
@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
         value += outflux[i];
     }
 
-    surf_cell_values_remove_scaling(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), outflux);
+    surf_cell_values_remove_scaling(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), outflux);
 
     // surf_cell_values_integrate(mesh.nelements, mesh.nnodes, mesh.elements, mesh.points, outflux, &value);
 

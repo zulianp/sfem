@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_P1toP2.hpp"
 #include "sfem_glob.hpp"
 
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
     sfem::create_directory(output_folder);
 
-    auto p1_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto p1_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(argv[1]));
     auto p2_mesh = sfem::convert_p1_mesh_to_p2(p1_mesh);
 
     if (!p2_mesh) {
@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (p2_mesh->write(output_folder) != SFEM_SUCCESS) {
+    if (p2_mesh->write(smesh::Path(output_folder)) != SFEM_SUCCESS) {
         if (!rank) {
             fprintf(stderr, "mesh_p1_to_p2: failed to write output mesh to %s\n", output_folder);
         }

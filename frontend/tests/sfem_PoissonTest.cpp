@@ -1,9 +1,9 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 
 // FIXME
@@ -25,7 +25,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
         auto fff = sfem::create_host_buffer<jacobian_t>(fs->mesh_ptr()->n_elements() * 6);
 
         if (SFEM_SUCCESS != hex8_fff_fill(fs->mesh_ptr()->n_elements(),
-                                          fs->mesh_ptr()->elements()->data(),
+                                          fs->mesh_ptr()->elements(0)->data(),
                                           fs->mesh_ptr()->points()->data(),
                                           fff->data())) {
             SFEM_ERROR("Unable to create fff");
@@ -135,10 +135,10 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
     sfem::create_directory(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        SFEM_TEST_ASSERT(m->write((output_dir + "/coarse_mesh").c_str()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
     } else {
-        SFEM_TEST_ASSERT(m->write((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
     }
 
     auto output = f->output();
@@ -173,8 +173,8 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
 
-    int SFEM_MAX_IT = sfem::Env::read<int>("SFEM_MAX_IT", 20000);
-    bool SFEM_USE_PRECONDITIONER = sfem::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
+    int SFEM_MAX_IT = smesh::Env::read<int>("SFEM_MAX_IT", 20000);
+    bool SFEM_USE_PRECONDITIONER = smesh::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
 
     cg->set_max_it(SFEM_MAX_IT);
     cg->set_op(linear_op);
@@ -198,7 +198,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     SFEM_TEST_ASSERT(cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
     double tock = MPI_Wtime();
 
-    bool SFEM_VERBOSE = sfem::Env::read<bool>("SFEM_VERBOSE", false);
+    bool SFEM_VERBOSE = smesh::Env::read<bool>("SFEM_VERBOSE", false);
 
     if (SFEM_VERBOSE) {
         printf("---------------------\n");
@@ -206,7 +206,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
         printf("---------------------\n");
     }
 
-    bool SFEM_ENABLE_OUTPUT = sfem::Env::read<bool>("SFEM_ENABLE_OUTPUT", false);
+    bool SFEM_ENABLE_OUTPUT = smesh::Env::read<bool>("SFEM_ENABLE_OUTPUT", false);
 
     if (SFEM_ENABLE_OUTPUT) {
         if (SFEM_VERBOSE) {
@@ -216,10 +216,10 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
         sfem::create_directory(output_dir.c_str());
 
         if (fs->has_semi_structured_mesh()) {
-            SFEM_TEST_ASSERT(m->write((output_dir + "/coarse_mesh").c_str()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
             SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
         } else {
-            SFEM_TEST_ASSERT(m->write((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
         }
 
         auto output = f->output();
@@ -241,9 +241,9 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
 
 int test_poisson() {
     MPI_Comm comm                      = MPI_COMM_WORLD;
-    auto     es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    int      SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
-    int      SFEM_BASE_RESOLUTION      = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 1);
+    auto     es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    int      SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
+    int      SFEM_BASE_RESOLUTION      = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 1);
 
     auto m = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
@@ -259,9 +259,9 @@ int test_poisson() {
     auto right_lfi    = sfem::create_host_buffer<int16_t>(1);
 
     left_parent->data()[0]  = 0;
-    left_lfi->data()[0]     = HEX8_LEFT;
+    left_lfi->data()[0]     = smesh::HEX8_LEFT;
     right_parent->data()[0] = 0;
-    right_lfi->data()[0]    = HEX8_RIGHT;
+    right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
     auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
@@ -360,17 +360,17 @@ int test_poisson_and_boundary_selector_aux(const char                        *te
 
 int test_poisson_and_boundary_selector() {
     MPI_Comm comm          = MPI_COMM_WORLD;
-    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+    auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
     int SFEM_BLOCK_SIZE = 1;
     if (SFEM_OPERATOR == "VectorLaplacian") {
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
 
-    int SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    int SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
 
     int x_dim = 1;
 
@@ -390,17 +390,17 @@ int test_poisson_and_boundary_selector() {
 
 int test_poisson_and_boundary_selector_checkerboard() {
     MPI_Comm comm          = MPI_COMM_WORLD;
-    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+    auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
     int SFEM_BLOCK_SIZE = 1;
     if (SFEM_OPERATOR == "VectorLaplacian") {
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
 
-    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_checkerboard_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
@@ -410,17 +410,17 @@ int test_poisson_and_boundary_selector_checkerboard() {
 
 int test_poisson_and_boundary_selector_bidomain() {
     MPI_Comm comm          = MPI_COMM_WORLD;
-    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+    auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
     int SFEM_BLOCK_SIZE = 1;
     if (SFEM_OPERATOR == "VectorLaplacian") {
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
 
-    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
@@ -450,8 +450,8 @@ int test_generic_operator_with_boundary_conditions(const std::string            
 
 int test_linear_elasticity() {
     MPI_Comm comm                      = MPI_COMM_WORLD;
-    auto     es                        = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    int      SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
+    auto     es                        = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    int      SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 4);
 
     auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
 
@@ -462,9 +462,9 @@ int test_linear_elasticity() {
     auto right_lfi    = sfem::create_host_buffer<int16_t>(1);
 
     left_parent->data()[0]  = 0;
-    left_lfi->data()[0]     = HEX8_LEFT;
+    left_lfi->data()[0]     = smesh::HEX8_LEFT;
     right_parent->data()[0] = 0;
-    right_lfi->data()[0]    = HEX8_RIGHT;
+    right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
     auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
@@ -491,7 +491,7 @@ int test_linear_elasticity() {
 // Example of how to create additional tests using the generic function
 int test_poisson_simple() {
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto     es   = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     es   = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
 
     auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
 
@@ -502,9 +502,9 @@ int test_poisson_simple() {
     auto right_lfi    = sfem::create_host_buffer<int16_t>(1);
 
     left_parent->data()[0]  = 0;
-    left_lfi->data()[0]     = HEX8_LEFT;
+    left_lfi->data()[0]     = smesh::HEX8_LEFT;
     right_parent->data()[0] = 0;
-    right_lfi->data()[0]    = HEX8_RIGHT;
+    right_lfi->data()[0]    = smesh::HEX8_RIGHT;
 
     auto left_sideset  = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), left_parent, left_lfi);
     auto right_sideset = std::make_shared<sfem::Sideset>(sfem::Communicator::wrap(comm), right_parent, right_lfi);
@@ -529,17 +529,17 @@ int test_poisson_simple() {
 
 int test_bidomain_elasticity() {
     MPI_Comm comm          = MPI_COMM_WORLD;
-    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+    auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
     int SFEM_BLOCK_SIZE = 1;
     if (SFEM_OPERATOR == "VectorLaplacian") {
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
 
-    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_bidomain_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 
@@ -578,17 +578,17 @@ int test_bidomain_elasticity() {
 
 int test_boundary_layer_elasticity() {
     MPI_Comm comm          = MPI_COMM_WORLD;
-    auto     es            = sfem::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
-    auto     SFEM_OPERATOR = sfem::Env::read_string("SFEM_OPERATOR", "Laplacian");
+    auto     es            = smesh::Env::read("SFEM_EXECUTION_SPACE", sfem::EXECUTION_SPACE_HOST);
+    auto     SFEM_OPERATOR = smesh::Env::read_string("SFEM_OPERATOR", "Laplacian");
 
     int SFEM_BLOCK_SIZE = 1;
     if (SFEM_OPERATOR == "VectorLaplacian") {
-        int SFEM_ELEMENT_REFINE_LEVEL = sfem::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+        int SFEM_ELEMENT_REFINE_LEVEL = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
         assert(SFEM_ELEMENT_REFINE_LEVEL <= 1);
         SFEM_BLOCK_SIZE = 3;
     }
 
-    int  SFEM_BASE_RESOLUTION = sfem::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
+    int  SFEM_BASE_RESOLUTION = smesh::Env::read<int>("SFEM_BASE_RESOLUTION", 6);
     auto m                    = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 2, 2, 2);
 

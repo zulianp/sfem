@@ -7,16 +7,16 @@
 #include <cstddef>
 
 extern "C" {
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "crs_graph.h"
 #include "cuda_crs.h"
-#include "sfem_base.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 }
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

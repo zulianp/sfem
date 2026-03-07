@@ -4,7 +4,7 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 
 // #include <cuda_runtime.h>
 
@@ -21,7 +21,7 @@ namespace sfem {
     std::shared_ptr<Sideset>              to_device(const std::shared_ptr<Sideset> &ss);
     std::vector<std::shared_ptr<Sideset>> to_device(const std::vector<std::shared_ptr<Sideset>> &ss);
 
-    SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const enum ElemType element_type);
+    SharedBuffer<idx_t *> create_device_elements(const std::shared_ptr<FunctionSpace> &space, const smesh::ElemType element_type);
 
     template <typename T>
     SharedBuffer<T> create_device_buffer(const std::ptrdiff_t n) {

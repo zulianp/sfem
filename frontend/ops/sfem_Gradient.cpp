@@ -2,14 +2,14 @@
 #include "sfem_Tracer.hpp"
 
 #include "crs_graph.h"
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "tet4_patch_gradient.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -59,10 +59,10 @@ namespace sfem {
 
         count_t       *d_n2e_ptr;
         element_idx_t *d_n2e_idx;
-        build_n2e(mesh->n_elements(),
+        smesh::create_n2e(mesh->n_elements(),
                   mesh->n_nodes(),
-                  mesh->n_nodes_per_element(),
-                  mesh->elements()->data(),
+                  mesh->n_nodes_per_element(0),
+                  mesh->elements(0)->data(),
                   &d_n2e_ptr,
                   &d_n2e_idx);
 
@@ -262,7 +262,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void Gradient::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void Gradient::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 }  // namespace sfem

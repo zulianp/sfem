@@ -2,8 +2,8 @@
 #ifdef __NVCC__
 
 extern "C" {
-#include "sfem_cuda_mesh.h"
-#include "sfem_base.h"
+#include "sfem_cuda_mesh.hpp"
+#include "sfem_base.hpp"
 }
 
 #include <cuda.h>

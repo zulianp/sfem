@@ -1,7 +1,7 @@
 #ifndef SFEM_CONTACT_SURFACE_HPP
 #define SFEM_CONTACT_SURFACE_HPP
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
@@ -17,7 +17,7 @@ namespace sfem {
         virtual SharedBuffer<geom_t *> points()             = 0;
         virtual SharedBuffer<idx_t *>  elements()           = 0;
         virtual SharedBuffer<idx_t>    node_mapping()       = 0;
-        virtual enum ElemType          element_type() const = 0;
+        virtual smesh::ElemType          element_type() const = 0;
 
 #ifdef SFEM_ENABLE_CUDA
         virtual SharedBuffer<geom_t *> points_device()       = 0;
@@ -53,7 +53,7 @@ namespace sfem {
         SharedBuffer<idx_t *>  elements_device() override;
         SharedBuffer<idx_t>    node_mapping_device() override;
 #endif
-        enum ElemType          element_type() const override;
+        smesh::ElemType          element_type() const override;
 
         void displace_points(const real_t *disp) override;
         void reset_points() override;
@@ -77,7 +77,7 @@ namespace sfem {
         SharedBuffer<idx_t *>  elements_device() override;
         SharedBuffer<idx_t>    node_mapping_device() override;
 #endif
-        enum ElemType          element_type() const override;
+        smesh::ElemType          element_type() const override;
 
         static std::unique_ptr<SSMeshContactSurface> create(const std::shared_ptr<FunctionSpace>        &space,
                                                             const std::vector<std::shared_ptr<Sideset>> &sidesets,

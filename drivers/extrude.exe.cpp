@@ -11,12 +11,12 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "extract_surface_graph.h"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
 
@@ -153,12 +153,12 @@ int main(int argc, char* argv[]) {
 
     const char* folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
-    if (mesh->element_type() != TRI3) {
-        fprintf(stderr, "This code only supports mesh with element type TRI3\n");
+    if (mesh->element_type(0) != smesh::TRI3) {
+        fprintf(stderr, "This code only supports mesh with element type smesh::TRI3\n");
         return EXIT_FAILURE;
     }
 
@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
 
 
     extruded.spatial_dim = mesh->spatial_dimension();
-    extruded.element_type = WEDGE6;
+    extruded.element_type = smesh::WEDGE6;
 
     extruded.nelements = n_elements;
     extruded.nnodes = n_nodes * 2;
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
 
     extrude(n_elements,
             n_nodes,
-            mesh->elements()->data(),
+            mesh->elements(0)->data(),
             mesh->points()->data(),
             inner_thickness,
             outer_thickness,

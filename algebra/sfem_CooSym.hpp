@@ -7,7 +7,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_config.h"
-#include "sfem_mask.h"
+#include "sfem_mask.hpp"
 #include "sfem_openmp_blas.hpp"
 
 #include "sfem_Tracer.hpp"

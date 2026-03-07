@@ -11,13 +11,13 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
+#include "sfem_vec.hpp"
 
 #include "extract_surface_graph.h"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
 
@@ -322,60 +322,35 @@ int main(int argc, char* argv[]) {
 
     const char* folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    if (mesh->element_type() != TRI3 || mesh->element_type() == TET4) {
-        fprintf(stderr, "This code only supports mesh with element type TRI3 or TET4\n");
+    if (mesh->element_type(0) != smesh::TRI3 || mesh->element_type(0) == smesh::TET4) {
+        fprintf(stderr, "This code only supports mesh with element type smesh::TRI3 or smesh::TET4\n");
         return EXIT_FAILURE;
     }
 
-    mesh_t intersection_mesh;
-    mesh_init(&intersection_mesh);
-
-    intersection_mesh.comm = comm;
-
-
-    intersection_mesh.spatial_dim = mesh->spatial_dimension();
-    intersection_mesh.element_type = WEDGE6;
-
-    intersection_mesh.nelements = mesh->n_elements();
-    intersection_mesh.nnodes = mesh->n_nodes() * 2;
-    intersection_mesh.n_owned_elements = intersection_mesh.nelements;
-
-    intersection_mesh.node_mapping = 0;
-    intersection_mesh.element_mapping = 0;
-    intersection_mesh.node_owner = 0;
-
-    int nnxe_intersection_mesh = elem_num_nodes(intersection_mesh.element_type);
-    intersection_mesh.elements = (idx_t**)malloc(nnxe_intersection_mesh * sizeof(idx_t*));
-    for (int d = 0; d < nnxe_intersection_mesh; d++) {
-        intersection_mesh.elements[d] = (idx_t*)malloc(intersection_mesh.nelements * sizeof(idx_t));
-    }
-
-    intersection_mesh.points = (geom_t**)malloc(intersection_mesh.spatial_dim * sizeof(geom_t*));
-    for (int d = 0; d < intersection_mesh.spatial_dim; d++) {
-        intersection_mesh.points[d] = (geom_t*)malloc(intersection_mesh.nnodes * sizeof(geom_t));
-    }
+    const ptrdiff_t intersection_nelements = mesh->n_elements();
+    const ptrdiff_t intersection_nnodes = mesh->n_nodes() * 2;
+    auto intersection_elements = sfem::create_host_buffer<idx_t>(elem_num_nodes(smesh::WEDGE6), intersection_nelements);
+    auto intersection_points = sfem::create_host_buffer<geom_t>(mesh->spatial_dimension(), intersection_nnodes);
 
     mesh_self_intersect(mesh->n_elements(),
                         mesh->n_nodes(),
-                        mesh->elements()->data(),
+                        mesh->elements(0)->data(),
                         mesh->points()->data(),
-                        intersection_mesh.elements,
-                        intersection_mesh.points);
+                        intersection_elements->data(),
+                        intersection_points->data());
 
-    mesh_write(output_folder, &intersection_mesh);
+    intersection_elements->to_files(smesh::Path(std::string(output_folder) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
+    intersection_points->to_files(smesh::Path(std::string(output_folder) + "/x%d." + std::string(smesh::TypeToString<geom_t>::value())));
 
     if (!rank) {
         printf("----------------------------------------\n");
         printf("Volume: #elements %ld #nodes %ld\n", (long)mesh->n_elements(), (long)mesh->n_nodes());
         printf("Surface: #elements %ld #nodes %ld\n",
-               (long)intersection_mesh.nelements,
-               (long)intersection_mesh.nnodes);
+               (long)intersection_nelements,
+               (long)intersection_nnodes);
     }
-
-    // Clean-up
-    mesh_destroy(&intersection_mesh);
 
     double tock = MPI_Wtime();
 

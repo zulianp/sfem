@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 #include "lumped_ptdp.h"
 
 static int test_restrict_level2_to_level1() {

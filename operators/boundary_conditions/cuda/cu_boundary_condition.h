@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #include "boundary_condition.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

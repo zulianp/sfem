@@ -9,8 +9,8 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "laplacian.h"
 #include "mass.h"
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_nodes = mesh->n_nodes();
     const ptrdiff_t n_elements = mesh->n_elements();
 
@@ -108,8 +108,8 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(
-        mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), &rowptr, &colidx);
+    smesh::create_crs_graph_for_elem_type(
+        mesh->element_type(0), n_elements, n_nodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
     nnz = rowptr[n_nodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));

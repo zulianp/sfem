@@ -1,7 +1,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "matrixio_array.h"
 

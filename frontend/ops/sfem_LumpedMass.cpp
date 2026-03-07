@@ -1,13 +1,13 @@
 #include "sfem_LumpedMass.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "mass.h"
 
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_CRSGraph.hpp"
 
@@ -17,7 +17,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("LumpedMass::create");
 
         auto ret          = std::make_unique<LumpedMass>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
         return ret;
     }
 
@@ -40,14 +40,14 @@ namespace sfem {
             assemble_lumped_mass(element_type,
                                  mesh->n_elements(),
                                  mesh->n_nodes(),
-                                 mesh->elements()->data(),
+                                 mesh->elements(0)->data(),
                                  mesh->points()->data(),
                                  values);
         } else {
             const ptrdiff_t n_nodes = mesh->n_nodes();
             real_t         *temp    = (real_t *)calloc(n_nodes, sizeof(real_t));
             assemble_lumped_mass(
-                    element_type, mesh->n_elements(), n_nodes, mesh->elements()->data(), mesh->points()->data(), temp);
+                    element_type, mesh->n_elements(), n_nodes, mesh->elements(0)->data(), mesh->points()->data(), temp);
 
             int bs = space->block_size();
 

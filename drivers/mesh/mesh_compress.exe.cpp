@@ -1,7 +1,7 @@
 #include "sfem_API.hpp"
 
-#include "sfem_macros.h"
-#include "sfem_mask.h"
+#include "sfem_macros.hpp"
+#include "sfem_mask.hpp"
 
 #include "sfem_Packed.hpp"
 
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh          = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto        mesh          = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
     std::string output_folder = argv[2];
 
     auto packed = sfem::Packed<pack_idx_t>::create(mesh);
