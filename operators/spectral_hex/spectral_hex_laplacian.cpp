@@ -1,7 +1,7 @@
 #include "spectral_hex_laplacian.h"
 
-#include "sfem_defs.h"
-#include "sfem_macros.h"
+#include "sfem_defs.hpp"
+#include "sfem_macros.hpp"
 
 #include "hex8_laplacian_inline_cpu.h"
 #include "hex8_quadrature.h"

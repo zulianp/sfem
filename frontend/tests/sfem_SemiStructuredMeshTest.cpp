@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
@@ -32,7 +32,7 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
 
     sfem::create_directory(output_dir.c_str());
 
-    SFEM_TEST_ASSERT(m->write((output_dir + "/input_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(l2_mesh->export_as_standard((output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(l1_mesh->export_as_standard((output_dir + "/l1_mesh").c_str()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(l1_mesh_from_l2->export_as_standard((output_dir + "/l1_mesh_from_l2").c_str()) == SFEM_SUCCESS);
@@ -55,7 +55,7 @@ int test_derefine_cube() {
 
 int test_derefine_mesh() {
     MPI_Comm comm = MPI_COMM_WORLD;
-    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), "impeller");
+    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path("impeller"));
     return test_derefine(m, "test_derefine_mesh");
 }
 
@@ -163,7 +163,7 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     // coarse_field->print(std::cout);
 
     sfem::create_directory(output_dir.c_str());
-    SFEM_TEST_ASSERT(m->write((output_dir + "/input_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(coarse_fs->semi_structured_mesh().export_as_standard((output_dir + "/coarse").c_str()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/fine").c_str()) == SFEM_SUCCESS);
     

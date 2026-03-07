@@ -1,7 +1,7 @@
 #ifndef SFEM_TET10_L2_PROJECTION_P1_P2_H
 #define SFEM_TET10_L2_PROJECTION_P1_P2_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include <stddef.h>
 
 #ifdef __cplusplus

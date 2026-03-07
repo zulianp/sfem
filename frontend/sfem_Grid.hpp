@@ -10,7 +10,7 @@
 
 #include <mpi.h>
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 namespace sfem {
     template <class T>

@@ -31,7 +31,7 @@ namespace sfem {
      * - Boundary stabilization
      *
      * The operator supports:
-     * - Various boundary element types (QUAD4, TRI3, etc.)
+     * - Various boundary element types (smesh::QUAD4, smesh::TRI3, etc.)
      * - Both scalar and vector function spaces
      * - CRS matrix format for assembly
      * - Matrix-vector products for application
@@ -41,7 +41,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>   space;                     ///< Function space for the operator
         std::shared_ptr<Buffer<idx_t *>> boundary_elements;         ///< Boundary element connectivity
-        enum ElemType                    element_type { INVALID };  ///< Element type
+        smesh::ElemType                    element_type { smesh::INVALID };  ///< Element type
         const char                      *name() const override { return "BoundaryMass"; }
         inline bool                      is_linear() const override { return true; }
         inline ptrdiff_t                        n_dofs_domain() const override { return space->n_dofs(); }

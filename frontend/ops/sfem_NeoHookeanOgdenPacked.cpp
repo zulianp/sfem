@@ -1,11 +1,11 @@
 #include "sfem_NeoHookeanOgdenPacked.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "sfem_Env.hpp"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
+#include "smesh_env.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
 
 #include "hex8_fff.h"
 #include "hex8_laplacian_inline_cpu.h"
@@ -29,7 +29,7 @@
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_ElasticityAssemblyData.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -433,7 +433,7 @@ struct Tet10MicroKernelGradient {
 };
 
 template <typename pack_idx_t>
-static int packed_neohookean_ogden_gradient(enum ElemType                        element_type,
+static int packed_neohookean_ogden_gradient(smesh::ElemType                        element_type,
                                             const ptrdiff_t                      n_packs,
                                             const ptrdiff_t                      n_elements_per_pack,
                                             const ptrdiff_t                      n_elements,
@@ -456,7 +456,7 @@ static int packed_neohookean_ogden_gradient(enum ElemType                       
                                             real_t *const SFEM_RESTRICT          outz,
                                             HyperelasticityScratch              &scratch) {
     switch (element_type) {
-        case HEX8:
+        case smesh::HEX8:
             return NeoHookeanOgdenPackedGradient<PackedIdxType, 8, Hex8MicroKernelGradient>::apply(n_packs,
                                                                                                    n_elements_per_pack,
                                                                                                    n_elements,
@@ -478,7 +478,7 @@ static int packed_neohookean_ogden_gradient(enum ElemType                       
                                                                                                    outy,
                                                                                                    outz,
                                                                                                    scratch);
-        case TET4:
+        case smesh::TET4:
             return NeoHookeanOgdenPackedGradient<PackedIdxType, 4, Tet4MicroKernelGradient>::apply(n_packs,
                                                                                                    n_elements_per_pack,
                                                                                                    n_elements,
@@ -500,7 +500,7 @@ static int packed_neohookean_ogden_gradient(enum ElemType                       
                                                                                                    outy,
                                                                                                    outz,
                                                                                                    scratch);
-        case TET10:
+        case smesh::TET10:
             return NeoHookeanOgdenPackedGradient<PackedIdxType, 10, Tet10MicroKernelGradient>::apply(n_packs,
                                                                                                      n_elements_per_pack,
                                                                                                      n_elements,
@@ -722,7 +722,7 @@ struct Tet10MicroKernelApply {
     }
 };
 template <typename pack_idx_t>
-static int packed_neohookean_ogden_apply(enum ElemType                              element_type,
+static int packed_neohookean_ogden_apply(smesh::ElemType                              element_type,
                                          const ptrdiff_t                            n_packs,
                                          const ptrdiff_t                            n_elements_per_pack,
                                          const ptrdiff_t                            n_elements,
@@ -743,7 +743,7 @@ static int packed_neohookean_ogden_apply(enum ElemType                          
                                          real_t *const SFEM_RESTRICT                outz,
                                          HyperelasticityScratch                    &scratch) {
     switch (element_type) {
-        case HEX8: {
+        case smesh::HEX8: {
             scalar_t Wimpn_compressed[10];
             hex8_Wimpn_compressed(Wimpn_compressed);
             return HyperelasticityPackedApply<PackedIdxType, 8, Hex8MicroKernelApply>::apply(n_packs,
@@ -767,7 +767,7 @@ static int packed_neohookean_ogden_apply(enum ElemType                          
                                                                                              outz,
                                                                                              scratch);
         }
-            // case TET4: {
+            // case smesh::TET4: {
             // return HyperelasticityPackedApply<PackedIdxType, 4, Tet4MicroKernelApply>::apply(n_packs,
             //                                                                                  n_elements_per_pack,
             //                                                                                  n_elements,
@@ -789,7 +789,7 @@ static int packed_neohookean_ogden_apply(enum ElemType                          
             //                                                                                  outz,
             //                                                                                  scratch);
             // }
-        case TET10: {
+        case smesh::TET10: {
             scalar_t Wimpn_compressed[8];
             tet10_Wimpn_compressed(Wimpn_compressed);
             return HyperelasticityPackedApply<PackedIdxType, 10, Tet10MicroKernelApply>::apply(n_packs,
@@ -1185,7 +1185,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void NeoHookeanOgdenPacked::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void NeoHookeanOgdenPacked::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

@@ -11,7 +11,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_glob.hpp"
 
 #ifdef NDEBUG

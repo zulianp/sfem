@@ -37,7 +37,7 @@ namespace sfem {
      * - Preconditioning for iterative solvers
      * 
      * The operator supports:
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Both scalar and vector function spaces
      * - Diagonal matrix format only
      * - Performance optimization through diagonal structure
@@ -45,7 +45,7 @@ namespace sfem {
     class LumpedMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
+        smesh::ElemType element_type { smesh::INVALID }; ///< Element type
 
         const char *name() const override { return "LumpedMass"; }
         inline bool is_linear() const override { return true; }

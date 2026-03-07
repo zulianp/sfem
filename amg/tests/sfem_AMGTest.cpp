@@ -1,11 +1,11 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -16,7 +16,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -68,7 +68,7 @@ int test_amg_poisson() {
     solver->apply(rhs->data(), x->data());
 
     SFEM_TEST_ASSERT(sfem::create_directory("test_amg_poisson") == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(m->write("test_amg_poisson/mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_poisson/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();
     out->set_output_dir("test_amg_poisson/out");
@@ -166,7 +166,7 @@ int test_amg_sqp() {
     solver->apply(rhs->data(), x->data());
 
     SFEM_TEST_ASSERT(sfem::create_directory("test_amg_sqp") == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(m->write("test_amg_sqp/mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(m->write(smesh::Path("test_amg_sqp/mesh")) == SFEM_SUCCESS);
 
     auto out = f->output();
     out->set_output_dir("test_amg_sqp/out");

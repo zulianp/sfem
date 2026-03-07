@@ -2,7 +2,7 @@
 
 #include "sfem_ShiftedPenalty.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
@@ -15,7 +15,7 @@
 #include "sshex8_laplacian.h"
 #include "sshex8_linear_elasticity.h"
 #include "sfem_API.hpp"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     double tick = MPI_Wtime();
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
 
         char path[2048];
         snprintf(path, sizeof(path), "%s/crs_matrix", output_path);
-        write_crs(path, *crs_graph, *values);
+        sfem::write_crs(path, *crs_graph, *values);
     }
 
     auto h_upper_bound = sfem::create_buffer<real_t>(ndofs, sfem::MEMORY_SPACE_HOST);

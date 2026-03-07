@@ -1,7 +1,7 @@
 #ifndef SFEM_DUAL_GRAPH_HPP
 #define SFEM_DUAL_GRAPH_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"

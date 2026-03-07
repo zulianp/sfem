@@ -11,7 +11,7 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 // #include "sfem_Function.hpp"
 #include "sfem_glob.hpp"
 
@@ -275,7 +275,7 @@ namespace sfem {
 
         virtual bool is_no_op() const { return false; }
 
-        virtual void override_element_types(const std::vector<enum ElemType> &element_types) {}
+        virtual void override_element_types(const std::vector<smesh::ElemType> &element_types) {}
 
         virtual ptrdiff_t n_dofs_domain() const = 0;
         virtual ptrdiff_t n_dofs_image() const  = 0;

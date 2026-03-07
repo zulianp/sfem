@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 

@@ -1,4 +1,4 @@
-// #include "sfem_multiblock_adj_table.h"
+// #include "sfem_multiblock_adj_table.hpp"
 // #include "sfem_API.hpp"
 
 // #include "multiblock_crs_graph.h"
@@ -12,14 +12,14 @@
 //  * Number of nodes per sides may vary within one element.
 //  */
 
-// std::vector<enum ElemType> simple_element_types(const ptrdiff_t n_blocks, const enum ElemType element_types[]) {
-//     std::vector<enum ElemType> element_type_for_algo(n_blocks);
+// std::vector<smesh::ElemType> simple_element_types(const ptrdiff_t n_blocks, const smesh::ElemType element_types[]) {
+//     std::vector<smesh::ElemType> element_type_for_algo(n_blocks);
 //     for (ptrdiff_t b = 0; b < n_blocks; b++) {
 //         element_type_for_algo[b] = element_types[b];
-//         if (element_type_for_algo[b] == TET10) {
-//             element_type_for_algo[b] = TET4;
-//         } else if (element_type_for_algo[b] == TRI6) {
-//             element_type_for_algo[b] = TRI3;
+//         if (element_type_for_algo[b] == smesh::TET10) {
+//             element_type_for_algo[b] = smesh::TET4;
+//         } else if (element_type_for_algo[b] == smesh::TRI6) {
+//             element_type_for_algo[b] = smesh::TRI3;
 //         }
 //     }
 //     return element_type_for_algo;
@@ -29,12 +29,12 @@
 // extern "C" int multiblock_create_dual_graph(const ptrdiff_t       n_blocks,
 //                                             const ptrdiff_t       n_elements[],
 //                                             const ptrdiff_t       n_nodes,
-//                                             const enum ElemType   element_types[],
+//                                             const smesh::ElemType   element_types[],
 //                                             idx_t **const         elems[],
 //                                             count_t **const       adj_ptr_out,
 //                                             element_idx_t **const adj_idx_out,
 //                                             block_idx_t **const   adj_block_number_out) {
-//     std::vector<enum ElemType> element_type_for_algo = simple_element_types(n_blocks, element_types);
+//     std::vector<smesh::ElemType> element_type_for_algo = simple_element_types(n_blocks, element_types);
 
 //     count_t       *n2eptr;
 //     element_idx_t *elindex;
@@ -60,7 +60,7 @@
 //     // Not good enough: We should thing about pyramids and prisms
 //     std::vector<int> n_nodes_per_side(n_blocks);
 //     for (ptrdiff_t b = 0; b < n_blocks; b++) {
-//         enum ElemType st    = side_type(element_type_for_algo[b]);
+//         smesh::ElemType st    = side_type(element_type_for_algo[b]);
 //         n_nodes_per_side[b] = elem_num_nodes(st);
 //     }
 
@@ -151,14 +151,14 @@
 // extern "C" int multiblock_create_element_adj_table_from_dual_graph(const ptrdiff_t       n_blocks,
 //                                                                    const ptrdiff_t       n_elements[],
 //                                                                    const ptrdiff_t       n_nodes,
-//                                                                    const enum ElemType   element_types[],
+//                                                                    const smesh::ElemType   element_types[],
 //                                                                    idx_t **const         elems[],
 //                                                                    count_t **const       adj_ptr,
 //                                                                    element_idx_t **const adj_idx,
 //                                                                    block_idx_t **const adj_block_number,
 //                                                                    element_idx_t **const table_element,
 //                                                                    block_idx_t **const   table_block) {
-//     std::vector<enum ElemType> element_type_for_algo = simple_element_types(n_blocks, element_types);
+//     std::vector<smesh::ElemType> element_type_for_algo = simple_element_types(n_blocks, element_types);
 
 //     std::vector<int>           n_nodes_per_side(n_blocks);
 //     std::vector<int>           n_nodes_per_elem(n_blocks);
@@ -233,11 +233,11 @@
 // extern "C" int multiblock_create_element_adj_table(const ptrdiff_t              n_blocks,
 //                                                    const ptrdiff_t              n_elements[],
 //                                                    const ptrdiff_t              n_nodes,
-//                                                    const enum ElemType          element_types[],
+//                                                    const smesh::ElemType          element_types[],
 //                                                    idx_t **const                elems[],
 //                                                    element_idx_t *SFEM_RESTRICT table_element_out[],
 //                                                    block_idx_t *SFEM_RESTRICT   table_block_out[]) {
-//     std::vector<enum ElemType>   element_type_for_algo = simple_element_types(n_blocks, element_types);
+//     std::vector<smesh::ElemType>   element_type_for_algo = simple_element_types(n_blocks, element_types);
 //     std::vector<count_t *>       adj_ptr(n_blocks);
 //     std::vector<element_idx_t *> adj_idx(n_blocks);
 //     std::vector<block_idx_t *>   adj_block_number(n_blocks);

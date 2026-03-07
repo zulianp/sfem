@@ -1,7 +1,7 @@
 #include <math.h>
 #include <stddef.h>
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #define SFEM_DEVICE_MK static SFEM_INLINE __device__
 

@@ -64,8 +64,8 @@ int main(int argc, char* argv[]) {
     // points->print(std::cout);
 
     sfem::create_directory(output_folder.c_str());
-    elements->to_files((output_folder + "/i%d.raw").c_str());
-    points->to_files((output_folder + "/x%d.raw").c_str());
+    elements->to_files(smesh::Path(output_folder + "/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
+    points->to_files(smesh::Path(output_folder + "/x%d." + std::string(smesh::TypeToString<geom_t>::value())));
 
     double tock = MPI_Wtime();
 

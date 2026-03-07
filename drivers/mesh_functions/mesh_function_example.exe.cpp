@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        mesh   = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto        mesh   = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(argv[1]));
     const char *output = argv[2];
 
     const ptrdiff_t n_elements = mesh->n_elements();
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     auto points = mesh->points()->data();
     auto f      = sfem::create_host_buffer<real_t>(n_nodes);
     eval_function(n_nodes, points, f->data());
-    f->to_file(output);
+    f->to_file(smesh::Path(output));
 
     return MPI_Finalize();
 }

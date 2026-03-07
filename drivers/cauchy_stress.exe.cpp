@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "read_mesh.h"
 
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *stress[6];
     for (int d = 0; d < 6; ++d) {
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
         real_t *u;
         ptrdiff_t u_n_local, u_n_global;
         array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        neohookean_cauchy_stress_aos(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
+        neohookean_cauchy_stress_aos(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
         free(u);
     } else {
         real_t *u[3];
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         for (int d = 0; d < 3; d++) {
             array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
         }
-        neohookean_cauchy_stress_soa(mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
+        neohookean_cauchy_stress_soa(mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
         for (int d = 0; d < 3; d++) {
             free(u[d]);
         }

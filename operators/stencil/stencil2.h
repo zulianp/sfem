@@ -1,8 +1,8 @@
 #ifndef STENCIL_2_H
 #define STENCIL_2_H
 
-#include "sfem_base.h"
-#include "sfem_macros.h"
+#include "sfem_base.hpp"
+#include "sfem_macros.hpp"
 
 static void slice_stencil_6(const ptrdiff_t                   n,
                             const real_t                      s0,

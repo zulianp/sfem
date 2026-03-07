@@ -9,8 +9,8 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "laplacian.h"
 #include "mass.h"
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -108,8 +108,8 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(
-            mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), &rowptr, &colidx);
+    smesh::create_crs_graph_for_elem_type(
+            mesh->element_type(0), n_elements, n_nodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
     nnz = rowptr[n_nodes];
     values = (real_t *)malloc(nnz * sizeof(real_t));
@@ -123,21 +123,21 @@ int main(int argc, char *argv[]) {
     // Operator assembly
     ///////////////////////////////////////////////////////////////////////////////
     if (SFEM_LAPLACIAN) {
-        switch (mesh->element_type()) {
-            case TRI3: {
+        switch (mesh->element_type(0)) {
+            case smesh::TRI3: {
                 cvfem_tri3_diffusion_assemble_hessian(n_elements,
                                                       n_nodes,
-                                                      mesh->elements()->data(),
+                                                      mesh->elements(0)->data(),
                                                       mesh->points()->data(),
                                                       rowptr,
                                                       colidx,
                                                       values);
                 break;
             }
-            case TET4: {
+            case smesh::TET4: {
                 tet4_laplacian_crs(n_elements,
                                    n_nodes,
-                                   mesh->elements()->data(),
+                                   mesh->elements(0)->data(),
                                    mesh->points()->data(),
                                    rowptr,
                                    colidx,
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
 
         // idx_t *faces_neumann = 0;
 
-        // enum ElemType st = shell_type(side_type(mesh.element_type));
+        // smesh::ElemType st = shell_type(side_type(mesh.element_type));
         // int nnodesxface = elem_num_nodes(st);
         // ptrdiff_t nfacesxnxe = read_file(comm, path, (void **)&faces_neumann);
         // idx_t nfaces = (nfacesxnxe / nnodesxface) / sizeof(idx_t);

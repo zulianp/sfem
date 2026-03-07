@@ -1,7 +1,7 @@
 #ifndef POINT_TRIANGLE_DISTANCE_H
 #define POINT_TRIANGLE_DISTANCE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 static const short ENTITY_VERTEX_0 = 0;
 static const short ENTITY_VERTEX_1 = 1;

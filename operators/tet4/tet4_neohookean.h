@@ -2,7 +2,7 @@
 #define SFEM_NEOHOOKEAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // FIXME all functionalities to be revisited and moved to tet4_neohookean_ogden.{h,c}
 

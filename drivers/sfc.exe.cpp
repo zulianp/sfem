@@ -11,14 +11,14 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "argsort.h"
 
 #include "sfem_API.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_SFC.hpp"
 
 
@@ -36,11 +36,11 @@ int sfc_reorder(const std::shared_ptr<sfem::Communicator> &comm, int argc, char 
 
     double tick = MPI_Wtime();
 
-    auto mesh = sfem::Mesh::create_from_file(comm, folder);
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     auto sfc = sfem::SFC::create_from_env();
     sfc->reorder(*mesh);
 
-    mesh->write(output_folder);
+    mesh->write(smesh::Path(output_folder));
 
     double tock = MPI_Wtime();
 

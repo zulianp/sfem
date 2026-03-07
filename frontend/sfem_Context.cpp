@@ -1,7 +1,7 @@
 #include "sfem_Context.hpp"
 #include "sfem_Communicator.hpp"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"

@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "sfem_Function.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_Multigrid.hpp"
@@ -287,7 +287,7 @@ NB_MODULE(pysfem, m) {
              std::shared_ptr<sfem::Buffer<idx_t>>  idx,
              std::shared_ptr<sfem::Buffer<geom_t>> p) -> std::shared_ptr<Mesh> {
               size_t        n            = idx->size();
-              enum ElemType element_type = type_from_string(elem_type_name);
+              smesh::ElemType element_type = type_from_string(elem_type_name);
 
               int       nnxe              = p->size() / n;  // Assuming p is a flattened array
               ptrdiff_t nelements         = n;
@@ -313,11 +313,11 @@ NB_MODULE(pysfem, m) {
               }
 
               // Transfer ownership to mesh
-              return std::make_shared<Mesh>(sfem::Communicator::world(), spatial_dimension, element_type, nelements, elements, nnodes, points);
+              return std::make_shared<Mesh>(sfem::Communicator::world(), element_type, elements, points);
           });
 
     m.def("points", [](std::shared_ptr<Mesh> &mesh, int coord) -> nb::ndarray<nb::numpy, const geom_t> {
-        return nb::ndarray<nb::numpy, const geom_t>(mesh->points(coord), {(size_t)mesh->n_nodes()}, nb::handle());
+        return nb::ndarray<nb::numpy, const geom_t>(mesh->points()->data()[coord], {(size_t)mesh->n_nodes()}, nb::handle());
     });
 
     nb::class_<FunctionSpace>(m, "FunctionSpace")

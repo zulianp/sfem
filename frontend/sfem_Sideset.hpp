@@ -8,9 +8,9 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "smesh_mesh.hpp"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 namespace sfem {
 
@@ -49,11 +49,11 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
+    std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sideset(
             const std::shared_ptr<FunctionSpace> &space,
             const std::shared_ptr<Sideset>       &sideset);
 
-    std::pair<enum ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
+    std::pair<smesh::ElemType, std::shared_ptr<Buffer<idx_t *>>> create_surface_from_sidesets(
             const std::shared_ptr<FunctionSpace>        &space,
             const std::vector<std::shared_ptr<Sideset>> &sideset);
 

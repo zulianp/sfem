@@ -1,6 +1,6 @@
 #include "sfem_ssgmg.hpp"
 
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 
 #include "sfem_API.hpp"
 

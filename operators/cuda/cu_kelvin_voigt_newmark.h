@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #include "boundary_condition.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "cu_hex8_kelvin_voigt_newmark.h"
 
@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 
-int cu_kelvin_voigt_newmark_apply(const enum ElemType             element_type,
+int cu_kelvin_voigt_newmark_apply(const smesh::ElemType             element_type,
     const ptrdiff_t                 nelements,
     idx_t **const SFEM_RESTRICT     elements,
     const ptrdiff_t                 jacobian_stride,

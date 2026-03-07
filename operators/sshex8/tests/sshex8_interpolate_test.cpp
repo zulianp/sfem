@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 static int test_incidence_count() {
     auto elements = sfem::create_host_buffer<idx_t>(27, 2);

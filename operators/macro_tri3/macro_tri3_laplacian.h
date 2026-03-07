@@ -2,7 +2,7 @@
 #define MACRO_TRI3_LAPLACIAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

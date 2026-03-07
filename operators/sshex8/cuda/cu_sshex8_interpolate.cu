@@ -1,6 +1,6 @@
 #include "cu_sshex8_interpolate.h"
 
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include "cu_sshex8_inline.hpp"
 

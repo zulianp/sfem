@@ -29,7 +29,7 @@ namespace sfem {
      * - f is the body force
      *
      * The operator supports:
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Multiple matrix formats (CRS, BSR, diagonal)
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
@@ -79,7 +79,7 @@ namespace sfem {
          * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
          *
          * Sets up the MultiDomainOp for multi-block operations.
-         * For HEX8 elements, this precomputes Jacobian determinants and adjugates
+         * For smesh::HEX8 elements, this precomputes Jacobian determinants and adjugates
          * to optimize matrix-vector products.
          */
         int initialize(const std::vector<std::string> &block_names = {}) override;
@@ -129,7 +129,7 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
-        void override_element_types(const std::vector<enum ElemType> &element_types) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
     private:
         class Impl;

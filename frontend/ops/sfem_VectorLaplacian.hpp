@@ -32,7 +32,7 @@ namespace sfem {
      * 
      * The operator supports:
      * - Vector function spaces (block_size > 1)
-     * - Various element types (HEX8, TET4, etc.)
+     * - Various element types (smesh::HEX8, smesh::TET4, etc.)
      * - Optional FFF (Fast Finite Element) optimization
      * - Level-of-refinement (LOR) and derefinement
      * - Performance tracking
@@ -40,7 +40,7 @@ namespace sfem {
     class VectorLaplacian final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
-        enum ElemType element_type { INVALID }; ///< Element type
+        smesh::ElemType element_type { smesh::INVALID }; ///< Element type
 
         std::shared_ptr<Buffer<jacobian_t>> fff; ///< Fast Finite Element data (optional)
 

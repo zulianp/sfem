@@ -6,9 +6,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "boundary_condition.h"
 #include "boundary_condition_io.h"
@@ -33,12 +33,12 @@
 #include "adj_table.h"
 #include "hex8_fff.h"
 #include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
 
 // Multigrid
-#include "sfem_prolongation_restriction.h"
+#include "sfem_prolongation_restriction.hpp"
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"

@@ -7,14 +7,14 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "sortreduce.h"
 #include "sfem_glob.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 namespace sfem {
 
@@ -34,15 +34,15 @@ namespace sfem {
 
         const ptrdiff_t n_elements = p1_mesh->n_elements();
         const ptrdiff_t n_nodes    = p1_mesh->n_nodes();
-        const int       p1_nxe     = elem_num_nodes(p1_mesh->element_type());
+        const int       p1_nxe     = elem_num_nodes(p1_mesh->element_type(0));
 
         count_t *rowptr = nullptr;
         idx_t   *colidx = nullptr;
 
-        build_crs_graph_for_elem_type(p1_mesh->element_type(),
+        smesh::create_crs_graph_for_elem_type(p1_mesh->element_type(0),
                                       n_elements,
                                       n_nodes,
-                                      p1_mesh->elements()->data(),
+                                      p1_mesh->elements(0)->data(),
                                       &rowptr,
                                       &colidx);
 
@@ -74,9 +74,10 @@ namespace sfem {
             }
         }
 
-        const int          spatial_dim      = p1_mesh->spatial_dimension();
-        const enum ElemType p2_element_type = elem_higher_order(p1_mesh->element_type());
-        const int          p2_nxe           = elem_num_nodes(p2_element_type);
+        const int           spatial_dim      = p1_mesh->spatial_dimension();
+        const smesh::ElemType p1_element_type  = p1_mesh->element_type(0);
+        const smesh::ElemType p2_element_type  = elem_higher_order(p1_element_type);
+        const int           p2_nxe           = elem_num_nodes(p2_element_type);
 
         auto p2_elements_buffer = sfem::create_host_buffer<idx_t>(p2_nxe, n_elements);
         auto p2_points_buffer   = sfem::create_host_buffer<geom_t>(spatial_dim, n_nodes + p2_nodes);
@@ -88,7 +89,7 @@ namespace sfem {
         auto p2_elements = p2_elements_buffer->data();
         auto p2_points   = p2_points_buffer->data();
 
-        auto p1_elements = p1_mesh->elements()->data();
+        auto p1_elements = p1_mesh->elements(0)->data();
         auto p1_points   = p1_mesh->points()->data();
 
         for (int d = 0; d < p1_nxe; d++) {
@@ -103,7 +104,7 @@ namespace sfem {
             memcpy(p2_points[d], p1_points[d], n_nodes * sizeof(geom_t));
         }
 
-        if (p1_mesh->element_type() == TET4) {
+        if (p1_element_type == smesh::TET4) {
             for (ptrdiff_t e = 0; e < n_elements; e++) {
                 idx_t row[6];
                 row[0] = MIN(p2_elements[0][e], p2_elements[1][e]);
@@ -130,7 +131,7 @@ namespace sfem {
                     p2_elements[l + p1_nxe][e] = p2idx[row_begin + k];
                 }
             }
-        } else if (p1_mesh->element_type() == TRI3) {
+        } else if (p1_element_type == smesh::TRI3) {
             for (ptrdiff_t e = 0; e < n_elements; e++) {
                 idx_t row[3];
                 row[0] = MIN(p2_elements[0][e], p2_elements[1][e]);
@@ -152,7 +153,7 @@ namespace sfem {
                 }
             }
         } else {
-            fprintf(stderr, "convert_p1_mesh_to_p2: unsupported element_type %d\n", p1_mesh->element_type());
+            fprintf(stderr, "convert_p1_mesh_to_p2: unsupported element_type %d\n", p1_mesh->element_type(0));
             return handle_failure(rowptr, colidx, p2idx);
         }
 
@@ -223,13 +224,8 @@ namespace sfem {
             }
         }
 
-        auto p2_mesh = std::make_shared<Mesh>(p1_mesh->comm(),
-                                              spatial_dim,
-                                              p2_element_type,
-                                              n_elements,
-                                              p2_elements_buffer,
-                                              n_nodes + p2_nodes,
-                                              p2_points_buffer);
+        auto p2_mesh = std::make_shared<Mesh>(
+                p1_mesh->comm(), static_cast<smesh::ElemType>(p2_element_type), p2_elements_buffer, p2_points_buffer);
 
         free(p2idx);
         free(rowptr);

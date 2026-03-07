@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #include "boundary_condition.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "cu_tet4_linear_elasticity.h"
 
@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-int cu_linear_elasticity_apply(const enum ElemType             element_type,
+int cu_linear_elasticity_apply(const smesh::ElemType             element_type,
                                const ptrdiff_t                 nelements,
                                idx_t **const SFEM_RESTRICT     elements,
                                const ptrdiff_t                 jacobian_stride,
@@ -25,7 +25,7 @@ int cu_linear_elasticity_apply(const enum ElemType             element_type,
                                real_t *const                   d_y,
                                void                           *stream);
 
-int cu_linear_elasticity_diag(const enum ElemType             element_type,
+int cu_linear_elasticity_diag(const smesh::ElemType             element_type,
                               const ptrdiff_t                 nelements,
                               idx_t **const SFEM_RESTRICT     elements,
                               const ptrdiff_t                 jacobian_stride,
@@ -38,7 +38,7 @@ int cu_linear_elasticity_diag(const enum ElemType             element_type,
                               void                           *stream);
 
 // Block sparse row (BSR) https://docs.nvidia.com/cuda/cusparse/index.html#cusparse-storage-formats
-int cu_linear_elasticity_bsr(const enum ElemType                element_type,
+int cu_linear_elasticity_bsr(const smesh::ElemType                element_type,
                              const ptrdiff_t                    nelements,
                              idx_t **const SFEM_RESTRICT        elements,
                              const ptrdiff_t                    jacobian_stride,
@@ -52,7 +52,7 @@ int cu_linear_elasticity_bsr(const enum ElemType                element_type,
                              void *const SFEM_RESTRICT          values,
                              void                              *stream);
 
-int cu_linear_elasticity_block_diag_sym_aos(const enum ElemType             element_type,
+int cu_linear_elasticity_block_diag_sym_aos(const smesh::ElemType             element_type,
                                             const ptrdiff_t                 nelements,
                                             idx_t **const SFEM_RESTRICT     elements,
                                             const ptrdiff_t                 jacobian_stride,

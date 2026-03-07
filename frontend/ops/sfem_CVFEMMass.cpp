@@ -1,7 +1,7 @@
 #include "sfem_CVFEMMass.hpp"
 #include <mpi.h>
 #include "cvfem_operators.h"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
@@ -11,7 +11,7 @@ namespace sfem {
         assert(1 == space->block_size());
 
         auto ret          = std::make_unique<CVFEMMass>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
         return ret;
     }
 
@@ -22,7 +22,7 @@ namespace sfem {
     int CVFEMMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         auto mesh = space->mesh_ptr();
         cvfem_cv_volumes(
-                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), values);
+                element_type, mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), values);
 
         return SFEM_SUCCESS;
     }

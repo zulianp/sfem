@@ -9,7 +9,8 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "smesh_graph.impl.hpp"
+#include "sfem_base.hpp"
 
 // #include "tet4_neohookean.h"
 #include "linear_elasticity.h"
@@ -68,9 +69,9 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    auto element_type = mesh->element_type();
+    auto element_type = mesh->element_type(0);
     if(SFEM_USE_MACRO) {
         element_type = macro_type_variant(element_type);
     }
@@ -99,7 +100,8 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph_for_elem_type(element_type, nelements, nnodes, mesh->elements()->data(), &rowptr, &colidx);
+    smesh::create_crs_graph_for_elem_type(
+            element_type, nelements, nnodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
     values = (real_t *)malloc((size_t)nnz * 9 * sizeof(real_t));
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
                                            // Mesh
                                            nelements,
                                            nnodes,
-                                           mesh->elements()->data(),
+                                           mesh->elements(0)->data(),
                                            mesh->points()->data(),
                                            // Material
                                            mu,
@@ -141,7 +143,7 @@ int main(int argc, char *argv[]) {
     real_t *new_values =
             (real_t *)malloc((size_t)nnz * mesh->spatial_dimension() * mesh->spatial_dimension() * sizeof(real_t));
 
-    block_crs_to_crs(nnodes,
+    smesh::block_crs_to_crs(nnodes,
                      mesh->spatial_dimension(),
                      // Block matrix
                      rowptr,

@@ -9,7 +9,8 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "smesh_graph.impl.hpp"
+#include "sfem_base.hpp"
 
 #include "isotropic_phasefield_for_fracture.h"
 
@@ -90,7 +91,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     char path[1024 * 10];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     const ptrdiff_t nnodes = mesh->n_nodes();
     const ptrdiff_t nelements = mesh->n_elements();
@@ -127,7 +128,7 @@ int main(int argc, char *argv[]) {
     idx_t *colidx = 0;
     real_t *values = 0;
 
-    build_crs_graph(nelements, nnodes, mesh->elements()->data(), &rowptr, &colidx);
+    smesh::create_crs_graph(nelements, nnodes, mesh->elements(0)->data(), &rowptr, &colidx);
 
     nnz = rowptr[nnodes];
     values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
@@ -143,7 +144,7 @@ int main(int argc, char *argv[]) {
 
     isotropic_phasefield_for_fracture_assemble_hessian(nelements,
                                                        nnodes,
-                                                       mesh->elements()->data(),
+                                                       mesh->elements(0)->data(),
                                                        mesh->points()->data(),
                                                        mu,
                                                        lambda,
@@ -167,7 +168,7 @@ int main(int argc, char *argv[]) {
     idx_t *new_colidx = (idx_t *)malloc(nnz * mat_block_size * sizeof(idx_t));
     real_t *new_values = (real_t *)malloc(nnz * mat_block_size * sizeof(real_t));
 
-    block_crs_to_crs(nnodes,
+    smesh::block_crs_to_crs(nnodes,
                      block_size,
                      // Block matrix
                      rowptr,
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]) {
     memset(rhs, 0, nnodes * block_size * sizeof(real_t));
 
     isotropic_phasefield_for_fracture_assemble_gradient(
-        nelements, nnodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, rhs);
+        nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, rhs);
 
     // {  // Neumann
     //     sprintf(path, "%s/on.raw", folder);
@@ -231,7 +232,7 @@ int main(int argc, char *argv[]) {
 
     real_t energy = 0;
     isotropic_phasefield_for_fracture_assemble_value(
-        nelements, nnodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, &energy);
+        nelements, nnodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, Gc, ls, u, &energy);
 
     ///////////////////////////////////////////////////////////////////////////////
     // Write CRS matrix and rhs vector

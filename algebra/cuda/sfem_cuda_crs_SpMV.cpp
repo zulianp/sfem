@@ -6,7 +6,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_config.h"
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 #include "sfem_cuda_blas.hpp"
 
 #ifdef SFEM_ENABLE_CUSPARSE

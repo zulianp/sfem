@@ -1,7 +1,7 @@
 #ifndef HEX8_SKELETON_STENCIL_H
 #define HEX8_SKELETON_STENCIL_H 
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 //===============
 // stencil000)

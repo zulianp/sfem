@@ -1,7 +1,7 @@
 #ifndef SFEM_BLOCK_MATERIAL_HPP
 #define SFEM_BLOCK_MATERIAL_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <memory>
 #include <tuple>

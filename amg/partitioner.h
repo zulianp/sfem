@@ -1,7 +1,7 @@
 #ifndef PARTITIONER_H
 #define PARTITIONER_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #ifdef __cplusplus
 extern "C" {
 #endif

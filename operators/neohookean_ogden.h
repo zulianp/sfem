@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,7 +14,7 @@ extern "C" {
 // Structure of arrays
 //////////////////////////
 
-int neohookean_ogden_value_soa(const enum ElemType          element_type,
+int neohookean_ogden_value_soa(const smesh::ElemType          element_type,
                                const ptrdiff_t              nelements,
                                const ptrdiff_t              nnodes,
                                idx_t **const SFEM_RESTRICT  elements,
@@ -24,7 +24,7 @@ int neohookean_ogden_value_soa(const enum ElemType          element_type,
                                real_t **const SFEM_RESTRICT u,
                                real_t *const SFEM_RESTRICT  value);
 
-int neohookean_ogden_gradient_soa(const enum ElemType          element_type,
+int neohookean_ogden_gradient_soa(const smesh::ElemType          element_type,
                                   const ptrdiff_t              nelements,
                                   const ptrdiff_t              nnodes,
                                   idx_t **const SFEM_RESTRICT  elements,
@@ -34,7 +34,7 @@ int neohookean_ogden_gradient_soa(const enum ElemType          element_type,
                                   real_t **const SFEM_RESTRICT u,
                                   real_t **const SFEM_RESTRICT values);
 
-int neohookean_ogden_apply_soa(const enum ElemType          element_type,
+int neohookean_ogden_apply_soa(const smesh::ElemType          element_type,
                                const ptrdiff_t              nelements,
                                const ptrdiff_t              nnodes,
                                idx_t **const SFEM_RESTRICT  elements,
@@ -45,7 +45,7 @@ int neohookean_ogden_apply_soa(const enum ElemType          element_type,
                                real_t **const SFEM_RESTRICT h,
                                real_t **const SFEM_RESTRICT values);
 
-int neohookean_ogden_hessian_soa(const enum ElemType                element_type,
+int neohookean_ogden_hessian_soa(const smesh::ElemType                element_type,
                                  const ptrdiff_t                    nelements,
                                  const ptrdiff_t                    nnodes,
                                  idx_t **const SFEM_RESTRICT        elements,
@@ -60,7 +60,7 @@ int neohookean_ogden_hessian_soa(const enum ElemType                element_type
 // Array of structures
 //////////////////////////
 
-int neohookean_ogden_value_aos(const enum ElemType               element_type,
+int neohookean_ogden_value_aos(const smesh::ElemType               element_type,
                                const ptrdiff_t                   nelements,
                                const ptrdiff_t                   nnodes,
                                idx_t **const SFEM_RESTRICT       elements,
@@ -70,7 +70,7 @@ int neohookean_ogden_value_aos(const enum ElemType               element_type,
                                const real_t *const SFEM_RESTRICT u,
                                real_t *const SFEM_RESTRICT       value);
 
-int neohookean_ogden_apply_aos(const enum ElemType               element_type,
+int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
                                const ptrdiff_t                   nelements,
                                const ptrdiff_t                   nnodes,
                                idx_t **const SFEM_RESTRICT       elements,
@@ -81,7 +81,7 @@ int neohookean_ogden_apply_aos(const enum ElemType               element_type,
                                const real_t *const SFEM_RESTRICT h,
                                real_t *const SFEM_RESTRICT       values);
 
-int neohookean_ogden_gradient_aos(const enum ElemType               element_type,
+int neohookean_ogden_gradient_aos(const smesh::ElemType               element_type,
                                   const ptrdiff_t                   nelements,
                                   const ptrdiff_t                   nnodes,
                                   idx_t **const SFEM_RESTRICT       elements,
@@ -91,7 +91,7 @@ int neohookean_ogden_gradient_aos(const enum ElemType               element_type
                                   const real_t *const SFEM_RESTRICT u,
                                   real_t *const SFEM_RESTRICT       values);
 
-int neohookean_ogden_hessian_aos(const enum ElemType                element_type,
+int neohookean_ogden_hessian_aos(const smesh::ElemType                element_type,
                                  const ptrdiff_t                    nelements,
                                  const ptrdiff_t                    nnodes,
                                  idx_t **const SFEM_RESTRICT        elements,
@@ -103,7 +103,7 @@ int neohookean_ogden_hessian_aos(const enum ElemType                element_type
                                  const idx_t *const SFEM_RESTRICT   colidx,
                                  real_t *const SFEM_RESTRICT        values);
 
-int neohookean_ogden_diag_aos(const enum ElemType               element_type,
+int neohookean_ogden_diag_aos(const smesh::ElemType               element_type,
                               const ptrdiff_t                   nelements,
                               const ptrdiff_t                   stride,
                               const ptrdiff_t                   nnodes,
@@ -114,7 +114,7 @@ int neohookean_ogden_diag_aos(const enum ElemType               element_type,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT       values);
 
-int neohookean_ogden_hessian_partial_assembly(const enum ElemType                  element_type,
+int neohookean_ogden_hessian_partial_assembly(const smesh::ElemType                  element_type,
                                               const ptrdiff_t                      nelements,
                                               const ptrdiff_t                      stride,
                                               idx_t **const SFEM_RESTRICT          elements,
@@ -127,7 +127,7 @@ int neohookean_ogden_hessian_partial_assembly(const enum ElemType               
                                               const real_t *const SFEM_RESTRICT    uz,
                                               metric_tensor_t *const SFEM_RESTRICT partial_assembly);
 
-int neohookean_ogden_partial_assembly_apply(const enum ElemType                        element_type,
+int neohookean_ogden_partial_assembly_apply(const smesh::ElemType                        element_type,
                                             const ptrdiff_t                            nelements,
                                             const ptrdiff_t                            stride,
                                             idx_t **const SFEM_RESTRICT                elements,
@@ -141,7 +141,7 @@ int neohookean_ogden_partial_assembly_apply(const enum ElemType                 
                                             real_t *const                              outy,
                                             real_t *const                              outz);
 
-int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType                     element_type,
+int neohookean_ogden_compressed_partial_assembly_apply(const smesh::ElemType                     element_type,
                                                        const ptrdiff_t                         nelements,
                                                        const ptrdiff_t                         stride,
                                                        idx_t **const SFEM_RESTRICT             elements,
@@ -156,7 +156,7 @@ int neohookean_ogden_compressed_partial_assembly_apply(const enum ElemType      
                                                        real_t *const                           outy,
                                                        real_t *const                           outz);
 
-int neohookean_ogden_partial_assembly_diag(const enum ElemType               element_type,
+int neohookean_ogden_partial_assembly_diag(const smesh::ElemType               element_type,
                                            const ptrdiff_t                   nelements,
                                            const ptrdiff_t                   stride,
                                            idx_t **const SFEM_RESTRICT       elements,
@@ -172,7 +172,7 @@ int neohookean_ogden_partial_assembly_diag(const enum ElemType               ele
                                            real_t *const SFEM_RESTRICT       outy,
                                            real_t *const SFEM_RESTRICT       outz);
 
-int neohookean_ogden_objective_aos(const enum ElemType               element_type,
+int neohookean_ogden_objective_aos(const smesh::ElemType               element_type,
                                    const ptrdiff_t                   nelements,
                                    const ptrdiff_t                   stride,
                                    const ptrdiff_t                   nnodes,
@@ -184,7 +184,7 @@ int neohookean_ogden_objective_aos(const enum ElemType               element_typ
                                    const int                         is_element_wise,
                                    real_t *const SFEM_RESTRICT       out);
 
-int neohookean_ogden_objective_steps_aos(const enum ElemType               element_type,
+int neohookean_ogden_objective_steps_aos(const smesh::ElemType               element_type,
                                          const ptrdiff_t                   nelements,
                                          const ptrdiff_t                   stride,
                                          const ptrdiff_t                   nnodes,
@@ -198,7 +198,7 @@ int neohookean_ogden_objective_steps_aos(const enum ElemType               eleme
                                          const real_t *const               steps,
                                          real_t *const SFEM_RESTRICT       out);
 
-int neohookean_ogden_bsr(const enum ElemType                element_type,
+int neohookean_ogden_bsr(const smesh::ElemType                element_type,
                          const ptrdiff_t                    nelements,
                          const ptrdiff_t                    stride,
                          idx_t **const SFEM_RESTRICT        elems,
@@ -213,7 +213,7 @@ int neohookean_ogden_bsr(const enum ElemType                element_type,
                          const idx_t *const SFEM_RESTRICT   colidx,
                          real_t *const SFEM_RESTRICT        values);
 
-int neohookean_ogden_bcrs_sym(const enum ElemType                element_type,
+int neohookean_ogden_bcrs_sym(const smesh::ElemType                element_type,
                               const ptrdiff_t                    nelements,
                               const ptrdiff_t                    stride,
                               idx_t **const SFEM_RESTRICT        elems,

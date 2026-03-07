@@ -2,8 +2,8 @@
 #define TET4_ADJUGATE_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 
 #ifdef __cplusplus
@@ -19,7 +19,7 @@ typedef struct {
     jacobian_t *jacobian_adjugate;
     jacobian_t *jacobian_determinant;
     idx_t **elements;
-    enum ElemType element_type;
+    smesh::ElemType element_type;
 } tet4_adjugate_t;
 
 void tet4_adjugate_fill(const ptrdiff_t nelements,

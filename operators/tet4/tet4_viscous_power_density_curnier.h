@@ -2,7 +2,7 @@
 #define TET4_VISOUS_POWER_DENSITY_CURNIER_HPP
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

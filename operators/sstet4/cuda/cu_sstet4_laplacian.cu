@@ -1,7 +1,7 @@
 #include "cu_sstet4_laplacian.h"
 
 #include "cu_tet4_inline.hpp"
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include <cassert>
 

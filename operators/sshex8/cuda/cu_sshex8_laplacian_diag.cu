@@ -2,7 +2,7 @@
 
 #include "cu_hex8_laplacian_inline.hpp"
 #include "cu_sshex8_inline.hpp"
-#include "sfem_cuda_base.h"
+#include "sfem_cuda_base.hpp"
 
 #include <cassert>
 #include <cstdio>

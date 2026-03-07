@@ -1,7 +1,7 @@
 #ifndef SPECTRAL_HEX_LAPLACIAN_INLINE_HPP
 #define SPECTRAL_HEX_LAPLACIAN_INLINE_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include <cstdio>
 #include <cmath>

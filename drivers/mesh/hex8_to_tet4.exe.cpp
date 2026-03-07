@@ -1,7 +1,7 @@
 #include "sfem_API.hpp"
 
 #include "sortreduce.h"
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -50,8 +50,7 @@ int main(int argc, char *argv[]) {
     // Output
     sfem::create_directory(output_folder);
 
-    std::string path_output_format = output_folder;
-    path_output_format += "/i%d.raw";
-    tet4_elements->to_files(path_output_format.c_str());
+    std::string path_output_format = std::string(output_folder) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value());
+    tet4_elements->to_files(smesh::Path(path_output_format));
     return MPI_Finalize();
 }

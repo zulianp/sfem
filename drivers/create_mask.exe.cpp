@@ -1,7 +1,7 @@
 #include "matrixio_array.h"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
-#include "sfem_mask.h"
+#include "smesh_mask.hpp"
 
 #include <mpi.h>
 #include <stdio.h>
@@ -38,19 +38,19 @@ int main(int argc, char *argv[]) {
         return SFEM_FAILURE;
     }
 
-    mask_t *m = mask_create(n);
+    smesh::mask_t *m = smesh::mask_create(n);
 
     double tick = MPI_Wtime();
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nlocal; i++) {
-        mask_set(data[i], m);
+        smesh::mask_set(data[i], m);
     }
 
     double tock = MPI_Wtime();
     double elapsed = tock - tick;
 
-    ptrdiff_t output_bytes = mask_count(n) * sizeof(mask_t);
+    ptrdiff_t output_bytes = smesh::mask_count(n) * sizeof(smesh::mask_t);
     ptrdiff_t intput_bytes = nlocal * sizeof(idx_t);
     printf("Mask set TTS %g [s] BW %g [GB/s]\n",
            elapsed,
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
     if (0) {
         for (ptrdiff_t i = 0; i < n; i++) {
-            int val = mask_get(i, m);
+            int val = smesh::mask_get(i, m);
             printf("%ld %d\n", i, val);
         }
         printf("\n");
@@ -66,27 +66,27 @@ int main(int argc, char *argv[]) {
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < nlocal; i++) {
-        int must_be_true = mask_get(data[i], m);
+        int must_be_true = smesh::mask_get(data[i], m);
         assert(must_be_true);
     }
 #endif
 
     if (!SFEM_SKIP_WRITE) {
         // There will be an issue with the padding of the mask if run in parallel
-        if (array_write(comm, path_output, SFEM_MPI_MASK_T, m, mask_count(n), mask_count(n))) {
+        if (array_write(comm, path_output, SFEM_MPI_MASK_T, m, smesh::mask_count(n), smesh::mask_count(n))) {
             return SFEM_FAILURE;
         }
     }
 
 #ifndef NDEBUG
     for (ptrdiff_t i = 0; i < nlocal; i++) {
-        mask_unset(data[i], m);
-        int must_be_false = !mask_get(data[i], m);
+        smesh::mask_unset(data[i], m);
+        int must_be_false = !smesh::mask_get(data[i], m);
         assert(must_be_false);
     }
 #endif
 
-    mask_destroy(m);
+    smesh::mask_destroy(m);
 
     return MPI_Finalize();
 }

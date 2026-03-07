@@ -1,8 +1,8 @@
 #ifndef CU_INTEGRATE_VALUES_H
 #define CU_INTEGRATE_VALUES_H
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #include <stddef.h>
 

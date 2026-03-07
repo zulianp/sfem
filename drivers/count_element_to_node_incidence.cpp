@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 #include "matrixio_array.h"
 
 int main(int argc, char *argv[]) {
@@ -25,14 +25,14 @@ int main(int argc, char *argv[]) {
     const char *path_count = argv[2];
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     int *count = (int*)calloc(m->n_nodes(), sizeof(int));
 
-    int nxe = elem_num_nodes(m->element_type());
+    int nxe = elem_num_nodes(m->element_type(0));
 
     const ptrdiff_t nelements = m->n_elements();
-    const auto elements = m->elements()->data();
+    const auto elements = m->elements(0)->data();
     for (int d = 0; d < nxe; d++) {
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < nelements; ++i) {

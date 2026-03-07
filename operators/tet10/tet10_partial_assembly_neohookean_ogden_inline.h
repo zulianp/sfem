@@ -1,7 +1,7 @@
 #ifndef SFEM_TET10_PARTIAL_ASSEMBLY_NEOHOOKEAN_OGDEN_INLINE_H
 #define SFEM_TET10_PARTIAL_ASSEMBLY_NEOHOOKEAN_OGDEN_INLINE_H
 
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 
 static SFEM_INLINE void tet10_F(const scalar_t *const SFEM_RESTRICT adjugate,
                                 const scalar_t                      jacobian_determinant,

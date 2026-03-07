@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "linear_elasticity.h"
 

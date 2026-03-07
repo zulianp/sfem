@@ -4,9 +4,9 @@
 #include "crs_graph.h"
 
 // C++ includes
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 
 namespace sfem {
@@ -28,19 +28,19 @@ namespace sfem {
 
         const ptrdiff_t     n_elements            = mesh->n_elements();
         const ptrdiff_t     n_nodes               = mesh->n_nodes();
-        const enum ElemType element_type          = mesh->element_type();
-        enum ElemType element_type_for_algo = element_type;
+        const smesh::ElemType element_type          = mesh->element_type(0);
+        smesh::ElemType element_type_for_algo = element_type;
 
-        auto elems = mesh->elements()->data();
-        if (element_type == TET10) {
-            element_type_for_algo = TET4;
-        } else if (element_type == TRI6) {
-            element_type_for_algo = TRI3;
+        auto elems = mesh->elements(0)->data();
+        if (element_type == smesh::TET10) {
+            element_type_for_algo = smesh::TET4;
+        } else if (element_type == smesh::TRI6) {
+            element_type_for_algo = smesh::TRI3;
         }
 
         count_t       *adj_ptr = 0;
         element_idx_t *adj_idx = 0;
-        create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
+        smesh::create_dual_graph(n_elements, n_nodes, element_type_for_algo, elems, &adj_ptr, &adj_idx);
 
         ret->impl_->adj_ptr = manage_host_buffer<count_t>(n_elements + 1, adj_ptr);
         ret->impl_->adj_idx = manage_host_buffer<element_idx_t>(adj_ptr[n_elements], adj_idx);

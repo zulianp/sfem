@@ -7,13 +7,13 @@
 #include "boundary_condition.h"
 #include "matrixio_array.h"
 #include "operators/boundary_conditions/dirichlet.h"
-#include "operators/hierarchical/sfem_prolongation_restriction.h"
+#include "operators/hierarchical/sfem_prolongation_restriction.hpp"
 #include "sfem_Function.hpp"
 #include "utils.h"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include <sys/stat.h>
 #include <cstddef>
@@ -29,7 +29,7 @@
 #include "adj_table.h"
 #include "hex8_fff.h"
 #include "hex8_jacobian.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
 #include "sshex8.h"
 #include "sshex8_mesh.h"
 
@@ -102,7 +102,7 @@ namespace sfem {
 
         auto space = impl_->space;
         auto mesh  = space->mesh_ptr();
-        auto et    = (enum ElemType)space->element_type();
+        auto et    = (smesh::ElemType)space->element_type();
 
         ptrdiff_t max_coarse_idx = -1;
         auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
@@ -120,7 +120,7 @@ namespace sfem {
 
             if (cdc.sidesets.empty()) {
                 if (max_coarse_idx == -1)
-                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements()->data());
+                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
 
                 hierarchical_create_coarse_indices(
                         max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
@@ -374,7 +374,7 @@ namespace sfem {
                     }
                 } else {
                     if (extract_nodeset_from_sideset(space->element_type(),
-                                                     space->mesh_ptr()->elements()->data(),
+                                                     space->mesh_ptr()->elements(0)->data(),
                                                      sideset->parent()->size(),
                                                      sideset->parent()->data(),
                                                      sideset->lfi()->data(),

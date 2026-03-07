@@ -14,9 +14,9 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "sortreduce.h"
 #include "sfem_glob.hpp"
@@ -55,9 +55,9 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     // char path[1024 * 10];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    int nnxe = elem_num_nodes(mesh->element_type());
+    int nnxe = elem_num_nodes(mesh->element_type(0));
 
     local_idx_t **lelements = (local_idx_t**)malloc(nnxe * sizeof(local_idx_t *));
 
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
         node_lidx[i] = SFEM_LOCAL_IDX_INVALID;
     }
 
-    auto elements = mesh->elements()->data();
+    auto elements = mesh->elements(0)->data();
     for (ptrdiff_t e_offset = 0, block_num = 0; e_offset < mesh->n_elements();
          e_offset += max_block_size, block_num++) {
         const ptrdiff_t next_offset = e_offset + MIN(max_block_size, mesh->n_elements() - e_offset);

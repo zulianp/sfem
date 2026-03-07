@@ -1,15 +1,15 @@
 #include "sfem_Mass.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "mass.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -23,12 +23,12 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp> domains;
-        enum ElemType                  element_type { INVALID };  ///< Element type
+        smesh::ElemType                  element_type { smesh::INVALID };  ///< Element type
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
 #endif
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
-            element_type = (enum ElemType)space->element_type();
+            element_type = (smesh::ElemType)space->element_type();
 #if SFEM_PRINT_THROUGHPUT
             op_profiler = std::make_unique<OpTracer>(space, "Mass::apply");
 #endif
@@ -140,7 +140,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void Mass::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void Mass::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

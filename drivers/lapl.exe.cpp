@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "operators/laplacian.h"
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     real_t *lapl_u = (real_t *)malloc(u_n_local * sizeof(real_t));
     memset(lapl_u, 0, u_n_local * sizeof(real_t));
 
-    laplacian_apply(mesh->element_type(), n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), u, lapl_u);
+    laplacian_apply(mesh->element_type(0), n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), u, lapl_u);
 
     real_t SFEM_SCALE = 1;
     SFEM_READ_ENV(SFEM_SCALE, atof);

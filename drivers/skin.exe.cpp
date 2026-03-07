@@ -11,19 +11,19 @@
 
 #include "crs_graph.h"
 #include "read_mesh.h"
-#include "sfem_base.h"
-#include "sfem_mesh_write.h"
+#include "sfem_base.hpp"
+#include "sfem_mesh_write.hpp"
 
 #include "extract_surface_graph.h"
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "argsort.h"
 
 #include "adj_table.h"
 
-#include "sfem_hex8_mesh_graph.h"
-#include "sfem_sshex8_skin.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "sfem_sshex8_skin.hpp"
 #include "sshex8.h"  // FIXME
 
 #include "sfem_glob.hpp"
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     auto points      = mesh->points()->data();
     const ptrdiff_t n_nodes     = mesh->n_nodes();
     const ptrdiff_t n_elements  = mesh->n_elements();
@@ -140,30 +140,22 @@ int main(int argc, char *argv[]) {
 
     const char *SFEM_ELEMENT_TYPE = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_TYPE, );
-    enum ElemType override_element_type = INVALID;
+    smesh::ElemType override_element_type = smesh::INVALID;
     if (SFEM_ELEMENT_TYPE) {
         override_element_type = type_from_string(SFEM_ELEMENT_TYPE);
     }
 
-    if (override_element_type == SSHEX8) {
-        int SFEM_ELEMENT_REFINE_LEVEL = 0;
-        SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+    if (is_semistructured_type(override_element_type)) {
+        const int SFEM_ELEMENT_REFINE_LEVEL = proteus_hex_micro_elements_per_dim(override_element_type);
 
-        if (!SFEM_ELEMENT_REFINE_LEVEL) {
-            fprintf(stderr,
-                    "ElemType sshex8 requires SFEM_ELEMENT_REFINE_LEVEL to be defined and >= "
-                    "2!\n");
-            return EXIT_FAILURE;
-        }
-
-        if (mesh->element_type() == HEX8) {
+        if (mesh->element_type(0) == smesh::HEX8) {
             // Generate proteus mesh on the fly!
 
             const int nxe = sshex8_nxe(SFEM_ELEMENT_REFINE_LEVEL);
             const int txe = sshex8_txe(SFEM_ELEMENT_REFINE_LEVEL);
 
             auto elements   = sfem::create_host_buffer<idx_t>(nxe, n_elements);
-            auto d_elements = mesh->elements()->data();
+            auto d_elements = mesh->elements(0)->data();
 
             for (int d = 0; d < nxe; d++) {
                 for (ptrdiff_t i = 0; i < n_elements; i++) {
@@ -175,7 +167,7 @@ int main(int argc, char *argv[]) {
             sshex8_generate_elements(SFEM_ELEMENT_REFINE_LEVEL,
                                      n_elements,
                                      n_nodes,
-                                     mesh->elements()->data(),
+                                     mesh->elements(0)->data(),
                                      d_elements,
                                      &n_unique_nodes,
                                      &interior_start);
@@ -205,7 +197,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    enum ElemType st   = side_type(mesh->element_type());
+    smesh::ElemType st   = side_type(mesh->element_type(0));
     const int     nnxs = elem_num_nodes(st);
 
     ptrdiff_t      n_surf_elements = 0;
@@ -214,7 +206,7 @@ int main(int argc, char *argv[]) {
     int16_t       *side_idx        = 0;
 
     if (extract_skin_sideset(
-                n_elements, n_nodes, mesh->element_type(), mesh->elements()->data(), &n_surf_elements, &parent, &side_idx) !=
+                n_elements, n_nodes, mesh->element_type(0), mesh->elements(0)->data(), &n_surf_elements, &parent, &side_idx) !=
         SFEM_SUCCESS) {
         SFEM_ERROR("Failed to extract skin!\n");
     }
@@ -224,7 +216,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (extract_surface_from_sideset(
-                mesh->element_type(), mesh->elements()->data(), n_surf_elements, parent, side_idx, d_surf_elems) !=
+                mesh->element_type(0), mesh->elements(0)->data(), n_surf_elements, parent, side_idx, d_surf_elems) !=
         SFEM_SUCCESS) {
         SFEM_ERROR("Unable to extract surface from sideset!\n");
     }
@@ -261,8 +253,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Correct normal orientation using elements with orginal indexing (only with P1 for the moment)
-    // if (mesh->element_type() == TET4) {
-    //     correct_side_orientation(n_surf_elements, d_surf_elems, parent, mesh->elements()->data(), points);
+    // if (mesh->element_type(0) == smesh::TET4) {
+    //     correct_side_orientation(n_surf_elements, d_surf_elems, parent, mesh->elements(0)->data(), points);
     // }
 
     // Re-index elements
@@ -282,12 +274,12 @@ int main(int argc, char *argv[]) {
     std::string sideset_path = output_folder;
     sideset_path += "/sidesets";
     sfem::create_directory(sideset_path.c_str());
-    sideset->write(sideset_path.c_str());
+    sideset->write(smesh::Path(sideset_path));
 
     auto surf = std::make_shared<sfem::Mesh>(
-            sfem::Communicator::wrap(comm), spatial_dim, shell_type(side_type(mesh->element_type())), n_surf_elements, surf_elements, n_surf_nodes, surf_points);
+            sfem::Communicator::wrap(comm), shell_type(side_type(mesh->element_type(0))), surf_elements, surf_points);
 
-    surf->write(output_folder);
+    surf->write(smesh::Path(output_folder));
 
     // Clean-up
 

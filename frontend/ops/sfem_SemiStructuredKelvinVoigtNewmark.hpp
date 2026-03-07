@@ -17,7 +17,7 @@ namespace sfem {
     class SemiStructuredKelvinVoigtNewmark : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
         std::shared_ptr<Buffer<real_t>> vel_[3];
         std::shared_ptr<Buffer<real_t>> acc_[3];
 

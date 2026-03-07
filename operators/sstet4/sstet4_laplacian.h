@@ -4,7 +4,7 @@
 // Adapted from Bole Ma implementation in https://github.com/zulianp/hpcfem
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

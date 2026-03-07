@@ -1,16 +1,16 @@
 #include "sfem_LinearElasticity.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "hex8_jacobian.h"
 #include "linear_elasticity.h"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -23,7 +23,7 @@ namespace sfem {
     /**
      * @brief Jacobian storage for performance optimization
      *
-     * Precomputed Jacobian determinants and adjugates for HEX8 elements
+     * Precomputed Jacobian determinants and adjugates for smesh::HEX8 elements
      * to avoid repeated computation during matrix-vector products.
      */
     class Jacobians {
@@ -73,7 +73,7 @@ namespace sfem {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
         // FIXME: Must work for all element types
-        if (impl_->space->element_type() == HEX8) {
+        if (impl_->space->element_type() == smesh::HEX8) {
             auto mesh = impl_->space->mesh_ptr();
             int  dim  = mesh->spatial_dimension();
 
@@ -403,7 +403,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void LinearElasticity::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void LinearElasticity::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

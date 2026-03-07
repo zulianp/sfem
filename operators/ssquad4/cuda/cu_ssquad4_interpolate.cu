@@ -1,7 +1,7 @@
 #include "cu_ssquad4_interpolate.h"
 
-#include "sfem_cuda_base.h"
-#include "sfem_macros.h"
+#include "sfem_cuda_base.hpp"
+#include "sfem_macros.hpp"
 
 #include "cu_ssquad4_inline.cuh"
 

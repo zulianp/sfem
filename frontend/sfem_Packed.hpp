@@ -1,11 +1,11 @@
 #ifndef SFEM_PACKED_HPP
 #define SFEM_PACKED_HPP
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include <memory>
 

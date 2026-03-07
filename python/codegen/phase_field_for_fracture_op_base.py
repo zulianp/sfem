@@ -293,8 +293,8 @@ class PhaseFieldForFractureOpBase(FEMaterial):
 
         output = f"// Automatically generate code for {material_name}\n"
 
-        includes = '#include "sfem_base.h"\n'
-        includes += '#include "sfem_vec.h"\n'
+        includes = '#include "sfem_base.hpp"\n'
+        includes += '#include "sfem_vec.hpp"\n'
         includes += '#include "math.h"\n'
         output += includes
 

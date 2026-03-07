@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "read_mesh.h"
 
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
     const ptrdiff_t n_nodes = mesh->n_nodes();
 
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         real_t *u;
         ptrdiff_t u_n_local, u_n_global;
         array_create_from_file(comm, path_u[0], SFEM_MPI_REAL_T, (void **)&u, &u_n_local, &u_n_global);
-        neohookean_principal_stresses_aos(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
+        neohookean_principal_stresses_aos(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
         free(u);
     } else {
         real_t *u[3];
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         for (int d = 0; d < 3; d++) {
             array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
         }
-        neohookean_principal_stresses_soa(n_elements, n_nodes, mesh->elements()->data(), mesh->points()->data(), mu, lambda, u, stress);
+        neohookean_principal_stresses_soa(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), mu, lambda, u, stress);
         for (int d = 0; d < 3; d++) {
             free(u[d]);
         }

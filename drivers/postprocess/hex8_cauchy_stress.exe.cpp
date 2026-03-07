@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto        hex8_mesh     = sfem::Mesh::create_from_file(comm, argv[1]);
+    auto        hex8_mesh     = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
     real_t      mu            = atof(argv[2]);
     real_t      lambda        = atof(argv[3]);
     auto        ux            = sfem::create_buffer_from_file<real_t>(comm, argv[4]); 
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
         SFEM_TRACE_SCOPE("hex8_linear_elasticity_l2_project_cauchy_stress");
         hex8_linear_elasticity_l2_project_cauchy_stress(hex8_mesh->n_elements(),
                                                         nnodes,
-                                                        hex8_mesh->elements()->data(),
+                                                        hex8_mesh->elements(0)->data(),
                                                         hex8_mesh->points()->data(),
                                                         mu,
                                                         lambda,
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     {
         SFEM_TRACE_SCOPE("hex8_assemble_lumped_mass");
         hex8_assemble_lumped_mass(
-                hex8_mesh->n_elements(), nnodes, hex8_mesh->elements()->data(), hex8_mesh->points()->data(), 1, mass->data());
+                hex8_mesh->n_elements(), nnodes, hex8_mesh->elements(0)->data(), hex8_mesh->points()->data(), 1, mass->data());
     }
 
     {
@@ -76,8 +76,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::string path_output_format = output_prefix;
-    path_output_format += ".%d.raw";
-    stress->to_files(path_output_format.c_str());
+    std::string path_output_format = std::string(output_prefix) + ".%d." + std::string(smesh::TypeToString<real_t>::value());
+    stress->to_files(smesh::Path(path_output_format));
     return MPI_Finalize();
 }

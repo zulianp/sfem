@@ -1,11 +1,11 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -15,7 +15,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -52,7 +52,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         }
     }
 
-    auto      mesh       = sfem::Mesh::create_from_file(comm, mesh_path);
+    auto      mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
@@ -119,7 +119,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     // Output to disk
     sfem::create_directory(output_path.c_str());
 
-    fs->mesh_ptr()->write((output_path + "/coarse_mesh").c_str());
+    fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
 
     auto out = f->output();

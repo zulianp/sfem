@@ -12,9 +12,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 
 #include "mass.h"
@@ -32,7 +32,7 @@
 
 #include "constrained_gs.h"
 
-#include "sfem_logger.h"
+#include "sfem_logger.hpp"
 
 // https://fenicsproject.org/olddocs/dolfin/1.6.0/python/demo/documented/navier-stokes/python/documentation.html
 
@@ -312,7 +312,7 @@ int main(int argc, char *argv[]) {
     //                         &neumann_conditions,
     //                         &n_neumann_conditions);
 
-    enum ElemType p1_type = elem_lower_order(mesh.element_type);
+    smesh::ElemType p1_type = elem_lower_order(mesh.element_type);
     const int p1_nxe = elem_num_nodes(p1_type);
     const int sdim = elem_manifold_dim(mesh.element_type);
     ptrdiff_t p1_nnodes = 0;

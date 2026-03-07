@@ -16,9 +16,9 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_vec.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_vec.hpp"
 #include "sortreduce.h"
 
 #include "mass.h"
@@ -254,10 +254,10 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
-    if (mesh->element_type() != TRI3) {
-        fprintf(stderr, "element_type must be TRI3\n");
+    if (mesh->element_type(0) != smesh::TRI3) {
+        fprintf(stderr, "element_type must be smesh::TRI3\n");
         return EXIT_FAILURE;
     }
 

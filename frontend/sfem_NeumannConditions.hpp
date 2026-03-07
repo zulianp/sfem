@@ -7,11 +7,11 @@
 #include <memory>
 #include <vector>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_Sideset.hpp"
 
 // Operator includes
@@ -23,7 +23,7 @@ namespace sfem {
     class NeumannConditions final : public Op {
     public:
         struct Condition {
-            enum ElemType            element_type { INVALID };
+            smesh::ElemType            element_type { smesh::INVALID };
             std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe empty in certain cases
             SharedBuffer<idx_t *>    surface;
             SharedBuffer<real_t>     values;

@@ -5,7 +5,7 @@ namespace sfem {
     class SemiStructuredLaplacian : public Op {
     public:
         std::shared_ptr<FunctionSpace>      space;
-        enum ElemType                       element_type { INVALID };
+        smesh::ElemType                       element_type { smesh::INVALID };
         bool                                use_affine_approximation{true};
         bool                                use_stencil{true};
         std::shared_ptr<Buffer<jacobian_t>> fff;

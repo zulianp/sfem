@@ -16,9 +16,9 @@
 #include "mesh_utils.h"
 #include "quadratures_rule.h"
 #include "read_mesh.h"
-#include "sfem_mesh_write.h"
-#include "sfem_resample_field.h"
-#include "sfem_resample_field_tet4_math.h"
+#include "sfem_mesh_write.hpp"
+#include "sfem_resample_field.hpp"
+#include "sfem_resample_field_tet4_math.hpp"
 #include "tet10_resample_field.h"
 
 #include "sfem_API.hpp"
@@ -145,9 +145,9 @@ print_performance_metrics_cpu(sfem_resample_field_info* info,             //
 
     char tet_model[100];
 
-    if (info->element_type == TET4) {
+    if (info->element_type == smesh::TET4) {
         snprintf(tet_model, 100, "TET4");
-    } else if (info->element_type == TET10) {
+    } else if (info->element_type == smesh::TET10) {
         snprintf(tet_model, 100, "TET10");
     } else {
         snprintf(tet_model, 100, "UNKNOWN");
@@ -214,9 +214,9 @@ handle_print_performance_metrics_cpu(sfem_resample_field_info* info,            
 
     char tet_model[100];
 
-    if (info->element_type == TET4) {
+    if (info->element_type == smesh::TET4) {
         snprintf(tet_model, 100, "TET4");
-    } else if (info->element_type == TET10) {
+    } else if (info->element_type == smesh::TET10) {
         snprintf(tet_model, 100, "TET10");
     } else {
         snprintf(tet_model, 100, "UNKNOWN");
@@ -409,7 +409,7 @@ int main(int argc, char* argv[]) {
 
     sfem_resample_field_info info;
 
-    info.element_type = TET10;
+    info.element_type = smesh::TET10;
 
     MPI_Init(&argc, &argv);
 
@@ -456,9 +456,9 @@ int main(int argc, char* argv[]) {
     const char* output_path = argv[12];
 
     if (check_string_in_args(argc, (const char**)argv, "TET4", mpi_rank == 0)) {
-        info.element_type = TET4;
+        info.element_type = smesh::TET4;
     } else if (check_string_in_args(argc, (const char**)argv, "TET10", mpi_rank == 0)) {
-        info.element_type = TET10;
+        info.element_type = smesh::TET10;
     } else {
         fprintf(stderr, "Error: Invalid element type\n\n");
         fprintf(stderr,
@@ -491,21 +491,32 @@ int main(int argc, char* argv[]) {
 
 #endif
 
-    if (info.element_type == TET4) {
-        if (mpi_rank == 0) printf("info.element_type = TET4,    %s:%d\n", __FILE__, __LINE__);
-    } else if (info.element_type == TET10) {
-        if (mpi_rank == 0) printf("info.element_type = TET10,   %s:%d\n", __FILE__, __LINE__);
+    if (info.element_type == smesh::TET4) {
+        if (mpi_rank == 0) printf("info.element_type = smesh::TET4,    %s:%d\n", __FILE__, __LINE__);
+    } else if (info.element_type == smesh::TET10) {
+        if (mpi_rank == 0) printf("info.element_type = smesh::TET10,   %s:%d\n", __FILE__, __LINE__);
     } else {
         if (mpi_rank == 0) printf("info.element_type = UNKNOWN, %s:%d\n", __FILE__, __LINE__);
     }
 
     info.quad_nodes_cnt = TET_QUAD_NQP;
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     // FIXME mesh_t will be removed in the future
-    mesh_t mesh_deprecated;
-    mesh->extract_deprecated(&mesh_deprecated);
+    mesh_t mesh_deprecated                = {0};
+    mesh_deprecated.comm                  = mesh->comm()->get();
+    mesh_deprecated.mem_space             = SFEM_MEM_SPACE_HOST;
+    mesh_deprecated.spatial_dim           = mesh->spatial_dimension();
+    mesh_deprecated.element_type          = mesh->element_type(0);
+    mesh_deprecated.nelements             = mesh->n_elements();
+    mesh_deprecated.nnodes                = mesh->n_nodes();
+    mesh_deprecated.elements              = mesh->elements(0)->data();
+    mesh_deprecated.points                = mesh->points()->data();
+    mesh_deprecated.n_owned_nodes         = mesh->n_nodes();
+    mesh_deprecated.n_owned_nodes_with_ghosts = mesh->n_nodes();
+    mesh_deprecated.n_owned_elements      = mesh->n_elements();
+    mesh_deprecated.n_owned_elements_with_ghosts = mesh->n_elements();
 
     // ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     real_t*       field        = NULL;
@@ -603,12 +614,12 @@ int main(int argc, char* argv[]) {
     ptrdiff_t stride[3] = {1, nlocal[0], nlocal[0] * nlocal[1]};
 
     // used to perform the assembly of the dual mass vector in the kernel
-    // for TET10 elements
+    // for smesh::TET10 elements
     // 0: do not assemble the dual mass vector in the kernel if the memory model is host and mpi_size > 1
     // 1: assemble the dual mass vector in the kernel
     int assemble_dual_mass_vector_cuda = 0;
 
-    if (info.element_type == TET10 && SFEM_TET10_CUDA == ON) {
+    if (info.element_type == smesh::TET10 && SFEM_TET10_CUDA == ON) {
         if (SFEM_CUDA_MEMORY_MODEL == CUDA_HOST_MEMORY && mpi_size > 1) {
             assemble_dual_mass_vector_cuda = 0;
         } else {
@@ -649,7 +660,7 @@ int main(int argc, char* argv[]) {
 
         if (SFEM_INTERPOLATE) {
             printf("SFEM_INTERPOLATE = 1, %s:%d\n", __FILE__, __LINE__);
-            interpolate_field(mesh->n_owned_nodes(),   // Mesh:
+            interpolate_field((mesh->distributed() ? mesh->distributed()->n_nodes_owned() : mesh->n_nodes()),   // Mesh:
                               mesh->points()->data(),  // Mesh:
                               nlocal,                  // discrete field
                               stride,                  //
@@ -661,7 +672,7 @@ int main(int argc, char* argv[]) {
             int ret_resample = 1;
 
             switch (info.element_type) {                                 //
-                case TET10:                                              // TET10 case
+                case smesh::TET10:                                              // smesh::TET10 case
                     ret_resample =                                       //
                             resample_field_mesh_tet10(mpi_size,          //
                                                       mpi_rank,          //
@@ -675,7 +686,7 @@ int main(int argc, char* argv[]) {
                                                       &info);            //
                     break;                                               //
 
-                case TET4:                                              // TET4 case
+                case smesh::TET4:                                              // smesh::TET4 case
                     ret_resample =                                      //
                             resample_field_mesh_tet4(mpi_size,          //
                                                      mpi_rank,          //
@@ -721,7 +732,7 @@ int main(int argc, char* argv[]) {
             const real_t alpha_th_tet10 = 2.5;
 
             switch (info.element_type) {
-                case TET10: {
+                case smesh::TET10: {
                     ret_resample_adjoint =                                       //
                             resample_field_mesh_adjoint_tet10(mpi_size,          //
                                                               mpi_rank,          //
@@ -752,7 +763,7 @@ int main(int argc, char* argv[]) {
 
                     break;
                 }
-                case TET4: {
+                case smesh::TET4: {
                     ///////////////////////////////////// Case TEt4 /////////////////////////////////////
 
                     // ret_resample_adjoint =                                //
@@ -933,7 +944,7 @@ int main(int argc, char* argv[]) {
         int tot_nelements = mesh->n_elements();
         MPI_Reduce(MPI_IN_PLACE, &tot_nelements, 1, MPI_INT, MPI_SUM, 0, comm);
 
-        int tot_nnodes = mesh->n_owned_nodes();
+        int tot_nnodes = (mesh->distributed() ? mesh->distributed()->n_nodes_owned() : mesh->n_nodes());
         MPI_Reduce(MPI_IN_PLACE, &tot_nnodes, 1, MPI_INT, MPI_SUM, 0, comm);
 
         double* flops_v = NULL;

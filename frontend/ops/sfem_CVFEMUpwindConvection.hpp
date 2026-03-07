@@ -6,7 +6,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>  space;
         std::shared_ptr<Buffer<real_t>> vel[3];
-        enum ElemType                   element_type { INVALID };
+        smesh::ElemType                   element_type { smesh::INVALID };
         const char                     *name() const override { return "CVFEMUpwindConvection"; }
         inline bool                     is_linear() const override { return true; }
         inline ptrdiff_t                       n_dofs_domain() const override { return space->n_dofs(); }

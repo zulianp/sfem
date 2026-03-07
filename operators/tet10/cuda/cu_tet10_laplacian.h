@@ -2,7 +2,7 @@
 #define TET10_CUDA_INCORE_LAPLACIAN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "cu_tet4_laplacian.h"
 

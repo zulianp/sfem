@@ -3,9 +3,10 @@
 
 #include <stdio.h>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "smesh_sshex8_graph.hpp"
 
 int test_sshex8_hierarchical_renumbering() {
     const ptrdiff_t nelements = 2;
@@ -26,13 +27,13 @@ int test_sshex8_hierarchical_renumbering() {
     ptrdiff_t interior_start = -1;
 
     SFEM_TEST_ASSERT(
-            sshex8_generate_elements(
+            smesh::sshex8_generate_elements(
                     L, elements->extent(1), nnodes, elements->data(), sshex8_elements->data(), &sshex_nnodes, &interior_start) ==
             SFEM_SUCCESS);
 
-    int  nlevels = sshex8_hierarchical_n_levels(L);
+    int  nlevels = smesh::sshex8_hierarchical_n_levels(L);
     auto levels  = sfem::create_host_buffer<int>(nlevels);
-    sshex8_hierarchical_mesh_levels(L, nlevels, levels->data());
+    smesh::sshex8_hierarchical_mesh_levels(L, nlevels, levels->data());
 
     SFEM_TEST_ASSERT(nlevels == 4);
     SFEM_TEST_ASSERT(levels->data()[0] == 1);
@@ -40,7 +41,7 @@ int test_sshex8_hierarchical_renumbering() {
     SFEM_TEST_ASSERT(levels->data()[2] == 12);
     SFEM_TEST_ASSERT(levels->data()[3] == 24);
 
-    SFEM_TEST_ASSERT(sshex8_hierarchical_renumbering(
+    SFEM_TEST_ASSERT(smesh::sshex8_hierarchical_renumbering(
                              L, nlevels, levels->data(), nelements, sshex_nnodes, sshex8_elements->data()) == SFEM_SUCCESS);
 
     // Check that original nodes are in range

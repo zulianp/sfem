@@ -12,7 +12,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_bsr_SpMV.hpp"
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 
 static void compute_contact_lower_bound(
@@ -198,7 +198,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     if (fs->has_semi_structured_mesh()) {
         fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
     } else {
-        fs->mesh_ptr()->write(output_dir.c_str());
+        fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
     return output;
 }
@@ -576,14 +576,14 @@ int test_mooney_rivlin_gravity() {
     MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_BASE_RESOLUTION = 10;
+    int SFEM_BASE_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     std::shared_ptr<sfem::Mesh> mesh;
     const char *mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
-        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), mesh_path);
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
     } else {
         // Default cube mesh with configurable initial gap
         real_t SFEM_INIT_GAP = 0.05;  // Default gap above contact plane
@@ -1035,7 +1035,7 @@ int test_mooney_rivlin_gravity() {
     }
 
     // 5. Time Loop with Full Newmark Integration
-    real_t SFEM_T = 8.0;
+    real_t SFEM_T = 1.0;
     SFEM_READ_ENV(SFEM_T, atof);
     real_t t           = 0;
     size_t steps       = 0;

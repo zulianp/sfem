@@ -1,8 +1,8 @@
 #ifndef TRI3_MASS_H
 #define TRI3_MASS_H
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

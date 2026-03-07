@@ -2,8 +2,8 @@
 #define TET10_NEOHOOKEAN_OGDEN_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

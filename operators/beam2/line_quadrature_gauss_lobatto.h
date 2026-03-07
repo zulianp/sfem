@@ -1,7 +1,7 @@
 #ifndef SFEM_LINE_QUADRATURE_GAUSSS_LOBATTO_H
 #define SFEM_LINE_QUADRATURE_GAUSSS_LOBATTO_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #define line_GL_q2_n 2
 static const scalar_t line_GL_q2_x[line_GL_q2_n] = {0.0, 1.0};

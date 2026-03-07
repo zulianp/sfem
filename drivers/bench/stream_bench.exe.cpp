@@ -11,10 +11,7 @@ typedef double array_element_t;
 static double mysecond() { return MPI_Wtime(); }
 #define REPEAT 5
 
-static void bench(const size_t                   n,
-                  array_element_t *SFEM_RESTRICT a,
-                  array_element_t *SFEM_RESTRICT b,
-                  array_element_t *SFEM_RESTRICT c) {
+static void bench(const size_t n, array_element_t *a, array_element_t *b, array_element_t *c) {
     size_t          i, j;
     int             k;
     array_element_t scalar = 3.0;

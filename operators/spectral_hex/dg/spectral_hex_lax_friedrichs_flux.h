@@ -2,7 +2,7 @@
 #define SPECTRAL_HEX_LAX_FRIEDRICHS_FLUX_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

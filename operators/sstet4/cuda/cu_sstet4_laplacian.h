@@ -1,8 +1,8 @@
 #ifndef CU_SSTET4_LAPLACIAN_H
 #define CU_SSTET4_LAPLACIAN_H
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

@@ -5,8 +5,8 @@
 #include <cmath>
 #include <cstddef>
 
-#include "sfem_cuda_base.h"
-#include "sfem_defs.h"
+#include "sfem_cuda_base.hpp"
+#include "sfem_defs.hpp"
 
 #include "cu_tet4_inline.hpp"
 

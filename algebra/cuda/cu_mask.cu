@@ -1,8 +1,8 @@
 #include "cu_mask.h"
 #include "cu_mask.cuh"
 
-#include "sfem_base.h"
-#include "sfem_cuda_base.h"
+#include "sfem_base.hpp"
+#include "sfem_cuda_base.hpp"
 
 __global__ void cu_mask_nodes_kernel(const ptrdiff_t                  nnodes,
                                      const idx_t *const SFEM_RESTRICT nodes,

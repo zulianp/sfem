@@ -2,7 +2,7 @@
 #define SSHEX8_STENCIL_ELEMENT_MATRIX_APPLY_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

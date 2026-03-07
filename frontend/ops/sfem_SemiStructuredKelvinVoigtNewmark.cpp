@@ -6,7 +6,7 @@
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -38,7 +38,7 @@ namespace sfem {
             return nullptr;
         }
 
-        assert(space->element_type() == SSHEX8);
+        assert(is_semistructured_type(space->element_type()));
         auto ret = std::make_unique<SemiStructuredKelvinVoigtNewmark>(space);
 
         real_t SFEM_SHEAR_STIFFNESS_KV = 4.0;
@@ -62,7 +62,7 @@ namespace sfem {
         ret->gamma        = SFEM_GAMMA;
         ret->beta         = SFEM_BETA;
         ret->rho          = SFEM_DENSITY;
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
 
         int SFEM_HEX8_ASSUME_AFFINE = ret->use_affine_approximation;
         SFEM_READ_ENV(SFEM_HEX8_ASSUME_AFFINE, atoi);
@@ -160,7 +160,7 @@ namespace sfem {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::gradient", ssm.level());
 
-        assert(element_type == SSHEX8);
+        assert(is_semistructured_type(element_type));
 
         const real_t *u = x;
 
@@ -214,7 +214,7 @@ namespace sfem {
         auto &ssm = space->semi_structured_mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredKelvinVoigtNewmark[%d]::apply", ssm.level());
 
-        assert(element_type == SSHEX8);
+        assert(is_semistructured_type(element_type));
 
         calls++;
         double tick = MPI_Wtime();

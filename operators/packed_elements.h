@@ -1,7 +1,7 @@
 #ifndef PACKED_ELEMENTS_H
 #define PACKED_ELEMENTS_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sshex8.h"
 
 

@@ -1,14 +1,14 @@
 #include "sfem_VectorLaplacian.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_mesh.hpp"
 
 #include "hex8_vector_laplacian.h"
 #include "hex8_fff.h"
 
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"
 
 namespace sfem {
@@ -18,7 +18,7 @@ namespace sfem {
 
         assert(1 != space->block_size());
         auto ret          = std::make_unique<VectorLaplacian>(space);
-        ret->element_type = (enum ElemType)space->element_type();
+        ret->element_type = (smesh::ElemType)space->element_type();
 
         int SFEM_VECTOR_LAPLACIAN_FFF = 1;
         SFEM_READ_ENV(SFEM_VECTOR_LAPLACIAN_FFF, atoi);
@@ -27,7 +27,7 @@ namespace sfem {
             ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
 
             if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
-                                              space->mesh_ptr()->elements()->data(),
+                                              space->mesh_ptr()->elements(0)->data(),
                                               space->mesh_ptr()->points()->data(),
                                               ret->fff->data())) {
                 SFEM_ERROR("Unable to create fff");
@@ -113,7 +113,7 @@ namespace sfem {
             err = affine_hex8_vector_laplacian_apply_fff(
                     // element_type,
                     mesh->n_elements(),
-                    mesh->elements()->data(),
+                    mesh->elements(0)->data(),
                     this->fff->data(),
                     block_size,
                     block_size,
@@ -124,7 +124,7 @@ namespace sfem {
                     // element_type,
                     mesh->n_elements(),
                     mesh->n_nodes(),
-                    mesh->elements()->data(),
+                    mesh->elements(0)->data(),
                     mesh->points()->data(),
                     block_size,
                     block_size,

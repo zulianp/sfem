@@ -10,7 +10,7 @@
 
 #include "dirichlet.h"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_glob.hpp"
 
 int main(int argc, char *argv[]) {

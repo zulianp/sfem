@@ -1,15 +1,15 @@
 #include "sfem_NeoHookeanOgden.hpp"
 
 #include "neohookean_ogden.h"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_CRSGraph.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -47,8 +47,8 @@ namespace sfem {
 
         assert(space->mesh_ptr()->spatial_dimension() == space->block_size());
         auto ret           = std::make_unique<NeoHookeanOgden>(space);
-        ret->impl_->mu     = sfem::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
-        ret->impl_->lambda = sfem::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
+        ret->impl_->mu     = smesh::Env::read("SFEM_SHEAR_MODULUS", ret->impl_->mu);
+        ret->impl_->lambda = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", ret->impl_->lambda);
         return ret;
     }
 
@@ -186,14 +186,14 @@ namespace sfem {
     int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
-        bool use_partial_assembly = sfem::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
-        bool use_compression      = sfem::Env::read("SFEM_USE_COMPRESSION", false);
-        bool use_AoS              = sfem::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
+        bool use_partial_assembly = smesh::Env::read("SFEM_USE_PARTIAL_ASSEMBLY", false);
+        bool use_compression      = smesh::Env::read("SFEM_USE_COMPRESSION", false);
+        bool use_AoS              = smesh::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
             auto ua = std::make_shared<struct ElasticityAssemblyData>();
             ua->use_partial_assembly =
-                    use_partial_assembly || domain.second.element_type == HEX8 || domain.second.element_type == TET10;
+                    use_partial_assembly || domain.second.element_type == smesh::HEX8 || domain.second.element_type == smesh::TET10;
             ua->use_compression     = use_compression;
             ua->use_AoS             = use_AoS;
             ua->elements            = domain.second.block->elements();
@@ -330,7 +330,7 @@ namespace sfem {
         impl_->domains->set_value_in_block(block_name, var_name, value);
     }
 
-    void NeoHookeanOgden::override_element_types(const std::vector<enum ElemType> &element_types) {
+    void NeoHookeanOgden::override_element_types(const std::vector<smesh::ElemType> &element_types) {
         impl_->domains->override_element_types(element_types);
     }
 

@@ -4,9 +4,9 @@
 #include <mpi.h>
 #include <memory>
 
+#include "sfem_Communicator.hpp"
+
 namespace sfem {
-    class Communicator;
-    
     class Context {
     public:
  

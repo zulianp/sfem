@@ -1,8 +1,8 @@
 #ifndef CU_TET4_ADJUGATE_H
 #define CU_TET4_ADJUGATE_H
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
 
 #ifdef __cplusplus
 extern "C" {

@@ -2,7 +2,7 @@
 #define HEX8_LINEAR_ELASTICITY_H
 
 #include <stddef.h>
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

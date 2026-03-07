@@ -9,7 +9,7 @@
 #include "utils.h"
 
 #include "crs_graph.h"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #include "read_mesh.h"
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     // Read data
     ///////////////////////////////////////////////////////////////////////////////
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     real_t *p0;
     ptrdiff_t p0_n_local, p0_n_global;
@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_COMPUTE_COEFFICIENTS, atoi);
 
     if (SFEM_COMPUTE_COEFFICIENTS) {
-        surface_e_projection_coeffs(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), p0, p1);
+        surface_e_projection_coeffs(mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
     } else {
-        surface_e_projection_apply(mesh->element_type(), mesh->n_elements(), mesh->n_nodes(), mesh->elements()->data(), mesh->points()->data(), p0, p1);
+        surface_e_projection_apply(mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), mesh->points()->data(), p0, p1);
     }
 
     ///////////////////////////////////////////////////////////////////////////////

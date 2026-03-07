@@ -1,11 +1,11 @@
 #include <memory>
 
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 
@@ -14,12 +14,13 @@
 #include "sfem_API.hpp"
 #include "sfem_ssgmg.hpp"
 
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "smesh_sshex8_graph.hpp"
 #include "ssquad4_interpolate.h"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -47,13 +48,13 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     
     ptrdiff_t n_nodes{0};
     idx_t    *nodes{nullptr};
-    SFEM_TEST_ASSERT(sshex8_extract_nodeset_from_sideset(coarse_ssmesh.level(),
-                                                         coarse_ssmesh.element_data(),
-                                                         sideset[0]->parent()->size(),
-                                                         sideset[0]->parent()->data(),
-                                                         sideset[0]->lfi()->data(),
-                                                         &n_nodes,
-                                                         &nodes) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::sshex8_extract_nodeset_from_sideset(coarse_ssmesh.level(),
+                                                                coarse_ssmesh.element_data(),
+                                                                sideset[0]->parent()->size(),
+                                                                sideset[0]->parent()->data(),
+                                                                sideset[0]->lfi()->data(),
+                                                                &n_nodes,
+                                                                &nodes) == SFEM_SUCCESS);
 
     auto coarse_nodeset = sfem::manage_host_buffer(n_nodes, nodes);
 
@@ -76,12 +77,12 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     const int nexs       = (fine_ssmesh.level() + 1) * (fine_ssmesh.level() + 1);
     auto      fine_sides = sfem::create_host_buffer<idx_t>(nexs, sideset[0]->parent()->size());
 
-    SFEM_TEST_ASSERT(sshex8_extract_surface_from_sideset(fine_ssmesh.level(),
-                                                         fine_ssmesh.element_data(),
-                                                         sideset[0]->parent()->size(),
-                                                         sideset[0]->parent()->data(),
-                                                         sideset[0]->lfi()->data(),
-                                                         fine_sides->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::sshex8_extract_surface_from_sideset(fine_ssmesh.level(),
+                                                                fine_ssmesh.element_data(),
+                                                                sideset[0]->parent()->size(),
+                                                                sideset[0]->parent()->data(),
+                                                                sideset[0]->lfi()->data(),
+                                                                fine_sides->data()) == SFEM_SUCCESS);
 
     SFEM_TEST_ASSERT(ssquad4_prolongate(fine_sides->extent(1),                        // nelements,
                                         coarse_ssmesh.level(),                        // rom_level

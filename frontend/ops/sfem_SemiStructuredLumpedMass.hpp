@@ -5,7 +5,7 @@ namespace sfem {
     class SemiStructuredLumpedMass final : public Op {
     public:
         std::shared_ptr<FunctionSpace> space;
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
         const char                    *name() const override { return "ss:LumpedMass"; }
         inline bool                    is_linear() const override { return true; }
         inline ptrdiff_t                      n_dofs_domain() const override { return space->n_dofs(); }

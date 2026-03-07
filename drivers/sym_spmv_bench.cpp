@@ -12,11 +12,11 @@
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 int  SFEM_REPEAT = 10;
 void time_operator_cpu(const std::shared_ptr<sfem::Operator<real_t>> op,

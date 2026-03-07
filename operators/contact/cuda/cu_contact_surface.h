@@ -1,7 +1,7 @@
 #ifndef CU_CONTACT_SURFACE_H
 #define CU_CONTACT_SURFACE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 #ifdef __cplusplus
 extern "C" {

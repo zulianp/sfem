@@ -1,7 +1,7 @@
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_API.hpp"
 
 #include <iostream>
@@ -27,7 +27,7 @@ int test_multi_block_op() {
     SFEM_TEST_ASSERT(cg->apply(x->data(), b->data()) == SFEM_SUCCESS);
 
     sfem::create_directory("test_multi_block_op");
-    SFEM_TEST_ASSERT(mesh->write("test_multi_block_op") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(mesh->write(smesh::Path("test_multi_block_op")) == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }

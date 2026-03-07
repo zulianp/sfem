@@ -5,7 +5,7 @@
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -32,7 +32,7 @@ namespace sfem {
         std::shared_ptr<MultiDomainOp>  domains;
         std::shared_ptr<Buffer<real_t>> vel_[3];
         std::shared_ptr<Buffer<real_t>> acc_[3];
-        enum ElemType                   element_type { INVALID };
+        smesh::ElemType                   element_type { smesh::INVALID };
 
         real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
 
@@ -85,7 +85,7 @@ namespace sfem {
         ret->impl_->gamma        = SFEM_GAMMA;
         ret->impl_->beta         = SFEM_BETA;
         ret->impl_->rho          = SFEM_DENSITY;
-        ret->impl_->element_type = (enum ElemType)space->element_type();
+        ret->impl_->element_type = (smesh::ElemType)space->element_type();
 
         return ret;
     }
@@ -140,7 +140,7 @@ namespace sfem {
         auto mesh      = impl_->space->mesh_ptr();
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
 
-        if (impl_->space->element_type() == HEX8) {
+        if (impl_->space->element_type() == smesh::HEX8) {
             int dim = mesh->spatial_dimension();
             for (auto &domain : impl_->domains->domains()) {
                 auto block     = domain.second.block;

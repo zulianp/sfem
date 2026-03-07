@@ -1,7 +1,7 @@
 #ifndef HEX8_INLINE_CPU_H
 #define HEX8_INLINE_CPU_H
 
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #ifndef POW2
 #define POW2(a) ((a) * (a))

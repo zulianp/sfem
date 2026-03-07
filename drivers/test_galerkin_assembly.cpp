@@ -1,7 +1,7 @@
 #include <memory>
 #include "sfem_Function.hpp"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.h"
 #include "sfem_Buffer.hpp"
@@ -12,7 +12,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     const char *folder = argv[1];
     const char *output_path = argv[2];
 
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {

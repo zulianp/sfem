@@ -1,15 +1,15 @@
 #include "sfem_MooneyRivlinVisco.hpp"
 
 #include "mooney_rivlin_visco.h"
-#include "sfem_defs.h"
-#include "sfem_logger.h"
-#include "sfem_macros.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_mesh.hpp"
 
 #include "sfem_CRSGraph.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -216,17 +216,17 @@ namespace sfem {
         auto ret = std::make_unique<MooneyRivlinVisco>(space);
         
         // Material parameters
-        ret->impl_->C10 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C10", ret->impl_->C10);
-        ret->impl_->K   = sfem::Env::read("SFEM_MOONEY_RIVLIN_K", ret->impl_->K);
-        ret->impl_->C01 = sfem::Env::read("SFEM_MOONEY_RIVLIN_C01", ret->impl_->C01);
-        ret->impl_->dt  = sfem::Env::read("SFEM_DT", ret->impl_->dt);
+        ret->impl_->C10 = smesh::Env::read("SFEM_MOONEY_RIVLIN_C10", ret->impl_->C10);
+        ret->impl_->K   = smesh::Env::read("SFEM_MOONEY_RIVLIN_K", ret->impl_->K);
+        ret->impl_->C01 = smesh::Env::read("SFEM_MOONEY_RIVLIN_C01", ret->impl_->C01);
+        ret->impl_->dt  = smesh::Env::read("SFEM_DT", ret->impl_->dt);
         
         // WLF temperature shift parameters (all temperatures in °C)
-        ret->impl_->wlf_C1    = sfem::Env::read("SFEM_WLF_C1", ret->impl_->wlf_C1);
-        ret->impl_->wlf_C2    = sfem::Env::read("SFEM_WLF_C2", ret->impl_->wlf_C2);
-        ret->impl_->wlf_T_ref = sfem::Env::read("SFEM_WLF_T_REF", ret->impl_->wlf_T_ref);
-        ret->impl_->current_T = sfem::Env::read("SFEM_TEMPERATURE", ret->impl_->current_T);
-        ret->impl_->use_wlf   = sfem::Env::read("SFEM_USE_WLF", 0) != 0;
+        ret->impl_->wlf_C1    = smesh::Env::read("SFEM_WLF_C1", ret->impl_->wlf_C1);
+        ret->impl_->wlf_C2    = smesh::Env::read("SFEM_WLF_C2", ret->impl_->wlf_C2);
+        ret->impl_->wlf_T_ref = smesh::Env::read("SFEM_WLF_T_REF", ret->impl_->wlf_T_ref);
+        ret->impl_->current_T = smesh::Env::read("SFEM_TEMPERATURE", ret->impl_->current_T);
+        ret->impl_->use_wlf   = smesh::Env::read("SFEM_USE_WLF", 0) != 0;
         
         printf("[MooneyRivlinVisco::create] WLF params: C1=%g, C2=%g, T_ref=%g, T=%g, use_wlf=%d\n",
                (double)ret->impl_->wlf_C1, (double)ret->impl_->wlf_C2, 
@@ -235,8 +235,8 @@ namespace sfem {
         
         // Prony series parameters (comma-separated values)
         // Example: SFEM_PRONY_G="0.15,0.15,0.10,0.05" SFEM_PRONY_TAU="0.1,1.0,10.0,100.0"
-        std::string prony_g_str = sfem::Env::read("SFEM_PRONY_G", std::string(""));
-        std::string prony_tau_str = sfem::Env::read("SFEM_PRONY_TAU", std::string(""));
+        std::string prony_g_str = smesh::Env::read("SFEM_PRONY_G", std::string(""));
+        std::string prony_tau_str = smesh::Env::read("SFEM_PRONY_TAU", std::string(""));
         
         if (!prony_g_str.empty() && !prony_tau_str.empty()) {
             std::vector<real_t> g_values = parse_csv_values(prony_g_str);

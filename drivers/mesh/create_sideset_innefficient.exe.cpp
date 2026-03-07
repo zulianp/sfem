@@ -413,7 +413,7 @@ int main(int argc, char *argv[]) {
 
         sfem::create_directory(output_folder.c_str());
         sideset_parent->to_file(smesh::Path(output_folder + "/parent." + std::string(smesh::TypeToString<element_idx_t>::value())));
-        sideset_lfi->to_file(smesh::Path(output_folder + "/lfi." + std::string(smesh::TypeToString<i16>::value())));
+        sideset_lfi->to_file(smesh::Path(output_folder + "/lfi." + std::string(smesh::TypeToString<smesh::i16>::value())));
 
         if (SFEM_DEBUG) {
             printf("Extraced %ld/%ld surface elements\n", long(sideset_parent->size()), long(parent->size()));

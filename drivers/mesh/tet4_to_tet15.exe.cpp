@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sfem_macros.h"
+#include "sfem_macros.hpp"
 #include "sortreduce.h"
 
 int main(int argc, char *argv[]) {
@@ -20,14 +20,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto tet4_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), argv[1]);
+    auto tet4_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(argv[1]));
     const char *output_folder = argv[2];
 
     const ptrdiff_t n_elements = tet4_mesh->n_elements();
     const ptrdiff_t n_nodes    = tet4_mesh->n_nodes();
     auto            edge_graph = tet4_mesh->node_to_node_graph_upper_triangular();
     auto            side_table = tet4_mesh->half_face_table();
-    int             nsxe       = elem_num_sides(tet4_mesh->element_type());
+    int             nsxe       = elem_num_sides(tet4_mesh->element_type(0));
 
     auto side_ids = sfem::create_host_buffer<idx_t>(side_table->size());
 
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
         auto rowptr      = edge_graph->rowptr()->data();
         auto colidx      = edge_graph->colidx()->data();
         auto si          = side_ids->data();
-        auto tet4_elems  = tet4_mesh->elements()->data();
+        auto tet4_elems  = tet4_mesh->elements(0)->data();
         auto tet15_elems = tet15_elements->data();
 
         for (ptrdiff_t e = 0; e < n_elements; e++) {
@@ -208,13 +208,11 @@ int main(int argc, char *argv[]) {
     // Output
     sfem::create_directory(output_folder);
 
-    std::string path_output_format = output_folder;
-    path_output_format += "/i%d.raw";
-    tet15_elements->to_files(path_output_format.c_str());
+    std::string path_output_format = std::string(output_folder) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value());
+    tet15_elements->to_files(smesh::Path(path_output_format));
 
-    path_output_format = output_folder;
-    path_output_format += "/x%d.raw";
-    tet15_points->to_files(path_output_format.c_str());
+    path_output_format = std::string(output_folder) + "/x%d." + std::string(smesh::TypeToString<geom_t>::value());
+    tet15_points->to_files(smesh::Path(path_output_format));
 
     return MPI_Finalize();
 }

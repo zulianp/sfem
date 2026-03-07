@@ -8,7 +8,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

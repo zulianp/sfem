@@ -1,10 +1,13 @@
 #include "sfem_API.hpp"
 
 #include "matrixio_array.h"
-#include "sfem_defs.h"
+#include "sfem_defs.hpp"
 
 #include "adj_table.h"
-#include "sfem_hex8_mesh_graph.h"
+#include "sfem_hex8_mesh_graph.hpp"
+#include "sshex8_mesh.h"
+#include "smesh_sidesets.hpp"
+#include "smesh_sshex8_graph.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -35,17 +38,16 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_CONVERT_TO_STD_MESH, atoi);
 
     const char *path_mesh    = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), path_mesh);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(path_mesh));
     const char *path_sideset = argv[2];
     auto s = sfem::Sideset::create_from_file(sfem::Communicator::wrap(comm), path_sideset);
-    const auto elements = m->elements()->data();
+    const auto elements = m->elements(0)->data();
 
     // Make sure the folder exists
     sfem::create_directory(argv[3]);
 
-    enum ElemType element_type       = m->element_type();
-    std::string   path_output_format = argv[3];
-    path_output_format += "/i%d.raw";
+    smesh::ElemType element_type       = m->element_type(0);
+    std::string path_output_format = std::string(argv[3]) + "/i%d." + std::string(smesh::TypeToString<idx_t>::value());
 
     if (SFEM_ELEMENT_REFINE_LEVEL <= 1) {
         int  nnxs       = elem_num_nodes(side_type(element_type));
@@ -53,17 +55,17 @@ int main(int argc, char *argv[]) {
 
         {
             SFEM_TRACE_SCOPE("extract_surface_from_sideset");
-            if (extract_surface_from_sideset(element_type,
-                                             elements,
-                                             s->parent()->size(),
-                                             s->parent()->data(),
-                                             s->lfi()->data(),
-                                             surf_elems->data()) != SFEM_SUCCESS) {
+            if (smesh::extract_surface_from_sideset(element_type,
+                                                    elements,
+                                                    s->parent()->size(),
+                                                    s->parent()->data(),
+                                                    s->lfi()->data(),
+                                                    surf_elems->data()) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
         }
 
-        if (surf_elems->to_files(path_output_format.c_str()) != SFEM_SUCCESS) {
+        if (surf_elems->to_files(smesh::Path(path_output_format)) != SFEM_SUCCESS) {
             SFEM_ERROR("Unable to write files!\n");
         }
 
@@ -73,25 +75,24 @@ int main(int argc, char *argv[]) {
 
             {
                 SFEM_TRACE_SCOPE("extract_nodeset_from_sideset");
-                if (extract_nodeset_from_sideset(element_type,
-                                                 elements,
-                                                 s->parent()->size(),
-                                                 s->parent()->data(),
-                                                 s->lfi()->data(),
-                                                 &n_nodes,
-                                                 &nodes) != SFEM_SUCCESS) {
+                if (smesh::extract_nodeset_from_sideset(element_type,
+                                                        elements,
+                                                        s->parent()->size(),
+                                                        s->parent()->data(),
+                                                        s->lfi()->data(),
+                                                        &n_nodes,
+                                                        &nodes) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract nodeset from sideset!\n");
                 }
             }
 
-            std::string path_nodes = argv[3];
-            path_nodes += "/nodeset.raw";
+            std::string path_nodes = std::string(argv[3]) + "/nodeset." + std::string(smesh::TypeToString<idx_t>::value());
             auto nodeset = sfem::manage_host_buffer(n_nodes, nodes);
-            nodeset->to_file(path_nodes.c_str());
+            nodeset->to_file(smesh::Path(path_nodes));
         }
 
     } else {
-        if (element_type != HEX8) {
+        if (element_type != smesh::HEX8) {
             SFEM_ERROR("Element %s not supported for semi-structured discretization\n", type_to_string(element_type));
         }
 
@@ -103,33 +104,36 @@ int main(int argc, char *argv[]) {
             const int nnxs = 4;
             const int nexs = ss->level() * ss->level();
             surf_elems     = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size() * nexs);
+            auto ss_surf_elems = sfem::create_host_buffer<idx_t>((ss->level() + 1) * (ss->level() + 1), s->parent()->size());
 
-            SFEM_TRACE_SCOPE("sshex8_extract_quadshell4_surface_from_sideset");
-            if (sshex8_extract_quadshell4_surface_from_sideset(ss->level(),
-                                                               ss->element_data(),
-                                                               s->parent()->size(),
-                                                               s->parent()->data(),
-                                                               s->lfi()->data(),
-                                                               surf_elems->data()) != SFEM_SUCCESS) {
+            SFEM_TRACE_SCOPE("sshex8_extract_surface_from_sideset");
+            if (smesh::sshex8_extract_surface_from_sideset(ss->level(),
+                                                           ss->element_data(),
+                                                           s->parent()->size(),
+                                                           s->parent()->data(),
+                                                           s->lfi()->data(),
+                                                           ss_surf_elems->data()) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
+
+            ssquad4_to_standard_quad4_mesh(ss->level(), s->parent()->size(), ss_surf_elems->data(), surf_elems->data());
 
         } else {
             int nnxs   = (ss->level() + 1) * (ss->level() + 1);
             surf_elems = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size());
 
             SFEM_TRACE_SCOPE("sshex8_extract_surface_from_sideset");
-            if (sshex8_extract_surface_from_sideset(ss->level(),
-                                                    ss->element_data(),
-                                                    s->parent()->size(),
-                                                    s->parent()->data(),
-                                                    s->lfi()->data(),
-                                                    surf_elems->data()) != SFEM_SUCCESS) {
+            if (smesh::sshex8_extract_surface_from_sideset(ss->level(),
+                                                           ss->element_data(),
+                                                           s->parent()->size(),
+                                                           s->parent()->data(),
+                                                           s->lfi()->data(),
+                                                           surf_elems->data()) != SFEM_SUCCESS) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
         }
 
-        if (surf_elems->to_files(path_output_format.c_str()) != SFEM_SUCCESS) {
+        if (surf_elems->to_files(smesh::Path(path_output_format)) != SFEM_SUCCESS) {
             SFEM_ERROR("Unable to write files!\n");
         }
 
@@ -139,21 +143,20 @@ int main(int argc, char *argv[]) {
 
             {
                 SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                if (sshex8_extract_nodeset_from_sideset(ss->level(),
-                                                        ss->element_data(),
-                                                        s->parent()->size(),
-                                                        s->parent()->data(),
-                                                        s->lfi()->data(),
-                                                        &n_nodes,
-                                                        &nodes) != SFEM_SUCCESS) {
+                if (smesh::sshex8_extract_nodeset_from_sideset(ss->level(),
+                                                               ss->element_data(),
+                                                               s->parent()->size(),
+                                                               s->parent()->data(),
+                                                               s->lfi()->data(),
+                                                               &n_nodes,
+                                                               &nodes) != SFEM_SUCCESS) {
                     SFEM_ERROR("Unable to extract nodeset from sideset!\n");
                 }
             }
 
-            std::string path_nodes = argv[3];
-            path_nodes += "/nodeset.raw";
+            std::string path_nodes = std::string(argv[3]) + "/nodeset." + std::string(smesh::TypeToString<idx_t>::value());
             auto nodeset = sfem::manage_host_buffer(n_nodes, nodes);
-            nodeset->to_file(path_nodes.c_str());
+            nodeset->to_file(smesh::Path(path_nodes));
         }
     }
 

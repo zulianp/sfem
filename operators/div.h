@@ -2,11 +2,7 @@
 #define SFEM_DIV_H
 
 #include <stddef.h>
-#include "sfem_base.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "sfem_base.hpp"
 
 void div_apply(const int element_type,
                const ptrdiff_t nelements,
@@ -55,9 +51,5 @@ void p1_u_dot_grad_q_apply(const ptrdiff_t nelements,
                            const real_t *const SFEM_RESTRICT uy,
                            const real_t *const SFEM_RESTRICT uz,
                            real_t *const SFEM_RESTRICT values);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  // SFEM_DIV_H

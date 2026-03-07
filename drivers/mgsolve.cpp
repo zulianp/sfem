@@ -4,7 +4,7 @@
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_GaussSeidel.hpp"
 #include "sfem_Multigrid.hpp"
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_crs_SpMV.hpp"
@@ -16,7 +16,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
 #endif
 
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
     const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), folder);
+    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
 
     const char *SFEM_OPERATOR = "Laplacian";
     const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;

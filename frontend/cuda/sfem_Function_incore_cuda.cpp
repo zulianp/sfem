@@ -2,9 +2,9 @@
 #include <memory>
 #include "boundary_condition.h"
 
-#include "sfem_defs.h"
-#include "sfem_defs.h"
-#include "sfem_mesh.h"
+#include "sfem_defs.hpp"
+#include "sfem_defs.hpp"
+#include "smesh_mesh.hpp"
 #include <cuda_runtime_api.h>
 
 // CPU
@@ -55,24 +55,24 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
-                                                            const enum ElemType                   element_type) {
+                                                            const smesh::ElemType                   element_type) {
         if (space->has_semi_structured_mesh()) {
             return to_device(space->semi_structured_mesh().elements());
 
         } else {
-            return to_device(space->mesh().elements());
+            return to_device(space->mesh().elements(0));
         }
     }
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
-                                                              const enum ElemType                   element_type) {
+                                                              const smesh::ElemType                   element_type) {
         if (space->has_semi_structured_mesh()) {
             auto nxe = space->semi_structured_mesh().n_nodes_per_element();
             return to_device(soa_to_aos(1, nxe, space->semi_structured_mesh().elements()));
 
         } else {
-            auto nxe = space->mesh().n_nodes_per_element();
-            return to_device(soa_to_aos(1, nxe, space->mesh().elements()));
+            auto nxe = space->mesh().n_nodes_per_element(0);
+            return to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
         }
     }
 
@@ -95,50 +95,50 @@ namespace sfem {
 
     class FFF {
     public:
-        FFF(Mesh &mesh, const enum ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
+        FFF(Mesh &mesh, const smesh::ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
             : element_type_(element_type), elements_(elements) {
             void *fff{nullptr};
-            if (element_type == HEX8 || element_type == SSHEX8) {
+            if (element_type == smesh::HEX8 || is_semistructured_type(element_type)) {
                 cu_hex8_fff_allocate(mesh.n_elements(), &fff);
-                cu_hex8_fff_fill(mesh.n_elements(), mesh.elements()->data(), mesh.points()->data(), fff);
+                cu_hex8_fff_fill(mesh.n_elements(), mesh.elements(0)->data(), mesh.points()->data(), fff);
             } else {
                 cu_tet4_fff_allocate(mesh.n_elements(), &fff);
-                cu_tet4_fff_fill(mesh.n_elements(), mesh.elements()->data(), mesh.points()->data(), fff);
+                cu_tet4_fff_fill(mesh.n_elements(), mesh.elements(0)->data(), mesh.points()->data(), fff);
             }
 
             // FIXME compute size (currently 6)
             fff_ = manage_device_buffer<void>(mesh.n_elements() * 6, fff);
         }
 
-        FFF(enum ElemType                           element_type,
+        FFF(smesh::ElemType                           element_type,
             const std::shared_ptr<Buffer<idx_t *>> &elements,
             const std::shared_ptr<Buffer<void>>    &fff)
             : element_type_(element_type), elements_(elements), fff_(fff) {}
 
         ~FFF() {}
 
-        enum ElemType                    element_type() const { return element_type_; }
+        smesh::ElemType                    element_type() const { return element_type_; }
         ptrdiff_t                        n_elements() const { return elements_->extent(1); }
         std::shared_ptr<Buffer<idx_t *>> elements() const { return elements_; }
         std::shared_ptr<Buffer<void>>    fff() const { return fff_; }
 
     private:
-        enum ElemType                    element_type_;
+        smesh::ElemType                    element_type_;
         std::shared_ptr<Buffer<idx_t *>> elements_;
         std::shared_ptr<Buffer<void>>    fff_;
     };
 
     class Adjugate {
     public:
-        Adjugate(Mesh &mesh, const enum ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
+        Adjugate(Mesh &mesh, const smesh::ElemType element_type, const std::shared_ptr<Buffer<idx_t *>> &elements)
             : element_type_(element_type), elements_(elements) {
             void *jacobian_adjugate{nullptr};
             void *jacobian_determinant{nullptr};
 
-            if (element_type == HEX8 || element_type == SSHEX8) {
+            if (element_type == smesh::HEX8 || is_semistructured_type(element_type)) {
                 cu_hex8_adjugate_allocate(mesh.n_elements(), &jacobian_adjugate, &jacobian_determinant);
                 cu_hex8_adjugate_fill(mesh.n_elements(),
-                                      mesh.elements()->data(),
+                                      mesh.elements(0)->data(),
                                       mesh.points()->data(),
                                       jacobian_adjugate,
                                       jacobian_determinant);
@@ -146,7 +146,7 @@ namespace sfem {
             } else {
                 cu_tet4_adjugate_allocate(mesh.n_elements(), &jacobian_adjugate, &jacobian_determinant);
                 cu_tet4_adjugate_fill(mesh.n_elements(),
-                                      mesh.elements()->data(),
+                                      mesh.elements(0)->data(),
                                       mesh.points()->data(),
                                       jacobian_adjugate,
                                       jacobian_determinant);
@@ -157,7 +157,7 @@ namespace sfem {
             jacobian_determinant_ = manage_device_buffer<void>(mesh.n_elements(), jacobian_determinant);
         }
 
-        Adjugate(enum ElemType                           element_type,
+        Adjugate(smesh::ElemType                           element_type,
                  const std::shared_ptr<Buffer<idx_t *>> &elements,
                  const std::shared_ptr<Buffer<void>>    &jacobian_adjugate,
                  const std::shared_ptr<Buffer<void>>    &jacobian_determinant)
@@ -168,14 +168,14 @@ namespace sfem {
 
         ~Adjugate() {}
 
-        enum ElemType                    element_type() const { return element_type_; }
+        smesh::ElemType                    element_type() const { return element_type_; }
         ptrdiff_t                        n_elements() const { return elements_->extent(1); }
         std::shared_ptr<Buffer<idx_t *>> elements() const { return elements_; }
         std::shared_ptr<Buffer<void>>    jacobian_determinant() const { return jacobian_determinant_; }
         std::shared_ptr<Buffer<void>>    jacobian_adjugate() const { return jacobian_adjugate_; }
 
     private:
-        enum ElemType                    element_type_;
+        smesh::ElemType                    element_type_;
         std::shared_ptr<Buffer<idx_t *>> elements_;
         std::shared_ptr<Buffer<void>>    jacobian_adjugate_;
         std::shared_ptr<Buffer<void>>    jacobian_determinant_;
@@ -327,15 +327,15 @@ namespace sfem {
                 const auto &hc = hconds[i];
                 const auto &dc = conditions[i];
 
-                const enum ElemType st     = hc.element_type;
+                const smesh::ElemType st     = hc.element_type;
                 const int           nnxs   = elem_num_nodes(st);
                 const int           dim    = mesh->spatial_dimension();
                 const ptrdiff_t     ne     = dc.surface->extent(1);
 
                 if (ne == 0) continue;
 
-                if (st != QUADSHELL4) {
-                    SFEM_ERROR("GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only QUADSHELL4)\n",
+                if (st != smesh::QUADSHELL4) {
+                    SFEM_ERROR("GPUNeumannConditions::gradient: unsupported element type %s (GPU supports only smesh::QUADSHELL4)\n",
                                type_to_string(st));
                     return SFEM_FAILURE;
                 }
@@ -419,7 +419,7 @@ namespace sfem {
         std::shared_ptr<FFF>           fff;
         enum RealType                  real_type { SFEM_REAL_DEFAULT };
         void                          *stream{SFEM_DEFAULT_STREAM};
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(1 == space->block_size());
@@ -537,7 +537,7 @@ namespace sfem {
         std::shared_ptr<FFF>           fff;
         enum RealType                  real_type { SFEM_REAL_DEFAULT };
         void                          *stream{SFEM_DEFAULT_STREAM};
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
             assert(1 == space->block_size());
@@ -656,7 +656,7 @@ namespace sfem {
         std::shared_ptr<Adjugate>      adjugate;
         enum RealType                  real_type { SFEM_REAL_DEFAULT };
         void                          *stream{SFEM_DEFAULT_STREAM};
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
         real_t                         mu{1};
         real_t                         lambda{1};
 
@@ -1202,7 +1202,7 @@ namespace sfem {
             std::shared_ptr<Adjugate>      adjugate;
             enum RealType                  real_type { SFEM_REAL_DEFAULT };
             void                          *stream{SFEM_DEFAULT_STREAM};
-            enum ElemType                  element_type { INVALID };
+            smesh::ElemType                  element_type { smesh::INVALID };
             real_t                         k{4};
             real_t                         K{3};
             real_t                         eta{0.1};
@@ -1387,7 +1387,7 @@ namespace sfem {
         std::shared_ptr<Adjugate>      adjugate;
         enum RealType                  real_type { SFEM_REAL_DEFAULT };
         void                          *stream{SFEM_DEFAULT_STREAM};
-        enum ElemType                  element_type { INVALID };
+        smesh::ElemType                  element_type { smesh::INVALID };
        
         real_t k{4}, K{3}, eta{0.1}, dt{0.1}, gamma{0.5}, beta{0.25}, rho{1.0};
         std::shared_ptr<Buffer<real_t>> vel_[3];
@@ -1598,14 +1598,14 @@ namespace sfem {
                 err       = sshex8_laplacian_element_matrix(ssm.level(),
                                                       mesh->n_elements(),
                                                       mesh->n_nodes(),
-                                                      mesh->elements()->data(),
+                                                      mesh->elements(0)->data(),
                                                       mesh->points()->data(),
                                                       h_element_matrix->data());
             } else {
                 err = sshex8_laplacian_element_matrix(1,
                                                       mesh->n_elements(),
                                                       mesh->n_nodes(),
-                                                      mesh->elements()->data(),
+                                                      mesh->elements(0)->data(),
                                                       mesh->points()->data(),
                                                       h_element_matrix->data());
             }
@@ -1710,14 +1710,14 @@ namespace sfem {
                     err = sshex8_laplacian_element_matrix_cartesian(ssm.level(),
                                                                     mesh->n_elements(),
                                                                     mesh->n_nodes(),
-                                                                    mesh->elements()->data(),
+                                                                    mesh->elements(0)->data(),
                                                                     mesh->points()->data(),
                                                                     h_element_matrix->data());
                 } else {
                     err = sshex8_laplacian_element_matrix(ssm.level(),
                                                           mesh->n_elements(),
                                                           mesh->n_nodes(),
-                                                          mesh->elements()->data(),
+                                                          mesh->elements(0)->data(),
                                                           mesh->points()->data(),
                                                           h_element_matrix->data());
                 }
@@ -1796,4 +1796,3 @@ namespace sfem {
     }
 
 }  // namespace sfem
-

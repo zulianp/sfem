@@ -5,10 +5,10 @@
 #include "adj_table.h"
 #include "crs_graph.h"
 #include "sfem_Buffer.hpp"
-#include "sfem_base.h"
-#include "sfem_mask.h"
-#include "sfem_mesh.h"
-#include "sfem_prolongation_restriction.h"
+#include "sfem_base.hpp"
+#include "sfem_mask.hpp"
+#include "smesh_mesh.hpp"
+#include "sfem_prolongation_restriction.hpp"
 #include "sshex8.h"
 #include "sshex8_interpolate.h"
 #include "ssquad4.h"
@@ -22,7 +22,7 @@
 #include "sfem_ContactConditions.hpp"
 #include "sfem_Context.hpp"
 #include "sfem_CooSym.hpp"
-#include "sfem_Env.hpp"
+#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
@@ -47,7 +47,7 @@
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftableJacobi.hpp"
-#include "sfem_cuda_blas.h"
+#include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_crs_SpMV.hpp"
 #include "sfem_cuda_mprgp_impl.hpp"
@@ -385,9 +385,9 @@ namespace sfem {
     }
 
     static std::shared_ptr<CRSGraph> create_derefined_crs_graph(FunctionSpace &space) {
-        auto et        = (enum ElemType)space.element_type();
+        auto et        = (smesh::ElemType)space.element_type();
         auto coarse_et = macro_base_elem(et);
-        auto crs_graph = space.mesh().create_node_to_node_graph(coarse_et);
+        auto crs_graph = space.mesh().create_node_to_node_graph(static_cast<smesh::ElemType>(coarse_et));
         return crs_graph;
     }
 
@@ -531,7 +531,7 @@ namespace sfem {
                             hierarchical_prolongation(from_space->element_type(),
                                                       to_space->element_type(),
                                                       to_space->mesh().n_elements(),
-                                                      to_space->mesh().elements()->data(),
+                                                      to_space->mesh().elements(0)->data(),
                                                       from_space->block_size(),
                                                       from,
                                                       to);
@@ -777,7 +777,7 @@ namespace sfem {
         // Get the mesh node-to-node graph instead of the FunctionSpace scalar adapted graph
         auto      crs_graph  = f->space()->node_to_node_graph();
         const int block_size = f->space()->block_size();
-        int       prec       = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int       prec       = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
         // FIXME: there is a memory leak here!
 #ifdef SFEM_ENABLE_CUDA
@@ -873,7 +873,7 @@ namespace sfem {
         bool SFEM_BCRS_SYM_USE_AOS = false;
         SFEM_READ_ENV(SFEM_BCRS_SYM_USE_AOS, atoi);
 
-        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
         SharedBuffer<real_t *> diag_values;
         SharedBuffer<real_t *> off_diag_values;
@@ -1052,7 +1052,7 @@ namespace sfem {
                                                                   const sfem::ExecutionSpace             es) {
         auto crs = hessian_crs(f, x, es);
 
-        int prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         switch (prec) {
             case 2:
                 return sfem::sdacrs_from_crs<count_t, idx_t, real_t, int16_t, real_t, half_t>(
@@ -1068,7 +1068,7 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_acrs(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
@@ -1084,7 +1084,7 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_scrs(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
             case 2:
@@ -1101,8 +1101,8 @@ namespace sfem {
     static std::shared_ptr<sfem::Operator<real_t>> hessian_sell(const std::shared_ptr<sfem::Function> &f,
                                                                 const std::shared_ptr<Buffer<real_t>> &x,
                                                                 const sfem::ExecutionSpace             es) {
-        int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
-        int  slice_height = sfem::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
+        int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+        int  slice_height = smesh::Env::read("SFEM_SELL_SLICE_HEIGHT", 32);
 
         auto temp = sfem::hessian_crs(f, x, es);
         switch (prec) {
@@ -1188,7 +1188,7 @@ namespace sfem {
             }
 
             // FIXME: This is a hack to support mixed precision
-            int  prec = sfem::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
+            int  prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
             auto crs  = sfem::hessian_crs(f, u, es);
             switch (prec) {
                 case 2:
@@ -1326,8 +1326,8 @@ namespace sfem {
 
         if (extract_skin_sideset(mesh->n_elements(),
                                  mesh->n_nodes(),
-                                 mesh->element_type(),
-                                 mesh->elements()->data(),
+                                 mesh->element_type(0),
+                                 mesh->elements(0)->data(),
                                  &n_surf_elements,
                                  &parent,
                                  &side_idx) != SFEM_SUCCESS) {

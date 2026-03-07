@@ -1,4 +1,4 @@
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 #ifdef SFEM_ENABLE_CUDA
 
 #include <thrust/device_vector.h>

@@ -1,7 +1,7 @@
 #ifndef SFEM_LINE_QUADRATURE_H
 #define SFEM_LINE_QUADRATURE_H
 
-#include "sfem_base.h"
+#include "sfem_base.hpp"
 
 // Gauss-Legendre
 

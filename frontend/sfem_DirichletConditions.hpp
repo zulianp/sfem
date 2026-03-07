@@ -8,12 +8,12 @@
 #include <string>
 #include <vector>
 
-#include "sfem_base.h"
-#include "sfem_defs.h"
-#include "sfem_mask.h"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_mask.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_ForwardDeclarations.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 #include "sfem_Sideset.hpp"
 #include "sfem_Constraint.hpp"
 

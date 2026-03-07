@@ -1,7 +1,7 @@
-#include "sfem_test.h"
+#include "sfem_test.hpp"
 
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_Mesh.hpp"
+#include "smesh_mesh.hpp"
 
 #include <iostream>
 #include <memory>
@@ -15,12 +15,12 @@ int test_single_block_mesh() {
     // Test basic properties
     SFEM_TEST_ASSERT(space->n_blocks() == 1);
     SFEM_TEST_ASSERT(!space->is_multi_block());
-    SFEM_TEST_ASSERT(space->element_type(0) == HEX8);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
     
     // Test fallback behavior for non-existent blocks
-    SFEM_TEST_ASSERT(space->element_type(1) == INVALID);  // Out of range should be INVALID
-    SFEM_TEST_ASSERT(space->element_type(-1) == INVALID); // Out of range should be INVALID
-    SFEM_TEST_ASSERT(space->element_type(10) == INVALID); // Out of range should be INVALID
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::INVALID);  // Out of range should be smesh::INVALID
+    SFEM_TEST_ASSERT(space->element_type(-1) == smesh::INVALID); // Out of range should be smesh::INVALID
+    SFEM_TEST_ASSERT(space->element_type(10) == smesh::INVALID); // Out of range should be smesh::INVALID
     
     // Test block size
     SFEM_TEST_ASSERT(space->block_size() == 1);
@@ -47,9 +47,9 @@ int test_multi_block_fallback() {
     // Test that element types are consistent across block sizes
     SFEM_TEST_ASSERT(space1->element_type(0) == space3->element_type(0));
     
-    // Test that requesting invalid blocks returns INVALID
-    SFEM_TEST_ASSERT(space1->element_type(999) == INVALID);
-    SFEM_TEST_ASSERT(space3->element_type(999) == INVALID);
+    // Test that requesting invalid blocks returns smesh::INVALID
+    SFEM_TEST_ASSERT(space1->element_type(999) == smesh::INVALID);
+    SFEM_TEST_ASSERT(space3->element_type(999) == smesh::INVALID);
     
     return SFEM_TEST_SUCCESS;
 }
@@ -62,7 +62,7 @@ int test_semi_structured_promotion() {
     
     // Initially should not have semi-structured mesh
     SFEM_TEST_ASSERT(!space->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(space->element_type(0) == HEX8);
+    SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
     
     // Promote to semi-structured
     int result = space->promote_to_semi_structured(2);
@@ -70,10 +70,10 @@ int test_semi_structured_promotion() {
     
     // Should now have semi-structured mesh
     SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
-    SFEM_TEST_ASSERT(space->element_type(0) == SSHEX8);
+    SFEM_TEST_ASSERT(is_semistructured_type(space->element_type(0)));
     
     // Test that fallback still works
-    SFEM_TEST_ASSERT(space->element_type(1) == INVALID);
+    SFEM_TEST_ASSERT(space->element_type(1) == smesh::INVALID);
     
     return SFEM_TEST_SUCCESS;
 }
@@ -150,7 +150,7 @@ int test_edge_cases() {
     
     // Test with minimal mesh
     SFEM_TEST_ASSERT(space->n_dofs() > 0);
-    SFEM_TEST_ASSERT(space->element_type(0) != INVALID);
+    SFEM_TEST_ASSERT(space->element_type(0) != smesh::INVALID);
     
     // Test with large block size
     auto space_large = sfem::FunctionSpace::create(mesh, 10);
