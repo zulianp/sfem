@@ -414,8 +414,13 @@ namespace sfem {
         // auto semi_structured_sides = sfem::create_surface_from_sidesets(space, sidesets).second;
 
         smesh::ssquad4_hierarchical_remapping(ssmesh.level(),
-                semi_structured_sides->extent(1), semi_structured_sides->extent(0), semi_structured_sides->data(), &n_contiguous, &idx);
-
+                                       levels.size(),
+                                       levels.data(),
+                                       semi_structured_sides->extent(1),
+                                       ssmesh.n_nodes(),
+                                       semi_structured_sides->data(),
+                                       &idx,
+                                       &n_contiguous);
         auto node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
 
         const int nnxs  = 4;

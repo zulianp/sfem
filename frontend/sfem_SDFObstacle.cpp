@@ -1,6 +1,6 @@
 #include "sfem_SDFObstacle.hpp"
 
-#include "sfem_resample_gap.h"
+#include "sfem_resample_gap.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "cu_resample_gap.hpp"
@@ -41,7 +41,7 @@ namespace sfem {
 
     void SDFObstacle::set_variational(const bool enabled) { impl_->variational = enabled; }
 
-    int SDFObstacle::sample(enum ElemType                element_type,
+    int SDFObstacle::sample(smesh::ElemType              element_type,
                             const ptrdiff_t              nelements,
                             const ptrdiff_t              nnodes,
                             idx_t **const SFEM_RESTRICT  elements,
@@ -90,7 +90,7 @@ namespace sfem {
                 normals[2]);
     }
 
-    int SDFObstacle::sample_normals(enum ElemType                element_type,
+    int SDFObstacle::sample_normals(smesh::ElemType              element_type,
                                     const ptrdiff_t              nelements,
                                     const ptrdiff_t              nnodes,
                                     idx_t **const SFEM_RESTRICT  elements,
@@ -136,7 +136,7 @@ namespace sfem {
                 normals[2]);
     }
 
-    int SDFObstacle::sample_value(enum ElemType                element_type,
+    int SDFObstacle::sample_value(smesh::ElemType              element_type,
                                   const ptrdiff_t              nelements,
                                   const ptrdiff_t              nnodes,
                                   idx_t **const SFEM_RESTRICT  elements,
