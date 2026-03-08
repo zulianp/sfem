@@ -1,7 +1,7 @@
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <assert.h>
 #include <string.h>

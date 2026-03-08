@@ -8,18 +8,18 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "field_mpi_domain.h"
-#include "mass.h"
+#include "field_mpi_domain.hpp"
+#include "mass.hpp"
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
-#include "mesh_aura.h"
-#include "mesh_utils.h"
-#include "quadratures_rule.h"
-#include "read_mesh.h"
+#include "mesh_aura.hpp"
+#include "mesh_utils.hpp"
+#include "quadratures_rule.hpp"
+#include "read_mesh.hpp"
 #include "sfem_mesh_write.hpp"
 #include "sfem_resample_field.hpp"
 #include "sfem_resample_field_tet4_math.hpp"
-#include "tet10_resample_field.h"
+#include "tet10_resample_field.hpp"
 
 #include "sfem_API.hpp"
 

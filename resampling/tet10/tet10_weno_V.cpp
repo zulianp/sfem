@@ -1,4 +1,4 @@
-#include "tet10_weno_V.h"
+#include "tet10_weno_V.hpp"
 
 /**
  * @brief Compute the square of a vector

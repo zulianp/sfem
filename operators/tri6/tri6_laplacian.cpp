@@ -1,6 +1,6 @@
-#include "tri6_laplacian.h"
+#include "tri6_laplacian.hpp"
 
-#include "tri6_laplacian_inline_cpu.h"
+#include "tri6_laplacian_inline_cpu.hpp"
 
 #include <assert.h>
 #include <math.h>

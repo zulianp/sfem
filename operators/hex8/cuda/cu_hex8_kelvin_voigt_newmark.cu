@@ -1,4 +1,4 @@
-#include "cu_hex8_kelvin_voigt_newmark.h"
+#include "cu_hex8_kelvin_voigt_newmark.hpp"
 
 #include "sfem_cuda_base.hpp"
 

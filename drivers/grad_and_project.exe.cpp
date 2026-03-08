@@ -8,20 +8,20 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "operators/div.h"
-#include "tet4_grad.h"
+#include "operators/div.hpp"
+#include "tet4_grad.hpp"
 
-#include "operators/tet4/tet4_l2_projection_p0_p1.h"
+#include "operators/tet4/tet4_l2_projection_p0_p1.hpp"
 
-#include "operators/tet10/tet10_grad.h"
-#include "operators/tet10/tet10_l2_projection_p1_p2.h"
+#include "operators/tet10/tet10_grad.hpp"
+#include "operators/tet10/tet10_l2_projection_p1_p2.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
 #include "sfem_API.hpp"
 

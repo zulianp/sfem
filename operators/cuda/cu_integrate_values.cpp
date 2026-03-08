@@ -1,6 +1,6 @@
-#include "cu_integrate_values.h"
+#include "cu_integrate_values.hpp"
 
-#include "cu_quadshell4_integrate_values.h"
+#include "cu_quadshell4_integrate_values.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"

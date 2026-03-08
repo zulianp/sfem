@@ -1,4 +1,4 @@
-#include "navier_stokes.h"
+#include "navier_stokes.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -7,13 +7,13 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
-#include "tet10_navier_stokes.h"
-#include "tri6_navier_stokes.h"
+#include "tet10_navier_stokes.hpp"
+#include "tri6_navier_stokes.hpp"
 
 void navier_stokes_assemble_value_aos(const smesh::ElemType               element_type,
                                       const ptrdiff_t                   nelements,

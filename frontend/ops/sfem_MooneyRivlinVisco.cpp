@@ -1,6 +1,6 @@
 #include "sfem_MooneyRivlinVisco.hpp"
 
-#include "mooney_rivlin_visco.h"
+#include "mooney_rivlin_visco.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"

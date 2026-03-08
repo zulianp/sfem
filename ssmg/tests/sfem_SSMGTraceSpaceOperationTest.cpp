@@ -7,7 +7,7 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -16,7 +16,7 @@
 
 #include "sfem_hex8_mesh_graph.hpp"
 #include "smesh_sshex8_graph.hpp"
-#include "ssquad4_interpolate.h"
+#include "ssquad4_interpolate.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"

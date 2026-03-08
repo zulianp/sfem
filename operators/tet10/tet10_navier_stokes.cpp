@@ -1,4 +1,4 @@
-#include "tet10_navier_stokes.h"
+#include "tet10_navier_stokes.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -9,7 +9,7 @@
 
 #include "sfem_vec.hpp"
 
-#include "tet10_convection.h"
+#include "tet10_convection.hpp"
 
 static SFEM_INLINE void tet10_momentum_lhs_scalar_kernel(const real_t px0,
                                                          const real_t px1,

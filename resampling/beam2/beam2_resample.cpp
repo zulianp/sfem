@@ -1,5 +1,5 @@
-#include "beam2_resample.h"
-#include "beam2_mass.h"
+#include "beam2_resample.hpp"
+#include "beam2_mass.hpp"
 
 #include <math.h>
 #include <stdio.h>

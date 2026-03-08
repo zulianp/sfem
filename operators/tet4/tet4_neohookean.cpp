@@ -1,4 +1,4 @@
-#include "tet4_neohookean.h"
+#include "tet4_neohookean.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -6,11 +6,11 @@
 
 #include <mpi.h>
 
-#include "tet4_neohookean_ogden_inline_cpu.h"
+#include "tet4_neohookean_ogden_inline_cpu.hpp"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 static SFEM_INLINE void neohookean_value(const real_t mu,
                                          const real_t lambda,

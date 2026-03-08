@@ -1,4 +1,4 @@
-#include "tet10_l2_projection_p1_p2.h"
+#include "tet10_l2_projection_p1_p2.hpp"
 
 #include <assert.h>
 #include <mpi.h>

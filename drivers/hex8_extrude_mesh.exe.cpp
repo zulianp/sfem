@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 static SFEM_INLINE void normalize(real_t* const vec3) {
     const real_t len = sqrt(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);

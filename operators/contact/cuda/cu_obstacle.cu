@@ -1,4 +1,4 @@
-#include "cu_obstacle.h"
+#include "cu_obstacle.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_macros.hpp"

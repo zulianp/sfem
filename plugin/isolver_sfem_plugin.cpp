@@ -12,17 +12,17 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 
-#include "dirichlet.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 typedef struct {
     mesh_t *mesh;

@@ -9,22 +9,22 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "read_mesh.h"
+#include "crs_graph.hpp"
+#include "read_mesh.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mesh_write.hpp"
 
-#include "extract_surface_graph.h"
+#include "extract_surface_graph.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "argsort.h"
+#include "argsort.hpp"
 
-#include "adj_table.h"
+#include "adj_table.hpp"
 
 #include "sfem_hex8_mesh_graph.hpp"
 #include "sfem_sshex8_skin.hpp"
-#include "sshex8.h"  // FIXME
+#include "sshex8.hpp"  // FIXME
 
 #include "sfem_glob.hpp"
 

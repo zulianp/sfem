@@ -1,4 +1,4 @@
-#include "tet4_patch_gradient.h"
+#include "tet4_patch_gradient.hpp"
 
 #include "sfem_base.hpp"
 

@@ -1,5 +1,5 @@
 
-#include "tet20_laplacian.h"
+#include "tet20_laplacian.hpp"
 
 // TODO
 #include "tet20_laplacian_inline_cpu.h"

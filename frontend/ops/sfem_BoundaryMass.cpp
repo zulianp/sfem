@@ -1,6 +1,6 @@
 #include "sfem_BoundaryMass.hpp"
 #include <mpi.h>
-#include "mass.h"
+#include "mass.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"

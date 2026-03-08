@@ -1,12 +1,12 @@
-#include "beam2_mass.h"
+#include "beam2_mass.hpp"
 
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 

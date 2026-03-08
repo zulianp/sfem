@@ -1,5 +1,5 @@
-#include "trishell3_resample.h"
-#include "trishell3_mass.h"
+#include "trishell3_resample.hpp"
+#include "trishell3_mass.hpp"
 
 #include <math.h>
 #include <stdio.h>

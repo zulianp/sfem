@@ -1,5 +1,5 @@
 
-// #include "read_mesh.h"
+// #include "read_mesh.hpp"
 
 // #include "matrixio_array.h"
 // #include "sfem_defs.hpp"
@@ -13,7 +13,7 @@
 // // #include <unistd.h>
 // #include <mpi.h>
 
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // // sfem_glob.hpp
 // size_t count_files(const char *pattern);

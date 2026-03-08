@@ -1,4 +1,4 @@
-#include "cu_hex8_adjugate.h"
+#include "cu_hex8_adjugate.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_defs.hpp"

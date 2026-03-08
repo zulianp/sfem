@@ -1,5 +1,5 @@
 
-#include "field_mpi_domain.h"
+#include "field_mpi_domain.hpp"
 
 /**
  * @brief Builds a field_mpi_domain_t structure.

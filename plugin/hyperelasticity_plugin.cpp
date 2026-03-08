@@ -13,20 +13,20 @@
 #include "mpi.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 
-#include "linear_elasticity.h"
-#include "tet4_neohookean.h"
+#include "linear_elasticity.hpp"
+#include "tet4_neohookean.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 typedef struct {
     mesh_t *mesh;

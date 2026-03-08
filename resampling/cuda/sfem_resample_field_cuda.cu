@@ -13,7 +13,7 @@
 
 #define MY_RESTRICT __restrict__
 
-#include "mass.h"
+#include "mass.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_resample_field_cuda_kernel.cuh"
 

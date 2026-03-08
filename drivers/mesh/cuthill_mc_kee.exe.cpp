@@ -1,7 +1,7 @@
 #include "sfem_API.hpp"
 
 #include "sfem_macros.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

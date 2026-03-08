@@ -1,4 +1,4 @@
-#include "cu_ssquad4_interpolate.h"
+#include "cu_ssquad4_interpolate.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_macros.hpp"

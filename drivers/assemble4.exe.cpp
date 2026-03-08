@@ -8,13 +8,13 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "smesh_graph.impl.hpp"
 #include "sfem_base.hpp"
 
-#include "isotropic_phasefield_for_fracture.h"
+#include "isotropic_phasefield_for_fracture.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
 #include "sfem_API.hpp"
 

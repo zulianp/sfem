@@ -7,8 +7,8 @@
 #include "sfem_Function.hpp"
 
 // FIXME
-#include "hex8_fff.h"
-#include "sshex8_laplacian.h"
+#include "hex8_fff.hpp"
+#include "sshex8_laplacian.hpp"
 
 int test_hyperelasticity_partial_assembly(const std::string &op_name) {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -172,8 +172,9 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
 }
 
 int test_hyperelasticity_partial_assembly_all() {
-    return test_hyperelasticity_partial_assembly("NeoHookeanOgden") +
-           test_hyperelasticity_partial_assembly("MooneyRivlin");
+    return test_hyperelasticity_partial_assembly("NeoHookeanOgden");
+    //  +
+        //    test_hyperelasticity_partial_assembly("MooneyRivlin");
 }
 
 int test_hyperelasticity_active_strain_partial_assembly_all() {

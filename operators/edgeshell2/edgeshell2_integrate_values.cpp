@@ -1,4 +1,4 @@
-#include "edgeshell2_integrate_values.h"
+#include "edgeshell2_integrate_values.hpp"
 
 #include "sfem_macros.hpp"
 

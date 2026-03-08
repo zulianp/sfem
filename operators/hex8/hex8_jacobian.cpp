@@ -1,6 +1,6 @@
-#include "hex8_jacobian.h"
+#include "hex8_jacobian.hpp"
 
-#include "hex8_inline_cpu.h"
+#include "hex8_inline_cpu.hpp"
 
 int hex8_adjugate_and_det_fill(const ptrdiff_t                 nelements,
                                idx_t **const SFEM_RESTRICT     elements,

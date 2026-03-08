@@ -1,6 +1,6 @@
 #include "sfem_NeoHookeanOgden.hpp"
 
-#include "neohookean_ogden.h"
+#include "neohookean_ogden.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"
@@ -17,9 +17,9 @@
 #include "sfem_glob.hpp"
 
 // FIXME
-#include "hex8_neohookean_ogden.h"
-#include "tet4_neohookean_ogden.h"
-#include "tet4_partial_assembly_neohookean_inline.h"
+#include "hex8_neohookean_ogden.hpp"
+#include "tet4_neohookean_ogden.hpp"
+#include "tet4_partial_assembly_neohookean_inline.hpp"
 
 #include "sfem_ElasticityAssemblyData.hpp"
 

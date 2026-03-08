@@ -1,13 +1,13 @@
 #include "sfem_Laplacian.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "hex8_fff.h"
+#include "hex8_fff.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
-#include "tet4_fff.h"
+#include "tet4_fff.hpp"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"

@@ -1,8 +1,8 @@
-#include "cvfem_tet4_convection.h"
+#include "cvfem_tet4_convection.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <assert.h>
 #include <mpi.h>

@@ -1,13 +1,13 @@
-#include "sshex8_linear_elasticity.h"
+#include "sshex8_linear_elasticity.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_linear_elasticity_inline_cpu.h"
-// #include "hex8_quadrature.h"
-#include "line_quadrature.h"
-#include "packed_elements.h"
-#include "sshex8.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_linear_elasticity_inline_cpu.hpp"
+// #include "hex8_quadrature.hpp"
+#include "line_quadrature.hpp"
+#include "packed_elements.hpp"
+#include "sshex8.hpp"
 
 #ifndef POW3
 #define POW3(x) ((x) * (x) * (x))

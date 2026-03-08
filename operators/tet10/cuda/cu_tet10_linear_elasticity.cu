@@ -5,9 +5,9 @@
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "cu_tet10_linear_elasticity.h"
+#include "cu_tet10_linear_elasticity.hpp"
 #include "sfem_cuda_base.hpp"
 #include "sfem_defs.hpp"
 

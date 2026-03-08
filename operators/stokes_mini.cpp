@@ -1,7 +1,7 @@
-#include "stokes_mini.h"
+#include "stokes_mini.hpp"
 
-#include "tet4_stokes_mini.h"
-#include "tri3_stokes_mini.h"
+#include "tet4_stokes_mini.hpp"
+#include "tri3_stokes_mini.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

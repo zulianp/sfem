@@ -1,7 +1,7 @@
 #include "sfem_KelvinVoigtNewmark.hpp"
 
 // C includes
-#include "kelvin_voigt_newmark.h"
+#include "kelvin_voigt_newmark.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
@@ -12,7 +12,7 @@
 #include "sfem_Tracer.hpp"
 
 #include <mpi.h>
-#include "hex8_jacobian.h"
+#include "hex8_jacobian.hpp"
 
 namespace sfem {
 

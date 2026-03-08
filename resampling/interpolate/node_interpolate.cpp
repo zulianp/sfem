@@ -1,4 +1,4 @@
-#include "node_interpolate.h"
+#include "node_interpolate.hpp"
 
 #include <math.h>
 #include <stdio.h>

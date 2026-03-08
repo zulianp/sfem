@@ -1,10 +1,10 @@
-#include "linear_elasticity.h"
+#include "linear_elasticity.hpp"
 
-#include "hex8_linear_elasticity.h"
-#include "macro_tet4_linear_elasticity.h"
-#include "tet10_linear_elasticity.h"
-#include "tet4_linear_elasticity.h"
-#include "tri3_linear_elasticity.h"
+#include "hex8_linear_elasticity.hpp"
+#include "macro_tet4_linear_elasticity.hpp"
+#include "tet10_linear_elasticity.hpp"
+#include "tet4_linear_elasticity.hpp"
+#include "tri3_linear_elasticity.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

@@ -3,9 +3,9 @@
 #include "sfem_macros.hpp"
 
 // FIXME
-#include "hex8_neohookean_ogden.h"
-#include "tet4_neohookean_ogden.h"
-#include "tet4_partial_assembly_neohookean_inline.h"
+#include "hex8_neohookean_ogden.hpp"
+#include "tet4_neohookean_ogden.hpp"
+#include "tet4_partial_assembly_neohookean_inline.hpp"
 
 namespace sfem {
 

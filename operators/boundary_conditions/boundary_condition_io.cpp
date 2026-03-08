@@ -1,8 +1,8 @@
-#include "boundary_condition_io.h"
-#include "boundary_condition.h"
+#include "boundary_condition_io.hpp"
+#include "boundary_condition.hpp"
 
-#include "dirichlet.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 #include "sfem_defs.hpp"
 
 #include "matrixio_array.h"

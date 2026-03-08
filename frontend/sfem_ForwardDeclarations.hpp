@@ -2,22 +2,17 @@
 #define SFEM_FORWARD_DECLARATIONS_HPP
 
 #include "sfem_base.hpp"
-
-namespace smesh {
-    class Communicator;
-    class Mesh;
-    template <typename T>
-    class Buffer;
-    template <typename count_t, typename idx_t>
-    class CRSGraph;
-}
+#include "smesh_forward_declarations.hpp"
+#include "smesh_crs_graph.hpp"
 
 namespace sfem {
     class Function;
-    class SemiStructuredMesh;
+    
     class FunctionSpace;
     class Op;
-    class Sideset;
+
+    // class SemiStructuredMesh;
+    // class Sideset;
 
     class DirichletConditions;
     class NeumannConditions;
@@ -28,6 +23,7 @@ namespace sfem {
     using Communicator = smesh::Communicator;
     using Mesh = smesh::Mesh;
     using CRSGraph = smesh::CRSGraph<count_t, idx_t>;
+    using Sideset = smesh::Sideset;
 
     template <typename pack_idx_t>
     class Packed;

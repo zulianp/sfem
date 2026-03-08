@@ -1,7 +1,7 @@
-#include "sshex8_interpolate.h"
+#include "sshex8_interpolate.hpp"
 
 #include "sfem_macros.hpp"
-#include "sshex8.h"
+#include "sshex8.hpp"
 
 #include <math.h>
 #include <stdio.h>

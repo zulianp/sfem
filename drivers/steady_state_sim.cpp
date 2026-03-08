@@ -15,7 +15,7 @@
 
 #ifdef SFEM_ENABLE_AMG
 #include "mg_builder.hpp"
-#include "smoother.h"
+#include "smoother.hpp"
 #endif
 
 #include "sfem_SSMultigrid.hpp"

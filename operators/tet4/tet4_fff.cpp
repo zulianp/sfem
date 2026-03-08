@@ -1,6 +1,6 @@
 
-#include "tet4_fff.h"
-#include "tet4_inline_cpu.h"
+#include "tet4_fff.hpp"
+#include "tet4_inline_cpu.hpp"
 
 int tet4_fff_fill(const ptrdiff_t nelements,
                   idx_t **const SFEM_RESTRICT elements,

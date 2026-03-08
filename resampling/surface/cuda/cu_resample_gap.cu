@@ -1,6 +1,6 @@
-#include "cu_resample_gap.h"
+#include "cu_resample_gap.hpp"
 
-#include "cu_quadshell4_resample.h"
+#include "cu_quadshell4_resample.hpp"
 #include "sfem_cuda_base.hpp"
 #include "sfem_macros.hpp"
 

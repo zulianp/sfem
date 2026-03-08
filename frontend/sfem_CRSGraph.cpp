@@ -1,7 +1,7 @@
 #include "sfem_CRSGraph.hpp"
 
 // C includes
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 
 namespace sfem {
 

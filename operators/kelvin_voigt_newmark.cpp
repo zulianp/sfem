@@ -1,6 +1,6 @@
-#include "kelvin_voigt_newmark.h"
+#include "kelvin_voigt_newmark.hpp"
 
-#include "hex8_kelvin_voigt_newmark.h"
+#include "hex8_kelvin_voigt_newmark.hpp"
 
 #include <assert.h>
 #include <stdio.h>

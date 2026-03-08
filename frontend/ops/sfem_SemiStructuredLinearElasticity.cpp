@@ -1,7 +1,7 @@
 #include "sfem_SemiStructuredLinearElasticity.hpp"
 
 // C includes
-#include "sshex8_linear_elasticity.h"
+#include "sshex8_linear_elasticity.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"

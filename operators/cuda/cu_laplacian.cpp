@@ -1,9 +1,9 @@
-#include "cu_laplacian.h"
+#include "cu_laplacian.hpp"
 
-#include "cu_hex8_laplacian.h"
-#include "cu_macro_tet4_laplacian.h"
-#include "cu_tet10_laplacian.h"
-#include "cu_tet4_laplacian.h"
+#include "cu_hex8_laplacian.hpp"
+#include "cu_macro_tet4_laplacian.hpp"
+#include "cu_tet10_laplacian.hpp"
+#include "cu_tet4_laplacian.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

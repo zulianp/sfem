@@ -1,10 +1,10 @@
-#include "ssquad4_interpolate.h"
+#include "ssquad4_interpolate.hpp"
 #include "sfem_API.hpp"
 
 #include <stdio.h>
 
 #include "sfem_test.hpp"
-#include "lumped_ptdp.h"
+#include "lumped_ptdp.hpp"
 
 static int test_restrict_level2_to_level1() {
     real_t from[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};

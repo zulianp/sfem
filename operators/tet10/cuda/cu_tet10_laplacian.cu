@@ -1,4 +1,4 @@
-#include "cu_tet10_laplacian.h"
+#include "cu_tet10_laplacian.hpp"
 #include "sfem_cuda_base.hpp"
 
 #include <cassert>

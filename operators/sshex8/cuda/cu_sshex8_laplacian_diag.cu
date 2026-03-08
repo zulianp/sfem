@@ -1,4 +1,4 @@
-#include "cu_sshex8_laplacian.h"
+#include "cu_sshex8_laplacian.hpp"
 
 #include "cu_hex8_laplacian_inline.hpp"
 #include "cu_sshex8_inline.hpp"

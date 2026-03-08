@@ -1,8 +1,8 @@
 #include "sfem_SemiStructuredVectorLaplacian.hpp"
 
 // C includes
-#include "hex8_fff.h"
-#include "sshex8_vector_laplacian.h"
+#include "hex8_fff.hpp"
+#include "sshex8_vector_laplacian.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"

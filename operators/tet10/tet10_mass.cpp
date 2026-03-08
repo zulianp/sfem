@@ -1,4 +1,4 @@
-#include "tet10_mass.h"
+#include "tet10_mass.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -8,8 +8,8 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"

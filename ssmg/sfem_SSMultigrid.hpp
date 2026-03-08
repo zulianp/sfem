@@ -14,9 +14,9 @@
 
 #ifdef SFEM_ENABLE_AMG
 
-#include "partitioner.h"
+#include "partitioner.hpp"
 #include "sfem_pwc_interpolator.hpp"
-#include "smoother.h"
+#include "smoother.hpp"
 
 #endif
 

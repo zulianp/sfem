@@ -1,4 +1,4 @@
-// #include "laplacian.h"
+// #include "laplacian.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -11,10 +11,10 @@
 extern "C" {
 #include "sfem_base.hpp"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 }
 
 #include "sfem_cuda_base.hpp"

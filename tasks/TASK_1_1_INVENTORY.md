@@ -263,7 +263,7 @@ Based on analysis, algorithms typically need only:
 | `read_dirichlet_conditions(const mesh_t *mesh, ...)` | Read Dirichlet BCs | `nelements`, `nnodes`, `elements`, `points` | No | Medium |
 | `read_neumann_conditions(const mesh_t *mesh, ...)` | Read Neumann BCs | `nelements`, `nnodes`, `elements`, `points` | No | Medium |
 
-### 2.6 CUDA Mesh Operations (`mesh/sfem_cuda_mesh.hpp`)
+### 2.6 CUDA Mesh Operations (`mesh/sfem_cuda_mesh.hpppp`)
 
 | Function | Purpose | Minimal Data Required | MPI Dependent | Refactor Priority |
 |----------|---------|----------------------|---------------|-------------------|

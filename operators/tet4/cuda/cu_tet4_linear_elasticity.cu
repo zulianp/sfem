@@ -1,4 +1,4 @@
-#include "cu_tet4_linear_elasticity.h"
+#include "cu_tet4_linear_elasticity.hpp"
 
 #include <algorithm>
 #include <cassert>

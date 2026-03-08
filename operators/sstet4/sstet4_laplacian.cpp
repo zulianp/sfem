@@ -1,7 +1,7 @@
-#include "sstet4_laplacian.h"
+#include "sstet4_laplacian.hpp"
 
-#include "tet4_inline_cpu.h"
-#include "tet4_laplacian_inline_cpu.h"
+#include "tet4_inline_cpu.hpp"
+#include "tet4_laplacian_inline_cpu.hpp"
 
 #include <math.h>
 

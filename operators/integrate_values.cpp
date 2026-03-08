@@ -1,12 +1,12 @@
-#include "integrate_values.h"
+#include "integrate_values.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "edgeshell2_integrate_values.h"
-#include "quadshell4_integrate_values.h"
-#include "trishell3_integrate_values.h"
-#include "trishell6_integrate_values.h"
+#include "edgeshell2_integrate_values.hpp"
+#include "quadshell4_integrate_values.hpp"
+#include "trishell3_integrate_values.hpp"
+#include "trishell6_integrate_values.hpp"
 
 #include <assert.h>
 #include <stdio.h>

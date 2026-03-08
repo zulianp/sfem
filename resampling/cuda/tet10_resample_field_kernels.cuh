@@ -1,7 +1,7 @@
 #ifndef __TET10_RESAMPLE_FIELD_KERNELS_CUH__
 #define __TET10_RESAMPLE_FIELD_KERNELS_CUH__
 
-#include "mesh_aura.h"
+#include "mesh_aura.hpp"
 #include "sfem_cuda_math.cuh"
 #include "smesh_mesh.hpp"
 

@@ -287,7 +287,7 @@ def demo_emit_for_tet4_neohookean():
     gen = PAKernelGenerator(op)
     gen.build_S_tensors()
     gen.emit_S_ikqm_assignments("S_ikqm")
-    gen.emit_header("operators/tet4/tet4_partial_assembly_neohookean_inline.h",
+    gen.emit_header("operators/tet4/tet4_partial_assembly_neohookean_inline.hpp",
                     func_name="tet4_S_ikqm",
                     guard="SFEM_TET4_PARTIAL_ASSEMBLY_NEOHOOKEAN_INLINE_H",
                     tensor_name="S_ikqm")

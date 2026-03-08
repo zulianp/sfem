@@ -18,11 +18,11 @@
 #include "generic_hyperelasticity.hpp"
 
 // smesh::HEX8 dedicated micro-kernels and helpers
-#include "hex8_inline_cpu.h"
-#include "line_quadrature.h"
-#include "hex8_partial_assembly_neohookean_inline.h"
-#include "hex8_neohookean_ogden_local.h"
-#include "neohookean_ogden.h"
+#include "hex8_inline_cpu.hpp"
+#include "line_quadrature.hpp"
+#include "hex8_partial_assembly_neohookean_inline.hpp"
+#include "hex8_neohookean_ogden_local.hpp"
+#include "neohookean_ogden.hpp"
 
 #include <dlfcn.h>
 #include <math.h>

@@ -1,7 +1,7 @@
 #include "sfem_API.hpp"
 
-#include "hex8_linear_elasticity.h"
-#include "hex8_mass.h"
+#include "hex8_linear_elasticity.hpp"
+#include "hex8_mass.hpp"
 
 // Paraview Frobenius norm
 // sqrt("cauchy_stress.0" * "cauchy_stress.0" + 2 * "cauchy_stress.1" * "cauchy_stress.1" + 2 * "cauchy_stress.2" * "cauchy_stress.2" +  "cauchy_stress.3" * "cauchy_stress.3" +  2 * "cauchy_stress.4" * "cauchy_stress.4" +"cauchy_stress.5" * "cauchy_stress.5")

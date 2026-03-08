@@ -1,4 +1,4 @@
-#include "cu_hex8_laplacian.h"
+#include "cu_hex8_laplacian.hpp"
 
 #include "cu_hex8_laplacian_inline.hpp"
 #include "sfem_cuda_base.hpp"

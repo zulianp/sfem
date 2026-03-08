@@ -2,10 +2,10 @@
 
 #include "sfem_test.hpp"
 
-#include "cu_ssquad4_interpolate.h"
+#include "cu_ssquad4_interpolate.hpp"
 #include "matrixio_array.h"
 #include "sfem_base.hpp"
-#include "ssquad4_interpolate.h"
+#include "ssquad4_interpolate.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_Buffer.hpp"
@@ -16,7 +16,7 @@
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #include "sfem_cuda_blas.hpp"
 #include "sfem_cuda_solver.hpp"
-#include "spmv.h"
+#include "spmv.hpp"
 
 using namespace sfem;
 

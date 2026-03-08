@@ -1,9 +1,9 @@
 // #include "sfem_API.hpp"
 
-// #include "crs_graph.h"
+// #include "crs_graph.hpp"
 // #include "sfem_clustering.hpp"
 // #include "sfem_macros.hpp"
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // #include "sfem_API.hpp"
 // #include "sfem_DualGraph.hpp"

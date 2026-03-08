@@ -1,4 +1,4 @@
-#include "lumped_ptdp.h"
+#include "lumped_ptdp.hpp"
 
 int lumped_ptdp_crs(const ptrdiff_t                    fine_nodes,
                     const count_t *const SFEM_RESTRICT rowptr,

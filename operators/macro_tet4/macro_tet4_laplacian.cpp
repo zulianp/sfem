@@ -1,10 +1,10 @@
-#include "macro_tet4_laplacian.h"
+#include "macro_tet4_laplacian.hpp"
 
 #include "sfem_base.hpp"
 
-#include "tet4_inline_cpu.h"
-#include "tet4_laplacian_inline_cpu.h"
-#include "macro_tet4_inline_cpu.h"
+#include "tet4_inline_cpu.hpp"
+#include "tet4_laplacian_inline_cpu.hpp"
+#include "macro_tet4_inline_cpu.hpp"
 
 #include <assert.h>
 #include <stdio.h>

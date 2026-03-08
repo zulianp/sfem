@@ -1,6 +1,6 @@
-#include "tet4_adjugate.h"
+#include "tet4_adjugate.hpp"
 
-#include "tet4_inline_cpu.h"
+#include "tet4_inline_cpu.hpp"
 
 void tet4_adjugate_fill(const ptrdiff_t nelements,
                         idx_t **const SFEM_RESTRICT elements,

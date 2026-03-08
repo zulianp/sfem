@@ -4,10 +4,11 @@
 
 #include <stddef.h>
 
-#include "boundary_condition.h"
+#include "boundary_condition.hpp"
 #include "matrixio_array.h"
-#include "operators/boundary_conditions/dirichlet.h"
-#include "operators/hierarchical/sfem_prolongation_restriction.hpp"
+#include "operators/boundary_conditions/dirichlet.hpp"
+#include "smesh_prolongation.hpp"
+#include "smesh_restriction.hpp"
 #include "sfem_Function.hpp"
 #include "utils.h"
 
@@ -26,12 +27,12 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.h"
-#include "hex8_fff.h"
-#include "hex8_jacobian.h"
+#include "adj_table.hpp"
+#include "hex8_fff.hpp"
+#include "hex8_jacobian.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
-#include "sshex8.h"
-#include "sshex8_mesh.h"
+#include "sshex8.hpp"
+#include "sshex8_mesh.hpp"
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"
@@ -66,6 +67,8 @@
 #include <map>
 
 namespace sfem {
+
+
 
     class DirichletConditions::Impl {
     public:
@@ -120,15 +123,15 @@ namespace sfem {
 
             if (cdc.sidesets.empty()) {
                 if (max_coarse_idx == -1)
-                    max_coarse_idx = max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
+                    max_coarse_idx = smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
 
-                hierarchical_create_coarse_indices(
+                smesh::hierarchical_create_coarse_indices<idx_t>(
                         max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
                 cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
 
                 if (!as_zero && conds[i].values) {
                     cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
-                    hierarchical_collect_coarse_values(max_coarse_idx,
+                    smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
                                                        conds[i].nodeset->size(),
                                                        conds[i].nodeset->data(),
                                                        conds[i].values->data(),

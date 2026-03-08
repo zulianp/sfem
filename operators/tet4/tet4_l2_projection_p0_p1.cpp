@@ -1,5 +1,5 @@
 
-#include "tet4_l2_projection_p0_p1.h"
+#include "tet4_l2_projection_p0_p1.hpp"
 
 #include <mpi.h>
 #include <string.h>

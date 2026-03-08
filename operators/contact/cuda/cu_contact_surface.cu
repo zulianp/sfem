@@ -1,4 +1,4 @@
-#include "cu_contact_surface.h"
+#include "cu_contact_surface.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_macros.hpp"

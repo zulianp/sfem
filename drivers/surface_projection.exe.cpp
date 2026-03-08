@@ -8,12 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
-#include "surface_l2_projection.h"
+#include "surface_l2_projection.hpp"
 
 #include "sfem_API.hpp"
 

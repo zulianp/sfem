@@ -7,12 +7,12 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-#include "hex8_fff.h"
-#include "hex8_laplacian_inline_cpu.h"
-#include "laplacian.h"
-#include "tet10_laplacian_inline_cpu.h"
-#include "tet4_inline_cpu.h"
-#include "tet4_laplacian_inline_cpu.h"
+#include "hex8_fff.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "laplacian.hpp"
+#include "tet10_laplacian_inline_cpu.hpp"
+#include "tet4_inline_cpu.hpp"
+#include "tet4_laplacian_inline_cpu.hpp"
 
 #include <stddef.h>
 #include <stdint.h>

@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "tet10_weno.h"
+#include "tet10_weno.hpp"
 #include "sfem_base.hpp"
 
 // real_t Power(const real_t x, const real_t y) { return exp(y * log(x)); }

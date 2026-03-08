@@ -1,9 +1,9 @@
 #include "sfem_ContactConditions.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 #include "sfem_prolongation_restriction.hpp"
 
 #include "matrixio_array.h"
@@ -30,7 +30,7 @@
 #include <vector>
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_obstacle.h"
+#include "cu_obstacle.hpp"
 #include "sfem_cuda_blas.hpp"
 #endif
 
@@ -298,7 +298,7 @@ namespace sfem {
 
             auto st           = contact_surface->element_type();
              auto surface_mesh = std::make_shared<Mesh>(
-                    space->mesh_ptr()->comm(), static_cast<smesh::ElemType>(st), contact_surface->elements(), contact_surface->points());
+                    space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
 
 
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);

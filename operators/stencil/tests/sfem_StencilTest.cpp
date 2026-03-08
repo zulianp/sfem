@@ -4,9 +4,9 @@
 
 #include "sfem_API.hpp"
 
-#include "stencil3.h"
-#include "sshex8_skeleton_stencil.h"
-#include "hex8_laplacian_inline_cpu.h"
+#include "stencil3.hpp"
+#include "sshex8_skeleton_stencil.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
 
 
 bool verbose{true};

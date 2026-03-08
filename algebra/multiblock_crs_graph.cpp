@@ -1,6 +1,6 @@
-// #include "multiblock_crs_graph.h"
+// #include "multiblock_crs_graph.hpp"
 
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // int build_multiblock_n2e(const block_idx_t   n_blocks,
 //                          const smesh::ElemType element_types[],

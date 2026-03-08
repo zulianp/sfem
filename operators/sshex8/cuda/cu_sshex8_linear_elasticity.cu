@@ -1,5 +1,5 @@
 #include "cu_hex8_linear_elasticity_inline.hpp"
-#include "cu_sshex8_linear_elasticity.h"
+#include "cu_sshex8_linear_elasticity.hpp"
 #include "sfem_cuda_base.hpp"
 
 #include "sfem_macros.hpp"

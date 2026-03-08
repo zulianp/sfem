@@ -1,15 +1,15 @@
-#include "macro_tri3_laplacian.h"
+#include "macro_tri3_laplacian.hpp"
 
 #include <assert.h>
 #include <stdio.h>
 
 #include "sfem_base.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "tri3_inline_cpu.h"
-#include "tri3_laplacian_inline_cpu.h"
+#include "tri3_inline_cpu.hpp"
+#include "tri3_laplacian_inline_cpu.hpp"
 
-#include "macro_tri3_inline_cpu.h"
+#include "macro_tri3_inline_cpu.hpp"
 
 static SFEM_INLINE void element_apply(const idx_t *const SFEM_RESTRICT ev,
                                       const scalar_t *const SFEM_RESTRICT fff,

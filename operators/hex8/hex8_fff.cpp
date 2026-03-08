@@ -1,6 +1,6 @@
-#include "hex8_fff.h"
+#include "hex8_fff.hpp"
 
-#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_laplacian_inline_cpu.hpp"
 
 int hex8_fff_fill(const ptrdiff_t                 nelements,
                   idx_t **const SFEM_RESTRICT     elements,

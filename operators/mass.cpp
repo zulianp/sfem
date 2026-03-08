@@ -1,4 +1,4 @@
-#include "mass.h"
+#include "mass.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -6,21 +6,21 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "beam2_mass.h"
-#include "hex8_mass.h"
-#include "quadshell4_mass.h"
-#include "tet10_mass.h"
-#include "tet4_mass.h"
-#include "tri3_mass.h"
-#include "tri6_mass.h"
-#include "trishell3_mass.h"
+#include "beam2_mass.hpp"
+#include "hex8_mass.hpp"
+#include "quadshell4_mass.hpp"
+#include "tet10_mass.hpp"
+#include "tet4_mass.hpp"
+#include "tri3_mass.hpp"
+#include "tri6_mass.hpp"
+#include "trishell3_mass.hpp"
 
 void assemble_mass(const int element_type,
                    const ptrdiff_t nelements,

@@ -1,7 +1,7 @@
 #include "sfem_SpectralElementLaplacian.hpp"
 
 // C includes
-#include "spectral_hex_laplacian.h"
+#include "spectral_hex_laplacian.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"

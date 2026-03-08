@@ -1,4 +1,4 @@
-#include "tet10_neohookean_ogden.h"
+#include "tet10_neohookean_ogden.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -6,16 +6,16 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "line_quadrature.h"
-#include "tet10_inline_cpu.h"
+#include "line_quadrature.hpp"
+#include "tet10_inline_cpu.hpp"
 
-#include "tet10_neohookean_ogden_local.h"
-#include "tet10_partial_assembly_neohookean_ogden_inline.h"
+#include "tet10_neohookean_ogden_local.hpp"
+#include "tet10_partial_assembly_neohookean_ogden_inline.hpp"
 
 #define TET_QUAD_NQP 35
 static real_t tet_qw[TET_QUAD_NQP] = {

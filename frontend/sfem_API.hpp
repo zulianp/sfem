@@ -2,16 +2,16 @@
 #define SFEM_API_HPP
 
 // C includes
-#include "adj_table.h"
-#include "crs_graph.h"
+#include "adj_table.hpp"
+#include "crs_graph.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_prolongation_restriction.hpp"
-#include "sshex8.h"
-#include "sshex8_interpolate.h"
-#include "ssquad4.h"
+#include "sshex8.hpp"
+#include "sshex8_interpolate.hpp"
+#include "ssquad4.hpp"
 
 // C++ includes
 #include "acrs.hpp"
@@ -42,8 +42,8 @@
 
 // CUDA includes
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_sshex8_interpolate.h"
-#include "cu_tet4_prolongation_restriction.h"
+#include "cu_sshex8_interpolate.hpp"
+#include "cu_tet4_prolongation_restriction.hpp"
 #include "sfem_ContactConditions_cuda.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftableJacobi.hpp"

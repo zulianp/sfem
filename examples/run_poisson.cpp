@@ -10,18 +10,18 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 #include "matrixio_array.h"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
-#include "macro_tet4_laplacian.h"
+#include "macro_tet4_laplacian.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 

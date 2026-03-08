@@ -9,12 +9,12 @@
 // #include "matrixio_crs.h"
 // #include "utils.h"
 
-// #include "crs_graph.h"
-// #include "read_mesh.h"
+// #include "crs_graph.hpp"
+// #include "read_mesh.hpp"
 // #include "sfem_base.hpp"
 // #include "sfem_mesh_write.hpp"
 
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // void mesh_promote_p1_to_p2(const mesh_t *const p1_mesh, mesh_t *const p2_mesh, const int
 // steal_p1_nodes) {

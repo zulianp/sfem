@@ -1,15 +1,15 @@
-#include "cvfem_operators.h"
+#include "cvfem_operators.hpp"
 #include "mpi.h"
 #include "sfem_defs.hpp"
 
-#include "cvfem_tri3_convection.h"
-#include "tri3_laplacian.h"
+#include "cvfem_tri3_convection.hpp"
+#include "tri3_laplacian.hpp"
 
-#include "cvfem_quad4_convection.h"
-#include "cvfem_quad4_laplacian.h"
+#include "cvfem_quad4_convection.hpp"
+#include "cvfem_quad4_laplacian.hpp"
 
-#include "cvfem_tet4_convection.h"
-#include "tet4_laplacian.h"
+#include "cvfem_tet4_convection.hpp"
+#include "tet4_laplacian.hpp"
 
 #include <stdio.h>
 

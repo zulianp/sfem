@@ -1,4 +1,4 @@
-#include "grid.h"
+#include "grid.hpp"
 
 #include "sfem_base.hpp"
 

@@ -3,11 +3,11 @@
 #include <cmath>
 #include <cstddef>
 
-#include "cu_macro_tet4_linear_elasticity.h"
+#include "cu_macro_tet4_linear_elasticity.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include "sfem_cuda_base.hpp"
 

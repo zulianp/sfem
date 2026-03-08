@@ -1,7 +1,7 @@
 #include "sfem_SemiStructuredKelvinVoigtNewmark.hpp"
 
 // C includes
-#include "sshex8_kelvin_voigt_newmark.h"
+#include "sshex8_kelvin_voigt_newmark.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"

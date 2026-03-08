@@ -5,8 +5,8 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 
-#include "hex8_jacobian.h"
-#include "linear_elasticity.h"
+#include "hex8_jacobian.hpp"
+#include "linear_elasticity.hpp"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"

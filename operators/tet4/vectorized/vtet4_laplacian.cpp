@@ -1,7 +1,7 @@
-#include "vtet4_laplacian.h"
+#include "vtet4_laplacian.hpp"
 
-#include "vtet4_inline_cpu.h"
-#include "vtet4_laplacian_inline_cpu.h"
+#include "vtet4_inline_cpu.hpp"
+#include "vtet4_laplacian_inline_cpu.hpp"
 
 #include <assert.h>
 #include <math.h>

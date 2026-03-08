@@ -1,5 +1,5 @@
-// #include "sshex8_interpolate.h"
-#include "sshex8_interpolate.h"
+// #include "sshex8_interpolate.hpp"
+#include "sshex8_interpolate.hpp"
 #include "sfem_API.hpp"
 
 #include <stdio.h>

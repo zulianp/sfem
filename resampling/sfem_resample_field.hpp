@@ -3,9 +3,9 @@
 
 #include <mpi.h>
 #include <stddef.h>
-#include "hyteg.h"
+#include "hyteg.hpp"
 
-#include "bit_array.h"
+#include "bit_array.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"

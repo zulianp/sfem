@@ -1,11 +1,11 @@
 // #include "sfem_hex8_mesh_graph.hpp"
 
-// #include "crs_graph.h"
-// #include "sortreduce.h"
+// #include "crs_graph.hpp"
+// #include "sortreduce.hpp"
 
-// #include "adj_table.h"
-// #include "sshex8.h"   //FIXME
-// #include "ssquad4.h"  //FIXME
+// #include "adj_table.hpp"
+// #include "sshex8.hpp"   //FIXME
+// #include "ssquad4.hpp"  //FIXME
 
 // #include <assert.h>
 // #include <mpi.h>

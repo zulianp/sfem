@@ -3,7 +3,7 @@
 #ifndef SFEM_ENABLE_CUDA
 
 #include <stdlib.h>
-#include "coo_sort.h"
+#include "coo_sort.hpp"
 #include "sfem_config.h"
 
 // Global variables needed for qsort...

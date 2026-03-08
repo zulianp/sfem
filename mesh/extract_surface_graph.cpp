@@ -8,7 +8,7 @@
 
 #if 0
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 
 extern "C" void extract_surface_connectivity(const int element_type,
                                              const ptrdiff_t n_elements,

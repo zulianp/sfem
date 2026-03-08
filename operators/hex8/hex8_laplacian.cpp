@@ -1,10 +1,10 @@
-#include "hex8_laplacian.h"
+#include "hex8_laplacian.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "hex8_laplacian_inline_cpu.h"
-#include "hex8_quadrature.h"
-#include "tet4_inline_cpu.h"
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "hex8_quadrature.hpp"
+#include "tet4_inline_cpu.hpp"
 
 int hex8_laplacian_apply(const ptrdiff_t                   nelements,
                          const ptrdiff_t                   nnodes,

@@ -1,6 +1,6 @@
 #include "sfem_Function_incore_cuda.hpp"
 #include <memory>
-#include "boundary_condition.h"
+#include "boundary_condition.hpp"
 
 #include "sfem_defs.hpp"
 #include "sfem_defs.hpp"
@@ -8,23 +8,23 @@
 #include <cuda_runtime_api.h>
 
 // CPU
-#include "sshex8_laplacian.h"
+#include "sshex8_laplacian.hpp"
 
 // GPU
-#include "cu_boundary_condition.h"
-#include "cu_integrate_values.h"
-#include "cu_hex8_adjugate.h"
-#include "cu_hex8_fff.h"
-#include "cu_laplacian.h"
-#include "cu_linear_elasticity.h"
-#include "cu_kelvin_voigt_newmark.h"
-#include "cu_mask.h"
-#include "cu_sshex8_elemental_matrix.h"
-#include "cu_sshex8_laplacian.h"
-#include "cu_sshex8_linear_elasticity.h"
-#include "cu_sshex8_kelvin_voigt_newmark.h"
-#include "cu_tet4_adjugate.h"
-#include "cu_tet4_fff.h"
+#include "cu_boundary_condition.hpp"
+#include "cu_integrate_values.hpp"
+#include "cu_hex8_adjugate.hpp"
+#include "cu_hex8_fff.hpp"
+#include "cu_laplacian.hpp"
+#include "cu_linear_elasticity.hpp"
+#include "cu_kelvin_voigt_newmark.hpp"
+#include "cu_mask.hpp"
+#include "cu_sshex8_elemental_matrix.hpp"
+#include "cu_sshex8_laplacian.hpp"
+#include "cu_sshex8_linear_elasticity.hpp"
+#include "cu_sshex8_kelvin_voigt_newmark.hpp"
+#include "cu_tet4_adjugate.hpp"
+#include "cu_tet4_fff.hpp"
 
 // C++ includes
 #include "sfem_API.hpp"

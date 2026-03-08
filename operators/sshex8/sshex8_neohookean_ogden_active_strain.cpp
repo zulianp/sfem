@@ -1,16 +1,16 @@
-// #include "sshex8_neohookean_ogden_active_strain.h"
+// #include "sshex8_neohookean_ogden_active_strain.hpp"
 
 // #include "sfem_defs.hpp"
 // #include "sfem_unroll.hpp"
 
-// #include "hex8_inline_cpu.h"
-// #include "hex8_linear_elasticity_inline_cpu.h"
-// // #include "hex8_quadrature.h"
-// #include "line_quadrature.h"
-// #include "sshex8.h"
+// #include "hex8_inline_cpu.hpp"
+// #include "hex8_linear_elasticity_inline_cpu.hpp"
+// // #include "hex8_quadrature.hpp"
+// #include "line_quadrature.hpp"
+// #include "sshex8.hpp"
 
-// #include "hex8_neohookean_ogden_local.h"
-// #include "packed_elements.h"
+// #include "hex8_neohookean_ogden_local.hpp"
+// #include "packed_elements.hpp"
 
 // int sshex8_neohookean_ogden_active_strain_objective(int                               level,
 //                                                     const ptrdiff_t                   nelements,

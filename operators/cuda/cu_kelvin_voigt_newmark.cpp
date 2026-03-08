@@ -1,7 +1,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "cu_hex8_kelvin_voigt_newmark.h"
+#include "cu_hex8_kelvin_voigt_newmark.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

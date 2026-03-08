@@ -1,6 +1,6 @@
-#include "cu_quadshell4_resample.h"
+#include "cu_quadshell4_resample.hpp"
 
-#include "line_quadrature.h"
+#include "line_quadrature.hpp"
 #include "sfem_macros.hpp"
 
 #include "sfem_cuda_base.hpp"

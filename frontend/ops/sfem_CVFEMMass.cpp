@@ -1,6 +1,6 @@
 #include "sfem_CVFEMMass.hpp"
 #include <mpi.h>
-#include "cvfem_operators.h"
+#include "cvfem_operators.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"

@@ -1,4 +1,4 @@
-#include "cu_tet4_prolongation_restriction.h"
+#include "cu_tet4_prolongation_restriction.hpp"
 
 #include "sfem_cuda_base.hpp"
 
