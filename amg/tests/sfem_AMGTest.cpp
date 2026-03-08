@@ -121,7 +121,7 @@ int test_amg_sqp() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     // Indices of potential contact boundary nodes
-    auto mesh_for_sidesets = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+    auto mesh_for_sidesets = fs->mesh_ptr();
     auto bottom = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, {bottom_ss});
 
     // FIXME not GPU ready

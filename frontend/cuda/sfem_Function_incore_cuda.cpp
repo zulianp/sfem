@@ -57,7 +57,7 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
                                                             const smesh::ElemType                   element_type) {
         if (space->has_semi_structured_mesh()) {
-            return to_device(space->semi_structured_mesh().elements());
+            return to_device(space->mesh().elements());
 
         } else {
             return to_device(space->mesh().elements(0));
@@ -67,8 +67,8 @@ namespace sfem {
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
                                                               const smesh::ElemType                   element_type) {
         if (space->has_semi_structured_mesh()) {
-            auto nxe = space->semi_structured_mesh().n_nodes_per_element();
-            return to_device(soa_to_aos(1, nxe, space->semi_structured_mesh().elements()));
+            auto nxe = space->mesh().n_nodes_per_element();
+            return to_device(soa_to_aos(1, nxe, space->mesh().elements()));
 
         } else {
             auto nxe = space->mesh().n_nodes_per_element(0);
@@ -311,7 +311,7 @@ namespace sfem {
 
             auto points = mesh->points();
             if (space->has_semi_structured_mesh()) {
-                points = space->semi_structured_mesh().points();
+                points = space->mesh().points();
             }
 
             // Device-only: assume 'out' is a device pointer
@@ -572,8 +572,8 @@ namespace sfem {
                 ret->element_type = element_type;
                 ret->fff          = std::make_shared<FFF>(
                         element_type,
-                        sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
-                                                             derefined_space->semi_structured_mesh().level(),
+                        sshex8_derefine_element_connectivity(space->mesh().level(),
+                                                             derefined_space->mesh().level(),
                                                              fff->elements()),
                         fff->fff());
                 ret->real_type = real_type;
@@ -598,7 +598,7 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_diag[%d]", ssm.level());
 
             return cu_affine_sshex8_laplacian_diag(ssm.level(),
@@ -612,7 +612,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
@@ -627,7 +627,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_laplacian_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_laplacian_apply(ssm.level(),
@@ -828,8 +828,8 @@ namespace sfem {
 
                 ret->adjugate = std::make_shared<Adjugate>(
                         derefined_space->element_type(),
-                        sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
-                                                             derefined_space->semi_structured_mesh().level(),
+                        sshex8_derefine_element_connectivity(space->mesh().level(),
+                                                             derefined_space->mesh().level(),
                                                              adjugate->elements()),
                         adjugate->jacobian_adjugate(),
                         adjugate->jacobian_determinant());
@@ -887,7 +887,7 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
@@ -907,7 +907,7 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
@@ -944,7 +944,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
@@ -968,7 +968,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
@@ -1023,8 +1023,8 @@ namespace sfem {
 
                 ret->adjugate = std::make_shared<Adjugate>(
                         derefined_space->element_type(),
-                        sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
-                                                             derefined_space->semi_structured_mesh().level(),
+                        sshex8_derefine_element_connectivity(space->mesh().level(),
+                                                             derefined_space->mesh().level(),
                                                              adjugate->elements()),
                         adjugate->jacobian_adjugate(),
                         adjugate->jacobian_determinant());
@@ -1082,7 +1082,7 @@ namespace sfem {
         }
 
         int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_diag[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_diag(ssm.level(),
@@ -1102,7 +1102,7 @@ namespace sfem {
         }
 
         int hessian_block_diag_sym(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_block_diag_sym_aos[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
@@ -1139,7 +1139,7 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
@@ -1163,7 +1163,7 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            auto &ssm = space->semi_structured_mesh();
+            auto &ssm = space->mesh();
             SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_linear_elasticity_apply[%d]", ssm.level());
 
             return cu_affine_sshex8_linear_elasticity_apply(ssm.level(),
@@ -1414,8 +1414,8 @@ namespace sfem {
                 auto ret = std::make_shared<SemiStructuredGPUKelvinVoigtNewmark>(derefined_space);
                 ret->adjugate = std::make_shared<Adjugate>(
                     derefined_space->element_type(),
-                    sshex8_derefine_element_connectivity(space->semi_structured_mesh().level(),
-                                                         derefined_space->semi_structured_mesh().level(),
+                    sshex8_derefine_element_connectivity(space->mesh().level(),
+                                                         derefined_space->mesh().level(),
                                                          adjugate->elements()),
                     adjugate->jacobian_adjugate(),
                     adjugate->jacobian_determinant());
@@ -1478,7 +1478,7 @@ namespace sfem {
         SemiStructuredGPUKelvinVoigtNewmark(const std::shared_ptr<FunctionSpace>& space) : space(space) {}
     
     int gradient(const real_t *const x, real_t *const out) override {
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
         const real_t *v = vel_[0]->data();
         const real_t *a = acc_[0]->data();
@@ -1497,7 +1497,7 @@ namespace sfem {
     }
 
     int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_apply[%d]", ssm.level());
         
         // In Newmark's apply (linearized operator), we construct v and a from h
@@ -1533,7 +1533,7 @@ namespace sfem {
     }
 
     int hessian_diag(const real_t *const /*x*/, real_t *const values) override {
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("cu_affine_sshex8_kelvin_voigt_newmark_diag[%d]", ssm.level());
         
         return cu_affine_sshex8_kelvin_voigt_newmark_diag(ssm.level(),
@@ -1594,7 +1594,7 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->semi_structured_mesh();
+                auto &ssm = space->mesh();
                 err       = sshex8_laplacian_element_matrix(ssm.level(),
                                                       mesh->n_elements(),
                                                       mesh->n_nodes(),
@@ -1622,7 +1622,7 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->semi_structured_mesh();
+                auto &ssm = space->mesh();
                 err       = cu_affine_sshex8_elemental_matrix_apply(ssm.level(),
                                                               ssm.n_elements(),
                                                               elements->data(),
@@ -1705,7 +1705,7 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->semi_structured_mesh();
+                auto &ssm = space->mesh();
                 if (cartesian_ordering) {
                     err = sshex8_laplacian_element_matrix_cartesian(ssm.level(),
                                                                     mesh->n_elements(),
@@ -1738,7 +1738,7 @@ namespace sfem {
 
             int err = 0;
             if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->semi_structured_mesh();
+                auto &ssm = space->mesh();
                 err       = cu_affine_sshex8_elemental_matrix_apply_AoS(ssm.level(),
                                                                   ssm.n_elements(),
                                                                   elements->data(),

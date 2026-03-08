@@ -52,7 +52,7 @@ namespace sfem {
     int SemiStructuredLumpedMass::hessian_diag(const real_t *const /*x*/, real_t *const values) {
         SFEM_TRACE_SCOPE("SemiStructuredLumpedMass::hessian_diag");
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         if (space->block_size() == 1) {
             return affine_sshex8_mass_lumped(sfem::semi_structured_level(ssm),
                                              ssm.n_elements(),

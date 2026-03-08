@@ -58,7 +58,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA
@@ -107,7 +107,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     blas->zeros(ndofs, displacement->data());
     blas->zeros(ndofs, velocity->data());
     {
-        auto nnodes = fs->semi_structured_mesh().n_nodes();
+        auto nnodes = fs->mesh().n_nodes();
         auto dims = fs->mesh_ptr()->spatial_dimension();
         auto v = velocity->data();
         for (int i = 0; i < nnodes; i++) {
@@ -165,7 +165,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     sfem::create_directory((output_path + "/out").c_str());
 
     fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
-    sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_path + "/mesh").c_str());
+    sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
 
     auto out = f->output();
     out->set_output_dir((output_path + "/out").c_str());

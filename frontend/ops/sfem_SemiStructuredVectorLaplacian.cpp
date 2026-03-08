@@ -63,7 +63,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
 
         double tick = MPI_Wtime();
 
@@ -133,7 +133,7 @@ namespace sfem {
             printf("SemiStructuredVectorLaplacian[%d]::apply called %ld times. "
                    "Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->semi_structured_mesh()),
+                   sfem::semi_structured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,

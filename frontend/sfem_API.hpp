@@ -417,8 +417,8 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
 
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
+                                auto &from_ssm = from_space->mesh();
+                                auto &to_ssm   = to_space->mesh();
 
                                 cu_sshex8_prolongate(from_ssm.n_elements(),
                                                      from_ssm.level(),
@@ -445,7 +445,7 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
 
-                                auto &ssm = to_space->semi_structured_mesh();
+                                auto &ssm = to_space->mesh();
                                 cu_sshex8_hierarchical_prolongation(ssm.level(),
                                                                     ssm.n_elements(),
                                                                     elements->data(),
@@ -492,7 +492,7 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
 
-                                auto &ssm = to_space->semi_structured_mesh();
+                                auto &ssm = to_space->mesh();
                                 sshex8_hierarchical_prolongation(
                                         sfem::semi_structured_level(ssm),
                                         ssm.n_elements(),
@@ -503,7 +503,7 @@ namespace sfem {
                             },
                             EXECUTION_SPACE_HOST);
                 } else {
-                    assert(sfem::semi_structured_level(from_space->semi_structured_mesh()) > 1);
+                    assert(sfem::semi_structured_level(from_space->mesh()) > 1);
 
                     return make_op<real_t>(
                             to_space->n_dofs(),
@@ -511,8 +511,8 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("sshex8_prolongate");
 
-                                auto &from_ssm = from_space->semi_structured_mesh();
-                                auto &to_ssm   = to_space->semi_structured_mesh();
+                                auto &from_ssm = from_space->mesh();
+                                auto &to_ssm   = to_space->mesh();
 
                                 sshex8_prolongate(from_ssm.n_elements(),     // nelements,
                                                   sfem::semi_structured_level(from_ssm),          // from_level

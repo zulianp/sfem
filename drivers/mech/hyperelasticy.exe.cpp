@@ -150,7 +150,7 @@ struct RotateYZ {
                                             const int                                   steps,
                                             const real_t                                angle,
                                             const sfem::ExecutionSpace                  execution_space) {
-        auto mesh_for_sideset = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+        auto mesh_for_sideset = space->mesh_ptr();
         auto nodeset = smesh::create_nodeset_from_sideset(mesh_for_sideset, sideset);
 
         auto uy  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
@@ -330,7 +330,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Output to disk
     sfem::create_directory(output_path.c_str());
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_path + "/mesh").c_str());
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     } else {
         fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));

@@ -46,7 +46,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), output_dir.c_str());
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
@@ -302,7 +302,7 @@ int test_mooney_rivlin_visco_relaxation() {
         lower_bound = sfem::create_buffer<real_t>(ndofs, es);
 
         // Get contact boundary nodes
-        auto mesh_for_sideset = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+        auto mesh_for_sideset = fs->mesh_ptr();
         auto lnodes = smesh::create_nodeset_from_sideset(mesh_for_sideset, left_sideset[0]);
         const ptrdiff_t nbnodes = lnodes->size();
         contact_node_indices.resize(nbnodes);

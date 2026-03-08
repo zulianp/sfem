@@ -253,7 +253,7 @@ namespace sfem {
         }
         const int       nnxs = elem_num_nodes(st);
 
-        auto mesh_for_surface = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+        auto mesh_for_surface = space->mesh_ptr();
         auto sides = smesh::create_surface_from_sidesets(mesh_for_surface, sidesets).second;
 
         idx_t    *idx          = nullptr;
@@ -314,7 +314,7 @@ namespace sfem {
         void collect_points(std::shared_ptr<Buffer<geom_t *>> &surface_points) {
             SFEM_TRACE_SCOPE("SSMeshContactSurface::collect_points");
 
-            auto &ssmesh   = space->semi_structured_mesh();
+            auto &ssmesh   = space->mesh();
             auto  sspoints = ssmesh.points();
 
             auto               mesh = space->mesh_ptr();
@@ -369,7 +369,7 @@ namespace sfem {
                 return;
             }
 #endif
-            auto &ssmesh   = space->semi_structured_mesh();
+            auto &ssmesh   = space->mesh();
             auto  sspoints = ssmesh.points();
 
             const idx_t *const idx = node_mapping->data();
@@ -408,7 +408,7 @@ namespace sfem {
     std::unique_ptr<SSMeshContactSurface> SSMeshContactSurface::create(const std::shared_ptr<FunctionSpace>        &space,
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
-        auto &ssmesh = space->semi_structured_mesh();
+        auto &ssmesh = space->mesh();
         const int level = sfem::semi_structured_level(ssmesh);
 
         if (sidesets.size() > 1) {

@@ -62,7 +62,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->semi_structured_mesh()),
+                   sfem::semi_structured_level(space->mesh()),
                    use_affine_approximation ? (use_stencil ? "stencil" : "affine") : "isoparametric",
                    calls,
                    total_time,
@@ -112,7 +112,7 @@ namespace sfem {
     //                                          const count_t *const rowptr,
     //                                          const idx_t *const colidx,
     //                                          real_t *const values) {
-    //     auto &ssm = space->semi_structured_mesh();
+    //     auto &ssm = space->mesh();
     //     SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_bsr", ssm.level());
 
     //     return affine_sshex8_laplacian_bsr(ssm.level(),
@@ -126,7 +126,7 @@ namespace sfem {
     // }
 
     int SemiStructuredLaplacian::hessian_diag(const real_t *const x, real_t *const values) {
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", sfem::semi_structured_level(ssm));
 
         return affine_sshex8_laplacian_diag(sfem::semi_structured_level(ssm),
@@ -144,7 +144,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
 
         double tick = MPI_Wtime();
 

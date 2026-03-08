@@ -31,7 +31,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>                              space;
         std::shared_ptr<MultiDomainOp>                              domains;
-        std::shared_ptr<Packed<sfem::FunctionSpace::PackedIdxType>> packed;
+        std::shared_ptr<FunctionSpace::PackedMesh> packed;
         real_t                                                      mu{1}, lambda{1};
         std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
 

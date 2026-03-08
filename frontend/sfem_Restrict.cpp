@@ -33,7 +33,7 @@ namespace sfem {
             idx_t**   elements = nullptr;
             int       nxe;
             if (from_space->has_semi_structured_mesh()) {
-                auto& ssmesh = from_space->semi_structured_mesh();
+                auto& ssmesh = from_space->mesh();
                 nxe          = sshex8_nxe(sfem::semi_structured_level(ssmesh));
                 elements     = sfem::semi_structured_element_data(ssmesh);
                 nnodes       = ssmesh.n_nodes();
@@ -82,8 +82,8 @@ namespace sfem {
                                 [=](const real_t* const from, real_t* const to) {
                                     SFEM_TRACE_SCOPE("cu_sshex8_restrict");
 
-                                    auto& from_ssm = from_space->semi_structured_mesh();
-                                    auto& to_ssm   = to_space->semi_structured_mesh();
+                                    auto& from_ssm = from_space->mesh();
+                                    auto& to_ssm   = to_space->mesh();
 
                                     cu_sshex8_restrict(from_ssm.n_elements(),
                                                        sfem::semi_structured_level(from_ssm),
@@ -112,7 +112,7 @@ namespace sfem {
                                 [=](const real_t* const from, real_t* const to) {
                                     SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_restriction");
 
-                                    auto& ssm = from_space->semi_structured_mesh();
+                                    auto& ssm = from_space->mesh();
                                     cu_sshex8_hierarchical_restriction(sfem::semi_structured_level(ssm),
                                                                        ssm.n_elements(),
                                                                        elements->data(),
@@ -163,7 +163,7 @@ namespace sfem {
                                 [=](const real_t* const from, real_t* const to) {
                                     SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
 
-                                    auto& ssm = from_space->semi_structured_mesh();
+                                    auto& ssm = from_space->mesh();
                                     sshex8_hierarchical_restriction(sfem::semi_structured_level(ssm),
                                                                     ssm.n_elements(),
                                                                     sfem::semi_structured_element_data(ssm),
@@ -181,8 +181,8 @@ namespace sfem {
                                 [=](const real_t* const from, real_t* const to) {
                                     SFEM_TRACE_SCOPE("sshex8_restrict");
 
-                                    auto& from_ssm = from_space->semi_structured_mesh();
-                                    auto& to_ssm   = to_space->semi_structured_mesh();
+                                    auto& from_ssm = from_space->mesh();
+                                    auto& to_ssm   = to_space->mesh();
 
                                     sshex8_restrict(from_ssm.n_elements(),                              // nelements,
                                                     sfem::semi_structured_level(from_ssm),             // from_level
