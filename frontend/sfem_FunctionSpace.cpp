@@ -122,15 +122,19 @@ namespace sfem {
 
     smesh::ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }
 
-    std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
-        if (!has_semi_structured_mesh()) {
-            // return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, impl_->get_element_type_for_block(0));
-            SMESH_ERROR("Cannot derfine mesh!\n");
-        }
-
-        auto derefined_mesh = sfem::semi_structured_derefine(impl_->mesh, to_level);
-        return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
+std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
+    if (!has_semi_structured_mesh()) {
+        // return std::make_shared<FunctionSpace>(impl_->mesh, impl_->block_size, impl_->get_element_type_for_block(0));
+        SMESH_ERROR("Cannot derfine mesh!\n");
     }
+
+    auto derefined_mesh = sfem::semi_structured_derefine(impl_->mesh, to_level);
+    if (derefined_mesh && derefined_mesh->element_type(0) == smesh::PROTEUS_HEX8) {
+        derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
+    }
+
+    return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
+}
 
     FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
 

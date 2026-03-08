@@ -195,8 +195,6 @@ namespace sfem {
     std::shared_ptr<Op> SemiStructuredLinearElasticity::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredLinearElasticity::derefine_op");
 
-        assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
-
         if (space->has_semi_structured_mesh()) {
             auto ret                      = std::make_shared<SemiStructuredLinearElasticity>(space);
             ret->element_type             = element_type;
@@ -206,12 +204,11 @@ namespace sfem {
             // ret->initialize();
             return ret;
         } else {
-            assert(space->element_type() == macro_base_elem(element_type));
             auto ret = std::make_shared<LinearElasticity>(space);
             ret->initialize();
             ret->set_mu(mu);
             ret->set_lambda(lambda);
-            ret->override_element_types({macro_base_elem(element_type)});
+            ret->override_element_types({space->element_type()});
 
             return ret;
         }

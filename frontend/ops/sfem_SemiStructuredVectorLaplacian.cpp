@@ -31,11 +31,13 @@ namespace sfem {
 
         ret->element_type = (smesh::ElemType)space->element_type();
 
-        ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
+        // FIXME
+        auto macro_mesh = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+        ret->fff = create_host_buffer<jacobian_t>(macro_mesh->n_elements() * 6);
 
-        if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
-                                          space->mesh_ptr()->elements(0)->data(),
-                                          space->mesh_ptr()->points()->data(),
+        if (SFEM_SUCCESS != hex8_fff_fill(macro_mesh->n_elements(),
+                                          macro_mesh->elements(0)->data(),
+                                          macro_mesh->points()->data(),
                                           ret->fff->data())) {
             SFEM_ERROR("Unable to create fff");
         }
@@ -101,14 +103,13 @@ namespace sfem {
     std::shared_ptr<Op> SemiStructuredVectorLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredVectorLaplacian::derefine_op");
 
-        assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
         if (space->has_semi_structured_mesh()) {
             auto ret          = std::make_shared<SemiStructuredVectorLaplacian>(space);
             ret->element_type = element_type;
             return ret;
         } else {
             auto ret          = std::make_shared<VectorLaplacian>(space);
-            ret->element_type = macro_base_elem(element_type);
+            ret->element_type = space->element_type();
             return ret;
         }
     }

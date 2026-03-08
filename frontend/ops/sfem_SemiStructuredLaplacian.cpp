@@ -41,13 +41,17 @@ namespace sfem {
 
         int SFEM_SS_LAPLACIAN_FFF = 1;
         SFEM_READ_ENV(SFEM_SS_LAPLACIAN_FFF, atoi);
+        if (space->mesh_ptr()->element_type(0) != smesh::HEX8) {
+            SFEM_SS_LAPLACIAN_FFF = 0;
+        }
 
         if (SFEM_SS_LAPLACIAN_FFF) {
-            ret->fff = create_host_buffer<jacobian_t>(space->mesh_ptr()->n_elements() * 6);
+            auto macro_mesh = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            ret->fff = create_host_buffer<jacobian_t>(macro_mesh->n_elements() * 6);
 
-            if (SFEM_SUCCESS != hex8_fff_fill(space->mesh_ptr()->n_elements(),
-                                              space->mesh_ptr()->elements(0)->data(),
-                                              space->mesh_ptr()->points()->data(),
+            if (SFEM_SUCCESS != hex8_fff_fill(macro_mesh->n_elements(),
+                                              macro_mesh->elements(0)->data(),
+                                              macro_mesh->points()->data(),
                                               ret->fff->data())) {
                 SFEM_ERROR("Unable to create fff");
             }
@@ -80,7 +84,6 @@ namespace sfem {
     std::shared_ptr<Op> SemiStructuredLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SemiStructuredLaplacian::derefine_op");
 
-        assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
         if (space->has_semi_structured_mesh()) {
             auto ret                      = std::make_shared<SemiStructuredLaplacian>(space);
             ret->element_type             = element_type;
@@ -91,7 +94,7 @@ namespace sfem {
             auto ret = std::make_shared<Laplacian>(space);
             assert(space->n_blocks() == 1);  // FIXME
             ret->initialize({});
-            ret->override_element_types({macro_base_elem(element_type)});
+            ret->override_element_types({space->element_type()});
             return ret;
         }
     }
