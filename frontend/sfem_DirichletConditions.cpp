@@ -114,6 +114,10 @@ namespace sfem {
         auto mesh  = space->mesh_ptr();
         auto et    = (smesh::ElemType)space->element_type();
 
+        // FIXME
+        auto coarse_restriction_mesh =
+                (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh()) ? sfem::semi_structured_derefine(mesh, 1) : nullptr;
+
         ptrdiff_t max_coarse_idx = -1;
         auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
         auto     &conds          = impl_->conditions;
@@ -128,9 +132,18 @@ namespace sfem {
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
+            // FIXME
+
             if (cdc.sidesets.empty()) {
-                if (max_coarse_idx == -1)
-                    max_coarse_idx = smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
+                if (max_coarse_idx == -1) {
+                    if (coarse_restriction_mesh) {
+                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
+                                                            coarse_restriction_mesh->n_elements(),
+                                                            coarse_restriction_mesh->elements(0)->data());
+                    } else {
+                        max_coarse_idx = smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
+                    }
+                }
 
                 smesh::hierarchical_create_coarse_indices<idx_t>(
                         max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
@@ -147,16 +160,28 @@ namespace sfem {
 
             } else {
                 assert(as_zero);
-                // Use first sideset to find nodeset
-                auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
-                if (it == sideset_to_nodeset.end()) {
-                    auto mesh_for_sidesets                   = coarse_space->mesh_ptr();
-                    auto nodeset                             = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
-                    cdc.nodeset                              = nodeset;
-                    sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
+                if (!coarse_space->has_semi_structured_mesh()) {
+                    if (max_coarse_idx == -1) {
+                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
+                                                            coarse_restriction_mesh->n_elements(),
+                                                            coarse_restriction_mesh->elements(0)->data());
+                    }
 
+                    smesh::hierarchical_create_coarse_indices<idx_t>(
+                            max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
+                    cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
                 } else {
-                    cdc.nodeset = it->second;
+                    // Use first sideset to find nodeset
+                    auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
+                    if (it == sideset_to_nodeset.end()) {
+                        auto mesh_for_sidesets                    = coarse_space->mesh_ptr();
+                        auto nodeset                              = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
+                        cdc.nodeset                               = nodeset;
+                        sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
+
+                    } else {
+                        cdc.nodeset = it->second;
+                    }
                 }
             }
 

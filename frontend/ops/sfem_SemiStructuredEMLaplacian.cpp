@@ -74,7 +74,7 @@ namespace sfem {
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
         auto &ssm      = space->mesh();
-        auto  mesh     = space->mesh_ptr();
+        auto  mesh     = space->has_semi_structured_mesh() ? sfem::semi_structured_derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
         return sshex8_laplacian_element_matrix(sfem::semi_structured_level(ssm),
                                                mesh->n_elements(),
