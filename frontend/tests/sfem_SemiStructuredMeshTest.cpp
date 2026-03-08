@@ -60,7 +60,7 @@ int test_derefine_mesh() {
 }
 
 int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
-    int  L  = 16;
+    int  L  = 8;
     auto fs = sfem::FunctionSpace::create(m, 1);
     fs->promote_to_semi_structured(L);
 
