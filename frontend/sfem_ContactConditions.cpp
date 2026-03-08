@@ -14,11 +14,10 @@
 
 #include "sfem_API.hpp"
 
-#include "adj_table.h"
-#include "obstacle.h"
+#include "obstacle.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
 #include "sfem_sshex8_skin.hpp"
-#include "sshex8_mesh.h"
+#include "sshex8_mesh.hpp"
 
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
@@ -26,6 +25,7 @@
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_resample_gap.hpp"
 
 #include <vector>
 
