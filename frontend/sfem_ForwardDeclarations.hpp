@@ -26,7 +26,10 @@ namespace sfem {
     using Sideset = smesh::Sideset;
 
     template <typename pack_idx_t>
-    class Packed;
+    using PackedMesh = smesh::PackedMesh<pack_idx_t>;
+
+    // template <typename pack_idx_t>
+    // class Packed;
 }
 
 #endif //SFEM_FORWARD_DECLARATIONS_HPP

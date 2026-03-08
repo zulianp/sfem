@@ -140,7 +140,7 @@ namespace sfem {
             SFEM_TRACE_SCOPE("SPMG::init_discretization");
 
             auto            fs             = f->space();
-            auto           &ssmesh         = f->space()->semi_structured_mesh();
+            auto           &ssmesh         = f->space()->mesh();
             const int       L              = sfem::semi_structured_level(ssmesh);
             const ptrdiff_t sym_block_size = (fs->block_size() == 3 ? 6 : 3);
 
@@ -238,10 +238,10 @@ namespace sfem {
                 auto coarse = levels[i];
 
                 auto      fine_space   = fine->function->space();
-                const int level        = sfem::semi_structured_level(fine_space->semi_structured_mesh());
+                const int level        = sfem::semi_structured_level(fine_space->mesh());
                 auto      coarse_space = coarse->function->space();
                 const int coarse_level =
-                        coarse_space->has_semi_structured_mesh() ? sfem::semi_structured_level(coarse_space->semi_structured_mesh()) : 1;
+                        coarse_space->has_semi_structured_mesh() ? sfem::semi_structured_level(coarse_space->mesh()) : 1;
 
                 auto coarse_sides = sfem::ssquad4_derefine_element_connectivity(level, coarse_level, host_sides[i - 1]);
                 coarse->sides     = coarse_sides;
@@ -447,7 +447,7 @@ namespace sfem {
 
             for (int i = 0; i < nlevels; i++) {
                 auto s = levels[i]->function->space();
-                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? sfem::semi_structured_level(s->semi_structured_mesh()) : 1);
+                printf("%d) \tL=%d\n", i, s->has_semi_structured_mesh() ? sfem::semi_structured_level(s->mesh()) : 1);
 
                 levels[i]->function->describe(std::cout);
             }

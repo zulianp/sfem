@@ -827,7 +827,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>                              space;
         std::shared_ptr<MultiDomainOp>                              domains;
-        std::shared_ptr<Packed<PackedIdxType>>                      packed;
+        std::shared_ptr<FunctionSpace::PackedMesh>                  packed;
         real_t                                                      mu{1}, lambda{1};
         std::vector<std::shared_ptr<HyperelasticityScratch>>        scratch;
         std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;

@@ -89,7 +89,7 @@ namespace sfem {
 
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
-                auto mesh_for_sidesets = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+                auto mesh_for_sidesets = space->mesh_ptr();
                 c.nodeset = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, c.sidesets);
             }
         }
@@ -150,7 +150,7 @@ namespace sfem {
                 // Use first sideset to find nodeset
                 auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);
                 if (it == sideset_to_nodeset.end()) {
-                    auto mesh_for_sidesets                   = coarse_space->has_semi_structured_mesh() ? coarse_space->semi_structured_mesh_ptr() : coarse_space->mesh_ptr();
+                    auto mesh_for_sidesets                   = coarse_space->mesh_ptr();
                     auto nodeset                             = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
                     cdc.nodeset                              = nodeset;
                     sideset_to_nodeset[conds[i].sidesets[0]] = nodeset;
@@ -256,7 +256,7 @@ namespace sfem {
                     cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
                     cdc.sidesets.push_back(Sideset::create_from_file(comm, smesh::Path(pch)));
-                    auto mesh_for_sidesets = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+                    auto mesh_for_sidesets = space->mesh_ptr();
                     cdc.nodeset = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, cdc.sidesets);
                 }
 
@@ -373,7 +373,7 @@ namespace sfem {
                 ptrdiff_t n_nodes{0};
                 idx_t    *nodes{nullptr};
                 if (space->has_semi_structured_mesh()) {
-                    auto &&ss = space->semi_structured_mesh();
+                    auto &&ss = space->mesh();
                     SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
                     if (sshex8_extract_nodeset_from_sideset(ss.level(),
                                                             ss.element_data(),

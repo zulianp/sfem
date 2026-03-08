@@ -203,7 +203,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), output_dir.c_str());
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
@@ -953,7 +953,7 @@ int test_mooney_rivlin_gravity() {
         // For other types: use ALL nodes
         if (SFEM_OBSTACLE_TYPE == 4) {
             // Hemisphere: only constrain bottom boundary nodes
-            auto mesh_for_sidesets = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+            auto mesh_for_sidesets = fs->mesh_ptr();
             auto nodeset = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, contact_sideset);
             auto nodeset_data = nodeset->data();
             ptrdiff_t n_boundary_nodes = nodeset->size();

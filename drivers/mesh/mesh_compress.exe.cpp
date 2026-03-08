@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     auto        mesh          = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
     std::string output_folder = argv[2];
 
-    auto packed = sfem::Packed<pack_idx_t>::create(mesh);
+    auto packed = sfem::PackedMesh<smesh::i16>::create(mesh);
 
     for (ptrdiff_t b = 0; b < packed->n_blocks(); b++) {
         auto elements = packed->elements(b);

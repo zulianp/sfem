@@ -39,7 +39,7 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        // fs->semi_structured_mesh().apply_hierarchical_renumbering();
+        // fs->mesh().apply_hierarchical_renumbering();
     }
 
     auto f = sfem::Function::create(fs);
@@ -113,7 +113,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), output_dir.c_str());
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }

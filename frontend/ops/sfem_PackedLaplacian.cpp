@@ -526,7 +526,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>                       space;  ///< Function space for the operator
         std::shared_ptr<MultiDomainOp>                       domains;
-        std::shared_ptr<Packed<PackedIdxType>>               packed;
+        std::shared_ptr<FunctionSpace::PackedMesh>          packed;
         std::vector<SharedBuffer<jacobian_t>>                fff;
         std::vector<std::shared_ptr<PackedLaplacianScratch>> scratch;
 

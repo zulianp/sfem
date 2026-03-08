@@ -40,7 +40,7 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     sfem::create_directory(name.c_str());
     sfem::create_directory((name +"/fields").c_str());
 
-    SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((name +"/mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name +"/mesh").c_str()) == SFEM_SUCCESS);
 
     sfem::Output out(fs);
     out.enable_AoS_to_SoA(true);
@@ -88,7 +88,7 @@ int test_ssgmg_poisson_cube() {
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -149,7 +149,7 @@ int test_ssgmg_linear_elasticity_cube() {
     int  block_size = 3;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);

@@ -6,6 +6,8 @@
 #include "sfem_Buffer.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
+#include "smesh_packed_mesh.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,7 +18,7 @@ namespace sfem {
     public:
         using PackedIdxType = uint16_t;
         // using PackedIdxType = uint8_t;
-        using PackedMesh = Packed<PackedIdxType>;
+        using PackedMesh = smesh::PackedMesh<PackedIdxType>;
 
         FunctionSpace(const std::shared_ptr<Mesh> &mesh, const int block_size = 1, const smesh::ElemType element_type = smesh::INVALID);
         ~FunctionSpace();
@@ -44,10 +46,8 @@ namespace sfem {
 
         Mesh                 &mesh();
         std::shared_ptr<Mesh> mesh_ptr() const;
-        std::shared_ptr<Mesh> semi_structured_mesh_ptr() const;
 
         bool                has_semi_structured_mesh() const;
-        Mesh               &semi_structured_mesh();
 
         
         // using PackedIdxType = uint8_t;

@@ -54,7 +54,7 @@ int test_hyperelasticity_partial_assembly(const std::string &op_name) {
         auto     dh = sfem::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->semi_structured_mesh().points()->data();
+            pts = fs->mesh().points()->data();
         } else {
             pts = fs->mesh_ptr()->points()->data();
         }
@@ -141,7 +141,7 @@ int test_hyperelasticity_active_strain_partial_assembly(const std::string &op_na
         auto     dh = sfem::to_host(h);
         geom_t **pts{nullptr};
         if (fs->has_semi_structured_mesh()) {
-            pts = fs->semi_structured_mesh().points()->data();
+            pts = fs->mesh().points()->data();
         } else {
             pts = fs->mesh_ptr()->points()->data();
         }

@@ -327,11 +327,7 @@ NB_MODULE(pysfem, m) {
             .def("mesh", &FunctionSpace::mesh_ptr)
             .def("n_dofs", &FunctionSpace::n_dofs)
             .def("block_size", &FunctionSpace::block_size)
-            .def("promote_to_semi_structured", &FunctionSpace::promote_to_semi_structured)
-            .def(
-                    "semi_structured_mesh",
-                    [](FunctionSpace &self) -> SemiStructuredMesh * { return &self.semi_structured_mesh(); },
-                    nb::rv_policy::reference);
+            .def("promote_to_semi_structured", &FunctionSpace::promote_to_semi_structured);
 
     m.def("create_derefined_crs_graph", [](const std::shared_ptr<FunctionSpace> &space) -> std::shared_ptr<CRSGraph> {
         return sfem::create_derefined_crs_graph(*space);
@@ -781,14 +777,13 @@ NB_MODULE(pysfem, m) {
               return sfem::create_sdf(sfem::Communicator::world(), nx, ny, nz, xmin, ymin, zmin, xmax, ymax, zmax, cpp_sdf_func);
           });
 
-    // Add SemiStructuredMesh class and export_as_standard binding
-    nb::class_<SemiStructuredMesh>(m, "SemiStructuredMesh")
-            .def("export_as_standard", &SemiStructuredMesh::export_as_standard)
-            .def("apply_hierarchical_renumbering", &SemiStructuredMesh::apply_hierarchical_renumbering)
-            .def("level", &SemiStructuredMesh::level)
-            .def("__copy__", [](const SemiStructuredMesh &) { throw std::runtime_error("Copy not allowed"); })
-            .def("__deepcopy__",
-                 [](const SemiStructuredMesh &, nb::handle) { throw std::runtime_error("Deepcopy not allowed"); });
+    m.def("semi_structured_export_as_standard",
+          [](const std::shared_ptr<Mesh> &mesh, const std::string &path) {
+              return sfem::semi_structured_export_as_standard(mesh, path.c_str());
+          });
+    m.def("semi_structured_apply_hierarchical_renumbering",
+          [](const std::shared_ptr<Mesh> &mesh) { return sfem::semi_structured_apply_hierarchical_renumbering(*mesh); });
+    m.def("semi_structured_level", [](const std::shared_ptr<Mesh> &mesh) { return sfem::semi_structured_level(*mesh); });
 
     // Expose the C++ types as Python dtypes
     try {

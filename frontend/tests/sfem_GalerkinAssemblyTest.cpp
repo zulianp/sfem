@@ -101,7 +101,7 @@ int test_cube() {
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
 
     if (SFEM_HIERARCHICAL_RENUMBERING) {
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
     }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -123,14 +123,14 @@ int test_cube() {
 
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
-    printf("Fine op (%d):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, SFEM_FINE_OP_TYPE);
+    printf("Fine op (%d,%s):\t%s\n", SFEM_ELEMENT_REFINE_LEVEL, type_to_string(fs->element_type()), SFEM_FINE_OP_TYPE);
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
-    auto levels    = sfem::semi_structured_derefinement_levels(fs->semi_structured_mesh());
+    auto levels    = sfem::semi_structured_derefinement_levels(fs->mesh());
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
     auto f_coarse  = f->derefine(fs_coarse, true);
 
-    printf("Coarse op (%d):\t%s\n", levels[SFEM_ELEMENT_DEREFINE], SFEM_COARSE_OP_TYPE);
+    printf("Coarse op (%d,%s):\t%s\n", levels[SFEM_ELEMENT_DEREFINE], type_to_string(fs_coarse->element_type()), SFEM_COARSE_OP_TYPE);
     coarse_op = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
     auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
@@ -149,7 +149,7 @@ int test_cube() {
     {
         geom_t **points{nullptr};
         if (fs_coarse->has_semi_structured_mesh()) {
-            points = fs_coarse->semi_structured_mesh().points()->data();
+            points = fs_coarse->mesh().points()->data();
         } else {
             points = fs_coarse->mesh_ptr()->points()->data();
         }
@@ -264,7 +264,7 @@ int test_cube() {
                 sfem::create_directory("galerkin/fields");
 
                 {  // COARSE
-                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs_coarse->semi_structured_mesh(), "galerkin") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs_coarse->mesh_ptr(), "galerkin") == SFEM_SUCCESS);
 
                     sfem::Output out(fs_coarse);
                     out.enable_AoS_to_SoA(SFEM_BLOCK_SIZE > 1);
@@ -285,7 +285,7 @@ int test_cube() {
 
                     sfem::create_directory("galerkin_fine");
                     sfem::create_directory("galerkin_fine/fields");
-                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), "galerkin_fine") == SFEM_SUCCESS);
+                    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->mesh_ptr(), "galerkin_fine") == SFEM_SUCCESS);
 
                     sfem::Output out(fs);
                     out.set_output_dir("galerkin_fine/fields");

@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
     }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
     if (fs->has_semi_structured_mesh()) {
         std::string path = output_path;
         path += "/ssmesh";
-        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), path.c_str());
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), path.c_str());
     }
 
     auto output = f->output();
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
     double tock = MPI_Wtime();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().n_nodes() : m->n_nodes();
+    ptrdiff_t nnodes    = fs->mesh().n_nodes();
 
     if (!rank) {
         printf("----------------------------------------\n");

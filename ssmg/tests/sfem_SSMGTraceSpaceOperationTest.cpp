@@ -43,8 +43,8 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     auto coarse_x = sfem::create_host_buffer<real_t>(coarse_fs->n_dofs());
     auto fine_x   = sfem::create_buffer<real_t>(fine_fs->n_dofs(), es);
 
-    auto &&fine_ssmesh   = fine_fs->semi_structured_mesh();
-    auto &&coarse_ssmesh = coarse_fs->semi_structured_mesh();
+    auto &&fine_ssmesh   = fine_fs->mesh();
+    auto &&coarse_ssmesh = coarse_fs->mesh();
     
     ptrdiff_t n_nodes{0};
     idx_t    *nodes{nullptr};
@@ -164,7 +164,7 @@ int test_trace_space_prolongation_restriction() {
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto sideset = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });

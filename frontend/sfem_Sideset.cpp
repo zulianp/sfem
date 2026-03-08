@@ -284,7 +284,7 @@
 //         ptrdiff_t n_nodes{0};
 //         idx_t    *nodes{nullptr};
 //         if (space->has_semi_structured_mesh()) {
-//             auto &&ss = space->semi_structured_mesh();
+//             auto &&ss = space->mesh();
 //             SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
 //             if (smesh::sshex8_extract_nodeset_from_sideset(ss.level(),
 //                                                            ss.element_data(),
@@ -314,7 +314,7 @@
 //             const std::shared_ptr<FunctionSpace> &space,
 //             const std::shared_ptr<Sideset>       &sideset) {
 //         if (space->has_semi_structured_mesh()) {
-//             auto &&ssmesh = space->semi_structured_mesh();
+//             auto &&ssmesh = space->mesh();
 //             auto   ss_sides =
 //                     sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sideset->parent()->size());
 

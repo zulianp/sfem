@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
 
     ptrdiff_t nelements = m->n_elements();
     ptrdiff_t nnodes =
-            fs->has_semi_structured_mesh() ? fs->semi_structured_mesh().n_nodes() : m->n_nodes();
+            fs->mesh().n_nodes();
 
     if (!rank) {
         printf("----------------------------------------\n");

@@ -36,7 +36,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredEMLaplacian[%d]::apply() called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   sfem::semi_structured_level(space->semi_structured_mesh()),
+                   sfem::semi_structured_level(space->mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -73,7 +73,7 @@ namespace sfem {
     const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
-        auto &ssm      = space->semi_structured_mesh();
+        auto &ssm      = space->mesh();
         auto  mesh     = space->mesh_ptr();
         element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
         return sshex8_laplacian_element_matrix(sfem::semi_structured_level(ssm),
@@ -95,7 +95,7 @@ namespace sfem {
     int SemiStructuredEMLaplacian::hessian_diag(const real_t *const, real_t *const out) {
         SFEM_TRACE_SCOPE("SemiStructuredLaplacian::hessian_diag");
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
         return affine_sshex8_laplacian_diag(sfem::semi_structured_level(ssm),
                                             ssm.n_elements(),
                                             sfem::semi_structured_interior_start(ssm),
@@ -114,7 +114,7 @@ namespace sfem {
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = space->semi_structured_mesh();
+        auto &ssm = space->mesh();
 
         double tick = MPI_Wtime();
 

@@ -56,8 +56,8 @@ inline std::shared_ptr<Mesh> semi_structured_derefine(const std::shared_ptr<Mesh
     return smesh::derefine(mesh, to_level);
 }
 
-inline int semi_structured_export_as_standard(const Mesh &mesh, const char *path) {
-    auto standard_mesh = smesh::sshex_to_hex8(mesh.clone());
+inline int semi_structured_export_as_standard(const  std::shared_ptr<Mesh> &mesh, const char *path) {
+    auto standard_mesh = smesh::sshex_to_hex8(mesh);
     if (!standard_mesh) {
         return SFEM_FAILURE;
     }
