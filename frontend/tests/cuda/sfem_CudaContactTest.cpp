@@ -170,7 +170,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto      mask           = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
 
     f->hessian_block_diag_sym(nullptr, diag->data());
-    f->constaints_mask(mask->data());
+    f->constraints_mask(mask->data());
 
     auto linear_op = sfem::create_linear_operator(MATRIX_FREE, f, nullptr, es);
     auto cg        = sfem::create_cg(linear_op, es);

@@ -254,8 +254,8 @@ namespace sfem {
 
     void Function::add_dirichlet_conditions(const std::shared_ptr<DirichletConditions> &c) { add_constraint(c); }
 
-    int Function::constaints_mask(mask_t *mask) {
-        SFEM_TRACE_SCOPE("Function::constaints_mask");
+    int Function::constraints_mask(mask_t *mask) {
+        SFEM_TRACE_SCOPE("Function::constraints_mask");
 
         for (auto &c : impl_->constraints) {
             c->mask(mask);

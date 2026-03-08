@@ -47,7 +47,7 @@ namespace sfem {
         auto diag   = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
         auto mask   = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
         
-        f->constaints_mask(mask->data());
+        f->constraints_mask(mask->data());
 
         
         if(f->hessian_block_diag_sym(nullptr, diag->data()) == SFEM_SUCCESS) {
@@ -383,7 +383,7 @@ namespace sfem {
                 auto diag = sfem::create_buffer<real_t>(fsi->n_dofs() / fsi->block_size() * sym_block_size, es);
                 auto mask = sfem::create_buffer<mask_t>(mask_count(fsi->n_dofs()), es);
 
-                fi->constaints_mask(mask->data());
+                fi->constraints_mask(mask->data());
                 fi->hessian_block_diag_sym(nullptr, diag->data());
 
                 std::shared_ptr<sfem::Operator<real_t>> sj;
@@ -430,7 +430,7 @@ namespace sfem {
                 f_coarse->hessian_block_diag_sym(nullptr, diag->data());
 
                 auto mask = sfem::create_buffer<mask_t>(mask_count(fs_coarse->n_dofs()), es);
-                f_coarse->constaints_mask(mask->data());
+                f_coarse->constraints_mask(mask->data());
 
                 std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
                 if (enable_mixed_precision) {

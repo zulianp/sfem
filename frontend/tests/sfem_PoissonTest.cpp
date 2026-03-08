@@ -52,7 +52,7 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
         f->set_value_to_constrained_dofs(1, diag->data());
 
         auto constraints_mask = sfem::create_buffer<mask_t>(fs->n_dofs(), es);
-        f->constaints_mask(constraints_mask->data());
+        f->constraints_mask(constraints_mask->data());
 
         bjacobi = sfem::make_op<real_t>(
                 fs->n_dofs(),

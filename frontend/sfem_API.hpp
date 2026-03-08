@@ -983,7 +983,7 @@ namespace sfem {
             auto row_idx = sfem::create_buffer<idx_t>(crs_graph->nnz(), es);
             crs_to_coo(fs->n_dofs(), crs_graph->rowptr()->data(), row_idx->data());
             // auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-            // f->constaints_mask(mask->data());
+            // f->constraints_mask(mask->data());
 
             spmv = sfem::h_coosym<idx_t, real_t>(nullptr, row_idx, crs_graph->colidx(), off_diag_values, diag_values);
         }
