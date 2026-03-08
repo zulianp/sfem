@@ -62,7 +62,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredLaplacian[%d]::apply(%s) called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   space->semi_structured_mesh().level(),
+                   sfem::semi_structured_level(space->semi_structured_mesh()),
                    use_affine_approximation ? (use_stencil ? "stencil" : "affine") : "isoparametric",
                    calls,
                    total_time,
@@ -127,10 +127,14 @@ namespace sfem {
 
     int SemiStructuredLaplacian::hessian_diag(const real_t *const x, real_t *const values) {
         auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", ssm.level());
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLaplacian[%d]::hessian_diag", sfem::semi_structured_level(ssm));
 
-        return affine_sshex8_laplacian_diag(
-                ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), values);
+        return affine_sshex8_laplacian_diag(sfem::semi_structured_level(ssm),
+                                            ssm.n_elements(),
+                                            sfem::semi_structured_interior_start(ssm),
+                                            sfem::semi_structured_element_data(ssm),
+                                            sfem::semi_structured_point_data(ssm),
+                                            values);
     }
 
     int SemiStructuredLaplacian::gradient(const real_t *const x, real_t *const out) { return apply(nullptr, x, out); }
@@ -148,19 +152,38 @@ namespace sfem {
 
         if (this->fff) {
             SFEM_TRACE_SCOPE("affine_sshex8_laplacian_stencil_apply_fff");
-            affine_sshex8_laplacian_stencil_apply_fff(
-                    ssm.level(), ssm.n_elements(), ssm.element_data(), this->fff->data(), h, out);
+            affine_sshex8_laplacian_stencil_apply_fff(sfem::semi_structured_level(ssm),
+                                                      ssm.n_elements(),
+                                                      sfem::semi_structured_element_data(ssm),
+                                                      this->fff->data(),
+                                                      h,
+                                                      out);
         } else {
             if (use_stencil) {
-                err = affine_sshex8_laplacian_stencil_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                err = affine_sshex8_laplacian_stencil_apply(sfem::semi_structured_level(ssm),
+                                                            ssm.n_elements(),
+                                                            sfem::semi_structured_interior_start(ssm),
+                                                            sfem::semi_structured_element_data(ssm),
+                                                            sfem::semi_structured_point_data(ssm),
+                                                            h,
+                                                            out);
             } else if (use_affine_approximation) {
-                err = affine_sshex8_laplacian_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                err = affine_sshex8_laplacian_apply(sfem::semi_structured_level(ssm),
+                                                    ssm.n_elements(),
+                                                    sfem::semi_structured_interior_start(ssm),
+                                                    sfem::semi_structured_element_data(ssm),
+                                                    sfem::semi_structured_point_data(ssm),
+                                                    h,
+                                                    out);
 
             } else {
-                err = sshex8_laplacian_apply(
-                        ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+                err = sshex8_laplacian_apply(sfem::semi_structured_level(ssm),
+                                             ssm.n_elements(),
+                                             sfem::semi_structured_interior_start(ssm),
+                                             sfem::semi_structured_element_data(ssm),
+                                             sfem::semi_structured_point_data(ssm),
+                                             h,
+                                             out);
             }
         }
 

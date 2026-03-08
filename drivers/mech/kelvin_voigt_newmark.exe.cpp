@@ -50,7 +50,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+        sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
     }
 
 // FIXME
@@ -141,7 +141,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     sfem::create_directory(output_path.c_str());
     sfem::create_directory((output_path + "/out").c_str());
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     } else {
         fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));

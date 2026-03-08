@@ -18,6 +18,7 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
 #include "smesh_sshex8_graph.hpp"
 #include "sshex8.hpp"
 
@@ -252,7 +253,8 @@ namespace sfem {
         }
         const int       nnxs = elem_num_nodes(st);
 
-        auto sides = sfem::create_surface_from_sidesets(space, sidesets).second;
+        auto mesh_for_surface = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+        auto sides = smesh::create_surface_from_sidesets(mesh_for_surface, sidesets).second;
 
         idx_t    *idx          = nullptr;
         ptrdiff_t n_contiguous = SFEM_PTRDIFF_INVALID;
@@ -286,7 +288,7 @@ namespace sfem {
                                                                              const std::string                    &path,
                                                                              const enum ExecutionSpace             es) {
         SFEM_TRACE_SCOPE("MeshContactSurface::create_from_file");
-        auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path.c_str());
+        auto sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
         return create(space, {sideset}, es);
     }
 
@@ -407,16 +409,17 @@ namespace sfem {
                                                                        const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                        const enum ExecutionSpace                    es) {
         auto &ssmesh = space->semi_structured_mesh();
+        const int level = sfem::semi_structured_level(ssmesh);
 
         if (sidesets.size() > 1) {
             SFEM_ERROR("Not implemented!\n");
         }
 
         auto semi_structured_sides =
-                sfem::create_host_buffer<idx_t>((ssmesh.level() + 1) * (ssmesh.level() + 1), sidesets[0]->parent()->size());
+                sfem::create_host_buffer<idx_t>((level + 1) * (level + 1), sidesets[0]->parent()->size());
 
-        if (smesh::sshex8_extract_surface_from_sideset(ssmesh.level(),
-                                                       ssmesh.element_data(),
+        if (smesh::sshex8_extract_surface_from_sideset(level,
+                                                       sfem::semi_structured_element_data(ssmesh),
                                                        sidesets[0]->parent()->size(),
                                                        sidesets[0]->parent()->data(),
                                                        sidesets[0]->lfi()->data(),
@@ -426,13 +429,13 @@ namespace sfem {
 
         idx_t           *idx          = nullptr;
         ptrdiff_t        n_contiguous = SFEM_PTRDIFF_INVALID;
-        std::vector<int> levels(smesh::sshex8_hierarchical_n_levels(ssmesh.level()));
+        std::vector<int> levels(smesh::sshex8_hierarchical_n_levels(level));
 
-        smesh::sshex8_hierarchical_mesh_levels(ssmesh.level(), levels.size(), levels.data());
+        smesh::sshex8_hierarchical_mesh_levels(level, levels.size(), levels.data());
 
         // auto semi_structured_sides = sfem::create_surface_from_sidesets(space, sidesets).second;
 
-        smesh::ssquad4_hierarchical_remapping(ssmesh.level(),
+        smesh::ssquad4_hierarchical_remapping(level,
                                               levels.size(),
                                               levels.data(),
                                               semi_structured_sides->extent(1),
@@ -443,11 +446,11 @@ namespace sfem {
         auto node_mapping = sfem::manage_host_buffer(n_contiguous, idx);
 
         const int nnxs  = 4;
-        const int nexs  = ssmesh.level() * ssmesh.level();
+        const int nexs  = level * level;
         auto      sides = sfem::create_host_buffer<idx_t>(nnxs, semi_structured_sides->extent(1) * nexs);
 
         ssquad4_to_standard_quad4_mesh(
-                ssmesh.level(), semi_structured_sides->extent(1), semi_structured_sides->data(), sides->data());
+                level, semi_structured_sides->extent(1), semi_structured_sides->data(), sides->data());
 
         // Create object
         auto ret                          = std::make_unique<SSMeshContactSurface>();

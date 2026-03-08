@@ -54,15 +54,23 @@ namespace sfem {
 
         auto &ssm = space->semi_structured_mesh();
         if (space->block_size() == 1) {
-            return affine_sshex8_mass_lumped(
-                    ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), values);
+            return affine_sshex8_mass_lumped(sfem::semi_structured_level(ssm),
+                                             ssm.n_elements(),
+                                             sfem::semi_structured_interior_start(ssm),
+                                             sfem::semi_structured_element_data(ssm),
+                                             sfem::semi_structured_point_data(ssm),
+                                             values);
         } else {
             const ptrdiff_t n = space->n_dofs() / space->block_size();
 
             auto    buff = create_host_buffer<real_t>(n);
             real_t *temp = buff->data();
-            int     err  = affine_sshex8_mass_lumped(
-                    ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), temp);
+            int     err  = affine_sshex8_mass_lumped(sfem::semi_structured_level(ssm),
+                                                     ssm.n_elements(),
+                                                     sfem::semi_structured_interior_start(ssm),
+                                                     sfem::semi_structured_element_data(ssm),
+                                                     sfem::semi_structured_point_data(ssm),
+                                                     temp);
 
             if (err) SFEM_ERROR("Failure in affine_sshex8_mass_lumped\n");
 

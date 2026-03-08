@@ -5,6 +5,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "smesh_sideset.hpp"
 #include "sfem_ssgmg.hpp"
 #include "sfem_test.hpp"
 
@@ -73,7 +74,7 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+        sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
     }
 
     auto f = sfem::Function::create(fs);
@@ -149,7 +150,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
@@ -423,7 +424,8 @@ int test_newmark_kv() {
             lower_bound = sfem::create_buffer<real_t>(ndofs, es);
             
             // Get contact boundary nodes (left boundary for compression from right)
-            auto lnodes = sfem::create_nodeset_from_sideset(fs, left_sideset[0]);
+            auto mesh_for_sideset = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+            auto lnodes = smesh::create_nodeset_from_sideset(mesh_for_sideset, left_sideset[0]);
             const ptrdiff_t nbnodes = lnodes->size();
             contact_node_indices.resize(nbnodes);
             for (ptrdiff_t i = 0; i < nbnodes; i++) {

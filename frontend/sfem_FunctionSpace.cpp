@@ -8,7 +8,6 @@
 
 #include "sfem_Buffer.hpp"
 #include "sfem_CRSGraph.hpp"
-#include "smesh_mesh.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Packed.hpp"
 
@@ -31,7 +30,7 @@ namespace sfem {
         std::shared_ptr<sfem::Buffer<idx_t *>> device_elements;
         std::shared_ptr<Packed<PackedIdxType>> packed_mesh;
         // Data-structures for semistructured mesh
-        std::shared_ptr<SemiStructuredMesh> semi_structured_mesh;
+        std::shared_ptr<Mesh> semi_structured_mesh;
 
         ~Impl() {}
 
@@ -134,29 +133,18 @@ namespace sfem {
         }
 
         assert(has_semi_structured_mesh());
-        return create(semi_structured_mesh().derefine(to_level), block_size());
-    }
-
-    FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
-
-    std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size) {
-        auto ret                         = std::make_shared<FunctionSpace>();
-        ret->impl_->mesh                 = mesh->macro_mesh();
-        ret->impl_->block_size           = block_size;
-        ret->impl_->semi_structured_mesh = mesh;
-        ret->impl_->nlocal               = mesh->n_nodes() * block_size;
+        auto derefined_mesh = sfem::semi_structured_derefine(impl_->semi_structured_mesh, to_level);
+        auto ret            = std::make_shared<FunctionSpace>();
+        ret->impl_->mesh                 = impl_->mesh;
+        ret->impl_->block_size           = impl_->block_size;
+        ret->impl_->semi_structured_mesh = derefined_mesh;
+        ret->impl_->nlocal               = derefined_mesh->n_nodes() * ret->impl_->block_size;
         ret->impl_->nglobal              = ret->impl_->nlocal;
-
-        ret->impl_->element_types.push_back(
-                semistructured_type(mesh->macro_mesh()->element_type(0), mesh->level()));
-
-        // TODO: Once multi-block support is available in the semistructured mesh,
-        // Initialize element types for multi-block support
-        // ret->impl_->initialize_element_types();
-
+        ret->impl_->override_element_types(derefined_mesh->element_type(0));
         return ret;
     }
 
+    FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
 
     std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<Packed<PackedIdxType>> &mesh, const int block_size) {
         auto ret                         = std::make_shared<FunctionSpace>();
@@ -204,7 +192,7 @@ namespace sfem {
             // For multi-block meshes, we need to check if all blocks are compatible
             // For now, we'll only promote if the default element type is smesh::HEX8
             if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
-                impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
+                impl_->semi_structured_mesh = sfem::to_semi_structured(impl_->mesh, level);
                 impl_->override_element_types(semistructured_type(smesh::HEX8, level));
                 impl_->nlocal  = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
                 impl_->nglobal = impl_->nlocal;
@@ -215,7 +203,7 @@ namespace sfem {
         } else {
             // Single block mesh - original behavior
             if (impl_->get_element_type_for_block(0) == smesh::HEX8) {
-                impl_->semi_structured_mesh = std::make_shared<SemiStructuredMesh>(impl_->mesh, level);
+                impl_->semi_structured_mesh = sfem::to_semi_structured(impl_->mesh, level);
                 impl_->override_element_types(semistructured_type(smesh::HEX8, level));
                 impl_->nlocal  = impl_->semi_structured_mesh->n_nodes() * impl_->block_size;
                 impl_->nglobal = impl_->nlocal;
@@ -234,8 +222,10 @@ namespace sfem {
     Mesh &FunctionSpace::mesh() { return *impl_->mesh; }
 
     std::shared_ptr<Mesh> FunctionSpace::mesh_ptr() const { return impl_->mesh; }
+    
+    std::shared_ptr<Mesh> FunctionSpace::semi_structured_mesh_ptr() const { return impl_->semi_structured_mesh; }
 
-    SemiStructuredMesh &FunctionSpace::semi_structured_mesh() { return *impl_->semi_structured_mesh; }
+    Mesh &FunctionSpace::semi_structured_mesh() { return *impl_->semi_structured_mesh; }
 
     int FunctionSpace::block_size() const { return impl_->block_size; }
 

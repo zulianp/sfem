@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     const char *path_mesh    = argv[1];
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(path_mesh));
     const char *path_sideset = argv[2];
-    auto s = sfem::Sideset::create_from_file(sfem::Communicator::wrap(comm), path_sideset);
+    auto s = sfem::Sideset::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(path_sideset));
     const auto elements = m->elements(0)->data();
 
     // Make sure the folder exists
@@ -96,19 +96,20 @@ int main(int argc, char *argv[]) {
             SFEM_ERROR("Element %s not supported for semi-structured discretization\n", type_to_string(element_type));
         }
 
-        auto ss = sfem::SemiStructuredMesh::create(m, SFEM_ELEMENT_REFINE_LEVEL);
+        auto ss = sfem::to_semi_structured(m, SFEM_ELEMENT_REFINE_LEVEL);
+        const int level = sfem::semi_structured_level(*ss);
 
         std::shared_ptr<sfem::Buffer<idx_t *>> surf_elems;
 
         if (SFEM_CONVERT_TO_STD_MESH) {
             const int nnxs = 4;
-            const int nexs = ss->level() * ss->level();
+            const int nexs = level * level;
             surf_elems     = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size() * nexs);
-            auto ss_surf_elems = sfem::create_host_buffer<idx_t>((ss->level() + 1) * (ss->level() + 1), s->parent()->size());
+            auto ss_surf_elems = sfem::create_host_buffer<idx_t>((level + 1) * (level + 1), s->parent()->size());
 
             SFEM_TRACE_SCOPE("sshex8_extract_surface_from_sideset");
-            if (smesh::sshex8_extract_surface_from_sideset(ss->level(),
-                                                           ss->element_data(),
+            if (smesh::sshex8_extract_surface_from_sideset(level,
+                                                           ss->elements(0)->data(),
                                                            s->parent()->size(),
                                                            s->parent()->data(),
                                                            s->lfi()->data(),
@@ -116,15 +117,15 @@ int main(int argc, char *argv[]) {
                 SFEM_ERROR("Unable to extract surface from sideset!\n");
             }
 
-            ssquad4_to_standard_quad4_mesh(ss->level(), s->parent()->size(), ss_surf_elems->data(), surf_elems->data());
+            ssquad4_to_standard_quad4_mesh(level, s->parent()->size(), ss_surf_elems->data(), surf_elems->data());
 
         } else {
-            int nnxs   = (ss->level() + 1) * (ss->level() + 1);
+            int nnxs   = (level + 1) * (level + 1);
             surf_elems = sfem::create_host_buffer<idx_t>(nnxs, s->parent()->size());
 
             SFEM_TRACE_SCOPE("sshex8_extract_surface_from_sideset");
-            if (smesh::sshex8_extract_surface_from_sideset(ss->level(),
-                                                           ss->element_data(),
+            if (smesh::sshex8_extract_surface_from_sideset(level,
+                                                           ss->elements(0)->data(),
                                                            s->parent()->size(),
                                                            s->parent()->data(),
                                                            s->lfi()->data(),
@@ -143,8 +144,8 @@ int main(int argc, char *argv[]) {
 
             {
                 SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                if (smesh::sshex8_extract_nodeset_from_sideset(ss->level(),
-                                                               ss->element_data(),
+                if (smesh::sshex8_extract_nodeset_from_sideset(level,
+                                                               ss->elements(0)->data(),
                                                                s->parent()->size(),
                                                                s->parent()->data(),
                                                                s->lfi()->data(),

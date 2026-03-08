@@ -14,6 +14,7 @@
 #include "sfem_API.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "smesh_env.hpp"
+#include "smesh_sideset.hpp"
 #include "sfem_P1toP2.hpp"
 #include "sfem_Packed.hpp"
 #include "sfem_SFC.hpp"
@@ -149,7 +150,8 @@ struct RotateYZ {
                                             const int                                   steps,
                                             const real_t                                angle,
                                             const sfem::ExecutionSpace                  execution_space) {
-        auto nodeset = sfem::create_nodeset_from_sideset(space, sideset);
+        auto mesh_for_sideset = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+        auto nodeset = smesh::create_nodeset_from_sideset(mesh_for_sideset, sideset);
 
         auto uy  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
         auto uz  = sfem::create_buffer<real_t>(nodeset->size(), sfem::EXECUTION_SPACE_HOST);
@@ -165,7 +167,7 @@ struct RotateYZ {
 
         if (!sideset_path.empty()) {
             printf("Rotating sideset %s with angle %g\n", sideset_path.c_str(), angle);
-            auto sideset    = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), sideset_path.c_str());
+            auto sideset    = sfem::Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(sideset_path));
             auto ret        = RotateYZ::create(space, sideset, steps, angle, execution_space);
             ret->rcenter[0] = smesh::Env::read("SFEM_ROTATE_RCENTER_X", 0.0);
             ret->rcenter[1] = smesh::Env::read("SFEM_ROTATE_RCENTER_Y", 0.0);
@@ -328,7 +330,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     // Output to disk
     sfem::create_directory(output_path.c_str());
     if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_path + "/mesh").c_str());
         fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
     } else {
         fs->mesh_ptr()->write(smesh::Path((output_path + "/mesh")));

@@ -13,6 +13,13 @@
 
 #include "sfem_API.hpp"
 #include "sfem_ShiftedPenalty.hpp"
+#include "smesh_sideset.hpp"
+
+namespace smesh {
+    SharedBuffer<idx_t> create_nodeset_from_sidesets(
+        const std::shared_ptr<Mesh> &mesh,
+        const std::vector<std::shared_ptr<Sideset>> &sidesets);
+}
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -114,7 +121,8 @@ int test_amg_sqp() {
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
 
     // Indices of potential contact boundary nodes
-    auto bottom = sfem::create_nodeset_from_sidesets(fs, {bottom_ss});
+    auto mesh_for_sidesets = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+    auto bottom = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, {bottom_ss});
 
     // FIXME not GPU ready
     {

@@ -4,6 +4,7 @@
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_Buffer.hpp"
+#include "sfem_SemiStructuredMesh.hpp"
 
 #include <memory>
 #include <string>
@@ -43,9 +44,10 @@ namespace sfem {
 
         Mesh                 &mesh();
         std::shared_ptr<Mesh> mesh_ptr() const;
+        std::shared_ptr<Mesh> semi_structured_mesh_ptr() const;
 
         bool                has_semi_structured_mesh() const;
-        // SemiStructuredMesh &semi_structured_mesh();
+        Mesh               &semi_structured_mesh();
 
         
         // using PackedIdxType = uint8_t;

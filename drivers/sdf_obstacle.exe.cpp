@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        fs->semi_structured_mesh().apply_hierarchical_renumbering();
+        sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
     }
 
 #ifdef SFEM_ENABLE_CUDA
@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
     if (fs->has_semi_structured_mesh()) {
         std::string path = output_path;
         path += "/ssmesh";
-        fs->semi_structured_mesh().export_as_standard(path.c_str());
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), path.c_str());
     }
 
     auto output = f->output();

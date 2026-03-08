@@ -8,6 +8,7 @@
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
 #include "sfem_prolongation_restriction.hpp"
 #include "sshex8.hpp"
 #include "sshex8_interpolate.hpp"
@@ -493,11 +494,16 @@ namespace sfem {
 
                                 auto &ssm = to_space->semi_structured_mesh();
                                 sshex8_hierarchical_prolongation(
-                                        ssm.level(), ssm.n_elements(), ssm.element_data(), from_space->block_size(), from, to);
+                                        sfem::semi_structured_level(ssm),
+                                        ssm.n_elements(),
+                                        sfem::semi_structured_element_data(ssm),
+                                        from_space->block_size(),
+                                        from,
+                                        to);
                             },
                             EXECUTION_SPACE_HOST);
                 } else {
-                    assert(from_space->semi_structured_mesh().level() > 1);
+                    assert(sfem::semi_structured_level(from_space->semi_structured_mesh()) > 1);
 
                     return make_op<real_t>(
                             to_space->n_dofs(),
@@ -509,12 +515,12 @@ namespace sfem {
                                 auto &to_ssm   = to_space->semi_structured_mesh();
 
                                 sshex8_prolongate(from_ssm.n_elements(),     // nelements,
-                                                  from_ssm.level(),          // from_level
+                                                  sfem::semi_structured_level(from_ssm),          // from_level
                                                   1,                         // from_level_stride
-                                                  from_ssm.element_data(),   // from_elements
-                                                  to_ssm.level(),            // to_level
+                                                  sfem::semi_structured_element_data(from_ssm),   // from_elements
+                                                  sfem::semi_structured_level(to_ssm),            // to_level
                                                   1,                         // to_level_stride
-                                                  to_ssm.element_data(),     // to_elements
+                                                  sfem::semi_structured_element_data(to_ssm),     // to_elements
                                                   from_space->block_size(),  // vec_size
                                                   from,
                                                   to);

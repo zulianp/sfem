@@ -34,8 +34,8 @@ namespace sfem {
             int       nxe;
             if (from_space->has_semi_structured_mesh()) {
                 auto& ssmesh = from_space->semi_structured_mesh();
-                nxe          = sshex8_nxe(ssmesh.level());
-                elements     = ssmesh.element_data();
+                nxe          = sshex8_nxe(sfem::semi_structured_level(ssmesh));
+                elements     = sfem::semi_structured_element_data(ssmesh);
                 nnodes       = ssmesh.n_nodes();
             } else {
                 nxe      = elem_num_nodes(from_element);
@@ -86,11 +86,11 @@ namespace sfem {
                                     auto& to_ssm   = to_space->semi_structured_mesh();
 
                                     cu_sshex8_restrict(from_ssm.n_elements(),
-                                                       from_ssm.level(),
+                                                       sfem::semi_structured_level(from_ssm),
                                                        1,
                                                        elements->data(),
                                                        dbuff->data(),
-                                                       to_ssm.level(),
+                                                       sfem::semi_structured_level(to_ssm),
                                                        1,
                                                        to_elements->data(),
                                                        block_size,
@@ -113,7 +113,7 @@ namespace sfem {
                                     SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_restriction");
 
                                     auto& ssm = from_space->semi_structured_mesh();
-                                    cu_sshex8_hierarchical_restriction(ssm.level(),
+                                    cu_sshex8_hierarchical_restriction(sfem::semi_structured_level(ssm),
                                                                        ssm.n_elements(),
                                                                        elements->data(),
                                                                        dbuff->data(),
@@ -164,9 +164,9 @@ namespace sfem {
                                     SFEM_TRACE_SCOPE("sshex8_hierarchical_restriction");
 
                                     auto& ssm = from_space->semi_structured_mesh();
-                                    sshex8_hierarchical_restriction(ssm.level(),
+                                    sshex8_hierarchical_restriction(sfem::semi_structured_level(ssm),
                                                                     ssm.n_elements(),
-                                                                    ssm.element_data(),
+                                                                    sfem::semi_structured_element_data(ssm),
                                                                     element_to_node_incidence_count->data(),
                                                                     block_size,
                                                                     from,
@@ -184,15 +184,15 @@ namespace sfem {
                                     auto& from_ssm = from_space->semi_structured_mesh();
                                     auto& to_ssm   = to_space->semi_structured_mesh();
 
-                                    sshex8_restrict(from_ssm.n_elements(),    // nelements,
-                                                    from_ssm.level(),         // from_level
-                                                    1,                        // from_level_stride
-                                                    from_ssm.element_data(),  // from_elements
+                                    sshex8_restrict(from_ssm.n_elements(),                              // nelements,
+                                                    sfem::semi_structured_level(from_ssm),             // from_level
+                                                    1,                                                  // from_level_stride
+                                                    sfem::semi_structured_element_data(from_ssm),      // from_elements
                                                     element_to_node_incidence_count->data(),
-                                                    to_ssm.level(),         // to_level
-                                                    1,                      // to_level_stride
-                                                    to_ssm.element_data(),  // to_elements
-                                                    block_size,             // vec_size
+                                                    sfem::semi_structured_level(to_ssm),               // to_level
+                                                    1,                                                  // to_level_stride
+                                                    sfem::semi_structured_element_data(to_ssm),        // to_elements
+                                                    block_size,                                         // vec_size
                                                     from,
                                                     to);
                                 },
