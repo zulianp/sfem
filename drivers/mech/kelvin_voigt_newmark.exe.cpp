@@ -187,7 +187,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             int  block_size = fs->block_size();
             auto diag       = sfem::create_buffer<real_t>((fs->n_dofs() / block_size) * (block_size == 3 ? 6 : 3), es);
             auto mask       = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-            f->constaints_mask(mask->data());
+            f->constraints_mask(mask->data());
             f->hessian_block_diag_sym(nullptr, diag->data());
             auto jacobi = sfem::create_shiftable_block_sym_jacobi(fs->block_size(), diag, mask, es);
             cg->set_preconditioner_op(jacobi);

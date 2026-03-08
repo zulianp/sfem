@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
         }
 
         auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
-        f->constaints_mask(mask->data());
+        f->constraints_mask(mask->data());
         auto fine_mat = sfem::h_coosym<idx_t, real_t>(
                 mask, off_diag_rows, crs_graph->colidx(), off_diag_values, diag_values);
 

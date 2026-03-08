@@ -112,7 +112,7 @@ namespace sfem {
         int copy_constrained_dofs(const real_t *const src, real_t *const dest);
         int report_solution(const real_t *const x);
         int initial_guess(real_t *const x);
-        int constaints_mask(mask_t *mask);
+        int constraints_mask(mask_t *mask);
 
         int set_output_dir(const char *path);
 
