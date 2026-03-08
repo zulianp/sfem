@@ -12,7 +12,14 @@
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 #include "sfem_bsr_SpMV.hpp"
+#include "smesh_sideset.hpp"
 #include "sfem_test.hpp"
+
+namespace smesh {
+    SharedBuffer<idx_t> create_nodeset_from_sidesets(
+        const std::shared_ptr<Mesh> &mesh,
+        const std::vector<std::shared_ptr<Sideset>> &sidesets);
+}
 
 
 static void compute_contact_lower_bound(
@@ -196,7 +203,7 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
     output->set_output_dir(output_dir.c_str());
 
     if (fs->has_semi_structured_mesh()) {
-        fs->semi_structured_mesh().export_as_standard(output_dir.c_str());
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), output_dir.c_str());
     } else {
         fs->mesh_ptr()->write(smesh::Path(output_dir));
     }
@@ -946,7 +953,8 @@ int test_mooney_rivlin_gravity() {
         // For other types: use ALL nodes
         if (SFEM_OBSTACLE_TYPE == 4) {
             // Hemisphere: only constrain bottom boundary nodes
-            auto nodeset = sfem::create_nodeset_from_sidesets(fs, contact_sideset);
+            auto mesh_for_sidesets = fs->has_semi_structured_mesh() ? fs->semi_structured_mesh_ptr() : fs->mesh_ptr();
+            auto nodeset = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, contact_sideset);
             auto nodeset_data = nodeset->data();
             ptrdiff_t n_boundary_nodes = nodeset->size();
             contact_node_indices.resize(n_boundary_nodes);

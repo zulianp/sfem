@@ -61,13 +61,13 @@ namespace sfem {
                                                     const idx_t *const   colidx,
                                                     real_t *const        values) {
         auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_bsr", ssm.level());
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_bsr", sfem::semi_structured_level(ssm));
 
-        return affine_sshex8_elasticity_bsr(ssm.level(),
+        return affine_sshex8_elasticity_bsr(sfem::semi_structured_level(ssm),
                                             ssm.n_elements(),
-                                            ssm.interior_start(),
-                                            ssm.element_data(),
-                                            ssm.point_data(),
+                                            sfem::semi_structured_interior_start(ssm),
+                                            sfem::semi_structured_element_data(ssm),
+                                            sfem::semi_structured_point_data(ssm),
                                             this->mu,
                                             this->lambda,
                                             rowptr,
@@ -77,13 +77,13 @@ namespace sfem {
 
     int SemiStructuredLinearElasticity::hessian_diag(const real_t *const x, real_t *const values) {
         auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_diag", ssm.level());
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_diag", sfem::semi_structured_level(ssm));
 
-        return affine_sshex8_linear_elasticity_diag(ssm.level(),
+        return affine_sshex8_linear_elasticity_diag(sfem::semi_structured_level(ssm),
                                                     ssm.n_elements(),
-                                                    ssm.interior_start(),
-                                                    ssm.element_data(),
-                                                    ssm.point_data(),
+                                                    sfem::semi_structured_interior_start(ssm),
+                                                    sfem::semi_structured_element_data(ssm),
+                                                    sfem::semi_structured_point_data(ssm),
                                                     mu,
                                                     lambda,
                                                     3,
@@ -94,13 +94,14 @@ namespace sfem {
 
     int SemiStructuredLinearElasticity::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
         auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_block_diag_sym", ssm.level());
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::hessian_block_diag_sym",
+                                 sfem::semi_structured_level(ssm));
 
-        return affine_sshex8_linear_elasticity_block_diag_sym(ssm.level(),
+        return affine_sshex8_linear_elasticity_block_diag_sym(sfem::semi_structured_level(ssm),
                                                               ssm.n_elements(),
-                                                              ssm.interior_start(),
-                                                              ssm.element_data(),
-                                                              ssm.point_data(),
+                                                              sfem::semi_structured_interior_start(ssm),
+                                                              sfem::semi_structured_element_data(ssm),
+                                                              sfem::semi_structured_point_data(ssm),
                                                               mu,
                                                               lambda,
                                                               6,
@@ -116,7 +117,7 @@ namespace sfem {
 
     int SemiStructuredLinearElasticity::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         auto &ssm = space->semi_structured_mesh();
-        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::apply", ssm.level());
+        SFEM_TRACE_SCOPE_VARIANT("SemiStructuredLinearElasticity[%d]::apply", sfem::semi_structured_level(ssm));
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
@@ -125,11 +126,11 @@ namespace sfem {
         double tick = MPI_Wtime();
         int    err;
         if (use_affine_approximation) {
-            err = affine_sshex8_linear_elasticity_apply(ssm.level(),
+            err = affine_sshex8_linear_elasticity_apply(sfem::semi_structured_level(ssm),
                                                         ssm.n_elements(),
-                                                        ssm.interior_start(),
-                                                        ssm.element_data(),
-                                                        ssm.point_data(),
+                                                        sfem::semi_structured_interior_start(ssm),
+                                                        sfem::semi_structured_element_data(ssm),
+                                                        sfem::semi_structured_point_data(ssm),
                                                         mu,
                                                         lambda,
                                                         3,
@@ -142,11 +143,11 @@ namespace sfem {
                                                         &out[2]);
 
         } else {
-            err = sshex8_linear_elasticity_apply(ssm.level(),
+            err = sshex8_linear_elasticity_apply(sfem::semi_structured_level(ssm),
                                                  ssm.n_elements(),
-                                                 ssm.interior_start(),
-                                                 ssm.element_data(),
-                                                 ssm.point_data(),
+                                                 sfem::semi_structured_interior_start(ssm),
+                                                 sfem::semi_structured_element_data(ssm),
+                                                 sfem::semi_structured_point_data(ssm),
                                                  mu,
                                                  lambda,
                                                  3,
@@ -180,7 +181,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SemiStructuredLinearElasticity[%d]::apply(%s) called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   space->semi_structured_mesh().level(),
+                   sfem::semi_structured_level(space->semi_structured_mesh()),
                    use_affine_approximation ? "affine" : "isoparametric",
                    calls,
                    total_time,

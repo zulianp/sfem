@@ -48,8 +48,8 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     
     ptrdiff_t n_nodes{0};
     idx_t    *nodes{nullptr};
-    SFEM_TEST_ASSERT(smesh::sshex8_extract_nodeset_from_sideset(coarse_ssmesh.level(),
-                                                                coarse_ssmesh.element_data(),
+    SFEM_TEST_ASSERT(smesh::sshex8_extract_nodeset_from_sideset(sfem::semi_structured_level(coarse_ssmesh),
+                                                                sfem::semi_structured_element_data(coarse_ssmesh),
                                                                 sideset[0]->parent()->size(),
                                                                 sideset[0]->parent()->data(),
                                                                 sideset[0]->lfi()->data(),
@@ -74,21 +74,23 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
     if (es == sfem::EXECUTION_SPACE_DEVICE) coarse_x = sfem::to_device(coarse_x);
 #endif
 
-    const int nexs       = (fine_ssmesh.level() + 1) * (fine_ssmesh.level() + 1);
+    const int fine_level = sfem::semi_structured_level(fine_ssmesh);
+    const int coarse_level = sfem::semi_structured_level(coarse_ssmesh);
+    const int nexs       = (fine_level + 1) * (fine_level + 1);
     auto      fine_sides = sfem::create_host_buffer<idx_t>(nexs, sideset[0]->parent()->size());
 
-    SFEM_TEST_ASSERT(smesh::sshex8_extract_surface_from_sideset(fine_ssmesh.level(),
-                                                                fine_ssmesh.element_data(),
+    SFEM_TEST_ASSERT(smesh::sshex8_extract_surface_from_sideset(fine_level,
+                                                                sfem::semi_structured_element_data(fine_ssmesh),
                                                                 sideset[0]->parent()->size(),
                                                                 sideset[0]->parent()->data(),
                                                                 sideset[0]->lfi()->data(),
                                                                 fine_sides->data()) == SFEM_SUCCESS);
 
     SFEM_TEST_ASSERT(ssquad4_prolongate(fine_sides->extent(1),                        // nelements,
-                                        coarse_ssmesh.level(),                        // rom_level
-                                        fine_ssmesh.level() / coarse_ssmesh.level(),  // from_level_stride
+                                        coarse_level,                                 // rom_level
+                                        fine_level / coarse_level,                    // from_level_stride
                                         fine_sides->data(),                           // from_elements
-                                        fine_ssmesh.level(),                          // to_level
+                                        fine_level,                                   // to_level
                                         1,                                            // to_level_stride
                                         fine_sides->data(),                           // to_elements
                                         fine_fs->block_size(),                        // vec_size
@@ -103,15 +105,15 @@ int test_trace_space_operations(const std::shared_ptr<sfem::FunctionSpace> &coar
 #endif
 
     SFEM_TEST_ASSERT(ssquad4_element_node_incidence_count(
-                             fine_ssmesh.level(), 1, fine_sides->extent(1), fine_sides->data(), count->data()) == SFEM_SUCCESS);
+                             fine_level, 1, fine_sides->extent(1), fine_sides->data(), count->data()) == SFEM_SUCCESS);
 
     SFEM_TEST_ASSERT(ssquad4_restrict(fine_sides->extent(1),
-                                      fine_ssmesh.level(),
+                                      fine_level,
                                       1,
                                       fine_sides->data(),
                                       count->data(),
-                                      coarse_ssmesh.level(),
-                                      fine_ssmesh.level() / coarse_ssmesh.level(),
+                                      coarse_level,
+                                      fine_level / coarse_level,
                                       fine_sides->data(),
                                       fine_fs->block_size(),
                                       fine_x->data(),
@@ -162,7 +164,7 @@ int test_trace_space_prolongation_restriction() {
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
     auto sideset = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });

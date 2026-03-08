@@ -396,7 +396,7 @@ namespace sfem {
 
         auto in_surface = YAMLNoIndent::create_from_file(path_surface + "/meta.yaml");
 
-        auto sideset = Sideset::create_from_file(mesh->comm(), path_surface.c_str());
+        auto sideset = Sideset::create_from_file(mesh->comm(), smesh::Path(path_surface));
 
         std::string path_sdf;
         in->require("sdf", path_sdf);

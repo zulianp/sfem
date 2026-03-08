@@ -12,31 +12,31 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &outpu
     fs->promote_to_semi_structured(L);
 
     // Do this before any other operation
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
     // Create the points to avoid duplication in coarse levels (lazy init)!
     // Otherwise every level will construct its points
     // fs->semi_structured_mesh().points();
 
-    auto levels = fs->semi_structured_mesh().derefinement_levels();
+    auto levels = sfem::semi_structured_derefinement_levels(fs->semi_structured_mesh());
     assert(levels[3] == L);
     assert(levels[2] == 4);
     assert(levels[1] == 2);
     assert(levels[0] == 1);
 
-    auto l2_mesh = fs->semi_structured_mesh().derefine(levels[2]);
-    auto l1_mesh = fs->semi_structured_mesh().derefine(levels[1]);
+    auto l2_mesh = sfem::semi_structured_derefine(fs->semi_structured_mesh_ptr(), levels[2]);
+    auto l1_mesh = sfem::semi_structured_derefine(fs->semi_structured_mesh_ptr(), levels[1]);
 
     // Recursive way
-    auto l1_mesh_from_l2 = l2_mesh->derefine(levels[1]);
+    auto l1_mesh_from_l2 = sfem::semi_structured_derefine(l2_mesh, levels[1]);
 
     sfem::create_directory(output_dir.c_str());
 
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(l2_mesh->export_as_standard((output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(l1_mesh->export_as_standard((output_dir + "/l1_mesh").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(l1_mesh_from_l2->export_as_standard((output_dir + "/l1_mesh_from_l2").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/og_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(*l2_mesh, (output_dir + "/l2_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(*l1_mesh, (output_dir + "/l1_mesh").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(*l1_mesh_from_l2, (output_dir + "/l1_mesh_from_l2").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_dir + "/og_mesh").c_str()) == SFEM_SUCCESS);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -65,9 +65,9 @@ int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &o
     fs->promote_to_semi_structured(L);
 
     // // Do this before any other operation
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
-    auto levels = fs->semi_structured_mesh().derefinement_levels();
+    auto levels = sfem::semi_structured_derefinement_levels(fs->semi_structured_mesh());
 
     auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
 
@@ -133,9 +133,9 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     fs->promote_to_semi_structured(L);
 
     // // Do this before any other operation
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
-    auto levels = fs->semi_structured_mesh().derefinement_levels();
+    auto levels = sfem::semi_structured_derefinement_levels(fs->semi_structured_mesh());
 
     auto coarse_fs    = fs->derefine(levels[1]);  // Choose any level
     auto restriction  = create_hierarchical_restriction(fs, coarse_fs, es);
@@ -164,8 +164,10 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
 
     sfem::create_directory(output_dir.c_str());
     SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/input_mesh"))) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(coarse_fs->semi_structured_mesh().export_as_standard((output_dir + "/coarse").c_str()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/fine").c_str()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(coarse_fs->semi_structured_mesh(), (output_dir + "/coarse").c_str()) ==
+                     SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_dir + "/fine").c_str()) ==
+                     SFEM_SUCCESS);
     
     sfem::Output out(coarse_fs);
     out.set_output_dir((output_dir + "/coarse/fields").c_str());

@@ -8,6 +8,7 @@
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
 
 #include "integrate_values.hpp"
 #include "neumann.hpp"
@@ -146,10 +147,11 @@ namespace sfem {
                     cneumann_conditions.surface      = manage_host_buffer(nnxs, nse, surface);
 
                 } else {
-                    auto sideset                = Sideset::create_from_file(space->mesh_ptr()->comm(), pch);
+                    auto sideset                = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(pch));
                     cneumann_conditions.sidesets.push_back(sideset);
 
-                    auto surface                     = create_surface_from_sideset(space, sideset);
+                    auto mesh_for_surface            = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+                    auto surface                     = smesh::create_surface_from_sideset(mesh_for_surface, sideset);
                     cneumann_conditions.element_type = surface.first;
                     cneumann_conditions.surface      = surface.second;
                 }
@@ -291,7 +293,8 @@ namespace sfem {
             if (!c.surface) {
                 auto it = sideset_to_surface.find(c.sidesets[0]);
                 if (it == sideset_to_surface.end()) {
-                    auto surface                  = create_surface_from_sidesets(space, c.sidesets);
+                    auto mesh_for_surface         = space->has_semi_structured_mesh() ? space->semi_structured_mesh_ptr() : space->mesh_ptr();
+                    auto surface                  = smesh::create_surface_from_sidesets(mesh_for_surface, c.sidesets);
                     c.element_type                = surface.first;
                     c.surface                     = surface.second;
                     sideset_to_surface[c.sidesets[0]] = surface;

@@ -38,7 +38,7 @@ namespace sfem {
         if (SFEM_PRINT_THROUGHPUT && calls) {
             printf("SpectralElementLaplacian[%d]::apply called %ld times. Total: %g [s], "
                    "Avg: %g [s], TP %g [MDOF/s]\n",
-                   space->semi_structured_mesh().level(),
+                   sfem::semi_structured_level(space->semi_structured_mesh()),
                    calls,
                    total_time,
                    total_time / calls,
@@ -101,8 +101,13 @@ namespace sfem {
 
         double tick = MPI_Wtime();
 
-        int err = spectral_hex_laplacian_apply(
-                ssm.level(), ssm.n_elements(), ssm.interior_start(), ssm.element_data(), ssm.point_data(), h, out);
+        int err = spectral_hex_laplacian_apply(sfem::semi_structured_level(ssm),
+                                               ssm.n_elements(),
+                                               sfem::semi_structured_interior_start(ssm),
+                                               sfem::semi_structured_element_data(ssm),
+                                               sfem::semi_structured_point_data(ssm),
+                                               h,
+                                               out);
 
         double tock = MPI_Wtime();
         total_time += (tock - tick);

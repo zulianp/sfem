@@ -67,7 +67,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * fs->semi_structured_mesh().level();
+    const int n   = base_resolution * sfem::semi_structured_level(fs->semi_structured_mesh());
     auto      sdf = sfem::create_sdf(comm,
                                 n * resolution_ratio * 2,
                                 n * 1 * 2,
@@ -136,7 +136,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * fs->semi_structured_mesh().level();
+    const int n   = base_resolution * sfem::semi_structured_level(fs->semi_structured_mesh());
     auto      sdf = sfem::create_sdf(comm,
                                 n * resolution_ratio * 2,
                                 n * 1 * 2,
@@ -216,7 +216,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n              = base_resolution * fs->semi_structured_mesh().level();
+    const int n              = base_resolution * sfem::semi_structured_level(fs->semi_structured_mesh());
     int       SFEM_N_SPHERES = 2;
     SFEM_READ_ENV(SFEM_N_SPHERES, atoi);
     auto sdf = sfem::create_sdf(comm,
@@ -304,7 +304,7 @@ int test_contact() {
     SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -371,7 +371,7 @@ int test_contact() {
 
     if (SFEM_ENABLE_OUTPUT) {
         mesh->write(smesh::Path("test_contact/coarse_mesh"));
-        fs->semi_structured_mesh().export_as_standard("test_contact/mesh");
+        sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), "test_contact/mesh");
 
         auto out = f->output();
         out->set_output_dir("test_contact/out");

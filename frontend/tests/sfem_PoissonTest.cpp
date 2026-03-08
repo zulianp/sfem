@@ -34,9 +34,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
         count = sfem::create_buffer<uint16_t>(fs->semi_structured_mesh().n_nodes(), es);
         {
             auto buff     = count->data();
-            auto elements = fs->semi_structured_mesh().element_data();
+            auto elements = sfem::semi_structured_element_data(fs->semi_structured_mesh());
 
-            const int nxe = fs->semi_structured_mesh().n_nodes_per_element();
+            const int nxe = fs->semi_structured_mesh().n_nodes_per_element(0);
             printf("nxe = %d\n", nxe);
 
             for (int d = 0; d < nxe; d++) {
@@ -59,9 +59,9 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
                 fs->n_dofs(),
                 [=](const real_t *x, real_t *y) {
                     SFEM_TRACE_SCOPE("affine_sshex8_laplacian_bjacobi_fff");
-                    affine_sshex8_laplacian_bjacobi_fff(fs->semi_structured_mesh().level(),
+                    affine_sshex8_laplacian_bjacobi_fff(sfem::semi_structured_level(fs->semi_structured_mesh()),
                                                         fs->semi_structured_mesh().n_elements(),
-                                                        fs->semi_structured_mesh().elements()->data(),
+                                                        sfem::semi_structured_element_data(fs->semi_structured_mesh()),
                                                         fff->data(),
                                                         count->data(),
                                                         constraints_mask->data(),
@@ -136,7 +136,8 @@ int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::
 
     if (fs->has_semi_structured_mesh()) {
         SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-        SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_dir + "/mesh").c_str()) ==
+                         SFEM_SUCCESS);
     } else {
         SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
     }
@@ -217,7 +218,8 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
 
         if (fs->has_semi_structured_mesh()) {
             SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/coarse_mesh"))) == SFEM_SUCCESS);
-            SFEM_TEST_ASSERT(fs->semi_structured_mesh().export_as_standard((output_dir + "/mesh").c_str()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_dir + "/mesh").c_str()) ==
+                             SFEM_SUCCESS);
         } else {
             SFEM_TEST_ASSERT(m->write(smesh::Path((output_dir + "/mesh"))) == SFEM_SUCCESS);
         }

@@ -57,7 +57,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    fs->semi_structured_mesh().apply_hierarchical_renumbering();
+    sfem::semi_structured_apply_hierarchical_renumbering(fs->semi_structured_mesh());
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA
@@ -86,7 +86,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     }
 
     auto sdf              = sfem::Grid<geom_t>::create_from_file(comm, sdf_path);
-    auto contact_boundary = sfem::Sideset::create_from_file(comm, contact_boundary_path);
+    auto contact_boundary = sfem::Sideset::create_from_file(comm, smesh::Path(contact_boundary_path));
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -120,7 +120,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     sfem::create_directory(output_path.c_str());
 
     fs->mesh_ptr()->write(smesh::Path((output_path + "/coarse_mesh")));
-    fs->semi_structured_mesh().export_as_standard((output_path + "/mesh").c_str());
+    sfem::semi_structured_export_as_standard(fs->semi_structured_mesh(), (output_path + "/mesh").c_str());
 
     auto out = f->output();
 
