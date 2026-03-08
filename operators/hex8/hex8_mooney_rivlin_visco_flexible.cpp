@@ -1,4 +1,4 @@
-#include "hex8_mooney_rivlin_visco_flexible.h"
+#include "hex8_mooney_rivlin_visco_flexible.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -7,16 +7,16 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "line_quadrature.h"
+#include "hex8_inline_cpu.hpp"
+#include "line_quadrature.hpp"
 
-#include "hex8_mooney_rivlin_visco_unique_Hi_local.h"  // Unimodular form
-// #include "hex8_mooney_rivlin_visco_unique_Hi_standard.h"   // Standard form (has non-zero initial stress)
+#include "hex8_mooney_rivlin_visco_unique_Hi_local.hpp"  // Unimodular form
+// #include "hex8_mooney_rivlin_visco_unique_Hi_standard.hpp"   // Standard form (has non-zero initial stress)
 
 // ============================================================================
 // HISTORY UPDATE

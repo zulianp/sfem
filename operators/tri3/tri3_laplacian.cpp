@@ -1,7 +1,7 @@
-#include "tri3_laplacian.h"
+#include "tri3_laplacian.hpp"
 
-#include "tri3_inline_cpu.h"
-#include "tri3_laplacian_inline_cpu.h"
+#include "tri3_inline_cpu.hpp"
+#include "tri3_laplacian_inline_cpu.hpp"
 
 #include <assert.h>
 #include <math.h>

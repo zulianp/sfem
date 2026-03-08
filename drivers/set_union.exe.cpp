@@ -7,7 +7,7 @@
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "utils.h"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include "sfem_base.hpp"
 

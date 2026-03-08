@@ -1,7 +1,7 @@
 #include "mg_builder.hpp"
 #include <stdio.h>
 #include <cstddef>
-#include "partitioner.h"
+#include "partitioner.hpp"
 #include "sfem_API.hpp"
 #include "sfem_Buffer.hpp"
 #include "sfem_CooSym.hpp"
@@ -9,7 +9,7 @@
 #include "sfem_Multigrid.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_pwc_interpolator.hpp"
-#include "smoother.h"
+#include "smoother.hpp"
 
 std::shared_ptr<sfem::Multigrid<real_t>> builder(
         const real_t coarsening_factor, const std::shared_ptr<sfem::Buffer<mask_t>> bdy_dofs_buff,

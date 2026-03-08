@@ -1,4 +1,4 @@
-#include "trishell3_l2_projection_p0_p1.h"
+#include "trishell3_l2_projection_p0_p1.hpp"
 
 #include <math.h>
 #include <stdio.h>

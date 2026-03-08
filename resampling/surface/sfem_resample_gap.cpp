@@ -1,11 +1,11 @@
 #include "sfem_resample_gap.hpp"
 
-#include "beam2_resample.h"
-#include "quadshell4_resample.h"
-#include "trishell3_resample.h"
+#include "beam2_resample.hpp"
+#include "quadshell4_resample.hpp"
+#include "trishell3_resample.hpp"
 
-#include "mass.h"
-#include "read_mesh.h"
+#include "mass.hpp"
+#include "read_mesh.hpp"
 
 #include "matrixio_array.h"
 

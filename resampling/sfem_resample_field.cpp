@@ -10,14 +10,14 @@
 #include "matrixio_array.h"
 #include "sfem_resample_field.hpp"
 
-#include "mass.h"
+#include "mass.hpp"
 
 #include "sfem_resample_V.hpp"
-#include "tet10_resample_field.h"
-#include "tet10_resample_field_V2.h"
+#include "tet10_resample_field.hpp"
+#include "tet10_resample_field_V2.hpp"
 
-#include "mesh_aura.h"
-#include "quadratures_rule.h"
+#include "mesh_aura.hpp"
+#include "quadratures_rule.hpp"
 #include "sfem_defs.hpp"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

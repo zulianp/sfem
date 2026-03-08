@@ -8,7 +8,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_glob.hpp"

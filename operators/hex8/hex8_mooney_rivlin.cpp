@@ -3,16 +3,16 @@
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
-#include "crs_graph.h"
-#include "hex8_inline_cpu.h"
-#include "hex8_mooney_rivlin_active_strain.h"
-#include "hex8_partial_assembly_mooney_rivlin_active_strain_inline.h"
-#include "hex8_partial_assembly_neohookean_inline.h"
-#include "hex8_mooney_rivlin_local.h"
-#include "line_quadrature.h"
+#include "crs_graph.hpp"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_mooney_rivlin_active_strain.hpp"
+#include "hex8_partial_assembly_mooney_rivlin_active_strain_inline.hpp"
+#include "hex8_partial_assembly_neohookean_inline.hpp"
+#include "hex8_mooney_rivlin_local.hpp"
+#include "line_quadrature.hpp"
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 // Local inverse of 3x3 matrix and determinant (copied from smith implementation)
 static SFEM_INLINE void inverse3(

@@ -1,4 +1,4 @@
-#include "hyteg_coordinates.h"
+#include "hyteg_coordinates.hpp"
 
 // Array definitions for coordinates
 // Coordinate arrays for L = 1

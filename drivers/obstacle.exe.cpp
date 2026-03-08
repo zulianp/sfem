@@ -11,15 +11,15 @@
 #include <cstdio>
 #include <vector>
 
-#include "sshex8.h"
-#include "sshex8_laplacian.h"
-#include "sshex8_linear_elasticity.h"
+#include "sshex8.hpp"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_linear_elasticity.hpp"
 #include "sfem_API.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
 
 #include "matrixio_array.h"
 

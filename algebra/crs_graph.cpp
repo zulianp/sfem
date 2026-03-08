@@ -1,4 +1,4 @@
-// #include "crs_graph.h"
+// #include "crs_graph.hpp"
 
 // #include <math.h>
 // #include <stdio.h>
@@ -11,7 +11,7 @@
 // #include "matrixio_crs.h"
 // #include "utils.h"
 
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // #include "sfem_defs.hpp"
 

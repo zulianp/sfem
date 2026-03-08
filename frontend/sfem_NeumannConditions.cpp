@@ -9,8 +9,8 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 
-#include "integrate_values.h"
-#include "neumann.h"
+#include "integrate_values.hpp"
+#include "neumann.hpp"
 
 #include <sys/stat.h>
 #include <cstddef>
@@ -23,12 +23,12 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.h"
-#include "hex8_fff.h"
-#include "hex8_jacobian.h"
+#include "adj_table.hpp"
+#include "hex8_fff.hpp"
+#include "hex8_jacobian.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
-#include "sshex8.h"
-#include "sshex8_mesh.h"
+#include "sshex8.hpp"
+#include "sshex8_mesh.hpp"
 
 // C++ includes
 #include "sfem_CRSGraph.hpp"

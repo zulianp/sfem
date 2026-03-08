@@ -1,4 +1,4 @@
-#include "cu_mask.h"
+#include "cu_mask.hpp"
 #include "cu_mask.cuh"
 
 #include "sfem_base.hpp"

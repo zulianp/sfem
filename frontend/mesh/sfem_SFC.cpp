@@ -2,7 +2,7 @@
 
 
 
-#include "argsort.h"
+#include "argsort.hpp"
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"

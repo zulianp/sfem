@@ -1,8 +1,8 @@
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 
 // C includes
-#include "sshex8_laplacian.h"
-#include "sshex8_stencil_element_matrix_apply.h"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_stencil_element_matrix_apply.hpp"
 
 // C++ includes
 #include "sfem_Laplacian.hpp"

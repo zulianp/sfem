@@ -1,8 +1,8 @@
-#include "tri3_stokes_mini.h"
+#include "tri3_stokes_mini.hpp"
 
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <mpi.h>
 

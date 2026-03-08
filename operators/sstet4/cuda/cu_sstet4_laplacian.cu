@@ -1,4 +1,4 @@
-#include "cu_sstet4_laplacian.h"
+#include "cu_sstet4_laplacian.hpp"
 
 #include "cu_tet4_inline.hpp"
 #include "sfem_cuda_base.hpp"

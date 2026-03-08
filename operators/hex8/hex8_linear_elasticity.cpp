@@ -1,10 +1,10 @@
-#include "hex8_linear_elasticity.h"
+#include "hex8_linear_elasticity.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_linear_elasticity_inline_cpu.h"
-// #include "hex8_quadrature.h"
-#include "hex8_laplacian_inline_cpu.h"
-#include "line_quadrature.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_linear_elasticity_inline_cpu.hpp"
+// #include "hex8_quadrature.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "line_quadrature.hpp"
 
 #include <stdio.h>
 

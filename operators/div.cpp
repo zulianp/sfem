@@ -6,8 +6,8 @@
 
 #include <mpi.h>
 
-#include "tet10_div.h"
-#include "tet4_div.h"
+#include "tet10_div.hpp"
+#include "tet4_div.hpp"
 
 #include "sfem_defs.hpp"
 

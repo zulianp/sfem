@@ -1,8 +1,8 @@
-#include "neohookean_ogden.h"
+#include "neohookean_ogden.hpp"
 
-#include "hex8_neohookean_ogden.h"
-#include "tet10_neohookean_ogden.h"
-#include "tet4_neohookean_ogden.h"
+#include "hex8_neohookean_ogden.hpp"
+#include "tet10_neohookean_ogden.hpp"
+#include "tet4_neohookean_ogden.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

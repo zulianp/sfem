@@ -1,4 +1,4 @@
-#include "coo_sort.h"
+#include "coo_sort.hpp"
 #include <assert.h>
 #include <stdio.h>
 

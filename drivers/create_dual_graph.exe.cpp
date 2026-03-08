@@ -9,16 +9,16 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
-#include "read_mesh.h"
+#include "crs_graph.hpp"
+#include "read_mesh.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mesh_write.hpp"
 
-#include "extract_surface_graph.h"
+#include "extract_surface_graph.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "argsort.h"
+#include "argsort.hpp"
 #include "sfem_API.hpp"
 #include "sfem_glob.hpp"
 

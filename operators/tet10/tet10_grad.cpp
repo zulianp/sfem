@@ -1,4 +1,4 @@
-#include "tet10_grad.h"
+#include "tet10_grad.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

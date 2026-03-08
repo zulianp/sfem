@@ -1,8 +1,8 @@
-#include "cvfem_quad4_laplacian.h"
+#include "cvfem_quad4_laplacian.hpp"
 
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <assert.h>
 #include <mpi.h>

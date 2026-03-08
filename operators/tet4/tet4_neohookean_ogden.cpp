@@ -1,4 +1,4 @@
-#include "tet4_neohookean_ogden.h"
+#include "tet4_neohookean_ogden.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -6,13 +6,13 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
-#include "tet4_neohookean_ogden_inline_cpu.h"
-#include "tet4_neohookean_ogden_local.h"
-#include "tet4_partial_assembly_neohookean_inline.h"
+#include "tet4_neohookean_ogden_inline_cpu.hpp"
+#include "tet4_neohookean_ogden_local.hpp"
+#include "tet4_partial_assembly_neohookean_inline.hpp"
 
 int tet4_neohookean_ogden_objective(const ptrdiff_t                   nelements,
                                     const ptrdiff_t                   stride,

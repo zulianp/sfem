@@ -1,4 +1,4 @@
-#include "trishell3_integrate_values.h"
+#include "trishell3_integrate_values.hpp"
 
 #include "sfem_macros.hpp"
 

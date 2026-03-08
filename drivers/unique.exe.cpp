@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include "matrixio_array.h"
 #include "matrixio_crs.h"

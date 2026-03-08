@@ -1,4 +1,4 @@
-#include "constrained_gs.h"
+#include "constrained_gs.hpp"
 
 #include <math.h>
 #include <stdio.h>
@@ -10,7 +10,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "dirichlet.h"
+#include "dirichlet.hpp"
 
 #include "../algebra/inverse.cpp"
 #include "sfem_base.hpp"

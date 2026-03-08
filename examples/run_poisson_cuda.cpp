@@ -7,22 +7,22 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
 #include "boundary_condition_incore_cuda.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
 #include "matrixio_array.h"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 
 #include "laplacian_incore_cuda.h"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 

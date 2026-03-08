@@ -1,6 +1,6 @@
-#include "sshex8_mesh.h"
-#include "sshex8.h"
-#include "ssquad4.h"
+#include "sshex8_mesh.hpp"
+#include "sshex8.hpp"
+#include "ssquad4.hpp"
 
 static SFEM_INLINE void hex8_eval_f(const scalar_t x, const scalar_t y, const scalar_t z, scalar_t *const f) {
     const scalar_t xm = (1 - x);

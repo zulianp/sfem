@@ -1,6 +1,6 @@
-#include "hex8_mass.h"
-#include "hex8_quadrature.h"
-#include "hex8_mass_inline_cpu.h"
+#include "hex8_mass.hpp"
+#include "hex8_quadrature.hpp"
+#include "hex8_mass_inline_cpu.hpp"
 
 #include <stdio.h>
 

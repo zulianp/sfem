@@ -1,4 +1,4 @@
-#include "isotropic_phasefield_for_fracture.h"
+#include "isotropic_phasefield_for_fracture.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -8,8 +8,8 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
 

@@ -1,9 +1,9 @@
-#include "hex8_kelvin_voigt_newmark.h"
+#include "hex8_kelvin_voigt_newmark.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_kelvin_voigt_newmark_inline_cpu.h"
-#include "hex8_laplacian_inline_cpu.h"
-#include "line_quadrature.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_kelvin_voigt_newmark_inline_cpu.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
+#include "line_quadrature.hpp"
 
 #include <assert.h>
 #include <stdio.h>

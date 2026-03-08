@@ -1,8 +1,8 @@
-#include "tet4_stokes_mini.h"
+#include "tet4_stokes_mini.hpp"
 
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <mpi.h>
 

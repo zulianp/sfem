@@ -4,11 +4,11 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
-#include "sortreduce.h"
+#include "crs_graph.hpp"
+#include "sortreduce.hpp"
 
 #include "sfem_vec.hpp"
-#include "tet4_linear_elasticity_inline_cpu.h"
+#include "tet4_linear_elasticity_inline_cpu.hpp"
 
 int tet4_linear_elasticity_value(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,

@@ -1,7 +1,7 @@
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
 #include <mpi.h>
 #include <stdio.h>

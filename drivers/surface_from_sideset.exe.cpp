@@ -3,9 +3,9 @@
 #include "matrixio_array.h"
 #include "sfem_defs.hpp"
 
-#include "adj_table.h"
+#include "adj_table.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
-#include "sshex8_mesh.h"
+#include "sshex8_mesh.hpp"
 #include "smesh_sidesets.hpp"
 #include "smesh_sshex8_graph.hpp"
 

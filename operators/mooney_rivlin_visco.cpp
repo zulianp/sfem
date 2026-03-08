@@ -1,5 +1,5 @@
-#include "mooney_rivlin_visco.h"
-#include "hex8/hex8_mooney_rivlin_visco_flexible.h"
+#include "mooney_rivlin_visco.hpp"
+#include "hex8_mooney_rivlin_visco_flexible.hpp"
 #include <stdio.h>
 
 // =============================================================================

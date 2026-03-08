@@ -4,7 +4,7 @@
  * Data type: double
  */
 
-#include "hyteg_jacobian_double.h"
+#include "hyteg_jacobian_double.hpp"
 #include <math.h>
 
 

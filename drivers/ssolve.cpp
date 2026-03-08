@@ -2,13 +2,13 @@
 #include "isolver_lsolve.h"
 
 extern "C" {
-#include "crs_graph.h"
-#include "dirichlet.h"
+#include "crs_graph.hpp"
+#include "dirichlet.hpp"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 #include "matrixio_array.h"
-#include "neumann.h"
-#include "read_mesh.h"
+#include "neumann.hpp"
+#include "read_mesh.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_mesh_write.hpp"
 }

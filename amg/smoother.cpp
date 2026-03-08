@@ -1,4 +1,4 @@
-#include "smoother.h"
+#include "smoother.hpp"
 #include <math.h>
 #include "sfem_mask.hpp"
 

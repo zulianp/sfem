@@ -12,23 +12,23 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "mass.h"
+#include "mass.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
-#include "cvfem_operators.h"
-#include "laplacian.h"
-#include "navier_stokes.h"
-#include "read_mesh.h"
+#include "cvfem_operators.hpp"
+#include "laplacian.hpp"
+#include "navier_stokes.hpp"
+#include "read_mesh.hpp"
 
 #include "sfem_logger.hpp"
 

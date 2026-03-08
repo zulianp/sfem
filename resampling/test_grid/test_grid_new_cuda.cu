@@ -56,7 +56,7 @@ int getSPcores(cudaDeviceProp devProp) {
     return cores;
 }
 
-#include "test_grid_new.h"
+#include "test_grid_new.hpp"
 
 struct local_grid_cuda_type {
     double delta; /**< The grid spacing. */

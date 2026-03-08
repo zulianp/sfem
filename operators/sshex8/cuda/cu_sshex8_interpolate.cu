@@ -1,4 +1,4 @@
-#include "cu_sshex8_interpolate.h"
+#include "cu_sshex8_interpolate.hpp"
 
 #include "sfem_cuda_base.hpp"
 

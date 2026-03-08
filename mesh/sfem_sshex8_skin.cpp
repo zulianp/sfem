@@ -1,10 +1,10 @@
 // #include "sfem_sshex8_skin.hpp"
 
-// #include "adj_table.h"
-// #include "sshex8.h"
+// #include "adj_table.hpp"
+// #include "sshex8.hpp"
 // #include "sfem_hex8_mesh_graph.hpp"
 
-// #include "ssquad4.h"
+// #include "ssquad4.hpp"
 
 // #include <assert.h>
 

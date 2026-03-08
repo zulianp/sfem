@@ -1,5 +1,5 @@
 #include "cu_hex8_kelvin_voigt_newmark_inline.hpp"
-#include "cu_sshex8_kelvin_voigt_newmark.h"
+#include "cu_sshex8_kelvin_voigt_newmark.hpp"
 #include "sfem_cuda_base.hpp"
 
 #include "sfem_macros.hpp"

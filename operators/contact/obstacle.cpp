@@ -1,4 +1,4 @@
-#include "obstacle.h"
+#include "obstacle.hpp"
 
 int         obstacle_normal_project(const int                         dim,
                                     const ptrdiff_t                   n,

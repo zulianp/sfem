@@ -8,12 +8,12 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
-#include "tet4_strain.h"
+#include "tet4_strain.hpp"
 
 #include "sfem_API.hpp"
 

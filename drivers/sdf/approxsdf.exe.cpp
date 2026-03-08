@@ -2,12 +2,12 @@
 
 
 // #include "smesh_sideset.hpp"
-// // #include "adj_table.h"
-// #include "div.h"
-// #include "mass.h"
-// #include "point_triangle_distance.h"
+// // #include "adj_table.hpp"
+// #include "div.hpp"
+// #include "mass.hpp"
+// #include "point_triangle_distance.hpp"
 // #include "sfem_macros.hpp"
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // #include "sfem_API.hpp"
 

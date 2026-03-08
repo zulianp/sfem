@@ -2,7 +2,7 @@
 
 // C includes
 #include "sfem_macros.hpp"
-#include "sshex8_neohookean_ogden.h"
+#include "sshex8_neohookean_ogden.hpp"
 
 // C++ includes
 #include "sfem_FunctionSpace.hpp"
@@ -15,8 +15,8 @@
 #include <mpi.h>
 
 // FIXME
-#include "hex8_neohookean_ogden.h"
-#include "hex8_partial_assembly_neohookean_inline.h"
+#include "hex8_neohookean_ogden.hpp"
+#include "hex8_partial_assembly_neohookean_inline.hpp"
 
 namespace sfem {
     class SemiStructuredNeoHookeanOgden::Impl {

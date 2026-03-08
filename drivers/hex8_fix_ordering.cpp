@@ -3,7 +3,7 @@
 #include "matrixio_array.h"
 #include "sfem_defs.hpp"
 #include "sfem_mesh_write.hpp"
-#include "tet4_inline_cpu.h"
+#include "tet4_inline_cpu.hpp"
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);

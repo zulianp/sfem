@@ -1,11 +1,11 @@
 #include "sfem_Gradient.hpp"
 #include "sfem_Tracer.hpp"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_macros.hpp"
 
 #include "sfem_Buffer.hpp"
-#include "tet4_patch_gradient.h"
+#include "tet4_patch_gradient.hpp"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"

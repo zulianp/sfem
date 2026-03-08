@@ -7,8 +7,8 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-#include "hex8_neohookean_ogden_active_strain.h"
-#include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.h"
+#include "hex8_neohookean_ogden_active_strain.hpp"
+#include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.hpp"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"

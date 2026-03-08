@@ -1,4 +1,4 @@
-#include "cu_quadshell4_integrate_values.h"
+#include "cu_quadshell4_integrate_values.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_macros.hpp"

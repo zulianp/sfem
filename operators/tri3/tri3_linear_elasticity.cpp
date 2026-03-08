@@ -4,7 +4,7 @@
 
 #include <mpi.h>
 
-#include "tri3_linear_elasticity_inline_cpu.h"
+#include "tri3_linear_elasticity_inline_cpu.hpp"
 
 int tri3_linear_elasticity_value(const ptrdiff_t nelements,
                                  const ptrdiff_t nnodes,

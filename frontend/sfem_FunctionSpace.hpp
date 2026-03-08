@@ -28,7 +28,7 @@ namespace sfem {
             return std::make_shared<FunctionSpace>(mesh, block_size, element_type);
         }
 
-        static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
+        // static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<SemiStructuredMesh> &mesh, const int block_size = 1);
         static std::shared_ptr<FunctionSpace> create(const std::shared_ptr<PackedMesh> &mesh, const int block_size = 1);
 
         int create_vector(ptrdiff_t *nlocal, ptrdiff_t *nglobal, real_t **values);
@@ -45,7 +45,7 @@ namespace sfem {
         std::shared_ptr<Mesh> mesh_ptr() const;
 
         bool                has_semi_structured_mesh() const;
-        SemiStructuredMesh &semi_structured_mesh();
+        // SemiStructuredMesh &semi_structured_mesh();
 
         
         // using PackedIdxType = uint8_t;

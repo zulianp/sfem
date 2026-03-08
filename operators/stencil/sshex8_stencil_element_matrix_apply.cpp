@@ -1,8 +1,8 @@
-#include "sshex8_stencil_element_matrix_apply.h"
+#include "sshex8_stencil_element_matrix_apply.hpp"
 
-#include "sshex8.h"
-#include "sshex8_skeleton_stencil.h"
-#include "stencil3.h"
+#include "sshex8.hpp"
+#include "sshex8_skeleton_stencil.hpp"
+#include "stencil3.hpp"
 
 #include <string.h>
 

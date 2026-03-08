@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "crs_graph.h"
-#include "read_mesh.h"
+#include "crs_graph.hpp"
+#include "read_mesh.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_prolongation_restriction.hpp"
 

@@ -1,4 +1,4 @@
-#include "cu_macro_tet4_laplacian.h"
+#include "cu_macro_tet4_laplacian.hpp"
 
 #include "cu_macro_tet4_inline.hpp"
 #include "cu_tet4_inline.hpp"

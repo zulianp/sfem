@@ -1,20 +1,20 @@
-#include "sshex8_laplacian.h"
+#include "sshex8_laplacian.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
 
-#include "hex8_quadrature.h"
+#include "hex8_quadrature.hpp"
 #include "sfem_mask.hpp"
-#include "sshex8_skeleton_offdiag_stencil.h"
-#include "sshex8_skeleton_stencil.h"
-#include "stencil3.h"
-#include "stencil_cg.h"
-#include "tet4_inline_cpu.h"
+#include "sshex8_skeleton_offdiag_stencil.hpp"
+#include "sshex8_skeleton_stencil.hpp"
+#include "stencil3.hpp"
+#include "stencil_cg.hpp"
+#include "tet4_inline_cpu.hpp"
 
 #include <math.h>
 #include <stdio.h>
 
-#include "sshex8.h"
+#include "sshex8.hpp"
 
 static SFEM_INLINE void hex8_sub_fff_0(const scalar_t *const SFEM_RESTRICT fff,
                                        const scalar_t                      h,

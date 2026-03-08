@@ -8,11 +8,11 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
-#include "mass.h"
+#include "mass.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
 #include "sfem_API.hpp"
 

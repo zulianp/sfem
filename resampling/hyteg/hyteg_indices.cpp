@@ -1,4 +1,4 @@
-#include "hyteg_indices.h"
+#include "hyteg_indices.hpp"
 
 // Array definitions for indices and categories
 // Tetrahedral indices for L = 1

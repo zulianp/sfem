@@ -7,18 +7,18 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "mesh_aura.h"
-#include "read_mesh.h"
+#include "mesh_aura.hpp"
+#include "read_mesh.hpp"
 #include "sfem_mesh_write.hpp"
 #include "sfem_resample_gap.hpp"
-#include "node_interpolate.h"
+#include "node_interpolate.hpp"
 
-#include "mass.h"
+#include "mass.hpp"
 
-#include "crs_graph.h"
-#include "extract_sharp_features.h"
+#include "crs_graph.hpp"
+#include "extract_sharp_features.hpp"
 
-#include "mesh_utils.h"
+#include "mesh_utils.hpp"
 #include "sfem_API.hpp"
 
 int main(int argc, char* argv[]) {

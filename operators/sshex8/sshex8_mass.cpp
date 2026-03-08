@@ -1,12 +1,12 @@
-#include "sshex8_mass.h"
+#include "sshex8_mass.hpp"
 
 #include "sfem_defs.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_mass_inline_cpu.h"
-#include "hex8_quadrature.h"
-#include "line_quadrature.h"
-#include "sshex8.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_mass_inline_cpu.hpp"
+#include "hex8_quadrature.hpp"
+#include "line_quadrature.hpp"
+#include "sshex8.hpp"
 
 extern int affine_sshex8_mass_lumped(const int                    level,
                                      const ptrdiff_t              nelements,

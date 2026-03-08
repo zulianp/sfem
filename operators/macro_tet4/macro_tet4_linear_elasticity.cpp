@@ -1,9 +1,9 @@
-#include "macro_tet4_linear_elasticity.h"
+#include "macro_tet4_linear_elasticity.hpp"
 
 #include "sfem_base.hpp"
 
-#include "macro_tet4_inline_cpu.h"
-#include "tet4_linear_elasticity_inline_cpu.h"
+#include "macro_tet4_inline_cpu.hpp"
+#include "tet4_linear_elasticity_inline_cpu.hpp"
 
 #include <stddef.h>
 

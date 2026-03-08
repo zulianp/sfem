@@ -1,4 +1,4 @@
-#include "cu_sshex8_elemental_matrix.h"
+#include "cu_sshex8_elemental_matrix.hpp"
 
 #include "cu_sshex8_inline.hpp"
 #include "sfem_cuda_base.hpp"

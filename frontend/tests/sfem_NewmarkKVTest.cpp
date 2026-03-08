@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-#include "hex8_jacobian.h"
-#include "kelvin_voigt_newmark.h"
+#include "hex8_jacobian.hpp"
+#include "kelvin_voigt_newmark.hpp"
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"

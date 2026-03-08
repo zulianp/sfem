@@ -1,4 +1,4 @@
-#include "hex8_neohookean_ogden_active_strain.h"
+#include "hex8_neohookean_ogden_active_strain.hpp"
 
 #include <assert.h>
 #include <math.h>
@@ -6,16 +6,16 @@
 
 #include <mpi.h>
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "line_quadrature.h"
+#include "hex8_inline_cpu.hpp"
+#include "line_quadrature.hpp"
 
-#include "hex8_neohookean_ogden_active_strain_local.h"
-#include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.h"
+#include "hex8_neohookean_ogden_active_strain_local.hpp"
+#include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.hpp"
 
 static SFEM_INLINE void inverse3(
         // Input

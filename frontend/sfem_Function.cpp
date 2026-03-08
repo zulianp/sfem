@@ -5,17 +5,17 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
 
-#include "dirichlet.h"
-#include "integrate_values.h"
-#include "neumann.h"
+#include "dirichlet.hpp"
+#include "integrate_values.hpp"
+#include "neumann.hpp"
 
 #include <sys/stat.h>
 // #include <sys/wait.h>
@@ -30,12 +30,12 @@
 #include <vector>
 
 // Mesh
-#include "adj_table.h"
-#include "hex8_fff.h"
-#include "hex8_jacobian.h"
+#include "adj_table.hpp"
+#include "hex8_fff.hpp"
+#include "hex8_jacobian.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
-#include "sshex8.h"
-#include "sshex8_mesh.h"
+#include "sshex8.hpp"
+#include "sshex8_mesh.hpp"
 
 // Multigrid
 #include "sfem_prolongation_restriction.hpp"

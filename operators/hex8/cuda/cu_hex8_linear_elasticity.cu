@@ -1,4 +1,4 @@
-#include "cu_hex8_linear_elasticity.h"
+#include "cu_hex8_linear_elasticity.hpp"
 
 #include "sfem_cuda_base.hpp"
 

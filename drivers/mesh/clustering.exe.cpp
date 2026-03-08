@@ -1,7 +1,7 @@
 // #include "sfem_API.hpp"
 
 // #include "sfem_macros.hpp"
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // #include "sfem_DualGraph.hpp"
 // #include "smesh_env.hpp"

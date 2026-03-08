@@ -1,6 +1,6 @@
-#include "tet10_laplacian.h"
+#include "tet10_laplacian.hpp"
 
-#include "tet10_laplacian_inline_cpu.h"
+#include "tet10_laplacian_inline_cpu.hpp"
 
 #include <assert.h>
 #include <math.h>

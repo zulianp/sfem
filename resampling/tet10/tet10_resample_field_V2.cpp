@@ -1,6 +1,6 @@
-#include "tet10_resample_field_V2.h"
+#include "tet10_resample_field_V2.hpp"
 
-#include "quadratures_rule.h"
+#include "quadratures_rule.hpp"
 
 #include <math.h>
 #include <stddef.h>
@@ -8,9 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tet10_resample_field.h"
-#include "tet10_vec.h"
-#include "tet10_weno_V.h"
+#include "tet10_resample_field.hpp"
+#include "tet10_vec.hpp"
+#include "tet10_weno_V.hpp"
 
 // #define UNROLL_ZERO _Pragma("GCC unroll(0)")
 #define UNROLL_ZERO _Pragma("unroll(1)")

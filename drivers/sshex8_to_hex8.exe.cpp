@@ -9,17 +9,17 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "read_mesh.h"
+#include "read_mesh.hpp"
 
-#include "laplacian.h"
+#include "laplacian.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
-#include "sshex8.h"
-#include "sshex8_laplacian.h"
-#include "sshex8_mesh.h"
+#include "sshex8.hpp"
+#include "sshex8_laplacian.hpp"
+#include "sshex8_mesh.hpp"
 #include "smesh_sshex8_graph.hpp"
 #include "sfem_glob.hpp"
 

@@ -6,11 +6,11 @@
 
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 #include "sfem_glob.hpp"
 
 #include "sfem_API.hpp"

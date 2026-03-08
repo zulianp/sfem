@@ -11,25 +11,25 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.h"
+#include "crs_graph.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 
-#include "mass.h"
+#include "mass.hpp"
 
-#include "boundary_condition.h"
-#include "boundary_condition_io.h"
-#include "dirichlet.h"
-#include "neumann.h"
+#include "boundary_condition.hpp"
+#include "boundary_condition_io.hpp"
+#include "dirichlet.hpp"
+#include "neumann.hpp"
 
-#include "laplacian.h"
-#include "read_mesh.h"
+#include "laplacian.hpp"
+#include "read_mesh.hpp"
 
 #include "isolver_lsolve.h"
 
-#include "spmv.h"
+#include "spmv.hpp"
 
 //////////////////////////////////////////////
 

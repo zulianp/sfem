@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "sortreduce.h"
+#include "sortreduce.hpp"
 #include "sfem_macros.hpp"
 
 

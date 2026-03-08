@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "cu_boundary_condition.h"
+#include "cu_boundary_condition.hpp"
 #include "sfem_cuda_base.hpp"
 
 extern "C" {

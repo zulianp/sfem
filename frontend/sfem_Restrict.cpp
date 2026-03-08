@@ -4,12 +4,12 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
-#include "sshex8.h"
-#include "ssquad4_interpolate.h"
+#include "sshex8.hpp"
+#include "ssquad4_interpolate.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_sshex8_interpolate.h"
-#include "cu_ssquad4_interpolate.h"
+#include "cu_sshex8_interpolate.hpp"
+#include "cu_ssquad4_interpolate.hpp"
 #endif
 
 namespace sfem {

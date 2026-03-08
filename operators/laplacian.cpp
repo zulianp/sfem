@@ -1,14 +1,14 @@
 
-#include "tet10_laplacian.h"
-#include "tet4_laplacian.h"
-#include "tri3_laplacian.h"
-#include "tri6_laplacian.h"
+#include "tet10_laplacian.hpp"
+#include "tet4_laplacian.hpp"
+#include "tri3_laplacian.hpp"
+#include "tri6_laplacian.hpp"
 
-#include "macro_tet4_laplacian.h"
-#include "macro_tri3_laplacian.h"
+#include "macro_tet4_laplacian.hpp"
+#include "macro_tri3_laplacian.hpp"
 
-#include "hex8_laplacian.h"
-#include "spectral_hex_laplacian.h"
+#include "hex8_laplacian.hpp"
+#include "spectral_hex_laplacian.hpp"
 
 #include "sfem_defs.hpp"
 

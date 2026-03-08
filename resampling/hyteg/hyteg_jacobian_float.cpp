@@ -4,7 +4,7 @@
  * Data type: float
  */
 
-#include "hyteg_jacobian_float.h"
+#include "hyteg_jacobian_float.hpp"
 #include <math.h>
 
 

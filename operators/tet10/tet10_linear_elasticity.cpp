@@ -1,8 +1,8 @@
-#include "tet10_linear_elasticity.h"
+#include "tet10_linear_elasticity.hpp"
 #include "sfem_base.hpp"
 
-#include "tet10_inline_cpu.h"
-#include "tet10_linear_elasticity_inline_cpu.h"
+#include "tet10_inline_cpu.hpp"
+#include "tet10_linear_elasticity_inline_cpu.hpp"
 
 #include <stddef.h>
 

@@ -1,11 +1,11 @@
-#include "surface_l2_projection.h"
+#include "surface_l2_projection.hpp"
 
 #include <mpi.h>
 
 #include "sfem_defs.hpp"
 
-#include "trishell3_l2_projection_p0_p1.h"
-#include "trishell6_l2_projection_p1_p2.h"
+#include "trishell3_l2_projection_p0_p1.hpp"
+#include "trishell6_l2_projection_p1_p2.hpp"
 
 #include <stdio.h>
 void surface_e_projection_apply(const int element_type,

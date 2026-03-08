@@ -5,7 +5,7 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 
-#include "mass.h"
+#include "mass.hpp"
 
 #include "sfem_CRSGraph.hpp"
 #include "sfem_FunctionSpace.hpp"

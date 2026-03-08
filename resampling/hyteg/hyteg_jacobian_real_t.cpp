@@ -4,7 +4,7 @@
  * Data type: real_t
  */
 
-#include "hyteg_jacobian_real_t.h"
+#include "hyteg_jacobian_real_t.hpp"
 #include <math.h>
 
 real_t det_jacobian_cat0_real(const real_t x0, const real_t y0, const real_t z0, const real_t x1, const real_t y1,

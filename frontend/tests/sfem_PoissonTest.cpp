@@ -7,8 +7,8 @@
 #include "sfem_Function.hpp"
 
 // FIXME
-#include "hex8_fff.h"
-#include "sshex8_laplacian.h"
+#include "hex8_fff.hpp"
+#include "sshex8_laplacian.hpp"
 
 int test_linear_function_0(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
     auto es        = f->execution_space();

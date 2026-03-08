@@ -1,9 +1,9 @@
-#include "ssquad4_interpolate.h"
+#include "ssquad4_interpolate.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "argsort.h"
-#include "ssquad4.h"
+#include "argsort.hpp"
+#include "ssquad4.hpp"
 
 #include <assert.h>
 #include <stdio.h>

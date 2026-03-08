@@ -1,8 +1,8 @@
 // #include "sfem_multiblock_adj_table.hpp"
 // #include "sfem_API.hpp"
 
-// #include "multiblock_crs_graph.h"
-// #include "sortreduce.h"
+// #include "multiblock_crs_graph.hpp"
+// #include "sortreduce.hpp"
 
 // #include <vector>
 

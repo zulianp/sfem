@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bit_array.h"
+#include "bit_array.hpp"
 #include "sfem_config.h"
 
 /**

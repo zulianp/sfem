@@ -1,6 +1,6 @@
-#include "partitioner.h"
+#include "partitioner.hpp"
 #include <stdio.h>
-#include "coo_sort.h"
+#include "coo_sort.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
 

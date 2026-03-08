@@ -1,4 +1,4 @@
-#include "quadshell4_mass.h"
+#include "quadshell4_mass.hpp"
 #include "sfem_defs.hpp"
 
 #include <math.h>

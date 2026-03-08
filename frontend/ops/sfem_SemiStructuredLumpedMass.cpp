@@ -1,6 +1,6 @@
 #include "sfem_SemiStructuredLumpedMass.hpp"
 
-#include "sshex8_mass.h"
+#include "sshex8_mass.hpp"
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearElasticity.hpp"

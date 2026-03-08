@@ -1,9 +1,9 @@
-#include "cu_hex8_fff.h"
+#include "cu_hex8_fff.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_laplacian_inline_cpu.hpp"
 
 static int cu_hex8_fff_allocate_generic(const ptrdiff_t nelements,
                                         const enum RealType real_type,

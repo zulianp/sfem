@@ -1,6 +1,6 @@
-#include "quadshell4_resample.h"
+#include "quadshell4_resample.hpp"
 
-#include "line_quadrature.h"
+#include "line_quadrature.hpp"
 
 #include <math.h>
 #include <stddef.h>

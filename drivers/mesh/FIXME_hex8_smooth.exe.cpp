@@ -1,6 +1,6 @@
 #include "sfem_API.hpp"
 
-#include "adj_table.h"
+#include "adj_table.hpp"
 
 #include "sfem_glob.hpp"
 #include "sfem_hex8_mesh_graph.hpp"
@@ -8,10 +8,10 @@
 
 #include <unordered_map>
 
-#include "hex8_inline_cpu.h"
-#include "hex8_linear_elasticity.h"
-#include "hex8_linear_elasticity_inline_cpu.h"
-#include "line_quadrature.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_linear_elasticity.hpp"
+#include "hex8_linear_elasticity_inline_cpu.hpp"
+#include "line_quadrature.hpp"
 
 namespace sfem {
     static void remap_surface_elements_to_contiguous_index(const ptrdiff_t n_elements,

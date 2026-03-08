@@ -1,17 +1,17 @@
-#include "sshex8_vector_laplacian.h"
+#include "sshex8_vector_laplacian.hpp"
 
-#include "hex8_inline_cpu.h"
-#include "hex8_laplacian_inline_cpu.h"
+#include "hex8_inline_cpu.hpp"
+#include "hex8_laplacian_inline_cpu.hpp"
 
-#include "hex8_quadrature.h"
-#include "sshex8_skeleton_stencil.h"
-#include "stencil3.h"
-#include "tet4_inline_cpu.h"
+#include "hex8_quadrature.hpp"
+#include "sshex8_skeleton_stencil.hpp"
+#include "stencil3.hpp"
+#include "tet4_inline_cpu.hpp"
 
 #include <math.h>
 #include <stdio.h>
 
-#include "sshex8.h"
+#include "sshex8.hpp"
 
 int affine_sshex8_vector_laplacian_apply_fff(const int                             level,
                                              const ptrdiff_t                       nelements,

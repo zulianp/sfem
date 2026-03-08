@@ -1,4 +1,4 @@
-// #include "tet4_viscous_power_density_curnier.h"
+// #include "tet4_viscous_power_density_curnier.hpp"
 
 // #include <assert.h>
 // #include <math.h>
@@ -6,9 +6,9 @@
 
 // #include <mpi.h>
 
-// #include "crs_graph.h"
+// #include "crs_graph.hpp"
 // #include "sfem_vec.hpp"
-// #include "sortreduce.h"
+// #include "sortreduce.hpp"
 
 // static SFEM_INLINE void viscous_power_density_curnier_value(const real_t mu,
 //                                                             const real_t lambda,

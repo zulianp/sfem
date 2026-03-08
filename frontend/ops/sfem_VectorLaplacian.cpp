@@ -5,8 +5,8 @@
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
 
-#include "hex8_vector_laplacian.h"
-#include "hex8_fff.h"
+#include "hex8_vector_laplacian.hpp"
+#include "hex8_fff.hpp"
 
 #include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"

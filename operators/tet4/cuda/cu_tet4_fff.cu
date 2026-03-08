@@ -1,4 +1,4 @@
-#include "cu_tet4_fff.h"
+#include "cu_tet4_fff.hpp"
 #include "sfem_cuda_base.hpp"
 #include "sfem_defs.hpp"
 

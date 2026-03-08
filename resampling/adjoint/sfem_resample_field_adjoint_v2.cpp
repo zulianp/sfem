@@ -2,8 +2,8 @@
 #include "sfem_resample_field_tet4_math.hpp"
 #include "sfem_stack.hpp"
 
-#include "mass.h"
-// #include "read_mesh.h"
+#include "mass.hpp"
+// #include "read_mesh.hpp"
 #include "matrixio_array.h"
 
 #include <math.h>
@@ -13,8 +13,8 @@
 
 // #define real_t real_type
 
-#include "hyteg.h"
-#include "quadratures_rule.h"
+#include "hyteg.hpp"
+#include "quadratures_rule.hpp"
 
 #define real_type real_t
 #define SFEM_RESTRICT __restrict__

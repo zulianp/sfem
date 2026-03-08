@@ -2,12 +2,12 @@
 
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
-#include "ssquad4_interpolate.h"
+#include "ssquad4_interpolate.hpp"
 
-#include "lumped_ptdp.h"
+#include "lumped_ptdp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
-#include "cu_ssquad4_interpolate.h"
+#include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
 #endif
