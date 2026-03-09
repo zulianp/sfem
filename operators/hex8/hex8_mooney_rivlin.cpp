@@ -3,7 +3,7 @@
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
-#include "crs_graph.hpp"
+
 #include "hex8_inline_cpu.hpp"
 #include "hex8_mooney_rivlin_active_strain.hpp"
 #include "hex8_partial_assembly_mooney_rivlin_active_strain_inline.hpp"

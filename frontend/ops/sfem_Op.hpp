@@ -9,14 +9,10 @@
 
 #pragma once
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_defs.hpp"
-// #include "sfem_Function.hpp"
 #include "sfem_glob.hpp"
-
-#include <string>
-#include <vector>
 
 namespace sfem {
 

@@ -8,7 +8,7 @@
 #include "ssquad4_interpolate.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_ShiftedPenaltyMultigrid.hpp"

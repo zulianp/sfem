@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_config.h"
 #include "sfem_cuda_base.hpp"

@@ -1,4 +1,4 @@
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 
 // Sloppily adapted from stream bench
 

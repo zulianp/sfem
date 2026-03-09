@@ -6,10 +6,10 @@
 
 #include "sfem_prolongation_restriction.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_CRSGraph.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
-// #include "sfem_Packed.hpp"
+#include "sfem_aliases.hpp"
+// 
+// #include "sfem_SemiStructuredMesh.hpp"
+// 
 #include "smesh_packed_mesh.hpp"
 
 namespace sfem {

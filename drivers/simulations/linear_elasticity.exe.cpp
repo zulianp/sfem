@@ -5,7 +5,7 @@
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_SFC.hpp"
+#include "smesh_mesh_reorder.hpp"
 #include "sfem_P1toP2.hpp"
 
 int lsolve(const std::shared_ptr<sfem::Function> &f, const std::string &output_dir) {
@@ -98,7 +98,7 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
     auto m = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
 
     // Important for packed elements
-    auto sfc = sfem::SFC::create_from_env();
+    auto sfc = smesh::SFC::create_from_env();
     sfc->reorder(*m);
 
     if(smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {

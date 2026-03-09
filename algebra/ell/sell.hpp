@@ -1,7 +1,7 @@
 #ifndef SFEM_ELL_SELL_HPP
 #define SFEM_ELL_SELL_HPP
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_Tracer.hpp"
 

@@ -2,15 +2,15 @@
 #include "isolver_lsolve.h"
 
 extern "C" {
-#include "crs_graph.hpp"
+
 #include "dirichlet.hpp"
 
 #include "laplacian.hpp"
 #include "matrixio_array.h"
 #include "neumann.hpp"
-#include "read_mesh.hpp"
+
 #include "smesh_mesh.hpp"
-#include "sfem_mesh_write.hpp"
+
 }
 
 #include <yaml-cpp/yaml.h>

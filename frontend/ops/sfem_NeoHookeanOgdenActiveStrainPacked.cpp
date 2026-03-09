@@ -10,14 +10,14 @@
 #include "hex8_neohookean_ogden_active_strain.hpp"
 #include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.hpp"
 
-#include "sfem_CRSGraph.hpp"
+
 #include "sfem_FunctionSpace.hpp"
 #include "smesh_mesh.hpp"
 
 #include "sfem_ElasticityAssemblyData.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
-#include "sfem_Packed.hpp"
+
 #include "sfem_Parameters.hpp"
 
 #ifdef _OPENMP

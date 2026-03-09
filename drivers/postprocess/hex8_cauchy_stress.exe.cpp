@@ -1,5 +1,7 @@
 #include "sfem_API.hpp"
 
+#include "sfem_aliases.hpp"
+
 #include "hex8_linear_elasticity.hpp"
 #include "hex8_mass.hpp"
 
@@ -22,9 +24,9 @@ int main(int argc, char *argv[]) {
     auto        hex8_mesh     = sfem::Mesh::create_from_file(comm, smesh::Path(argv[1]));
     real_t      mu            = atof(argv[2]);
     real_t      lambda        = atof(argv[3]);
-    auto        ux            = sfem::create_buffer_from_file<real_t>(comm, argv[4]); 
-    auto        uy            = sfem::create_buffer_from_file<real_t>(comm, argv[5]);
-    auto        uz            = sfem::create_buffer_from_file<real_t>(comm, argv[6]);
+    auto        ux            = smesh::Buffer<real_t>::from_file(smesh::Path(argv[4]));
+    auto        uy            = smesh::Buffer<real_t>::from_file(smesh::Path(argv[5]));
+    auto        uz            = smesh::Buffer<real_t>::from_file(smesh::Path(argv[6]));
     const char *output_prefix = argv[7];
 
     const ptrdiff_t nnodes = hex8_mesh->n_nodes();

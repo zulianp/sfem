@@ -4,7 +4,7 @@
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 
 #include "matrixio_array.h"
 

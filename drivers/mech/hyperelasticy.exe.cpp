@@ -4,7 +4,7 @@
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
@@ -16,7 +16,7 @@
 #include "smesh_env.hpp"
 #include "smesh_sideset.hpp"
 #include "sfem_P1toP2.hpp"
-#include "sfem_Packed.hpp"
+
 #include "sfem_SFC.hpp"
 
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"

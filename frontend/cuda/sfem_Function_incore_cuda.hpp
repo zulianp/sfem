@@ -8,8 +8,8 @@
 
 // #include <cuda_runtime.h>
 
-#include "sfem_Buffer.hpp"
-#include "sfem_CRSGraph.hpp"
+#include "sfem_aliases.hpp"
+
 #include "sfem_MatrixFreeLinearSolver.hpp"
 
 #include <memory>

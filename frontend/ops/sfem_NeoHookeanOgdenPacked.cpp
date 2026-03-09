@@ -27,14 +27,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sfem_CRSGraph.hpp"
+
 #include "sfem_FunctionSpace.hpp"
 #include "smesh_mesh.hpp"
 
 #include "sfem_ElasticityAssemblyData.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
-#include "sfem_Packed.hpp"
+
 #include "sfem_Parameters.hpp"
 
 #ifdef _OPENMP

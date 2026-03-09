@@ -8,7 +8,7 @@
 
 #include "tet4_neohookean_ogden_inline_cpu.hpp"
 
-#include "crs_graph.hpp"
+
 #include "sfem_vec.hpp"
 #include "sortreduce.hpp"
 

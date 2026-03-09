@@ -22,7 +22,7 @@
 
 #include "laplacian_incore_cuda.h"
 
-#include "read_mesh.hpp"
+
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 

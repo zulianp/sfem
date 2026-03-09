@@ -9,10 +9,9 @@
 
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_ForwardDeclarations.hpp"
 #include "smesh_mesh.hpp"
-#include "sfem_Sideset.hpp"
 
 // Operator includes
 #include "sfem_Op.hpp"

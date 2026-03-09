@@ -1,5 +1,5 @@
 #include "sfem_Grid.hpp"
-#include "sfem_Communicator.hpp"
+// #include "sfem_Communicator.hpp"
 #include "sfem_Input.hpp"
 
 #include "matrixio_array.h"

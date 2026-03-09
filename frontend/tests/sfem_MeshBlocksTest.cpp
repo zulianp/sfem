@@ -3,7 +3,7 @@
 #include "sfem_test.hpp"
 
 #include "smesh_mesh.hpp"
-#include "sfem_CRSGraph.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_glob.hpp"
 
 

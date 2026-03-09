@@ -1,7 +1,7 @@
 #ifndef SDACRS_HPP
 #define SDACRS_HPP
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_Tracer.hpp"
 

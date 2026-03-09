@@ -3,7 +3,7 @@
 #include <cstddef>
 #include "partitioner.hpp"
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_LpSmoother.hpp"
 #include "sfem_Multigrid.hpp"

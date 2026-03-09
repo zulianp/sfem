@@ -11,7 +11,7 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.hpp"
+
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
@@ -26,7 +26,7 @@
 
 #include "laplacian.hpp"
 #include "navier_stokes.hpp"
-#include "read_mesh.hpp"
+
 
 #include "isolver_lsolve.h"
 

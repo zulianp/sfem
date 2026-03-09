@@ -1,10 +1,9 @@
 #include "sfem_API.hpp"
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "smesh_env.hpp"
-#include "sfem_Packed.hpp"
-#include "sfem_SFC.hpp"
 #include "sfem_base.hpp"
+#include "smesh_mesh_reorder.hpp"
 
 int main(int argc, char *argv[]) {
     using namespace sfem;
@@ -23,7 +22,7 @@ int main(int argc, char *argv[]) {
             comm, smesh::TET4, base_resolution, base_resolution, base_resolution, 0, 0, 0, 1, 1, 1);
 
     if (smesh::Env::read("SFEM_USE_SFC", false)) {
-        auto sfc = SFC::create_from_env();
+        auto sfc = smesh::SFC::create_from_env();
         sfc->reorder(*mesh);
     }
 

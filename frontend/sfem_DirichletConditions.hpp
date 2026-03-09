@@ -11,10 +11,9 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_mask.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_ForwardDeclarations.hpp"
 #include "smesh_mesh.hpp"
-#include "sfem_Sideset.hpp"
 #include "sfem_Constraint.hpp"
 
 namespace sfem {

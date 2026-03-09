@@ -3,7 +3,7 @@
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_defs.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_SemiStructuredMesh.hpp"
 
 #include "smesh_packed_mesh.hpp"

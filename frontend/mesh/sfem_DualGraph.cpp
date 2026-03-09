@@ -1,7 +1,7 @@
 #include "sfem_DualGraph.hpp"
 
 // C includes
-#include "crs_graph.hpp"
+
 
 // C++ includes
 #include "smesh_mesh.hpp"
