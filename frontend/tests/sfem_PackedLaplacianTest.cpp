@@ -5,22 +5,35 @@
 int test_packed_laplacian() {
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    constexpr int N = 3;
-    auto          mesh =
-            sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, 0, 0, 0, 1, 1, 1);
-    auto fs = sfem::FunctionSpace::create(mesh, 1);
+    constexpr int N    = 100;
+    auto          mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, -1, -1, -1, 1, 1, 1);
+    auto          fs   = sfem::FunctionSpace::create(mesh, 1);
 
     SFEM_TEST_ASSERT(fs->initialize_packed_mesh() == SFEM_SUCCESS);
 
     auto laplacian        = sfem::create_op(fs, "Laplacian", sfem::EXECUTION_SPACE_HOST);
     auto packed_laplacian = sfem::create_op(fs, "PackedLaplacian", sfem::EXECUTION_SPACE_HOST);
 
+    {
+        // Make the mesh non-uniform
+        auto b_points = mesh->points()->data();
+        int  dim      = mesh->spatial_dimension();
+        const ptrdiff_t nnodes = mesh->n_nodes();
+        for (int d = 0; d < dim; d++) {
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                b_points[d][i] = b_points[d][i] * b_points[d][i] * b_points[d][i] + b_points[0][i] * b_points[0][i] * b_points[0][i] * 0.2;
+            }
+        }
+    }
+
+    // mesh->write(smesh::Path("mesh_r"));
+
     SFEM_TEST_ASSERT(laplacian != nullptr);
     SFEM_TEST_ASSERT(packed_laplacian != nullptr);
     SFEM_TEST_ASSERT(laplacian->initialize() == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(packed_laplacian->initialize() == SFEM_SUCCESS);
 
-    const ptrdiff_t ndofs = fs->n_dofs();
+    const ptrdiff_t ndofs  = fs->n_dofs();
     const ptrdiff_t nnodes = mesh->n_nodes();
 
     auto h        = sfem::create_host_buffer<real_t>(ndofs);
@@ -33,7 +46,7 @@ int test_packed_laplacian() {
     }
 
     for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        y_ref->data()[i] = 0;
+        y_ref->data()[i]    = 0;
         y_packed->data()[i] = 0;
     }
 
