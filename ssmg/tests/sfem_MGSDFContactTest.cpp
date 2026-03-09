@@ -42,7 +42,6 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
-    
 
     sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
@@ -269,7 +268,7 @@ int test_contact() {
     int comm_size;
     MPI_Comm_size(comm, &comm_size);
 
-    if(comm_size > 1) {
+    if (comm_size > 1) {
         SFEM_ERROR("test_contact() can only be run in serial!\n");
     }
 
@@ -288,26 +287,23 @@ int test_contact() {
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
 
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
-                                          SFEM_BASE_RESOLUTION * resolution_ratio,
-                                          SFEM_BASE_RESOLUTION * 1,
-                                          SFEM_BASE_RESOLUTION * resolution_ratio,
-                                          0,
-                                          0,
-                                          0,
-                                          1,
-                                          y_top,
-                                          1);
-
-    const int block_size = mesh->spatial_dimension();
-
-    auto fs = sfem::FunctionSpace::create(mesh, block_size);
+                                             SFEM_BASE_RESOLUTION * resolution_ratio,
+                                             SFEM_BASE_RESOLUTION * 1,
+                                             SFEM_BASE_RESOLUTION * resolution_ratio,
+                                             0,
+                                             0,
+                                             0,
+                                             1,
+                                             y_top,
+                                             1);
 
     int SFEM_ELEMENT_REFINE_LEVEL = 2;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
     SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
 
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
+    mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
+    const int block_size = mesh->spatial_dimension();
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
 
 #ifdef SFEM_ENABLE_CUDA
     {
@@ -373,7 +369,7 @@ int test_contact() {
     }
 
     if (SFEM_ENABLE_OUTPUT) {
-        mesh->write(smesh::Path("test_contact/coarse_mesh"));
+        // mesh->write(smesh::Path("test_contact/coarse_mesh"));
         sfem::semi_structured_export_as_standard(fs->mesh_ptr(), "test_contact/mesh");
 
         auto out = f->output();

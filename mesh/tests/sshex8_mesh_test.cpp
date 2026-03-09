@@ -41,8 +41,9 @@ int test_sshex8_hierarchical_renumbering() {
     SFEM_TEST_ASSERT(levels->data()[2] == 12);
     SFEM_TEST_ASSERT(levels->data()[3] == 24);
 
+    auto node_mapping = sfem::create_host_buffer<idx_t>(nnodes);
     SFEM_TEST_ASSERT(smesh::sshex8_hierarchical_renumbering(
-                             L, nlevels, levels->data(), nelements, sshex_nnodes, sshex8_elements->data()) == SFEM_SUCCESS);
+                             L, nlevels, levels->data(), nelements, sshex_nnodes, sshex8_elements->data(), node_mapping->data()) == SFEM_SUCCESS);
 
     // Check that original nodes are in range
     for (int zi = 0; zi <= 1; zi++) {
