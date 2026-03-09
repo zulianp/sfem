@@ -33,7 +33,8 @@ int test_dirichlet_conditions_read_yaml() {
     auto conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
 
     // Conditions for semi-structured mesh
-    fs->promote_to_semi_structured(32);
+    auto ssmesh = smesh::to_semistructured(8, m, true, false);
+    fs = sfem::FunctionSpace::create(ssmesh, 3);
     conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);
 
     return SFEM_TEST_SUCCESS;

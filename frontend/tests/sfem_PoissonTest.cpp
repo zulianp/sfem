@@ -250,7 +250,7 @@ int test_poisson() {
     auto m = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
@@ -293,7 +293,7 @@ int test_poisson_and_boundary_selector_aux(const char                        *te
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
     auto mesh = m;
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
         mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
@@ -441,7 +441,7 @@ int test_generic_operator_with_boundary_conditions(const std::string            
                                                    const std::vector<sfem::DirichletConditions::Condition> &boundary_conditions,
                                                    int                                                      refine_level = 1) {
     auto mesh = fs->mesh_ptr();
-    if (refine_level > 0) {
+    if (refine_level > 1) {
         mesh = smesh::to_semistructured(refine_level, mesh, true, false);
     }
     auto new_fs = sfem::FunctionSpace::create(mesh, fs->block_size());
@@ -669,8 +669,8 @@ int test_poisson_yaml() {
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     auto m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm));
+    m = smesh::to_semistructured(16, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, 1);
-    fs->promote_to_semi_structured(16);
     auto f = sfem::Function::create(fs);
 
     auto conds = sfem::DirichletConditions::create_from_yaml(fs, yaml);

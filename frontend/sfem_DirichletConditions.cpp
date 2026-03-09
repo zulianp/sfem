@@ -399,34 +399,7 @@ namespace sfem {
                     sideset = std::make_shared<Sideset>(space->mesh_ptr()->comm(), parent, lfi);
                 }
 
-                ptrdiff_t n_nodes{0};
-                idx_t    *nodes{nullptr};
-                if (space->has_semi_structured_mesh()) {
-                    auto &&ss = space->mesh();
-                    int level = sfem::semi_structured_level(ss);
-                    SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                    if (smesh::sshex8_extract_nodeset_from_sideset(level,
-                                                            ss.elements(0)->data(),
-                                                            sideset->parent()->size(),
-                                                            sideset->parent()->data(),
-                                                            sideset->lfi()->data(),
-                                                            &n_nodes,
-                                                            &nodes) != SFEM_SUCCESS) {
-                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                    }
-                } else {
-                    if (smesh::extract_nodeset_from_sideset(space->mesh_ptr()->element_type(sideset->block_id()),
-                                                     space->mesh_ptr()->elements(sideset->block_id())->data(),
-                                                     sideset->parent()->size(),
-                                                     sideset->parent()->data(),
-                                                     sideset->lfi()->data(),
-                                                     &n_nodes,
-                                                     &nodes) != SFEM_SUCCESS) {
-                        SFEM_ERROR("Unable to extract nodeset from sideset!\n");
-                    }
-                }
-
-                nodeset = sfem::manage_host_buffer(n_nodes, nodes);
+                nodeset = smesh::create_nodeset_from_sideset(space->mesh_ptr(), sideset);
             } else {
                 if (is_file) {
                     std::string path;
