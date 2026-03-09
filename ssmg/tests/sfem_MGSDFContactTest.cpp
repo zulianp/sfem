@@ -42,6 +42,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
         return y > (y_top - 1e-5) && y < (y_top + 1e-5);
     });
+    
 
     sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
     sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
@@ -66,6 +67,8 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
+
+    assert(bottom_ss[0]->size() > 0);
 
     const int n   = base_resolution * sfem::semi_structured_level(fs->mesh());
     auto      sdf = sfem::create_sdf(comm,
@@ -95,7 +98,7 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
 
-    auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
+    auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
 

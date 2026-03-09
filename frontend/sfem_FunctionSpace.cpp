@@ -129,6 +129,8 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
     }
 
     auto derefined_mesh = sfem::semi_structured_derefine(impl_->mesh, to_level);
+
+    // FIXME remove me once PROTEUS_HEX8 assemblies are supported
     if (derefined_mesh && derefined_mesh->element_type(0) == smesh::PROTEUS_HEX8) {
         derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
     }
