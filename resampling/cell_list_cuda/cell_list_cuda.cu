@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include "cell_list_cuda.cuh"
+#include "resample_field_adjoint_cell_cuda.cuh"
 
 //////////////////////////////////////////////////
 // copy_cell_list_3d_2d_map_to_device
