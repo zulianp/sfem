@@ -46,6 +46,8 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
+#include "smesh_common.hpp"
+
 #ifdef SFEM_ENABLE_RYAML
 
 #if defined(RYML_SINGLE_HEADER)  // using the single header directly in the executable
@@ -74,11 +76,12 @@ namespace sfem {
 
     class Output::Impl {
     public:
+        std::shared_ptr<smesh::Output> smesh_output;
         std::shared_ptr<FunctionSpace> space;
         bool                           AoS_to_SoA{false};
         std::string                    output_dir{"."};
-        std::string                    file_format{"%s/%s.raw"};
-        std::string                    time_dependent_file_format{"%s/%s.%09d.raw"};
+        std::string                    file_format{"%s/%s.%s"};
+        std::string                    time_dependent_file_format{"%s/%s.%09d.%s"};
         size_t                         export_counter{0};
         logger_t                       time_logger;
         Impl() { log_init(&time_logger); }
@@ -93,13 +96,17 @@ namespace sfem {
         const char *SFEM_OUTPUT_DIR = ".";
         SFEM_READ_ENV(SFEM_OUTPUT_DIR, );
         impl_->output_dir = SFEM_OUTPUT_DIR;
+
+        impl_->smesh_output = smesh::Output::create(space->mesh_ptr(), smesh::Path(impl_->output_dir));
     }
 
     Output::~Output() = default;
 
     void Output::clear() { impl_->export_counter = 0; }
 
-    void Output::set_output_dir(const char *path) { impl_->output_dir = path; }
+    void Output::set_output_dir(const char *path) { 
+        impl_->smesh_output = smesh::Output::create(impl_->space->mesh_ptr(), smesh::Path(path));
+        impl_->output_dir = path; }
 
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
@@ -122,18 +129,11 @@ namespace sfem {
 
                 char b_name[1024];
                 snprintf(b_name, sizeof(b_name), "%s.%d", name, b);
-                snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), b_name);
-                if (array_write(comm, path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
-                    return SFEM_FAILURE;
-                }
+                impl_->smesh_output->write_nodal(b_name, smesh::TypeToEnum<real_t>::value(), x, 1);
             }
 
         } else {
-            char path[2048];
-            snprintf(path, sizeof(path), impl_->file_format.c_str(), impl_->output_dir.c_str(), name);
-            if (array_write(comm, path, SFEM_MPI_REAL_T, x, impl_->space->n_dofs(), impl_->space->n_dofs())) {
-                return SFEM_FAILURE;
-            }
+            impl_->smesh_output->write_nodal(name, smesh::TypeToEnum<real_t>::value(), x, impl_->space->block_size());
         }
 
         return SFEM_SUCCESS;
@@ -178,8 +178,10 @@ namespace sfem {
                          impl_->time_dependent_file_format.c_str(),
                          impl_->output_dir.c_str(),
                          b_name,
-                         impl_->export_counter++);
+                         impl_->export_counter++,
+                        smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
+                        //  TODO
                 if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
                     return SFEM_FAILURE;
                 }
@@ -191,7 +193,8 @@ namespace sfem {
                      impl_->time_dependent_file_format.c_str(),
                      impl_->output_dir.c_str(),
                      name,
-                     impl_->export_counter++);
+                     impl_->export_counter++,
+                     smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
             if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
                 return SFEM_FAILURE;

@@ -26,6 +26,7 @@
 #include "sfem_Sideset.hpp"
 #include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
+#include "smesh_output.hpp"
 
 // Operator includes
 #include "sfem_Op.hpp"
@@ -35,6 +36,7 @@
 
 namespace sfem {
 
+    // using Output = smesh::Output;
     class Output {
     public:
         Output(const std::shared_ptr<FunctionSpace> &space);

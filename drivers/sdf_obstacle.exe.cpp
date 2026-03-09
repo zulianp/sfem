@@ -111,12 +111,13 @@ int main(int argc, char *argv[]) {
     auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
     const int   block_size = 3;
 
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
+
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
-    }
+   
 
 #ifdef SFEM_ENABLE_CUDA
     {
