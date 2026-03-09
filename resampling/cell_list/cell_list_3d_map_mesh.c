@@ -163,10 +163,6 @@ query_cell_list_3d_2d_map_mesh_given_xy_tets_v(const cell_list_3d_2d_map_t *map,
 
     int boxes_found = 0;
 
-    // for (int i = 0; i < size_z; i++) {
-    //     tets_array[i] = -1;  // Initialize output array to -1 (indicating not found)
-    // }
-
     if (num_boxes_local > 0) {
         for (int iz = 0; iz < size_z; iz++) {
             const real_t z = z_array[iz];

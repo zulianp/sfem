@@ -4,86 +4,9 @@
 #include <cuda_runtime.h>
 
 #include "cell_list_cuda.cuh"
+#include "cell_list_query_cuda.cuh"
+#include "cubature_cuda.cuh"
 #include "sfem_resample_field_cuda_fun.cuh"
-
-#define QUAD_N1D 2
-#define QUAD_TOTAL 8
-
-/* ---- double precision ---- */
-
-__device__ __constant__ double qx_dbl[8] = {2.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            7.50000000000000000e-01};
-
-__device__ __constant__ double qy_dbl[8] = {2.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            7.50000000000000000e-01};
-
-__device__ __constant__ double qz_dbl[8] = {2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01,
-                                            2.50000000000000000e-01,
-                                            7.50000000000000000e-01};
-
-__device__ __constant__ double qw_dbl[8] = {1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01,
-                                            1.25000000000000000e-01};
-
-/* ---- single precision ---- */
-
-__device__ __constant__ float qx_flt[8] = {2.50000000e-01f,
-                                           2.50000000e-01f,
-                                           2.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           7.50000000e-01f,
-                                           7.50000000e-01f,
-                                           7.50000000e-01f};
-
-__device__ __constant__ float qy_flt[8] = {2.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           7.50000000e-01f,
-                                           2.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           7.50000000e-01f};
-
-__device__ __constant__ float qz_flt[8] = {2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f,
-                                           2.50000000e-01f,
-                                           7.50000000e-01f};
-
-__device__ __constant__ float qw_flt[8] = {1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f,
-                                           1.25000000e-01f};
 
 //////////////////////////////////////////////
 // update_hex_field
@@ -213,5 +136,122 @@ update_hex_quad_node_cuda(                                           //
 
     return 0;
 }  // END Function: update_hex_quad_node
+
+///////////////////////////////////////////////
+// update_hex_field
+///////////////////////////////////////////////
+__device__ int                                                      //
+update_hex_field(cell_list_split_3d_2d_map_t *split_map,            // Cell list split map data structure
+                 boxes_t                     *boxes,                // Boxes data structure
+                 const mesh_tet_geom_t       *mesh_geom,            // Mesh geometry data structure
+                 const ptrdiff_t              i_grid,               // The i index of the grid point in the hex mesh
+                 const ptrdiff_t              j_grid,               // The j index of the grid point in the hex mesh
+                 const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
+                 const ptrdiff_t n0,                                // SDF: n[3]
+                 const ptrdiff_t n1,                                //
+                 const ptrdiff_t n2,                                //
+                 const ptrdiff_t const __restrict__ stride0,        // SDF: stride[3]
+                 const ptrdiff_t const __restrict__ stride1,        //
+                 const ptrdiff_t const __restrict__ stride2,        //
+                 const geom_t const __restrict__ origin0,           // SDF: origin[3]
+                 const geom_t const __restrict__ origin1,           //
+                 const geom_t const __restrict__ origin2,           //
+                 const geom_t const __restrict__ delta0,            // SDF: delta[3]
+                 const geom_t const __restrict__ delta1,            //
+                 const geom_t const __restrict__ delta2,            //
+                 const real_t *const __restrict__ weighted_field,   // Weighted field
+                 real_t *const __restrict__ hex_field) {            //
+
+    const int threads_per_block = blockDim.x * blockDim.y;
+    const int block_thread_id   = threadIdx.y * blockDim.x + threadIdx.x;
+
+    const real_t grid_x  = real_t(origin0) + real_t(i_grid) * real_t(delta0);
+    const real_t grid_y  = real_t(origin1) + real_t(j_grid) * real_t(delta1);
+    const real_t delta_z = delta2;
+
+    const real_t *quad_x = QuadPoints<real_t>::x();
+    const real_t *quad_y = QuadPoints<real_t>::y();
+    const real_t *quad_z = QuadPoints<real_t>::z();
+    const real_t *quad_w = QuadPoints<real_t>::w();
+
+    for (int q_ijk = 0; q_ijk < QUAD_TOTAL; q_ijk++) {
+        const real_t q_x = quad_x[q_ijk];
+        const real_t q_y = quad_y[q_ijk];
+        const real_t q_z = quad_z[q_ijk];
+        const real_t q_w = quad_w[q_ijk];
+
+        const real_t phys_z_base = origin2 + q_z * delta2;
+
+        for (int block_k = 0; block_k < n2; block_k += threads_per_block) {
+            const int k = block_k + block_thread_id;
+
+            if (k >= n2) break;
+
+            const real_t z = phys_z_base + (real_t)k * delta_z;
+
+            // Query of the tet. for GPU CUDA ...
+            // That's tricky
+
+            // Update filed given the tet.
+        }
+    }
+}
+
+/////////////////////////////////////////////////
+// transfer_to_hex_field_cell_split_tet4_kernel
+/////////////////////////////////////////////////
+__global__ void                                            //
+transfer_to_hex_field_cell_split_tet4_kernel(              //
+        cell_list_split_3d_2d_map_t *split_map,            // Cell list split map data structure
+        boxes_t                     *boxes,                // Boxes data structure
+        const mesh_tet_geom_t       *mesh_geom,            // Mesh geometry data structure
+        const elems_tet4_device *const __restrict__ mesh,  // Mesh: mesh_t struct
+        const int       delta_x,                           // Cell list box size in x direction
+        const int       delta_y,                           // Cell list box size in y direction
+        const int       size_x,                            // Number of grid points in x direction
+        const int       size_y,                            // Number of grid points in y direction
+        const ptrdiff_t n0,                                // SDF: n[3]
+        const ptrdiff_t n1,                                //
+        const ptrdiff_t n2,                                //
+        const ptrdiff_t stride0,                           // SDF: stride[3]
+        const ptrdiff_t stride1,                           //
+        const ptrdiff_t stride2,                           //
+        const geom_t    origin0,                           // SDF: origin[3]
+        const geom_t    origin1,                           //
+        const geom_t    origin2,                           //
+        const geom_t    delta0,                            // SDF: delta[3]
+        const geom_t    delta1,                            //
+        const geom_t    delta2,                            //
+        const real_t *const __restrict__ weighted_field,   // Weighted field
+        real_t *const __restrict__ hex_field) {            // Output field values for the hex nodes
+
+    const int i_grid = (blockIdx.x * blockDim.x + threadIdx.x) * delta_x;
+    const int j_grid = (blockIdx.y * blockDim.y + threadIdx.y) * delta_y;
+
+    if (i_grid >= size_x || j_grid >= size_y) {
+        return;  // Out of bounds, exit the kernel
+    }
+
+    update_hex_field(split_map,  //
+                     boxes,
+                     mesh_geom,
+                     i_grid,
+                     j_grid,
+                     mesh,
+                     n0,
+                     n1,
+                     n2,
+                     stride0,
+                     stride1,
+                     stride2,
+                     origin0,
+                     origin1,
+                     origin2,
+                     delta0,
+                     delta1,
+                     delta2,
+                     weighted_field,
+                     hex_field);
+}
 
 #endif /* __RESAMPLE_FIELD_ADJOINT_CELL_CUDA_CUH__ */
