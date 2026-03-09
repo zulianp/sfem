@@ -587,7 +587,7 @@ static SFEM_INLINE void hex8_laplacian_apply_fff_integral_soa(const scalar_t    
                                                               scalar_t *const SFEM_RESTRICT out5,
                                                               scalar_t *const SFEM_RESTRICT out6,
                                                               scalar_t *const SFEM_RESTRICT out7) {
-    const scalar_t x0  = (scalar_t)(1.0 / 6.0) * fff0;
+    const scalar_t x0  = (scalar_t)(1.0 / 6.0) * fff4;
     const scalar_t x1  = u7 * x0;
     const scalar_t x2  = (scalar_t)(1.0 / 9.0) * fff3;
     const scalar_t x3  = u3 * x2;
