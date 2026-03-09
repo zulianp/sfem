@@ -70,8 +70,8 @@ namespace sfem {
         auto space = impl_->space;
         auto et    = (smesh::ElemType)space->element_type();
 
-        const ptrdiff_t max_coarse_idx =
-                max_node_id(coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
+        const ptrdiff_t max_coarse_idx = max_node_id(
+                coarse_space->element_type(), space->mesh_ptr()->n_elements(), space->mesh_ptr()->elements(0)->data());
 
         auto coarse = std::make_shared<AxisAlignedContactConditions>(coarse_space);
 
@@ -285,7 +285,7 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t *>>      normals;
         std::shared_ptr<Buffer<real_t>>        mass_vector;
         bool                                   debug{false};
-        bool                                   variational{true};
+        bool                                   variational{false};
         enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
         std::shared_ptr<BLAS_Tpl<real_t>>      blas_;
 
@@ -296,13 +296,14 @@ namespace sfem {
 
             contact_surface->reset_points();
 
-            auto st           = contact_surface->element_type();
-             auto surface_mesh = std::make_shared<Mesh>(
-                    space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
+            auto st = contact_surface->element_type();
+            auto surface_mesh =
+                    std::make_shared<Mesh>(space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
 
-
+            // surface_mesh->print();
             auto trace_space = std::make_shared<FunctionSpace>(surface_mesh, 1);
             auto bop         = sfem::Factory::create_op(trace_space, "Mass");
+            bop->initialize();
 
             mass_vector = create_host_buffer<real_t>(trace_space->n_dofs());
 

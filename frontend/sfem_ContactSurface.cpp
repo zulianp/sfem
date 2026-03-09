@@ -419,7 +419,7 @@ namespace sfem {
                 sfem::create_host_buffer<idx_t>((level + 1) * (level + 1), sidesets[0]->parent()->size());
 
         if (smesh::sshex8_extract_surface_from_sideset(level,
-                                                       sfem::semi_structured_element_data(ssmesh),
+                                                       ssmesh.elements(0)->data(),
                                                        sidesets[0]->parent()->size(),
                                                        sidesets[0]->parent()->data(),
                                                        sidesets[0]->lfi()->data(),
@@ -460,11 +460,7 @@ namespace sfem {
         ret->impl_->semi_structured_sides = semi_structured_sides;
         ret->impl_->node_mapping          = node_mapping;
         ret->impl_->surface_points  = create_host_buffer<geom_t>(space->mesh_ptr()->spatial_dimension(), node_mapping->size());
-        // ret->impl_->element_type    = shell_type(side_type(macro_base_elem(space->element_type()))); //FIXME
         ret->impl_->element_type    = smesh::QUADSHELL4;
-        // if (ret->impl_->element_type == smesh::INVALID) {
-        //     SFEM_ERROR("Invalid element type: %d\n", space->element_type());
-        // }
         ret->impl_->execution_space = es;
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
