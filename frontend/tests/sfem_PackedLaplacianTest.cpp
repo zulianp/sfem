@@ -5,9 +5,10 @@
 int test_packed_laplacian() {
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    constexpr int N    = 100;
-    auto          mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), N, N, N, -1, -1, -1, 1, 1, 1);
-    auto          fs   = sfem::FunctionSpace::create(mesh, 1);
+    enum smesh::ElemType SFEM_ELEM_TYPE = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
+    constexpr int        N              = 40;
+    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::wrap(comm), SFEM_ELEM_TYPE, N, N, N, -1, -1, -1, 1, 1, 1);
+    auto fs   = sfem::FunctionSpace::create(mesh, 1);
 
     SFEM_TEST_ASSERT(fs->initialize_packed_mesh() == SFEM_SUCCESS);
 
@@ -16,12 +17,13 @@ int test_packed_laplacian() {
 
     {
         // Make the mesh non-uniform
-        auto b_points = mesh->points()->data();
-        int  dim      = mesh->spatial_dimension();
-        const ptrdiff_t nnodes = mesh->n_nodes();
+        auto            b_points = mesh->points()->data();
+        int             dim      = mesh->spatial_dimension();
+        const ptrdiff_t nnodes   = mesh->n_nodes();
         for (int d = 0; d < dim; d++) {
             for (ptrdiff_t i = 0; i < nnodes; ++i) {
-                b_points[d][i] = b_points[d][i] * b_points[d][i] * b_points[d][i] + b_points[0][i] * b_points[0][i] * b_points[0][i] * 0.2;
+                b_points[d][i] =
+                        b_points[d][i] * b_points[d][i] * b_points[d][i] + b_points[0][i] * b_points[0][i] * b_points[0][i] * 0.2;
             }
         }
     }
