@@ -269,7 +269,7 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
+    int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::apply");
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
@@ -279,6 +279,41 @@ namespace sfem {
             }
             auto b             = *std::static_pointer_cast<int>(domain.user_data);
             auto assembly_data = impl_->assembly_data[b];
+
+#if 1
+            const real_t *Fa   = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            if (x) {
+                return hex8_neohookean_ogden_active_strain_apply(domain.block->n_elements(),
+                                                                 assembly_data->elements_stride,
+                                                                 assembly_data->elements->data(),
+                                                                 mesh->points()->data(),
+                                                                 domain.parameters->get_real_value("mu", impl_->mu),
+                                                                 domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                 Fa_stride,
+                                                                 Fa_soa,
+                                                                 3,
+                                                                 &x[0],
+                                                                 &x[1],
+                                                                 &x[2],
+                                                                 3,
+                                                                 &h[0],
+                                                                 &h[1],
+                                                                 &h[2],
+                                                                 3,
+                                                                 &out[0],
+                                                                 &out[1],
+                                                                 &out[2]);
+            }
+#endif
             return hex8_neohookean_ogden_active_strain_partial_assembly_apply(
                     domain.block->n_elements(),
                     assembly_data->elements_stride,
@@ -500,5 +535,4 @@ namespace sfem {
         });
     }
 }  // namespace sfem
-
 

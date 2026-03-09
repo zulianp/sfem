@@ -71,4 +71,4 @@ export SFEM_OPERATOR=NeoHookeanOgdenPacked
 $LAUNCH hyperelasticy hex8_geometry/box dirichlet_hex8.yaml hex8_output
 # raw_to_db.py hex8_output/mesh hex8_output.vtk -p 'hex8_output/out/*.raw' $EXTRA_OPTIONS
 
-raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.raw,hex8_output/out/disp.1.*.raw,hex8_output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
+$CODE_DIR/smesh/python/smesh/raw_to_db.py hex8_output/mesh hex8_output.xdmf -p "hex8_output/out/disp.0.*.raw,hex8_output/out/disp.1.*.raw,hex8_output/out/disp.2.*.raw" --transient --n_time_steps=$SFEM_ROTATE_STEPS 
