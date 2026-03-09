@@ -417,6 +417,152 @@ int hex8_neohookean_ogden_active_strain_gradient(const ptrdiff_t                
     return SFEM_SUCCESS;
 }
 
+int hex8_neohookean_ogden_active_strain_apply(const ptrdiff_t                    nelements,
+                                              const ptrdiff_t                    stride,
+                                              idx_t **const SFEM_RESTRICT        elements,
+                                              geom_t **const SFEM_RESTRICT       points,
+                                              const real_t                       mu,
+                                              const real_t                       lambda,
+                                              const ptrdiff_t                    Fa_stride,
+                                              const real_t **const               Fa,
+                                              const ptrdiff_t                    u_stride,
+                                              const real_t *const SFEM_RESTRICT  ux,
+                                              const real_t *const SFEM_RESTRICT  uy,
+                                              const real_t *const SFEM_RESTRICT  uz,
+                                              const ptrdiff_t                    h_stride,
+                                              const real_t *const SFEM_RESTRICT  hx,
+                                              const real_t *const SFEM_RESTRICT  hy,
+                                              const real_t *const SFEM_RESTRICT  hz,
+                                              const ptrdiff_t                    out_stride,
+                                              real_t *const SFEM_RESTRICT        outx,
+                                              real_t *const SFEM_RESTRICT        outy,
+                                              real_t *const SFEM_RESTRICT        outz) {
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+    static const int       n_qp = line_q2_n;
+    static const scalar_t *qx   = line_q2_x;
+    static const scalar_t *qw   = line_q2_w;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        scalar_t element_matrix[(3 * 8) * (3 * 8)] = {0};
+        idx_t    ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+
+        scalar_t edispx[8];
+        scalar_t edispy[8];
+        scalar_t edispz[8];
+
+        scalar_t element_h[3 * 8];
+        accumulator_t eout[3 * 8] = {0};
+
+        scalar_t *const element_hx = &element_h[0 * 8];
+        scalar_t *const element_hy = &element_h[1 * 8];
+        scalar_t *const element_hz = &element_h[2 * 8];
+
+        accumulator_t *const eoutx = &eout[0 * 8];
+        accumulator_t *const eouty = &eout[1 * 8];
+        accumulator_t *const eoutz = &eout[2 * 8];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i * stride];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        for (int v = 0; v < 8; ++v) {
+            const ptrdiff_t uidx = ev[v] * u_stride;
+            edispx[v]            = ux[uidx];
+            edispy[v]            = uy[uidx];
+            edispz[v]            = uz[uidx];
+
+            const ptrdiff_t hidx = ev[v] * h_stride;
+            element_hx[v]        = hx[hidx];
+            element_hy[v]        = hy[hidx];
+            element_hz[v]        = hz[hidx];
+        }
+
+        scalar_t Fa_inv[9];
+        scalar_t Ja;
+        inverse3(Fa[0][i * Fa_stride],
+                 Fa[1][i * Fa_stride],
+                 Fa[2][i * Fa_stride],
+                 Fa[3][i * Fa_stride],
+                 Fa[4][i * Fa_stride],
+                 Fa[5][i * Fa_stride],
+                 Fa[6][i * Fa_stride],
+                 Fa[7][i * Fa_stride],
+                 Fa[8][i * Fa_stride],
+                 &Fa_inv[0],
+                 &Fa_inv[1],
+                 &Fa_inv[2],
+                 &Fa_inv[3],
+                 &Fa_inv[4],
+                 &Fa_inv[5],
+                 &Fa_inv[6],
+                 &Fa_inv[7],
+                 &Fa_inv[8],
+                 &Ja);
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant;
+
+        for (int kz = 0; kz < n_qp; kz++) {
+            for (int ky = 0; ky < n_qp; ky++) {
+                for (int kx = 0; kx < n_qp; kx++) {
+                    hex8_adjugate_and_det(lx, ly, lz, qx[kx], qx[ky], qx[kz], jacobian_adjugate, &jacobian_determinant);
+
+                    hex8_neohookean_ogden_active_strain_hessian(jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                qx[kx],
+                                                                qx[ky],
+                                                                qx[kz],
+                                                                qw[kx] * qw[ky] * qw[kz],
+                                                                lambda,
+                                                                mu,
+                                                                Fa_inv,
+                                                                Ja,
+                                                                edispx,
+                                                                edispy,
+                                                                edispz,
+                                                                element_matrix);
+                }
+            }
+        }
+
+        for (int row = 0; row < 3 * 8; ++row) {
+            const scalar_t *const element_row = &element_matrix[row * (3 * 8)];
+            for (int col = 0; col < 3 * 8; ++col) {
+                eout[row] += element_row[col] * element_h[col];
+            }
+        }
+
+        for (int edof_i = 0; edof_i < 8; ++edof_i) {
+            const ptrdiff_t idx = ev[edof_i] * out_stride;
+
+#pragma omp atomic update
+            outx[idx] += eoutx[edof_i];
+
+#pragma omp atomic update
+            outy[idx] += eouty[edof_i];
+
+#pragma omp atomic update
+            outz[idx] += eoutz[edof_i];
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int hex8_neohookean_ogden_active_strain_hessian_partial_assembly(const ptrdiff_t                      nelements,
                                                                  const ptrdiff_t                      stride,
                                                                  idx_t **const SFEM_RESTRICT          elements,
@@ -1041,8 +1187,8 @@ int hex8_neohookean_ogden_active_strain_bsr(const ptrdiff_t                    n
                                                                     qx[ky],
                                                                     qx[kz],
                                                                     qw[kx] * qw[ky] * qw[kz],
-                                                                    mu,
                                                                     lambda,
+                                                                    mu,
                                                                     Fa_inv,
                                                                     Ja,
                                                                     edispx,
