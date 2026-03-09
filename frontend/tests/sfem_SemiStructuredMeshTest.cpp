@@ -8,11 +8,8 @@
 int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
     int L = 8;
 
-    auto fs = sfem::FunctionSpace::create(m, 1);
-    fs->promote_to_semi_structured(L);
-
-    // Do this before any other operation
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
 
     // Create the points to avoid duplication in coarse levels (lazy init)!
     // Otherwise every level will construct its points
@@ -61,12 +58,9 @@ int test_derefine_mesh() {
 
 int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const std::string &output_dir) {
     int  L  = 8;
-    auto fs = sfem::FunctionSpace::create(m, 1);
-    fs->promote_to_semi_structured(L);
 
-    // // Do this before any other operation
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
-
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
     auto levels = sfem::semi_structured_derefinement_levels(fs->mesh());
 
     auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
@@ -129,11 +123,8 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const std::string &ou
     }
 
     int  L  = 4;
-    auto fs = sfem::FunctionSpace::create(m, 1);
-    fs->promote_to_semi_structured(L);
-
-    // // Do this before any other operation
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs = sfem::FunctionSpace::create(ssmesh, 1);
 
     auto levels = sfem::semi_structured_derefinement_levels(fs->mesh());
 

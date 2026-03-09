@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
             SFEM_ERROR("Element %s not supported for semi-structured discretization\n", type_to_string(element_type));
         }
 
-        auto ss = sfem::to_semi_structured(m, SFEM_ELEMENT_REFINE_LEVEL);
+        auto ss = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
         const int level = sfem::semi_structured_level(*ss);
 
         std::shared_ptr<sfem::Buffer<idx_t *>> surf_elems;

@@ -54,11 +54,11 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     const bool verbose = smesh::Env::read("SFEM_VERBOSE", false);
 
     auto      mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
+    }
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
-
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA

@@ -44,14 +44,12 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     const char *neumann_path   = argv[4];
 
     auto m = sfem::Mesh::create_from_file(comm, smesh::Path(mesh_path));
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
 
     // Create function space
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
-    }
 
 // FIXME
 #ifdef SFEM_ENABLE_CUDA

@@ -110,6 +110,8 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     if(smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
         m = sfem::convert_p1_mesh_to_p2(m);
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
     auto fs = sfem::FunctionSpace::create(m, 1);
@@ -126,10 +128,6 @@ int solve_poisson_problem(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {{.sidesets = sideset1, .value = -1, .component = 0},
                                                                              {.sidesets = sideset0, .value = 1, .component = 0}};
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
 
     auto f     = sfem::Function::create(fs);
     auto conds = sfem::create_dirichlet_conditions(fs, boundary_conditions, op->execution_space());

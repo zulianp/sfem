@@ -35,12 +35,11 @@ std::shared_ptr<sfem::Function> create_elasticity_function() {
                                           1.,
                                           1.);
 
-    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        // fs->mesh().apply_hierarchical_renumbering();
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
+
+    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
     auto f = sfem::Function::create(fs);
     

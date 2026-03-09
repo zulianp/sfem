@@ -218,6 +218,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
     if (smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
         mesh = sfem::convert_p1_mesh_to_p2(mesh);
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
     }
 
     // FIXME SFC should also sort the BCs
@@ -237,10 +239,6 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
         fs = sfem::FunctionSpace::create(packed_mesh, block_size);
     } else {
         fs = sfem::FunctionSpace::create(mesh, block_size);
-    }
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
     }
 
     auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);

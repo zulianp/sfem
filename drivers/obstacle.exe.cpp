@@ -100,13 +100,14 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
     int block_size = SFEM_USE_ELASTICITY ? m->spatial_dimension() : 1;
 
     auto fs = sfem::FunctionSpace::create(m, block_size);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
 
 #ifdef SFEM_ENABLE_CUDA
     {

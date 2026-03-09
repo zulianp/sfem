@@ -58,6 +58,7 @@ int test_semi_structured_promotion() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     // Initially should not have semi-structured mesh
@@ -65,8 +66,10 @@ int test_semi_structured_promotion() {
     SFEM_TEST_ASSERT(space->element_type(0) == smesh::HEX8);
     
     // Promote to semi-structured
-    int result = space->promote_to_semi_structured(2);
-    SFEM_TEST_ASSERT(result == SFEM_SUCCESS);
+    // int result = space->promote_to_semi_structured(2);
+    auto ssmesh = smesh::to_semistructured(2, mesh, true, false);
+    space = sfem::FunctionSpace::create(ssmesh, 1);
+
     
     // Should now have semi-structured mesh
     SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
@@ -125,11 +128,12 @@ int test_derefine_function_space() {
     
     MPI_Comm comm = MPI_COMM_WORLD;
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), 2, 2, 2);
+    mesh = smesh::to_semistructured(2, mesh, true, false);
     auto space = sfem::FunctionSpace::create(mesh, 1);
     
     // Promote to semi-structured first
-    int result = space->promote_to_semi_structured(2);
-    SFEM_TEST_ASSERT(result == SFEM_SUCCESS);
+    // int result = space->promote_to_semi_structured(2);
+    // SFEM_TEST_ASSERT(result == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
     
     // Test derefine

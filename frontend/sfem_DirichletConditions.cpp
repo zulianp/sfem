@@ -43,6 +43,10 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
+
+#include "smesh_path.hpp"
+#include "smesh_sideset.hpp"
+
 #ifdef SFEM_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -372,7 +376,7 @@ namespace sfem {
                 if (is_file) {
                     std::string path;
                     c["path"] >> path;
-                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), path.c_str());
+                    sideset = Sideset::create_from_file(space->mesh_ptr()->comm(), smesh::Path(path));
                 } else if (is_expr) {
                     assert(c["parent"].is_seq());
                     assert(c["lfi"].is_seq());
@@ -399,9 +403,10 @@ namespace sfem {
                 idx_t    *nodes{nullptr};
                 if (space->has_semi_structured_mesh()) {
                     auto &&ss = space->mesh();
+                    int level = sfem::semi_structured_level(ss);
                     SFEM_TRACE_SCOPE("sshex8_extract_nodeset_from_sideset");
-                    if (sshex8_extract_nodeset_from_sideset(ss.level(),
-                                                            ss.element_data(),
+                    if (smesh::sshex8_extract_nodeset_from_sideset(level,
+                                                            ss.elements(0)->data(),
                                                             sideset->parent()->size(),
                                                             sideset->parent()->data(),
                                                             sideset->lfi()->data(),
@@ -410,8 +415,8 @@ namespace sfem {
                         SFEM_ERROR("Unable to extract nodeset from sideset!\n");
                     }
                 } else {
-                    if (extract_nodeset_from_sideset(space->element_type(),
-                                                     space->mesh_ptr()->elements(0)->data(),
+                    if (smesh::extract_nodeset_from_sideset(space->mesh_ptr()->element_type(sideset->block_id()),
+                                                     space->mesh_ptr()->elements(sideset->block_id())->data(),
                                                      sideset->parent()->size(),
                                                      sideset->parent()->data(),
                                                      sideset->lfi()->data(),

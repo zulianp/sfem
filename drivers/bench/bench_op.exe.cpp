@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
 
         ptrdiff_t nnodes = m->n_nodes();
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-            ssmesh = sfem::to_semi_structured(m, SFEM_ELEMENT_REFINE_LEVEL);
+            ssmesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
             nnodes = ssmesh->n_nodes();
         } else {
             packed_mesh = sfem::FunctionSpace::PackedMesh::create(m, {}, true);
@@ -229,8 +229,7 @@ int main(int argc, char *argv[]) {
         for (auto &op_desc : ops) {
             std::shared_ptr<sfem::FunctionSpace> fs;
             if (ssmesh) {
-                fs = sfem::FunctionSpace::create(m, op_desc.block_size);
-                fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+                fs = sfem::FunctionSpace::create(ssmesh, op_desc.block_size);
             } else if (packed_mesh) {
                 fs = sfem::FunctionSpace::create(packed_mesh, op_desc.block_size);
             } else {
