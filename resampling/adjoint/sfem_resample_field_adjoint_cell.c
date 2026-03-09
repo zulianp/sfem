@@ -700,7 +700,7 @@ transfer_to_hex_field_cell_split_par_tet4(cell_list_split_3d_2d_map_t         *s
                     ptrdiff_t loop_count_i = (x_size > start_i) ? ((x_size - start_i + 2) / 3) : 0;
                     ptrdiff_t loop_count_j = (y_size > start_j) ? ((y_size - start_j + 2) / 3) : 0;
 
-#pragma omp for collapse(2) schedule(guided)
+#pragma omp for collapse(2) schedule(guided) nowait
                     for (ptrdiff_t k = 0; k < loop_count_i; k++) {
                         for (ptrdiff_t m = 0; m < loop_count_j; m++) {
                             ptrdiff_t i_grid = start_i + (k * 3);
@@ -722,6 +722,7 @@ transfer_to_hex_field_cell_split_par_tet4(cell_list_split_3d_2d_map_t         *s
                                              hex_field);          //
                         }
                     }
+#pragma omp barrier
                 }
             }
         }  // END if (z_array_buffer && tet_indices_buffer)
@@ -752,6 +753,8 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
                                       real_t *const SFEM_RESTRICT          data) {                        // SDF: data (output)
 
     PRINT_CURRENT_FUNCTION;
+
+    const double tick = MPI_Wtime();
 
     boxes_t  *bounding_boxes_ptr = NULL;                          //
     const int fb_error           =                                //
@@ -805,16 +808,16 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
                                     min_grid_z,                     //
                                     max_grid_z);                    //
 
-    transfer_to_hex_field_cell_tet4(split_map,           //
-                                    bounding_boxes_ptr,  //
-                                    geom,                //
-                                    mesh,                //
-                                    n,                   //
-                                    stride,              //
-                                    origin,              //
-                                    delta,               //
-                                    weighted_field,      //
-                                    data);               //
+    transfer_to_hex_field_cell_split_par_tet4(split_map,           //
+                                              bounding_boxes_ptr,  //
+                                              geom,                //
+                                              mesh,                //
+                                              n,                   //
+                                              stride,              //
+                                              origin,              //
+                                              delta,               //
+                                              weighted_field,      //
+                                              data);               //
 
     ///////// FREE RESOURCES /////////
     free_cell_list_split_3d_2d_map(split_map);
@@ -827,6 +830,10 @@ tet4_resample_field_adjoint_cell_quad(const ptrdiff_t                      start
     bounding_boxes_ptr = NULL;
 
     free_side_length_histograms(&histograms);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    const double tock = MPI_Wtime();
+    printf("Time taken for tet4_resample_field_adjoint_cell_quad: %f seconds\n", tock - tick);
 
     RETURN_FROM_FUNCTION(0);
 }  // END Function: tet4_resample_field_adjoint_cell_quad

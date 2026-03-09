@@ -52,15 +52,16 @@ void free_boxes_device(boxes_t *d_boxes, cudaStream_t stream);
  * @param stream CUDA stream to use for async operations.
  * @return A cell_list_split_3d_2d_map_t struct containing device pointers and scalar fields.
  */
-cell_list_split_3d_2d_map_t copy_cell_list_split_3d_2d_map_to_device(const cell_list_split_3d_2d_map_t *h_split,
-                                                                     cudaStream_t                       stream);
+cell_list_split_3d_2d_map_t copy_cell_list_split_3d_2d_map_to_device(const cell_list_split_3d_2d_map_t *h_split,  //
+                                                                     cudaStream_t                       stream);                        //
 
 /**
  * @brief Frees device memory owned by a cell_list_split_3d_2d_map_t.
  * @param d_split Pointer to the device split map to free.
  * @param stream CUDA stream used for async frees.
  */
-void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split, cudaStream_t stream);
+void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,  //
+                                           cudaStream_t                 stream);                  //
 
 /**
  * @brief Copies a mesh_tet_geom_t from host to device.
@@ -69,13 +70,16 @@ void free_cell_list_split_3d_2d_map_device(cell_list_split_3d_2d_map_t *d_split,
  * @param stream CUDA stream to use for async operations.
  * @return A mesh_tet_geom_device_t struct containing device pointers and scalar fields.
  */
-mesh_tet_geom_device_t copy_mesh_tet_geom_to_device(const mesh_tet_geom_t *h_geom, int nelements, cudaStream_t stream);
+mesh_tet_geom_device_t copy_mesh_tet_geom_to_device(const mesh_tet_geom_t *h_geom,     //
+                                                    int                    nelements,  //
+                                                    cudaStream_t           stream);              //
 
 /**
  * @brief Frees device memory owned by a mesh_tet_geom_device_t.
  * @param d_geom Pointer to the device mesh tet geometry to free.
  * @param stream CUDA stream used for async frees.
  */
-void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom, cudaStream_t stream);
+void free_mesh_tet_geom_device(mesh_tet_geom_device_t *d_geom,  //
+                               cudaStream_t            stream);            //
 
 #endif  // CELL_LIST_CUDA_CUH
