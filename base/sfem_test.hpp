@@ -7,7 +7,7 @@
 #include <exception>
 #include <iostream>
 
-#include "sfem_Context.hpp"
+
 #include "sfem_Tracer.hpp"
 #include "sfem_base.hpp"
 

@@ -9,7 +9,7 @@
 #include "smesh_env.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
-#include "sfem_mesh_write.hpp"
+
 #include "sfem_ssgmg.hpp"
 
 #ifdef SFEM_ENABLE_CUDA

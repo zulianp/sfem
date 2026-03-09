@@ -3,7 +3,7 @@
 
 #include "sfem_config.h"
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_MultiDomainOp.hpp"
 
 namespace sfem {

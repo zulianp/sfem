@@ -6,7 +6,7 @@
 
 // #define real_type real_t
 
-#include "mesh_aura.hpp"
+
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 

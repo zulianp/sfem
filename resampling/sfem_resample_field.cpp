@@ -16,7 +16,7 @@
 #include "tet10_resample_field.hpp"
 #include "tet10_resample_field_V2.hpp"
 
-#include "mesh_aura.hpp"
+
 #include "quadratures_rule.hpp"
 #include "sfem_defs.hpp"
 

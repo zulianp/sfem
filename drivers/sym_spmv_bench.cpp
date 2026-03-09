@@ -8,7 +8,7 @@
 #include "matrixio_array.h"
 #include "matrixio_crs.h"
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_crs_sym_SpMV.hpp"

@@ -7,10 +7,10 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "mesh_aura.hpp"
+
 #include "node_interpolate.hpp"
-#include "read_mesh.hpp"
-#include "sfem_mesh_write.hpp"
+
+
 #include "sfem_resample_gap.hpp"
 
 #include "mesh_utils.hpp"

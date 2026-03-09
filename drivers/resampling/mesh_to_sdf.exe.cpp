@@ -7,8 +7,8 @@
 #include "matrixio_array.h"
 #include "matrixio_ndarray.h"
 
-#include "read_mesh.hpp"
-#include "sfem_mesh_write.hpp"
+
+
 #include "sfem_resample_gap.hpp"
 
 #include "point_triangle_distance.hpp"

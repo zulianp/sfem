@@ -5,7 +5,7 @@
 #include "matrixio_array.h"
 #include "utils.h"
 
-#include "crs_graph.hpp"
+
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_mesh.hpp"
@@ -41,7 +41,7 @@
 #include "sfem_prolongation_restriction.hpp"
 
 // C++ includes
-#include "sfem_CRSGraph.hpp"
+// 
 #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"

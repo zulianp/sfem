@@ -2,7 +2,7 @@
 #include "sfem_Function.hpp"
 
 #include "matrixio_array.h"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
@@ -10,8 +10,8 @@
 #include "sfem_API.hpp"
 #include "smesh_env.hpp"
 #include "sfem_P1toP2.hpp"
-#include "sfem_Packed.hpp"
-#include "sfem_SFC.hpp"
+
+#include "smesh_mesh_reorder.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
         const char *SFEM_EXECUTION_SPACE{nullptr};
         SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
         if (SFEM_EXECUTION_SPACE) {
-            es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+            es = smesh::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
 
         std::string                 path = smesh::Env::read_string("SFEM_MESH", "");
@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (smesh::Env::read("SFEM_USE_SFC", false)) {
-            auto sfc = sfem::SFC::create_from_env();
+            auto sfc = smesh::SFC::create_from_env();
             sfc->reorder(*m);
         }
 

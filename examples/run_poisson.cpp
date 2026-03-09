@@ -21,7 +21,7 @@
 
 #include "macro_tet4_laplacian.hpp"
 
-#include "read_mesh.hpp"
+
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 

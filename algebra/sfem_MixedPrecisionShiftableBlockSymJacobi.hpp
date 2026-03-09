@@ -3,11 +3,9 @@
 
 #include "sfem_base.hpp"
 
-#include "sfem_Buffer.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
-#include "sfem_openmp_ShiftableJacobi.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 
 namespace sfem {

@@ -1,8 +1,7 @@
 #ifndef SFEM_GRID_HPP
 #define SFEM_GRID_HPP
 
-#include "sfem_Buffer.hpp"
-#include "sfem_Communicator.hpp"
+#include "sfem_aliases.hpp"
 
 #include <cstddef>
 #include <memory>

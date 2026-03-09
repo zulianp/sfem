@@ -8,7 +8,7 @@
 #include "hex8_jacobian.hpp"
 #include "linear_elasticity.hpp"
 
-#include "sfem_CRSGraph.hpp"
+
 #include "sfem_FunctionSpace.hpp"
 #include "smesh_mesh.hpp"
 

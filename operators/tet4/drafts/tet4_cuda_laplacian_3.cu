@@ -9,7 +9,7 @@
 extern "C" {
 #include "sfem_base.hpp"
 
-#include "crs_graph.hpp"
+
 #include "cuda_crs.hpp"
 #include "sfem_base.hpp"
 #include "sfem_vec.hpp"

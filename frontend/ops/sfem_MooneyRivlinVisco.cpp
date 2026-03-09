@@ -6,7 +6,7 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-#include "sfem_CRSGraph.hpp"
+
 #include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "smesh_mesh.hpp"
@@ -15,7 +15,7 @@
 #include "sfem_Parameters.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_API.hpp"
 
 #include <math.h>

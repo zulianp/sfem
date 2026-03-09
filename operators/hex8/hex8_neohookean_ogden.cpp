@@ -6,7 +6,7 @@
 
 #include <mpi.h>
 
-#include "crs_graph.hpp"
+
 #include "sfem_macros.hpp"
 #include "sfem_vec.hpp"
 #include "sortreduce.hpp"

@@ -13,13 +13,13 @@
 #include "mpi.h"
 #include "utils.h"
 
-#include "crs_graph.hpp"
+
 #include "sfem_base.hpp"
 
 #include "linear_elasticity.hpp"
 #include "tet4_neohookean.hpp"
 
-#include "read_mesh.hpp"
+
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 

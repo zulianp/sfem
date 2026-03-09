@@ -4,7 +4,7 @@
 
 #include "sfem_Function.hpp"
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_crs_SpMV.hpp"
 #include "spmv.hpp"
@@ -48,7 +48,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         const char *SFEM_EXECUTION_SPACE{nullptr};
         SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
         if (SFEM_EXECUTION_SPACE) {
-            es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+            es = smesh::execution_space_from_string(SFEM_EXECUTION_SPACE);
         }
     }
 

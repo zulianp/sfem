@@ -1,9 +1,11 @@
 #ifndef ACRS_HPP
 #define ACRS_HPP
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_Tracer.hpp"
+
+#include "sfem_macros.hpp"
 
 #include <algorithm>
 #include <cassert>

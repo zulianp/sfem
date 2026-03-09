@@ -5,7 +5,7 @@
 #include "sfem_base.hpp"
 
 // C++ includes
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 
 namespace sfem {
 

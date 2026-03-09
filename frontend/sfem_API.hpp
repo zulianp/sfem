@@ -2,11 +2,10 @@
 #define SFEM_API_HPP
 
 // C includes
-#include "adj_table.hpp"
-#include "crs_graph.hpp"
-#include "sfem_Buffer.hpp"
+#include "matrixio_array.h"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_mask.hpp"
+// #include "sfem_mask.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_sideset.hpp"
 #include "sfem_prolongation_restriction.hpp"
@@ -18,10 +17,9 @@
 #include "acrs.hpp"
 #include "scrs.hpp"
 #include "sdacrs.hpp"
-#include "sfem_CRSGraph.hpp"
 #include "sfem_Chebyshev3.hpp"
 #include "sfem_ContactConditions.hpp"
-#include "sfem_Context.hpp"
+
 #include "sfem_CooSym.hpp"
 #include "smesh_env.hpp"
 #include "sfem_Function.hpp"

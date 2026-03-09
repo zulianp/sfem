@@ -4,11 +4,9 @@
 #include <cstddef>
 #include <memory>
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_openmp_blas.hpp"
-
-#include "sfem_Buffer.hpp"
 
 #include "sfem_openmp_ShiftableJacobi.hpp"
 

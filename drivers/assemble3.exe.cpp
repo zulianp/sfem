@@ -8,14 +8,14 @@
 #include "matrixio_crs.h"
 #include "utils.h"
 
-#include "crs_graph.hpp"
+
 #include "smesh_graph.impl.hpp"
 #include "sfem_base.hpp"
 
 // #include "tet4_neohookean.hpp"
 #include "linear_elasticity.hpp"
 
-#include "read_mesh.hpp"
+
 
 #include "sfem_API.hpp"
 

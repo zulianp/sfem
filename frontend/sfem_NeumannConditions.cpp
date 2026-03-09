@@ -32,8 +32,8 @@
 #include "sshex8_mesh.hpp"
 
 // C++ includes
-#include "sfem_CRSGraph.hpp"
-#include "sfem_SemiStructuredMesh.hpp"
+// 
+// #include "sfem_SemiStructuredMesh.hpp"
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 

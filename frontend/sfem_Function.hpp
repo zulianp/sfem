@@ -16,14 +16,13 @@
 
 // #include "isolver_function.h"
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_glob.hpp"
-#include "sfem_Sideset.hpp"
 #include "sfem_NeumannConditions.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "smesh_output.hpp"

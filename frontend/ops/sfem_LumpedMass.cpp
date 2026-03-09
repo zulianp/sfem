@@ -9,7 +9,7 @@
 
 #include "smesh_mesh.hpp"
 #include "sfem_FunctionSpace.hpp"
-#include "sfem_CRSGraph.hpp"
+
 
 namespace sfem {
 

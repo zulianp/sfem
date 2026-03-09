@@ -1,7 +1,7 @@
 #ifndef MG_BUILDER_H
 #define MG_BUILDER_H
 
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_Multigrid.hpp"
 

@@ -5,6 +5,8 @@
 #include "sfem_Tracer.hpp"
 #include "sfem_glob.hpp"
 
+#include "matrixio_array.h"
+
 namespace sfem {
 
     std::unique_ptr<Op> CVFEMUpwindConvection::create(const std::shared_ptr<FunctionSpace> &space) {

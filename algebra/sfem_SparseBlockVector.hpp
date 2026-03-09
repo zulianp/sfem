@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sfem_base.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 
 namespace sfem {
 

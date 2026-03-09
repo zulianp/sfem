@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
-#include "crs_graph.hpp"
+
 #include "sortreduce.hpp"
 
 #ifdef __cplusplus

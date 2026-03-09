@@ -7,7 +7,7 @@
 #include <cstdio>
 
 #include "sfem_API.hpp"
-#include "sfem_Buffer.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_config.h"
