@@ -77,11 +77,13 @@ int main(int argc, char *argv[]) {
     // -------------------------------
 
     auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
-    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
+    auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
+
+  
 
     // -------------------------------
     // Create problem

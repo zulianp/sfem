@@ -160,11 +160,9 @@ int test_trace_space_prolongation_restriction() {
 
     geom_t Lx = 1;
     auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, Lx, 1, 1);
-
+m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto sideset = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });

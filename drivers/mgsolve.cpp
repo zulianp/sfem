@@ -138,11 +138,12 @@ int main(int argc, char *argv[]) {
     sfem::register_device_ops();
 #endif
 
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
+    // if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+    //     fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    // }
 
 #ifdef SFEM_ENABLE_CUDA
     {

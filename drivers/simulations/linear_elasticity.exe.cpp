@@ -103,6 +103,8 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
 
     if(smesh::Env::read("SFEM_PROMOTE_TO_P2", false)) {
         m = sfem::convert_p1_mesh_to_p2(m);
+    } else if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
@@ -110,11 +112,6 @@ int solve_linear_elasticity(const std::shared_ptr<sfem::Communicator> &comm, int
 
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
-
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    }
 
     auto f     = sfem::Function::create(fs);
     auto conds = sfem::DirichletConditions::create_from_file(fs, argv[2]);

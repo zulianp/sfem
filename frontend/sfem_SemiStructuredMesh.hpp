@@ -13,12 +13,12 @@
 
 namespace sfem {
 
-    inline std::shared_ptr<Mesh> to_semi_structured(const std::shared_ptr<Mesh> &macro_mesh,
-                                                    const int                    level,
-                                                    const bool                   hierarchical_ordering = false,
-                                                    const bool                   use_gll               = false) {
-        return smesh::to_semistructured(level, macro_mesh, hierarchical_ordering, use_gll);
-    }
+    // inline std::shared_ptr<Mesh> to_semi_structured(const std::shared_ptr<Mesh> &macro_mesh,
+    //                                                 const int                    level,
+    //                                                 const bool                   hierarchical_ordering = false,
+    //                                                 const bool                   use_gll               = false) {
+    //     return smesh::to_semistructured(level, macro_mesh, hierarchical_ordering, use_gll);
+    // }
 
     inline int semi_structured_level(const Mesh &mesh) { return smesh::proteus_hex_micro_elements_per_dim(mesh.element_type(0)); }
 
@@ -40,10 +40,10 @@ namespace sfem {
         return levels;
     }
 
-    inline int semi_structured_apply_hierarchical_renumbering(Mesh &mesh) {
-        return smesh::semistructured_hierarchical_renumbering(
-                mesh.element_type(0), semi_structured_level(mesh), mesh.n_nodes(), mesh.elements(0), mesh.points());
-    }
+    // inline int semi_structured_apply_hierarchical_renumbering(Mesh &mesh) {
+    //     return smesh::semistructured_hierarchical_renumbering(
+    //             mesh.element_type(0), semi_structured_level(mesh), mesh.n_nodes(), mesh.elements(0), mesh.points());
+    // }
 
     inline std::shared_ptr<Mesh> semi_structured_derefine(const std::shared_ptr<Mesh> &mesh, const int to_level) {
         return smesh::derefine(mesh, to_level);

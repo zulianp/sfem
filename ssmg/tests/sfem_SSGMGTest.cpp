@@ -36,18 +36,22 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const std::str
     auto mg = create_ssgmg(f, f->execution_space());
     SFEM_TEST_ASSERT(mg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
 
-#if 0
-    sfem::create_directory(name.c_str());
-    sfem::create_directory((name +"/fields").c_str());
+    int SFEM_ENABLE_OUTPUT = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
+    if (SFEM_ENABLE_OUTPUT) {
+        sfem::create_directory(name.c_str());
+        sfem::create_directory((name + "/fields").c_str());
 
-    SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name +"/mesh").c_str()) == SFEM_SUCCESS);
+        // SFEM_TEST_ASSERT(fs->mesh().export_as_standard((name + "/mesh").c_str()) == SFEM_SUCCESS);
 
-    sfem::Output out(fs);
-    out.enable_AoS_to_SoA(true);
+        sfem::semi_structured_export_as_standard(fs->mesh_ptr(), (name + "/mesh").c_str());
 
-    out.set_output_dir((name +"/fields").c_str());
-    SFEM_TEST_ASSERT(out.write("u", x->data()) == SFEM_SUCCESS);
-#endif
+        sfem::Output out(fs);
+        out.enable_AoS_to_SoA(true);
+
+        out.set_output_dir((name + "/fields").c_str());
+        SFEM_TEST_ASSERT(out.write("u", x->data()) == SFEM_SUCCESS);
+    }
     return SFEM_TEST_SUCCESS;
 }
 
@@ -85,10 +89,10 @@ int test_ssgmg_poisson_cube() {
                                           1,
                                           1);
 
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+
     int  block_size = 1;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
@@ -146,10 +150,10 @@ int test_ssgmg_linear_elasticity_cube() {
                                           1,
                                           1);
 
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+
     int  block_size = 3;
     auto fs         = sfem::FunctionSpace::create(m, block_size);
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-    sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
 
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, SFEM_OPERATOR, es);

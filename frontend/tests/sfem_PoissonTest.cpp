@@ -3,8 +3,8 @@
 #include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
-#include "smesh_env.hpp"
 #include "sfem_Function.hpp"
+#include "smesh_env.hpp"
 
 // FIXME
 #include "hex8_fff.hpp"
@@ -174,7 +174,7 @@ int test_linear_function(const std::shared_ptr<sfem::Function> &f, const std::st
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
     cg->verbose    = true;
 
-    int SFEM_MAX_IT = smesh::Env::read<int>("SFEM_MAX_IT", 20000);
+    int  SFEM_MAX_IT             = smesh::Env::read<int>("SFEM_MAX_IT", 20000);
     bool SFEM_USE_PRECONDITIONER = smesh::Env::read<bool>("SFEM_USE_PRECONDITIONER", false);
 
     cg->set_max_it(SFEM_MAX_IT);
@@ -249,9 +249,12 @@ int test_poisson() {
 
     auto m = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, 1, 1, 1);
-    auto fs = sfem::FunctionSpace::create(m, 1);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
+
+    auto fs = sfem::FunctionSpace::create(m, 1);
 
     auto f = sfem::Function::create(fs);
 
@@ -286,14 +289,16 @@ int test_poisson_and_boundary_selector_aux(const char                        *te
                                            int                                block_size,
                                            sfem::ExecutionSpace               es,
                                            std::vector<std::string>           block_names = {}) {
-    auto fs = sfem::FunctionSpace::create(m, block_size);
-
     int SFEM_ELEMENT_REFINE_LEVEL = 1;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
+    auto mesh = m;
+    if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        mesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+    }
 
-    auto f = sfem::Function::create(fs);
+    auto fs = sfem::FunctionSpace::create(mesh, block_size);
+    auto f  = sfem::Function::create(fs);
 
     auto aabb = m->compute_bounding_box();
 
@@ -435,14 +440,16 @@ int test_generic_operator_with_boundary_conditions(const std::string            
                                                    std::shared_ptr<sfem::Op>                                op,
                                                    const std::vector<sfem::DirichletConditions::Condition> &boundary_conditions,
                                                    int                                                      refine_level = 1) {
-    if (refine_level > 1) {
-        fs->promote_to_semi_structured(refine_level);
+    auto mesh = fs->mesh_ptr();
+    if (refine_level > 0) {
+        mesh = smesh::to_semistructured(refine_level, mesh, true, false);
     }
+    auto new_fs = sfem::FunctionSpace::create(mesh, fs->block_size());
 
-    auto f = sfem::Function::create(fs);
+    auto f = sfem::Function::create(new_fs);
 
     // Add boundary conditions
-    auto conds = sfem::create_dirichlet_conditions(fs, boundary_conditions, op->execution_space());
+    auto conds = sfem::create_dirichlet_conditions(new_fs, boundary_conditions, op->execution_space());
     f->add_constraint(conds);
 
     f->add_operator(op);
@@ -483,11 +490,8 @@ int test_linear_elasticity() {
     auto op = sfem::create_op(fs, "LinearElasticity", es);
     op->initialize();
 
-    return test_generic_operator_with_boundary_conditions("test_linear_elasticity",
-                                                          fs,
-                                                          op,
-                                                          boundary_conditions,
-                                                          SFEM_ELEMENT_REFINE_LEVEL);
+    return test_generic_operator_with_boundary_conditions(
+            "test_linear_elasticity", fs, op, boundary_conditions, SFEM_ELEMENT_REFINE_LEVEL);
 }
 
 // Example of how to create additional tests using the generic function
@@ -596,14 +600,15 @@ int test_boundary_layer_elasticity() {
 
     real_t margin_min = 0.5;
     real_t margin_max = 1.5;
-    auto selection = m->select_elements(
-            [margin_min, margin_max](const geom_t x, const geom_t y, const geom_t z) -> bool { 
-                return (x <= margin_min || x >= margin_max) || (y <= margin_min || y >= margin_max) || (z <= margin_min || z >= margin_max); },
+    auto   selection  = m->select_elements(
+            [margin_min, margin_max](const geom_t x, const geom_t y, const geom_t z) -> bool {
+                return (x <= margin_min || x >= margin_max) || (y <= margin_min || y >= margin_max) ||
+                       (z <= margin_min || z >= margin_max);
+            },
             {});
-    
 
     m->split_block(selection[0].second, "boundary_layer");
-    m->renumber_nodes(); // Make sure that nodes in blocks are near each other
+    m->renumber_nodes();  // Make sure that nodes in blocks are near each other
 
     auto fs = sfem::FunctionSpace::create(m, 3);
 
@@ -616,13 +621,11 @@ int test_boundary_layer_elasticity() {
     op->set_value_in_block("default", "lambda", 1);
 
     auto left_sideset = sfem::Sideset::create_from_selector(
-        m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
-
+            m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x < 0.00001; });
 
     auto right_sideset = sfem::Sideset::create_from_selector(
             m, [](const geom_t x, const geom_t y, const geom_t z) -> bool { return x > 1.99999; });
 
-  
     std::vector<sfem::DirichletConditions::Condition> boundary_conditions = {
             {.sidesets = left_sideset, .value = 0.2, .component = 0},
             {.sidesets = left_sideset, .value = 0.2, .component = 1},

@@ -129,7 +129,7 @@ namespace sfem {
 
                 char b_name[1024];
                 snprintf(b_name, sizeof(b_name), "%s.%d", name, b);
-                impl_->smesh_output->write_nodal(b_name, smesh::TypeToEnum<real_t>::value(), x, 1);
+                impl_->smesh_output->write_nodal(b_name, smesh::TypeToEnum<real_t>::value(), bb, 1);
             }
 
         } else {

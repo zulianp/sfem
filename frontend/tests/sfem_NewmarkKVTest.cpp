@@ -70,12 +70,11 @@ KVFunctionBundle create_kelvin_voigt_newmark_function(bool enable_contact = fals
                                           1.,
                                           1.);
 
-    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
-
-    if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
-        fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
+                                          if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+        m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
     }
+
+    auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
 
     auto f = sfem::Function::create(fs);
 

@@ -96,13 +96,11 @@ int test_cube() {
     auto m = sfem::Mesh::create_hex8_cube(
             sfem::Communicator::wrap(comm), SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, SFEM_BASE_RESOLUTION * 1, 0, 0, 0, 1, 1, 1);
 
+            if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
+                m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+            }
+
     auto fs = sfem::FunctionSpace::create(m, SFEM_BLOCK_SIZE);
-
-    fs->promote_to_semi_structured(SFEM_ELEMENT_REFINE_LEVEL);
-
-    if (SFEM_HIERARCHICAL_RENUMBERING) {
-        sfem::semi_structured_apply_hierarchical_renumbering(fs->mesh());
-    }
 
 #ifdef SFEM_ENABLE_CUDA
     {
